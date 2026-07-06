@@ -1,32 +1,46 @@
-"use server"
+"use server";
 
-import { revalidatePath } from "next/cache"
+import { revalidatePath } from "next/cache";
 import {
   InventoryCategory,
   MetalType,
   OrnamentType,
   PurityType,
-} from "@prisma/client"
+} from "@prisma/client";
 
-import { prisma } from "@/lib/prisma"
-import type { ProductFormState } from "@/lib/inventory/product-types"
+import { prisma } from "@/lib/prisma";
+import type { ProductFormState } from "@/lib/inventory/product-types";
 
 function parseNullableString(value: FormDataEntryValue | null) {
-  const parsed = String(value || "").trim()
-  return parsed.length ? parsed : null
+  const parsed = String(value || "").trim();
+  return parsed.length ? parsed : null;
 }
 
 function parseOptionalEnum<T extends string>(
   value: FormDataEntryValue | null,
-  allowed: readonly T[]
+  allowed: readonly T[],
 ): T | null {
-  const parsed = String(value || "").trim()
-  if (!parsed) return null
-  return allowed.includes(parsed as T) ? (parsed as T) : null
+  const parsed = String(value || "").trim();
+  if (!parsed) return null;
+  return allowed.includes(parsed as T) ? (parsed as T) : null;
+}
+
+function parseNullableDecimal(
+  value: FormDataEntryValue | null
+): number | null {
+  const parsed = String(value ?? "").trim();
+
+  if (!parsed) {
+    return null;
+  }
+
+  const number = Number(parsed);
+
+  return Number.isNaN(number) ? null : number;
 }
 
 function parseBoolean(value: FormDataEntryValue | null) {
-  return String(value || "") === "true"
+  return String(value || "") === "true";
 }
 
 /**
@@ -34,22 +48,22 @@ function parseBoolean(value: FormDataEntryValue | null) {
  * so it can be passed from Server Component to Client Component.
  */
 function serializeProduct(product: {
-  id: string
-  productCode: string
-  name: string
-  category: InventoryCategory
-  ornamentType: OrnamentType | null
-  metalType: MetalType
-  defaultPurity: PurityType | null
-  defaultMakingCharge: { toString(): string } | null
-  defaultStoneCharge: { toString(): string } | null
-  designCode: string | null
-  hsnCode: string | null
-  description: string | null
-  notes: string | null
-  isActive: boolean
-  createdAt: Date
-  updatedAt: Date
+  id: string;
+  productCode: string;
+  name: string;
+  category: InventoryCategory;
+  ornamentType: OrnamentType | null;
+  metalType: MetalType;
+  defaultPurity: PurityType | null;
+  defaultMakingCharge: { toString(): string } | null;
+  defaultStoneCharge: { toString(): string } | null;
+  designCode: string | null;
+  hsnCode: string | null;
+  description: string | null;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }) {
   return {
     id: product.id,
@@ -68,13 +82,13 @@ function serializeProduct(product: {
     isActive: product.isActive,
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),
-  }
+  };
 }
 
 export async function getProducts() {
   const rows = await prisma.product.findMany({
     orderBy: { createdAt: "desc" },
-  })
+  });
 
   return rows.map((row) => ({
     id: row.id,
@@ -85,13 +99,9 @@ export async function getProducts() {
     metalType: row.metalType,
     defaultPurity: row.defaultPurity,
     defaultMakingCharge:
-      row.defaultMakingCharge != null
-        ? Number(row.defaultMakingCharge)
-        : null,
+      row.defaultMakingCharge != null ? Number(row.defaultMakingCharge) : null,
     defaultStoneCharge:
-      row.defaultStoneCharge != null
-        ? Number(row.defaultStoneCharge)
-        : null,
+      row.defaultStoneCharge != null ? Number(row.defaultStoneCharge) : null,
     designCode: row.designCode,
     hsnCode: row.hsnCode,
     description: row.description,
@@ -99,62 +109,70 @@ export async function getProducts() {
     isActive: row.isActive,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-  }))
+  }));
 }
 
 export async function getProductById(id: string) {
   const product = await prisma.product.findUnique({
     where: { id },
-  })
+  });
 
-  if (!product) return null
-  return serializeProduct(product)
+  if (!product) return null;
+  return serializeProduct(product);
 }
 
 export async function createProduct(
   prevState: ProductFormState,
-  formData: FormData
+  formData: FormData,
 ): Promise<ProductFormState> {
   try {
-    const productCode = String(formData.get("productCode") || "").trim()
-    const name = String(formData.get("name") || "").trim()
+    const productCode = String(formData.get("productCode") || "").trim();
+    const name = String(formData.get("name") || "").trim();
 
     const category =
       (parseOptionalEnum(
         formData.get("category"),
-        Object.values(InventoryCategory)
-      ) as InventoryCategory | null) ?? InventoryCategory.ORNAMENT
+        Object.values(InventoryCategory),
+      ) as InventoryCategory | null) ?? InventoryCategory.ORNAMENT;
 
     const ornamentType = parseOptionalEnum(
       formData.get("ornamentType"),
-      Object.values(OrnamentType)
-    ) as OrnamentType | null
+      Object.values(OrnamentType),
+    ) as OrnamentType | null;
 
     const metalType =
       (parseOptionalEnum(
         formData.get("metalType"),
-        Object.values(MetalType)
-      ) as MetalType | null) ?? MetalType.GOLD
+        Object.values(MetalType),
+      ) as MetalType | null) ?? MetalType.GOLD;
 
     const defaultPurity = parseOptionalEnum(
       formData.get("defaultPurity"),
-      Object.values(PurityType)
-    ) as PurityType | null
+      Object.values(PurityType),
+    ) as PurityType | null;
 
-    const designCode = parseNullableString(formData.get("designCode"))
-    const hsnCode = parseNullableString(formData.get("hsnCode"))
-    const description = parseNullableString(formData.get("description"))
-    const notes = parseNullableString(formData.get("notes"))
-    const isActive = parseBoolean(formData.get("isActive"))
+    const defaultMakingCharge = parseNullableDecimal(
+      formData.get("defaultMakingCharge"),
+    );
 
-    const errors: Record<string, string[]> = {}
+    const defaultStoneCharge = parseNullableDecimal(
+      formData.get("defaultStoneCharge"),
+    );
+
+    const designCode = parseNullableString(formData.get("designCode"));
+    const hsnCode = parseNullableString(formData.get("hsnCode"));
+    const description = parseNullableString(formData.get("description"));
+    const notes = parseNullableString(formData.get("notes"));
+    const isActive = parseBoolean(formData.get("isActive"));
+
+    const errors: Record<string, string[]> = {};
 
     if (!productCode) {
-      errors.productCode = ["Product code is required"]
+      errors.productCode = ["Product code is required"];
     }
 
     if (!name) {
-      errors.name = ["Product name is required"]
+      errors.name = ["Product name is required"];
     }
 
     if (Object.keys(errors).length > 0) {
@@ -162,13 +180,13 @@ export async function createProduct(
         success: false,
         message: "Please fix the form errors",
         errors,
-      }
+      };
     }
 
     const existing = await prisma.product.findUnique({
       where: { productCode },
       select: { id: true },
-    })
+    });
 
     if (existing) {
       return {
@@ -177,7 +195,7 @@ export async function createProduct(
         errors: {
           productCode: ["This product code is already in use"],
         },
-      }
+      };
     }
 
     await prisma.product.create({
@@ -188,77 +206,85 @@ export async function createProduct(
         ornamentType,
         metalType,
         defaultPurity,
+        defaultMakingCharge,
+        defaultStoneCharge,
         designCode,
         hsnCode,
         description,
         notes,
         isActive,
       },
-    })
+    });
 
-    revalidatePath("/inventory")
-    revalidatePath("/inventory/products")
+    revalidatePath("/inventory");
+    revalidatePath("/inventory/products");
 
     return {
       success: true,
       message: "Product created successfully",
       errors: {},
-    }
+    };
   } catch (error) {
-    console.error("createProduct error:", error)
+    console.error("createProduct error:", error);
     return {
       success: false,
       message: "Failed to create product",
       errors: {},
-    }
+    };
   }
 }
 
 export async function updateProduct(
   id: string,
   prevState: ProductFormState,
-  formData: FormData
+  formData: FormData,
 ): Promise<ProductFormState> {
   try {
-    const productCode = String(formData.get("productCode") || "").trim()
-    const name = String(formData.get("name") || "").trim()
+    const productCode = String(formData.get("productCode") || "").trim();
+    const name = String(formData.get("name") || "").trim();
 
     const category =
       (parseOptionalEnum(
         formData.get("category"),
-        Object.values(InventoryCategory)
-      ) as InventoryCategory | null) ?? InventoryCategory.ORNAMENT
+        Object.values(InventoryCategory),
+      ) as InventoryCategory | null) ?? InventoryCategory.ORNAMENT;
 
     const ornamentType = parseOptionalEnum(
       formData.get("ornamentType"),
-      Object.values(OrnamentType)
-    ) as OrnamentType | null
+      Object.values(OrnamentType),
+    ) as OrnamentType | null;
 
     const metalType =
       (parseOptionalEnum(
         formData.get("metalType"),
-        Object.values(MetalType)
-      ) as MetalType | null) ?? MetalType.GOLD
+        Object.values(MetalType),
+      ) as MetalType | null) ?? MetalType.GOLD;
 
     const defaultPurity = parseOptionalEnum(
       formData.get("defaultPurity"),
-      Object.values(PurityType)
-    ) as PurityType | null
+      Object.values(PurityType),
+    ) as PurityType | null;
+    const defaultMakingCharge = parseNullableDecimal(
+      formData.get("defaultMakingCharge"),
+    );
 
-    const designCode = parseNullableString(formData.get("designCode"))
-    const hsnCode = parseNullableString(formData.get("hsnCode"))
-    const description = parseNullableString(formData.get("description"))
-    const notes = parseNullableString(formData.get("notes"))
-    const isActive = parseBoolean(formData.get("isActive"))
+    const defaultStoneCharge = parseNullableDecimal(
+      formData.get("defaultStoneCharge"),
+    );
+    const designCode = parseNullableString(formData.get("designCode"));
+    const hsnCode = parseNullableString(formData.get("hsnCode"));
+    const description = parseNullableString(formData.get("description"));
+    const notes = parseNullableString(formData.get("notes"));
+    const isActive = parseBoolean(formData.get("isActive"));
 
-    const errors: Record<string, string[]> = {}
+    const errors: Record<string, string[]> = {};
 
     if (!productCode) {
-      errors.productCode = ["Product code is required"]
+      errors.productCode = ["Product code is required"];
     }
 
     if (!name) {
-      errors.name = ["Product name is required"]
+      errors.name = ["Product name is required"];
     }
 
     if (Object.keys(errors).length > 0) {
@@ -266,7 +292,7 @@ export async function updateProduct(
         success: false,
         message: "Please fix the form errors",
         errors,
-      }
+      };
     }
 
     const existing = await prisma.product.findFirst({
@@ -275,7 +301,7 @@ export async function updateProduct(
         NOT: { id },
       },
       select: { id: true },
-    })
+    });
 
     if (existing) {
       return {
@@ -284,43 +310,45 @@ export async function updateProduct(
         errors: {
           productCode: ["This product code is already in use"],
         },
-      }
+      };
     }
 
-    await prisma.product.update({
-      where: { id },
-      data: {
-        productCode,
-        name,
-        category,
-        ornamentType,
-        metalType,
-        defaultPurity,
-        designCode,
-        hsnCode,
-        description,
-        notes,
-        isActive,
-      },
-    })
+   await prisma.product.update({
+  where: { id },
+  data: {
+    productCode,
+    name,
+    category,
+    ornamentType,
+    metalType,
+    defaultPurity,
+    defaultMakingCharge,
+    defaultStoneCharge,
+    designCode,
+    hsnCode,
+    description,
+    notes,
+    isActive,
+  },
+})
 
-    revalidatePath("/inventory")
-    revalidatePath("/inventory/products")
-    revalidatePath(`/inventory/products/${id}`)
-    revalidatePath(`/inventory/products/${id}/edit`)
+    revalidatePath("/inventory");
+    revalidatePath("/inventory/products");
+    revalidatePath(`/inventory/products/${id}`);
+    revalidatePath(`/inventory/products/${id}/edit`);
 
     return {
       success: true,
       message: "Product updated successfully",
       errors: {},
-    }
+    };
   } catch (error) {
-    console.error("updateProduct error:", error)
+    console.error("updateProduct error:", error);
     return {
       success: false,
       message: "Failed to update product",
       errors: {},
-    }
+    };
   }
 }
 
@@ -352,24 +380,24 @@ export async function deleteProduct(id: string): Promise<ProductFormState> {
           },
         },
       },
-    })
+    });
 
     if (!product) {
       return {
         success: false,
         message: "Product not found",
         errors: {},
-      }
+      };
     }
 
     if (product.stockItems.length > 0) {
       const stockLinkedToInvoices = product.stockItems.some(
-        (stock) => stock.invoiceItems.length > 0
-      )
+        (stock) => stock.invoiceItems.length > 0,
+      );
 
       const stockLinkedToKarigarJobs = product.stockItems.some(
-        (stock) => stock.karigarJobs.length > 0
-      )
+        (stock) => stock.karigarJobs.length > 0,
+      );
 
       if (stockLinkedToInvoices || stockLinkedToKarigarJobs) {
         return {
@@ -377,35 +405,35 @@ export async function deleteProduct(id: string): Promise<ProductFormState> {
           message:
             "This product cannot be deleted because inventory or transaction records are linked to it. Please first remove all stock entries for this product. If any stock is already used in sales or karigar jobs, remove those dependent records first.",
           errors: {},
-        }
+        };
       }
 
       return {
         success: false,
         message:
           "This product cannot be deleted because inventory exists for it. Please first clear / remove all stock entries for this product, then try again.",
-          errors: {},
-      }
+        errors: {},
+      };
     }
 
     await prisma.product.delete({
       where: { id },
-    })
+    });
 
-    revalidatePath("/inventory")
-    revalidatePath("/inventory/products")
+    revalidatePath("/inventory");
+    revalidatePath("/inventory/products");
 
     return {
       success: true,
       message: "Product deleted successfully",
       errors: {},
-    }
+    };
   } catch (error) {
-    console.error("deleteProduct error:", error)
+    console.error("deleteProduct error:", error);
     return {
       success: false,
       message: "Failed to delete product",
       errors: {},
-    }
+    };
   }
 }

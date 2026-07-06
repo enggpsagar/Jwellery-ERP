@@ -1,0 +1,247 @@
+.
+├──   middleware.ts
+├── .env
+├── .gitignore
+├── .neon
+├── app
+│   ├── (auth)
+│   │   └── login
+│   │       └── page.tsx
+│   ├── (dashboard)
+│   │   ├── customers
+│   │   │   ├── [id]
+│   │   │   │   └── page.tsx
+│   │   │   ├── export
+│   │   │   │   └── route.ts
+│   │   │   ├── loading.tsx
+│   │   │   └── page.tsx
+│   │   ├── dashboard
+│   │   │   └── page.tsx
+│   │   ├── inventory
+│   │   │   ├── page.tsx
+│   │   │   ├── products
+│   │   │   │   ├── [id]
+│   │   │   │   │   ├── edit
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── page.tsx
+│   │   │   └── stock
+│   │   │       ├── [id]
+│   │   │       │   ├── edit
+│   │   │       │   │   └── page.tsx
+│   │   │       │   └── page.tsx
+│   │   │       └── page.tsx
+│   │   ├── layout.tsx
+│   │   ├── ledger
+│   │   │   └── page.tsx
+│   │   ├── profile
+│   │   │   └── page.tsx
+│   │   └── users
+│   │       ├── actions.ts
+│   │       └── page.tsx
+│   ├── api
+│   │   ├── auth
+│   │   │   ├── [...nextauth]
+│   │   │   │   └── route.ts
+│   │   │   ├── route.ts
+│   │   │   └── send-otp
+│   │   │       └── route.ts
+│   │   ├── cities
+│   │   │   └── route.ts
+│   │   ├── inventory
+│   │   │   └── products
+│   │   │       └── route.ts
+│   │   ├── metal-rates
+│   │   │   └── route.ts
+│   │   └── profile
+│   │       ├── route.ts
+│   │       └── upload
+│   │           └── route.ts
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── auth.config.ts
+├── components
+│   ├── auth
+│   │   ├── login-form.tsx
+│   │   └── logout-button.tsx
+│   ├── customers
+│   │   ├── add-customer-dialog.tsx
+│   │   ├── customer-row-actions.tsx
+│   │   ├── customer-view.tsx
+│   │   ├── customers-client.tsx
+│   │   ├── customers-pagination.tsx
+│   │   ├── customers-table.tsx
+│   │   ├── customers-toolbar.tsx
+│   │   ├── edit-customer-dialog.tsx
+│   │   └── ledger
+│   │       ├── add-customer-ledger-entry-dialog.tsx
+│   │       ├── add-customer-refund-entry-dialog.tsx
+│   │       ├── add-customer-sale-entry-dialog.tsx
+│   │       └── customer-ledger-card.tsx
+│   ├── dashboard
+│   │   ├── activity-feed.tsx
+│   │   ├── app-sidebar.tsx
+│   │   ├── category-chart.tsx
+│   │   ├── sales-chart.tsx
+│   │   ├── stat-cards.tsx
+│   │   ├── top-bar.tsx
+│   │   └── transactions-table.tsx
+│   ├── inventory
+│   │   ├── inventory-page-header.tsx
+│   │   ├── inventory-view.tsx
+│   │   ├── products
+│   │   │   ├── add-product-dialog.tsx
+│   │   │   ├── delete-product-button.tsx
+│   │   │   ├── edit-product-dialog.tsx
+│   │   │   ├── edit-product-form.tsx
+│   │   │   ├── product-row-actions.tsx
+│   │   │   └── products-table.tsx
+│   │   ├── shared
+│   │   │   ├── product-select.tsx
+│   │   │   ├── purity-badge.tsx
+│   │   │   └── stock-status-badge.tsx
+│   │   └── stock
+│   │       ├── [id]
+│   │       ├── add-stock-dialog.tsx
+│   │       ├── edit-stock-dialog.tsx
+│   │       ├── edit-stock-form.tsx
+│   │       ├── stock-row-actions.tsx
+│   │       └── stock-table.tsx
+│   ├── ledger
+│   │   ├── ledger-detail-drawer.tsx
+│   │   └── ledger-view.tsx
+│   ├── profile
+│   │   ├── avatar-upload.tsx
+│   │   ├── change-password-dialog.tsx
+│   │   ├── profile-card.tsx
+│   │   └── profile-form.tsx
+│   ├── providers
+│   │   ├── providers.tsx
+│   │   ├── session-provider.tsx
+│   │   └── toast-provider.tsx
+│   ├── shared
+│   │   └── page-back-header.tsx
+│   ├── ui
+│   │   ├── avatar.tsx
+│   │   ├── badge.tsx
+│   │   ├── breadcrumb.tsx
+│   │   ├── button.tsx
+│   │   ├── calendar.tsx
+│   │   ├── card.tsx
+│   │   ├── chart.tsx
+│   │   ├── dialog.tsx
+│   │   ├── dropdown-menu.tsx
+│   │   ├── input.tsx
+│   │   ├── label.tsx
+│   │   ├── popover.tsx
+│   │   ├── scroll-area.tsx
+│   │   ├── select.tsx
+│   │   ├── separator.tsx
+│   │   ├── sheet.tsx
+│   │   ├── sidebar.tsx
+│   │   ├── skeleton.tsx
+│   │   ├── switch.tsx
+│   │   ├── table.tsx
+│   │   ├── textarea.tsx
+│   │   ├── toast.tsx
+│   │   └── tooltip.tsx
+│   └── users
+│       ├── status-badge.tsx
+│       └── user-table.tsx
+├── components.json
+├── docs
+│   ├── charts.png
+│   ├── dashboard.png
+│   ├── drawer.png
+│   ├── ledger-fixed.png
+│   └── ledger.png
+├── hooks
+│   └── use-mobile.ts
+├── lib
+│   ├── actions
+│   │   ├── customer-actions.ts
+│   │   ├── customer-ledger-actions.ts
+│   │   ├── customers.ts
+│   │   ├── inventory
+│   │   │   ├── product-actions.ts
+│   │   │   ├── product-types.ts
+│   │   │   └── stock-actions.ts
+│   │   ├── inventory-stock-actions.ts
+│   │   ├── location-actions.ts
+│   │   └── profile-actions.ts
+│   ├── auth
+│   │   ├── auth-options.ts
+│   │   ├── auth.ts
+│   │   ├── otp.ts
+│   │   ├── permissions.ts
+│   │   └── sms.ts
+│   ├── constants
+│   │   └── customer-ledger.ts
+│   ├── customer-ledger
+│   │   └── customer-ledger-form-state.ts
+│   ├── data.ts
+│   ├── db.ts
+│   ├── inventory
+│   │   ├── constants.ts
+│   │   ├── product-types.ts
+│   │   ├── stock-types.ts
+│   │   └── utils.ts
+│   ├── permissions.ts
+│   ├── prisma.ts
+│   ├── roles.ts
+│   ├── types
+│   │   └── next-auth.d.ts
+│   ├── user.ts
+│   ├── utils.ts
+│   └── validation
+│       └── user.ts
+├── next-env.d.ts
+├── next.config.mjs
+├── package-lock.json
+├── package.json
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml
+├── postcss.config.mjs
+├── prisma
+│   ├── india-states-cities.ts
+│   ├── migrations
+│   │   ├── 20260623060819_add_states_and_cities
+│   │   │   └── migration.sql
+│   │   ├── 20260623081116_add_state_city_master
+│   │   │   └── migration.sql
+│   │   ├── 20260623113633_add_customer_archive
+│   │   │   └── migration.sql
+│   │   ├── 20260623143223_add_metal_rates
+│   │   │   └── migration.sql
+│   │   ├── 20260624081415_inventory_module_refactor
+│   │   │   └── migration.sql
+│   │   ├── 20260626085630_add_auth_models
+│   │   │   └── migration.sql
+│   │   ├── 20260626144408_add_user_profile_fields
+│   │   │   └── migration.sql
+│   │   └── migration_lock.toml
+│   ├── schema.prisma
+│   ├── seed-inventory.ts
+│   └── seed.ts
+├── project-structure.txt
+├── public
+│   ├── apple-icon.png
+│   ├── icon-dark-32x32.png
+│   ├── icon-light-32x32.png
+│   ├── icon.svg
+│   ├── placeholder-logo.png
+│   ├── placeholder-logo.svg
+│   ├── placeholder-user.jpg
+│   ├── placeholder.jpg
+│   ├── placeholder.svg
+│   └── uploads
+│       └── profile
+│           └── 1782488691818-Stack-Outline-BlueLSLogo (1).png
+├── script
+│   └── seed-metal.ts
+├── skills-lock.json
+├── tsconfig.json
+└── types
+
+70 directories, 175 files

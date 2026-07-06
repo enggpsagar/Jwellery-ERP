@@ -1,3 +1,6 @@
+
+export const runtime = "nodejs"
+
 import { NextRequest, NextResponse } from "next/server"
 import * as XLSX from "xlsx"
 import { prisma } from "@/lib/prisma"

@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import {
+
+import type {
   InventoryCategory,
   MetalType,
   OrnamentType,
   PurityType,
 } from "@prisma/client";
+
 
 import type { ProductFormState } from "@/lib/inventory/product-types";
 

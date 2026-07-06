@@ -4,3 +4,4 @@ allowBuilds:
   esbuild: false
   prisma: false
   sharp: false
+  unrs-resolver: set this to true or false

@@ -1,20 +1,20 @@
 // File: lib/auth-options.ts
 
-import type { NextAuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
-import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
+import type { NextAuthOptions } from "next-auth"
+import GoogleProvider from "next-auth/providers/google"
+import CredentialsProvider from "next-auth/providers/credentials"
 import {
   OtpPurpose,
   UserRole,
   UserStatus,
-} from "@prisma/client";
+} from "@prisma/client"
 
-import { prisma } from "@/lib/prisma";
-import { hashOTP } from "@/lib/auth/otp";
+import { adapter } from "@/lib/auth/prisma-adapter"
+import { prisma } from "@/lib/prisma"
+import { hashOTP } from "@/lib/auth/otp"
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter,
 
   secret: process.env.NEXTAUTH_SECRET,
 
@@ -29,20 +29,13 @@ export const authOptions: NextAuthOptions = {
       name: "Mobile OTP",
 
       credentials: {
-        phone: {
-          label: "Phone",
-          type: "text",
-        },
-
-        otp: {
-          label: "OTP",
-          type: "text",
-        },
+        phone: { label: "Phone", type: "text" },
+        otp: { label: "OTP", type: "text" },
       },
 
       async authorize(credentials) {
         if (!credentials?.phone || !credentials?.otp) {
-          throw new Error("Phone and OTP are required.");
+          throw new Error("Phone and OTP are required.")
         }
 
         const otp = await prisma.otpCode.findFirst({
@@ -54,34 +47,23 @@ export const authOptions: NextAuthOptions = {
           orderBy: {
             createdAt: "desc",
           },
-        });
+        })
 
-        if (!otp) {
-          throw new Error("OTP not found.");
-        }
-
-        if (otp.expiresAt < new Date()) {
-          throw new Error("OTP expired.");
-        }
+        if (!otp) throw new Error("OTP not found.")
+        if (otp.expiresAt < new Date()) throw new Error("OTP expired.")
 
         if (otp.codeHash !== hashOTP(credentials.otp)) {
-          throw new Error("Invalid OTP.");
+          throw new Error("Invalid OTP.")
         }
 
         await prisma.otpCode.update({
-          where: {
-            id: otp.id,
-          },
-          data: {
-            consumedAt: new Date(),
-          },
-        });
+          where: { id: otp.id },
+          data: { consumedAt: new Date() },
+        })
 
         let user = await prisma.user.findUnique({
-          where: {
-            phone: credentials.phone,
-          },
-        });
+          where: { phone: credentials.phone },
+        })
 
         if (!user) {
           user = await prisma.user.create({
@@ -91,14 +73,14 @@ export const authOptions: NextAuthOptions = {
               role: UserRole.STAFF,
               isActive: true,
             },
-          });
+          })
         }
 
         if (!user.isActive) {
-          throw new Error("Your account has been disabled.");
+          throw new Error("Your account has been disabled.")
         }
 
-        return user;
+        return user
       },
     }),
   ],
@@ -116,26 +98,24 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.role = (user as any).role;
-        token.phone = (user as any).phone;
+        token.id = user.id
+        token.role = (user as any).role
+        token.phone = (user as any).phone
       }
-
-      return token;
+      return token
     },
 
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id as string;
-        session.user.role = token.role as UserRole;
-        (session.user as any).phone = token.phone;
+        session.user.id = token.id as string
+        session.user.role = token.role as UserRole
+        ;(session.user as any).phone = token.phone
       }
-
-      return session;
+      return session
     },
 
     async signIn({ user }) {
-      return !!user;
+      return !!user
     },
   },
-};
+}

@@ -7,11 +7,390 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/**
- * =========================
- * ENUMS
- * =========================
- */
+model Customer {
+  id             String        @id @default(cuid())
+  customerCode   String?       @unique
+  name           String
+  phone          String?
+  alternatePhone String?
+  email          String?
+  addressLine1   String?
+  addressLine2   String?
+  city           String?
+  state          String?
+  pincode        String?
+  gstin          String?
+  notes          String?
+  openingBalance Decimal       @default(0) @db.Decimal(12, 2)
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  isArchived     Boolean       @default(false)
+  invoices       Invoice[]
+  ledgerEntries  LedgerEntry[]
+
+  @@index([name])
+  @@index([phone])
+  @@index([customerCode])
+}
+
+model Karigar {
+  id             String        @id @default(cuid())
+  name           String
+  phone          String?
+  city           String?
+  address        String?
+  specialization String?
+  notes          String?
+  openingBalance Decimal       @default(0) @db.Decimal(12, 2)
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  jobs           KarigarJob[]
+  ledgerEntries  LedgerEntry[]
+
+  @@index([name])
+  @@index([phone])
+}
+
+model Product {
+  id                  String            @id @default(cuid())
+  productCode         String            @unique
+  name                String
+  category            InventoryCategory @default(ORNAMENT)
+  ornamentType        OrnamentType?
+  metalType           MetalType         @default(GOLD)
+  defaultPurity       PurityType?
+  defaultMakingCharge Decimal?          @db.Decimal(12, 2)
+  defaultStoneCharge  Decimal?          @db.Decimal(12, 2)
+  designCode          String?
+  hsnCode             String?
+  description         String?
+  notes               String?
+  isActive            Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  stockItems          InventoryStock[]
+
+  @@index([name])
+  @@index([productCode])
+  @@index([category])
+  @@index([ornamentType])
+  @@index([metalType])
+  @@index([designCode])
+}
+
+model InventoryStock {
+  id             String                 @id @default(cuid())
+  stockCode      String                 @unique
+  tagNumber      String?                @unique
+  productId      String
+  metalType      MetalType
+  purity         PurityType?
+  quantity       Int                    @default(1)
+  status         InventoryStockStatus   @default(IN_STOCK)
+  isActive       Boolean                @default(true)
+  grossWeight    Decimal?               @db.Decimal(10, 3)
+  lessWeight     Decimal?               @db.Decimal(10, 3)
+  netWeight      Decimal?               @db.Decimal(10, 3)
+  stoneWeight    Decimal?               @db.Decimal(10, 3)
+  wastagePercent Decimal?               @db.Decimal(5, 2)
+  purchaseRate   Decimal?               @db.Decimal(12, 2)
+  saleRate       Decimal?               @db.Decimal(12, 2)
+  makingCharge   Decimal?               @db.Decimal(12, 2)
+  stoneCharge    Decimal?               @db.Decimal(12, 2)
+  otherCharge    Decimal?               @db.Decimal(12, 2)
+  purchaseAmount Decimal?               @db.Decimal(12, 2)
+  saleAmount     Decimal?               @db.Decimal(12, 2)
+  vendorName     String?
+  purchaseDate   DateTime?
+  location       String?
+  remarks        String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  product        Product                @relation(fields: [productId], references: [id])
+  transactions   InventoryTransaction[]
+  invoiceItems   InvoiceItem[]
+  karigarJobs    KarigarJob[]
+
+  @@index([stockCode])
+  @@index([tagNumber])
+  @@index([productId])
+  @@index([metalType])
+  @@index([purity])
+  @@index([status])
+  @@index([purchaseDate])
+  @@index([location])
+}
+
+model InventoryTransaction {
+  id               String                   @id @default(cuid())
+  inventoryStockId String
+  transactionType  InventoryTransactionType
+  quantity         Int                      @default(1)
+  grossWeight      Decimal?                 @db.Decimal(10, 3)
+  netWeight        Decimal?                 @db.Decimal(10, 3)
+  referenceType    String?
+  referenceId      String?
+  notes            String?
+  createdAt        DateTime                 @default(now())
+  inventoryStock   InventoryStock           @relation(fields: [inventoryStockId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryStockId])
+  @@index([transactionType])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  customerId    String
+  invoiceDate   DateTime      @default(now())
+  dueDate       DateTime?
+  status        InvoiceStatus @default(PAID)
+  subtotal      Decimal       @default(0) @db.Decimal(12, 2)
+  makingCharges Decimal       @default(0) @db.Decimal(12, 2)
+  stoneCharges  Decimal       @default(0) @db.Decimal(12, 2)
+  discount      Decimal       @default(0) @db.Decimal(12, 2)
+  taxAmount     Decimal       @default(0) @db.Decimal(12, 2)
+  totalAmount   Decimal       @default(0) @db.Decimal(12, 2)
+  paidAmount    Decimal       @default(0) @db.Decimal(12, 2)
+  balanceAmount Decimal       @default(0) @db.Decimal(12, 2)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  items         InvoiceItem[]
+  ledgerEntries LedgerEntry[]
+
+  @@index([customerId])
+  @@index([invoiceDate])
+  @@index([status])
+  @@index([invoiceNumber])
+}
+
+model InvoiceItem {
+  id               String          @id @default(cuid())
+  invoiceId        String
+  itemName         String
+  metalType        MetalType?
+  quantity         Int             @default(1)
+  grossWeight      Decimal?        @db.Decimal(10, 3)
+  netWeight        Decimal?        @db.Decimal(10, 3)
+  rate             Decimal?        @db.Decimal(12, 2)
+  makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
+  stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
+  lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  inventoryStockId String?
+  purity           PurityType?
+  inventoryStock   InventoryStock? @relation(fields: [inventoryStockId], references: [id])
+  invoice          Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([inventoryStockId])
+}
+
+model LedgerEntry {
+  id          String           @id @default(cuid())
+  entryDate   DateTime         @default(now())
+  type        LedgerEntryType
+  sourceType  LedgerSourceType @default(MANUAL)
+  customerId  String?
+  karigarId   String?
+  invoiceId   String?
+  metalType   MetalType?
+  metalWeight Decimal?         @db.Decimal(10, 3)
+  amount      Decimal          @default(0) @db.Decimal(12, 2)
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  customer    Customer?        @relation(fields: [customerId], references: [id])
+  invoice     Invoice?         @relation(fields: [invoiceId], references: [id])
+  karigar     Karigar?         @relation(fields: [karigarId], references: [id])
+
+  @@index([entryDate])
+  @@index([customerId])
+  @@index([karigarId])
+  @@index([invoiceId])
+  @@index([type])
+  @@index([sourceType])
+}
+
+model KarigarJob {
+  id               String          @id @default(cuid())
+  jobNumber        String?         @unique
+  karigarId        String
+  issueDate        DateTime        @default(now())
+  expectedDate     DateTime?
+  receivedDate     DateTime?
+  metalType        MetalType?
+  issueWeight      Decimal?        @db.Decimal(10, 3)
+  receiveWeight    Decimal?        @db.Decimal(10, 3)
+  labourCharge     Decimal         @default(0) @db.Decimal(12, 2)
+  status           String          @default("issued")
+  notes            String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  inventoryStockId String?
+  inventoryStock   InventoryStock? @relation(fields: [inventoryStockId], references: [id])
+  karigar          Karigar         @relation(fields: [karigarId], references: [id])
+
+  @@index([karigarId])
+  @@index([inventoryStockId])
+  @@index([issueDate])
+  @@index([jobNumber])
+}
+
+model State {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isoCode   String   @unique
+  country   String   @default("India")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  cities    City[]
+}
+
+model City {
+  id        String   @id @default(cuid())
+  name      String
+  stateId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  @@unique([name, stateId])
+  @@index([stateId])
+}
+
+model MetalRate {
+  id        String   @id @default(cuid())
+  gold22k   Decimal  @db.Decimal(12, 2)
+  gold24k   Decimal  @db.Decimal(12, 2)
+  silver    Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  unit      String   @default("GRAM")
+
+  @@index([createdAt])
+}
+
+model User {
+  id                  String        @id @default(cuid())
+  name                String?
+  email               String?       @unique
+  phone               String?       @unique
+  image               String?
+  role                UserRole      @default(STAFF)
+  status              UserStatus    @default(INVITED)
+  isActive            Boolean       @default(true)
+  emailVerified       DateTime?
+  phoneVerified       DateTime?
+  invitedById         String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  addressLine1        String?
+  addressLine2        String?
+  city                String?
+  country             String?       @default("India")
+  pincode             String?
+  state               String?
+  accounts            Account[]
+  employee            Employee?
+  createdInviteTokens InviteToken[] @relation("UserCreatedInvites")
+  inviteTokens        InviteToken[] @relation("InviteTokenUser")
+  otpCodes            OtpCode[]
+  sessions            Session[]
+  invitedBy           User?         @relation("UserInvites", fields: [invitedById], references: [id])
+  invitedUsers        User[]        @relation("UserInvites")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model InviteToken {
+  id          String    @id @default(cuid())
+  email       String?
+  phone       String?
+  tokenHash   String    @unique
+  role        UserRole
+  name        String?
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  userId      String?
+  invitedById String
+  createdAt   DateTime  @default(now())
+  invitedBy   User      @relation("UserCreatedInvites", fields: [invitedById], references: [id], onDelete: Cascade)
+  user        User?     @relation("InviteTokenUser", fields: [userId], references: [id])
+
+  @@index([email])
+  @@index([phone])
+  @@index([invitedById])
+}
+
+model OtpCode {
+  id         String     @id @default(cuid())
+  phone      String
+  codeHash   String
+  purpose    OtpPurpose
+  expiresAt  DateTime
+  consumedAt DateTime?
+  userId     String?
+  createdAt  DateTime   @default(now())
+  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([phone, purpose])
+  @@index([userId])
+}
+
+model Employee {
+  id           String    @id @default(cuid())
+  employeeCode String    @unique
+  userId       String    @unique
+  designation  String?
+  branch       String?
+  joiningDate  DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 
 enum MetalType {
   GOLD
@@ -100,10 +479,6 @@ enum InventoryTransactionType {
   UNRESERVE
 }
 
-// =========================
-// AUTH ENUMS
-// =========================
-
 enum UserRole {
   ADMIN
   MANAGER
@@ -119,540 +494,4 @@ enum UserStatus {
 enum OtpPurpose {
   LOGIN
   PHONE_VERIFY
-}
-
-/**
- * =========================
- * CUSTOMER
- * =========================
- */
-
-model Customer {
-  id             String  @id @default(cuid())
-  customerCode   String? @unique
-  name           String
-  phone          String?
-  alternatePhone String?
-  email          String?
-  addressLine1   String?
-  addressLine2   String?
-  city           String?
-  state          String?
-  pincode        String?
-  gstin          String?
-  notes          String?
-  openingBalance Decimal @default(0) @db.Decimal(12, 2)
-  isActive       Boolean @default(true)
-  isArchived     Boolean @default(false)
-
-  invoices      Invoice[]
-  ledgerEntries LedgerEntry[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([name])
-  @@index([phone])
-  @@index([customerCode])
-}
-
-/**
- * =========================
- * KARIGAR
- * =========================
- */
-
-model Karigar {
-  id             String  @id @default(cuid())
-  name           String
-  phone          String?
-  city           String?
-  address        String?
-  specialization String?
-  notes          String?
-  openingBalance Decimal @default(0) @db.Decimal(12, 2)
-  isActive       Boolean @default(true)
-
-  jobs          KarigarJob[]
-  ledgerEntries LedgerEntry[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([name])
-  @@index([phone])
-}
-
-/**
- * =========================
- * PRODUCT MASTER
- * = design / catalogue level
- * =========================
- */
-
-model Product {
-  id            String            @id @default(cuid())
-  productCode   String            @unique
-  name          String
-  category      InventoryCategory @default(ORNAMENT)
-  ornamentType  OrnamentType?
-  metalType     MetalType         @default(GOLD)
-  defaultPurity PurityType?
-
-  // default commercial values for this design
-  defaultMakingCharge Decimal? @db.Decimal(12, 2)
-  defaultStoneCharge  Decimal? @db.Decimal(12, 2)
-
-  // catalogue / design metadata
-  designCode  String?
-  hsnCode     String?
-  description String?
-  notes       String?
-  isActive    Boolean @default(true)
-
-  stockItems InventoryStock[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([name])
-  @@index([productCode])
-  @@index([category])
-  @@index([ornamentType])
-  @@index([metalType])
-  @@index([designCode])
-}
-
-/**
- * =========================
- * INVENTORY STOCK
- * = actual physical stock piece / batch
- * =========================
- */
-
-model InventoryStock {
-  id        String  @id @default(cuid())
-  stockCode String  @unique
-  tagNumber String? @unique
-
-  productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
-
-  metalType MetalType
-  purity    PurityType?
-
-  quantity Int                  @default(1)
-  status   InventoryStockStatus @default(IN_STOCK)
-  isActive Boolean              @default(true)
-
-  // physical details
-  grossWeight    Decimal? @db.Decimal(10, 3)
-  lessWeight     Decimal? @db.Decimal(10, 3)
-  netWeight      Decimal? @db.Decimal(10, 3)
-  stoneWeight    Decimal? @db.Decimal(10, 3)
-  wastagePercent Decimal? @db.Decimal(5, 2)
-
-  // pricing details
-  purchaseRate   Decimal? @db.Decimal(12, 2)
-  saleRate       Decimal? @db.Decimal(12, 2)
-  makingCharge   Decimal? @db.Decimal(12, 2)
-  stoneCharge    Decimal? @db.Decimal(12, 2)
-  otherCharge    Decimal? @db.Decimal(12, 2)
-  purchaseAmount Decimal? @db.Decimal(12, 2)
-  saleAmount     Decimal? @db.Decimal(12, 2)
-
-  // purchase / source / storage info
-  vendorName   String?
-  purchaseDate DateTime?
-  location     String?
-  remarks      String?
-
-  // relations
-  invoiceItems InvoiceItem[]
-  karigarJobs  KarigarJob[]
-  transactions InventoryTransaction[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([stockCode])
-  @@index([tagNumber])
-  @@index([productId])
-  @@index([metalType])
-  @@index([purity])
-  @@index([status])
-  @@index([purchaseDate])
-  @@index([location])
-}
-
-/**
- * =========================
- * INVENTORY TRANSACTIONS
- * = stock movement / audit trail
- * =========================
- */
-
-model InventoryTransaction {
-  id String @id @default(cuid())
-
-  inventoryStockId String
-  inventoryStock   InventoryStock @relation(fields: [inventoryStockId], references: [id], onDelete: Cascade)
-
-  transactionType InventoryTransactionType
-  quantity        Int                      @default(1)
-
-  grossWeight Decimal? @db.Decimal(10, 3)
-  netWeight   Decimal? @db.Decimal(10, 3)
-
-  referenceType String?
-  referenceId   String?
-  notes         String?
-
-  createdAt DateTime @default(now())
-
-  @@index([inventoryStockId])
-  @@index([transactionType])
-  @@index([referenceType, referenceId])
-  @@index([createdAt])
-}
-
-/**
- * =========================
- * SALES / INVOICES
- * =========================
- */
-
-model Invoice {
-  id            String   @id @default(cuid())
-  invoiceNumber String   @unique
-  customerId    String
-  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
-
-  invoiceDate DateTime      @default(now())
-  dueDate     DateTime?
-  status      InvoiceStatus @default(PAID)
-
-  subtotal      Decimal @default(0) @db.Decimal(12, 2)
-  makingCharges Decimal @default(0) @db.Decimal(12, 2)
-  stoneCharges  Decimal @default(0) @db.Decimal(12, 2)
-  discount      Decimal @default(0) @db.Decimal(12, 2)
-  taxAmount     Decimal @default(0) @db.Decimal(12, 2)
-  totalAmount   Decimal @default(0) @db.Decimal(12, 2)
-  paidAmount    Decimal @default(0) @db.Decimal(12, 2)
-  balanceAmount Decimal @default(0) @db.Decimal(12, 2)
-
-  notes         String?
-  items         InvoiceItem[]
-  ledgerEntries LedgerEntry[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([customerId])
-  @@index([invoiceDate])
-  @@index([status])
-  @@index([invoiceNumber])
-}
-
-model InvoiceItem {
-  id String @id @default(cuid())
-
-  invoiceId String
-  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-
-  inventoryStockId String?
-  inventoryStock   InventoryStock? @relation(fields: [inventoryStockId], references: [id], onDelete: SetNull)
-
-  // snapshot data at the time of sale
-  itemName  String
-  metalType MetalType?
-  purity    PurityType?
-  quantity  Int         @default(1)
-
-  grossWeight Decimal? @db.Decimal(10, 3)
-  netWeight   Decimal? @db.Decimal(10, 3)
-  rate        Decimal? @db.Decimal(12, 2)
-
-  makingCharge Decimal @default(0) @db.Decimal(12, 2)
-  stoneCharge  Decimal @default(0) @db.Decimal(12, 2)
-  lineTotal    Decimal @default(0) @db.Decimal(12, 2)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([invoiceId])
-  @@index([inventoryStockId])
-}
-
-/**
- * =========================
- * LEDGER
- * =========================
- */
-
-model LedgerEntry {
-  id         String           @id @default(cuid())
-  entryDate  DateTime         @default(now())
-  type       LedgerEntryType
-  sourceType LedgerSourceType @default(MANUAL)
-
-  customerId String?
-  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-
-  karigarId String?
-  karigar   Karigar? @relation(fields: [karigarId], references: [id], onDelete: SetNull)
-
-  invoiceId String?
-  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
-
-  metalType   MetalType?
-  metalWeight Decimal?   @db.Decimal(10, 3)
-
-  amount      Decimal @default(0) @db.Decimal(12, 2)
-  description String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([entryDate])
-  @@index([customerId])
-  @@index([karigarId])
-  @@index([invoiceId])
-  @@index([type])
-  @@index([sourceType])
-}
-
-/**
- * =========================
- * KARIGAR JOBS
- * =========================
- */
-
-model KarigarJob {
-  id        String  @id @default(cuid())
-  jobNumber String? @unique
-
-  karigarId String
-  karigar   Karigar @relation(fields: [karigarId], references: [id], onDelete: Restrict)
-
-  inventoryStockId String?
-  inventoryStock   InventoryStock? @relation(fields: [inventoryStockId], references: [id], onDelete: SetNull)
-
-  issueDate    DateTime  @default(now())
-  expectedDate DateTime?
-  receivedDate DateTime?
-
-  metalType     MetalType?
-  issueWeight   Decimal?   @db.Decimal(10, 3)
-  receiveWeight Decimal?   @db.Decimal(10, 3)
-
-  labourCharge Decimal @default(0) @db.Decimal(12, 2)
-  status       String  @default("issued")
-  notes        String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([karigarId])
-  @@index([inventoryStockId])
-  @@index([issueDate])
-  @@index([jobNumber])
-}
-
-/**
- * =========================
- * LOCATION MASTER
- * =========================
- */
-
-model State {
-  id      String @id @default(cuid())
-  name    String @unique
-  isoCode String @unique
-  country String @default("India")
-  cities  City[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model City {
-  id      String @id @default(cuid())
-  name    String
-  stateId String
-  state   State  @relation(fields: [stateId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([name, stateId])
-  @@index([stateId])
-}
-
-/**
- * =========================
- * METAL RATES
- * =========================
- */
-
-model MetalRate {
-  id String @id @default(cuid())
-
-  gold22k Decimal @db.Decimal(12, 2)
-  gold24k Decimal @db.Decimal(12, 2)
-  silver  Decimal @db.Decimal(12, 2)
-
-  unit String @default("GRAM")
-
-  createdAt DateTime @default(now())
-
-  @@index([createdAt])
-}
-
-// =========================
-// USER
-// =========================
-
-model User {
-  id    String  @id @default(cuid())
-  name  String?
-  email String? @unique
-  phone String? @unique
-  image String?
-
-  addressLine1 String?
-  addressLine2 String?
-  city          String?
-  state         String?
-  pincode       String?
-  country       String? @default("India")
-
-  role     UserRole   @default(STAFF)
-  status   UserStatus @default(INVITED)
-  isActive Boolean    @default(true)
-
-  emailVerified DateTime?
-  phoneVerified DateTime?
-
-  invitedById  String?
-  invitedBy    User?  @relation("UserInvites", fields: [invitedById], references: [id])
-  invitedUsers User[] @relation("UserInvites")
-
-  accounts            Account[]
-  sessions            Session[]
-  inviteTokens        InviteToken[] @relation("InviteTokenUser")
-  createdInviteTokens InviteToken[] @relation("UserCreatedInvites")
-  otpCodes            OtpCode[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  emailVerifiedAt DateTime?
-
-  employee Employee?
-}
-
-// =========================
-// AUTH.JS MODELS
-// =========================
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-// =========================
-// INVITE TOKENS
-// =========================
-
-model InviteToken {
-  id         String    @id @default(cuid())
-  email      String?
-  phone      String?
-  tokenHash  String    @unique
-  role       UserRole
-  name       String?
-  expiresAt  DateTime
-  acceptedAt DateTime?
-
-  userId String?
-  user   User?   @relation("InviteTokenUser", fields: [userId], references: [id], onDelete: SetNull)
-
-  invitedById String
-  invitedBy   User   @relation("UserCreatedInvites", fields: [invitedById], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([email])
-  @@index([phone])
-  @@index([invitedById])
-}
-
-// =========================
-// MOBILE OTP CODES
-// =========================
-
-model OtpCode {
-  id         String     @id @default(cuid())
-  phone      String
-  codeHash   String
-  purpose    OtpPurpose
-  expiresAt  DateTime
-  consumedAt DateTime?
-
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([phone, purpose])
-  @@index([userId])
-}
-
-model Employee {
-  id           String @id @default(cuid())
-  employeeCode String @unique
-  userId       String @unique
-  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  designation String?
-  branch      String?
-  joiningDate DateTime?
-  isActive    Boolean   @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }

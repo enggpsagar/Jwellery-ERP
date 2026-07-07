@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
@@ -7,13 +7,17 @@ export async function GET() {
       orderBy: {
         createdAt: "desc",
       },
-    })
+    });
 
     if (!latest) {
       return NextResponse.json(
-        { error: "No metal rates found" },
-        { status: 404 }
-      )
+        {
+          error: "No metal rates found",
+        },
+        {
+          status: 404,
+        }
+      );
     }
 
     const previous = await prisma.metalRate.findFirst({
@@ -21,7 +25,8 @@ export async function GET() {
         createdAt: "desc",
       },
       skip: 1,
-    })
+    });
+
 
     return NextResponse.json({
       current: {
@@ -29,6 +34,7 @@ export async function GET() {
         gold24k: Number(latest.gold24k),
         silver: Number(latest.silver),
       },
+
       previous: previous
         ? {
             gold22k: Number(previous.gold22k),
@@ -36,13 +42,19 @@ export async function GET() {
             silver: Number(previous.silver),
           }
         : null,
-    })
+    });
+
   } catch (error) {
-    console.error(error)
+
+    console.error("Metal rate API error:", error);
 
     return NextResponse.json(
-      { error: "Failed to fetch rates" },
-      { status: 500 }
-    )
+      {
+        error: "Failed to fetch metal rates",
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }

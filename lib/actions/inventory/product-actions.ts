@@ -126,8 +126,8 @@ export async function createProduct(
   formData: FormData,
 ): Promise<ProductFormState> {
   try {
-    const productCode = String(formData.get("productCode") || "").trim();
-    const name = String(formData.get("name") || "").trim();
+    const productCode = String(formData.get("productCode") ?? "").trim();
+    const name = String(formData.get("name") ?? "").trim();
 
     const category =
       (parseOptionalEnum(
@@ -178,7 +178,7 @@ export async function createProduct(
     if (Object.keys(errors).length > 0) {
       return {
         success: false,
-        message: "Please fix the form errors",
+        message: "Please fix the form errors.",
         errors,
       };
     }
@@ -191,9 +191,9 @@ export async function createProduct(
     if (existing) {
       return {
         success: false,
-        message: "Product code already exists",
+        message: "Product code already exists.",
         errors: {
-          productCode: ["This product code is already in use"],
+          productCode: ["This product code is already in use."],
         },
       };
     }
@@ -221,14 +221,15 @@ export async function createProduct(
 
     return {
       success: true,
-      message: "Product created successfully",
+      message: "Product created successfully.",
       errors: {},
     };
   } catch (error) {
     console.error("createProduct error:", error);
+
     return {
       success: false,
-      message: "Failed to create product",
+      message: "Failed to create product.",
       errors: {},
     };
   }

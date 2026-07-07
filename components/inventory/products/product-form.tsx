@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 
-import type {
+import {
   InventoryCategory,
   MetalType,
   OrnamentType,
   PurityType,
 } from "@prisma/client";
-
 
 import type { ProductFormState } from "@/lib/inventory/product-types";
 
@@ -49,18 +48,10 @@ type ProductFormProps = {
   pending: boolean;
 };
 
-function ErrorText({
-  error,
-}: {
-  error?: string[];
-}) {
+function ErrorText({ error }: { error?: string[] }) {
   if (!error?.length) return null;
 
-  return (
-    <p className="mt-1 text-sm text-red-600">
-      {error[0]}
-    </p>
-  );
+  return <p className="mt-1 text-sm text-red-600">{error[0]}</p>;
 }
 
 export function ProductForm({
@@ -70,40 +61,33 @@ export function ProductForm({
   pending,
 }: ProductFormProps) {
   const [category, setCategory] = useState(
-    product?.category ?? InventoryCategory.ORNAMENT
+    product?.category ?? InventoryCategory.ORNAMENT,
   );
 
   const [ornamentType, setOrnamentType] = useState(
-    product?.ornamentType ?? "__none__"
+    product?.ornamentType ?? "__none__",
   );
 
   const [metalType, setMetalType] = useState(
-    product?.metalType ?? MetalType.GOLD
+    product?.metalType ?? MetalType.GOLD,
   );
 
   const [defaultPurity, setDefaultPurity] = useState(
-    product?.defaultPurity ?? "__none__"
+    product?.defaultPurity ?? "__none__",
   );
 
   const [isActive, setIsActive] = useState(
-    product?.isActive === false ? "false" : "true"
+    product?.isActive === false ? "false" : "true",
   );
 
   return (
     <div className="space-y-8">
-
       <div className="rounded-xl border p-6">
-
-        <h3 className="mb-6 text-lg font-semibold">
-          Basic Information
-        </h3>
+        <h3 className="mb-6 text-lg font-semibold">Basic Information</h3>
 
         <div className="grid gap-6 lg:grid-cols-3">
-
           <div>
-            <Label htmlFor="productCode">
-              Product Code *
-            </Label>
+            <Label htmlFor="productCode">Product Code *</Label>
 
             <Input
               id="productCode"
@@ -112,15 +96,11 @@ export function ProductForm({
               placeholder="RING-001"
             />
 
-            <ErrorText
-              error={state.errors.productCode}
-            />
+            <ErrorText error={state.errors.productCode} />
           </div>
 
           <div>
-            <Label htmlFor="name">
-              Product Name *
-            </Label>
+            <Label htmlFor="name">Product Name *</Label>
 
             <Input
               id="name"
@@ -129,67 +109,43 @@ export function ProductForm({
               placeholder="Ladies Ring"
             />
 
-            <ErrorText
-              error={state.errors.name}
-            />
+            <ErrorText error={state.errors.name} />
           </div>
 
           <div>
             <Label>Category</Label>
 
-            <Select
-              value={category}
-              onValueChange={setCategory}
-            >
+            <Select value={category} onValueChange={setCategory}>
               <SelectTrigger className="h-11 w-full">
                 <SelectValue />
               </SelectTrigger>
 
               <SelectContent>
-                {Object.values(
-                  InventoryCategory
-                ).map((item) => (
-                  <SelectItem
-                    key={item}
-                    value={item}
-                  >
+                {Object.values(InventoryCategory).map((item) => (
+                  <SelectItem key={item} value={item}>
                     {item.replaceAll("_", " ")}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <input
-              type="hidden"
-              name="category"
-              value={category}
-            />
+            <input type="hidden" name="category" value={category} />
 
-            <ErrorText
-              error={state.errors.category}
-            />
+            <ErrorText error={state.errors.category} />
           </div>
-                    <div>
+          <div>
             <Label>Ornament Type</Label>
 
-            <Select
-              value={ornamentType}
-              onValueChange={setOrnamentType}
-            >
+            <Select value={ornamentType} onValueChange={setOrnamentType}>
               <SelectTrigger className="h-11 w-full">
                 <SelectValue placeholder="Select Ornament Type" />
               </SelectTrigger>
 
               <SelectContent>
-                <SelectItem value="__none__">
-                  None
-                </SelectItem>
+                <SelectItem value="__none__">None</SelectItem>
 
                 {Object.values(OrnamentType).map((item) => (
-                  <SelectItem
-                    key={item}
-                    value={item}
-                  >
+                  <SelectItem key={item} value={item}>
                     {item.replaceAll("_", " ")}
                   </SelectItem>
                 ))}
@@ -199,18 +155,11 @@ export function ProductForm({
             <input
               type="hidden"
               name="ornamentType"
-              value={
-                ornamentType === "__none__"
-                  ? ""
-                  : ornamentType
-              }
+              value={ornamentType === "__none__" ? "" : ornamentType}
             />
 
-            <ErrorText
-              error={state.errors.ornamentType}
-            />
+            <ErrorText error={state.errors.ornamentType} />
           </div>
-
         </div>
       </div>
 
@@ -219,68 +168,44 @@ export function ProductForm({
       ============================= */}
 
       <div className="rounded-xl border p-6">
-
-        <h3 className="mb-6 text-lg font-semibold">
-          Metal Details
-        </h3>
+        <h3 className="mb-6 text-lg font-semibold">Metal Details</h3>
 
         <div className="grid gap-6 lg:grid-cols-3">
-
           <div>
             <Label>Metal Type</Label>
 
-            <Select
-              value={metalType}
-              onValueChange={setMetalType}
-            >
+            <Select value={metalType} onValueChange={setMetalType}>
               <SelectTrigger className="h-11 w-full">
                 <SelectValue />
               </SelectTrigger>
 
               <SelectContent>
                 {Object.values(MetalType).map((item) => (
-                  <SelectItem
-                    key={item}
-                    value={item}
-                  >
+                  <SelectItem key={item} value={item}>
                     {item.replaceAll("_", " ")}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <input
-              type="hidden"
-              name="metalType"
-              value={metalType}
-            />
+            <input type="hidden" name="metalType" value={metalType} />
 
-            <ErrorText
-              error={state.errors.metalType}
-            />
+            <ErrorText error={state.errors.metalType} />
           </div>
 
           <div>
             <Label>Default Purity</Label>
 
-            <Select
-              value={defaultPurity}
-              onValueChange={setDefaultPurity}
-            >
-                <SelectTrigger className="h-11 w-full">
+            <Select value={defaultPurity} onValueChange={setDefaultPurity}>
+              <SelectTrigger className="h-11 w-full">
                 <SelectValue placeholder="Select Purity" />
               </SelectTrigger>
 
               <SelectContent>
-                <SelectItem value="__none__">
-                  None
-                </SelectItem>
+                <SelectItem value="__none__">None</SelectItem>
 
                 {Object.values(PurityType).map((item) => (
-                  <SelectItem
-                    key={item}
-                    value={item}
-                  >
+                  <SelectItem key={item} value={item}>
                     {item.replaceAll("_", " ")}
                   </SelectItem>
                 ))}
@@ -290,78 +215,53 @@ export function ProductForm({
             <input
               type="hidden"
               name="defaultPurity"
-              value={
-                defaultPurity === "__none__"
-                  ? ""
-                  : defaultPurity
-              }
+              value={defaultPurity === "__none__" ? "" : defaultPurity}
             />
 
-            <ErrorText
-              error={state.errors.defaultPurity}
-            />
+            <ErrorText error={state.errors.defaultPurity} />
           </div>
 
           <div>
-            <Label htmlFor="defaultMakingCharge">
-              Default Making Charge
-            </Label>
+            <Label htmlFor="defaultMakingCharge">Default Making Charge</Label>
 
             <Input
               id="defaultMakingCharge"
               name="defaultMakingCharge"
               type="number"
               step="0.01"
-              defaultValue={
-                product?.defaultMakingCharge ?? ""
-              }
+              defaultValue={product?.defaultMakingCharge ?? ""}
               placeholder="0.00"
             />
 
-            <ErrorText
-              error={state.errors.defaultMakingCharge}
-            />
+            <ErrorText error={state.errors.defaultMakingCharge} />
           </div>
 
           <div>
-            <Label htmlFor="defaultStoneCharge">
-              Default Stone Charge
-            </Label>
+            <Label htmlFor="defaultStoneCharge">Default Stone Charge</Label>
 
             <Input
               id="defaultStoneCharge"
               name="defaultStoneCharge"
               type="number"
               step="0.01"
-              defaultValue={
-                product?.defaultStoneCharge ?? ""
-              }
+              defaultValue={product?.defaultStoneCharge ?? ""}
               placeholder="0.00"
             />
 
-            <ErrorText
-              error={state.errors.defaultStoneCharge}
-            />
+            <ErrorText error={state.errors.defaultStoneCharge} />
           </div>
-
         </div>
-
       </div>
-            {/* ============================
+      {/* ============================
           PRODUCT DETAILS
       ============================= */}
 
       <div className="rounded-xl border p-6">
-        <h3 className="mb-6 text-lg font-semibold">
-          Product Details
-        </h3>
+        <h3 className="mb-6 text-lg font-semibold">Product Details</h3>
 
         <div className="grid gap-6 lg:grid-cols-3">
-
           <div>
-            <Label htmlFor="designCode">
-              Design Code
-            </Label>
+            <Label htmlFor="designCode">Design Code</Label>
 
             <Input
               id="designCode"
@@ -370,15 +270,11 @@ export function ProductForm({
               placeholder="RG-001"
             />
 
-            <ErrorText
-              error={state.errors.designCode}
-            />
+            <ErrorText error={state.errors.designCode} />
           </div>
 
           <div>
-            <Label htmlFor="hsnCode">
-              HSN Code
-            </Label>
+            <Label htmlFor="hsnCode">HSN Code</Label>
 
             <Input
               id="hsnCode"
@@ -387,44 +283,28 @@ export function ProductForm({
               placeholder="7113"
             />
 
-            <ErrorText
-              error={state.errors.hsnCode}
-            />
+            <ErrorText error={state.errors.hsnCode} />
           </div>
 
           <div>
             <Label>Status</Label>
 
-            <Select
-              value={isActive}
-              onValueChange={setIsActive}
-            >
+            <Select value={isActive} onValueChange={setIsActive}>
               <SelectTrigger className="h-11 w-full">
                 <SelectValue />
               </SelectTrigger>
 
               <SelectContent>
-                <SelectItem value="true">
-                  Active
-                </SelectItem>
+                <SelectItem value="true">Active</SelectItem>
 
-                <SelectItem value="false">
-                  Inactive
-                </SelectItem>
+                <SelectItem value="false">Inactive</SelectItem>
               </SelectContent>
             </Select>
 
-            <input
-              type="hidden"
-              name="isActive"
-              value={isActive}
-            />
+            <input type="hidden" name="isActive" value={isActive} />
 
-            <ErrorText
-              error={state.errors.isActive}
-            />
+            <ErrorText error={state.errors.isActive} />
           </div>
-
         </div>
       </div>
 
@@ -433,16 +313,11 @@ export function ProductForm({
       ============================= */}
 
       <div className="rounded-xl border p-6">
-        <h3 className="mb-6 text-lg font-semibold">
-          Additional Information
-        </h3>
+        <h3 className="mb-6 text-lg font-semibold">Additional Information</h3>
 
         <div className="space-y-5">
-
           <div>
-            <Label htmlFor="description">
-              Description
-            </Label>
+            <Label htmlFor="description">Description</Label>
 
             <Textarea
               id="description"
@@ -453,15 +328,11 @@ export function ProductForm({
               className="min-h-[120px]"
             />
 
-            <ErrorText
-              error={state.errors.description}
-            />
+            <ErrorText error={state.errors.description} />
           </div>
 
           <div>
-            <Label htmlFor="notes">
-              Notes
-            </Label>
+            <Label htmlFor="notes">Notes</Label>
 
             <Textarea
               id="notes"
@@ -472,35 +343,33 @@ export function ProductForm({
               className="min-h-[120px]"
             />
 
-            <ErrorText
-              error={state.errors.notes}
-            />
+            <ErrorText error={state.errors.notes} />
           </div>
-
         </div>
       </div>
 
-      {!state.success && state.message && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {state.message && (
+        <div
+          className={`rounded-lg px-4 py-3 text-sm ${
+            state.success
+              ? "border border-green-200 bg-green-50 text-green-700"
+              : "border border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
           {state.message}
         </div>
       )}
-
       <div className="flex justify-end border-t pt-6">
-        <Button
-          type="submit"
-          disabled={pending}
-        >
+        <Button type="submit" disabled={pending}>
           {pending
             ? mode === "create"
               ? "Creating..."
               : "Updating..."
             : mode === "create"
-            ? "Create Product"
-            : "Update Product"}
+              ? "Create Product"
+              : "Update Product"}
         </Button>
       </div>
-
     </div>
   );
 }

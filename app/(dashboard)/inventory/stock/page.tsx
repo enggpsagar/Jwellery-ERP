@@ -1,44 +1,34 @@
-// app/inventory/stock/page.tsx
+import Link from "next/link";
+import { Plus } from "lucide-react";
 
-import Link from "next/link"
+import { getInventoryStock } from "@/lib/actions/inventory/stock-actions";
 
-import { getInventoryStock } from "@/lib/actions/inventory/stock-actions"
-import { getProducts } from "@/lib/actions/inventory/product-actions"
-
-import { AddStockDialog } from "@/components/inventory/stock/add-stock-dialog"
-import { StockTable } from "@/components/inventory/stock/stock-table"
+import { Button } from "@/components/ui/button";
+import { PageBackHeader } from "@/components/shared/page-back-header";
+import { StockTable } from "@/components/inventory/stock/stock-table";
 
 export default async function InventoryStockPage() {
-  const [stockItems, products] = await Promise.all([
-    getInventoryStock(),
-    getProducts(),
-  ])
+  const stockItems = await getInventoryStock();
 
   return (
     <main className="space-y-6 p-6">
-      <div className="space-y-4">
-        <Link
-          href="/inventory"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-        >
-          ← Back to Inventory
+      <div className="flex items-start justify-between gap-4">
+        <PageBackHeader
+          title="Inventory Stock"
+          description="Manage physical stock entries for jewellery inventory."
+          backHref="/inventory"
+          backLabel="Back to Inventory"
+        />
+
+        <Link href="/inventory/stock/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Stock
+          </Button>
         </Link>
-
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Inventory Stock
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Manage physical stock entries for jewellery inventory.
-            </p>
-          </div>
-
-          <AddStockDialog products={products} />
-        </div>
       </div>
 
       <StockTable stockItems={stockItems} />
     </main>
-  )
+  );
 }

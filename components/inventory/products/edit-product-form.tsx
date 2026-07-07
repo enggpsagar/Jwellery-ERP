@@ -9,6 +9,7 @@ import {
   type ProductFormState,
 } from "@/lib/inventory/product-types";
 
+import { useToast } from "@/components/providers/toast-provider";
 import { ProductForm } from "./product-form";
 
 type EditProductFormProps = {
@@ -36,6 +37,7 @@ export function EditProductForm({
   product,
 }: EditProductFormProps) {
   const router = useRouter();
+  const toast = useToast();
 
   const updateAction = useMemo(() => {
     return updateProduct.bind(null, product.id);
@@ -49,10 +51,22 @@ export function EditProductForm({
 
   useEffect(() => {
     if (state.success) {
-      router.push("/inventory/products");
-      router.refresh();
+      toast.success(
+        state.message || "Product updated successfully"
+      );
+
+      const timer = setTimeout(() => {
+        router.push("/inventory/products");
+        router.refresh();
+      }, 1500);
+
+      return () => clearTimeout(timer);
     }
-  }, [state.success, router]);
+
+    if (!state.success && state.message) {
+      toast.error(state.message);
+    }
+  }, [state, router, toast]);
 
   return (
     <form action={formAction}>

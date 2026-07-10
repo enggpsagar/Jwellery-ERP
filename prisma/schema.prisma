@@ -270,6 +270,7 @@ model MetalRate {
   id        String   @id @default(cuid())
   gold22k   Decimal  @db.Decimal(12, 2)
   gold24k   Decimal  @db.Decimal(12, 2)
+  gold18k   Decimal  @db.Decimal(12, 2)
   silver    Decimal  @db.Decimal(12, 2)
   createdAt DateTime @default(now())
   unit      String   @default("GRAM")
@@ -495,3 +496,4 @@ enum OtpPurpose {
   LOGIN
   PHONE_VERIFY
 }
+

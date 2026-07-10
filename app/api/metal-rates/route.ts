@@ -3,20 +3,20 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const latest = await prisma.metalRate.findFirst({
+    const current = await prisma.metalRate.findFirst({
       orderBy: {
         createdAt: "desc",
       },
     });
 
-    if (!latest) {
+    if (!current) {
       return NextResponse.json(
         {
           error: "No metal rates found",
         },
         {
           status: 404,
-        }
+        },
       );
     }
 
@@ -27,25 +27,24 @@ export async function GET() {
       skip: 1,
     });
 
-
     return NextResponse.json({
       current: {
-        gold22k: Number(latest.gold22k),
-        gold24k: Number(latest.gold24k),
-        silver: Number(latest.silver),
+        gold24k: Number(current.gold24k),
+        gold22k: Number(current.gold22k),
+        gold18k: Number(current.gold18k),
+        silver: Number(current.silver),
       },
 
       previous: previous
         ? {
-            gold22k: Number(previous.gold22k),
             gold24k: Number(previous.gold24k),
+            gold22k: Number(previous.gold22k),
+            gold18k: Number(previous.gold18k),
             silver: Number(previous.silver),
           }
         : null,
     });
-
   } catch (error) {
-
     console.error("Metal rate API error:", error);
 
     return NextResponse.json(
@@ -54,7 +53,7 @@ export async function GET() {
       },
       {
         status: 500,
-      }
+      },
     );
   }
 }

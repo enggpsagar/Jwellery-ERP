@@ -36,21 +36,30 @@ model Customer {
 
 model Karigar {
   id             String        @id @default(cuid())
+  code           String?       @unique
   name           String
-  phone          String?
-  city           String?
+  mobile         String?
+  whatsapp       String?
+  email          String?
   address        String?
+  city           String?
+  pincode        String?
+  gstNumber      String?
+  panNumber      String?
+  aadhaarNumber  String?
   specialization String?
   notes          String?
-  openingBalance Decimal       @default(0) @db.Decimal(12, 2)
+  openingGold    Decimal       @default(0) @db.Decimal(10, 3)
+  openingCash    Decimal       @default(0) @db.Decimal(12, 2)
   isActive       Boolean       @default(true)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
-  jobs           KarigarJob[]
+  karigarJobs    KarigarJob[]
   ledgerEntries  LedgerEntry[]
 
   @@index([name])
-  @@index([phone])
+  @@index([mobile])
+  @@index([code])
 }
 
 model Product {
@@ -238,10 +247,10 @@ model KarigarJob {
   inventoryStock   InventoryStock? @relation(fields: [inventoryStockId], references: [id])
   karigar          Karigar         @relation(fields: [karigarId], references: [id])
 
-  @@index([karigarId])
   @@index([inventoryStockId])
   @@index([issueDate])
   @@index([jobNumber])
+  @@index([karigarId])
 }
 
 model State {
@@ -270,10 +279,10 @@ model MetalRate {
   id        String   @id @default(cuid())
   gold22k   Decimal  @db.Decimal(12, 2)
   gold24k   Decimal  @db.Decimal(12, 2)
-  gold18k   Decimal  @db.Decimal(12, 2)
   silver    Decimal  @db.Decimal(12, 2)
   createdAt DateTime @default(now())
   unit      String   @default("GRAM")
+  gold18k   Decimal  @db.Decimal(12, 2)
 
   @@index([createdAt])
 }
@@ -496,4 +505,3 @@ enum OtpPurpose {
   LOGIN
   PHONE_VERIFY
 }
-

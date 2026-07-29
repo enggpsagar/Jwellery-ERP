@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get("authorization");
 
+    // Protect cron endpoint
     if (
       process.env.CRON_SECRET &&
       authHeader !== `Bearer ${process.env.CRON_SECRET}`
@@ -21,7 +22,6 @@ export async function GET(request: Request) {
       );
     }
 
-
     if (!process.env.GOLD_API_KEY) {
       return NextResponse.json(
         {
@@ -33,20 +33,19 @@ export async function GET(request: Request) {
       );
     }
 
+    console.log("Cron started:", new Date().toISOString());
 
-    const response = await fetch(
-      "https://www.goldapi.io/api/XAU/INR",
-      {
-        headers: {
-          "x-access-token": process.env.GOLD_API_KEY,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
+    const response = await fetch("https://www.goldapi.io/api/XAU/INR", {
+      headers: {
+        "x-access-token": process.env.GOLD_API_KEY,
+        "Content-Type": "application/json",
+      },
+    });
 
     const data = await response.json();
 
+    console.log("Gold API Status:", response.status);
+    console.log("Gold API Response:", data);
 
     if (!response.ok) {
       console.error("Gold API Error:", data);
@@ -62,25 +61,13 @@ export async function GET(request: Request) {
       );
     }
 
+    // GoldAPI returns price per ounce
+    const gold24kPerGram = Number(data.price) / 31.1035;
+    const gold22kPerGram = gold24kPerGram * (22 / 24);
+    const gold18kPerGram = gold24kPerGram * (18 / 24);
 
-    /**
-     * GoldAPI returns 24K price per ounce
-     * Convert ounce to gram
-     */
-    const gold24kPerGram =
-      Number(data.price) / 31.1035;
-
-    const gold22kPerGram =
-      gold24kPerGram * (22 / 24);
-
-    const gold18kPerGram =
-      gold24kPerGram * (18 / 24);
-    /**
-     * Temporary silver value
-     * Replace with silver API later
-     */
+    // Temporary silver value
     const silverPerGram = 120;
-
 
     const payload = {
       gold24k: Number(gold24kPerGram.toFixed(2)),
@@ -90,38 +77,30 @@ export async function GET(request: Request) {
       unit: "GRAM",
     };
 
-    console.log("Payload:", payload);
+    console.log("Saving Metal Rate:", payload);
 
     const savedRate = await prisma.metalRate.create({
       data: payload,
     });
 
-    return NextResponse.json({
-      success: true,
-      payload,
-      data: savedRate,
-    });
-
+    console.log("Saved Successfully:", savedRate);
 
     return NextResponse.json({
       success: true,
-      message: "Metal rates updated",
+      message: "Metal rates updated successfully",
       data: savedRate,
     });
-
-
-  } catch (error) {
-
-    console.error(
-      "Metal rate cron error:",
-      error
-    );
-
+  } catch (error: any) {
+    console.error("Metal rate cron error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to update metal rates",
+        error: error?.message || "Unknown error",
+        stack:
+          process.env.NODE_ENV !== "production"
+            ? error?.stack
+            : undefined,
       },
       {
         status: 500,
@@ -129,4 +108,3 @@ export async function GET(request: Request) {
     );
   }
 }
-

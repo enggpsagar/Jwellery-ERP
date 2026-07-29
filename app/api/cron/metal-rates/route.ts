@@ -8,19 +8,19 @@ export async function GET(request: Request) {
     const authHeader = request.headers.get("authorization");
 
     // Protect cron endpoint
-    if (
-      process.env.CRON_SECRET &&
-      authHeader !== `Bearer ${process.env.CRON_SECRET}`
-    ) {
-      return NextResponse.json(
-        {
-          error: "Unauthorized",
-        },
-        {
-          status: 401,
-        }
-      );
-    }
+    // if (
+    //   process.env.CRON_SECRET &&
+    //   authHeader !== `Bearer ${process.env.CRON_SECRET}`
+    // ) {
+    //   return NextResponse.json(
+    //     {
+    //       error: "Unauthorized",
+    //     },
+    //     {
+    //       status: 401,
+    //     }
+    //   );
+    // }
 
     if (!process.env.GOLD_API_KEY) {
       return NextResponse.json(

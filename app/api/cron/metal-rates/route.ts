@@ -7,19 +7,19 @@ export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get("authorization");
 
-    // if (
-    //   process.env.CRON_SECRET &&
-    //   authHeader !== `Bearer ${process.env.CRON_SECRET}`
-    // ) {
-    //   return NextResponse.json(
-    //     {
-    //       error: "Unauthorized",
-    //     },
-    //     {
-    //       status: 401,
-    //     }
-    //   );
-    // }
+    if (
+      process.env.CRON_SECRET &&
+      authHeader !== `Bearer ${process.env.CRON_SECRET}`
+    ) {
+      return NextResponse.json(
+        {
+          error: "Unauthorized",
+        },
+        {
+          status: 401,
+        }
+      );
+    }
 
 
     if (!process.env.GOLD_API_KEY) {
@@ -74,7 +74,8 @@ export async function GET(request: Request) {
     const gold22kPerGram =
       gold24kPerGram * (22 / 24);
 
-
+    const gold18kPerGram =
+      gold24kPerGram * (18 / 24);
     /**
      * Temporary silver value
      * Replace with silver API later
@@ -82,23 +83,15 @@ export async function GET(request: Request) {
     const silverPerGram = 120;
 
 
-    const savedRate = await prisma.metalRate.create({
-      data: {
-        gold22k: Number(
-          gold22kPerGram.toFixed(2)
-        ),
-
-        gold24k: Number(
-          gold24kPerGram.toFixed(2)
-        ),
-
-        silver: Number(
-          silverPerGram.toFixed(2)
-        ),
-
-        unit: "GRAM",
-      },
-    });
+  const savedRate = await prisma.metalRate.create({
+  data: {
+    gold24k: Number(gold24kPerGram.toFixed(2)),
+    gold22k: Number(gold22kPerGram.toFixed(2)),
+    gold18k: Number(gold18kPerGram.toFixed(2)),
+    silver: Number(silverPerGram.toFixed(2)),
+    unit: "GRAM",
+  },
+});
 
 
     return NextResponse.json({

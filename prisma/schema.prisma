@@ -287,6 +287,43 @@ model MetalRate {
   @@index([createdAt])
 }
 
+model BusinessSettings {
+  id String @id @default("default")
+
+  // Business identity
+  businessName String
+  legalName    String?
+
+  // Tax / compliance
+  gstNumber     String?
+  panNumber     String?
+  stateCode     String? // GST state code, e.g. "27" for Maharashtra
+
+  // Contact & address
+  address  String?
+  city     String?
+  state    String?
+  pincode  String?
+  phone    String?
+  email    String?
+  website  String?
+
+  // Invoice preferences
+  invoicePrefix     String  @default("INV")
+  invoiceStartingNo Int     @default(1)
+  invoiceTerms      String?
+  invoiceNotes      String?
+
+  // Tax defaults
+  defaultGstRate    Float   @default(3.0) // jewellery GST is typically 3%
+
+  // Financial year
+  financialYearStartMonth Int @default(4) // April = 4, common in India
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
 model User {
   id                  String        @id @default(cuid())
   name                String?

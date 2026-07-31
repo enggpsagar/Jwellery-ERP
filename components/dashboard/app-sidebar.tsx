@@ -53,7 +53,7 @@ const mainNav = [
   },
   {
     title: "Karigar Management",
-    href: "/karigar",
+    href: "/karigars",
     icon: Hammer,
   },
   {

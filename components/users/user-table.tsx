@@ -2,6 +2,9 @@
 
 "use client";
 
+import { useTransition } from "react";
+import { useRouter } from "next/navigation";
+
 import {
   Table,
   TableBody,
@@ -13,6 +16,15 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/users/status-badge";
+import { UserFormDialog } from "@/components/users/user-form-dialog";
+import { useToast } from "@/components/providers/toast-provider";
+
+import {
+  disableUserAction,
+  enableUserAction,
+  deleteUserAction,
+} from "@/app/(dashboard)/users/actions";
 
 import type { UserRole, UserStatus } from "@prisma/client";
 
@@ -32,6 +44,47 @@ interface Props {
 }
 
 export function UserTable({ users }: Props) {
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+  const toast = useToast();
+
+  const handleToggleStatus = (user: User) => {
+    startTransition(async () => {
+      try {
+        if (user.status === "DISABLED") {
+          await enableUserAction(user.id);
+          toast.success(`${user.name ?? "User"} enabled`);
+        } else {
+          await disableUserAction(user.id);
+          toast.success(`${user.name ?? "User"} disabled`);
+        }
+        router.refresh();
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Something went wrong",
+        );
+      }
+    });
+  };
+
+  const handleDelete = (user: User) => {
+    if (!confirm(`Delete ${user.name ?? "this user"}? This cannot be undone.`)) {
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await deleteUserAction(user.id);
+        toast.success(`${user.name ?? "User"} deleted`);
+        router.refresh();
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Something went wrong",
+        );
+      }
+    });
+  };
+
   return (
     <div className="rounded-lg border">
       <Table>
@@ -70,23 +123,31 @@ export function UserTable({ users }: Props) {
                 </TableCell>
 
                 <TableCell>
-                  <Badge
-                    variant={
-                      user.status === "ACTIVE"
-                        ? "default"
-                        : user.status === "DISABLED"
-                        ? "destructive"
-                        : "secondary"
-                    }
-                  >
-                    {user.status}
-                  </Badge>
+                  <StatusBadge status={user.status} />
                 </TableCell>
 
                 <TableCell className="text-right">
-                  <Button variant="outline" size="sm">
-                    Edit
-                  </Button>
+                  <div className="flex justify-end gap-2">
+                    <UserFormDialog mode="edit" user={user} />
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => handleToggleStatus(user)}
+                    >
+                      {user.status === "DISABLED" ? "Enable" : "Disable"}
+                    </Button>
+
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => handleDelete(user)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))

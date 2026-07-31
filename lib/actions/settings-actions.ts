@@ -1,0 +1,175 @@
+// lib/actions/settings-actions.ts
+"use server";
+
+import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
+
+export type BusinessSettings = {
+  id: string;
+  businessName: string;
+  legalName: string;
+  gstNumber: string;
+  panNumber: string;
+  stateCode: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  phone: string;
+  email: string;
+  website: string;
+  invoicePrefix: string;
+  invoiceStartingNo: number;
+  invoiceTerms: string;
+  invoiceNotes: string;
+  defaultGstRate: number;
+  financialYearStartMonth: number;
+};
+
+export type SettingsFormState = {
+  success: boolean;
+  message: string;
+  errors?: Record<string, string[]>;
+};
+
+const SETTINGS_ID = "default";
+
+function toOptionalString(value: FormDataEntryValue | null) {
+  const str = String(value ?? "").trim();
+  return str || null;
+}
+
+function toNumber(value: FormDataEntryValue | null, fallback: number) {
+  if (value === null || value === "") return fallback;
+  const num = Number(value);
+  return Number.isNaN(num) ? fallback : num;
+}
+
+function mapSettings(settings: any): BusinessSettings {
+  return {
+    id: settings.id,
+    businessName: settings.businessName ?? "",
+    legalName: settings.legalName ?? "",
+    gstNumber: settings.gstNumber ?? "",
+    panNumber: settings.panNumber ?? "",
+    stateCode: settings.stateCode ?? "",
+    address: settings.address ?? "",
+    city: settings.city ?? "",
+    state: settings.state ?? "",
+    pincode: settings.pincode ?? "",
+    phone: settings.phone ?? "",
+    email: settings.email ?? "",
+    website: settings.website ?? "",
+    invoicePrefix: settings.invoicePrefix ?? "INV",
+    invoiceStartingNo: settings.invoiceStartingNo ?? 1,
+    invoiceTerms: settings.invoiceTerms ?? "",
+    invoiceNotes: settings.invoiceNotes ?? "",
+    defaultGstRate: Number(settings.defaultGstRate ?? 3.0),
+    financialYearStartMonth: settings.financialYearStartMonth ?? 4,
+  };
+}
+
+/**
+ * Fetch the single business settings record, creating a default
+ * one on first access so the form always has something to render.
+ */
+export async function getBusinessSettings(): Promise<BusinessSettings> {
+  let settings = await prisma.businessSettings.findUnique({
+    where: { id: SETTINGS_ID },
+  });
+
+  if (!settings) {
+    settings = await prisma.businessSettings.create({
+      data: {
+        id: SETTINGS_ID,
+        businessName: "My Jewellery Store",
+      },
+    });
+  }
+
+  return mapSettings(settings);
+}
+
+export async function updateBusinessSettings(
+  prevState: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  try {
+    const businessName = String(formData.get("businessName") || "").trim();
+
+    if (!businessName) {
+      return {
+        success: false,
+        message: "Business name is required",
+        errors: { businessName: ["Business name is required"] },
+      };
+    }
+
+    const gstNumber = toOptionalString(formData.get("gstNumber"));
+    if (gstNumber && !/^[0-9]{2}[A-Z0-9]{10}[0-9A-Z]{3}$/.test(gstNumber)) {
+      return {
+        success: false,
+        message: "Invalid GSTIN format",
+        errors: { gstNumber: ["Enter a valid 15-character GSTIN"] },
+      };
+    }
+
+    await prisma.businessSettings.upsert({
+      where: { id: SETTINGS_ID },
+      update: {
+        businessName,
+        legalName: toOptionalString(formData.get("legalName")),
+        gstNumber,
+        panNumber: toOptionalString(formData.get("panNumber")),
+        stateCode: toOptionalString(formData.get("stateCode")),
+        address: toOptionalString(formData.get("address")),
+        city: toOptionalString(formData.get("city")),
+        state: toOptionalString(formData.get("state")),
+        pincode: toOptionalString(formData.get("pincode")),
+        phone: toOptionalString(formData.get("phone")),
+        email: toOptionalString(formData.get("email")),
+        website: toOptionalString(formData.get("website")),
+        invoicePrefix: String(formData.get("invoicePrefix") || "INV").trim(),
+        invoiceStartingNo: toNumber(formData.get("invoiceStartingNo"), 1),
+        invoiceTerms: toOptionalString(formData.get("invoiceTerms")),
+        invoiceNotes: toOptionalString(formData.get("invoiceNotes")),
+        defaultGstRate: toNumber(formData.get("defaultGstRate"), 3.0),
+        financialYearStartMonth: toNumber(
+          formData.get("financialYearStartMonth"),
+          4,
+        ),
+      },
+      create: {
+        id: SETTINGS_ID,
+        businessName,
+        legalName: toOptionalString(formData.get("legalName")),
+        gstNumber,
+        panNumber: toOptionalString(formData.get("panNumber")),
+        stateCode: toOptionalString(formData.get("stateCode")),
+        address: toOptionalString(formData.get("address")),
+        city: toOptionalString(formData.get("city")),
+        state: toOptionalString(formData.get("state")),
+        pincode: toOptionalString(formData.get("pincode")),
+        phone: toOptionalString(formData.get("phone")),
+        email: toOptionalString(formData.get("email")),
+        website: toOptionalString(formData.get("website")),
+        invoicePrefix: String(formData.get("invoicePrefix") || "INV").trim(),
+        invoiceStartingNo: toNumber(formData.get("invoiceStartingNo"), 1),
+        invoiceTerms: toOptionalString(formData.get("invoiceTerms")),
+        invoiceNotes: toOptionalString(formData.get("invoiceNotes")),
+        defaultGstRate: toNumber(formData.get("defaultGstRate"), 3.0),
+        financialYearStartMonth: toNumber(
+          formData.get("financialYearStartMonth"),
+          4,
+        ),
+      },
+    });
+
+    revalidatePath("/settings");
+
+    return { success: true, message: "Settings updated successfully" };
+  } catch (error) {
+    console.error("updateBusinessSettings error:", error);
+    return { success: false, message: "Failed to update settings" };
+  }
+}

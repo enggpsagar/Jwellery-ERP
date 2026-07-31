@@ -2,6 +2,7 @@
 
 import { getUsers } from "@/lib/user";
 import { UserTable } from "@/components/users/user-table";
+import { UserFormDialog } from "@/components/users/user-form-dialog";
 
 export default async function UsersPage() {
   const users = await getUsers();
@@ -15,6 +16,8 @@ export default async function UsersPage() {
             Manage ERP users and their roles.
           </p>
         </div>
+
+        <UserFormDialog mode="create" />
       </div>
 
       <UserTable users={users} />

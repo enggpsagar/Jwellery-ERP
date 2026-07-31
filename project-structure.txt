@@ -5,6 +5,12 @@
 │   │   └── login
 │   │       └── page.tsx
 │   ├── (dashboard)
+│   │   ├── billing
+│   │   │   ├── [id]
+│   │   │   │   └── page.tsx
+│   │   │   ├── new
+│   │   │   │   └── page.tsx
+│   │   │   └── page.tsx
 │   │   ├── customers
 │   │   │   ├── [id]
 │   │   │   │   └── page.tsx
@@ -38,6 +44,8 @@
 │   │   ├── metal-rates
 │   │   │   └── page.tsx
 │   │   ├── profile
+│   │   │   └── page.tsx
+│   │   ├── reports
 │   │   │   └── page.tsx
 │   │   └── users
 │   │       ├── actions.ts
@@ -77,6 +85,11 @@
 │   ├── auth
 │   │   ├── login-form.tsx
 │   │   └── logout-button.tsx
+│   ├── billing
+│   │   ├── invoice-form.tsx
+│   │   ├── invoice-status-badge.tsx
+│   │   ├── invoice-table.tsx
+│   │   └── record-payment-dialog.tsx
 │   ├── customers
 │   │   ├── add-customer-dialog.tsx
 │   │   ├── customer-row-actions.tsx
@@ -129,8 +142,7 @@
 │   │   ├── karigar-edit-form.tsx
 │   │   ├── karigar-form.tsx
 │   │   ├── karigar-row-actions.tsx
-│   │   ├── karigar-table.tsx
-│   │   └── new
+│   │   └── karigar-table.tsx
 │   ├── ledger
 │   │   ├── ledger-detail-drawer.tsx
 │   │   └── ledger-view.tsx
@@ -145,6 +157,8 @@
 │   │   ├── providers.tsx
 │   │   ├── session-provider.tsx
 │   │   └── toast-provider.tsx
+│   ├── reports
+│   │   └── reports-tabs.tsx
 │   ├── shared
 │   │   └── page-back-header.tsx
 │   ├── ui
@@ -173,6 +187,7 @@
 │   │   └── tooltip.tsx
 │   └── users
 │       ├── status-badge.tsx
+│       ├── user-form-dialog.tsx
 │       └── user-table.tsx
 ├── components.json
 ├── docs
@@ -193,10 +208,12 @@
 │   │   │   ├── product-types.ts
 │   │   │   └── stock-actions.ts
 │   │   ├── inventory-stock-actions.ts
+│   │   ├── invoice-actions.ts
 │   │   ├── karigar-actions.ts
 │   │   ├── location-actions.ts
 │   │   ├── metal-rate-actions.ts
-│   │   └── profile-actions.ts
+│   │   ├── profile-actions.ts
+│   │   └── report-actions.ts
 │   ├── auth
 │   │   ├── auth-options.ts
 │   │   ├── auth.ts
@@ -272,12 +289,15 @@
 │   └── uploads
 │       └── profile
 │           └── 1782488691818-Stack-Outline-BlueLSLogo (1).png
+├── query.js
 ├── script
 │   └── seed-metal.ts
+├── scripts
+│   └── checkMigration.js
 ├── skills-lock.json
 ├── tsconfig.json
 ├── tsconfig.tsbuildinfo
 ├── types
 └── vercel.json
 
-85 directories, 196 files
+91 directories, 210 files

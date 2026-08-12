@@ -11,7 +11,7 @@ import {
 
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import { stats } from "@/lib/data"
+import type { DashboardStat } from "@/lib/actions/dashboard-actions"
 
 const iconMap = {
   rupee: IndianRupee,
@@ -22,7 +22,11 @@ const iconMap = {
   hammer: Hammer,
 }
 
-export function StatCards() {
+type StatCardsProps = {
+  stats: DashboardStat[]
+}
+
+export function StatCards({ stats }: StatCardsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {stats.map((stat) => {
@@ -40,21 +44,23 @@ export function StatCards() {
                     {stat.label}
                   </span>
                 </div>
-                <span
-                  className={cn(
-                    "flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-medium",
-                    isUp
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-red-50 text-red-700",
-                  )}
-                >
-                  {isUp ? (
-                    <ArrowUpRight className="size-3" />
-                  ) : (
-                    <ArrowDownRight className="size-3" />
-                  )}
-                  {stat.change}
-                </span>
+                {stat.change && (
+                  <span
+                    className={cn(
+                      "flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-medium",
+                      isUp
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-red-50 text-red-700",
+                    )}
+                  >
+                    {isUp ? (
+                      <ArrowUpRight className="size-3" />
+                    ) : (
+                      <ArrowDownRight className="size-3" />
+                    )}
+                    {stat.change}
+                  </span>
+                )}
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-2xl font-semibold tracking-tight tabular-nums">

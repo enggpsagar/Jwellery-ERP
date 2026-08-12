@@ -5,18 +5,16 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Search,
   Bell,
   Plus,
   ChevronDown,
   LogOut,
 } from "lucide-react";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -28,6 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { GlobalSearch } from "@/components/dashboard/global-search";
 
 type Rates = {
   gold24k: number;
@@ -37,6 +36,16 @@ type Rates = {
 };
 
 export function TopBar() {
+  const { data: session } = useSession();
+  const userName = session?.user?.name ?? "User";
+  const userInitials = userName
+    .split(" ")
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
   const [rates, setRates] = useState<Rates>({
     gold24k: 0,
     gold22k: 0,
@@ -95,15 +104,7 @@ export function TopBar() {
 
       <Separator orientation="vertical" className="h-6" />
 
-      <div className="relative hidden flex-1 md:block md:max-w-md">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-
-        <Input
-          type="search"
-          placeholder="Search customers, invoices, products..."
-          className="h-9 bg-muted/60 pl-9"
-        />
-      </div>
+      <GlobalSearch />
 
       <div className="ml-auto flex items-center gap-2">
         <div className="mr-2 hidden items-center gap-1 rounded-lg border bg-card px-2 py-1 shadow-sm xl:flex">
@@ -194,12 +195,12 @@ export function TopBar() {
           <DropdownMenuTrigger className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 hover:bg-accent">
             <Avatar className="h-7 w-7">
               <AvatarFallback className="bg-accent text-xs text-accent-foreground">
-                RS
+                {userInitials || "U"}
               </AvatarFallback>
             </Avatar>
 
             <span className="hidden text-sm font-medium sm:inline">
-              Ramesh Soni
+              {userName}
             </span>
 
             <ChevronDown className="hidden h-4 w-4 text-muted-foreground sm:inline" />
@@ -215,9 +216,13 @@ export function TopBar() {
                 <Link href="/profile">Profile</Link>
               </DropdownMenuItem>
 
-              <DropdownMenuItem>Store Settings</DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/settings">Store Settings</Link>
+              </DropdownMenuItem>
 
-              <DropdownMenuItem>Billing</DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/billing">Billing</Link>
+              </DropdownMenuItem>
             </DropdownMenuGroup>
 
             <DropdownMenuSeparator />

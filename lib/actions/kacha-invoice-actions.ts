@@ -1,0 +1,493 @@
+// lib/actions/kacha-invoice-actions.ts
+"use server";
+
+import { revalidatePath } from "next/cache";
+import {
+  InvoiceStatus,
+  InventoryStockStatus,
+  InventoryTransactionType,
+  LedgerEntryType,
+  LedgerSourceType,
+  MetalType,
+  PurityType,
+} from "@prisma/client";
+
+import { prisma } from "@/lib/prisma";
+import {
+  getInvoiceFormCustomers,
+  getInvoiceFormStockItems,
+} from "@/lib/actions/invoice-actions";
+
+export type KachaInvoiceLineItemInput = {
+  itemName: string;
+  metalType?: MetalType | null;
+  purity?: PurityType | null;
+  quantity: number;
+  grossWeight?: number | null;
+  netWeight?: number | null;
+  rate?: number | null;
+  makingCharge: number;
+  stoneCharge: number;
+  inventoryStockId?: string | null;
+};
+
+export type KachaInvoiceFormState = {
+  success: boolean;
+  message: string;
+  kachaInvoiceId?: string;
+  invoiceId?: string;
+};
+
+const initialState: KachaInvoiceFormState = { success: false, message: "" };
+
+function toNumber(value: unknown, fallback = 0) {
+  const num = Number(value);
+  return Number.isNaN(num) ? fallback : num;
+}
+
+function lineTotal(item: KachaInvoiceLineItemInput) {
+  const metalValue = toNumber(item.rate) * toNumber(item.netWeight);
+  return metalValue + toNumber(item.makingCharge) + toNumber(item.stoneCharge);
+}
+
+async function generateSlipNumber() {
+  const year = new Date().getFullYear();
+  const count = await prisma.kachaInvoice.count({
+    where: {
+      slipNumber: { startsWith: `KACHA-${year}-` },
+    },
+  });
+
+  return `KACHA-${year}-${String(count + 1).padStart(4, "0")}`;
+}
+
+function mapKachaInvoice(kachaInvoice: any) {
+  return {
+    id: kachaInvoice.id,
+    slipNumber: kachaInvoice.slipNumber,
+    invoiceDate: kachaInvoice.invoiceDate.toISOString(),
+    status: kachaInvoice.status as InvoiceStatus,
+    subtotal: Number(kachaInvoice.subtotal),
+    makingCharges: Number(kachaInvoice.makingCharges),
+    stoneCharges: Number(kachaInvoice.stoneCharges),
+    discount: Number(kachaInvoice.discount),
+    totalAmount: Number(kachaInvoice.totalAmount),
+    paidAmount: Number(kachaInvoice.paidAmount),
+    balanceAmount: Number(kachaInvoice.balanceAmount),
+    notes: kachaInvoice.notes,
+    convertedToId: kachaInvoice.convertedToId,
+    convertedTo: kachaInvoice.convertedTo
+      ? {
+          id: kachaInvoice.convertedTo.id,
+          invoiceNumber: kachaInvoice.convertedTo.invoiceNumber,
+        }
+      : null,
+    customer: kachaInvoice.customer
+      ? {
+          id: kachaInvoice.customer.id,
+          name: kachaInvoice.customer.name,
+          phone: kachaInvoice.customer.phone,
+          gstin: kachaInvoice.customer.gstin,
+        }
+      : null,
+    items: (kachaInvoice.items ?? []).map((item: any) => ({
+      id: item.id,
+      itemName: item.itemName,
+      metalType: item.metalType,
+      purity: item.purity,
+      quantity: item.quantity,
+      grossWeight: item.grossWeight ? Number(item.grossWeight) : null,
+      netWeight: item.netWeight ? Number(item.netWeight) : null,
+      rate: item.rate ? Number(item.rate) : null,
+      makingCharge: Number(item.makingCharge),
+      stoneCharge: Number(item.stoneCharge),
+      lineTotal: Number(item.lineTotal),
+      inventoryStockId: item.inventoryStockId,
+    })),
+  };
+}
+
+export type GetKachaInvoicesParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: InvoiceStatus | "ALL";
+};
+
+export async function getKachaInvoices(params: GetKachaInvoicesParams = {}) {
+  const page = Math.max(1, Number(params.page || 1));
+  const pageSize = Math.max(1, Number(params.pageSize || 10));
+  const search = String(params.search || "").trim();
+  const status = params.status && params.status !== "ALL" ? params.status : undefined;
+
+  const where = {
+    ...(status ? { status } : {}),
+    ...(search
+      ? {
+          OR: [
+            { slipNumber: { contains: search, mode: "insensitive" as const } },
+            { customer: { name: { contains: search, mode: "insensitive" as const } } },
+          ],
+        }
+      : {}),
+  };
+
+  const [totalCount, kachaInvoices] = await Promise.all([
+    prisma.kachaInvoice.count({ where }),
+    prisma.kachaInvoice.findMany({
+      where,
+      orderBy: { invoiceDate: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { customer: { select: { id: true, name: true, phone: true, gstin: true } } },
+    }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  return {
+    kachaInvoices: kachaInvoices.map(mapKachaInvoice),
+    pagination: {
+      page,
+      pageSize,
+      totalCount,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+    },
+  };
+}
+
+export async function getKachaInvoiceById(id: string) {
+  const kachaInvoice = await prisma.kachaInvoice.findUnique({
+    where: { id },
+    include: {
+      customer: { select: { id: true, name: true, phone: true, gstin: true } },
+      items: true,
+      convertedTo: { select: { id: true, invoiceNumber: true } },
+    },
+  });
+
+  if (!kachaInvoice) return null;
+  return mapKachaInvoice(kachaInvoice);
+}
+
+/** Same customer/stock pools as the Pakka invoice form — no need to duplicate the queries. */
+export const getKachaInvoiceFormCustomers = getInvoiceFormCustomers;
+export const getKachaInvoiceFormStockItems = getInvoiceFormStockItems;
+
+/**
+ * Create a Kacha slip with its line items in one transaction. Same
+ * stock/ledger side-effects as createInvoice, minus any tax handling —
+ * a Kacha slip is a real sale, just without GST paperwork yet.
+ */
+export async function createKachaInvoice(
+  prevState: KachaInvoiceFormState = initialState,
+  formData: FormData,
+): Promise<KachaInvoiceFormState> {
+  try {
+    const customerId = String(formData.get("customerId") || "");
+    const itemsRaw = String(formData.get("itemsJson") || "[]");
+
+    if (!customerId) {
+      return { success: false, message: "Please select a customer" };
+    }
+
+    let items: KachaInvoiceLineItemInput[] = [];
+    try {
+      items = JSON.parse(itemsRaw);
+    } catch {
+      return { success: false, message: "Invalid line items" };
+    }
+
+    if (!items.length) {
+      return { success: false, message: "Add at least one line item" };
+    }
+
+    const discount = toNumber(formData.get("discount"));
+    const paidAmount = toNumber(formData.get("paidAmount"));
+    const invoiceDateRaw = String(formData.get("invoiceDate") || "");
+    const notes = String(formData.get("notes") || "").trim() || null;
+
+    const subtotal = items.reduce(
+      (sum, item) => sum + toNumber(item.rate) * toNumber(item.netWeight),
+      0,
+    );
+    const makingCharges = items.reduce((sum, item) => sum + toNumber(item.makingCharge), 0);
+    const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
+    const totalAmount = subtotal + makingCharges + stoneCharges - discount;
+    const balanceAmount = Math.max(0, totalAmount - paidAmount);
+
+    let status: InvoiceStatus = InvoiceStatus.PAID;
+    if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
+    else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
+
+    const slipNumber = await generateSlipNumber();
+
+    const kachaInvoice = await prisma.$transaction(async (tx) => {
+      const created = await tx.kachaInvoice.create({
+        data: {
+          slipNumber,
+          customerId,
+          invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : new Date(),
+          status,
+          subtotal,
+          makingCharges,
+          stoneCharges,
+          discount,
+          totalAmount,
+          paidAmount,
+          balanceAmount,
+          notes,
+          items: {
+            create: items.map((item) => ({
+              itemName: item.itemName,
+              metalType: item.metalType ?? undefined,
+              purity: item.purity ?? undefined,
+              quantity: item.quantity || 1,
+              grossWeight: item.grossWeight ?? undefined,
+              netWeight: item.netWeight ?? undefined,
+              rate: item.rate ?? undefined,
+              makingCharge: item.makingCharge,
+              stoneCharge: item.stoneCharge,
+              lineTotal: lineTotal(item),
+              inventoryStockId: item.inventoryStockId || undefined,
+            })),
+          },
+        },
+      });
+
+      for (const item of items) {
+        if (!item.inventoryStockId) continue;
+
+        await tx.inventoryStock.update({
+          where: { id: item.inventoryStockId },
+          data: { status: InventoryStockStatus.SOLD, saleAmount: lineTotal(item) },
+        });
+
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryStockId: item.inventoryStockId,
+            transactionType: InventoryTransactionType.SALE,
+            netWeight: item.netWeight ?? undefined,
+            referenceType: "KachaInvoice",
+            referenceId: created.id,
+          },
+        });
+      }
+
+      if (balanceAmount > 0) {
+        await tx.ledgerEntry.create({
+          data: {
+            type: LedgerEntryType.DEBIT,
+            sourceType: LedgerSourceType.SALE,
+            customerId,
+            amount: balanceAmount,
+            description: `Kacha slip ${slipNumber} balance due`,
+          },
+        });
+      }
+
+      return created;
+    });
+
+    revalidatePath("/billing/kacha");
+
+    return {
+      success: true,
+      message: `Kacha slip ${slipNumber} created`,
+      kachaInvoiceId: kachaInvoice.id,
+    };
+  } catch (error) {
+    console.error("createKachaInvoice error:", error);
+    return { success: false, message: "Failed to create Kacha slip" };
+  }
+}
+
+/**
+ * Record a payment against a Kacha slip's outstanding balance. Mirrors
+ * recordInvoicePayment.
+ */
+export async function recordKachaInvoicePayment(
+  kachaInvoiceId: string,
+  prevState: KachaInvoiceFormState = initialState,
+  formData: FormData,
+): Promise<KachaInvoiceFormState> {
+  try {
+    const amount = toNumber(formData.get("amount"));
+    const notes = String(formData.get("notes") || "").trim() || null;
+
+    if (amount <= 0) {
+      return { success: false, message: "Enter a valid payment amount" };
+    }
+
+    const kachaInvoice = await prisma.kachaInvoice.findUnique({ where: { id: kachaInvoiceId } });
+    if (!kachaInvoice) return { success: false, message: "Kacha slip not found" };
+
+    const newPaid = Number(kachaInvoice.paidAmount) + amount;
+    const newBalance = Math.max(0, Number(kachaInvoice.totalAmount) - newPaid);
+    const status: InvoiceStatus =
+      newBalance === 0 ? InvoiceStatus.PAID : InvoiceStatus.PARTIAL;
+
+    await prisma.$transaction([
+      prisma.kachaInvoice.update({
+        where: { id: kachaInvoiceId },
+        data: { paidAmount: newPaid, balanceAmount: newBalance, status },
+      }),
+      prisma.ledgerEntry.create({
+        data: {
+          type: LedgerEntryType.CREDIT,
+          sourceType: LedgerSourceType.SALE,
+          customerId: kachaInvoice.customerId,
+          amount,
+          description: notes ?? `Payment received for ${kachaInvoice.slipNumber}`,
+        },
+      }),
+    ]);
+
+    revalidatePath("/billing/kacha");
+    revalidatePath(`/billing/kacha/${kachaInvoiceId}`);
+
+    return { success: true, message: "Payment recorded" };
+  } catch (error) {
+    console.error("recordKachaInvoicePayment error:", error);
+    return { success: false, message: "Failed to record payment" };
+  }
+}
+
+/**
+ * Convert a Kacha slip into a formal Pakka (GST) invoice. Copies the
+ * customer/items/weights/charges across, applies tax fields supplied on
+ * this form, and links the two records both ways. Does not re-trigger
+ * stock SOLD transitions or a second sale-debit ledger entry — the stock
+ * was already sold and the ledger already reflects the amount owed at
+ * Kacha creation; this is a paperwork upgrade, not a second sale.
+ */
+export async function convertKachaToPakka(
+  kachaInvoiceId: string,
+  prevState: KachaInvoiceFormState = initialState,
+  formData: FormData,
+): Promise<KachaInvoiceFormState> {
+  try {
+    const kachaInvoice = await prisma.kachaInvoice.findUnique({
+      where: { id: kachaInvoiceId },
+      include: { items: true },
+    });
+
+    if (!kachaInvoice) {
+      return { success: false, message: "Kacha slip not found" };
+    }
+
+    if (kachaInvoice.convertedToId) {
+      return { success: false, message: "This Kacha slip has already been converted" };
+    }
+
+    const taxAmount = toNumber(formData.get("taxAmount"));
+    const dueDateRaw = String(formData.get("dueDate") || "");
+    const notes = String(formData.get("notes") || "").trim() || kachaInvoice.notes;
+
+    const subtotal = Number(kachaInvoice.subtotal);
+    const makingCharges = Number(kachaInvoice.makingCharges);
+    const stoneCharges = Number(kachaInvoice.stoneCharges);
+    const discount = Number(kachaInvoice.discount);
+    const paidAmount = Number(kachaInvoice.paidAmount);
+
+    const totalAmount = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    const balanceAmount = Math.max(0, totalAmount - paidAmount);
+
+    let status: InvoiceStatus = InvoiceStatus.PAID;
+    if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
+    else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
+
+    const year = new Date().getFullYear();
+    const count = await prisma.invoice.count({
+      where: { invoiceNumber: { startsWith: `INV-${year}-` } },
+    });
+    const invoiceNumber = `INV-${year}-${String(count + 1).padStart(4, "0")}`;
+
+    const invoice = await prisma.$transaction(async (tx) => {
+      const created = await tx.invoice.create({
+        data: {
+          invoiceNumber,
+          customerId: kachaInvoice.customerId,
+          invoiceDate: kachaInvoice.invoiceDate,
+          dueDate: dueDateRaw ? new Date(dueDateRaw) : undefined,
+          status,
+          subtotal,
+          makingCharges,
+          stoneCharges,
+          discount,
+          taxAmount,
+          totalAmount,
+          paidAmount,
+          balanceAmount,
+          notes,
+          items: {
+            create: kachaInvoice.items.map((item) => ({
+              itemName: item.itemName,
+              metalType: item.metalType ?? undefined,
+              purity: item.purity ?? undefined,
+              quantity: item.quantity,
+              grossWeight: item.grossWeight ?? undefined,
+              netWeight: item.netWeight ?? undefined,
+              rate: item.rate ?? undefined,
+              makingCharge: item.makingCharge,
+              stoneCharge: item.stoneCharge,
+              lineTotal: item.lineTotal,
+              inventoryStockId: item.inventoryStockId ?? undefined,
+            })),
+          },
+        },
+      });
+
+      await tx.kachaInvoice.update({
+        where: { id: kachaInvoiceId },
+        data: { convertedToId: created.id },
+      });
+
+      return created;
+    });
+
+    revalidatePath("/billing");
+    revalidatePath("/billing/kacha");
+    revalidatePath(`/billing/kacha/${kachaInvoiceId}`);
+    revalidatePath(`/billing/${invoice.id}`);
+
+    return {
+      success: true,
+      message: `Converted to Pakka invoice ${invoiceNumber}`,
+      invoiceId: invoice.id,
+    };
+  } catch (error) {
+    console.error("convertKachaToPakka error:", error);
+    return { success: false, message: "Failed to convert to Pakka invoice" };
+  }
+}
+
+/** Only DRAFT Kacha slips with no recorded payments and not yet converted can be deleted. */
+export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormState> {
+  try {
+    const kachaInvoice = await prisma.kachaInvoice.findUnique({ where: { id } });
+
+    if (!kachaInvoice) return { success: false, message: "Kacha slip not found" };
+
+    if (kachaInvoice.convertedToId) {
+      return { success: false, message: "Cannot delete a Kacha slip that has been converted" };
+    }
+
+    if (kachaInvoice.status !== InvoiceStatus.DRAFT || Number(kachaInvoice.paidAmount) > 0) {
+      return {
+        success: false,
+        message: "Only draft Kacha slips with no payments can be deleted",
+      };
+    }
+
+    await prisma.kachaInvoice.delete({ where: { id } });
+    revalidatePath("/billing/kacha");
+
+    return { success: true, message: "Kacha slip deleted" };
+  } catch (error) {
+    console.error("deleteKachaInvoice error:", error);
+    return { success: false, message: "Failed to delete Kacha slip" };
+  }
+}

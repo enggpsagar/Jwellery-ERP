@@ -15,20 +15,31 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { revenueByCategory } from "@/lib/data"
+import type { CategoryRevenue } from "@/lib/actions/dashboard-actions"
 
 const chartConfig = {
   value: { label: "Revenue" },
-  gold: { label: "Gold Jewellery", color: "var(--chart-1)" },
-  diamond: { label: "Diamond Sets", color: "var(--chart-2)" },
-  silver: { label: "Silver Articles", color: "var(--chart-5)" },
-  coins: { label: "Coins & Bars", color: "var(--chart-4)" },
-  repairs: { label: "Repairs", color: "var(--chart-3)" },
 } satisfies ChartConfig
 
-const total = revenueByCategory.reduce((acc, c) => acc + c.value, 0)
+const CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+]
 
-export function CategoryChart() {
+type CategoryChartProps = {
+  data: CategoryRevenue[]
+}
+
+export function CategoryChart({ data }: CategoryChartProps) {
+  const chartData = data.map((c, i) => ({
+    ...c,
+    fill: CHART_COLORS[i % CHART_COLORS.length],
+  }))
+  const total = chartData.reduce((acc, c) => acc + c.value, 0)
+
   return (
     <Card className="gap-0">
       <CardHeader className="border-b [.border-b]:pb-5">
@@ -49,8 +60,7 @@ export function CategoryChart() {
                   formatter={(value, name) => (
                     <div className="flex w-full items-center justify-between gap-3">
                       <span className="capitalize text-muted-foreground">
-                        {chartConfig[name as keyof typeof chartConfig]?.label ??
-                          name}
+                        {name}
                       </span>
                       <span className="font-medium tabular-nums">
                         ₹{Number(value).toLocaleString("en-IN")}
@@ -61,7 +71,7 @@ export function CategoryChart() {
               }
             />
             <Pie
-              data={revenueByCategory}
+              data={chartData}
               dataKey="value"
               nameKey="category"
               innerRadius={56}
@@ -71,8 +81,14 @@ export function CategoryChart() {
           </PieChart>
         </ChartContainer>
 
+        {chartData.length === 0 && (
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            No sales recorded yet.
+          </p>
+        )}
+
         <div className="mt-4 flex flex-col gap-2.5">
-          {revenueByCategory.map((c) => (
+          {chartData.map((c) => (
             <div key={c.category} className="flex items-center gap-2.5 text-sm">
               <span
                 className="size-2.5 shrink-0 rounded-[3px]"

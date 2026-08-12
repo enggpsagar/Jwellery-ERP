@@ -38,11 +38,12 @@ type Props = {
   data: MetalRate[];
 };
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
 export function MetalRatesTable({ data }: Props) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE_OPTIONS[0]);
 
   const filteredData = useMemo(() => {
     return data.filter((item) =>
@@ -53,7 +54,7 @@ export function MetalRatesTable({ data }: Props) {
     );
   }, [data, search]);
 
-  const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
 
   const dataWithTrend = filteredData.map((rate, index) => ({
     ...rate,
@@ -61,8 +62,8 @@ export function MetalRatesTable({ data }: Props) {
   }));
 
   const paginatedData = dataWithTrend.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE,
+    (page - 1) * pageSize,
+    page * pageSize,
   );
 
   function getTrend(current: number, previous?: number) {
@@ -256,10 +257,29 @@ export function MetalRatesTable({ data }: Props) {
 
         {filteredData.length > 0 && (
           <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="text-sm text-muted-foreground">
-              Showing <strong>{(page - 1) * PAGE_SIZE + 1}</strong> to{" "}
-              <strong>{Math.min(page * PAGE_SIZE, filteredData.length)}</strong>{" "}
-              of <strong>{filteredData.length}</strong> records
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <span>
+                Showing <strong>{(page - 1) * pageSize + 1}</strong> to{" "}
+                <strong>
+                  {Math.min(page * pageSize, filteredData.length)}
+                </strong>{" "}
+                of <strong>{filteredData.length}</strong> records
+              </span>
+
+              <select
+                className="rounded-md border px-2 py-1 text-sm"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size} / page
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="flex items-center gap-2">

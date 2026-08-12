@@ -6,6 +6,8 @@ import { Pencil } from "lucide-react"
 
 import { getInventoryStockById } from "@/lib/actions/inventory/stock-actions"
 import { Button } from "@/components/ui/button"
+import { StockStatusBadge } from "@/components/inventory/shared/stock-status-badge"
+import { FinishBadge } from "@/components/inventory/shared/finish-badge"
 
 type InventoryStockDetailsPageProps = {
   params: Promise<{
@@ -88,7 +90,16 @@ export default async function InventoryStockDetailsPage({
 
             <div>
               <p className="text-xs text-muted-foreground">Status</p>
-              <p className="font-medium">{stock.status}</p>
+              <p className="font-medium">
+                <StockStatusBadge status={stock.status} />
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-muted-foreground">Finish</p>
+              <p className="font-medium">
+                <FinishBadge finish={stock.finish} />
+              </p>
             </div>
 
             <div>

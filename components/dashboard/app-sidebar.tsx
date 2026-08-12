@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   Users,
+  UserCog,
   CircleDollarSign,
   Package,
   ReceiptText,
@@ -66,10 +68,28 @@ const mainNav = [
     href: "/reports",
     icon: BarChart3,
   },
+  {
+    title: "Users",
+    href: "/users",
+    icon: UserCog,
+  },
 ];
+
+function isNavItemActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const userName = session?.user?.name ?? "User";
+  const userInitials = userName
+    .split(" ")
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   return (
     <Sidebar
@@ -102,7 +122,7 @@ export function AppSidebar() {
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       asChild
-                      isActive={pathname === item.href}
+                      isActive={isNavItemActive(pathname, item.href)}
                       tooltip={item.title}
                     >
                       <Link href={item.href}>
@@ -123,7 +143,11 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isNavItemActive(pathname, "/settings")}
+                  tooltip="Settings"
+                >
                   <Link href="/settings">
                     <Settings className="h-4 w-4" />
                     <span>Settings</span>
@@ -138,12 +162,14 @@ export function AppSidebar() {
       <SidebarFooter className="border-t">
         <div className="flex items-center gap-3 px-2 py-2">
           <Avatar className="h-8 w-8">
-            <AvatarFallback>RS</AvatarFallback>
+            <AvatarFallback>{userInitials || "U"}</AvatarFallback>
           </Avatar>
 
           <div className="group-data-[collapsible=icon]:hidden">
-            <div className="text-sm font-medium">Ramesh Soni</div>
-            <div className="text-xs text-muted-foreground">Store Owner</div>
+            <div className="text-sm font-medium">{userName}</div>
+            <div className="text-xs text-muted-foreground">
+              {session?.user?.role ?? "Store Owner"}
+            </div>
           </div>
         </div>
       </SidebarFooter>

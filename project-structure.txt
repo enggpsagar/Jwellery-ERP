@@ -20,6 +20,7 @@
 │   │   │   └── page.tsx
 │   │   ├── dashboard
 │   │   │   └── page.tsx
+│   │   ├── error.tsx
 │   │   ├── inventory
 │   │   │   ├── loading.tsx
 │   │   │   ├── page.tsx
@@ -43,9 +44,12 @@
 │   │   │   └── page.tsx
 │   │   ├── metal-rates
 │   │   │   └── page.tsx
+│   │   ├── not-found.tsx
 │   │   ├── profile
 │   │   │   └── page.tsx
 │   │   ├── reports
+│   │   │   └── page.tsx
+│   │   ├── settings
 │   │   │   └── page.tsx
 │   │   └── users
 │   │       ├── actions.ts
@@ -159,6 +163,8 @@
 │   │   └── toast-provider.tsx
 │   ├── reports
 │   │   └── reports-tabs.tsx
+│   ├── settings
+│   │   └── settings-form.tsx
 │   ├── shared
 │   │   └── page-back-header.tsx
 │   ├── ui
@@ -213,7 +219,8 @@
 │   │   ├── location-actions.ts
 │   │   ├── metal-rate-actions.ts
 │   │   ├── profile-actions.ts
-│   │   └── report-actions.ts
+│   │   ├── report-actions.ts
+│   │   └── settings-actions.ts
 │   ├── auth
 │   │   ├── auth-options.ts
 │   │   ├── auth.ts
@@ -271,6 +278,8 @@
 │   │   │   └── migration.sql
 │   │   ├── 20260729120000_extend_karigar_profile
 │   │   │   └── migration.sql
+│   │   ├── 20260730124506_add_business_settings
+│   │   │   └── migration.sql
 │   │   └── migration_lock.toml
 │   ├── schema.prisma
 │   ├── seed-inventory.ts
@@ -300,4 +309,4 @@
 ├── types
 └── vercel.json
 
-91 directories, 210 files
+94 directories, 216 files

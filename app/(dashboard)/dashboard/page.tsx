@@ -4,8 +4,24 @@ import { SalesChart } from "@/components/dashboard/sales-chart";
 import { CategoryChart } from "@/components/dashboard/category-chart";
 import { TransactionsTable } from "@/components/dashboard/transactions-table";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
+import {
+  getDashboardStats,
+  getMonthlySalesTrend,
+  getRevenueByCategory,
+  getRecentTransactions,
+  getRecentActivity,
+} from "@/lib/actions/dashboard-actions";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const [stats, monthlySales, revenueByCategory, transactions, activity] =
+    await Promise.all([
+      getDashboardStats(),
+      getMonthlySalesTrend(),
+      getRevenueByCategory(),
+      getRecentTransactions(),
+      getRecentActivity(),
+    ]);
+
   const currentDate = new Date();
 
   const formattedDate = currentDate.toLocaleDateString("en-US", {
@@ -28,7 +44,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <StatCards />
+      <StatCards stats={stats} />
 
       {/* Metal Price Trend */}
       <MetalPriceChart />
@@ -36,22 +52,22 @@ export default function DashboardPage() {
       {/* Existing Dashboard Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <SalesChart />
+          <SalesChart data={monthlySales} />
         </div>
 
         <div>
-          <CategoryChart />
+          <CategoryChart data={revenueByCategory} />
         </div>
       </div>
 
       {/* Transactions & Activity */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-2">
-          <TransactionsTable />
+          <TransactionsTable transactions={transactions} />
         </div>
 
         <div>
-          <ActivityFeed />
+          <ActivityFeed activity={activity} />
         </div>
       </div>
     </main>

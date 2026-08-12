@@ -1,29 +1,36 @@
-import Link from "next/link";
+// FILE PATH: app/(dashboard)/karigars/page.tsx
+// REPLACES the existing file at this path
+import { getKarigars } from "@/lib/actions/karigar-actions"
+import { KarigarsClient } from "@/components/karigars/karigars-client"
 
-import { getKarigars } from "@/lib/actions/karigar-actions";
+type KarigarsPageProps = {
+  searchParams?: Promise<{
+    page?: string
+    pageSize?: string
+    search?: string
+    sortBy?: "name" | "code" | "createdAt"
+    sortOrder?: "asc" | "desc"
+  }>
+}
 
-import { KarigarTable } from "@/components/karigars/karigar-table";
-import { PageBackHeader } from "@/components/shared/page-back-header";
-import { Button } from "@/components/ui/button";
+export const dynamic = "force-dynamic"
 
-export default async function KarigarsPage() {
-  const { karigars } = await getKarigars();
+export default async function KarigarsPage({ searchParams }: KarigarsPageProps) {
+  const params = (await searchParams) ?? {}
 
-  return (
-    <main className="space-y-6 p-6">
-      <PageBackHeader
-        title="Karigars"
-        description="Manage jewellery artisans and their job records."
-        backHref="/dashboard"
-        backLabel="Back to Dashboard"
-        action={
-          <Link href="/karigars/new">
-            <Button>Add Karigar</Button>
-          </Link>
-        }
-      />
+  const page = Number(params.page || 1)
+  const pageSize = Number(params.pageSize || 10)
+  const search = params.search || ""
+  const sortBy = params.sortBy || "createdAt"
+  const sortOrder = params.sortOrder || "desc"
 
-      <KarigarTable karigars={karigars} />
-    </main>
-  );
+  const { karigars, pagination } = await getKarigars({
+    page,
+    pageSize,
+    search,
+    sortBy,
+    sortOrder,
+  })
+
+  return <KarigarsClient karigars={karigars} pagination={pagination} />
 }

@@ -93,6 +93,12 @@ function mapInvoice(invoice: any) {
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
     })),
+    convertedFromKacha: invoice.convertedFromKacha
+      ? {
+          id: invoice.convertedFromKacha.id,
+          slipNumber: invoice.convertedFromKacha.slipNumber,
+        }
+      : null,
   };
 }
 
@@ -154,6 +160,7 @@ export async function getInvoiceById(id: string) {
       customer: { select: { id: true, name: true, phone: true } },
       items: true,
       ledgerEntries: { orderBy: { entryDate: "desc" } },
+      convertedFromKacha: { select: { id: true, slipNumber: true } },
     },
   });
 

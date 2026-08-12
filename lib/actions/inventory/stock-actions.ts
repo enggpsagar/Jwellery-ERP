@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache"
 import {
   InventoryStockStatus,
+  InventoryFinish,
   MetalType,
   PurityType,
   Prisma,
@@ -227,6 +228,12 @@ export async function createInventoryStock(
         Object.values(InventoryStockStatus)
       ) as InventoryStockStatus | null) ?? InventoryStockStatus.IN_STOCK
 
+    const finish =
+      (parseOptionalEnum(
+        formData.get("finish"),
+        Object.values(InventoryFinish)
+      ) as InventoryFinish | null) ?? InventoryFinish.KACHA
+
     const quantity = parseOptionalInt(formData.get("quantity")) ?? 1
     const isActive = parseBoolean(formData.get("isActive"))
 
@@ -296,6 +303,7 @@ export async function createInventoryStock(
         metalType,
         purity,
         status,
+        finish,
         quantity,
         isActive,
         grossWeight: toDecimal(grossWeight),
@@ -349,6 +357,10 @@ export async function updateInventoryStock(
           select: { id: true },
           take: 1,
         },
+        kachaInvoiceItems: {
+          select: { id: true },
+          take: 1,
+        },
         karigarJobs: {
           select: { id: true },
           take: 1,
@@ -365,7 +377,9 @@ export async function updateInventoryStock(
     }
 
     const isLockedForCoreChanges =
-      existingStock.invoiceItems.length > 0 || existingStock.karigarJobs.length > 0
+      existingStock.invoiceItems.length > 0 ||
+      existingStock.kachaInvoiceItems.length > 0 ||
+      existingStock.karigarJobs.length > 0
 
     const productId = String(formData.get("productId") || "").trim()
     const stockCode = String(formData.get("stockCode") || "").trim()
@@ -387,6 +401,12 @@ export async function updateInventoryStock(
         formData.get("status"),
         Object.values(InventoryStockStatus)
       ) as InventoryStockStatus | null) ?? InventoryStockStatus.IN_STOCK
+
+    const finish =
+      (parseOptionalEnum(
+        formData.get("finish"),
+        Object.values(InventoryFinish)
+      ) as InventoryFinish | null) ?? InventoryFinish.KACHA
 
     const quantity = parseOptionalInt(formData.get("quantity")) ?? 1
     const isActive = parseBoolean(formData.get("isActive"))
@@ -461,6 +481,7 @@ export async function updateInventoryStock(
         where: { id },
         data: {
           status,
+          finish,
           isActive,
           location,
           remarks,
@@ -490,6 +511,7 @@ export async function updateInventoryStock(
         metalType,
         purity,
         status,
+        finish,
         quantity,
         isActive,
         grossWeight: toDecimal(grossWeight),
@@ -542,6 +564,10 @@ export async function deleteInventoryStock(id: string): Promise<StockFormState> 
           select: { id: true },
           take: 1,
         },
+        kachaInvoiceItems: {
+          select: { id: true },
+          take: 1,
+        },
         karigarJobs: {
           select: { id: true },
           take: 1,
@@ -557,7 +583,11 @@ export async function deleteInventoryStock(id: string): Promise<StockFormState> 
       }
     }
 
-    if (stock.invoiceItems.length > 0 || stock.karigarJobs.length > 0) {
+    if (
+      stock.invoiceItems.length > 0 ||
+      stock.kachaInvoiceItems.length > 0 ||
+      stock.karigarJobs.length > 0
+    ) {
       return {
         success: false,
         message:

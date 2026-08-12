@@ -6,9 +6,13 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { customerActivity } from "@/lib/data"
+import type { DashboardActivity } from "@/lib/actions/dashboard-actions"
 
-export function ActivityFeed() {
+type ActivityFeedProps = {
+  activity: DashboardActivity[]
+}
+
+export function ActivityFeed({ activity }: ActivityFeedProps) {
   return (
     <Card className="gap-0">
       <CardHeader className="border-b [.border-b]:pb-5">
@@ -16,8 +20,13 @@ export function ActivityFeed() {
         <CardDescription>Live updates across the store</CardDescription>
       </CardHeader>
       <CardContent className="pt-2">
+        {activity.length === 0 && (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            No recent activity.
+          </p>
+        )}
         <ul className="flex flex-col">
-          {customerActivity.map((a, i) => (
+          {activity.map((a, i) => (
             <li
               key={i}
               className="flex items-start gap-3 border-b py-4 last:border-0"

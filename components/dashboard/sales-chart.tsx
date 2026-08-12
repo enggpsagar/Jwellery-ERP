@@ -15,27 +15,30 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { monthlySales } from "@/lib/data"
+import type { MonthlySalesPoint } from "@/lib/actions/dashboard-actions"
 
 const chartConfig = {
   sales: { label: "Sales", color: "var(--chart-1)" },
-  target: { label: "Target", color: "var(--chart-2)" },
 } satisfies ChartConfig
 
 const formatLakh = (v: number) => `₹${(v / 100000).toFixed(0)}L`
 
-export function SalesChart() {
+type SalesChartProps = {
+  data: MonthlySalesPoint[]
+}
+
+export function SalesChart({ data }: SalesChartProps) {
   return (
     <Card className="gap-0">
       <CardHeader className="border-b [.border-b]:pb-5">
         <CardTitle>Monthly Sales Trend</CardTitle>
         <CardDescription>
-          Sales against target for the last 12 months
+          Invoiced sales for the last 12 months
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-6">
         <ChartContainer config={chartConfig} className="h-[280px] w-full">
-          <AreaChart data={monthlySales} margin={{ left: 4, right: 8, top: 8 }}>
+          <AreaChart data={data} margin={{ left: 4, right: 8, top: 8 }}>
             <defs>
               <linearGradient id="fillSales" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="var(--color-sales)" stopOpacity={0.3} />
@@ -72,15 +75,6 @@ export function SalesChart() {
                   )}
                 />
               }
-            />
-            <Area
-              dataKey="target"
-              type="monotone"
-              fill="transparent"
-              stroke="var(--color-target)"
-              strokeWidth={1.5}
-              strokeDasharray="4 4"
-              dot={false}
             />
             <Area
               dataKey="sales"

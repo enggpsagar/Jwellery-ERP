@@ -16,7 +16,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { transactions } from "@/lib/data"
+import Link from "next/link"
+import type { DashboardTransaction } from "@/lib/actions/dashboard-actions"
 
 const statusStyles: Record<string, string> = {
   Paid: "bg-emerald-50 text-emerald-700",
@@ -24,15 +25,19 @@ const statusStyles: Record<string, string> = {
   Partial: "bg-blue-50 text-blue-700",
 }
 
-export function TransactionsTable() {
+type TransactionsTableProps = {
+  transactions: DashboardTransaction[]
+}
+
+export function TransactionsTable({ transactions }: TransactionsTableProps) {
   return (
     <Card className="gap-0 overflow-hidden">
       <CardHeader className="border-b [.border-b]:pb-5">
         <CardTitle>Recent Transactions</CardTitle>
         <CardDescription>Latest invoices and ledger entries</CardDescription>
         <CardAction>
-          <Button variant="outline" size="sm">
-            View all
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/billing">View all</Link>
           </Button>
         </CardAction>
       </CardHeader>
@@ -50,6 +55,16 @@ export function TransactionsTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {transactions.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={7}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  No transactions yet.
+                </TableCell>
+              </TableRow>
+            )}
             {transactions.map((t) => (
               <TableRow key={t.id}>
                 <TableCell className="font-medium tabular-nums">

@@ -1,8 +1,10 @@
-// lib/actions/karigar-actions.ts
+// FILE PATH: lib/actions/karigar-actions.ts
+// REPLACES the entire existing file at this path
 "use server";
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import * as XLSX from "xlsx";
 
 export type Karigar = {
   id: string;
@@ -52,6 +54,20 @@ export type KarigarListResponse = {
     hasNextPage: boolean;
     hasPrevPage: boolean;
   };
+};
+
+export type ExportKarigarsParams = {
+  selectedIds?: string[];
+  search?: string;
+  sortBy?: KarigarSortBy;
+  sortOrder?: SortOrder;
+};
+
+export type ExportResult = {
+  success: boolean;
+  message: string;
+  fileBase64?: string;
+  fileName?: string;
 };
 
 function toNumber(value: FormDataEntryValue | null, fallback = 0) {
@@ -280,5 +296,111 @@ export async function deleteKarigar(id: string): Promise<KarigarFormState> {
   } catch (error) {
     console.error("deleteKarigar error:", error);
     return { success: false, message: "Failed to delete karigar" };
+  }
+}
+
+function formatCurrencyINR(value: number) {
+  return `₹ ${value.toLocaleString("en-IN")}`;
+}
+
+function formatDateIST(date?: Date | null) {
+  if (!date) return "-";
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function getKarigarExportFileName() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const seconds = String(now.getSeconds()).padStart(2, "0");
+
+  return `karigars-${year}-${month}-${day}-${hours}-${minutes}-${seconds}.xlsx`;
+}
+
+export async function exportKarigarsToExcel(
+  params: ExportKarigarsParams,
+): Promise<ExportResult> {
+  try {
+    const { selectedIds, search, sortBy = "createdAt", sortOrder = "desc" } = params;
+
+    const where = selectedIds?.length
+      ? { id: { in: selectedIds } }
+      : getWhere(search);
+
+    const karigars = await prisma.karigar.findMany({
+      where,
+      orderBy: getOrderBy(sortBy, sortOrder),
+    });
+
+    if (!karigars.length) {
+      return { success: false, message: "No karigars found to export." };
+    }
+
+    const rows = karigars.map((karigar, index) => ({
+      "Sr No": index + 1,
+      "Karigar Code": karigar.code ?? "",
+      Name: karigar.name,
+      Mobile: karigar.mobile ?? "",
+      WhatsApp: karigar.whatsapp ?? "",
+      Email: karigar.email ?? "",
+      Address: karigar.address ?? "",
+      City: karigar.city ?? "",
+      Pincode: karigar.pincode ?? "",
+      Specialization: karigar.specialization ?? "",
+      GSTIN: karigar.gstNumber ?? "",
+      "PAN Number": karigar.panNumber ?? "",
+      "Aadhaar Number": karigar.aadhaarNumber ?? "",
+      "Opening Gold (g)": Number(karigar.openingGold ?? 0),
+      "Opening Cash": formatCurrencyINR(Number(karigar.openingCash ?? 0)),
+      Status: karigar.isActive ? "Active" : "Inactive",
+      Notes: karigar.notes ?? "",
+      "Created At": formatDateIST(karigar.createdAt),
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+
+    worksheet["!cols"] = [
+      { wch: 8 },
+      { wch: 14 },
+      { wch: 24 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 26 },
+      { wch: 30 },
+      { wch: 16 },
+      { wch: 12 },
+      { wch: 22 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 12 },
+      { wch: 30 },
+      { wch: 16 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Karigars");
+
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+    const fileName = getKarigarExportFileName();
+
+    return {
+      success: true,
+      message: `Exported ${karigars.length} karigar(s) successfully.`,
+      fileBase64: buffer.toString("base64"),
+      fileName,
+    };
+  } catch (error) {
+    console.error("exportKarigarsToExcel error:", error);
+    return { success: false, message: "Failed to export karigars." };
   }
 }

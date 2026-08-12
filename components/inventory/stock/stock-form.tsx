@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 
-import { InventoryStockStatus, MetalType, PurityType } from "@prisma/client";
+import {
+  InventoryStockStatus,
+  InventoryFinish,
+  MetalType,
+  PurityType,
+} from "@prisma/client";
 
 import type { StockFormState } from "@/lib/inventory/stock-types";
 
@@ -43,6 +48,8 @@ type Stock = {
   purity: string | null;
 
   status: string;
+
+  finish: string;
 
   quantity: number;
 
@@ -116,6 +123,10 @@ export function StockForm({
 
   const [status, setStatus] = useState(
     stock?.status ?? InventoryStockStatus.IN_STOCK,
+  );
+
+  const [finish, setFinish] = useState(
+    stock?.finish ?? InventoryFinish.KACHA,
   );
 
   const [isActive, setIsActive] = useState(
@@ -244,6 +255,26 @@ export function StockForm({
             </Select>
 
             <input type="hidden" name="status" value={status} />
+          </div>
+
+          <div>
+            <Label>Finish</Label>
+
+            <Select value={finish} onValueChange={setFinish}>
+              <SelectTrigger className="h-11 w-full">
+                <SelectValue />
+              </SelectTrigger>
+
+              <SelectContent>
+                {Object.values(InventoryFinish).map((item) => (
+                  <SelectItem key={item} value={item}>
+                    {item === "PAKKA" ? "Pakka / Hallmarked" : "Kacha"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <input type="hidden" name="finish" value={finish} />
           </div>
         </div>
       </div>

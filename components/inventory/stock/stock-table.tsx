@@ -2,6 +2,11 @@
 
 import Link from "next/link"
 
+import type { InventoryStockStatus, InventoryFinish } from "@prisma/client"
+
+import { StockStatusBadge } from "@/components/inventory/shared/stock-status-badge"
+import { FinishBadge } from "@/components/inventory/shared/finish-badge"
+
 type StockRow = {
   id: string
   stockCode: string
@@ -12,6 +17,7 @@ type StockRow = {
   purity: string | null
   quantity: number
   status: string
+  finish: string
   grossWeight: number | null
   netWeight: number | null
   makingCharge: number | null
@@ -70,6 +76,7 @@ export function StockTable({ stockItems }: StockTableProps) {
               <th className="px-4 py-3 text-left font-medium">Making</th>
               <th className="px-4 py-3 text-left font-medium">Sale Amt.</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
+              <th className="px-4 py-3 text-left font-medium">Finish</th>
               <th className="px-4 py-3 text-left font-medium">Location</th>
               <th className="px-4 py-3 text-left font-medium">Purchase Date</th>
               <th className="px-4 py-3 text-left font-medium">Action</th>
@@ -97,9 +104,13 @@ export function StockTable({ stockItems }: StockTableProps) {
                 <td className="px-4 py-3">{formatAmount(item.saleAmount)}</td>
 
                 <td className="px-4 py-3">
-                  <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                    {item.status}
-                  </span>
+                  <StockStatusBadge
+                    status={item.status as InventoryStockStatus}
+                  />
+                </td>
+
+                <td className="px-4 py-3">
+                  <FinishBadge finish={item.finish as InventoryFinish} />
                 </td>
 
                 <td className="px-4 py-3">{item.location ?? "-"}</td>

@@ -1,0 +1,373 @@
+// FILE PATH: lib/actions/dashboard-actions.ts
+"use server";
+
+import { MetalType } from "@prisma/client";
+
+import { prisma } from "@/lib/prisma";
+
+function startOfDay(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function percentChange(current: number, previous: number) {
+  if (previous === 0) return current === 0 ? 0 : 100;
+  return ((current - previous) / previous) * 100;
+}
+
+function formatPercent(value: number) {
+  const sign = value >= 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}%`;
+}
+
+export type DashboardStat = {
+  label: string;
+  value: string;
+  change: string;
+  trend: "up" | "down";
+  sub: string;
+  icon: "rupee" | "trending" | "wallet" | "gold" | "silver" | "hammer";
+};
+
+export async function getDashboardStats(): Promise<DashboardStat[]> {
+  const now = new Date();
+  const todayStart = startOfDay(now);
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
+  const monthStart = startOfMonth(now);
+  const lastMonthStart = startOfMonth(
+    new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  );
+
+  const [
+    todaySalesAgg,
+    yesterdaySalesAgg,
+    monthSalesAgg,
+    lastMonthSalesAgg,
+    outstandingAgg,
+    goldStock,
+    silverStock,
+    pendingJobs,
+    overdueJobs,
+  ] = await Promise.all([
+    prisma.invoice.aggregate({
+      where: { invoiceDate: { gte: todayStart } },
+      _sum: { totalAmount: true },
+    }),
+    prisma.invoice.aggregate({
+      where: { invoiceDate: { gte: yesterdayStart, lt: todayStart } },
+      _sum: { totalAmount: true },
+    }),
+    prisma.invoice.aggregate({
+      where: { invoiceDate: { gte: monthStart } },
+      _sum: { totalAmount: true },
+    }),
+    prisma.invoice.aggregate({
+      where: { invoiceDate: { gte: lastMonthStart, lt: monthStart } },
+      _sum: { totalAmount: true },
+    }),
+    prisma.invoice.aggregate({
+      where: { balanceAmount: { gt: 0 } },
+      _sum: { balanceAmount: true },
+      _count: true,
+    }),
+    prisma.inventoryStock.aggregate({
+      where: { metalType: MetalType.GOLD, isActive: true },
+      _sum: { netWeight: true },
+    }),
+    prisma.inventoryStock.aggregate({
+      where: { metalType: MetalType.SILVER, isActive: true },
+      _sum: { netWeight: true },
+    }),
+    prisma.karigarJob.count({ where: { receivedDate: null } }),
+    prisma.karigarJob.count({
+      where: {
+        receivedDate: null,
+        expectedDate: { lt: now },
+      },
+    }),
+  ]);
+
+  const todaySales = Number(todaySalesAgg._sum.totalAmount ?? 0);
+  const yesterdaySales = Number(yesterdaySalesAgg._sum.totalAmount ?? 0);
+  const monthSales = Number(monthSalesAgg._sum.totalAmount ?? 0);
+  const lastMonthSales = Number(lastMonthSalesAgg._sum.totalAmount ?? 0);
+  const outstanding = Number(outstandingAgg._sum.balanceAmount ?? 0);
+  const outstandingAccounts = outstandingAgg._count;
+  const goldGrams = Number(goldStock._sum.netWeight ?? 0);
+  const silverGrams = Number(silverStock._sum.netWeight ?? 0);
+
+  const todayChange = percentChange(todaySales, yesterdaySales);
+  const monthChange = percentChange(monthSales, lastMonthSales);
+
+  return [
+    {
+      label: "Today's Sales",
+      value: `₹${todaySales.toLocaleString("en-IN")}`,
+      change: formatPercent(todayChange),
+      trend: todayChange >= 0 ? "up" : "down",
+      sub: "vs. yesterday",
+      icon: "rupee",
+    },
+    {
+      label: "Monthly Revenue",
+      value: `₹${monthSales.toLocaleString("en-IN")}`,
+      change: formatPercent(monthChange),
+      trend: monthChange >= 0 ? "up" : "down",
+      sub: "vs. last month",
+      icon: "trending",
+    },
+    {
+      label: "Outstanding Receivables",
+      value: `₹${outstanding.toLocaleString("en-IN")}`,
+      change: "",
+      trend: outstanding > 0 ? "down" : "up",
+      sub: `across ${outstandingAccounts} account${outstandingAccounts === 1 ? "" : "s"}`,
+      icon: "wallet",
+    },
+    {
+      label: "Gold Stock",
+      value: `${goldGrams.toLocaleString("en-IN", { maximumFractionDigits: 1 })} g`,
+      change: "",
+      trend: "up",
+      sub: "active gold inventory",
+      icon: "gold",
+    },
+    {
+      label: "Silver Stock",
+      value: `${silverGrams.toLocaleString("en-IN", { maximumFractionDigits: 1 })} g`,
+      change: "",
+      trend: "up",
+      sub: "active silver inventory",
+      icon: "silver",
+    },
+    {
+      label: "Pending Karigar Orders",
+      value: `${pendingJobs}`,
+      change: "",
+      trend: overdueJobs > 0 ? "down" : "up",
+      sub: `${overdueJobs} overdue`,
+      icon: "hammer",
+    },
+  ];
+}
+
+export type MonthlySalesPoint = { month: string; sales: number };
+
+export async function getMonthlySalesTrend(
+  monthsBack = 12
+): Promise<MonthlySalesPoint[]> {
+  const now = new Date();
+  const rangeStart = new Date(
+    now.getFullYear(),
+    now.getMonth() - (monthsBack - 1),
+    1
+  );
+
+  const invoices = await prisma.invoice.findMany({
+    where: { invoiceDate: { gte: rangeStart } },
+    select: { invoiceDate: true, totalAmount: true },
+  });
+
+  const buckets = new Map<string, number>();
+
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    buckets.set(key, 0);
+  }
+
+  for (const inv of invoices) {
+    const d = inv.invoiceDate;
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if (buckets.has(key)) {
+      buckets.set(key, (buckets.get(key) ?? 0) + Number(inv.totalAmount));
+    }
+  }
+
+  const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
+
+  return Array.from(buckets.entries()).map(([key, sales]) => {
+    const [year, month] = key.split("-").map(Number);
+    return {
+      month: monthFormatter.format(new Date(year, month, 1)),
+      sales,
+    };
+  });
+}
+
+export type CategoryRevenue = { category: string; value: number };
+
+const CATEGORY_LABELS: Record<string, string> = {
+  ORNAMENT: "Ornaments",
+  COIN: "Coins & Bars",
+  BAR: "Coins & Bars",
+  RAW_METAL: "Raw Metal",
+  STONE: "Stones",
+  OTHER: "Other",
+};
+
+export async function getRevenueByCategory(): Promise<CategoryRevenue[]> {
+  const items = await prisma.invoiceItem.findMany({
+    select: {
+      lineTotal: true,
+      inventoryStock: {
+        select: { product: { select: { category: true } } },
+      },
+    },
+  });
+
+  const byCategory = new Map<string, number>();
+
+  for (const item of items) {
+    const category = item.inventoryStock?.product?.category ?? "OTHER";
+    const label = CATEGORY_LABELS[category] ?? "Other";
+    byCategory.set(label, (byCategory.get(label) ?? 0) + Number(item.lineTotal));
+  }
+
+  return Array.from(byCategory.entries())
+    .map(([category, value]) => ({ category, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+export type DashboardTransaction = {
+  id: string;
+  customer: string;
+  type: "Sale";
+  metal: string;
+  weight: string;
+  amount: string;
+  status: "Paid" | "Pending" | "Partial";
+  date: string;
+};
+
+const STATUS_MAP: Record<string, "Paid" | "Pending" | "Partial"> = {
+  PAID: "Paid",
+  DRAFT: "Pending",
+  PARTIAL: "Partial",
+  CANCELLED: "Pending",
+};
+
+export async function getRecentTransactions(
+  limit = 6
+): Promise<DashboardTransaction[]> {
+  const invoices = await prisma.invoice.findMany({
+    orderBy: { invoiceDate: "desc" },
+    take: limit,
+    include: {
+      customer: { select: { name: true } },
+      items: { select: { metalType: true, netWeight: true } },
+    },
+  });
+
+  return invoices.map((inv) => {
+    const metals = new Set(
+      inv.items.map((item) => item.metalType).filter(Boolean)
+    );
+    const metal =
+      metals.size === 0
+        ? "—"
+        : metals.size > 1
+          ? "Mixed"
+          : (metals.values().next().value as string);
+
+    const totalWeight = inv.items.reduce(
+      (sum, item) => sum + (item.netWeight ? Number(item.netWeight) : 0),
+      0
+    );
+
+    return {
+      id: inv.invoiceNumber,
+      customer: inv.customer.name,
+      type: "Sale" as const,
+      metal,
+      weight: totalWeight > 0 ? `${totalWeight.toFixed(1)} g` : "—",
+      amount: `₹${Number(inv.totalAmount).toLocaleString("en-IN")}`,
+      status: STATUS_MAP[inv.status] ?? "Pending",
+      date: inv.invoiceDate.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+  });
+}
+
+export type DashboardActivity = {
+  name: string;
+  initials: string;
+  action: string;
+  detail: string;
+  time: string;
+};
+
+function initialsOf(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function relativeTime(date: Date) {
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+
+  if (diffMinutes < 1) return "just now";
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hr ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+}
+
+export async function getRecentActivity(
+  limit = 5
+): Promise<DashboardActivity[]> {
+  const entries = await prisma.ledgerEntry.findMany({
+    orderBy: { entryDate: "desc" },
+    take: limit,
+    include: {
+      customer: { select: { name: true } },
+      karigar: { select: { name: true } },
+    },
+  });
+
+  return entries.map((entry) => {
+    const name = entry.customer?.name ?? entry.karigar?.name ?? "Store";
+    const isCredit = entry.type === "CREDIT";
+
+    let action = entry.description ?? "Ledger entry recorded";
+    if (entry.sourceType === "SALE") {
+      action = isCredit ? "Payment received" : "Completed a purchase";
+    } else if (entry.sourceType === "KARIGAR_ISSUE") {
+      action = "Material issued to karigar";
+    } else if (entry.sourceType === "KARIGAR_RECEIPT") {
+      action = "Received goods from karigar";
+    }
+
+    const detail =
+      entry.metalWeight && entry.metalType
+        ? `${entry.metalType} · ${Number(entry.metalWeight).toFixed(1)} g`
+        : `₹${Number(entry.amount).toLocaleString("en-IN")}`;
+
+    return {
+      name,
+      initials: initialsOf(name),
+      action,
+      detail,
+      time: relativeTime(entry.entryDate),
+    };
+  });
+}

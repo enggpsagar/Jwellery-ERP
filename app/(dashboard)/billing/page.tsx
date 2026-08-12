@@ -16,9 +16,15 @@ export default async function BillingPage() {
         backHref="/dashboard"
         backLabel="Back to Dashboard"
         action={
-          <Link href="/billing/new">
-            <Button>New Invoice</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/billing/kacha">
+              <Button variant="outline">Kacha Slips</Button>
+            </Link>
+
+            <Link href="/billing/new">
+              <Button>New Invoice</Button>
+            </Link>
+          </div>
         }
       />
 

@@ -1,0 +1,99 @@
+"use client"
+
+import Link from "next/link"
+import { Eye, ArrowRightCircle } from "lucide-react"
+
+import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
+
+type KachaInvoiceRow = {
+  id: string
+  slipNumber: string
+  invoiceDate: string
+  status: string
+  totalAmount: number
+  balanceAmount: number
+  convertedTo: { id: string; invoiceNumber: string } | null
+  customer: { id: string; name: string; phone: string | null } | null
+}
+
+type KachaInvoiceTableProps = {
+  kachaInvoices: KachaInvoiceRow[]
+}
+
+export function KachaInvoiceTable({ kachaInvoices }: KachaInvoiceTableProps) {
+  if (!kachaInvoices.length) {
+    return (
+      <div className="rounded-xl border bg-white p-6 text-sm text-muted-foreground">
+        No Kacha slips found yet.
+      </div>
+    )
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border bg-white">
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead className="bg-muted/40">
+            <tr className="border-b">
+              <th className="px-4 py-3 text-left font-medium">Slip #</th>
+              <th className="px-4 py-3 text-left font-medium">Date</th>
+              <th className="px-4 py-3 text-left font-medium">Customer</th>
+              <th className="px-4 py-3 text-left font-medium">Status</th>
+              <th className="px-4 py-3 text-left font-medium">Total</th>
+              <th className="px-4 py-3 text-left font-medium">Balance</th>
+              <th className="px-4 py-3 text-left font-medium">Converted</th>
+              <th className="px-4 py-3 text-left font-medium">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {kachaInvoices.map((kachaInvoice) => (
+              <tr key={kachaInvoice.id} className="border-b last:border-0">
+                <td className="px-4 py-3 font-medium">{kachaInvoice.slipNumber}</td>
+                <td className="px-4 py-3">
+                  {new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN")}
+                </td>
+                <td className="px-4 py-3">{kachaInvoice.customer?.name ?? "-"}</td>
+                <td className="px-4 py-3">
+                  <InvoiceStatusBadge status={kachaInvoice.status as any} />
+                </td>
+                <td className="px-4 py-3">₹{kachaInvoice.totalAmount.toFixed(2)}</td>
+                <td className="px-4 py-3">
+                  {kachaInvoice.balanceAmount > 0 ? (
+                    <span className="text-red-600 font-medium">
+                      ₹{kachaInvoice.balanceAmount.toFixed(2)}
+                    </span>
+                  ) : (
+                    "₹0.00"
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {kachaInvoice.convertedTo ? (
+                    <Link
+                      href={`/billing/${kachaInvoice.convertedTo.id}`}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline"
+                    >
+                      <ArrowRightCircle className="h-3 w-3" />
+                      {kachaInvoice.convertedTo.invoiceNumber}
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Not converted</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <Link
+                    href={`/billing/kacha/${kachaInvoice.id}`}
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
+                    title="View Kacha slip"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

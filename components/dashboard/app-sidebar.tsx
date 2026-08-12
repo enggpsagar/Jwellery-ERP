@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -14,6 +15,7 @@ import {
   BarChart3,
   Settings,
   Gem,
+  ChevronRight,
 } from "lucide-react";
 
 import {
@@ -27,6 +29,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
 
@@ -62,6 +67,10 @@ const mainNav = [
     title: "Billing",
     href: "/billing",
     icon: ReceiptText,
+    items: [
+      { title: "Pakka Invoices", href: "/billing" },
+      { title: "Kacha Slips", href: "/billing/kacha" },
+    ],
   },
   {
     title: "Reports",
@@ -77,6 +86,66 @@ const mainNav = [
 
 function isNavItemActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+type NavItem = (typeof mainNav)[number];
+
+function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string }) {
+  const Icon = item.icon;
+  const isActive = isNavItemActive(pathname, item.href);
+  const hasSubItems = "items" in item && item.items;
+  const isSubItemActive =
+    hasSubItems && item.items!.some((subItem) => pathname === subItem.href);
+
+  const [open, setOpen] = useState(isSubItemActive);
+
+  if (!hasSubItems) {
+    return (
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+          <Link href={item.href}>
+            <Icon className="h-4 w-4" />
+            <span>{item.title}</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  }
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        isActive={isActive}
+        tooltip={item.title}
+        onClick={() => setOpen(true)}
+      >
+        <Link href={item.href}>
+          <Icon className="h-4 w-4" />
+          <span>{item.title}</span>
+          <ChevronRight
+            className={`ml-auto h-4 w-4 shrink-0 transition-transform ${
+              open ? "rotate-90" : ""
+            }`}
+          />
+        </Link>
+      </SidebarMenuButton>
+
+      {open && (
+        <SidebarMenuSub>
+          {item.items!.map((subItem) => (
+            <SidebarMenuSubItem key={subItem.title}>
+              <SidebarMenuSubButton asChild isActive={pathname === subItem.href}>
+                <Link href={subItem.href}>
+                  <span>{subItem.title}</span>
+                </Link>
+              </SidebarMenuSubButton>
+            </SidebarMenuSubItem>
+          ))}
+        </SidebarMenuSub>
+      )}
+    </SidebarMenuItem>
+  );
 }
 
 export function AppSidebar() {
@@ -115,24 +184,9 @@ export function AppSidebar() {
 
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNav.map((item) => {
-                const Icon = item.icon;
-
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isNavItemActive(pathname, item.href)}
-                      tooltip={item.title}
-                    >
-                      <Link href={item.href}>
-                        <Icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+              {mainNav.map((item) => (
+                <SidebarNavItem key={item.title} item={item} pathname={pathname} />
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

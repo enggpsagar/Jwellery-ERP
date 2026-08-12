@@ -1,74 +1,72 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeftCircle } from "lucide-react"
+import { ArrowRightCircle } from "lucide-react"
 
-import { getInvoiceById } from "@/lib/actions/invoice-actions"
+import { getKachaInvoiceById } from "@/lib/actions/kacha-invoice-actions"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
-import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog"
+import { RecordKachaPaymentDialog } from "@/components/billing/kacha/record-kacha-payment-dialog"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import { Button } from "@/components/ui/button"
 
 type Props = {
   params: Promise<{ id: string }>
 }
 
-export default async function InvoiceDetailPage({ params }: Props) {
+export default async function KachaInvoiceDetailPage({ params }: Props) {
   const { id } = await params
-  const invoice = await getInvoiceById(id)
+  const kachaInvoice = await getKachaInvoiceById(id)
 
-  if (!invoice) notFound()
+  if (!kachaInvoice) notFound()
 
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
-        title={invoice.invoiceNumber}
-        description={invoice.customer?.name ?? ""}
-        backHref="/billing"
-        backLabel="Back to Billing"
+        title={kachaInvoice.slipNumber}
+        description={kachaInvoice.customer?.name ?? ""}
+        backHref="/billing/kacha"
+        backLabel="Back to Kacha Slips"
         action={
-          <RecordPaymentDialog
-            invoiceId={invoice.id}
-            balanceAmount={invoice.balanceAmount}
-          />
+          <div className="flex items-center gap-2">
+            {kachaInvoice.convertedTo ? (
+              <Link href={`/billing/${kachaInvoice.convertedTo.id}`}>
+                <Button variant="outline" className="gap-2">
+                  <ArrowRightCircle className="h-4 w-4" />
+                  View Pakka Invoice ({kachaInvoice.convertedTo.invoiceNumber})
+                </Button>
+              </Link>
+            ) : (
+              <Link href={`/billing/kacha/${kachaInvoice.id}/convert`}>
+                <Button variant="outline">Convert to Pakka</Button>
+              </Link>
+            )}
+
+            <RecordKachaPaymentDialog
+              kachaInvoiceId={kachaInvoice.id}
+              balanceAmount={kachaInvoice.balanceAmount}
+            />
+          </div>
         }
       />
-
-      {invoice.convertedFromKacha && (
-        <Link
-          href={`/billing/kacha/${invoice.convertedFromKacha.id}`}
-          className="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:underline"
-        >
-          <ArrowLeftCircle className="h-4 w-4" />
-          Converted from Kacha slip {invoice.convertedFromKacha.slipNumber}
-        </Link>
-      )}
 
       <div className="rounded-xl border bg-white p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground">Status</p>
-            <InvoiceStatusBadge status={invoice.status} />
+            <InvoiceStatusBadge status={kachaInvoice.status} />
           </div>
 
           <div>
-            <p className="text-sm text-muted-foreground">Invoice Date</p>
+            <p className="text-sm text-muted-foreground">Slip Date</p>
             <p className="font-medium">
-              {new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}
+              {new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN")}
             </p>
           </div>
-
-          {invoice.dueDate && (
-            <div>
-              <p className="text-sm text-muted-foreground">Due Date</p>
-              <p className="font-medium">
-                {new Date(invoice.dueDate).toLocaleDateString("en-IN")}
-              </p>
-            </div>
-          )}
 
           <div>
             <p className="text-sm text-muted-foreground">Customer</p>
             <p className="font-medium">
-              {invoice.customer?.name} {invoice.customer?.phone ? `(${invoice.customer.phone})` : ""}
+              {kachaInvoice.customer?.name}{" "}
+              {kachaInvoice.customer?.phone ? `(${kachaInvoice.customer.phone})` : ""}
             </p>
           </div>
         </div>
@@ -88,7 +86,7 @@ export default async function InvoiceDetailPage({ params }: Props) {
             </tr>
           </thead>
           <tbody>
-            {invoice.items.map((item) => (
+            {kachaInvoice.items.map((item: (typeof kachaInvoice.items)[number]) => (
               <tr key={item.id} className="border-b last:border-0">
                 <td className="px-4 py-3">{item.itemName}</td>
                 <td className="px-4 py-3">{item.quantity}</td>
@@ -106,42 +104,38 @@ export default async function InvoiceDetailPage({ params }: Props) {
       <div className="rounded-xl border bg-white p-6 max-w-sm ml-auto space-y-1 text-sm">
         <div className="flex justify-between">
           <span>Subtotal</span>
-          <span>₹{invoice.subtotal.toFixed(2)}</span>
+          <span>₹{kachaInvoice.subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
           <span>Making Charges</span>
-          <span>₹{invoice.makingCharges.toFixed(2)}</span>
+          <span>₹{kachaInvoice.makingCharges.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
           <span>Stone Charges</span>
-          <span>₹{invoice.stoneCharges.toFixed(2)}</span>
+          <span>₹{kachaInvoice.stoneCharges.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
           <span>Discount</span>
-          <span>-₹{invoice.discount.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Tax</span>
-          <span>₹{invoice.taxAmount.toFixed(2)}</span>
+          <span>-₹{kachaInvoice.discount.toFixed(2)}</span>
         </div>
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
           <span>Total</span>
-          <span>₹{invoice.totalAmount.toFixed(2)}</span>
+          <span>₹{kachaInvoice.totalAmount.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
           <span>Paid</span>
-          <span>₹{invoice.paidAmount.toFixed(2)}</span>
+          <span>₹{kachaInvoice.paidAmount.toFixed(2)}</span>
         </div>
         <div className="flex justify-between text-red-600 font-medium">
           <span>Balance</span>
-          <span>₹{invoice.balanceAmount.toFixed(2)}</span>
+          <span>₹{kachaInvoice.balanceAmount.toFixed(2)}</span>
         </div>
       </div>
 
-      {invoice.notes && (
+      {kachaInvoice.notes && (
         <div className="rounded-xl border bg-white p-6">
           <p className="text-sm text-muted-foreground">Notes</p>
-          <p className="font-medium">{invoice.notes}</p>
+          <p className="font-medium">{kachaInvoice.notes}</p>
         </div>
       )}
     </main>

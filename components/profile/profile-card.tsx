@@ -17,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 import { AvatarUpload } from "./avatar-upload";
 import { ChangePasswordDialog } from "./change-password-dialog";
+import { DeleteAccountDialog } from "./delete-account-dialog";
 
 type Profile = {
   name: string | null;
@@ -161,8 +162,9 @@ export function ProfileCard() {
           </div>
         </div>
 
-        <div className="mt-8 w-full">
+        <div className="mt-8 w-full space-y-2">
           <ChangePasswordDialog />
+          <DeleteAccountDialog />
         </div>
       </CardContent>
     </Card>

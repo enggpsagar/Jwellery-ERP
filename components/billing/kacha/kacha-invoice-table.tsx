@@ -71,10 +71,11 @@ export function KachaInvoiceTable({ kachaInvoices }: KachaInvoiceTableProps) {
                   {kachaInvoice.convertedTo ? (
                     <Link
                       href={`/billing/${kachaInvoice.convertedTo.id}`}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                      title={`View Pakka Invoice ${kachaInvoice.convertedTo.invoiceNumber}`}
                     >
-                      <ArrowRightCircle className="h-3 w-3" />
-                      {kachaInvoice.convertedTo.invoiceNumber}
+                      <ArrowRightCircle className="h-3.5 w-3.5" />
+                      Converted to Pakka Invoice ({kachaInvoice.convertedTo.invoiceNumber})
                     </Link>
                   ) : (
                     <span className="text-xs text-muted-foreground">Not converted</span>

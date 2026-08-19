@@ -3,7 +3,9 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { UserRole } from "@prisma/client";
 import { requireStoreScope } from "@/lib/store-context";
+import { requireRole } from "@/lib/auth/auth";
 
 export type BusinessSettings = {
   storeId: string;
@@ -95,6 +97,15 @@ export async function updateBusinessSettings(
   prevState: SettingsFormState,
   formData: FormData,
 ): Promise<SettingsFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return {
+      success: false,
+      message: "Only the Store Owner can update these settings.",
+    };
+  }
+
   try {
     const businessName = String(formData.get("businessName") || "").trim();
 

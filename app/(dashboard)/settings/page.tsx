@@ -1,10 +1,20 @@
+import { UserRole } from "@prisma/client";
+
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
+import { getCurrentUser } from "@/lib/auth/auth";
 
 import { SettingsForm } from "@/components/settings/settings-form";
 import { PageBackHeader } from "@/components/shared/page-back-header";
 
 export default async function SettingsPage() {
-  const settings = await getBusinessSettings();
+  const [settings, currentUser] = await Promise.all([
+    getBusinessSettings(),
+    getCurrentUser(),
+  ]);
+
+  const canEdit =
+    currentUser?.role === UserRole.ADMIN ||
+    currentUser?.role === UserRole.SUPER_ADMIN;
 
   return (
     <main className="space-y-6 p-6">
@@ -15,7 +25,7 @@ export default async function SettingsPage() {
         backLabel="Back to Dashboard"
       />
 
-      <SettingsForm settings={settings} />
+      <SettingsForm settings={settings} canEdit={canEdit} />
     </main>
   );
 }

@@ -129,7 +129,8 @@ function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string })
   const isSubItemActive =
     hasSubItems && item.items!.some((subItem) => pathname === subItem.href);
 
-  const [open, setOpen] = useState(isSubItemActive);
+  const [manuallyOpened, setManuallyOpened] = useState(false);
+  const open = isSubItemActive || manuallyOpened;
 
   if (!hasSubItems) {
     return (
@@ -150,7 +151,7 @@ function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string })
         asChild
         isActive={isActive}
         tooltip={item.title}
-        onClick={() => setOpen(true)}
+        onClick={() => setManuallyOpened(true)}
       >
         <Link href={item.href}>
           <Icon className="h-4 w-4" />

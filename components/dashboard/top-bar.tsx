@@ -5,7 +5,6 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Bell,
   Plus,
   ChevronDown,
   LogOut,
@@ -28,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { GlobalSearch } from "@/components/dashboard/global-search";
 import { StoreSwitcher } from "@/components/dashboard/store-switcher";
+import { NotificationBell } from "@/components/dashboard/notification-bell";
 
 type Rates = {
   gold24k: number;
@@ -195,18 +195,14 @@ export function TopBar({ stores = [], activeStoreId = null }: TopBarProps) {
             </>
           )}
         </div>
-        <Button size="sm">
-          <Plus className="mr-1 h-4 w-4" />
-          New Invoice
+        <Button size="sm" asChild>
+          <Link href="/billing/new">
+            <Plus className="mr-1 h-4 w-4" />
+            New Invoice
+          </Link>
         </Button>
 
-        <Button variant="outline" size="icon" className="relative">
-          <Bell className="h-4 w-4" />
-
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />
-
-          <span className="sr-only">Notifications</span>
-        </Button>
+        <NotificationBell />
 
         <DropdownMenu>
           <DropdownMenuTrigger className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 hover:bg-accent">

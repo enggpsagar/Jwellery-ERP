@@ -52,7 +52,18 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground">Status</p>
-            <InvoiceStatusBadge status={kachaInvoice.status} />
+            <div className="flex flex-wrap items-center gap-2">
+              <InvoiceStatusBadge status={kachaInvoice.status} />
+              {kachaInvoice.convertedTo && (
+                <Link
+                  href={`/billing/${kachaInvoice.convertedTo.id}`}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                >
+                  <ArrowRightCircle className="h-3.5 w-3.5" />
+                  Converted to Pakka Invoice
+                </Link>
+              )}
+            </div>
           </div>
 
           <div>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/auth";
@@ -148,6 +149,53 @@ export async function PATCH(req: NextRequest) {
       {
         status: 500,
       }
+    );
+  }
+}
+
+export async function DELETE() {
+  try {
+    const sessionUser = await requireAuth();
+
+    if (sessionUser.role === UserRole.SUPER_ADMIN) {
+      const otherSuperAdmins = await prisma.user.count({
+        where: { role: UserRole.SUPER_ADMIN, id: { not: sessionUser.id } },
+      });
+
+      if (otherSuperAdmins === 0) {
+        return NextResponse.json(
+          { message: "You're the only Super Admin — add another before deleting your account." },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (sessionUser.role === UserRole.ADMIN) {
+      const otherAdmins = await prisma.user.count({
+        where: {
+          role: UserRole.ADMIN,
+          storeId: sessionUser.storeId,
+          id: { not: sessionUser.id },
+        },
+      });
+
+      if (otherAdmins === 0) {
+        return NextResponse.json(
+          { message: "You're the only Admin for this store — add another Admin before deleting your account." },
+          { status: 400 }
+        );
+      }
+    }
+
+    await prisma.user.delete({ where: { id: sessionUser.id } });
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error(err);
+
+    return NextResponse.json(
+      { message: "Unable to delete account." },
+      { status: 500 }
     );
   }
 }

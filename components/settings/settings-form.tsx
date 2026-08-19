@@ -17,11 +17,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type SettingsFormProps = {
   settings: BusinessSettings;
+  canEdit: boolean;
 };
 
 const initialState: SettingsFormState = { success: false, message: "" };
 
-export function SettingsForm({ settings }: SettingsFormProps) {
+export function SettingsForm({ settings, canEdit }: SettingsFormProps) {
   const [state, formAction, isPending] = useActionState(
     updateBusinessSettings,
     initialState,
@@ -36,6 +37,12 @@ export function SettingsForm({ settings }: SettingsFormProps) {
 
   return (
     <form action={formAction} className="space-y-6">
+      {!canEdit ? (
+        <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Only the Store Owner can edit these settings. You have view-only access.
+        </div>
+      ) : null}
+
       {state.message ? (
         <div
           className={`rounded-lg px-4 py-3 text-sm ${
@@ -48,6 +55,7 @@ export function SettingsForm({ settings }: SettingsFormProps) {
         </div>
       ) : null}
 
+      <fieldset disabled={!canEdit} className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Business Details</CardTitle>
@@ -237,11 +245,14 @@ export function SettingsForm({ settings }: SettingsFormProps) {
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving..." : "Save Settings"}
-        </Button>
-      </div>
+      {canEdit && (
+        <div className="flex justify-end">
+          <Button type="submit" disabled={isPending}>
+            {isPending ? "Saving..." : "Save Settings"}
+          </Button>
+        </div>
+      )}
+      </fieldset>
     </form>
   );
 }

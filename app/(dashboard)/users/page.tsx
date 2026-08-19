@@ -1,5 +1,6 @@
 // File: src/app/(dashboard)/users/page.tsx
 
+import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 
 import { getUsers } from "@/lib/user";
@@ -11,6 +12,14 @@ import { UserFormDialog } from "@/components/users/user-form-dialog";
 
 export default async function UsersPage() {
   const currentUser = await getCurrentUser();
+
+  if (
+    currentUser?.role !== UserRole.ADMIN &&
+    currentUser?.role !== UserRole.SUPER_ADMIN
+  ) {
+    redirect("/profile");
+  }
+
   const storeId = await getEffectiveStoreId();
 
   const [users, karigars] = await Promise.all([

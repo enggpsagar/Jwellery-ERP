@@ -29,6 +29,10 @@ export const createUserSchema = z.object({
 
   // Only meaningful when role is KARIGAR — links the login to a Karigar record.
   karigarId: z.string().cuid().optional().or(z.literal("")),
+
+  // Only meaningful when role is STAFF — per-user module access overrides.
+  // Empty/omitted means "use the default full Staff bundle."
+  permissions: z.array(z.string()).optional().default([]),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

@@ -69,6 +69,7 @@ export const authOptions: NextAuthOptions = {
           storeId: string | null
           karigarId: string | null
           phone: string | null
+          permissions: string[] | null
         }
 
         let role = dbUser.role
@@ -91,6 +92,7 @@ export const authOptions: NextAuthOptions = {
         token.storeId = storeId
         token.karigarId = dbUser.karigarId
         token.phone = dbUser.phone
+        token.permissions = dbUser.permissions ?? []
       }
       return token
     },
@@ -102,6 +104,7 @@ export const authOptions: NextAuthOptions = {
         session.user.storeId = token.storeId ?? null
         session.user.karigarId = token.karigarId ?? null
         session.user.phone = token.phone ?? null
+        session.user.permissions = token.permissions ?? []
       }
       return session
     },

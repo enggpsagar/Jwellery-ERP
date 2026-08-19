@@ -40,6 +40,7 @@ interface User {
   isActive: boolean;
   createdAt: Date;
   karigarId?: string | null;
+  permissions?: string[] | null;
 }
 
 interface KarigarOption {

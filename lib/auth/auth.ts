@@ -3,7 +3,7 @@
 import { getServerSession } from "next-auth";
 import { UserRole } from "@prisma/client";
 import { authOptions } from "@/lib/auth/auth-options";
-import { ROLE_PERMISSIONS } from "@/lib/roles";
+import { getEffectivePermissions } from "@/lib/roles";
 
 export async function auth() {
   return getServerSession(authOptions);
@@ -38,8 +38,10 @@ export async function requireRole(role: UserRole | UserRole[]) {
 export async function hasPermission(permission: string) {
   const user = await requireAuth();
 
-  const permissions =
-    ROLE_PERMISSIONS[user.role as UserRole] ?? [];
+  const permissions = getEffectivePermissions({
+    role: user.role as UserRole,
+    permissions: user.permissions,
+  });
 
   return permissions.includes(permission);
 }

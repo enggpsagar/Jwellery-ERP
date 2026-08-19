@@ -24,6 +24,7 @@ export async function getUsers(storeId: string | null) {
       createdAt: true,
       storeId: true,
       karigarId: true,
+      permissions: true,
       store: { select: { name: true } },
       karigar: { select: { name: true } },
     },
@@ -49,7 +50,19 @@ async function assertKarigarInStore(karigarId: string | null, storeId: string) {
   }
 }
 
-export async function createUser(data: CreateUserInput, storeId: string) {
+/**
+ * Signing in with Google auto-creates a User row for any email (via the
+ * NextAuth adapter) with no store attached. If an Admin later tries to add
+ * that same email to their store, a plain unique-constraint create would
+ * fail with a confusing "already exists" error — instead, an orphaned
+ * (storeless) account is claimed into the inviting store. Accounts that
+ * already belong to a store, or to Super Admin, are never silently
+ * reassigned — that would let one store's Admin hijack another store's user.
+ */
+export async function createUser(
+  data: CreateUserInput,
+  storeId: string
+): Promise<{ user: Awaited<ReturnType<typeof prisma.user.create>>; claimed: boolean }> {
   const email = data.email?.trim() || null;
   const phone = data.phone?.trim() || null;
   const karigarId = data.karigarId?.trim() || null;
@@ -60,7 +73,47 @@ export async function createUser(data: CreateUserInput, storeId: string) {
 
   await assertKarigarInStore(karigarId, storeId);
 
-  return prisma.user.create({
+  const existing = await prisma.user.findFirst({
+    where: {
+      OR: [email ? { email } : undefined, phone ? { phone } : undefined].filter(
+        (clause): clause is { email: string } | { phone: string } => Boolean(clause)
+      ),
+    },
+  });
+
+  if (existing) {
+    if (existing.role === UserRole.SUPER_ADMIN) {
+      throw new Error(
+        "This email belongs to a Super Admin account and can't be added as a store user."
+      );
+    }
+
+    if (existing.storeId && existing.storeId === storeId) {
+      throw new Error("A user with this email or phone already exists in this store.");
+    }
+
+    if (existing.storeId && existing.storeId !== storeId) {
+      throw new Error("This email or phone is already associated with another store.");
+    }
+
+    // Existing account has no store yet (e.g. self-registered via Google) — claim it.
+    const user = await prisma.user.update({
+      where: { id: existing.id },
+      data: {
+        name: data.name || existing.name,
+        role: data.role,
+        isActive: data.isActive,
+        storeId,
+        karigarId,
+        status: UserStatus.ACTIVE,
+        permissions: data.role === UserRole.STAFF ? data.permissions : [],
+      },
+    });
+
+    return { user, claimed: true };
+  }
+
+  const user = await prisma.user.create({
     data: {
       name: data.name,
       email,
@@ -70,8 +123,11 @@ export async function createUser(data: CreateUserInput, storeId: string) {
       isActive: data.isActive,
       storeId,
       karigarId,
+      permissions: data.role === UserRole.STAFF ? data.permissions : [],
     },
   });
+
+  return { user, claimed: false };
 }
 
 export async function updateUser(data: UpdateUserInput, storeId: string) {
@@ -89,6 +145,7 @@ export async function updateUser(data: UpdateUserInput, storeId: string) {
       role: payload.role,
       isActive: payload.isActive,
       karigarId,
+      permissions: payload.role === UserRole.STAFF ? payload.permissions : [],
     },
   });
 

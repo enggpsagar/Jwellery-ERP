@@ -12,6 +12,7 @@ declare module "next-auth" {
       isActive: boolean
       storeId: string | null
       karigarId: string | null
+      permissions: string[]
       name?: string | null
       email?: string | null
       image?: string | null
@@ -26,5 +27,6 @@ declare module "next-auth/jwt" {
     phone?: string | null
     storeId?: string | null
     karigarId?: string | null
+    permissions?: string[]
   }
 }

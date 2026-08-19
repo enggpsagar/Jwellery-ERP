@@ -20,7 +20,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
 
 import {
   Sidebar,
@@ -108,12 +108,22 @@ const karigarNav: NavItem[] = [
   },
 ];
 
-function getNavForRole(role?: string) {
+function getNavForRole(role?: string, permissions: string[] = []) {
   if (role === "KARIGAR") return karigarNav;
 
   return mainNav.filter((item) => {
     if (item.href === "/stores") return role === "SUPER_ADMIN";
     if (item.href === "/users") return role === "SUPER_ADMIN" || role === "ADMIN";
+
+    // Empty permissions means "not customized" — falls back to full access,
+    // matching getEffectivePermissions() in lib/roles.ts.
+    if (role === "STAFF" && permissions.length > 0) {
+      const module = MODULE_DEFINITIONS.find((definition) => definition.href === item.href);
+      if (module) {
+        return module.permissions.every((permission) => permissions.includes(permission));
+      }
+    }
+
     return true;
   });
 }
@@ -201,7 +211,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const role = session?.user?.role;
-  const navItems = getNavForRole(role);
+  const navItems = getNavForRole(role, session?.user?.permissions);
   const showSettings = role !== "STAFF" && role !== "KARIGAR" && role !== "MANAGER";
   const userName = session?.user?.name ?? "User";
   const userInitials = userName

@@ -34,6 +34,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   ],
 
   // "Normal users" — day-to-day sales, invoicing and inventory, no admin surfaces.
+  // This is the fallback used when a Staff user has no custom module
+  // selection (`User.permissions` empty) — full access to every module,
+  // matching behavior before per-user module access existed.
   STAFF: [
     PERMISSIONS.DASHBOARD_VIEW,
 
@@ -46,6 +49,19 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     PERMISSIONS.INVENTORY_VIEW,
     PERMISSIONS.INVENTORY_CREATE,
     PERMISSIONS.INVENTORY_UPDATE,
+
+    PERMISSIONS.BILLING_VIEW,
+    PERMISSIONS.BILLING_CREATE,
+    PERMISSIONS.BILLING_UPDATE,
+
+    PERMISSIONS.KARIGAR_VIEW,
+    PERMISSIONS.KARIGAR_CREATE,
+    PERMISSIONS.KARIGAR_UPDATE,
+
+    PERMISSIONS.LEDGER_VIEW,
+    PERMISSIONS.LEDGER_CREATE,
+
+    PERMISSIONS.REPORT_VIEW,
   ],
 
   // Karigars only ever see their own jobs — enforced by a row-level
@@ -60,3 +76,97 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   STAFF: "Staff",
   KARIGAR: "Karigar",
 };
+
+/**
+ * The 6 workspace sections an Admin can toggle on/off per Staff user.
+ * Dashboard always stays visible; Users/Settings/Stores stay role-gated
+ * (Admin/Super Admin only) rather than per-user customizable.
+ */
+export type ModuleKey =
+  | "customers"
+  | "inventory"
+  | "billing"
+  | "karigars"
+  | "reports"
+  | "ledger";
+
+export const MODULE_DEFINITIONS: {
+  key: ModuleKey;
+  label: string;
+  href: string;
+  permissions: string[];
+}[] = [
+  {
+    key: "customers",
+    label: "Customers",
+    href: "/customers",
+    permissions: [
+      PERMISSIONS.CUSTOMER_VIEW,
+      PERMISSIONS.CUSTOMER_CREATE,
+      PERMISSIONS.CUSTOMER_UPDATE,
+    ],
+  },
+  {
+    key: "inventory",
+    label: "Inventory",
+    href: "/inventory",
+    permissions: [
+      PERMISSIONS.PRODUCT_VIEW,
+      PERMISSIONS.PRODUCT_CREATE,
+      PERMISSIONS.PRODUCT_UPDATE,
+      PERMISSIONS.INVENTORY_VIEW,
+      PERMISSIONS.INVENTORY_CREATE,
+      PERMISSIONS.INVENTORY_UPDATE,
+    ],
+  },
+  {
+    key: "billing",
+    label: "Billing",
+    href: "/billing",
+    permissions: [
+      PERMISSIONS.BILLING_VIEW,
+      PERMISSIONS.BILLING_CREATE,
+      PERMISSIONS.BILLING_UPDATE,
+    ],
+  },
+  {
+    key: "karigars",
+    label: "Karigar Management",
+    href: "/karigars",
+    permissions: [
+      PERMISSIONS.KARIGAR_VIEW,
+      PERMISSIONS.KARIGAR_CREATE,
+      PERMISSIONS.KARIGAR_UPDATE,
+    ],
+  },
+  {
+    key: "reports",
+    label: "Reports",
+    href: "/reports",
+    permissions: [PERMISSIONS.REPORT_VIEW],
+  },
+  {
+    key: "ledger",
+    label: "Gold & Silver Ledger",
+    href: "/ledger",
+    permissions: [PERMISSIONS.LEDGER_VIEW, PERMISSIONS.LEDGER_CREATE],
+  },
+];
+
+/**
+ * Effective permission list for a user. Admin/Super Admin always get the
+ * full role bundle — module customization only applies to Staff, so an
+ * Admin can't accidentally lock themselves out. A Staff user with no
+ * custom `permissions` saved falls back to the full STAFF bundle, so
+ * existing/plain Staff accounts keep working exactly as before.
+ */
+export function getEffectivePermissions(user: {
+  role: UserRole;
+  permissions?: string[] | null;
+}): string[] {
+  if (user.role === UserRole.STAFF && user.permissions && user.permissions.length > 0) {
+    return user.permissions;
+  }
+
+  return ROLE_PERMISSIONS[user.role] ?? [];
+}

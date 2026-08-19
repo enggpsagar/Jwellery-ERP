@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { MODULE_DEFINITIONS } from "@/lib/roles";
 
 const KARIGAR_ALLOWED_PREFIXES = ["/my-jobs", "/profile"];
 
@@ -29,6 +30,26 @@ export async function middleware(request: NextRequest) {
     !KARIGAR_ALLOWED_PREFIXES.some((prefix) => pathname.startsWith(prefix))
   ) {
     return NextResponse.redirect(new URL("/my-jobs", request.url));
+  }
+
+  // Per-user module access — only Staff can be restricted; Admin/Super Admin
+  // always have every module. An empty `permissions` array means "not
+  // customized" (e.g. a legacy Staff account) and falls back to full
+  // access, mirroring getEffectivePermissions() in lib/roles.ts — every
+  // enforcement point must agree on this fallback or a legacy Staff user
+  // would pass hasPermission() checks but get bounced here anyway.
+  if (role === "STAFF") {
+    const permissions = (token.permissions as string[] | undefined) ?? [];
+
+    if (permissions.length > 0) {
+      const module = MODULE_DEFINITIONS.find((definition) =>
+        pathname.startsWith(definition.href)
+      );
+
+      if (module && !module.permissions.every((permission) => permissions.includes(permission))) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
+    }
   }
 
   return NextResponse.next();

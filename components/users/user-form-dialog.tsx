@@ -9,7 +9,7 @@ import {
   updateUserAction,
 } from "@/app/(dashboard)/users/actions"
 
-import { ROLE_LABELS } from "@/lib/roles"
+import { ROLE_LABELS, MODULE_DEFINITIONS, type ModuleKey } from "@/lib/roles"
 
 import { useToast } from "@/components/providers/toast-provider"
 
@@ -40,6 +40,7 @@ type UserFormDialogUser = {
   role: UserRole
   isActive: boolean
   karigarId?: string | null
+  permissions?: string[] | null
 }
 
 type KarigarOption = {
@@ -73,6 +74,31 @@ export function UserFormDialog({
   const [role, setRole] = useState<UserRole>(user?.role ?? UserRole.STAFF)
   const [karigarId, setKarigarId] = useState(user?.karigarId ?? "")
 
+  // A module is "on" if every one of its permissions is present on the user.
+  // A brand-new Staff user defaults to every module enabled (matches the
+  // full-access behavior before per-user module toggles existed).
+  const [selectedModules, setSelectedModules] = useState<Set<ModuleKey>>(() => {
+    const existing = user?.permissions
+    if (!existing || existing.length === 0) {
+      return new Set(MODULE_DEFINITIONS.map((module) => module.key))
+    }
+
+    return new Set(
+      MODULE_DEFINITIONS.filter((module) =>
+        module.permissions.every((permission) => existing.includes(permission)),
+      ).map((module) => module.key),
+    )
+  })
+
+  const toggleModule = (key: ModuleKey, checked: boolean) => {
+    setSelectedModules((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(key)
+      else next.delete(key)
+      return next
+    })
+  }
+
   const router = useRouter()
   const toast = useToast()
 
@@ -92,6 +118,15 @@ export function UserFormDialog({
       formData.set("karigarId", karigarId)
     } else {
       formData.set("karigarId", "")
+    }
+
+    if (role === UserRole.STAFF) {
+      const permissions = MODULE_DEFINITIONS.filter((module) =>
+        selectedModules.has(module.key),
+      ).flatMap((module) => module.permissions)
+      formData.set("permissions", JSON.stringify(permissions))
+    } else {
+      formData.set("permissions", "[]")
     }
 
     startTransition(async () => {
@@ -168,6 +203,32 @@ export function UserFormDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {role === UserRole.STAFF && (
+            <div className="space-y-2">
+              <Label>Module Access</Label>
+              <div className="grid grid-cols-2 gap-2 rounded-md border p-3">
+                {MODULE_DEFINITIONS.map((module) => (
+                  <label
+                    key={module.key}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={selectedModules.has(module.key)}
+                      onChange={(event) => toggleModule(module.key, event.target.checked)}
+                    />
+                    {module.label}
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Choose which sections this user can access. Unchecked sections
+                are hidden and blocked entirely.
+              </p>
+            </div>
+          )}
 
           {role === UserRole.KARIGAR && (
             <div className="space-y-2">

@@ -31,6 +31,18 @@ export type UserActionState = {
   message: string;
 };
 
+function parsePermissionsField(formData: FormData): string[] {
+  const raw = formData.get("permissions");
+  if (typeof raw !== "string" || !raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function assertNoPrivilegeEscalation(
   actingRole: UserRole,
   targetRole: UserRole
@@ -122,12 +134,13 @@ export async function createUserAction(
       role: formData.get("role") as UserRole,
       isActive: formData.get("isActive") === "true",
       karigarId: formData.get("karigarId"),
+      permissions: parsePermissionsField(formData),
     });
 
     assertNoPrivilegeEscalation(currentUser.role as UserRole, payload.role);
 
     const storeId = await requireStoreScope();
-    await createUser(payload, storeId);
+    const { claimed } = await createUser(payload, storeId);
 
     revalidatePath("/users");
 
@@ -139,14 +152,16 @@ export async function createUserAction(
       storeId,
     });
 
+    const action = claimed ? "linked to this store" : "created";
+
     return {
       success: true,
       message:
         payload.email && emailSent
-          ? "User created and invite email sent"
+          ? `User ${action} and invite email sent`
           : payload.email
-            ? "User created, but the invite email could not be sent"
-            : "User created successfully",
+            ? `User ${action}, but the invite email could not be sent`
+            : `User ${action} successfully`,
     };
   } catch (error) {
     console.error("createUserAction error:", error);
@@ -174,6 +189,7 @@ export async function updateUserAction(
       role: formData.get("role") as UserRole,
       isActive: formData.get("isActive") === "true",
       karigarId: formData.get("karigarId"),
+      permissions: parsePermissionsField(formData),
     });
 
     assertNoPrivilegeEscalation(currentUser.role as UserRole, payload.role);

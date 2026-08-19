@@ -26,6 +26,22 @@ export const PERMISSIONS = {
   SUPPLIER_UPDATE: "supplier.update",
   SUPPLIER_DELETE: "supplier.delete",
 
+  // Billing (Pakka + Kacha invoices)
+  BILLING_VIEW: "billing.view",
+  BILLING_CREATE: "billing.create",
+  BILLING_UPDATE: "billing.update",
+  BILLING_DELETE: "billing.delete",
+
+  // Karigar management
+  KARIGAR_VIEW: "karigar.view",
+  KARIGAR_CREATE: "karigar.create",
+  KARIGAR_UPDATE: "karigar.update",
+  KARIGAR_DELETE: "karigar.delete",
+
+  // Gold & Silver Ledger
+  LEDGER_VIEW: "ledger.view",
+  LEDGER_CREATE: "ledger.create",
+
   // Reports
   REPORT_VIEW: "report.view",
   REPORT_EXPORT: "report.export",

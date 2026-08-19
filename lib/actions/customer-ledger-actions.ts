@@ -6,6 +6,7 @@ import { LedgerEntryType, LedgerSourceType } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
+import { formatLedgerSource } from "@/lib/ledger-format"
 
 export type CustomerLedgerFormState = {
   success: boolean
@@ -42,32 +43,6 @@ function formatDate(date?: Date | null) {
     month: "short",
     year: "numeric",
   }).format(date)
-}
-
-function formatLedgerSource(
-  sourceType: LedgerSourceType | string | null | undefined
-) {
-  if (!sourceType) return "Manual"
-
-  switch (sourceType) {
-    case LedgerSourceType.MANUAL:
-      return "Manual"
-    case LedgerSourceType.SALE:
-      return "Sale"
-    case LedgerSourceType.PURCHASE:
-      return "Purchase"
-    case LedgerSourceType.KARIGAR_ISSUE:
-      return "Karigar Issue"
-    case LedgerSourceType.KARIGAR_RECEIPT:
-      return "Karigar Receipt"
-    case LedgerSourceType.ADJUSTMENT:
-      return "Adjustment"
-    default:
-      return String(sourceType)
-        .replaceAll("_", " ")
-        .toLowerCase()
-        .replace(/\b\w/g, (char) => char.toUpperCase())
-  }
 }
 
 export async function getCustomerLedgerEntries(

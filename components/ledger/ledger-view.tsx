@@ -1,18 +1,20 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import {
   CalendarDays,
-  Coins,
-  CircleDollarSign,
   ArrowRightLeft,
+  ArrowDownCircle,
+  ArrowUpCircle,
   Search,
   X,
   ArrowDownLeft,
   ArrowUpRight,
+  Receipt,
 } from "lucide-react"
 
-import { ledgerEntries, ledgerCustomers, type LedgerEntry } from "@/lib/data"
+import type { LedgerEntryRow, LedgerTotals } from "@/lib/actions/ledger-actions"
 import { cn } from "@/lib/utils"
 import {
   Card,
@@ -43,101 +45,100 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { LedgerDetailDrawer } from "@/components/ledger/ledger-detail-drawer"
 
-function formatGrams(value: number, withSign = false) {
+function formatCurrency(value: number, withSign = false) {
   const abs = Math.abs(value)
-  const formatted = abs.toLocaleString("en-IN", {
-    minimumFractionDigits: abs % 1 === 0 ? 0 : 1,
-    maximumFractionDigits: 3,
-  })
-  if (withSign) return `${value >= 0 ? "+" : "-"}${formatted} g`
-  return `${formatted} g`
+  const formatted = `₹${abs.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
+  if (withSign) return `${value >= 0 ? "+" : "-"}${formatted}`
+  return formatted
 }
 
-const metalStyles: Record<LedgerEntry["metal"], string> = {
-  Gold: "border-primary/40 bg-primary/10 text-primary",
-  Silver: "border-border bg-muted text-muted-foreground",
+function daysAgo(dateISO: string) {
+  const then = new Date(dateISO).getTime()
+  const now = Date.now()
+  return Math.floor((now - then) / (1000 * 60 * 60 * 24))
 }
 
 const dateRanges = [
   { value: "7d", label: "Last 7 days" },
   { value: "30d", label: "Last 30 days" },
-  { value: "quarter", label: "This quarter" },
-  { value: "year", label: "This financial year" },
+  { value: "90d", label: "Last 90 days" },
   { value: "all", label: "All time" },
 ]
 
-const txnTypes = ["Receipt", "Issue", "Sale", "Purchase", "Adjustment"]
+type LedgerViewProps = {
+  entries: LedgerEntryRow[]
+  totals: LedgerTotals
+}
 
-export function LedgerView() {
+export function LedgerView({ entries, totals }: LedgerViewProps) {
   const [search, setSearch] = useState("")
   const [dateRange, setDateRange] = useState("30d")
-  const [customer, setCustomer] = useState("all")
+  const [account, setAccount] = useState("all")
   const [txnType, setTxnType] = useState("all")
-  const [selected, setSelected] = useState<LedgerEntry | null>(null)
+  const [selected, setSelected] = useState<LedgerEntryRow | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
+  const accounts = useMemo(
+    () => Array.from(new Set(entries.map((e) => e.account).filter((a) => a !== "—"))).sort(),
+    [entries],
+  )
+
+  const types = useMemo(
+    () => Array.from(new Set(entries.map((e) => e.sourceLabel))).sort(),
+    [entries],
+  )
+
   const filtered = useMemo(() => {
-    return ledgerEntries.filter((entry) => {
-      if (customer !== "all" && entry.customer !== customer) return false
-      if (txnType !== "all" && entry.type !== txnType) return false
+    return entries.filter((entry) => {
+      if (account !== "all" && entry.account !== account) return false
+      if (txnType !== "all" && entry.sourceLabel !== txnType) return false
+      if (dateRange !== "all") {
+        const maxDays = dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : 90
+        if (daysAgo(entry.dateISO) > maxDays) return false
+      }
       if (search) {
         const q = search.toLowerCase()
-        const haystack =
-          `${entry.customer} ${entry.id} ${entry.reference} ${entry.notes}`.toLowerCase()
+        const haystack = `${entry.account} ${entry.id} ${entry.invoiceNumber ?? ""} ${entry.description}`.toLowerCase()
         if (!haystack.includes(q)) return false
       }
       return true
     })
-  }, [customer, txnType, search])
+  }, [entries, account, txnType, dateRange, search])
 
-  const totals = useMemo(() => {
-    const gold = ledgerEntries
-      .filter((e) => e.metal === "Gold")
-      .reduce((sum, e) => sum + e.weightIn - e.weightOut, 0)
-    const silver = ledgerEntries
-      .filter((e) => e.metal === "Silver")
-      .reduce((sum, e) => sum + e.weightIn - e.weightOut, 0)
-    const today = ledgerEntries.filter(
-      (e) => e.dateISO === "2026-06-19",
-    ).length
-    return { gold, silver, today }
-  }, [])
-
-  const hasFilters =
-    customer !== "all" || txnType !== "all" || search.length > 0
+  const hasFilters = account !== "all" || txnType !== "all" || search.length > 0
 
   function clearFilters() {
-    setCustomer("all")
+    setAccount("all")
     setTxnType("all")
     setSearch("")
   }
 
-  function openEntry(entry: LedgerEntry) {
+  function openEntry(entry: LedgerEntryRow) {
     setSelected(entry)
     setDrawerOpen(true)
   }
 
   const summaryCards = [
     {
-      label: "Total Gold Balance",
-      value: formatGrams(totals.gold),
-      sub: "22K, 24K & 18K combined",
-      icon: CircleDollarSign,
-      accent: "text-primary bg-primary/10",
+      label: "Total Debit",
+      value: formatCurrency(totals.totalDebit),
+      sub: "Amount owed by customers",
+      icon: ArrowUpCircle,
+      accent: "text-destructive bg-destructive/10",
     },
     {
-      label: "Total Silver Balance",
-      value: formatGrams(totals.silver),
-      sub: "Fine & sterling combined",
-      icon: Coins,
-      accent: "text-foreground bg-muted",
+      label: "Total Credit",
+      value: formatCurrency(totals.totalCredit),
+      sub: "Payments received",
+      icon: ArrowDownCircle,
+      accent: "text-emerald-600 bg-emerald-50",
     },
     {
       label: "Today's Transactions",
-      value: String(totals.today),
-      sub: "Recorded on 19 Jun 2026",
+      value: String(totals.todayCount),
+      sub: "Recorded today",
       icon: ArrowRightLeft,
-      accent: "text-emerald-600 bg-emerald-50",
+      accent: "text-primary bg-primary/10",
     },
   ]
 
@@ -174,7 +175,7 @@ export function LedgerView() {
           <div className="flex flex-col gap-1">
             <CardTitle>Ledger Entries</CardTitle>
             <CardDescription>
-              Metal movement across all customer and karigar accounts.
+              Money movement across all customer and karigar accounts.
             </CardDescription>
           </div>
 
@@ -182,7 +183,7 @@ export function LedgerView() {
             <div className="relative flex-1 lg:max-w-xs">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search entries, refs, notes..."
+                placeholder="Search accounts, invoices, notes..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-9 pl-9"
@@ -206,14 +207,14 @@ export function LedgerView() {
                 </SelectContent>
               </Select>
 
-              <Select value={customer} onValueChange={setCustomer}>
+              <Select value={account} onValueChange={setAccount}>
                 <SelectTrigger className="h-9 w-[170px]">
-                  <SelectValue placeholder="Customer" />
+                  <SelectValue placeholder="Account" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="all">All customers</SelectItem>
-                    {ledgerCustomers.map((c) => (
+                    <SelectItem value="all">All accounts</SelectItem>
+                    {accounts.map((c) => (
                       <SelectItem key={c} value={c}>
                         {c}
                       </SelectItem>
@@ -229,7 +230,7 @@ export function LedgerView() {
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem value="all">All types</SelectItem>
-                    {txnTypes.map((t) => (
+                    {types.map((t) => (
                       <SelectItem key={t} value={t}>
                         {t}
                       </SelectItem>
@@ -258,11 +259,11 @@ export function LedgerView() {
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="pl-6">Date</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Metal Type</TableHead>
-                <TableHead className="text-right">Weight In</TableHead>
-                <TableHead className="text-right">Weight Out</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
+                <TableHead>Account</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead className="text-right">Debit</TableHead>
+                <TableHead className="text-right">Credit</TableHead>
+                <TableHead>Invoice</TableHead>
                 <TableHead className="hidden md:table-cell">Notes</TableHead>
               </TableRow>
             </TableHeader>
@@ -290,15 +291,15 @@ export function LedgerView() {
                       <div className="flex items-center gap-2.5">
                         <Avatar className="size-7">
                           <AvatarFallback className="bg-accent text-accent-foreground text-xs">
-                            {entry.customerInitials}
+                            {entry.accountInitials || "—"}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col">
                           <span className="text-sm font-medium leading-tight">
-                            {entry.customer}
+                            {entry.account}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {entry.type} · {entry.reference}
+                            {entry.sourceLabel}
                           </span>
                         </div>
                       </div>
@@ -306,44 +307,52 @@ export function LedgerView() {
                     <TableCell>
                       <Badge
                         variant="outline"
-                        className={cn("font-normal", metalStyles[entry.metal])}
+                        className={cn(
+                          "font-normal",
+                          entry.type === "CREDIT"
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-destructive/30 bg-destructive/10 text-destructive",
+                        )}
                       >
-                        {entry.metal} · {entry.purity}
+                        {entry.type === "CREDIT" ? "Credit" : "Debit"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {entry.weightIn > 0 ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600">
-                          <ArrowDownLeft className="size-3.5" />
-                          {formatGrams(entry.weightIn)}
+                      {entry.type === "DEBIT" ? (
+                        <span className="inline-flex items-center gap-1 text-destructive">
+                          <ArrowUpRight className="size-3.5" />
+                          {formatCurrency(entry.amount)}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {entry.weightOut > 0 ? (
-                        <span className="inline-flex items-center gap-1 text-destructive">
-                          <ArrowUpRight className="size-3.5" />
-                          {formatGrams(entry.weightOut)}
+                      {entry.type === "CREDIT" ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-600">
+                          <ArrowDownLeft className="size-3.5" />
+                          {formatCurrency(entry.amount)}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right font-medium tabular-nums",
-                        entry.balance >= 0
-                          ? "text-emerald-600"
-                          : "text-destructive",
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      {entry.invoiceId && entry.invoiceNumber ? (
+                        <Link
+                          href={`/billing/${entry.invoiceId}`}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
+                        >
+                          <Receipt className="size-3.5" />
+                          {entry.invoiceNumber}
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
-                    >
-                      {formatGrams(entry.balance, true)}
                     </TableCell>
                     <TableCell className="hidden max-w-[260px] md:table-cell">
                       <span className="block truncate text-sm text-muted-foreground">
-                        {entry.notes}
+                        {entry.description}
                       </span>
                     </TableCell>
                   </TableRow>

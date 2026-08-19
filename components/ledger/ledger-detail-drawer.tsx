@@ -1,8 +1,9 @@
 "use client"
 
-import { ArrowDownLeft, ArrowUpRight, Scale } from "lucide-react"
+import Link from "next/link"
+import { ArrowDownLeft, ArrowUpRight, Wallet, Receipt } from "lucide-react"
 
-import type { LedgerEntry } from "@/lib/data"
+import type { LedgerEntryRow } from "@/lib/actions/ledger-actions"
 import {
   Sheet,
   SheetContent,
@@ -16,8 +17,8 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
-function formatGrams(value: number) {
-  return `${value.toLocaleString("en-IN", { minimumFractionDigits: value % 1 === 0 ? 0 : 1, maximumFractionDigits: 3 })} g`
+function formatCurrency(value: number) {
+  return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
 }
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -34,7 +35,7 @@ export function LedgerDetailDrawer({
   open,
   onOpenChange,
 }: {
-  entry: LedgerEntry | null
+  entry: LedgerEntryRow | null
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
@@ -50,11 +51,11 @@ export function LedgerDetailDrawer({
                   variant="outline"
                   className="font-mono text-xs font-normal"
                 >
-                  {entry.id}
+                  {entry.id.slice(0, 10)}
                 </Badge>
               </div>
               <SheetDescription>
-                Recorded on {entry.date} · Ref {entry.reference}
+                Recorded on {entry.date} · {entry.sourceLabel}
               </SheetDescription>
             </SheetHeader>
 
@@ -63,34 +64,19 @@ export function LedgerDetailDrawer({
                 <div className="flex items-center gap-3">
                   <Avatar className="size-11">
                     <AvatarFallback className="bg-accent text-accent-foreground">
-                      {entry.customerInitials}
+                      {entry.accountInitials || "—"}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col">
-                    <span className="font-medium">{entry.customer}</span>
+                    {entry.accountHref ? (
+                      <Link href={entry.accountHref} className="font-medium hover:underline">
+                        {entry.account}
+                      </Link>
+                    ) : (
+                      <span className="font-medium">{entry.account}</span>
+                    )}
                     <span className="text-sm text-muted-foreground">
-                      {entry.metal} account · {entry.purity}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1 rounded-lg border bg-card p-4">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <ArrowDownLeft className="size-3.5 text-emerald-600" />
-                      Weight In
-                    </div>
-                    <span className="text-lg font-semibold tabular-nums">
-                      {entry.weightIn > 0 ? formatGrams(entry.weightIn) : "—"}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1 rounded-lg border bg-card p-4">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <ArrowUpRight className="size-3.5 text-destructive" />
-                      Weight Out
-                    </div>
-                    <span className="text-lg font-semibold tabular-nums">
-                      {entry.weightOut > 0 ? formatGrams(entry.weightOut) : "—"}
+                      {entry.sourceLabel}
                     </span>
                   </div>
                 </div>
@@ -98,39 +84,58 @@ export function LedgerDetailDrawer({
                 <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 p-4">
                   <div className="flex items-center gap-2">
                     <div className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
-                      <Scale className="size-4" />
+                      <Wallet className="size-4" />
                     </div>
-                    <span className="text-sm font-medium">Net Balance</span>
+                    <span className="text-sm font-medium">
+                      {entry.type === "CREDIT" ? "Credit" : "Debit"}
+                    </span>
                   </div>
                   <span
                     className={
-                      entry.balance >= 0
-                        ? "text-lg font-semibold tabular-nums text-emerald-600"
-                        : "text-lg font-semibold tabular-nums text-destructive"
+                      entry.type === "CREDIT"
+                        ? "flex items-center gap-1 text-lg font-semibold tabular-nums text-emerald-600"
+                        : "flex items-center gap-1 text-lg font-semibold tabular-nums text-destructive"
                     }
                   >
-                    {entry.balance >= 0 ? "+" : ""}
-                    {formatGrams(entry.balance)}
+                    {entry.type === "CREDIT" ? (
+                      <ArrowDownLeft className="size-4" />
+                    ) : (
+                      <ArrowUpRight className="size-4" />
+                    )}
+                    {formatCurrency(entry.amount)}
                   </span>
                 </div>
+
+                {entry.metalWeight ? (
+                  <div className="flex items-center justify-between rounded-lg border bg-card p-4">
+                    <span className="text-sm text-muted-foreground">Metal Weight</span>
+                    <span className="text-sm font-medium tabular-nums">
+                      {entry.metalWeight.toLocaleString("en-IN", { maximumFractionDigits: 3 })} g
+                      {entry.metalType ? ` (${entry.metalType})` : ""}
+                    </span>
+                  </div>
+                ) : null}
 
                 <div>
                   <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Information
                   </h3>
-                  <DetailRow label="Transaction Type" value={entry.type} />
+                  <DetailRow label="Type" value={entry.sourceLabel} />
                   <Separator />
                   <DetailRow
-                    label="Metal"
-                    value={`${entry.metal} (${entry.purity})`}
-                  />
-                  <Separator />
-                  <DetailRow label="Rate Applied" value={entry.rate} />
-                  <Separator />
-                  <DetailRow
-                    label="Reference"
+                    label="Invoice"
                     value={
-                      <span className="font-mono text-xs">{entry.reference}</span>
+                      entry.invoiceId && entry.invoiceNumber ? (
+                        <Link
+                          href={`/billing/${entry.invoiceId}`}
+                          className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                        >
+                          <Receipt className="size-3.5" />
+                          {entry.invoiceNumber}
+                        </Link>
+                      ) : (
+                        "—"
+                      )
                     }
                   />
                   <Separator />
@@ -142,17 +147,20 @@ export function LedgerDetailDrawer({
                     Notes
                   </h3>
                   <p className="rounded-lg border bg-muted/40 p-4 text-sm leading-relaxed text-foreground">
-                    {entry.notes}
+                    {entry.description || "No notes for this entry."}
                   </p>
                 </div>
               </div>
             </ScrollArea>
 
             <div className="flex items-center gap-3 border-t p-4">
-              <Button variant="outline" className="flex-1">
-                Print Voucher
-              </Button>
-              <Button className="flex-1">Edit Entry</Button>
+              {entry.invoiceId ? (
+                <Link href={`/billing/${entry.invoiceId}`} className="flex-1">
+                  <Button variant="outline" className="w-full">
+                    View Invoice
+                  </Button>
+                </Link>
+              ) : null}
             </div>
           </>
         ) : null}

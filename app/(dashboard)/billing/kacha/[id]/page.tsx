@@ -5,6 +5,7 @@ import { ArrowRightCircle } from "lucide-react"
 import { getKachaInvoiceById } from "@/lib/actions/kacha-invoice-actions"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordKachaPaymentDialog } from "@/components/billing/kacha/record-kacha-payment-dialog"
+import { EmailKachaInvoiceButton } from "@/components/billing/kacha/email-kacha-invoice-button"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
 
@@ -39,6 +40,8 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
                 <Button variant="outline">Convert to Pakka</Button>
               </Link>
             )}
+
+            <EmailKachaInvoiceButton kachaInvoiceId={kachaInvoice.id} />
 
             <RecordKachaPaymentDialog
               kachaInvoiceId={kachaInvoice.id}

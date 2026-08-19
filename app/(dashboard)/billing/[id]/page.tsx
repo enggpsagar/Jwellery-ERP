@@ -5,6 +5,7 @@ import { ArrowLeftCircle } from "lucide-react"
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog"
+import { EmailInvoiceButton } from "@/components/billing/email-invoice-button"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 type Props = {
@@ -25,10 +26,13 @@ export default async function InvoiceDetailPage({ params }: Props) {
         backHref="/billing"
         backLabel="Back to Billing"
         action={
-          <RecordPaymentDialog
-            invoiceId={invoice.id}
-            balanceAmount={invoice.balanceAmount}
-          />
+          <div className="flex items-center gap-2">
+            <EmailInvoiceButton invoiceId={invoice.id} />
+            <RecordPaymentDialog
+              invoiceId={invoice.id}
+              balanceAmount={invoice.balanceAmount}
+            />
+          </div>
         }
       />
 

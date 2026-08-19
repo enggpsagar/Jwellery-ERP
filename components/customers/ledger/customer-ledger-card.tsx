@@ -8,6 +8,7 @@ import {
 } from "@/lib/actions/customer-ledger-actions"
 import { AddCustomerSaleEntryDialog } from "@/components/customers/ledger/add-customer-sale-entry-dialog"
 import { AddCustomerRefundEntryDialog } from "@/components/customers/ledger/add-customer-refund-entry-dialog"
+import { EmailLedgerStatementButton } from "@/components/customers/ledger/email-ledger-statement-button"
 
 type CustomerLedgerCardProps = {
   customerId: string
@@ -41,6 +42,7 @@ export async function CustomerLedgerCard({
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row">
+          <EmailLedgerStatementButton customerId={customerId} />
           <AddCustomerSaleEntryDialog customerId={customerId} />
           <AddCustomerRefundEntryDialog customerId={customerId} />
         </div>

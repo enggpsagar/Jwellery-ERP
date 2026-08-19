@@ -20,7 +20,11 @@ import {
 
 import { requireAuth, hasPermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
+import { ROLE_LABELS } from "@/lib/roles";
 import { requireStoreScope } from "@/lib/store-context";
+import { prisma } from "@/lib/prisma";
+import { sendMail } from "@/lib/mailer";
+import { inviteUserEmail } from "@/lib/email-templates";
 
 export type UserActionState = {
   success: boolean;
@@ -60,6 +64,45 @@ function friendlyUserErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+/**
+ * Best-effort welcome email for a newly created user — never throws,
+ * since a failed/skipped send shouldn't undo the user that was just created.
+ */
+async function sendInviteEmailSafely(params: {
+  email: string | null;
+  phone: string | null;
+  name: string;
+  role: UserRole;
+  storeId: string;
+}): Promise<boolean> {
+  if (!params.email) return false;
+
+  try {
+    const settings = await prisma.businessSettings.findUnique({
+      where: { storeId: params.storeId },
+      select: { businessName: true },
+    });
+
+    const storeName = settings?.businessName || "your store";
+    const loginUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/login`;
+
+    const { subject, html } = inviteUserEmail({
+      name: params.name,
+      roleLabel: ROLE_LABELS[params.role],
+      storeName,
+      hasEmailLogin: true,
+      hasPhoneLogin: !!params.phone,
+      loginUrl,
+    });
+
+    const result = await sendMail({ to: params.email, subject, html });
+    return result.sent;
+  } catch (error) {
+    console.error("sendInviteEmailSafely error:", error);
+    return false;
+  }
+}
+
 export async function createUserAction(
   formData: FormData
 ): Promise<UserActionState> {
@@ -88,7 +131,23 @@ export async function createUserAction(
 
     revalidatePath("/users");
 
-    return { success: true, message: "User created successfully" };
+    const emailSent = await sendInviteEmailSafely({
+      email: payload.email || null,
+      phone: payload.phone || null,
+      name: payload.name,
+      role: payload.role,
+      storeId,
+    });
+
+    return {
+      success: true,
+      message:
+        payload.email && emailSent
+          ? "User created and invite email sent"
+          : payload.email
+            ? "User created, but the invite email could not be sent"
+            : "User created successfully",
+    };
   } catch (error) {
     console.error("createUserAction error:", error);
     return { success: false, message: friendlyUserErrorMessage(error, "Failed to create user") };

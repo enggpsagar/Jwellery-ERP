@@ -14,6 +14,8 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { sendMail } from "@/lib/mailer";
+import { invoiceEmail } from "@/lib/email-templates";
 
 export type InvoiceLineItemInput = {
   itemName: string;
@@ -440,5 +442,63 @@ export async function deleteInvoice(id: string): Promise<InvoiceFormState> {
   } catch (error) {
     console.error("deleteInvoice error:", error);
     return { success: false, message: "Failed to delete invoice" };
+  }
+}
+
+/** Email a formatted copy of this invoice to the customer on file. */
+export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceFormState> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const [invoice, settings] = await Promise.all([
+      prisma.invoice.findFirst({
+        where: { id: invoiceId, storeId },
+        include: {
+          customer: { select: { name: true, email: true } },
+          items: true,
+        },
+      }),
+      prisma.businessSettings.findUnique({
+        where: { storeId },
+        select: { businessName: true },
+      }),
+    ]);
+
+    if (!invoice) return { success: false, message: "Invoice not found" };
+
+    if (!invoice.customer?.email) {
+      return { success: false, message: "This customer has no email on file" };
+    }
+
+    const { subject, html } = invoiceEmail({
+      storeName: settings?.businessName || "Your Store",
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceDate: invoice.invoiceDate.toISOString(),
+      customerName: invoice.customer.name,
+      items: invoice.items.map((item) => ({
+        itemName: item.itemName,
+        quantity: item.quantity,
+        netWeight: item.netWeight ? Number(item.netWeight) : null,
+        rate: item.rate ? Number(item.rate) : null,
+        makingCharge: Number(item.makingCharge),
+        stoneCharge: Number(item.stoneCharge),
+        lineTotal: Number(item.lineTotal),
+      })),
+      subtotal: Number(invoice.subtotal),
+      makingCharges: Number(invoice.makingCharges),
+      stoneCharges: Number(invoice.stoneCharges),
+      discount: Number(invoice.discount),
+      taxAmount: Number(invoice.taxAmount),
+      totalAmount: Number(invoice.totalAmount),
+      paidAmount: Number(invoice.paidAmount),
+      balanceAmount: Number(invoice.balanceAmount),
+    });
+
+    const result = await sendMail({ to: invoice.customer.email, subject, html });
+
+    return { success: result.sent, message: result.message };
+  } catch (error) {
+    console.error("emailInvoiceAction error:", error);
+    return { success: false, message: "Failed to email invoice" };
   }
 }

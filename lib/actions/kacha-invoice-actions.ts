@@ -14,6 +14,8 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { sendMail } from "@/lib/mailer";
+import { kachaSlipEmail } from "@/lib/email-templates";
 import {
   getInvoiceFormCustomers,
   getInvoiceFormStockItems,
@@ -523,5 +525,64 @@ export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormSt
   } catch (error) {
     console.error("deleteKachaInvoice error:", error);
     return { success: false, message: "Failed to delete Kacha slip" };
+  }
+}
+
+/** Email a formatted copy of this Kacha slip to the customer on file. */
+export async function emailKachaInvoiceAction(
+  kachaInvoiceId: string,
+): Promise<KachaInvoiceFormState> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const [kachaInvoice, settings] = await Promise.all([
+      prisma.kachaInvoice.findFirst({
+        where: { id: kachaInvoiceId, storeId },
+        include: {
+          customer: { select: { name: true, email: true } },
+          items: true,
+        },
+      }),
+      prisma.businessSettings.findUnique({
+        where: { storeId },
+        select: { businessName: true },
+      }),
+    ]);
+
+    if (!kachaInvoice) return { success: false, message: "Kacha slip not found" };
+
+    if (!kachaInvoice.customer?.email) {
+      return { success: false, message: "This customer has no email on file" };
+    }
+
+    const { subject, html } = kachaSlipEmail({
+      storeName: settings?.businessName || "Your Store",
+      slipNumber: kachaInvoice.slipNumber,
+      invoiceDate: kachaInvoice.invoiceDate.toISOString(),
+      customerName: kachaInvoice.customer.name,
+      items: kachaInvoice.items.map((item) => ({
+        itemName: item.itemName,
+        quantity: item.quantity,
+        netWeight: item.netWeight ? Number(item.netWeight) : null,
+        rate: item.rate ? Number(item.rate) : null,
+        makingCharge: Number(item.makingCharge),
+        stoneCharge: Number(item.stoneCharge),
+        lineTotal: Number(item.lineTotal),
+      })),
+      subtotal: Number(kachaInvoice.subtotal),
+      makingCharges: Number(kachaInvoice.makingCharges),
+      stoneCharges: Number(kachaInvoice.stoneCharges),
+      discount: Number(kachaInvoice.discount),
+      totalAmount: Number(kachaInvoice.totalAmount),
+      paidAmount: Number(kachaInvoice.paidAmount),
+      balanceAmount: Number(kachaInvoice.balanceAmount),
+    });
+
+    const result = await sendMail({ to: kachaInvoice.customer.email, subject, html });
+
+    return { success: result.sent, message: result.message };
+  } catch (error) {
+    console.error("emailKachaInvoiceAction error:", error);
+    return { success: false, message: "Failed to email Kacha slip" };
   }
 }

@@ -7,6 +7,8 @@ import { LedgerEntryType, LedgerSourceType } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { formatLedgerSource } from "@/lib/ledger-format"
+import { sendMail } from "@/lib/mailer"
+import { ledgerStatementEmail } from "@/lib/email-templates"
 
 export type CustomerLedgerFormState = {
   success: boolean
@@ -242,5 +244,64 @@ export async function addCustomerRefundEntry(
       success: false,
       message: "Failed to add refund entry",
     }
+  }
+}
+
+/** Email this customer's current ledger statement to the address on file. */
+export async function emailLedgerStatementAction(
+  customerId: string
+): Promise<CustomerLedgerFormState> {
+  try {
+    const storeId = await requireStoreScope()
+
+    const customer = await prisma.customer.findFirst({
+      where: { id: customerId, storeId },
+      select: { name: true, email: true },
+    })
+
+    if (!customer) {
+      return { success: false, message: "Customer not found" }
+    }
+
+    if (!customer.email) {
+      return { success: false, message: "This customer has no email on file" }
+    }
+
+    const [entries, summary, settings] = await Promise.all([
+      getCustomerLedgerEntries(customerId),
+      getCustomerLedgerSummary(customerId),
+      prisma.businessSettings.findUnique({
+        where: { storeId },
+        select: { businessName: true },
+      }),
+    ])
+
+    if (!summary) {
+      return { success: false, message: "Customer not found" }
+    }
+
+    const { subject, html } = ledgerStatementEmail({
+      storeName: settings?.businessName || "Your Store",
+      customerName: customer.name,
+      openingBalance: summary.openingBalance,
+      ledgerDebitTotal: summary.ledgerDebitTotal,
+      ledgerCreditTotal: summary.ledgerCreditTotal,
+      currentBalance: summary.currentBalance,
+      entries: entries.map((entry) => ({
+        entryDate: entry.entryDate,
+        sourceType: entry.sourceType,
+        description: entry.description,
+        type: entry.type,
+        amount: entry.amount,
+        invoiceNumber: entry.invoiceNumber,
+      })),
+    })
+
+    const result = await sendMail({ to: customer.email, subject, html })
+
+    return { success: result.sent, message: result.message }
+  } catch (error) {
+    console.error("emailLedgerStatementAction error:", error)
+    return { success: false, message: "Failed to email statement" }
   }
 }

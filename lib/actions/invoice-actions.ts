@@ -138,7 +138,10 @@ export async function getInvoices(params: GetInvoicesParams = {}) {
       orderBy: { invoiceDate: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: { customer: { select: { id: true, name: true, phone: true } } },
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        convertedFromKacha: { select: { id: true, slipNumber: true } },
+      },
     }),
   ]);
 

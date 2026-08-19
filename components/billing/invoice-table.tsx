@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Eye } from "lucide-react"
+import { Eye, ArrowLeftCircle } from "lucide-react"
 
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 
@@ -13,6 +13,7 @@ type InvoiceRow = {
   totalAmount: number
   balanceAmount: number
   customer: { id: string; name: string; phone: string | null } | null
+  convertedFromKacha: { id: string; slipNumber: string } | null
 }
 
 type InvoiceTableProps = {
@@ -37,6 +38,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
               <th className="px-4 py-3 text-left font-medium">Invoice #</th>
               <th className="px-4 py-3 text-left font-medium">Date</th>
               <th className="px-4 py-3 text-left font-medium">Customer</th>
+              <th className="px-4 py-3 text-left font-medium">Source</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <th className="px-4 py-3 text-left font-medium">Total</th>
               <th className="px-4 py-3 text-left font-medium">Balance</th>
@@ -52,6 +54,20 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                   {new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}
                 </td>
                 <td className="px-4 py-3">{invoice.customer?.name ?? "-"}</td>
+                <td className="px-4 py-3">
+                  {invoice.convertedFromKacha ? (
+                    <Link
+                      href={`/billing/kacha/${invoice.convertedFromKacha.id}`}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                      title={`View Kacha slip ${invoice.convertedFromKacha.slipNumber}`}
+                    >
+                      <ArrowLeftCircle className="h-3.5 w-3.5" />
+                      From Kacha ({invoice.convertedFromKacha.slipNumber})
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Direct Sale</span>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <InvoiceStatusBadge status={invoice.status as any} />
                 </td>

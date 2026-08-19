@@ -32,21 +32,22 @@ export default async function InvoiceDetailPage({ params }: Props) {
         }
       />
 
-      {invoice.convertedFromKacha && (
-        <Link
-          href={`/billing/kacha/${invoice.convertedFromKacha.id}`}
-          className="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:underline"
-        >
-          <ArrowLeftCircle className="h-4 w-4" />
-          Converted from Kacha slip {invoice.convertedFromKacha.slipNumber}
-        </Link>
-      )}
-
       <div className="rounded-xl border bg-white p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground">Status</p>
-            <InvoiceStatusBadge status={invoice.status} />
+            <div className="flex flex-wrap items-center gap-2">
+              <InvoiceStatusBadge status={invoice.status} />
+              {invoice.convertedFromKacha && (
+                <Link
+                  href={`/billing/kacha/${invoice.convertedFromKacha.id}`}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                >
+                  <ArrowLeftCircle className="h-3.5 w-3.5" />
+                  Converted from Kacha Slip ({invoice.convertedFromKacha.slipNumber})
+                </Link>
+              )}
+            </div>
           </div>
 
           <div>

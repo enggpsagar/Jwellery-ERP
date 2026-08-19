@@ -122,8 +122,11 @@ function isNavItemActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+// The sidebar is hardcoded dark (bg-zinc-950) regardless of the app's light/dark
+// mode, so the active state must use the sidebar-specific accent tokens — the
+// plain `primary` token resolves to near-black in light mode and is invisible here.
 const ACTIVE_NAV_CLASS =
-  "data-active:!bg-primary/20 data-active:!text-primary data-active:font-semibold data-active:border-l-2 data-active:border-primary";
+  "data-active:!bg-sidebar-primary/25 data-active:!text-sidebar-primary data-active:font-semibold data-active:border-l-2 data-active:border-sidebar-primary";
 
 function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string }) {
   const Icon = item.icon;

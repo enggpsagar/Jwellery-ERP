@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   CalendarDays,
@@ -58,6 +58,8 @@ function daysAgo(dateISO: string) {
   return Math.floor((now - then) / (1000 * 60 * 60 * 24))
 }
 
+const PAGE_SIZE = 20
+
 const dateRanges = [
   { value: "7d", label: "Last 7 days" },
   { value: "30d", label: "Last 30 days" },
@@ -77,6 +79,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
   const [txnType, setTxnType] = useState("all")
   const [selected, setSelected] = useState<LedgerEntryRow | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [page, setPage] = useState(1)
 
   const accounts = useMemo(
     () => Array.from(new Set(entries.map((e) => e.account).filter((a) => a !== "—"))).sort(),
@@ -106,6 +109,19 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
   }, [entries, account, txnType, dateRange, search])
 
   const hasFilters = account !== "all" || txnType !== "all" || search.length > 0
+
+  useEffect(() => {
+    setPage(1)
+  }, [account, txnType, dateRange, search])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const paginated = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  )
+  const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length)
 
   function clearFilters() {
     setAccount("all")
@@ -268,7 +284,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 ? (
+              {paginated.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={7}
@@ -278,7 +294,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((entry) => (
+                paginated.map((entry) => (
                   <TableRow
                     key={entry.id}
                     onClick={() => openEntry(entry)}
@@ -361,6 +377,40 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
             </TableBody>
           </Table>
         </CardContent>
+
+        {filtered.length > 0 && (
+          <div className="flex flex-col gap-3 border-t px-4 py-3 text-sm md:flex-row md:items-center md:justify-between">
+            <p className="text-muted-foreground">
+              Showing <span className="font-medium text-foreground">{rangeStart}</span> to{" "}
+              <span className="font-medium text-foreground">{rangeEnd}</span> of{" "}
+              <span className="font-medium text-foreground">{filtered.length}</span> entries
+            </p>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage <= 1}
+                onClick={() => setPage(currentPage - 1)}
+              >
+                Previous
+              </Button>
+
+              <span className="px-2 text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <LedgerDetailDrawer

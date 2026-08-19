@@ -1,4 +1,7 @@
 // components/customers/ledger/customer-ledger-card.tsx
+import Link from "next/link"
+import { Receipt } from "lucide-react"
+
 import {
   getCustomerLedgerEntries,
   getCustomerLedgerSummary,
@@ -101,6 +104,7 @@ export async function CustomerLedgerCard({
                   <th className="px-4 py-3 font-medium">Entry Type</th>
                   <th className="px-4 py-3 font-medium">Source</th>
                   <th className="px-4 py-3 font-medium">Description</th>
+                  <th className="px-4 py-3 font-medium">Invoice</th>
                   <th className="px-4 py-3 font-medium text-right">Amount</th>
                 </tr>
               </thead>
@@ -123,6 +127,19 @@ export async function CustomerLedgerCard({
                     <td className="px-4 py-3 text-gray-700">{entry.sourceType}</td>
                     <td className="px-4 py-3 text-gray-700">
                       {entry.description || "-"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {entry.invoiceId && entry.invoiceNumber ? (
+                        <Link
+                          href={`/billing/${entry.invoiceId}`}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
+                        >
+                          <Receipt className="h-3.5 w-3.5" />
+                          {entry.invoiceNumber}
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-gray-400">-</span>
+                      )}
                     </td>
                     <td
                       className={`px-4 py-3 text-right font-medium ${

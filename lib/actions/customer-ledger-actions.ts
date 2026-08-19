@@ -21,6 +21,8 @@ export type CustomerLedgerEntryItem = {
   description: string
   amount: number
   entryDate: string
+  invoiceId: string | null
+  invoiceNumber: string | null
 }
 
 export type CustomerLedgerSummary = {
@@ -53,6 +55,9 @@ export async function getCustomerLedgerEntries(
   const entries = await prisma.ledgerEntry.findMany({
     where: { customerId, storeId },
     orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
+    include: {
+      invoice: { select: { id: true, invoiceNumber: true } },
+    },
   })
 
   return entries.map((entry) => ({
@@ -62,6 +67,8 @@ export async function getCustomerLedgerEntries(
     description: entry.description ?? "",
     amount: Number(entry.amount ?? 0),
     entryDate: formatDate(entry.entryDate),
+    invoiceId: entry.invoice?.id ?? null,
+    invoiceNumber: entry.invoice?.invoiceNumber ?? null,
   }))
 }
 

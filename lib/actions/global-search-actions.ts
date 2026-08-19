@@ -2,6 +2,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { requireStoreScope } from "@/lib/store-context";
 
 export type GlobalSearchResultType =
   | "customer"
@@ -32,9 +33,12 @@ export async function globalSearch(
     return { results: [] };
   }
 
+  const storeId = await requireStoreScope();
+
   const [customers, products, invoices, karigars] = await Promise.all([
     prisma.customer.findMany({
       where: {
+        storeId,
         OR: [
           { name: { contains: term, mode: "insensitive" } },
           { phone: { contains: term, mode: "insensitive" } },
@@ -46,6 +50,7 @@ export async function globalSearch(
     }),
     prisma.product.findMany({
       where: {
+        storeId,
         OR: [
           { name: { contains: term, mode: "insensitive" } },
           { productCode: { contains: term, mode: "insensitive" } },
@@ -57,6 +62,7 @@ export async function globalSearch(
     }),
     prisma.invoice.findMany({
       where: {
+        storeId,
         OR: [
           { invoiceNumber: { contains: term, mode: "insensitive" } },
           { customer: { name: { contains: term, mode: "insensitive" } } },
@@ -72,6 +78,7 @@ export async function globalSearch(
     }),
     prisma.karigar.findMany({
       where: {
+        storeId,
         OR: [
           { name: { contains: term, mode: "insensitive" } },
           { code: { contains: term, mode: "insensitive" } },

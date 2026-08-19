@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { GlobalSearch } from "@/components/dashboard/global-search";
+import { StoreSwitcher } from "@/components/dashboard/store-switcher";
 
 type Rates = {
   gold24k: number;
@@ -35,8 +36,20 @@ type Rates = {
   silver: number;
 };
 
-export function TopBar() {
+type StoreOption = {
+  id: string;
+  name: string;
+  code: string;
+};
+
+type TopBarProps = {
+  stores?: StoreOption[];
+  activeStoreId?: string | null;
+};
+
+export function TopBar({ stores = [], activeStoreId = null }: TopBarProps) {
   const { data: session } = useSession();
+  const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
   const userName = session?.user?.name ?? "User";
   const userInitials = userName
     .split(" ")
@@ -105,6 +118,10 @@ export function TopBar() {
       <Separator orientation="vertical" className="h-6" />
 
       <GlobalSearch />
+
+      {isSuperAdmin && (
+        <StoreSwitcher stores={stores} activeStoreId={activeStoreId} />
+      )}
 
       <div className="ml-auto flex items-center gap-2">
         <div className="mr-2 hidden items-center gap-1 rounded-lg border bg-card px-2 py-1 shadow-sm xl:flex">

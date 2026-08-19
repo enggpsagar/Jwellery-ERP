@@ -56,7 +56,7 @@ async function markStockFinish() {
   console.log(`Updated finish on ${stock.length} stock items.`);
 }
 
-async function seedKachaSlips() {
+async function seedKachaSlips(storeId: string) {
   console.log("Seeding Kacha slips...");
 
   const customers = await prisma.customer.findMany({
@@ -109,6 +109,7 @@ async function seedKachaSlips() {
     const kachaInvoice = await prisma.$transaction(async (tx) => {
       const created = await tx.kachaInvoice.create({
         data: {
+          storeId,
           slipNumber,
           customerId: plan.customer.id,
           invoiceDate,
@@ -158,6 +159,7 @@ async function seedKachaSlips() {
       if (balanceAmount > 0) {
         await tx.ledgerEntry.create({
           data: {
+            storeId,
             entryDate: invoiceDate,
             type: LedgerEntryType.DEBIT,
             sourceType: LedgerSourceType.SALE,
@@ -171,6 +173,7 @@ async function seedKachaSlips() {
       if (paidAmount > 0) {
         await tx.ledgerEntry.create({
           data: {
+            storeId,
             entryDate: invoiceDate,
             type: LedgerEntryType.CREDIT,
             sourceType: LedgerSourceType.SALE,
@@ -193,6 +196,7 @@ async function seedKachaSlips() {
       await prisma.$transaction(async (tx) => {
         const invoice = await tx.invoice.create({
           data: {
+            storeId,
             invoiceNumber,
             customerId: plan.customer.id,
             invoiceDate,
@@ -238,8 +242,14 @@ async function seedKachaSlips() {
 }
 
 async function main() {
+  const store = await prisma.store.upsert({
+    where: { code: "MAIN" },
+    update: {},
+    create: { name: "Main Store", code: "MAIN" },
+  });
+
   await markStockFinish();
-  await seedKachaSlips();
+  await seedKachaSlips(store.id);
 }
 
 main()

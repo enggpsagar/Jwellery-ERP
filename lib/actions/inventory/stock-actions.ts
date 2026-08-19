@@ -11,6 +11,7 @@ import {
 } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { requireStoreScope } from "@/lib/store-context"
 import type { StockFormState } from "@/lib/inventory/stock-types"
 
 function parseNullableString(value: FormDataEntryValue | null) {
@@ -54,7 +55,10 @@ function toDecimal(value: number | null | undefined): Prisma.Decimal | undefined
 }
 
 export async function getInventoryStock() {
+  const storeId = await requireStoreScope()
+
   const rows = await prisma.inventoryStock.findMany({
+    where: { storeId },
     include: {
       product: {
         select: {
@@ -88,8 +92,11 @@ export async function getInventoryStock() {
   }))
 }
 export async function getInventoryStockFormProducts() {
+  const storeId = await requireStoreScope()
+
   const products = await prisma.product.findMany({
     where: {
+      storeId,
       isActive: true,
     },
     orderBy: [
@@ -118,8 +125,10 @@ export async function getInventoryStockFormProducts() {
 }
 
 export async function getInventoryStockById(id: string) {
-  const row = await prisma.inventoryStock.findUnique({
-    where: { id },
+  const storeId = await requireStoreScope()
+
+  const row = await prisma.inventoryStock.findFirst({
+    where: { id, storeId },
     include: {
       product: {
         select: {
@@ -280,8 +289,25 @@ export async function createInventoryStock(
       }
     }
 
-    const existing = await prisma.inventoryStock.findUnique({
-      where: { stockCode },
+    const storeId = await requireStoreScope()
+
+    const product = await prisma.product.findFirst({
+      where: { id: productId, storeId },
+      select: { id: true },
+    })
+
+    if (!product) {
+      return {
+        success: false,
+        message: "Selected product is invalid",
+        errors: {
+          productId: ["Selected product could not be found"],
+        },
+      }
+    }
+
+    const existing = await prisma.inventoryStock.findFirst({
+      where: { stockCode, storeId },
       select: { id: true },
     })
 
@@ -297,6 +323,7 @@ export async function createInventoryStock(
 
     await prisma.inventoryStock.create({
       data: {
+        storeId,
         productId,
         stockCode,
         tagNumber,
@@ -349,8 +376,10 @@ export async function updateInventoryStock(
   formData: FormData
 ): Promise<StockFormState> {
   try {
-    const existingStock = await prisma.inventoryStock.findUnique({
-      where: { id },
+    const storeId = await requireStoreScope()
+
+    const existingStock = await prisma.inventoryStock.findFirst({
+      where: { id, storeId },
       select: {
         id: true,
         invoiceItems: {
@@ -457,6 +486,7 @@ export async function updateInventoryStock(
     const duplicate = await prisma.inventoryStock.findFirst({
       where: {
         stockCode,
+        storeId,
         NOT: { id },
       },
       select: { id: true },
@@ -469,6 +499,23 @@ export async function updateInventoryStock(
         errors: {
           stockCode: ["This stock code is already in use"],
         },
+      }
+    }
+
+    if (!isLockedForCoreChanges) {
+      const product = await prisma.product.findFirst({
+        where: { id: productId, storeId },
+        select: { id: true },
+      })
+
+      if (!product) {
+        return {
+          success: false,
+          message: "Selected product is invalid",
+          errors: {
+            productId: ["Selected product could not be found"],
+          },
+        }
       }
     }
 
@@ -555,8 +602,10 @@ export async function updateInventoryStock(
 
 export async function deleteInventoryStock(id: string): Promise<StockFormState> {
   try {
-    const stock = await prisma.inventoryStock.findUnique({
-      where: { id },
+    const storeId = await requireStoreScope()
+
+    const stock = await prisma.inventoryStock.findFirst({
+      where: { id, storeId },
       select: {
         id: true,
         stockCode: true,

@@ -50,16 +50,14 @@ async function seedAuthData() {
       name: "Admin User",
       role: UserRole.SUPER_ADMIN,
       status: UserStatus.ACTIVE,
-      isEmailVerified: true,
-      phoneVerified: false,
+      emailVerified: new Date(),
     },
     create: {
       name: "Admin User",
       email: adminEmail,
       role: UserRole.SUPER_ADMIN,
       status: UserStatus.ACTIVE,
-      isEmailVerified: true,
-      phoneVerified: false,
+      emailVerified: new Date(),
     },
   })
 

@@ -26,6 +26,8 @@ import {
   deleteUserAction,
 } from "@/app/(dashboard)/users/actions";
 
+import { ROLE_LABELS } from "@/lib/roles";
+
 import type { UserRole, UserStatus } from "@prisma/client";
 
 interface User {
@@ -37,13 +39,21 @@ interface User {
   status: UserStatus;
   isActive: boolean;
   createdAt: Date;
+  karigarId?: string | null;
+}
+
+interface KarigarOption {
+  id: string;
+  name: string;
 }
 
 interface Props {
   users: User[];
+  karigars?: KarigarOption[];
+  allowSuperAdmin?: boolean;
 }
 
-export function UserTable({ users }: Props) {
+export function UserTable({ users, karigars = [], allowSuperAdmin = false }: Props) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const toast = useToast();
@@ -119,7 +129,7 @@ export function UserTable({ users }: Props) {
                 <TableCell>{user.phone ?? "-"}</TableCell>
 
                 <TableCell>
-                  <Badge variant="outline">{user.role}</Badge>
+                  <Badge variant="outline">{ROLE_LABELS[user.role]}</Badge>
                 </TableCell>
 
                 <TableCell>
@@ -128,7 +138,12 @@ export function UserTable({ users }: Props) {
 
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
-                    <UserFormDialog mode="edit" user={user} />
+                    <UserFormDialog
+                      mode="edit"
+                      user={user}
+                      karigars={karigars}
+                      allowSuperAdmin={allowSuperAdmin}
+                    />
 
                     <Button
                       variant="outline"

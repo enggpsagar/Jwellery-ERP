@@ -4,6 +4,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireStoreScope } from "@/lib/store-context";
 import * as XLSX from "xlsx";
 
 export type Karigar = {
@@ -104,11 +105,12 @@ function mapKarigar(karigar: any): Karigar {
   };
 }
 
-function getWhere(search?: string) {
+function getWhere(storeId: string, search?: string) {
   const query = String(search || "").trim();
-  if (!query) return {};
+  if (!query) return { storeId };
 
   return {
+    storeId,
     OR: [
       { name: { contains: query, mode: "insensitive" as const } },
       { code: { contains: query, mode: "insensitive" as const } },
@@ -136,7 +138,8 @@ export async function getKarigars(
   const search = String(params.search || "").trim();
   const sortBy = params.sortBy || "createdAt";
   const sortOrder = params.sortOrder || "desc";
-  const where = getWhere(search);
+  const storeId = await requireStoreScope();
+  const where = getWhere(storeId, search);
 
   const [totalCount, karigars] = await Promise.all([
     prisma.karigar.count({ where }),
@@ -164,7 +167,8 @@ export async function getKarigars(
 }
 
 export async function getKarigarById(id: string): Promise<Karigar | null> {
-  const karigar = await prisma.karigar.findUnique({ where: { id } });
+  const storeId = await requireStoreScope();
+  const karigar = await prisma.karigar.findFirst({ where: { id, storeId } });
   if (!karigar) return null;
   return mapKarigar(karigar);
 }
@@ -209,7 +213,8 @@ export async function createKarigar(
     // isActive should default to true on create, not depend on a checkbox being present
     if (formData.get("isActive") === null) data.isActive = true;
 
-    await prisma.karigar.create({ data });
+    const storeId = await requireStoreScope();
+    await prisma.karigar.create({ data: { ...data, storeId } });
     revalidatePath("/karigars");
 
     return { success: true, message: "Karigar created successfully" };
@@ -243,7 +248,12 @@ export async function updateKarigar(
 
     const data = buildKarigarData(formData);
 
-    await prisma.karigar.update({ where: { id }, data });
+    const storeId = await requireStoreScope();
+    const { count } = await prisma.karigar.updateMany({ where: { id, storeId }, data });
+
+    if (count === 0) {
+      return { success: false, message: "Karigar not found" };
+    }
 
     revalidatePath("/karigars");
     revalidatePath(`/karigars/${id}`);
@@ -267,8 +277,9 @@ export async function updateKarigar(
  */
 export async function deleteKarigar(id: string): Promise<KarigarFormState> {
   try {
-    const karigar = await prisma.karigar.findUnique({
-      where: { id },
+    const storeId = await requireStoreScope();
+    const karigar = await prisma.karigar.findFirst({
+      where: { id, storeId },
       select: {
         id: true,
         name: true,
@@ -330,9 +341,10 @@ export async function exportKarigarsToExcel(
   try {
     const { selectedIds, search, sortBy = "createdAt", sortOrder = "desc" } = params;
 
+    const storeId = await requireStoreScope();
     const where = selectedIds?.length
-      ? { id: { in: selectedIds } }
-      : getWhere(search);
+      ? { id: { in: selectedIds }, storeId }
+      : getWhere(storeId, search);
 
     const karigars = await prisma.karigar.findMany({
       where,

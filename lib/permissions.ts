@@ -39,6 +39,12 @@ export const PERMISSIONS = {
   // Settings
   SETTINGS_VIEW: "settings.view",
   SETTINGS_UPDATE: "settings.update",
+
+  // Stores (Super Admin only)
+  STORE_VIEW: "store.view",
+  STORE_CREATE: "store.create",
+  STORE_UPDATE: "store.update",
+  STORE_DELETE: "store.delete",
 } as const;
 
 export type Permission =

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { InventoryStockStatus, InventoryTransactionType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { requireStoreScope } from "@/lib/store-context";
 
 /**
  * This file covers STOCK MOVEMENTS (reserve, damage, karigar issue/receipt,
@@ -33,8 +34,10 @@ function toDecimalOrNull(value: FormDataEntryValue | null) {
  * Full movement history for a single stock item, most recent first.
  */
 export async function getStockTransactions(inventoryStockId: string) {
+  const storeId = await requireStoreScope();
+
   const transactions = await prisma.inventoryTransaction.findMany({
-    where: { inventoryStockId },
+    where: { inventoryStockId, inventoryStock: { storeId } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -75,8 +78,10 @@ export async function reserveStock(
   notes?: string,
 ): Promise<StockActionState> {
   try {
-    const stock = await prisma.inventoryStock.findUnique({
-      where: { id: inventoryStockId },
+    const storeId = await requireStoreScope();
+
+    const stock = await prisma.inventoryStock.findFirst({
+      where: { id: inventoryStockId, storeId },
     });
 
     if (!stock) return { success: false, message: "Stock item not found" };
@@ -120,8 +125,10 @@ export async function unreserveStock(
   notes?: string,
 ): Promise<StockActionState> {
   try {
-    const stock = await prisma.inventoryStock.findUnique({
-      where: { id: inventoryStockId },
+    const storeId = await requireStoreScope();
+
+    const stock = await prisma.inventoryStock.findFirst({
+      where: { id: inventoryStockId, storeId },
     });
 
     if (!stock) return { success: false, message: "Stock item not found" };
@@ -166,19 +173,22 @@ export async function markStockDamaged(
   notes?: string,
 ): Promise<StockActionState> {
   try {
-    await prisma.$transaction([
-      prisma.inventoryStock.update({
-        where: { id: inventoryStockId },
-        data: { status: InventoryStockStatus.DAMAGED },
-      }),
-      prisma.inventoryTransaction.create({
-        data: {
-          inventoryStockId,
-          transactionType: InventoryTransactionType.DAMAGE,
-          notes: notes ?? null,
-        },
-      }),
-    ]);
+    const storeId = await requireStoreScope();
+
+    const { count } = await prisma.inventoryStock.updateMany({
+      where: { id: inventoryStockId, storeId },
+      data: { status: InventoryStockStatus.DAMAGED },
+    });
+
+    if (count === 0) return { success: false, message: "Stock item not found" };
+
+    await prisma.inventoryTransaction.create({
+      data: {
+        inventoryStockId,
+        transactionType: InventoryTransactionType.DAMAGE,
+        notes: notes ?? null,
+      },
+    });
 
     revalidatePath("/inventory/stock");
     revalidatePath(`/inventory/stock/${inventoryStockId}`);
@@ -206,8 +216,10 @@ export async function issueStockToKarigar(
       return { success: false, message: "Stock item and karigar are required" };
     }
 
-    const stock = await prisma.inventoryStock.findUnique({
-      where: { id: inventoryStockId },
+    const storeId = await requireStoreScope();
+
+    const stock = await prisma.inventoryStock.findFirst({
+      where: { id: inventoryStockId, storeId },
     });
 
     if (!stock) return { success: false, message: "Stock item not found" };
@@ -219,6 +231,13 @@ export async function issueStockToKarigar(
       };
     }
 
+    const karigar = await prisma.karigar.findFirst({
+      where: { id: karigarId, storeId },
+      select: { id: true },
+    });
+
+    if (!karigar) return { success: false, message: "Karigar not found" };
+
     const issueWeight = toDecimalOrNull(formData.get("issueWeight")) ?? stock.netWeight;
     const labourCharge = toDecimalOrNull(formData.get("labourCharge")) ?? 0;
     const expectedDateRaw = String(formData.get("expectedDate") || "");
@@ -227,6 +246,7 @@ export async function issueStockToKarigar(
     await prisma.$transaction([
       prisma.karigarJob.create({
         data: {
+          storeId,
           karigarId,
           inventoryStockId,
           metalType: stock.metalType,
@@ -279,8 +299,10 @@ export async function receiveStockFromKarigar(
       return { success: false, message: "Karigar job is required" };
     }
 
-    const job = await prisma.karigarJob.findUnique({
-      where: { id: karigarJobId },
+    const storeId = await requireStoreScope();
+
+    const job = await prisma.karigarJob.findFirst({
+      where: { id: karigarJobId, storeId },
     });
 
     if (!job) return { success: false, message: "Karigar job not found" };

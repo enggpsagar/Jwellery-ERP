@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { OtpPurpose, UserRole, UserStatus } from "@prisma/client"
+import { OtpPurpose } from "@prisma/client"
 import { hashOTP } from "@/lib/auth/otp"
 
 export async function verifyOtpLogin(phone: string, otpInput: string) {
@@ -21,19 +21,14 @@ export async function verifyOtpLogin(phone: string, otpInput: string) {
     data: { consumedAt: new Date() },
   })
 
-  let user = await prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { phone },
   })
 
   if (!user) {
-    user = await prisma.user.create({
-      data: {
-        phone,
-        status: UserStatus.ACTIVE,
-        role: UserRole.STAFF,
-        isActive: true,
-      },
-    })
+    throw new Error(
+      "No account found for this phone number. Ask your admin to add you as a user first."
+    )
   }
 
   if (!user.isActive) {

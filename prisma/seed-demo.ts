@@ -102,17 +102,19 @@ function daysAgoDate(days: number) {
   return date;
 }
 
-async function seedCustomers() {
+async function seedCustomers(storeId: string) {
   console.log("Seeding customers...");
 
   const customers = [];
 
   for (const c of CUSTOMERS) {
     const existing = await prisma.customer.findFirst({
-      where: { phone: c.phone },
+      where: { storeId, phone: c.phone },
     });
 
-    const customer = existing ?? (await prisma.customer.create({ data: c }));
+    const customer =
+      existing ??
+      (await prisma.customer.create({ data: { ...c, storeId } }));
     customers.push(customer);
   }
 
@@ -120,16 +122,16 @@ async function seedCustomers() {
   return customers;
 }
 
-async function seedKarigars() {
+async function seedKarigars(storeId: string) {
   console.log("Seeding karigars...");
 
   const karigars = [];
 
   for (const k of KARIGARS) {
     const karigar = await prisma.karigar.upsert({
-      where: { code: k.code },
+      where: { storeId_code: { storeId, code: k.code } },
       update: {},
-      create: k,
+      create: { ...k, storeId },
     });
     karigars.push(karigar);
   }
@@ -140,11 +142,13 @@ async function seedKarigars() {
 
 async function seedInvoicesAndLedger(
   customers: Awaited<ReturnType<typeof seedCustomers>>,
-  karigars: Awaited<ReturnType<typeof seedKarigars>>
+  karigars: Awaited<ReturnType<typeof seedKarigars>>,
+  storeId: string
 ) {
   console.log("Seeding invoices, invoice items and ledger entries...");
 
   const stockItems = await prisma.inventoryStock.findMany({
+    where: { storeId },
     take: 10,
     include: { product: true },
   });
@@ -224,13 +228,14 @@ async function seedInvoicesAndLedger(
     const invoiceDate = daysAgoDate(seed.daysAgo);
 
     const existing = await prisma.invoice.findUnique({
-      where: { invoiceNumber },
+      where: { storeId_invoiceNumber: { storeId, invoiceNumber } },
     });
 
     if (existing) continue;
 
     const invoice = await prisma.invoice.create({
       data: {
+        storeId,
         invoiceNumber,
         customerId: seed.customer.id,
         invoiceDate,
@@ -261,6 +266,7 @@ async function seedInvoicesAndLedger(
 
     await prisma.ledgerEntry.create({
       data: {
+        storeId,
         entryDate: invoiceDate,
         type: LedgerEntryType.DEBIT,
         sourceType: LedgerSourceType.SALE,
@@ -274,6 +280,7 @@ async function seedInvoicesAndLedger(
     if (paidAmount > 0) {
       await prisma.ledgerEntry.create({
         data: {
+          storeId,
           entryDate: invoiceDate,
           type: LedgerEntryType.CREDIT,
           sourceType: LedgerSourceType.SALE,
@@ -326,7 +333,7 @@ async function seedInvoicesAndLedger(
     jobCounter += 1;
 
     const existing = await prisma.karigarJob.findUnique({
-      where: { jobNumber },
+      where: { storeId_jobNumber: { storeId, jobNumber } },
     });
 
     if (existing) continue;
@@ -335,6 +342,7 @@ async function seedInvoicesAndLedger(
 
     await prisma.karigarJob.create({
       data: {
+        storeId,
         jobNumber,
         karigarId: job.karigar.id,
         issueDate,
@@ -350,6 +358,7 @@ async function seedInvoicesAndLedger(
 
     await prisma.ledgerEntry.create({
       data: {
+        storeId,
         entryDate: issueDate,
         type: LedgerEntryType.DEBIT,
         sourceType: LedgerSourceType.KARIGAR_ISSUE,
@@ -364,6 +373,7 @@ async function seedInvoicesAndLedger(
     if (job.receiveWeight) {
       await prisma.ledgerEntry.create({
         data: {
+          storeId,
           entryDate: new Date(),
           type: LedgerEntryType.CREDIT,
           sourceType: LedgerSourceType.KARIGAR_RECEIPT,
@@ -381,9 +391,15 @@ async function seedInvoicesAndLedger(
 }
 
 async function main() {
-  const customers = await seedCustomers();
-  const karigars = await seedKarigars();
-  await seedInvoicesAndLedger(customers, karigars);
+  const store = await prisma.store.upsert({
+    where: { code: "MAIN" },
+    update: {},
+    create: { name: "Main Store", code: "MAIN" },
+  });
+
+  const customers = await seedCustomers(store.id);
+  const karigars = await seedKarigars(store.id);
+  await seedInvoicesAndLedger(customers, karigars, store.id);
 }
 
 main()

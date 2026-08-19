@@ -7,9 +7,41 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  address   String?
+  city      String?
+  state     String?
+  pincode   String?
+  phone     String?
+  email     String?
+  gstNumber String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            User[]
+  customers        Customer[]
+  karigars         Karigar[]
+  products         Product[]
+  inventoryStock   InventoryStock[]
+  invoices         Invoice[]
+  kachaInvoices    KachaInvoice[]
+  ledgerEntries    LedgerEntry[]
+  karigarJobs      KarigarJob[]
+  metalRates       MetalRate[]
+  businessSettings BusinessSettings?
+  inviteTokens     InviteToken[]
+
+  @@index([code])
+}
+
 model Customer {
   id             String         @id @default(cuid())
-  customerCode   String?        @unique
+  storeId        String
+  customerCode   String?
   name           String
   phone          String?
   alternatePhone String?
@@ -26,18 +58,22 @@ model Customer {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   isArchived     Boolean        @default(false)
+  store          Store          @relation(fields: [storeId], references: [id])
   invoices       Invoice[]
   kachaInvoices  KachaInvoice[]
   ledgerEntries  LedgerEntry[]
 
+  @@unique([storeId, customerCode])
   @@index([name])
   @@index([phone])
   @@index([customerCode])
+  @@index([storeId])
 }
 
 model Karigar {
   id             String        @id @default(cuid())
-  code           String?       @unique
+  storeId        String
+  code           String?
   name           String
   mobile         String?
   whatsapp       String?
@@ -55,17 +91,22 @@ model Karigar {
   isActive       Boolean       @default(true)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  store          Store         @relation(fields: [storeId], references: [id])
   karigarJobs    KarigarJob[]
   ledgerEntries  LedgerEntry[]
+  loginUser      User?
 
+  @@unique([storeId, code])
   @@index([name])
   @@index([mobile])
   @@index([code])
+  @@index([storeId])
 }
 
 model Product {
   id                  String            @id @default(cuid())
-  productCode         String            @unique
+  storeId             String
+  productCode         String
   name                String
   category            InventoryCategory @default(ORNAMENT)
   ornamentType        OrnamentType?
@@ -80,20 +121,24 @@ model Product {
   isActive            Boolean           @default(true)
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
+  store               Store             @relation(fields: [storeId], references: [id])
   stockItems          InventoryStock[]
 
+  @@unique([storeId, productCode])
   @@index([name])
   @@index([productCode])
   @@index([category])
   @@index([ornamentType])
   @@index([metalType])
   @@index([designCode])
+  @@index([storeId])
 }
 
 model InventoryStock {
   id                String                 @id @default(cuid())
-  stockCode         String                 @unique
-  tagNumber         String?                @unique
+  storeId           String
+  stockCode         String
+  tagNumber         String?
   productId         String
   metalType         MetalType
   purity            PurityType?
@@ -119,12 +164,15 @@ model InventoryStock {
   remarks           String?
   createdAt         DateTime               @default(now())
   updatedAt         DateTime               @updatedAt
+  store             Store                  @relation(fields: [storeId], references: [id])
   product           Product                @relation(fields: [productId], references: [id])
   transactions      InventoryTransaction[]
   invoiceItems      InvoiceItem[]
   kachaInvoiceItems KachaInvoiceItem[]
   karigarJobs       KarigarJob[]
 
+  @@unique([storeId, stockCode])
+  @@unique([storeId, tagNumber])
   @@index([stockCode])
   @@index([tagNumber])
   @@index([productId])
@@ -134,6 +182,7 @@ model InventoryStock {
   @@index([finish])
   @@index([purchaseDate])
   @@index([location])
+  @@index([storeId])
 }
 
 model InventoryTransaction {
@@ -157,7 +206,8 @@ model InventoryTransaction {
 
 model Invoice {
   id                 String        @id @default(cuid())
-  invoiceNumber      String        @unique
+  storeId            String
+  invoiceNumber      String
   customerId         String
   invoiceDate        DateTime      @default(now())
   dueDate            DateTime?
@@ -173,20 +223,24 @@ model Invoice {
   notes              String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
+  store              Store         @relation(fields: [storeId], references: [id])
   customer           Customer      @relation(fields: [customerId], references: [id])
   items              InvoiceItem[]
   ledgerEntries      LedgerEntry[]
   convertedFromKacha KachaInvoice? @relation("KachaConvertedToPakka")
 
+  @@unique([storeId, invoiceNumber])
   @@index([customerId])
   @@index([invoiceDate])
   @@index([status])
   @@index([invoiceNumber])
+  @@index([storeId])
 }
 
 model KachaInvoice {
   id            String             @id @default(cuid())
-  slipNumber    String             @unique
+  storeId       String
+  slipNumber    String
   customerId    String
   invoiceDate   DateTime           @default(now())
   status        InvoiceStatus      @default(PAID)
@@ -202,13 +256,16 @@ model KachaInvoice {
   convertedTo   Invoice?           @relation("KachaConvertedToPakka", fields: [convertedToId], references: [id])
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
+  store         Store              @relation(fields: [storeId], references: [id])
   customer      Customer           @relation(fields: [customerId], references: [id])
   items         KachaInvoiceItem[]
 
+  @@unique([storeId, slipNumber])
   @@index([customerId])
   @@index([invoiceDate])
   @@index([status])
   @@index([slipNumber])
+  @@index([storeId])
 }
 
 model KachaInvoiceItem {
@@ -259,6 +316,7 @@ model InvoiceItem {
 
 model LedgerEntry {
   id          String           @id @default(cuid())
+  storeId     String
   entryDate   DateTime         @default(now())
   type        LedgerEntryType
   sourceType  LedgerSourceType @default(MANUAL)
@@ -271,6 +329,7 @@ model LedgerEntry {
   description String?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+  store       Store            @relation(fields: [storeId], references: [id])
   customer    Customer?        @relation(fields: [customerId], references: [id])
   invoice     Invoice?         @relation(fields: [invoiceId], references: [id])
   karigar     Karigar?         @relation(fields: [karigarId], references: [id])
@@ -281,11 +340,13 @@ model LedgerEntry {
   @@index([invoiceId])
   @@index([type])
   @@index([sourceType])
+  @@index([storeId])
 }
 
 model KarigarJob {
   id               String          @id @default(cuid())
-  jobNumber        String?         @unique
+  storeId          String
+  jobNumber        String?
   karigarId        String
   issueDate        DateTime        @default(now())
   expectedDate     DateTime?
@@ -299,13 +360,16 @@ model KarigarJob {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   inventoryStockId String?
+  store            Store           @relation(fields: [storeId], references: [id])
   inventoryStock   InventoryStock? @relation(fields: [inventoryStockId], references: [id])
   karigar          Karigar         @relation(fields: [karigarId], references: [id])
 
+  @@unique([storeId, jobNumber])
   @@index([inventoryStockId])
   @@index([issueDate])
   @@index([jobNumber])
   @@index([karigarId])
+  @@index([storeId])
 }
 
 model State {
@@ -332,18 +396,22 @@ model City {
 
 model MetalRate {
   id        String   @id @default(cuid())
+  storeId   String
   gold22k   Decimal  @db.Decimal(12, 2)
   gold24k   Decimal  @db.Decimal(12, 2)
   gold18k   Decimal  @db.Decimal(12, 2)
   silver    Decimal  @db.Decimal(12, 2)
   createdAt DateTime @default(now())
   unit      String   @default("GRAM")
+  store     Store    @relation(fields: [storeId], references: [id])
 
   @@index([createdAt])
+  @@index([storeId])
 }
 
 model BusinessSettings {
-  id String @id @default("default")
+  storeId String @id
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   // Business identity
   businessName String
@@ -391,6 +459,8 @@ model User {
   emailVerified       DateTime?
   phoneVerified       DateTime?
   invitedById         String?
+  storeId             String?
+  karigarId           String?       @unique
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   addressLine1        String?
@@ -401,12 +471,16 @@ model User {
   state               String?
   accounts            Account[]
   employee            Employee?
+  store               Store?        @relation(fields: [storeId], references: [id])
+  karigar             Karigar?      @relation(fields: [karigarId], references: [id])
   createdInviteTokens InviteToken[] @relation("UserCreatedInvites")
   inviteTokens        InviteToken[] @relation("InviteTokenUser")
   otpCodes            OtpCode[]
   sessions            Session[]
   invitedBy           User?         @relation("UserInvites", fields: [invitedById], references: [id])
   invitedUsers        User[]        @relation("UserInvites")
+
+  @@index([storeId])
 }
 
 model Account {
@@ -453,17 +527,20 @@ model InviteToken {
   tokenHash   String    @unique
   role        UserRole
   name        String?
+  storeId     String?
   expiresAt   DateTime
   acceptedAt  DateTime?
   userId      String?
   invitedById String
   createdAt   DateTime  @default(now())
+  store       Store?    @relation(fields: [storeId], references: [id])
   invitedBy   User      @relation("UserCreatedInvites", fields: [invitedById], references: [id], onDelete: Cascade)
   user        User?     @relation("InviteTokenUser", fields: [userId], references: [id])
 
   @@index([email])
   @@index([phone])
   @@index([invitedById])
+  @@index([storeId])
 }
 
 model OtpCode {
@@ -587,9 +664,11 @@ enum InventoryTransactionType {
 }
 
 enum UserRole {
+  SUPER_ADMIN
   ADMIN
   MANAGER
   STAFF
+  KARIGAR
 }
 
 enum UserStatus {

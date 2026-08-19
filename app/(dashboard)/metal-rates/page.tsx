@@ -1,9 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { MetalRatesTable } from "@/components/metal-rates/metal-rates-table";
 import { PageBackHeader } from "@/components/shared/page-back-header";
+import { requireStoreScope } from "@/lib/store-context";
 
 export default async function MetalRatesPage() {
+  const storeId = await requireStoreScope();
+
   const rates = await prisma.metalRate.findMany({
+    where: {
+      storeId,
+    },
     orderBy: {
       createdAt: "desc",
     },

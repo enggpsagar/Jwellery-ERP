@@ -9,6 +9,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { requireStoreScope } from "@/lib/store-context";
 import type { ProductFormState } from "@/lib/inventory/product-types";
 
 function parseNullableString(value: FormDataEntryValue | null) {
@@ -86,7 +87,10 @@ function serializeProduct(product: {
 }
 
 export async function getProducts() {
+  const storeId = await requireStoreScope();
+
   const rows = await prisma.product.findMany({
+    where: { storeId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -113,8 +117,10 @@ export async function getProducts() {
 }
 
 export async function getProductById(id: string) {
-  const product = await prisma.product.findUnique({
-    where: { id },
+  const storeId = await requireStoreScope();
+
+  const product = await prisma.product.findFirst({
+    where: { id, storeId },
   });
 
   if (!product) return null;
@@ -183,8 +189,10 @@ export async function createProduct(
       };
     }
 
-    const existing = await prisma.product.findUnique({
-      where: { productCode },
+    const storeId = await requireStoreScope();
+
+    const existing = await prisma.product.findFirst({
+      where: { productCode, storeId },
       select: { id: true },
     });
 
@@ -200,6 +208,7 @@ export async function createProduct(
 
     await prisma.product.create({
       data: {
+        storeId,
         productCode,
         name,
         category,
@@ -296,9 +305,12 @@ export async function updateProduct(
       };
     }
 
+    const storeId = await requireStoreScope();
+
     const existing = await prisma.product.findFirst({
       where: {
         productCode,
+        storeId,
         NOT: { id },
       },
       select: { id: true },
@@ -314,8 +326,8 @@ export async function updateProduct(
       };
     }
 
-   await prisma.product.update({
-  where: { id },
+   const { count } = await prisma.product.updateMany({
+  where: { id, storeId },
   data: {
     productCode,
     name,
@@ -332,6 +344,14 @@ export async function updateProduct(
     isActive,
   },
 })
+
+    if (count === 0) {
+      return {
+        success: false,
+        message: "Product not found",
+        errors: {},
+      };
+    }
 
     revalidatePath("/inventory");
     revalidatePath("/inventory/products");
@@ -360,8 +380,10 @@ export async function updateProduct(
  */
 export async function deleteProduct(id: string): Promise<ProductFormState> {
   try {
-    const product = await prisma.product.findUnique({
-      where: { id },
+    const storeId = await requireStoreScope();
+
+    const product = await prisma.product.findFirst({
+      where: { id, storeId },
       select: {
         id: true,
         name: true,

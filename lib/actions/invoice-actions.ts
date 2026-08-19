@@ -13,6 +13,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { requireStoreScope } from "@/lib/store-context";
 
 export type InvoiceLineItemInput = {
   itemName: string;
@@ -45,10 +46,11 @@ function lineTotal(item: InvoiceLineItemInput) {
   return metalValue + toNumber(item.makingCharge) + toNumber(item.stoneCharge);
 }
 
-async function generateInvoiceNumber() {
+async function generateInvoiceNumber(storeId: string) {
   const year = new Date().getFullYear();
   const count = await prisma.invoice.count({
     where: {
+      storeId,
       invoiceNumber: { startsWith: `INV-${year}-` },
     },
   });
@@ -115,7 +117,9 @@ export async function getInvoices(params: GetInvoicesParams = {}) {
   const search = String(params.search || "").trim();
   const status = params.status && params.status !== "ALL" ? params.status : undefined;
 
+  const storeId = await requireStoreScope();
   const where = {
+    storeId,
     ...(status ? { status } : {}),
     ...(search
       ? {
@@ -154,8 +158,10 @@ export async function getInvoices(params: GetInvoicesParams = {}) {
 }
 
 export async function getInvoiceById(id: string) {
-  const invoice = await prisma.invoice.findUnique({
-    where: { id },
+  const storeId = await requireStoreScope();
+
+  const invoice = await prisma.invoice.findFirst({
+    where: { id, storeId },
     include: {
       customer: { select: { id: true, name: true, phone: true } },
       items: true,
@@ -170,8 +176,10 @@ export async function getInvoiceById(id: string) {
 
 /** Lightweight customer list for the invoice form's customer picker. */
 export async function getInvoiceFormCustomers() {
+  const storeId = await requireStoreScope();
+
   const customers = await prisma.customer.findMany({
-    where: { isActive: true, isArchived: false },
+    where: { storeId, isActive: true, isArchived: false },
     orderBy: { name: "asc" },
     select: { id: true, name: true, phone: true, customerCode: true },
   });
@@ -181,8 +189,10 @@ export async function getInvoiceFormCustomers() {
 
 /** In-stock items available to attach to an invoice line item. */
 export async function getInvoiceFormStockItems() {
+  const storeId = await requireStoreScope();
+
   const stockItems = await prisma.inventoryStock.findMany({
-    where: { status: InventoryStockStatus.IN_STOCK, isActive: true },
+    where: { storeId, status: InventoryStockStatus.IN_STOCK, isActive: true },
     orderBy: { stockCode: "asc" },
     include: { product: { select: { name: true } } },
   });
@@ -247,11 +257,22 @@ export async function createInvoice(
     if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
     else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
 
-    const invoiceNumber = await generateInvoiceNumber();
+    const storeId = await requireStoreScope();
+
+    const customer = await prisma.customer.findFirst({
+      where: { id: customerId, storeId },
+      select: { id: true },
+    });
+    if (!customer) {
+      return { success: false, message: "Please select a customer" };
+    }
+
+    const invoiceNumber = await generateInvoiceNumber(storeId);
 
     const invoice = await prisma.$transaction(async (tx) => {
       const created = await tx.invoice.create({
         data: {
+          storeId,
           invoiceNumber,
           customerId,
           invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : new Date(),
@@ -287,10 +308,11 @@ export async function createInvoice(
       for (const item of items) {
         if (!item.inventoryStockId) continue;
 
-        await tx.inventoryStock.update({
-          where: { id: item.inventoryStockId },
+        const { count } = await tx.inventoryStock.updateMany({
+          where: { id: item.inventoryStockId, storeId },
           data: { status: InventoryStockStatus.SOLD, saleAmount: lineTotal(item) },
         });
+        if (count === 0) continue;
 
         await tx.inventoryTransaction.create({
           data: {
@@ -306,6 +328,7 @@ export async function createInvoice(
       if (balanceAmount > 0) {
         await tx.ledgerEntry.create({
           data: {
+            storeId,
             type: LedgerEntryType.DEBIT,
             sourceType: LedgerSourceType.SALE,
             customerId,
@@ -350,7 +373,9 @@ export async function recordInvoicePayment(
       return { success: false, message: "Enter a valid payment amount" };
     }
 
-    const invoice = await prisma.invoice.findUnique({ where: { id: invoiceId } });
+    const storeId = await requireStoreScope();
+
+    const invoice = await prisma.invoice.findFirst({ where: { id: invoiceId, storeId } });
     if (!invoice) return { success: false, message: "Invoice not found" };
 
     const newPaid = Number(invoice.paidAmount) + amount;
@@ -365,6 +390,7 @@ export async function recordInvoicePayment(
       }),
       prisma.ledgerEntry.create({
         data: {
+          storeId,
           type: LedgerEntryType.CREDIT,
           sourceType: LedgerSourceType.SALE,
           customerId: invoice.customerId,
@@ -388,8 +414,10 @@ export async function recordInvoicePayment(
 /** Only DRAFT invoices with no recorded payments/ledger entries can be deleted. */
 export async function deleteInvoice(id: string): Promise<InvoiceFormState> {
   try {
-    const invoice = await prisma.invoice.findUnique({
-      where: { id },
+    const storeId = await requireStoreScope();
+
+    const invoice = await prisma.invoice.findFirst({
+      where: { id, storeId },
       include: { ledgerEntries: { select: { id: true }, take: 1 } },
     });
 

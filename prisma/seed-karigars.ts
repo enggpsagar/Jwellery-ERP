@@ -101,13 +101,19 @@ const karigars = [
 ];
 
 async function main() {
+  const store = await prisma.store.upsert({
+    where: { code: "MAIN" },
+    update: {},
+    create: { name: "Main Store", code: "MAIN" },
+  });
+
   console.log(`Seeding ${karigars.length} karigars...`);
 
   for (const karigar of karigars) {
     const result = await prisma.karigar.upsert({
-      where: { code: karigar.code },
-      update: karigar,
-      create: karigar,
+      where: { storeId_code: { storeId: store.id, code: karigar.code } },
+      update: { ...karigar, storeId: store.id },
+      create: { ...karigar, storeId: store.id },
     });
     console.log(`  ✓ ${result.name} (${result.code})`);
   }

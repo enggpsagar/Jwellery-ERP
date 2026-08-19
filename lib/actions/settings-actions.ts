@@ -3,9 +3,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireStoreScope } from "@/lib/store-context";
 
 export type BusinessSettings = {
-  id: string;
+  storeId: string;
   businessName: string;
   legalName: string;
   gstNumber: string;
@@ -32,8 +33,6 @@ export type SettingsFormState = {
   errors?: Record<string, string[]>;
 };
 
-const SETTINGS_ID = "default";
-
 function toOptionalString(value: FormDataEntryValue | null) {
   const str = String(value ?? "").trim();
   return str || null;
@@ -47,7 +46,7 @@ function toNumber(value: FormDataEntryValue | null, fallback: number) {
 
 function mapSettings(settings: any): BusinessSettings {
   return {
-    id: settings.id,
+    storeId: settings.storeId,
     businessName: settings.businessName ?? "",
     legalName: settings.legalName ?? "",
     gstNumber: settings.gstNumber ?? "",
@@ -74,14 +73,16 @@ function mapSettings(settings: any): BusinessSettings {
  * one on first access so the form always has something to render.
  */
 export async function getBusinessSettings(): Promise<BusinessSettings> {
+  const storeId = await requireStoreScope();
+
   let settings = await prisma.businessSettings.findUnique({
-    where: { id: SETTINGS_ID },
+    where: { storeId },
   });
 
   if (!settings) {
     settings = await prisma.businessSettings.create({
       data: {
-        id: SETTINGS_ID,
+        storeId,
         businessName: "My Jewellery Store",
       },
     });
@@ -114,8 +115,10 @@ export async function updateBusinessSettings(
       };
     }
 
+    const storeId = await requireStoreScope();
+
     await prisma.businessSettings.upsert({
-      where: { id: SETTINGS_ID },
+      where: { storeId },
       update: {
         businessName,
         legalName: toOptionalString(formData.get("legalName")),
@@ -140,7 +143,7 @@ export async function updateBusinessSettings(
         ),
       },
       create: {
-        id: SETTINGS_ID,
+        storeId,
         businessName,
         legalName: toOptionalString(formData.get("legalName")),
         gstNumber,

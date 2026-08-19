@@ -8,6 +8,10 @@
 │   │   ├── billing
 │   │   │   ├── [id]
 │   │   │   │   └── page.tsx
+│   │   │   ├── kacha
+│   │   │   │   ├── [id]
+│   │   │   │   ├── new
+│   │   │   │   └── page.tsx
 │   │   │   ├── new
 │   │   │   │   └── page.tsx
 │   │   │   └── page.tsx
@@ -38,11 +42,14 @@
 │   │   │   │   └── edit
 │   │   │   ├── loading.tsx
 │   │   │   ├── new
+│   │   │   │   └── page.tsx
 │   │   │   └── page.tsx
 │   │   ├── layout.tsx
 │   │   ├── ledger
 │   │   │   └── page.tsx
 │   │   ├── metal-rates
+│   │   │   └── page.tsx
+│   │   ├── my-jobs
 │   │   │   └── page.tsx
 │   │   ├── not-found.tsx
 │   │   ├── profile
@@ -50,6 +57,8 @@
 │   │   ├── reports
 │   │   │   └── page.tsx
 │   │   ├── settings
+│   │   │   └── page.tsx
+│   │   ├── stores
 │   │   │   └── page.tsx
 │   │   └── users
 │   │       ├── actions.ts
@@ -93,6 +102,11 @@
 │   │   ├── invoice-form.tsx
 │   │   ├── invoice-status-badge.tsx
 │   │   ├── invoice-table.tsx
+│   │   ├── kacha
+│   │   │   ├── convert-to-pakka-form.tsx
+│   │   │   ├── kacha-invoice-form.tsx
+│   │   │   ├── kacha-invoice-table.tsx
+│   │   │   └── record-kacha-payment-dialog.tsx
 │   │   └── record-payment-dialog.tsx
 │   ├── customers
 │   │   ├── add-customer-dialog.tsx
@@ -112,9 +126,11 @@
 │   │   ├── activity-feed.tsx
 │   │   ├── app-sidebar.tsx
 │   │   ├── category-chart.tsx
+│   │   ├── global-search.tsx
 │   │   ├── metal-price-chart.tsx
 │   │   ├── sales-chart.tsx
 │   │   ├── stat-cards.tsx
+│   │   ├── store-switcher.tsx
 │   │   ├── top-bar.tsx
 │   │   └── transactions-table.tsx
 │   ├── inventory
@@ -129,6 +145,7 @@
 │   │   │   ├── product-row-actions.tsx
 │   │   │   └── products-table.tsx
 │   │   ├── shared
+│   │   │   ├── finish-badge.tsx
 │   │   │   ├── product-select.tsx
 │   │   │   ├── purity-badge.tsx
 │   │   │   └── stock-status-badge.tsx
@@ -146,7 +163,10 @@
 │   │   ├── karigar-edit-form.tsx
 │   │   ├── karigar-form.tsx
 │   │   ├── karigar-row-actions.tsx
-│   │   └── karigar-table.tsx
+│   │   ├── karigar-table.tsx
+│   │   ├── karigars-client.tsx
+│   │   ├── karigars-pagination.tsx
+│   │   └── karigars-toolbar.tsx
 │   ├── ledger
 │   │   ├── ledger-detail-drawer.tsx
 │   │   └── ledger-view.tsx
@@ -167,6 +187,9 @@
 │   │   └── settings-form.tsx
 │   ├── shared
 │   │   └── page-back-header.tsx
+│   ├── stores
+│   │   ├── store-form-dialog.tsx
+│   │   └── store-table.tsx
 │   ├── ui
 │   │   ├── avatar.tsx
 │   │   ├── badge.tsx
@@ -208,25 +231,27 @@
 │   ├── actions
 │   │   ├── customer-actions.ts
 │   │   ├── customer-ledger-actions.ts
-│   │   ├── customers.ts
+│   │   ├── dashboard-actions.ts
+│   │   ├── global-search-actions.ts
 │   │   ├── inventory
 │   │   │   ├── product-actions.ts
 │   │   │   ├── product-types.ts
 │   │   │   └── stock-actions.ts
 │   │   ├── inventory-stock-actions.ts
 │   │   ├── invoice-actions.ts
+│   │   ├── kacha-invoice-actions.ts
 │   │   ├── karigar-actions.ts
 │   │   ├── location-actions.ts
 │   │   ├── metal-rate-actions.ts
 │   │   ├── profile-actions.ts
 │   │   ├── report-actions.ts
-│   │   └── settings-actions.ts
+│   │   ├── settings-actions.ts
+│   │   └── store-actions.ts
 │   ├── auth
 │   │   ├── auth-options.ts
 │   │   ├── auth.ts
 │   │   ├── otp-auth.ts
 │   │   ├── otp.ts
-│   │   ├── permissions.ts
 │   │   ├── prisma-adapter.ts
 │   │   └── sms.ts
 │   ├── constants
@@ -244,12 +269,14 @@
 │   ├── permissions.ts
 │   ├── prisma.ts
 │   ├── roles.ts
+│   ├── store-context.ts
 │   ├── types
 │   │   └── next-auth.d.ts
 │   ├── user.ts
 │   ├── utils.ts
 │   └── validation
 │       └── user.ts
+├── middleware.ts
 ├── next-env.d.ts
 ├── next.config.mjs
 ├── package-lock.json
@@ -280,9 +307,16 @@
 │   │   │   └── migration.sql
 │   │   ├── 20260730124506_add_business_settings
 │   │   │   └── migration.sql
+│   │   ├── 20260812130828_add_kacha_pakka_billing_and_stock_finish
+│   │   │   └── migration.sql
+│   │   ├── 20260819120000_add_store_multitenancy
+│   │   │   └── migration.sql
 │   │   └── migration_lock.toml
 │   ├── schema.prisma
+│   ├── seed-demo.ts
 │   ├── seed-inventory.ts
+│   ├── seed-kacha-demo.ts
+│   ├── seed-karigars.ts
 │   └── seed.ts
 ├── project-structure.txt
 ├── public
@@ -309,4 +343,4 @@
 ├── types
 └── vercel.json
 
-94 directories, 216 files
+103 directories, 241 files

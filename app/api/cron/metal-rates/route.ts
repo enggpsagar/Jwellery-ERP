@@ -79,16 +79,27 @@ export async function GET(request: Request) {
 
     console.log("Saving Metal Rate:", payload);
 
-    const savedRate = await prisma.metalRate.create({
-      data: payload,
+    // Gold/silver rates are a shared market price, but MetalRate is scoped
+    // per store — broadcast this fetch to every active store's own row.
+    const stores = await prisma.store.findMany({
+      where: { isActive: true },
+      select: { id: true },
     });
 
-    console.log("Saved Successfully:", savedRate);
+    const savedRates = await prisma.$transaction(
+      stores.map((store) =>
+        prisma.metalRate.create({
+          data: { ...payload, storeId: store.id },
+        })
+      )
+    );
+
+    console.log("Saved Successfully:", savedRates);
 
     return NextResponse.json({
       success: true,
       message: "Metal rates updated successfully",
-      data: savedRate,
+      data: savedRates,
     });
   } catch (error: any) {
     console.error("Metal rate cron error:", error);

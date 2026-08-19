@@ -19,10 +19,20 @@ import {
 } from "@/lib/user";
 
 import { requireAuth, hasPermission } from "@/lib/auth/auth";
-import { PERMISSIONS } from "@/lib/auth/permissions";
+import { PERMISSIONS } from "@/lib/permissions";
+import { requireStoreScope } from "@/lib/store-context";
+
+function assertNoPrivilegeEscalation(
+  actingRole: UserRole,
+  targetRole: UserRole
+) {
+  if (targetRole === UserRole.SUPER_ADMIN && actingRole !== UserRole.SUPER_ADMIN) {
+    throw new Error("Only a Super Admin can assign the Super Admin role.");
+  }
+}
 
 export async function createUserAction(formData: FormData) {
-  await requireAuth();
+  const currentUser = await requireAuth();
 
   const allowed = await hasPermission(PERMISSIONS.USER_CREATE);
 
@@ -36,15 +46,19 @@ export async function createUserAction(formData: FormData) {
     phone: formData.get("phone"),
     role: formData.get("role") as UserRole,
     isActive: formData.get("isActive") === "true",
+    karigarId: formData.get("karigarId"),
   });
 
-  await createUser(payload);
+  assertNoPrivilegeEscalation(currentUser.role as UserRole, payload.role);
+
+  const storeId = await requireStoreScope();
+  await createUser(payload, storeId);
 
   revalidatePath("/users");
 }
 
 export async function updateUserAction(formData: FormData) {
-  await requireAuth();
+  const currentUser = await requireAuth();
 
   const allowed = await hasPermission(PERMISSIONS.USER_UPDATE);
 
@@ -59,9 +73,13 @@ export async function updateUserAction(formData: FormData) {
     phone: formData.get("phone"),
     role: formData.get("role") as UserRole,
     isActive: formData.get("isActive") === "true",
+    karigarId: formData.get("karigarId"),
   });
 
-  await updateUser(payload);
+  assertNoPrivilegeEscalation(currentUser.role as UserRole, payload.role);
+
+  const storeId = await requireStoreScope();
+  await updateUser(payload, storeId);
 
   revalidatePath("/users");
 }
@@ -75,7 +93,8 @@ export async function disableUserAction(id: string) {
     throw new Error("You don't have permission to disable users.");
   }
 
-  await disableUser(id);
+  const storeId = await requireStoreScope();
+  await disableUser(id, storeId);
 
   revalidatePath("/users");
 }
@@ -89,7 +108,8 @@ export async function enableUserAction(id: string) {
     throw new Error("You don't have permission to enable users.");
   }
 
-  await enableUser(id);
+  const storeId = await requireStoreScope();
+  await enableUser(id, storeId);
 
   revalidatePath("/users");
 }
@@ -103,7 +123,8 @@ export async function deleteUserAction(id: string) {
     throw new Error("You don't have permission to delete users.");
   }
 
-  await deleteUser(id);
+  const storeId = await requireStoreScope();
+  await deleteUser(id, storeId);
 
   revalidatePath("/users");
 }

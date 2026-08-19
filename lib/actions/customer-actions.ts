@@ -3,6 +3,7 @@
 
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
+import { requireStoreScope } from "@/lib/store-context"
 import * as XLSX from "xlsx"
 
 export type Customer = {
@@ -88,10 +89,11 @@ function formatDate(date?: Date | null) {
   }).format(date)
 }
 
-function getCustomerWhere(search?: string) {
+function getCustomerWhere(storeId: string, search?: string) {
   const query = String(search || "").trim()
 
   return {
+    storeId,
     isArchived: false,
     ...(query
       ? {
@@ -177,7 +179,8 @@ export async function getCustomers(
   const sortBy: CustomerSortBy = params.sortBy || "createdAt"
   const sortOrder: SortOrder = params.sortOrder || "desc"
 
-  const where = getCustomerWhere(search)
+  const storeId = await requireStoreScope()
+  const where = getCustomerWhere(storeId, search)
   const orderBy = getCustomerOrderBy(sortBy, sortOrder)
 
   const [totalCount, customers] = await Promise.all([
@@ -230,8 +233,10 @@ export async function getCustomers(
 }
 
 export async function getCustomerById(id: string): Promise<Customer | null> {
-  const customer = await prisma.customer.findUnique({
-    where: { id },
+  const storeId = await requireStoreScope()
+
+  const customer = await prisma.customer.findFirst({
+    where: { id, storeId },
     include: {
       invoices: {
         select: {
@@ -267,14 +272,16 @@ async function getAllCustomersForExport(
   const sortBy: CustomerSortBy = params.sortBy || "createdAt"
   const sortOrder: SortOrder = params.sortOrder || "desc"
 
+  const storeId = await requireStoreScope()
   const where = params.selectedIds?.length
     ? {
         id: {
           in: params.selectedIds,
         },
+        storeId,
         isArchived: false,
       }
-    : getCustomerWhere(params.search)
+    : getCustomerWhere(storeId, params.search)
 
   const customers = await prisma.customer.findMany({
     where,
@@ -413,8 +420,11 @@ export async function addCustomer(
       }
     }
 
+    const storeId = await requireStoreScope()
+
     await prisma.customer.create({
       data: {
+        storeId,
         name,
         phone: phone || null,
         alternatePhone: altPhone || null,
@@ -475,8 +485,10 @@ export async function updateCustomer(
       }
     }
 
-    await prisma.customer.update({
-      where: { id },
+    const storeId = await requireStoreScope()
+
+    const { count } = await prisma.customer.updateMany({
+      where: { id, storeId },
       data: {
         name,
         phone: phone || null,
@@ -491,6 +503,13 @@ export async function updateCustomer(
         openingBalance,
       },
     })
+
+    if (count === 0) {
+      return {
+        success: false,
+        message: "Customer not found",
+      }
+    }
 
     revalidatePath("/customers")
     revalidatePath(`/customers/${id}`)
@@ -510,12 +529,21 @@ export async function updateCustomer(
 
 export async function archiveCustomer(id: string): Promise<CustomerFormState> {
   try {
-    await prisma.customer.update({
-      where: { id },
+    const storeId = await requireStoreScope()
+
+    const { count } = await prisma.customer.updateMany({
+      where: { id, storeId },
       data: {
         isArchived: true,
       },
     })
+
+    if (count === 0) {
+      return {
+        success: false,
+        message: "Customer not found",
+      }
+    }
 
     revalidatePath("/customers")
     revalidatePath(`/customers/${id}`)
@@ -535,8 +563,10 @@ export async function archiveCustomer(id: string): Promise<CustomerFormState> {
 
 export async function deleteCustomer(id: string): Promise<CustomerFormState> {
   try {
-    const customer = await prisma.customer.findUnique({
-      where: { id },
+    const storeId = await requireStoreScope()
+
+    const customer = await prisma.customer.findFirst({
+      where: { id, storeId },
       include: {
         invoices: {
           select: { id: true },

@@ -24,10 +24,11 @@ export async function requireAuth() {
   return user;
 }
 
-export async function requireRole(role: UserRole) {
+export async function requireRole(role: UserRole | UserRole[]) {
   const user = await requireAuth();
+  const allowed = Array.isArray(role) ? role : [role];
 
-  if (user.role !== role) {
+  if (!allowed.includes(user.role as UserRole)) {
     throw new Error("Forbidden");
   }
 

@@ -4,6 +4,7 @@
 import { InventoryStockStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { requireStoreScope } from "@/lib/store-context";
 
 export type DateRange = { from?: string; to?: string };
 
@@ -23,7 +24,8 @@ function toDateRangeWhere(range: DateRange, field: string) {
  * breakdown by metal type across invoice line items.
  */
 export async function getSalesReport(range: DateRange = {}) {
-  const where = toDateRangeWhere(range, "invoiceDate");
+  const storeId = await requireStoreScope();
+  const where = { storeId, ...toDateRangeWhere(range, "invoiceDate") };
 
   const invoices = await prisma.invoice.findMany({
     where,
@@ -75,8 +77,9 @@ export async function getSalesReport(range: DateRange = {}) {
  * weight and an estimated value (sale rate x quantity where set).
  */
 export async function getInventoryValuationReport() {
+  const storeId = await requireStoreScope();
   const stockItems = await prisma.inventoryStock.findMany({
-    where: { isActive: true },
+    where: { storeId, isActive: true },
     include: { product: { select: { name: true, category: true } } },
   });
 
@@ -116,8 +119,9 @@ export async function getInventoryValuationReport() {
  * received back, with total gold/silver weight outstanding per karigar.
  */
 export async function getKarigarOutstandingReport() {
+  const storeId = await requireStoreScope();
   const openJobs = await prisma.karigarJob.findMany({
-    where: { receivedDate: null },
+    where: { storeId, receivedDate: null },
     orderBy: { issueDate: "desc" },
     include: { karigar: { select: { name: true, code: true } } },
   });
@@ -156,8 +160,9 @@ export async function getKarigarOutstandingReport() {
  * dues first.
  */
 export async function getCustomerDuesReport() {
+  const storeId = await requireStoreScope();
   const customers = await prisma.customer.findMany({
-    where: { isActive: true, isArchived: false },
+    where: { storeId, isActive: true, isArchived: false },
     include: {
       invoices: {
         where: { balanceAmount: { gt: 0 } },

@@ -26,6 +26,9 @@ export const createUserSchema = z.object({
   role: z.nativeEnum(UserRole),
 
   isActive: z.boolean().default(true),
+
+  // Only meaningful when role is KARIGAR — links the login to a Karigar record.
+  karigarId: z.string().cuid().optional().or(z.literal("")),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

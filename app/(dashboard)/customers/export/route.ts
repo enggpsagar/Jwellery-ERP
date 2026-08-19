@@ -4,6 +4,7 @@ export const runtime = "nodejs"
 import { NextRequest, NextResponse } from "next/server"
 import * as XLSX from "xlsx"
 import { prisma } from "@/lib/prisma"
+import { requireStoreScope } from "@/lib/store-context"
 
 type CustomerSortBy = "name" | "createdAt" | "openingBalance"
 type SortOrder = "asc" | "desc"
@@ -42,7 +43,10 @@ export async function GET(request: NextRequest) {
     const sortBy = (searchParams.get("sortBy") || "createdAt") as CustomerSortBy
     const sortOrder = (searchParams.get("sortOrder") || "desc") as SortOrder
 
+    const storeId = await requireStoreScope()
+
     const where = {
+      storeId,
       isArchived: false,
       ...(search
         ? {

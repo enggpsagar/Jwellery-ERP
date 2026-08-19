@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { LedgerEntryType, LedgerSourceType } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { requireStoreScope } from "@/lib/store-context"
 
 export type CustomerLedgerFormState = {
   success: boolean
@@ -72,8 +73,10 @@ function formatLedgerSource(
 export async function getCustomerLedgerEntries(
   customerId: string
 ): Promise<CustomerLedgerEntryItem[]> {
+  const storeId = await requireStoreScope()
+
   const entries = await prisma.ledgerEntry.findMany({
-    where: { customerId },
+    where: { customerId, storeId },
     orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
   })
 
@@ -90,15 +93,17 @@ export async function getCustomerLedgerEntries(
 export async function getCustomerLedgerSummary(
   customerId: string
 ): Promise<CustomerLedgerSummary | null> {
-  const customer = await prisma.customer.findUnique({
-    where: { id: customerId },
+  const storeId = await requireStoreScope()
+
+  const customer = await prisma.customer.findFirst({
+    where: { id: customerId, storeId },
     select: { openingBalance: true },
   })
 
   if (!customer) return null
 
   const entries = await prisma.ledgerEntry.findMany({
-    where: { customerId },
+    where: { customerId, storeId },
     select: {
       type: true,
       amount: true,
@@ -151,8 +156,10 @@ export async function addCustomerSaleEntry(
       }
     }
 
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
+    const storeId = await requireStoreScope()
+
+    const customer = await prisma.customer.findFirst({
+      where: { id: customerId, storeId },
       select: { id: true },
     })
 
@@ -165,6 +172,7 @@ export async function addCustomerSaleEntry(
 
     await prisma.ledgerEntry.create({
       data: {
+        storeId,
         customerId,
         type: LedgerEntryType.DEBIT,
         sourceType: LedgerSourceType.MANUAL,
@@ -213,8 +221,10 @@ export async function addCustomerRefundEntry(
       }
     }
 
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
+    const storeId = await requireStoreScope()
+
+    const customer = await prisma.customer.findFirst({
+      where: { id: customerId, storeId },
       select: { id: true },
     })
 
@@ -227,6 +237,7 @@ export async function addCustomerRefundEntry(
 
     await prisma.ledgerEntry.create({
       data: {
+        storeId,
         customerId,
         type: LedgerEntryType.CREDIT,
         sourceType: LedgerSourceType.MANUAL,

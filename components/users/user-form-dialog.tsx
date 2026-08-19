@@ -9,6 +9,8 @@ import {
   updateUserAction,
 } from "@/app/(dashboard)/users/actions"
 
+import { ROLE_LABELS } from "@/lib/roles"
+
 import { useToast } from "@/components/providers/toast-provider"
 
 import {
@@ -37,21 +39,46 @@ type UserFormDialogUser = {
   phone: string | null
   role: UserRole
   isActive: boolean
+  karigarId?: string | null
+}
+
+type KarigarOption = {
+  id: string
+  name: string
 }
 
 type UserFormDialogProps = {
   mode: "create" | "edit"
   user?: UserFormDialogUser
   children?: React.ReactNode
+  karigars?: KarigarOption[]
+  allowSuperAdmin?: boolean
 }
 
-export function UserFormDialog({ mode, user, children }: UserFormDialogProps) {
+const ASSIGNABLE_ROLES: UserRole[] = [
+  UserRole.ADMIN,
+  UserRole.STAFF,
+  UserRole.KARIGAR,
+]
+
+export function UserFormDialog({
+  mode,
+  user,
+  children,
+  karigars = [],
+  allowSuperAdmin = false,
+}: UserFormDialogProps) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [role, setRole] = useState<UserRole>(user?.role ?? UserRole.STAFF)
+  const [karigarId, setKarigarId] = useState(user?.karigarId ?? "")
 
   const router = useRouter()
   const toast = useToast()
+
+  const roleOptions = allowSuperAdmin
+    ? [UserRole.SUPER_ADMIN, ...ASSIGNABLE_ROLES]
+    : ASSIGNABLE_ROLES
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -59,6 +86,12 @@ export function UserFormDialog({ mode, user, children }: UserFormDialogProps) {
 
     if (mode === "edit" && user) {
       formData.set("id", user.id)
+    }
+
+    if (role === UserRole.KARIGAR) {
+      formData.set("karigarId", karigarId)
+    } else {
+      formData.set("karigarId", "")
     }
 
     startTransition(async () => {
@@ -124,14 +157,35 @@ export function UserFormDialog({ mode, user, children }: UserFormDialogProps) {
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
-                {Object.values(UserRole).map((roleOption) => (
+                {roleOptions.map((roleOption) => (
                   <SelectItem key={roleOption} value={roleOption}>
-                    {roleOption}
+                    {ROLE_LABELS[roleOption]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {role === UserRole.KARIGAR && (
+            <div className="space-y-2">
+              <Label>Linked Karigar</Label>
+              <Select value={karigarId} onValueChange={setKarigarId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select karigar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {karigars.map((karigar) => (
+                    <SelectItem key={karigar.id} value={karigar.id}>
+                      {karigar.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                This karigar will only see their own jobs after logging in.
+              </p>
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             <input

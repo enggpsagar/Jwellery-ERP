@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { subDays, format } from "date-fns";
+import { requireStoreScope } from "@/lib/store-context";
 
 export interface DashboardMetalRate {
   id: string;
@@ -23,7 +24,12 @@ export interface ChartData {
  * yesterday's rate to calculate percentage changes.
  */
 export async function getLatestMetalRates() {
+  const storeId = await requireStoreScope();
+
   const latestRates = await prisma.metalRate.findMany({
+    where: {
+      storeId,
+    },
     orderBy: {
       createdAt: "desc",
     },
@@ -45,8 +51,11 @@ export async function getLatestMetalRates() {
  * the latest record of that day is used.
  */
 export async function getLast10DaysRates(): Promise<ChartData[]> {
+  const storeId = await requireStoreScope();
+
   const rates = await prisma.metalRate.findMany({
     where: {
+      storeId,
       createdAt: {
         gte: subDays(new Date(), 10),
       },

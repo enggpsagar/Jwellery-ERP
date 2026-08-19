@@ -3,6 +3,12 @@ import { PrismaClient, InventoryCategory, MetalType, OrnamentType, PurityType, I
 const prisma = new PrismaClient()
 
 async function main() {
+  const store = await prisma.store.upsert({
+    where: { code: "MAIN" },
+    update: {},
+    create: { name: "Main Store", code: "MAIN" },
+  })
+
   // clear in safe order if needed
   await prisma.inventoryStock.deleteMany()
   await prisma.product.deleteMany()
@@ -335,8 +341,18 @@ async function main() {
   ]
 
   for (const product of products) {
+    const { stockItems, ...productData } = product
     await prisma.product.create({
-      data: product,
+      data: {
+        ...productData,
+        storeId: store.id,
+        stockItems: {
+          create: stockItems.create.map((item) => ({
+            ...item,
+            storeId: store.id,
+          })),
+        },
+      },
     })
   }
 

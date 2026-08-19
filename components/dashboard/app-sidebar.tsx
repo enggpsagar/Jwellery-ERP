@@ -16,7 +16,11 @@ import {
   Settings,
   Gem,
   ChevronRight,
+  Store,
+  ClipboardList,
 } from "lucide-react";
+
+import { ROLE_LABELS } from "@/lib/roles";
 
 import {
   Sidebar,
@@ -37,7 +41,14 @@ import {
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
-const mainNav = [
+type NavItem = {
+  title: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  items?: { title: string; href: string }[];
+};
+
+const mainNav: NavItem[] = [
   {
     title: "Dashboard",
     href: "/dashboard",
@@ -82,13 +93,34 @@ const mainNav = [
     href: "/users",
     icon: UserCog,
   },
+  {
+    title: "Stores",
+    href: "/stores",
+    icon: Store,
+  },
 ];
+
+const karigarNav: NavItem[] = [
+  {
+    title: "My Jobs",
+    href: "/my-jobs",
+    icon: ClipboardList,
+  },
+];
+
+function getNavForRole(role?: string) {
+  if (role === "KARIGAR") return karigarNav;
+
+  return mainNav.filter((item) => {
+    if (item.href === "/stores") return role === "SUPER_ADMIN";
+    if (item.href === "/users") return role === "SUPER_ADMIN" || role === "ADMIN";
+    return true;
+  });
+}
 
 function isNavItemActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
-
-type NavItem = (typeof mainNav)[number];
 
 function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string }) {
   const Icon = item.icon;
@@ -151,6 +183,9 @@ function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string })
 export function AppSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const role = session?.user?.role;
+  const navItems = getNavForRole(role);
+  const showSettings = role !== "STAFF" && role !== "KARIGAR" && role !== "MANAGER";
   const userName = session?.user?.name ?? "User";
   const userInitials = userName
     .split(" ")
@@ -184,33 +219,35 @@ export function AppSidebar() {
 
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNav.map((item) => (
+              {navItems.map((item) => (
                 <SidebarNavItem key={item.title} item={item} pathname={pathname} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>System</SidebarGroupLabel>
+        {showSettings && (
+          <SidebarGroup>
+            <SidebarGroupLabel>System</SidebarGroupLabel>
 
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isNavItemActive(pathname, "/settings")}
-                  tooltip="Settings"
-                >
-                  <Link href="/settings">
-                    <Settings className="h-4 w-4" />
-                    <span>Settings</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isNavItemActive(pathname, "/settings")}
+                    tooltip="Settings"
+                  >
+                    <Link href="/settings">
+                      <Settings className="h-4 w-4" />
+                      <span>Settings</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t">
@@ -222,7 +259,7 @@ export function AppSidebar() {
           <div className="group-data-[collapsible=icon]:hidden">
             <div className="text-sm font-medium">{userName}</div>
             <div className="text-xs text-muted-foreground">
-              {session?.user?.role ?? "Store Owner"}
+              {role ? ROLE_LABELS[role as keyof typeof ROLE_LABELS] : "Store Owner"}
             </div>
           </div>
         </div>

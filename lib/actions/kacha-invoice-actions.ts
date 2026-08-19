@@ -13,6 +13,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { requireStoreScope } from "@/lib/store-context";
 import {
   getInvoiceFormCustomers,
   getInvoiceFormStockItems,
@@ -50,10 +51,11 @@ function lineTotal(item: KachaInvoiceLineItemInput) {
   return metalValue + toNumber(item.makingCharge) + toNumber(item.stoneCharge);
 }
 
-async function generateSlipNumber() {
+async function generateSlipNumber(storeId: string) {
   const year = new Date().getFullYear();
   const count = await prisma.kachaInvoice.count({
     where: {
+      storeId,
       slipNumber: { startsWith: `KACHA-${year}-` },
     },
   });
@@ -120,7 +122,9 @@ export async function getKachaInvoices(params: GetKachaInvoicesParams = {}) {
   const search = String(params.search || "").trim();
   const status = params.status && params.status !== "ALL" ? params.status : undefined;
 
+  const storeId = await requireStoreScope();
   const where = {
+    storeId,
     ...(status ? { status } : {}),
     ...(search
       ? {
@@ -159,8 +163,10 @@ export async function getKachaInvoices(params: GetKachaInvoicesParams = {}) {
 }
 
 export async function getKachaInvoiceById(id: string) {
-  const kachaInvoice = await prisma.kachaInvoice.findUnique({
-    where: { id },
+  const storeId = await requireStoreScope();
+
+  const kachaInvoice = await prisma.kachaInvoice.findFirst({
+    where: { id, storeId },
     include: {
       customer: { select: { id: true, name: true, phone: true, gstin: true } },
       items: true,
@@ -222,11 +228,22 @@ export async function createKachaInvoice(
     if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
     else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
 
-    const slipNumber = await generateSlipNumber();
+    const storeId = await requireStoreScope();
+
+    const customer = await prisma.customer.findFirst({
+      where: { id: customerId, storeId },
+      select: { id: true },
+    });
+    if (!customer) {
+      return { success: false, message: "Please select a customer" };
+    }
+
+    const slipNumber = await generateSlipNumber(storeId);
 
     const kachaInvoice = await prisma.$transaction(async (tx) => {
       const created = await tx.kachaInvoice.create({
         data: {
+          storeId,
           slipNumber,
           customerId,
           invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : new Date(),
@@ -260,10 +277,11 @@ export async function createKachaInvoice(
       for (const item of items) {
         if (!item.inventoryStockId) continue;
 
-        await tx.inventoryStock.update({
-          where: { id: item.inventoryStockId },
+        const { count } = await tx.inventoryStock.updateMany({
+          where: { id: item.inventoryStockId, storeId },
           data: { status: InventoryStockStatus.SOLD, saleAmount: lineTotal(item) },
         });
+        if (count === 0) continue;
 
         await tx.inventoryTransaction.create({
           data: {
@@ -279,6 +297,7 @@ export async function createKachaInvoice(
       if (balanceAmount > 0) {
         await tx.ledgerEntry.create({
           data: {
+            storeId,
             type: LedgerEntryType.DEBIT,
             sourceType: LedgerSourceType.SALE,
             customerId,
@@ -321,7 +340,11 @@ export async function recordKachaInvoicePayment(
       return { success: false, message: "Enter a valid payment amount" };
     }
 
-    const kachaInvoice = await prisma.kachaInvoice.findUnique({ where: { id: kachaInvoiceId } });
+    const storeId = await requireStoreScope();
+
+    const kachaInvoice = await prisma.kachaInvoice.findFirst({
+      where: { id: kachaInvoiceId, storeId },
+    });
     if (!kachaInvoice) return { success: false, message: "Kacha slip not found" };
 
     const newPaid = Number(kachaInvoice.paidAmount) + amount;
@@ -330,12 +353,13 @@ export async function recordKachaInvoicePayment(
       newBalance === 0 ? InvoiceStatus.PAID : InvoiceStatus.PARTIAL;
 
     await prisma.$transaction([
-      prisma.kachaInvoice.update({
-        where: { id: kachaInvoiceId },
+      prisma.kachaInvoice.updateMany({
+        where: { id: kachaInvoiceId, storeId },
         data: { paidAmount: newPaid, balanceAmount: newBalance, status },
       }),
       prisma.ledgerEntry.create({
         data: {
+          storeId,
           type: LedgerEntryType.CREDIT,
           sourceType: LedgerSourceType.SALE,
           customerId: kachaInvoice.customerId,
@@ -369,8 +393,10 @@ export async function convertKachaToPakka(
   formData: FormData,
 ): Promise<KachaInvoiceFormState> {
   try {
-    const kachaInvoice = await prisma.kachaInvoice.findUnique({
-      where: { id: kachaInvoiceId },
+    const storeId = await requireStoreScope();
+
+    const kachaInvoice = await prisma.kachaInvoice.findFirst({
+      where: { id: kachaInvoiceId, storeId },
       include: { items: true },
     });
 
@@ -401,13 +427,14 @@ export async function convertKachaToPakka(
 
     const year = new Date().getFullYear();
     const count = await prisma.invoice.count({
-      where: { invoiceNumber: { startsWith: `INV-${year}-` } },
+      where: { storeId, invoiceNumber: { startsWith: `INV-${year}-` } },
     });
     const invoiceNumber = `INV-${year}-${String(count + 1).padStart(4, "0")}`;
 
     const invoice = await prisma.$transaction(async (tx) => {
       const created = await tx.invoice.create({
         data: {
+          storeId,
           invoiceNumber,
           customerId: kachaInvoice.customerId,
           invoiceDate: kachaInvoice.invoiceDate,
@@ -440,8 +467,8 @@ export async function convertKachaToPakka(
         },
       });
 
-      await tx.kachaInvoice.update({
-        where: { id: kachaInvoiceId },
+      await tx.kachaInvoice.updateMany({
+        where: { id: kachaInvoiceId, storeId },
         data: { convertedToId: created.id },
       });
 
@@ -467,7 +494,9 @@ export async function convertKachaToPakka(
 /** Only DRAFT Kacha slips with no recorded payments and not yet converted can be deleted. */
 export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormState> {
   try {
-    const kachaInvoice = await prisma.kachaInvoice.findUnique({ where: { id } });
+    const storeId = await requireStoreScope();
+
+    const kachaInvoice = await prisma.kachaInvoice.findFirst({ where: { id, storeId } });
 
     if (!kachaInvoice) return { success: false, message: "Kacha slip not found" };
 
@@ -482,7 +511,9 @@ export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormSt
       };
     }
 
-    await prisma.kachaInvoice.delete({ where: { id } });
+    const { count } = await prisma.kachaInvoice.deleteMany({ where: { id, storeId } });
+    if (count === 0) return { success: false, message: "Kacha slip not found" };
+
     revalidatePath("/billing/kacha");
 
     return { success: true, message: "Kacha slip deleted" };

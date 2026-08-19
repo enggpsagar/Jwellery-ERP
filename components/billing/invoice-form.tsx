@@ -269,7 +269,7 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
                   <Input
                     type="number"
                     step="0.001"
-                    value={item.netWeight}
+                    value={item.netWeight === 0 ? "" : item.netWeight}
                     onChange={(e) =>
                       updateItem(item.key, { netWeight: Number(e.target.value) || 0 })
                     }
@@ -281,7 +281,7 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
                   <Input
                     type="number"
                     step="0.01"
-                    value={item.rate}
+                    value={item.rate === 0 ? "" : item.rate}
                     onChange={(e) =>
                       updateItem(item.key, { rate: Number(e.target.value) || 0 })
                     }
@@ -293,7 +293,7 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
                   <Input
                     type="number"
                     step="0.01"
-                    value={item.makingCharge}
+                    value={item.makingCharge === 0 ? "" : item.makingCharge}
                     onChange={(e) =>
                       updateItem(item.key, {
                         makingCharge: Number(e.target.value) || 0,
@@ -307,7 +307,7 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
                   <Input
                     type="number"
                     step="0.01"
-                    value={item.stoneCharge}
+                    value={item.stoneCharge === 0 ? "" : item.stoneCharge}
                     onChange={(e) =>
                       updateItem(item.key, {
                         stoneCharge: Number(e.target.value) || 0,
@@ -344,7 +344,7 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
           <Input
             type="number"
             step="0.01"
-            value={discount}
+            value={discount === 0 ? "" : discount}
             onChange={(e) => setDiscount(Number(e.target.value) || 0)}
           />
         </div>
@@ -354,7 +354,7 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
           <Input
             type="number"
             step="0.01"
-            value={taxAmount}
+            value={taxAmount === 0 ? "" : taxAmount}
             onChange={(e) => setTaxAmount(Number(e.target.value) || 0)}
           />
         </div>
@@ -364,7 +364,7 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
           <Input
             type="number"
             step="0.01"
-            value={paidAmount}
+            value={paidAmount === 0 ? "" : paidAmount}
             onChange={(e) => setPaidAmount(Number(e.target.value) || 0)}
           />
         </div>

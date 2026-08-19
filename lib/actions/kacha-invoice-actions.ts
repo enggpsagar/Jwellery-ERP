@@ -143,7 +143,10 @@ export async function getKachaInvoices(params: GetKachaInvoicesParams = {}) {
       orderBy: { invoiceDate: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: { customer: { select: { id: true, name: true, phone: true, gstin: true } } },
+      include: {
+        customer: { select: { id: true, name: true, phone: true, gstin: true } },
+        convertedTo: { select: { id: true, invoiceNumber: true } },
+      },
     }),
   ]);
 

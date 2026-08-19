@@ -122,6 +122,9 @@ function isNavItemActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+const ACTIVE_NAV_CLASS =
+  "data-active:!bg-primary/20 data-active:!text-primary data-active:font-semibold data-active:border-l-2 data-active:border-primary";
+
 function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string }) {
   const Icon = item.icon;
   const isActive = isNavItemActive(pathname, item.href);
@@ -135,7 +138,12 @@ function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string })
   if (!hasSubItems) {
     return (
       <SidebarMenuItem>
-        <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+        <SidebarMenuButton
+          asChild
+          isActive={isActive}
+          tooltip={item.title}
+          className={ACTIVE_NAV_CLASS}
+        >
           <Link href={item.href}>
             <Icon className="h-4 w-4" />
             <span>{item.title}</span>
@@ -152,6 +160,7 @@ function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string })
         isActive={isActive}
         tooltip={item.title}
         onClick={() => setManuallyOpened(true)}
+        className={ACTIVE_NAV_CLASS}
       >
         <Link href={item.href}>
           <Icon className="h-4 w-4" />
@@ -168,7 +177,11 @@ function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string })
         <SidebarMenuSub>
           {item.items!.map((subItem) => (
             <SidebarMenuSubItem key={subItem.title}>
-              <SidebarMenuSubButton asChild isActive={pathname === subItem.href}>
+              <SidebarMenuSubButton
+                asChild
+                isActive={pathname === subItem.href}
+                className={ACTIVE_NAV_CLASS}
+              >
                 <Link href={subItem.href}>
                   <span>{subItem.title}</span>
                 </Link>
@@ -238,6 +251,7 @@ export function AppSidebar() {
                     asChild
                     isActive={isNavItemActive(pathname, "/settings")}
                     tooltip="Settings"
+                    className={ACTIVE_NAV_CLASS}
                   >
                     <Link href="/settings">
                       <Settings className="h-4 w-4" />

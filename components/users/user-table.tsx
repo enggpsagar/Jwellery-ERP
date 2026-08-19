@@ -61,13 +61,17 @@ export function UserTable({ users, karigars = [], allowSuperAdmin = false }: Pro
   const handleToggleStatus = (user: User) => {
     startTransition(async () => {
       try {
-        if (user.status === "DISABLED") {
-          await enableUserAction(user.id);
-          toast.success(`${user.name ?? "User"} enabled`);
-        } else {
-          await disableUserAction(user.id);
-          toast.success(`${user.name ?? "User"} disabled`);
+        const result =
+          user.status === "DISABLED"
+            ? await enableUserAction(user.id)
+            : await disableUserAction(user.id);
+
+        if (!result.success) {
+          toast.error(result.message);
+          return;
         }
+
+        toast.success(result.message);
         router.refresh();
       } catch (error) {
         toast.error(
@@ -84,8 +88,14 @@ export function UserTable({ users, karigars = [], allowSuperAdmin = false }: Pro
 
     startTransition(async () => {
       try {
-        await deleteUserAction(user.id);
-        toast.success(`${user.name ?? "User"} deleted`);
+        const result = await deleteUserAction(user.id);
+
+        if (!result.success) {
+          toast.error(result.message);
+          return;
+        }
+
+        toast.success(result.message);
         router.refresh();
       } catch (error) {
         toast.error(

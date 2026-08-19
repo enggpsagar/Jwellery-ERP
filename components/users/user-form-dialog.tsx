@@ -96,14 +96,17 @@ export function UserFormDialog({
 
     startTransition(async () => {
       try {
-        if (mode === "create") {
-          await createUserAction(formData)
-          toast.success("User created successfully")
-        } else {
-          await updateUserAction(formData)
-          toast.success("User updated successfully")
+        const result =
+          mode === "create"
+            ? await createUserAction(formData)
+            : await updateUserAction(formData)
+
+        if (!result.success) {
+          toast.error(result.message)
+          return
         }
 
+        toast.success(result.message)
         setOpen(false)
         router.refresh()
       } catch (error) {

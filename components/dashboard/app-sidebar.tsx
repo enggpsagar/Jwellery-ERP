@@ -18,6 +18,9 @@ import {
   ChevronRight,
   Store,
   ClipboardList,
+  Truck,
+  PackagePlus,
+  FileText,
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
@@ -60,6 +63,11 @@ const mainNav: NavItem[] = [
     icon: Users,
   },
   {
+    title: "Vendors",
+    href: "/vendors",
+    icon: Truck,
+  },
+  {
     title: "Gold & Silver Ledger",
     href: "/ledger",
     icon: CircleDollarSign,
@@ -70,9 +78,19 @@ const mainNav: NavItem[] = [
     icon: Package,
   },
   {
+    title: "Purchases",
+    href: "/purchases",
+    icon: PackagePlus,
+  },
+  {
     title: "Karigar Management",
     href: "/karigars",
     icon: Hammer,
+  },
+  {
+    title: "Quotations",
+    href: "/quotations",
+    icon: FileText,
   },
   {
     title: "Billing",

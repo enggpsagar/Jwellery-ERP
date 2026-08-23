@@ -32,6 +32,18 @@ export const PERMISSIONS = {
   BILLING_UPDATE: "billing.update",
   BILLING_DELETE: "billing.delete",
 
+  // Quotations
+  QUOTATION_VIEW: "quotation.view",
+  QUOTATION_CREATE: "quotation.create",
+  QUOTATION_UPDATE: "quotation.update",
+  QUOTATION_DELETE: "quotation.delete",
+
+  // Purchases (vendor purchase invoices, add stock)
+  PURCHASE_VIEW: "purchase.view",
+  PURCHASE_CREATE: "purchase.create",
+  PURCHASE_UPDATE: "purchase.update",
+  PURCHASE_DELETE: "purchase.delete",
+
   // Karigar management
   KARIGAR_VIEW: "karigar.view",
   KARIGAR_CREATE: "karigar.create",

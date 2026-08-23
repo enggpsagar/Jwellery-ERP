@@ -45,11 +45,26 @@ type CustomerDues = {
   customers: { id: string; name: string; phone: string | null; totalDue: number; invoiceCount: number }[]
 }
 
+type GoldFlow = {
+  purchasedFine: number
+  issuedToKarigarFine: number
+  receivedFromKarigarFine: number
+  wastageFine: number
+  soldFine: number
+  remainingStockFine: number
+  withKarigarFine: number
+  itemsSoldCount: number
+  itemsCreatedCount: number
+  itemsRemainingCount: number
+  reconciliationGap: number
+}
+
 type ReportsTabsProps = {
   sales: SalesReport
   valuation: InventoryValuation
   karigarOutstanding: KarigarOutstanding
   customerDues: CustomerDues
+  goldFlow: GoldFlow
 }
 
 const TABS = [
@@ -57,6 +72,7 @@ const TABS = [
   { key: "inventory", label: "Inventory Valuation" },
   { key: "karigar", label: "Karigar Outstanding" },
   { key: "dues", label: "Customer Dues" },
+  { key: "goldFlow", label: "Gold Flow" },
 ] as const
 
 type TabKey = (typeof TABS)[number]["key"]
@@ -75,6 +91,7 @@ export function ReportsTabs({
   valuation,
   karigarOutstanding,
   customerDues,
+  goldFlow,
 }: ReportsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("sales")
 
@@ -249,6 +266,66 @@ export function ReportsTabs({
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "goldFlow" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4">
+            <StatCard title="Purchased (fine)" value={`${goldFlow.purchasedFine.toFixed(3)}g`} />
+            <StatCard
+              title="Issued to Karigar (fine)"
+              value={`${goldFlow.issuedToKarigarFine.toFixed(3)}g`}
+            />
+            <StatCard
+              title="Received from Karigar (fine)"
+              value={`${goldFlow.receivedFromKarigarFine.toFixed(3)}g`}
+            />
+            <StatCard title="Wastage (fine)" value={`${goldFlow.wastageFine.toFixed(3)}g`} />
+            <StatCard title="Sold (fine)" value={`${goldFlow.soldFine.toFixed(3)}g`} />
+            <StatCard
+              title="Remaining Stock (fine)"
+              value={`${goldFlow.remainingStockFine.toFixed(3)}g`}
+            />
+            <StatCard
+              title="Still with Karigar (fine)"
+              value={`${goldFlow.withKarigarFine.toFixed(3)}g`}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <StatCard title="Items Sold" value={goldFlow.itemsSoldCount} />
+            <StatCard title="Items Created" value={goldFlow.itemsCreatedCount} />
+            <StatCard title="Items Remaining In Stock" value={goldFlow.itemsRemainingCount} />
+          </div>
+
+          <div
+            className={`rounded-xl border p-5 shadow-sm ${
+              Math.abs(goldFlow.reconciliationGap) > 0.01
+                ? "border-red-200 bg-red-50"
+                : "border-green-200 bg-green-50"
+            }`}
+          >
+            <p
+              className={`text-sm font-medium ${
+                Math.abs(goldFlow.reconciliationGap) > 0.01 ? "text-red-700" : "text-green-700"
+              }`}
+            >
+              Reconciliation Gap
+            </p>
+            <p
+              className={`mt-2 text-2xl font-semibold ${
+                Math.abs(goldFlow.reconciliationGap) > 0.01 ? "text-red-700" : "text-green-700"
+              }`}
+            >
+              {goldFlow.reconciliationGap.toFixed(3)}g
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {Math.abs(goldFlow.reconciliationGap) > 0.01
+                ? "Purchased fine weight does not fully reconcile against sold, wastage, remaining stock, and karigar work-in-progress — investigate the shortfall."
+                : "Everything purchased is accounted for across sales, wastage, remaining stock, and karigar work-in-progress."}
+            </p>
           </div>
         </div>
       )}

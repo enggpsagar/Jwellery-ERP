@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { UserRole } from "@prisma/client";
 
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
@@ -24,6 +25,15 @@ export default async function SettingsPage() {
         backHref="/dashboard"
         backLabel="Back to Dashboard"
       />
+
+      <div className="flex gap-4 border-b text-sm">
+        <Link href="/settings" className="border-b-2 border-primary px-1 pb-2 font-medium">
+          Business Settings
+        </Link>
+        <Link href="/settings/purity" className="px-1 pb-2 text-muted-foreground hover:text-foreground">
+          Purity &amp; Carat
+        </Link>
+      </div>
 
       <SettingsForm settings={settings} canEdit={canEdit} />
     </main>

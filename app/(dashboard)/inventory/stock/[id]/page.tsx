@@ -3,11 +3,13 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Pencil } from "lucide-react"
+import QRCode from "qrcode"
 
 import { getInventoryStockById } from "@/lib/actions/inventory/stock-actions"
 import { Button } from "@/components/ui/button"
 import { StockStatusBadge } from "@/components/inventory/shared/stock-status-badge"
 import { FinishBadge } from "@/components/inventory/shared/finish-badge"
+import { StockQrCard } from "@/components/inventory/stock/stock-qr-card"
 
 type InventoryStockDetailsPageProps = {
   params: Promise<{
@@ -34,6 +36,11 @@ export default async function InventoryStockDetailsPage({
   if (!stock) {
     notFound()
   }
+
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+  const qrDataUrl = await QRCode.toDataURL(
+    `${baseUrl}/inventory/stock/${stock.id}`
+  )
 
   return (
     <main className="space-y-6 p-6">
@@ -123,6 +130,12 @@ export default async function InventoryStockDetailsPage({
             </div>
           </div>
         </section>
+
+        <StockQrCard
+          dataUrl={qrDataUrl}
+          stockCode={stock.stockCode}
+          productName={stock.product?.name ?? "-"}
+        />
 
         <section className="rounded-xl border bg-white p-5">
           <h2 className="mb-4 text-lg font-semibold">Weight Details</h2>

@@ -3,9 +3,11 @@ import { notFound } from "next/navigation"
 import { ArrowLeftCircle } from "lucide-react"
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog"
 import { EmailInvoiceButton } from "@/components/billing/email-invoice-button"
+import { ShareWhatsAppButton } from "@/components/billing/share-whatsapp-button"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 type Props = {
@@ -14,9 +16,14 @@ type Props = {
 
 export default async function InvoiceDetailPage({ params }: Props) {
   const { id } = await params
-  const invoice = await getInvoiceById(id)
+  const [invoice, settings] = await Promise.all([
+    getInvoiceById(id),
+    getBusinessSettings(),
+  ])
 
   if (!invoice) notFound()
+
+  const whatsappMessage = `Hi! Here is your invoice ${invoice.invoiceNumber} from ${settings.businessName}. Total: ₹${invoice.totalAmount.toFixed(2)}. Balance due: ₹${invoice.balanceAmount.toFixed(2)}.`
 
   return (
     <main className="space-y-6 p-6">
@@ -27,6 +34,10 @@ export default async function InvoiceDetailPage({ params }: Props) {
         backLabel="Back to Billing"
         action={
           <div className="flex items-center gap-2">
+            <ShareWhatsAppButton
+              phone={invoice.customer?.phone}
+              message={whatsappMessage}
+            />
             <EmailInvoiceButton invoiceId={invoice.id} />
             <RecordPaymentDialog
               invoiceId={invoice.id}

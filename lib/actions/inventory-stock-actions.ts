@@ -2,10 +2,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { InventoryStockStatus, InventoryTransactionType } from "@prisma/client";
+import {
+  InventoryStockStatus,
+  InventoryTransactionType,
+  InventoryFinish,
+  LedgerEntryType,
+  LedgerSourceType,
+  MetalType,
+  PurityType,
+} from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { getFinenessMap, toFineWeight } from "@/lib/purity";
 
 /**
  * This file covers STOCK MOVEMENTS (reserve, damage, karigar issue/receipt,
@@ -200,36 +209,52 @@ export async function markStockDamaged(
   }
 }
 
+export type KarigarReceiptItemInput = {
+  itemName: string;
+  productId?: string | null;
+  metalType: MetalType;
+  purity: PurityType;
+  quantity: number;
+  grossWeight?: number | null;
+  netWeight?: number | null;
+  stoneWeight?: number | null;
+  dmoWeight?: number | null;
+  wastagePercent?: number | null;
+};
+
+/** JOB-${year}-0001, incrementing per store per year — matches the numbering
+ * convention already used elsewhere in this codebase (e.g. invoice numbers). */
+async function generateJobNumber(storeId: string) {
+  const year = new Date().getFullYear();
+  const count = await prisma.karigarJob.count({
+    where: { storeId, jobNumber: { startsWith: `JOB-${year}-` } },
+  });
+
+  return `JOB-${year}-${String(count + 1).padStart(4, "0")}`;
+}
+
 /**
- * Issue a stock item out to a karigar for work: creates the KarigarJob,
- * logs a KARIGAR_ISSUE transaction, and flips the stock status.
+ * Issue raw material (bullion or otherwise, not an existing stock item) out
+ * to a karigar: creates a new KarigarJob tracking the issued weight, and
+ * logs a DEBIT ledger entry (material currently out with the karigar).
+ *
+ * GOLD/SILVER: fine-metal-equivalent is computed via toFineWeight and
+ * requires a valid issuePurity, exactly as before this function was
+ * generalized from "issue gold" to "issue material". OTHER (e.g. diamonds,
+ * loose stones, misc non-metal materials): purity/fineness has no meaning —
+ * a carat is a unit of mass, not a fineness percentage — so issueFineWeight
+ * is left null (never defaulted to 100% via PurityType.OTHER's fineness
+ * value, which would silently be wrong) and the raw weight is recorded on
+ * the ledger entry's metalWeight field instead of metalWeightFine, so it
+ * never pollutes the karigar ledger's fine-gold running balance.
  */
-export async function issueStockToKarigar(
+export async function issueMaterialToKarigar(
+  karigarId: string,
   prevState: StockActionState = initialState,
   formData: FormData,
 ): Promise<StockActionState> {
   try {
-    const inventoryStockId = String(formData.get("inventoryStockId") || "");
-    const karigarId = String(formData.get("karigarId") || "");
-
-    if (!inventoryStockId || !karigarId) {
-      return { success: false, message: "Stock item and karigar are required" };
-    }
-
     const storeId = await requireStoreScope();
-
-    const stock = await prisma.inventoryStock.findFirst({
-      where: { id: inventoryStockId, storeId },
-    });
-
-    if (!stock) return { success: false, message: "Stock item not found" };
-
-    if (stock.status !== InventoryStockStatus.IN_STOCK) {
-      return {
-        success: false,
-        message: `Cannot issue stock with status ${stock.status}`,
-      };
-    }
 
     const karigar = await prisma.karigar.findFirst({
       where: { id: karigarId, storeId },
@@ -238,114 +263,309 @@ export async function issueStockToKarigar(
 
     if (!karigar) return { success: false, message: "Karigar not found" };
 
-    const issueWeight = toDecimalOrNull(formData.get("issueWeight")) ?? stock.netWeight;
-    const labourCharge = toDecimalOrNull(formData.get("labourCharge")) ?? 0;
+    const metalType = String(formData.get("metalType") || "") as MetalType;
+    const issuePurityRaw = String(formData.get("issuePurity") || "");
+    const issueWeight = toDecimalOrNull(formData.get("issueWeight"));
     const expectedDateRaw = String(formData.get("expectedDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
 
-    await prisma.$transaction([
-      prisma.karigarJob.create({
+    if (!Object.values(MetalType).includes(metalType)) {
+      return { success: false, message: "Select a valid metal type" };
+    }
+
+    const isPreciousMetal = metalType === MetalType.GOLD || metalType === MetalType.SILVER;
+
+    if (!issueWeight || issueWeight <= 0) {
+      return { success: false, message: "Enter a valid issue weight" };
+    }
+
+    let issuePurity: PurityType | null = null;
+    let issueFineWeight: number | null = null;
+
+    if (isPreciousMetal) {
+      issuePurity = issuePurityRaw as PurityType;
+      if (!Object.values(PurityType).includes(issuePurity)) {
+        return { success: false, message: "Select a valid purity" };
+      }
+
+      const fineness = await getFinenessMap(storeId);
+      issueFineWeight = toFineWeight(issueWeight, issuePurity, fineness);
+    }
+
+    const jobNumber = await generateJobNumber(storeId);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.karigarJob.create({
         data: {
           storeId,
           karigarId,
-          inventoryStockId,
-          metalType: stock.metalType,
-          issueWeight: issueWeight ?? undefined,
-          labourCharge,
+          jobNumber,
+          metalType,
+          issuePurity: issuePurity ?? undefined,
+          issueWeight,
+          issueFineWeight: issueFineWeight ?? undefined,
           expectedDate: expectedDateRaw ? new Date(expectedDateRaw) : undefined,
           status: "issued",
           notes,
         },
-      }),
-      prisma.inventoryStock.update({
-        where: { id: inventoryStockId },
-        data: { status: InventoryStockStatus.ISSUED_TO_KARIGAR },
-      }),
-      prisma.inventoryTransaction.create({
+      });
+
+      await tx.ledgerEntry.create({
         data: {
-          inventoryStockId,
-          transactionType: InventoryTransactionType.KARIGAR_ISSUE,
-          netWeight: issueWeight ?? undefined,
-          referenceType: "Karigar",
-          referenceId: karigarId,
-          notes,
+          storeId,
+          type: LedgerEntryType.DEBIT,
+          sourceType: LedgerSourceType.KARIGAR_ISSUE,
+          karigarId,
+          metalType,
+          metalWeight: isPreciousMetal ? undefined : issueWeight,
+          metalWeightFine: isPreciousMetal ? (issueFineWeight ?? undefined) : undefined,
+          amount: 0,
+          description: isPreciousMetal
+            ? `${issueWeight}g ${issuePurity} issued (${(issueFineWeight ?? 0).toFixed(3)}g fine) — Job ${jobNumber}`
+            : `${issueWeight}g ${notes ? notes : "material"} issued — Job ${jobNumber}`,
         },
-      }),
-    ]);
+      });
+    });
 
-    revalidatePath("/inventory/stock");
-    revalidatePath(`/inventory/stock/${inventoryStockId}`);
     revalidatePath("/karigars");
+    revalidatePath(`/karigars/${karigarId}`);
 
-    return { success: true, message: "Stock issued to karigar" };
+    return { success: true, message: `Material issued — Job ${jobNumber}` };
   } catch (error) {
-    console.error("issueStockToKarigar error:", error);
-    return { success: false, message: "Failed to issue stock to karigar" };
+    console.error("issueMaterialToKarigar error:", error);
+    return { success: false, message: "Failed to issue material to karigar" };
   }
 }
 
 /**
- * Receive a stock item back from a karigar: closes the KarigarJob, logs a
- * KARIGAR_RECEIPT transaction, and returns the stock to IN_STOCK.
+ * Receive one or more finished items back from a karigar against an open
+ * job. Each item becomes new sellable IN_STOCK inventory. Sums the items'
+ * weight (raw and fine-gold-equivalent) onto the job, closes it, and logs
+ * a CREDIT ledger entry for the gold returned plus a separate DEBIT entry
+ * for any labour charge owed.
  */
-export async function receiveStockFromKarigar(
+export async function receiveItemsFromKarigar(
+  jobId: string,
   prevState: StockActionState = initialState,
   formData: FormData,
 ): Promise<StockActionState> {
   try {
-    const karigarJobId = String(formData.get("karigarJobId") || "");
+    const storeId = await requireStoreScope();
 
-    if (!karigarJobId) {
-      return { success: false, message: "Karigar job is required" };
+    const job = await prisma.karigarJob.findFirst({
+      where: { id: jobId, storeId },
+    });
+
+    if (!job) return { success: false, message: "Karigar job not found" };
+    if (job.status === "received") {
+      return { success: false, message: "This job has already been received" };
+    }
+
+    const itemsRaw = String(formData.get("itemsJson") || "[]");
+    let items: KarigarReceiptItemInput[] = [];
+    try {
+      items = JSON.parse(itemsRaw);
+    } catch {
+      return { success: false, message: "Invalid line items" };
+    }
+
+    if (!items.length) {
+      return { success: false, message: "Add at least one returned item" };
+    }
+
+    for (const item of items) {
+      if (!item.productId) {
+        return {
+          success: false,
+          message: "Each returned item must have a product selected",
+        };
+      }
+      if (!Object.values(MetalType).includes(item.metalType)) {
+        return { success: false, message: "Each returned item needs a valid metal type" };
+      }
+      if (!Object.values(PurityType).includes(item.purity)) {
+        return { success: false, message: "Each returned item needs a valid purity" };
+      }
+    }
+
+    const labourCharge = toDecimalOrNull(formData.get("labourCharge")) ?? 0;
+
+    const fineness = await getFinenessMap(storeId);
+    const year = new Date().getFullYear();
+    const baseStockCount = await prisma.inventoryStock.count({
+      where: { storeId, stockCode: { startsWith: `STK-${year}-` } },
+    });
+
+    let receiveWeight = 0;
+    let receiveFineWeight = 0;
+    let plainFineWeightTotal = 0;
+
+    await prisma.$transaction(async (tx) => {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const netWeight = item.netWeight ?? 0;
+        // Pure embedded-metal calc — stored as-is on KarigarReceiptItem.fineWeight,
+        // unaffected by wastage%.
+        const fineWeight = toFineWeight(netWeight, item.purity, fineness);
+        // Wastage is a % on top of the item's own embedded fine weight (standard
+        // jewellery-trade convention: e.g. 10g fine metal with 8% wastage means
+        // 10.8g of fine metal was actually consumed/lost in making it). This
+        // "accounted" figure — not the plain fineWeight — is what gets summed
+        // into the job's receiveFineWeight and the CREDIT ledger entry, so the
+        // job's closing balance reconciles against issueFineWeight.
+        const accountedFineWeight =
+          fineWeight + (fineWeight * (item.wastagePercent ?? 0)) / 100;
+
+        receiveWeight += netWeight;
+        receiveFineWeight += accountedFineWeight;
+        plainFineWeightTotal += fineWeight;
+
+        const stockCode = `STK-${year}-${String(baseStockCount + i + 1).padStart(4, "0")}`;
+
+        const stock = await tx.inventoryStock.create({
+          data: {
+            storeId,
+            productId: item.productId!,
+            stockCode,
+            metalType: item.metalType,
+            purity: item.purity,
+            quantity: item.quantity || 1,
+            status: InventoryStockStatus.IN_STOCK,
+            finish: InventoryFinish.PAKKA,
+            grossWeight: item.grossWeight ?? undefined,
+            netWeight: item.netWeight ?? undefined,
+            stoneWeight: item.stoneWeight ?? undefined,
+            dmoWeight: item.dmoWeight ?? undefined,
+            wastagePercent: item.wastagePercent ?? undefined,
+          },
+        });
+
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryStockId: stock.id,
+            transactionType: InventoryTransactionType.KARIGAR_RECEIPT,
+            netWeight: item.netWeight ?? undefined,
+            referenceType: "KarigarJob",
+            referenceId: jobId,
+          },
+        });
+
+        await tx.karigarReceiptItem.create({
+          data: {
+            karigarJobId: jobId,
+            itemName: item.itemName || "Item",
+            productId: item.productId,
+            metalType: item.metalType,
+            purity: item.purity,
+            quantity: item.quantity || 1,
+            grossWeight: item.grossWeight ?? undefined,
+            netWeight: item.netWeight ?? undefined,
+            stoneWeight: item.stoneWeight ?? undefined,
+            dmoWeight: item.dmoWeight ?? undefined,
+            wastagePercent: item.wastagePercent ?? undefined,
+            fineWeight,
+            inventoryStockId: stock.id,
+          },
+        });
+      }
+
+      await tx.karigarJob.update({
+        where: { id: jobId },
+        data: {
+          receiveWeight,
+          receiveFineWeight,
+          receivedDate: new Date(),
+          status: "received",
+          labourCharge,
+        },
+      });
+
+      const wastageFineWeight = receiveFineWeight - plainFineWeightTotal;
+
+      await tx.ledgerEntry.create({
+        data: {
+          storeId,
+          type: LedgerEntryType.CREDIT,
+          sourceType: LedgerSourceType.KARIGAR_RECEIPT,
+          karigarId: job.karigarId,
+          metalType: job.metalType,
+          metalWeightFine: receiveFineWeight,
+          amount: 0,
+          description: `Received ${items.length} item(s) — ${receiveFineWeight.toFixed(3)}g fine (incl. ${wastageFineWeight.toFixed(3)}g wastage) — Job ${job.jobNumber ?? jobId}`,
+        },
+      });
+
+      // Kept as its own row (not merged into the gold-movement entry above)
+      // so the ledger's fine-gold balance and cash balance columns are each
+      // driven by clean, single-purpose entries.
+      if (labourCharge > 0) {
+        await tx.ledgerEntry.create({
+          data: {
+            storeId,
+            type: LedgerEntryType.DEBIT,
+            sourceType: LedgerSourceType.KARIGAR_RECEIPT,
+            karigarId: job.karigarId,
+            amount: labourCharge,
+            description: `Labour charge for Job ${job.jobNumber ?? jobId}`,
+          },
+        });
+      }
+    });
+
+    revalidatePath("/karigars");
+    revalidatePath(`/karigars/${job.karigarId}`);
+    revalidatePath("/inventory/stock");
+
+    return { success: true, message: "Items received from karigar" };
+  } catch (error) {
+    console.error("receiveItemsFromKarigar error:", error);
+    return { success: false, message: "Failed to receive items from karigar" };
+  }
+}
+
+/**
+ * Record a cash payment made to a karigar (e.g. labour dues settled),
+ * independent of any specific job receipt — logs a CREDIT ledger entry,
+ * reducing what the shop owes them.
+ */
+export async function recordKarigarPayment(
+  karigarId: string,
+  prevState: StockActionState = initialState,
+  formData: FormData,
+): Promise<StockActionState> {
+  try {
+    const amount = toDecimalOrNull(formData.get("amount"));
+    const notes = String(formData.get("notes") || "").trim() || null;
+
+    if (!amount || amount <= 0) {
+      return { success: false, message: "Enter a valid payment amount" };
     }
 
     const storeId = await requireStoreScope();
 
-    const job = await prisma.karigarJob.findFirst({
-      where: { id: karigarJobId, storeId },
+    const karigar = await prisma.karigar.findFirst({
+      where: { id: karigarId, storeId },
+      select: { id: true, name: true },
     });
 
-    if (!job) return { success: false, message: "Karigar job not found" };
-    if (!job.inventoryStockId) {
-      return { success: false, message: "This job has no linked stock item" };
-    }
+    if (!karigar) return { success: false, message: "Karigar not found" };
 
-    const receiveWeight = toDecimalOrNull(formData.get("receiveWeight"));
-    const notes = String(formData.get("notes") || "").trim() || null;
+    await prisma.ledgerEntry.create({
+      data: {
+        storeId,
+        type: LedgerEntryType.CREDIT,
+        sourceType: LedgerSourceType.MANUAL,
+        karigarId,
+        amount,
+        description: notes ?? `Payment made to ${karigar.name}`,
+      },
+    });
 
-    await prisma.$transaction([
-      prisma.karigarJob.update({
-        where: { id: karigarJobId },
-        data: {
-          receiveWeight: receiveWeight ?? undefined,
-          receivedDate: new Date(),
-          status: "completed",
-          notes: notes ?? job.notes,
-        },
-      }),
-      prisma.inventoryStock.update({
-        where: { id: job.inventoryStockId },
-        data: { status: InventoryStockStatus.IN_STOCK },
-      }),
-      prisma.inventoryTransaction.create({
-        data: {
-          inventoryStockId: job.inventoryStockId,
-          transactionType: InventoryTransactionType.KARIGAR_RECEIPT,
-          netWeight: receiveWeight ?? undefined,
-          referenceType: "Karigar",
-          referenceId: job.karigarId,
-          notes,
-        },
-      }),
-    ]);
+    revalidatePath(`/karigars/${karigarId}`);
 
-    revalidatePath("/inventory/stock");
-    revalidatePath(`/inventory/stock/${job.inventoryStockId}`);
-    revalidatePath("/karigars");
-
-    return { success: true, message: "Stock received back from karigar" };
+    return { success: true, message: "Payment recorded" };
   } catch (error) {
-    console.error("receiveStockFromKarigar error:", error);
-    return { success: false, message: "Failed to receive stock from karigar" };
+    console.error("recordKarigarPayment error:", error);
+    return { success: false, message: "Failed to record payment" };
   }
 }

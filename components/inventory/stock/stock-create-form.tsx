@@ -11,7 +11,11 @@ import {
 import { useToast } from "@/components/providers/toast-provider";
 import { StockForm } from "./stock-form";
 
-export function StockCreateForm() {
+type StockCreateFormProps = {
+  products: any[];
+};
+
+export function StockCreateForm({ products }: StockCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
 
@@ -41,6 +45,7 @@ export function StockCreateForm() {
     <form action={formAction}>
       <StockForm
         mode="create"
+        products={products}
         state={state}
         pending={pending}
       />

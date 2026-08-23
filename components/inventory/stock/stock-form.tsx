@@ -24,6 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { ProductSelect } from "@/components/inventory/shared/product-select";
+
 type ProductOption = {
   id: string;
   productCode: string;
@@ -32,6 +34,7 @@ type ProductOption = {
   ornamentType: string | null;
   metalType: string | null;
   defaultPurity: string | null;
+  isActive: boolean;
 };
 
 type Stock = {
@@ -60,6 +63,8 @@ type Stock = {
   netWeight: string | null;
 
   stoneWeight: string | null;
+
+  dmoWeight: string | null;
 
   wastagePercent: string | null;
 
@@ -113,8 +118,6 @@ export function StockForm({
   state,
   pending,
 }: StockFormProps) {
-  const [productId, setProductId] = useState(stock?.productId ?? "");
-
   const [metalType, setMetalType] = useState(
     stock?.metalType ?? MetalType.GOLD,
   );
@@ -146,21 +149,12 @@ export function StockForm({
           <div>
             <Label>Product *</Label>
 
-            <Select value={productId} onValueChange={setProductId}>
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="Select Product" />
-              </SelectTrigger>
-
-              <SelectContent>
-                {products.map((product) => (
-                  <SelectItem key={product.id} value={product.id}>
-                    {product.productCode} - {product.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <input type="hidden" name="productId" value={productId} />
+            <ProductSelect
+              products={products}
+              name="productId"
+              defaultValue={stock?.productId}
+              placeholder="Select Product"
+            />
 
             <ErrorText error={state.errors.productId} />
           </div>
@@ -354,6 +348,20 @@ export function StockForm({
             />
 
             <ErrorText error={state.errors.stoneWeight} />
+          </div>
+
+          <div>
+            <Label htmlFor="dmoWeight">Dust/Making/Other Wt (g)</Label>
+
+            <Input
+              id="dmoWeight"
+              name="dmoWeight"
+              type="number"
+              step="0.001"
+              defaultValue={stock?.dmoWeight ?? ""}
+            />
+
+            <ErrorText error={state.errors.dmoWeight} />
           </div>
 
           <div>

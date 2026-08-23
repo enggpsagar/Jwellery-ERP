@@ -30,6 +30,14 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     PERMISSIONS.SUPPLIER_CREATE,
     PERMISSIONS.SUPPLIER_UPDATE,
 
+    PERMISSIONS.PURCHASE_VIEW,
+    PERMISSIONS.PURCHASE_CREATE,
+    PERMISSIONS.PURCHASE_UPDATE,
+
+    PERMISSIONS.QUOTATION_VIEW,
+    PERMISSIONS.QUOTATION_CREATE,
+    PERMISSIONS.QUOTATION_UPDATE,
+
     PERMISSIONS.REPORT_VIEW,
   ],
 
@@ -46,6 +54,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
 
     PERMISSIONS.PRODUCT_VIEW,
 
+    PERMISSIONS.SUPPLIER_VIEW,
+    PERMISSIONS.SUPPLIER_CREATE,
+    PERMISSIONS.SUPPLIER_UPDATE,
+
     PERMISSIONS.INVENTORY_VIEW,
     PERMISSIONS.INVENTORY_CREATE,
     PERMISSIONS.INVENTORY_UPDATE,
@@ -53,6 +65,14 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     PERMISSIONS.BILLING_VIEW,
     PERMISSIONS.BILLING_CREATE,
     PERMISSIONS.BILLING_UPDATE,
+
+    PERMISSIONS.QUOTATION_VIEW,
+    PERMISSIONS.QUOTATION_CREATE,
+    PERMISSIONS.QUOTATION_UPDATE,
+
+    PERMISSIONS.PURCHASE_VIEW,
+    PERMISSIONS.PURCHASE_CREATE,
+    PERMISSIONS.PURCHASE_UPDATE,
 
     PERMISSIONS.KARIGAR_VIEW,
     PERMISSIONS.KARIGAR_CREATE,
@@ -84,8 +104,11 @@ export const ROLE_LABELS: Record<UserRole, string> = {
  */
 export type ModuleKey =
   | "customers"
+  | "vendors"
   | "inventory"
   | "billing"
+  | "quotations"
+  | "purchases"
   | "karigars"
   | "reports"
   | "ledger";
@@ -104,6 +127,16 @@ export const MODULE_DEFINITIONS: {
       PERMISSIONS.CUSTOMER_VIEW,
       PERMISSIONS.CUSTOMER_CREATE,
       PERMISSIONS.CUSTOMER_UPDATE,
+    ],
+  },
+  {
+    key: "vendors",
+    label: "Vendors",
+    href: "/vendors",
+    permissions: [
+      PERMISSIONS.SUPPLIER_VIEW,
+      PERMISSIONS.SUPPLIER_CREATE,
+      PERMISSIONS.SUPPLIER_UPDATE,
     ],
   },
   {
@@ -127,6 +160,26 @@ export const MODULE_DEFINITIONS: {
       PERMISSIONS.BILLING_VIEW,
       PERMISSIONS.BILLING_CREATE,
       PERMISSIONS.BILLING_UPDATE,
+    ],
+  },
+  {
+    key: "quotations",
+    label: "Quotations",
+    href: "/quotations",
+    permissions: [
+      PERMISSIONS.QUOTATION_VIEW,
+      PERMISSIONS.QUOTATION_CREATE,
+      PERMISSIONS.QUOTATION_UPDATE,
+    ],
+  },
+  {
+    key: "purchases",
+    label: "Purchases",
+    href: "/purchases",
+    permissions: [
+      PERMISSIONS.PURCHASE_VIEW,
+      PERMISSIONS.PURCHASE_CREATE,
+      PERMISSIONS.PURCHASE_UPDATE,
     ],
   },
   {

@@ -22,6 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { CustomerSelect } from "@/components/customers/customer-select"
+import { MakingChargeInput } from "@/components/shared/making-charge-input"
 
 type CustomerOption = {
   id: string
@@ -51,6 +53,7 @@ type LineItem = {
   rate: number
   makingCharge: number
   stoneCharge: number
+  dmoWeight: number
   inventoryStockId: string
 }
 
@@ -66,6 +69,7 @@ function emptyLineItem(): LineItem {
     rate: 0,
     makingCharge: 0,
     stoneCharge: 0,
+    dmoWeight: 0,
     inventoryStockId: "",
   }
 }
@@ -157,6 +161,7 @@ export function KachaInvoiceForm({ customers, stockItems }: KachaInvoiceFormProp
       rate: item.rate || null,
       makingCharge: item.makingCharge,
       stoneCharge: item.stoneCharge,
+      dmoWeight: item.dmoWeight || null,
       inventoryStockId: item.inventoryStockId || null,
     })),
   )
@@ -164,25 +169,18 @@ export function KachaInvoiceForm({ customers, stockItems }: KachaInvoiceFormProp
   return (
     <form action={formAction} className="space-y-6">
       <input type="hidden" name="itemsJson" value={itemsJson} />
-      <input type="hidden" name="customerId" value={customerId} />
       <input type="hidden" name="discount" value={discount} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2">
           <Label>Customer *</Label>
-          <Select value={customerId} onValueChange={setCustomerId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a customer" />
-            </SelectTrigger>
-            <SelectContent>
-              {customers.map((customer) => (
-                <SelectItem key={customer.id} value={customer.id}>
-                  {customer.name} {customer.phone ? `(${customer.phone})` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <CustomerSelect
+            customers={customers}
+            defaultValue={customerId}
+            onChange={(id) => setCustomerId(id)}
+            name="customerId"
+          />
         </div>
 
         <div className="space-y-2">
@@ -252,7 +250,7 @@ export function KachaInvoiceForm({ customers, stockItems }: KachaInvoiceFormProp
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Net Weight (g)</Label>
                   <Input
@@ -261,6 +259,18 @@ export function KachaInvoiceForm({ customers, stockItems }: KachaInvoiceFormProp
                     value={item.netWeight === 0 ? "" : item.netWeight}
                     onChange={(e) =>
                       updateItem(item.key, { netWeight: Number(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Dust/Making/Other Wt (g)</Label>
+                  <Input
+                    type="number"
+                    step="0.001"
+                    value={item.dmoWeight === 0 ? "" : item.dmoWeight}
+                    onChange={(e) =>
+                      updateItem(item.key, { dmoWeight: Number(e.target.value) || 0 })
                     }
                   />
                 </div>
@@ -277,19 +287,12 @@ export function KachaInvoiceForm({ customers, stockItems }: KachaInvoiceFormProp
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs">Making Charge</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={item.makingCharge === 0 ? "" : item.makingCharge}
-                    onChange={(e) =>
-                      updateItem(item.key, {
-                        makingCharge: Number(e.target.value) || 0,
-                      })
-                    }
-                  />
-                </div>
+                <MakingChargeInput
+                  rate={item.rate}
+                  netWeight={item.netWeight}
+                  value={item.makingCharge}
+                  onChange={(v) => updateItem(item.key, { makingCharge: v })}
+                />
 
                 <div className="space-y-1">
                   <Label className="text-xs">Stone Charge</Label>

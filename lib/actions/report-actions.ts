@@ -5,6 +5,7 @@ import { InventoryStockStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { getFinenessMap, toFineWeight } from "@/lib/purity";
 
 export type DateRange = { from?: string; to?: string };
 
@@ -189,5 +190,136 @@ export async function getCustomerDuesReport() {
     customerCount: withDues.length,
     totalDue: withDues.reduce((sum, c) => sum + c.totalDue, 0),
     customers: withDues,
+  };
+}
+
+/**
+ * Gold-flow reconciliation: tracks every gram of fine metal from purchase
+ * through karigar work-in-progress to sale/remaining stock, for a date
+ * range (date-ranged flow figures) alongside point-in-time balances
+ * (remaining stock, still-with-karigar) shown for context regardless of
+ * range. `reconciliationGap` is the "strict tracking" signal — near-zero
+ * means everything purchased is accounted for; a real gap surfaces
+ * unexplained shrinkage instead of hiding it.
+ */
+export async function getGoldFlowReport(range: DateRange = {}) {
+  const storeId = await requireStoreScope();
+  const fineness = await getFinenessMap(storeId);
+
+  const purchaseItems = await prisma.purchaseItem.findMany({
+    where: { purchase: { storeId, ...toDateRangeWhere(range, "purchaseDate") } },
+    include: { purchase: { select: { purchaseDate: true } } },
+  });
+
+  const purchasedFine = purchaseItems.reduce(
+    (sum, item) => sum + toFineWeight(Number(item.netWeight ?? 0), item.purity, fineness),
+    0,
+  );
+
+  const itemsCreatedFromPurchaseCount = purchaseItems.filter(
+    (item) => item.inventoryStockId !== null,
+  ).length;
+
+  const issuedAgg = await prisma.karigarJob.aggregate({
+    where: { storeId, ...toDateRangeWhere(range, "issueDate") },
+    _sum: { issueFineWeight: true },
+  });
+  const issuedToKarigarFine = Number(issuedAgg._sum.issueFineWeight ?? 0);
+
+  const receivedAgg = await prisma.karigarJob.aggregate({
+    where: { storeId, receivedDate: { not: null }, ...toDateRangeWhere(range, "receivedDate") },
+    _sum: { receiveFineWeight: true },
+  });
+  const receivedFromKarigarFine = Number(receivedAgg._sum.receiveFineWeight ?? 0);
+
+  const karigarReceiptItems = await prisma.karigarReceiptItem.findMany({
+    where: { karigarJob: { storeId }, ...toDateRangeWhere(range, "createdAt") },
+  });
+
+  const wastageFine = karigarReceiptItems.reduce(
+    (sum, item) =>
+      sum + Number(item.fineWeight) * (Number(item.wastagePercent ?? 0) / 100),
+    0,
+  );
+  const itemsCreatedFromKarigarCount = karigarReceiptItems.length;
+
+  const [invoiceItems, kachaInvoiceItems] = await Promise.all([
+    prisma.invoiceItem.findMany({
+      where: { invoice: { storeId, ...toDateRangeWhere(range, "invoiceDate") } },
+      include: { inventoryStock: { select: { purity: true } } },
+    }),
+    prisma.kachaInvoiceItem.findMany({
+      where: { kachaInvoice: { storeId, ...toDateRangeWhere(range, "invoiceDate") } },
+      include: { inventoryStock: { select: { purity: true } } },
+    }),
+  ]);
+
+  const soldFine =
+    invoiceItems.reduce(
+      (sum, item) =>
+        sum +
+        toFineWeight(
+          Number(item.netWeight ?? 0),
+          item.purity ?? item.inventoryStock?.purity ?? null,
+          fineness,
+        ),
+      0,
+    ) +
+    kachaInvoiceItems.reduce(
+      (sum, item) =>
+        sum +
+        toFineWeight(
+          Number(item.netWeight ?? 0),
+          item.purity ?? item.inventoryStock?.purity ?? null,
+          fineness,
+        ),
+      0,
+    );
+
+  const itemsSoldCount =
+    invoiceItems.filter((item) => item.inventoryStockId !== null).length +
+    kachaInvoiceItems.filter((item) => item.inventoryStockId !== null).length;
+
+  const remainingStock = await prisma.inventoryStock.findMany({
+    where: {
+      storeId,
+      status: { in: [InventoryStockStatus.IN_STOCK, InventoryStockStatus.RESERVED] },
+    },
+    select: { netWeight: true, purity: true },
+  });
+  const remainingStockFine = remainingStock.reduce(
+    (sum, stock) => sum + toFineWeight(Number(stock.netWeight ?? 0), stock.purity, fineness),
+    0,
+  );
+
+  const withKarigarAgg = await prisma.karigarJob.aggregate({
+    where: { storeId, receivedDate: null },
+    _sum: { issueFineWeight: true },
+  });
+  const withKarigarFine = Number(withKarigarAgg._sum.issueFineWeight ?? 0);
+
+  const itemsRemainingCount = await prisma.inventoryStock.count({
+    where: { storeId, status: InventoryStockStatus.IN_STOCK },
+  });
+
+  const itemsCreatedCount = itemsCreatedFromPurchaseCount + itemsCreatedFromKarigarCount;
+
+  const reconciliationGap =
+    Math.round(
+      (purchasedFine - soldFine - wastageFine - remainingStockFine - withKarigarFine) * 1000,
+    ) / 1000;
+
+  return {
+    purchasedFine,
+    issuedToKarigarFine,
+    receivedFromKarigarFine,
+    wastageFine,
+    soldFine,
+    remainingStockFine,
+    withKarigarFine,
+    itemsSoldCount,
+    itemsCreatedCount,
+    itemsRemainingCount,
+    reconciliationGap,
   };
 }

@@ -3,17 +3,19 @@ import {
   getInventoryValuationReport,
   getKarigarOutstandingReport,
   getCustomerDuesReport,
+  getGoldFlowReport,
 } from "@/lib/actions/report-actions"
 
 import { ReportsTabs } from "@/components/reports/reports-tabs"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 export default async function ReportsPage() {
-  const [sales, valuation, karigarOutstanding, customerDues] = await Promise.all([
+  const [sales, valuation, karigarOutstanding, customerDues, goldFlow] = await Promise.all([
     getSalesReport(),
     getInventoryValuationReport(),
     getKarigarOutstandingReport(),
     getCustomerDuesReport(),
+    getGoldFlowReport(),
   ])
 
   return (
@@ -30,6 +32,7 @@ export default async function ReportsPage() {
         valuation={valuation}
         karigarOutstanding={karigarOutstanding}
         customerDues={customerDues}
+        goldFlow={goldFlow}
       />
     </main>
   )

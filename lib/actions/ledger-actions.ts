@@ -86,6 +86,68 @@ export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
   })
 }
 
+export type KarigarLedgerRow = {
+  id: string
+  date: string
+  type: "CREDIT" | "DEBIT"
+  sourceLabel: string
+  description: string
+  metalWeightFine: number | null
+  amount: number
+  runningFineGoldBalance: number
+  runningCashBalance: number
+}
+
+export type KarigarLedgerResult = {
+  rows: KarigarLedgerRow[]
+  finalFineGoldBalance: number
+  finalCashBalance: number
+}
+
+/**
+ * A single karigar's ledger, oldest first, with a running fine-gold balance
+ * (gold currently out with the karigar) and running cash balance (labour
+ * charges owed to the karigar) computed by walking the entries once.
+ */
+export async function getKarigarLedger(karigarId: string): Promise<KarigarLedgerResult> {
+  const storeId = await requireStoreScope()
+
+  const entries = await prisma.ledgerEntry.findMany({
+    where: { storeId, karigarId },
+    orderBy: [{ entryDate: "asc" }, { createdAt: "asc" }],
+  })
+
+  let fineGoldBalance = 0
+  let cashBalance = 0
+
+  const rows: KarigarLedgerRow[] = entries.map((entry) => {
+    const isDebit = entry.type === "DEBIT"
+    const metalWeightFine = entry.metalWeightFine ? Number(entry.metalWeightFine) : null
+    const amount = Number(entry.amount ?? 0)
+
+    fineGoldBalance += (isDebit ? 1 : -1) * (metalWeightFine ?? 0)
+    cashBalance += (isDebit ? 1 : -1) * amount
+
+    return {
+      id: entry.id,
+      date: formatDate(entry.entryDate),
+      type: entry.type as "CREDIT" | "DEBIT",
+      sourceLabel: formatLedgerSource(entry.sourceType),
+      description: entry.description ?? "",
+      metalWeightFine,
+      amount,
+      runningFineGoldBalance: fineGoldBalance,
+      runningCashBalance: cashBalance,
+    }
+  })
+
+  return {
+    rows,
+    finalFineGoldBalance: fineGoldBalance,
+    finalCashBalance: cashBalance,
+  }
+}
+
 export type LedgerTotals = {
   totalDebit: number
   totalCredit: number

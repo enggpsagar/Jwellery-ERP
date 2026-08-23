@@ -81,6 +81,7 @@ export async function getInventoryStock() {
     lessWeight: row.lessWeight?.toString() ?? null,
     netWeight: row.netWeight?.toString() ?? null,
     stoneWeight: row.stoneWeight?.toString() ?? null,
+    dmoWeight: row.dmoWeight?.toString() ?? null,
     wastagePercent: row.wastagePercent?.toString() ?? null,
     purchaseRate: row.purchaseRate?.toString() ?? null,
     saleRate: row.saleRate?.toString() ?? null,
@@ -190,6 +191,7 @@ export async function getInventoryStockById(id: string) {
     lessWeight: row.lessWeight?.toString() ?? null,
     netWeight: row.netWeight?.toString() ?? null,
     stoneWeight: row.stoneWeight?.toString() ?? null,
+    dmoWeight: row.dmoWeight?.toString() ?? null,
     wastagePercent: row.wastagePercent?.toString() ?? null,
     purchaseRate: row.purchaseRate?.toString() ?? null,
     saleRate: row.saleRate?.toString() ?? null,
@@ -250,6 +252,7 @@ export async function createInventoryStock(
     const lessWeight = parseOptionalNumber(formData.get("lessWeight"))
     const netWeight = parseOptionalNumber(formData.get("netWeight"))
     const stoneWeight = parseOptionalNumber(formData.get("stoneWeight"))
+    const dmoWeight = parseOptionalNumber(formData.get("dmoWeight"))
     const wastagePercent = parseOptionalNumber(formData.get("wastagePercent"))
 
     const purchaseRate = parseOptionalNumber(formData.get("purchaseRate"))
@@ -337,6 +340,7 @@ export async function createInventoryStock(
         lessWeight: toDecimal(lessWeight),
         netWeight: toDecimal(netWeight),
         stoneWeight: toDecimal(stoneWeight),
+        dmoWeight: toDecimal(dmoWeight),
         wastagePercent: toDecimal(wastagePercent),
         purchaseRate: toDecimal(purchaseRate),
         saleRate: toDecimal(saleRate),
@@ -444,6 +448,7 @@ export async function updateInventoryStock(
     const lessWeight = parseOptionalNumber(formData.get("lessWeight"))
     const netWeight = parseOptionalNumber(formData.get("netWeight"))
     const stoneWeight = parseOptionalNumber(formData.get("stoneWeight"))
+    const dmoWeight = parseOptionalNumber(formData.get("dmoWeight"))
     const wastagePercent = parseOptionalNumber(formData.get("wastagePercent"))
 
     const purchaseRate = parseOptionalNumber(formData.get("purchaseRate"))
@@ -565,6 +570,7 @@ export async function updateInventoryStock(
         lessWeight: toDecimal(lessWeight),
         netWeight: toDecimal(netWeight),
         stoneWeight: toDecimal(stoneWeight),
+        dmoWeight: toDecimal(dmoWeight),
         wastagePercent: toDecimal(wastagePercent),
         purchaseRate: toDecimal(purchaseRate),
         saleRate: toDecimal(saleRate),

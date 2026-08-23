@@ -27,6 +27,7 @@ export type InvoiceLineItemInput = {
   rate?: number | null;
   makingCharge: number;
   stoneCharge: number;
+  dmoWeight?: number | null;
   inventoryStockId?: string | null;
 };
 
@@ -94,6 +95,7 @@ function mapInvoice(invoice: any) {
       rate: item.rate ? Number(item.rate) : null,
       makingCharge: Number(item.makingCharge),
       stoneCharge: Number(item.stoneCharge),
+      dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
     })),
@@ -303,6 +305,7 @@ export async function createInvoice(
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,
               stoneCharge: item.stoneCharge,
+              dmoWeight: item.dmoWeight ?? undefined,
               lineTotal: lineTotal(item),
               inventoryStockId: item.inventoryStockId || undefined,
             })),

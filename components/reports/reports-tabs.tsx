@@ -7,7 +7,7 @@ type SalesReport = {
   totalRevenue: number
   totalMakingCharges: number
   totalOutstanding: number
-  byMetal: { metalType: string; weight: number; amount: number }[]
+  byMetal: { name: string; weight: number; amount: number }[]
   invoices: {
     id: string
     invoiceNumber: string

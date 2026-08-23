@@ -12,7 +12,7 @@ export default async function LedgerPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight text-balance">
-            Gold &amp; Silver Ledger
+            Ledger
           </h1>
           <p className="text-sm text-muted-foreground">
             Track customer and karigar account activity, with invoices linked

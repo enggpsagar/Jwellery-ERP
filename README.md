@@ -1,6 +1,6 @@
-# Swarna Suite — Jewellery ERP
+# Swarna Suite — B2B Trade ERP
 
-A multi-store SaaS ERP for jewellery retailers: customers, inventory, Pakka/Kacha billing, karigar (goldsmith) job tracking, gold/silver ledger, and reporting — with per-store data isolation and per-user permissions.
+A multi-store SaaS ERP for any B2B trader dealing in precious metals, stones, or other goods — gold, silver, diamond, and beyond. Covers customers/vendors, inventory, purchases, quotations, Pakka/Kacha billing, karigar (goldsmith) job tracking with carat-based conversion, a ledger, and reporting — with per-store data isolation and per-user permissions. Every store configures its own metals, categories, and item types in Settings rather than being locked to a fixed jewellery-specific vocabulary (see CLAUDE.md's "Configurable taxonomy" section).
 
 ## Tech stack
 
@@ -51,7 +51,7 @@ The database is shared between local development and the deployed app (a single 
 |---|---|
 | **Super Admin** | Every store. Creates new stores and their initial Admin from `/stores`. Signs in via a Google account listed in `SUPER_ADMIN_EMAILS`. |
 | **Admin** ("Store Owner") | Full control of their own store — settings, users, all data. |
-| **Staff** | Day-to-day sales/inventory/billing. An Admin can restrict a Staff user to specific sections (Customers, Inventory, Billing, Karigar Management, Reports, Ledger) from the Users page — unrestricted by default. |
+| **Staff** | Day-to-day sales/inventory/billing. An Admin can restrict a Staff user to specific sections (Customers, Vendors, Inventory, Billing, Quotations, Purchases, Karigar Management, Reports, Ledger) from the Users page — unrestricted by default. |
 | **Karigar** | Logs in and sees only their own assigned jobs (`/my-jobs`) — nothing else in the app. |
 
 ## Deploying

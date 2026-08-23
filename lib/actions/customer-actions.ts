@@ -422,6 +422,21 @@ export async function addCustomer(
 
     const storeId = await requireStoreScope()
 
+    if (phone) {
+      const existing = await prisma.customer.findFirst({
+        where: { phone, storeId },
+        select: { id: true },
+      })
+
+      if (existing) {
+        return {
+          success: false,
+          message: "Phone number already exists",
+          errors: { phone: ["A customer with this phone number already exists"] },
+        }
+      }
+    }
+
     await prisma.customer.create({
       data: {
         storeId,
@@ -445,7 +460,14 @@ export async function addCustomer(
       success: true,
       message: "Customer added successfully",
     }
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return {
+        success: false,
+        message: "Phone number already exists",
+        errors: { phone: ["A customer with this phone number already exists"] },
+      }
+    }
     console.error("addCustomer error:", error)
     return {
       success: false,
@@ -487,6 +509,21 @@ export async function updateCustomer(
 
     const storeId = await requireStoreScope()
 
+    if (phone) {
+      const existing = await prisma.customer.findFirst({
+        where: { phone, storeId, NOT: { id } },
+        select: { id: true },
+      })
+
+      if (existing) {
+        return {
+          success: false,
+          message: "Phone number already exists",
+          errors: { phone: ["A customer with this phone number already exists"] },
+        }
+      }
+    }
+
     const { count } = await prisma.customer.updateMany({
       where: { id, storeId },
       data: {
@@ -518,7 +555,14 @@ export async function updateCustomer(
       success: true,
       message: "Customer updated successfully",
     }
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return {
+        success: false,
+        message: "Phone number already exists",
+        errors: { phone: ["A customer with this phone number already exists"] },
+      }
+    }
     console.error("updateCustomer error:", error)
     return {
       success: false,

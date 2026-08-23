@@ -4,6 +4,10 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { getProductById } from "@/lib/actions/inventory/product-actions"
+import {
+  getStoreCategories,
+  getStoreMetals,
+} from "@/lib/actions/taxonomy-actions"
 import { EditProductForm } from "@/components/inventory/products/edit-product-form"
 
 type ProductEditPageProps = {
@@ -16,7 +20,11 @@ export default async function ProductEditPage({
   params,
 }: ProductEditPageProps) {
   const { id } = await params
-  const product = await getProductById(id)
+  const [product, metals, categories] = await Promise.all([
+    getProductById(id),
+    getStoreMetals(),
+    getStoreCategories(),
+  ])
 
   if (!product) {
     notFound()
@@ -44,7 +52,7 @@ export default async function ProductEditPage({
         </div>
       </div>
 
-      <EditProductForm product={product} />
+      <EditProductForm product={product} metals={metals} categories={categories} />
     </main>
   )
 }

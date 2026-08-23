@@ -1,7 +1,16 @@
 import { ProductCreateForm } from "@/components/inventory/products/product-create-form";
 import { PageBackHeader } from "@/components/shared/page-back-header";
+import {
+  getStoreCategories,
+  getStoreMetals,
+} from "@/lib/actions/taxonomy-actions";
 
-export default function NewProductPage() {
+export default async function NewProductPage() {
+  const [metals, categories] = await Promise.all([
+    getStoreMetals(),
+    getStoreCategories(),
+  ]);
+
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
@@ -11,7 +20,7 @@ export default function NewProductPage() {
         backLabel="Back to Products"
       />
 
-      <ProductCreateForm />
+      <ProductCreateForm metals={metals} categories={categories} />
     </main>
   );
 }

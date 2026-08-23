@@ -33,7 +33,7 @@ type StockOption = {
   id: string
   stockCode: string
   productName: string
-  metalType: string
+  metalType: { id: string; name: string } | null
   purity: string | null
   netWeight: number | null
   saleRate: number | null
@@ -42,7 +42,7 @@ type StockOption = {
 type LineItem = {
   key: string
   itemName: string
-  metalType: string
+  metalTypeId: string
   purity: string
   quantity: number
   grossWeight: number
@@ -58,7 +58,7 @@ function emptyLineItem(): LineItem {
   return {
     key: crypto.randomUUID(),
     itemName: "",
-    metalType: "GOLD",
+    metalTypeId: "",
     purity: "",
     quantity: 1,
     grossWeight: 0,
@@ -119,7 +119,7 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
     updateItem(key, {
       inventoryStockId: stockId,
       itemName: stock.productName,
-      metalType: stock.metalType,
+      metalTypeId: stock.metalType?.id ?? "",
       purity: stock.purity ?? "",
       netWeight: stock.netWeight ?? 0,
       rate: stock.saleRate ?? 0,
@@ -152,7 +152,7 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
   const itemsJson = JSON.stringify(
     items.map((item) => ({
       itemName: item.itemName || "Item",
-      metalType: item.metalType || null,
+      metalTypeId: item.metalTypeId || null,
       purity: item.purity || null,
       quantity: item.quantity || 1,
       grossWeight: item.grossWeight || null,

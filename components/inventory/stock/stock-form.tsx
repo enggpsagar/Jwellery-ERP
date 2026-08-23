@@ -5,7 +5,6 @@ import { useState } from "react";
 import {
   InventoryStockStatus,
   InventoryFinish,
-  MetalType,
   PurityType,
 } from "@prisma/client";
 
@@ -30,10 +29,19 @@ type ProductOption = {
   id: string;
   productCode: string;
   name: string;
-  category: string | null;
-  ornamentType: string | null;
-  metalType: string | null;
+  category: { id: string; name: string } | null;
+  categoryType: { id: string; name: string } | null;
+  metalType: { id: string; name: string } | null;
   defaultPurity: string | null;
+  defaultMakingCharge: string | null;
+  defaultStoneCharge: string | null;
+  isActive: boolean;
+};
+
+type StoreMetalOption = {
+  id: string;
+  name: string;
+  hasPurity: boolean;
   isActive: boolean;
 };
 
@@ -46,7 +54,7 @@ type Stock = {
 
   tagNumber: string | null;
 
-  metalType: string;
+  metalTypeId: string | null;
 
   purity: string | null;
 
@@ -100,6 +108,8 @@ type StockFormProps = {
 
   products: ProductOption[];
 
+  metals: StoreMetalOption[];
+
   state: StockFormState;
 
   pending: boolean;
@@ -115,11 +125,12 @@ export function StockForm({
   mode,
   stock,
   products,
+  metals,
   state,
   pending,
 }: StockFormProps) {
-  const [metalType, setMetalType] = useState(
-    stock?.metalType ?? MetalType.GOLD,
+  const [metalTypeId, setMetalTypeId] = useState(
+    stock?.metalTypeId ?? "",
   );
 
   const [purity, setPurity] = useState(stock?.purity ?? "__none__");
@@ -136,6 +147,35 @@ export function StockForm({
     stock?.isActive === false ? "false" : "true",
   );
 
+  const [makingCharge, setMakingCharge] = useState(stock?.makingCharge ?? "");
+  const [stoneCharge, setStoneCharge] = useState(stock?.stoneCharge ?? "");
+
+  function applyProductDefaults(productId: string) {
+    const product = products.find((item) => item.id === productId);
+    if (!product) return;
+
+    setMetalTypeId(product.metalType?.id ?? "");
+    setPurity(product.defaultPurity ?? "__none__");
+    if (product.defaultMakingCharge) setMakingCharge(product.defaultMakingCharge);
+    if (product.defaultStoneCharge) setStoneCharge(product.defaultStoneCharge);
+  }
+
+  // `ProductSelect` is a shared component whose `ProductOption` type
+  // expects `category`/`ornamentType`/`metalType` as display strings, not
+  // the relation objects this form works with — flatten to names for it,
+  // the full `products` array (with ids) is still used for the lookup in
+  // `applyProductDefaults` above.
+  const productSelectOptions = products.map((product) => ({
+    id: product.id,
+    productCode: product.productCode,
+    name: product.name,
+    category: product.category?.name ?? null,
+    ornamentType: product.categoryType?.name ?? null,
+    metalType: product.metalType?.name ?? null,
+    defaultPurity: product.defaultPurity,
+    isActive: product.isActive,
+  }));
+
   return (
     <div className="space-y-8">
       {/* ============================
@@ -150,10 +190,11 @@ export function StockForm({
             <Label>Product *</Label>
 
             <ProductSelect
-              products={products}
+              products={productSelectOptions}
               name="productId"
               defaultValue={stock?.productId}
               placeholder="Select Product"
+              onChange={(productId) => applyProductDefaults(productId)}
             />
 
             <ErrorText error={state.errors.productId} />
@@ -188,21 +229,23 @@ export function StockForm({
           <div>
             <Label>Metal Type</Label>
 
-            <Select value={metalType} onValueChange={setMetalType}>
+            <Select value={metalTypeId} onValueChange={setMetalTypeId}>
               <SelectTrigger className="h-11 w-full">
-                <SelectValue />
+                <SelectValue placeholder="Select Metal Type" />
               </SelectTrigger>
 
               <SelectContent>
-                {Object.values(MetalType).map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item.replaceAll("_", " ")}
+                {metals.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <input type="hidden" name="metalType" value={metalType} />
+            <input type="hidden" name="metalTypeId" value={metalTypeId} />
+
+            <ErrorText error={state.errors.metalTypeId} />
           </div>
 
           <div>
@@ -423,7 +466,8 @@ export function StockForm({
               name="makingCharge"
               type="number"
               step="0.01"
-              defaultValue={stock?.makingCharge ?? ""}
+              value={makingCharge}
+              onChange={(event) => setMakingCharge(event.target.value)}
             />
 
             <ErrorText error={state.errors.makingCharge} />
@@ -437,7 +481,8 @@ export function StockForm({
               name="stoneCharge"
               type="number"
               step="0.01"
-              defaultValue={stock?.stoneCharge ?? ""}
+              value={stoneCharge}
+              onChange={(event) => setStoneCharge(event.target.value)}
             />
 
             <ErrorText error={state.errors.stoneCharge} />

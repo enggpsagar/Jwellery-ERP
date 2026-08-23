@@ -8,7 +8,6 @@ import {
   InventoryFinish,
   LedgerEntryType,
   LedgerSourceType,
-  MetalType,
   PurityType,
 } from "@prisma/client";
 
@@ -212,7 +211,7 @@ export async function markStockDamaged(
 export type KarigarReceiptItemInput = {
   itemName: string;
   productId?: string | null;
-  metalType: MetalType;
+  metalTypeId: string;
   purity: PurityType;
   quantity: number;
   grossWeight?: number | null;
@@ -238,15 +237,17 @@ async function generateJobNumber(storeId: string) {
  * to a karigar: creates a new KarigarJob tracking the issued weight, and
  * logs a DEBIT ledger entry (material currently out with the karigar).
  *
- * GOLD/SILVER: fine-metal-equivalent is computed via toFineWeight and
- * requires a valid issuePurity, exactly as before this function was
- * generalized from "issue gold" to "issue material". OTHER (e.g. diamonds,
+ * Metals with hasPurity=true (the seeded Gold/Silver rows, or any custom
+ * metal an admin explicitly marks as having purity): fine-metal-equivalent
+ * is computed via toFineWeight and requires a valid issuePurity, exactly as
+ * before this function was generalized from a hardcoded GOLD/SILVER check
+ * to a real per-store StoreMetal lookup. hasPurity=false metals (Diamond,
  * loose stones, misc non-metal materials): purity/fineness has no meaning —
  * a carat is a unit of mass, not a fineness percentage — so issueFineWeight
- * is left null (never defaulted to 100% via PurityType.OTHER's fineness
- * value, which would silently be wrong) and the raw weight is recorded on
- * the ledger entry's metalWeight field instead of metalWeightFine, so it
- * never pollutes the karigar ledger's fine-gold running balance.
+ * is left null (never defaulted to 100% via a fineness value, which would
+ * silently be wrong) and the raw weight is recorded on the ledger entry's
+ * metalWeight field instead of metalWeightFine, so it never pollutes the
+ * karigar ledger's fine-gold running balance.
  */
 export async function issueMaterialToKarigar(
   karigarId: string,
@@ -263,17 +264,25 @@ export async function issueMaterialToKarigar(
 
     if (!karigar) return { success: false, message: "Karigar not found" };
 
-    const metalType = String(formData.get("metalType") || "") as MetalType;
+    const metalTypeId = String(formData.get("metalTypeId") || "").trim();
     const issuePurityRaw = String(formData.get("issuePurity") || "");
     const issueWeight = toDecimalOrNull(formData.get("issueWeight"));
     const expectedDateRaw = String(formData.get("expectedDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
 
-    if (!Object.values(MetalType).includes(metalType)) {
+    if (!metalTypeId) {
       return { success: false, message: "Select a valid metal type" };
     }
 
-    const isPreciousMetal = metalType === MetalType.GOLD || metalType === MetalType.SILVER;
+    const storeMetal = await prisma.storeMetal.findFirst({
+      where: { id: metalTypeId, storeId },
+    });
+
+    if (!storeMetal) {
+      return { success: false, message: "Select a valid metal type" };
+    }
+
+    const isPreciousMetal = storeMetal.hasPurity;
 
     if (!issueWeight || issueWeight <= 0) {
       return { success: false, message: "Enter a valid issue weight" };
@@ -300,7 +309,7 @@ export async function issueMaterialToKarigar(
           storeId,
           karigarId,
           jobNumber,
-          metalType,
+          metalTypeId: storeMetal.id,
           issuePurity: issuePurity ?? undefined,
           issueWeight,
           issueFineWeight: issueFineWeight ?? undefined,
@@ -316,13 +325,13 @@ export async function issueMaterialToKarigar(
           type: LedgerEntryType.DEBIT,
           sourceType: LedgerSourceType.KARIGAR_ISSUE,
           karigarId,
-          metalType,
+          metalTypeId: storeMetal.id,
           metalWeight: isPreciousMetal ? undefined : issueWeight,
           metalWeightFine: isPreciousMetal ? (issueFineWeight ?? undefined) : undefined,
           amount: 0,
           description: isPreciousMetal
             ? `${issueWeight}g ${issuePurity} issued (${(issueFineWeight ?? 0).toFixed(3)}g fine) — Job ${jobNumber}`
-            : `${issueWeight}g ${notes ? notes : "material"} issued — Job ${jobNumber}`,
+            : `${issueWeight}g ${notes ? notes : storeMetal.name} issued — Job ${jobNumber}`,
         },
       });
     });
@@ -373,6 +382,9 @@ export async function receiveItemsFromKarigar(
       return { success: false, message: "Add at least one returned item" };
     }
 
+    const storeMetals = await prisma.storeMetal.findMany({ where: { storeId } });
+    const metalById = new Map(storeMetals.map((metal) => [metal.id, metal]));
+
     for (const item of items) {
       if (!item.productId) {
         return {
@@ -380,7 +392,7 @@ export async function receiveItemsFromKarigar(
           message: "Each returned item must have a product selected",
         };
       }
-      if (!Object.values(MetalType).includes(item.metalType)) {
+      if (!item.metalTypeId || !metalById.has(item.metalTypeId)) {
         return { success: false, message: "Each returned item needs a valid metal type" };
       }
       if (!Object.values(PurityType).includes(item.purity)) {
@@ -427,7 +439,7 @@ export async function receiveItemsFromKarigar(
             storeId,
             productId: item.productId!,
             stockCode,
-            metalType: item.metalType,
+            metalTypeId: item.metalTypeId,
             purity: item.purity,
             quantity: item.quantity || 1,
             status: InventoryStockStatus.IN_STOCK,
@@ -455,7 +467,7 @@ export async function receiveItemsFromKarigar(
             karigarJobId: jobId,
             itemName: item.itemName || "Item",
             productId: item.productId,
-            metalType: item.metalType,
+            metalTypeId: item.metalTypeId,
             purity: item.purity,
             quantity: item.quantity || 1,
             grossWeight: item.grossWeight ?? undefined,
@@ -488,7 +500,7 @@ export async function receiveItemsFromKarigar(
           type: LedgerEntryType.CREDIT,
           sourceType: LedgerSourceType.KARIGAR_RECEIPT,
           karigarId: job.karigarId,
-          metalType: job.metalType,
+          metalTypeId: job.metalTypeId,
           metalWeightFine: receiveFineWeight,
           amount: 0,
           description: `Received ${items.length} item(s) — ${receiveFineWeight.toFixed(3)}g fine (incl. ${wastageFineWeight.toFixed(3)}g wastage) — Job ${job.jobNumber ?? jobId}`,

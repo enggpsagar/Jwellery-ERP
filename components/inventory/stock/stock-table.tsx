@@ -149,7 +149,7 @@ export function StockTable({
                     </div>
                   </td>
 
-                  <td className="px-4 py-3">{item.metalType}</td>
+                  <td className="px-4 py-3">{item.metalType?.name ?? "-"}</td>
                   <td className="px-4 py-3">{item.purity ?? "-"}</td>
                   <td className="px-4 py-3">{item.quantity}</td>
                   <td className="px-4 py-3">{formatNumber(item.grossWeight)}</td>

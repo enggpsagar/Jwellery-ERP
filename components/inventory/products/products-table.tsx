@@ -39,7 +39,7 @@ export function ProductsTable({ products }: ProductsTableProps) {
               <th className="px-4 py-3 text-left font-medium">Product Code</th>
               <th className="px-4 py-3 text-left font-medium">Name</th>
               <th className="px-4 py-3 text-left font-medium">Category</th>
-              <th className="px-4 py-3 text-left font-medium">Ornament Type</th>
+              <th className="px-4 py-3 text-left font-medium">Type</th>
               <th className="px-4 py-3 text-left font-medium">Metal</th>
               <th className="px-4 py-3 text-left font-medium">Purity</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>

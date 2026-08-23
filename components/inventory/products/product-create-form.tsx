@@ -7,9 +7,21 @@ import { useToast } from "@/components/providers/toast-provider";
 import { createProduct } from "@/lib/actions/inventory/product-actions";
 
 import { initialProductFormState } from "@/lib/inventory/product-types";
-import { ProductForm } from "./product-form";
+import {
+  ProductForm,
+  type StoreCategoryOption,
+  type StoreMetalOption,
+} from "./product-form";
 
-export function ProductCreateForm() {
+type ProductCreateFormProps = {
+  metals: StoreMetalOption[];
+  categories: StoreCategoryOption[];
+};
+
+export function ProductCreateForm({
+  metals,
+  categories,
+}: ProductCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
 
@@ -41,6 +53,8 @@ export function ProductCreateForm() {
         mode="create"
         state={state}
         pending={pending}
+        metals={metals}
+        categories={categories}
       />
     </form>
   );

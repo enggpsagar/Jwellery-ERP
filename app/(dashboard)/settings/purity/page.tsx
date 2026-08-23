@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { UserRole } from "@prisma/client";
 
 import { getPurityFineness } from "@/lib/actions/purity-actions";
 import { getCurrentUser } from "@/lib/auth/auth";
 
 import { PuritySettingsForm } from "@/components/settings/purity-settings-form";
+import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { PageBackHeader } from "@/components/shared/page-back-header";
 
 export default async function PuritySettingsPage() {
@@ -26,14 +26,7 @@ export default async function PuritySettingsPage() {
         backLabel="Back to Dashboard"
       />
 
-      <div className="flex gap-4 border-b text-sm">
-        <Link href="/settings" className="px-1 pb-2 text-muted-foreground hover:text-foreground">
-          Business Settings
-        </Link>
-        <Link href="/settings/purity" className="border-b-2 border-primary px-1 pb-2 font-medium">
-          Purity &amp; Carat
-        </Link>
-      </div>
+      <SettingsTabs active="purity" />
 
       <PuritySettingsForm rows={rows} canEdit={canEdit} />
     </main>

@@ -9,7 +9,6 @@ import {
   InventoryTransactionType,
   LedgerEntryType,
   LedgerSourceType,
-  MetalType,
   PurityType,
   Prisma,
 } from "@prisma/client";
@@ -20,7 +19,7 @@ import { requireStoreScope } from "@/lib/store-context";
 export type PurchaseLineItemInput = {
   productId: string;
   itemName: string;
-  metalType?: MetalType | null;
+  metalTypeId?: string | null;
   purity?: PurityType | null;
   quantity: number;
   grossWeight?: number | null;
@@ -112,7 +111,7 @@ function mapPurchase(purchase: any) {
       id: item.id,
       productId: item.productId,
       itemName: item.itemName,
-      metalType: item.metalType,
+      metalTypeId: item.metalTypeId,
       purity: item.purity,
       quantity: item.quantity,
       grossWeight: item.grossWeight ? Number(item.grossWeight) : null,
@@ -222,9 +221,9 @@ export async function getPurchaseFormProducts() {
       id: true,
       productCode: true,
       name: true,
-      category: true,
-      ornamentType: true,
-      metalType: true,
+      category: { select: { name: true } },
+      categoryType: { select: { name: true } },
+      metalType: { select: { id: true, name: true } },
       defaultPurity: true,
       defaultMakingCharge: true,
       defaultStoneCharge: true,
@@ -234,6 +233,9 @@ export async function getPurchaseFormProducts() {
 
   return products.map((product) => ({
     ...product,
+    category: product.category?.name ?? null,
+    ornamentType: product.categoryType?.name ?? null,
+    metalType: product.metalType ?? null,
     defaultMakingCharge:
       product.defaultMakingCharge !== null ? Number(product.defaultMakingCharge) : null,
     defaultStoneCharge:
@@ -335,7 +337,7 @@ export async function createPurchase(
             storeId,
             productId: item.productId,
             stockCode: stockCodes[i],
-            metalType: item.metalType ?? MetalType.GOLD,
+            metalTypeId: item.metalTypeId ?? undefined,
             purity: item.purity ?? undefined,
             quantity: item.quantity || 1,
             status: InventoryStockStatus.IN_STOCK,
@@ -376,7 +378,7 @@ export async function createPurchase(
             create: items.map((item, i) => ({
               productId: item.productId,
               itemName: item.itemName,
-              metalType: item.metalType ?? undefined,
+              metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,

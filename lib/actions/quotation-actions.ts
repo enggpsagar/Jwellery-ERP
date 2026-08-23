@@ -8,7 +8,6 @@ import {
   InventoryTransactionType,
   LedgerEntryType,
   LedgerSourceType,
-  MetalType,
   PurityType,
 } from "@prisma/client";
 
@@ -17,7 +16,7 @@ import { requireStoreScope } from "@/lib/store-context";
 
 export type QuotationLineItemInput = {
   itemName: string;
-  metalType?: MetalType | null;
+  metalTypeId?: string | null;
   purity?: PurityType | null;
   quantity: number;
   grossWeight?: number | null;
@@ -104,7 +103,7 @@ function mapQuotation(quotation: any) {
     items: (quotation.items ?? []).map((item: any) => ({
       id: item.id,
       itemName: item.itemName,
-      metalType: item.metalType,
+      metalTypeId: item.metalTypeId,
       purity: item.purity,
       quantity: item.quantity,
       grossWeight: item.grossWeight ? Number(item.grossWeight) : null,
@@ -210,7 +209,10 @@ export async function getQuotationFormStockItems() {
   const stockItems = await prisma.inventoryStock.findMany({
     where: { storeId, status: InventoryStockStatus.IN_STOCK, isActive: true },
     orderBy: { stockCode: "asc" },
-    include: { product: { select: { name: true } } },
+    include: {
+      product: { select: { name: true } },
+      metalType: { select: { id: true, name: true } },
+    },
   });
 
   return stockItems.map((stock) => ({
@@ -296,7 +298,7 @@ export async function createQuotation(
         items: {
           create: items.map((item) => ({
             itemName: item.itemName,
-            metalType: item.metalType ?? undefined,
+            metalTypeId: item.metalTypeId ?? undefined,
             purity: item.purity ?? undefined,
             quantity: item.quantity || 1,
             grossWeight: item.grossWeight ?? undefined,
@@ -421,7 +423,7 @@ export async function convertQuotationToInvoice(
           items: {
             create: quotation.items.map((item) => ({
               itemName: item.itemName,
-              metalType: item.metalType ?? undefined,
+              metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
               quantity: item.quantity,
               grossWeight: item.grossWeight ?? undefined,

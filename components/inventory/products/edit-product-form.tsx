@@ -10,16 +10,20 @@ import {
 } from "@/lib/inventory/product-types";
 
 import { useToast } from "@/components/providers/toast-provider";
-import { ProductForm } from "./product-form";
+import {
+  ProductForm,
+  type StoreCategoryOption,
+  type StoreMetalOption,
+} from "./product-form";
 
 type EditProductFormProps = {
   product: {
     id: string;
     productCode: string;
     name: string;
-    category: string;
-    ornamentType: string | null;
-    metalType: string;
+    categoryId: string | null;
+    categoryTypeId: string | null;
+    metalTypeId: string | null;
     defaultPurity: string | null;
     defaultMakingCharge: string | null;
     defaultStoneCharge: string | null;
@@ -31,10 +35,14 @@ type EditProductFormProps = {
     createdAt: string;
     updatedAt: string;
   };
+  metals: StoreMetalOption[];
+  categories: StoreCategoryOption[];
 };
 
 export function EditProductForm({
   product,
+  metals,
+  categories,
 }: EditProductFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -75,6 +83,8 @@ export function EditProductForm({
         product={product}
         state={state}
         pending={pending}
+        metals={metals}
+        categories={categories}
       />
     </form>
   );

@@ -9,6 +9,7 @@ import {
   receiveItemsFromKarigar,
   type StockActionState,
 } from "@/lib/actions/inventory-stock-actions"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { useToast } from "@/components/providers/toast-provider"
 import { ProductSelect, type ProductOption } from "@/components/inventory/shared/product-select"
 
@@ -32,6 +33,9 @@ import {
 
 const initialState: StockActionState = { success: false, message: "" }
 
+// "OTHER" is intentionally not in this list — it's no longer a value a user
+// picks from a dropdown, it's auto-applied when the selected metal has no
+// purity (see the per-item Metal Type <Select> below).
 const PURITY_OPTIONS: { value: string; label: string }[] = [
   { value: "GOLD_24K", label: "Gold 24K" },
   { value: "GOLD_22K", label: "Gold 22K" },
@@ -39,14 +43,13 @@ const PURITY_OPTIONS: { value: string; label: string }[] = [
   { value: "GOLD_18K", label: "Gold 18K" },
   { value: "SILVER_999", label: "Silver 999" },
   { value: "SILVER_925", label: "Silver 925" },
-  { value: "OTHER", label: "Other" },
 ]
 
 type ReceiptItem = {
   key: string
   itemName: string
   productId: string
-  metalType: string
+  metalTypeId: string
   purity: string
   quantity: number
   grossWeight: number
@@ -56,13 +59,13 @@ type ReceiptItem = {
   wastagePercent: number
 }
 
-function emptyReceiptItem(): ReceiptItem {
+function emptyReceiptItem(defaultMetal?: StoreMetalRow): ReceiptItem {
   return {
     key: crypto.randomUUID(),
     itemName: "",
     productId: "",
-    metalType: "GOLD",
-    purity: "GOLD_22K",
+    metalTypeId: defaultMetal?.id ?? "",
+    purity: defaultMetal && !defaultMetal.hasPurity ? "OTHER" : "GOLD_22K",
     quantity: 1,
     grossWeight: 0,
     netWeight: 0,
@@ -76,11 +79,24 @@ type ReceiveItemsDialogProps = {
   jobId: string
   products: ProductOption[]
   fineness: Record<string, number>
+  metals: StoreMetalRow[]
 }
 
-export function ReceiveItemsDialog({ jobId, products, fineness }: ReceiveItemsDialogProps) {
+export function ReceiveItemsDialog({ jobId, products, fineness, metals }: ReceiveItemsDialogProps) {
+  const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
+  // Mirrors the old hardcoded default of "GOLD": prefer a hasPurity metal if
+  // one exists, otherwise just fall back to whatever is first in the list.
+  const defaultMetal = useMemo(
+    () => activeMetals.find((m) => m.hasPurity) ?? activeMetals[0],
+    [activeMetals],
+  )
+  const metalById = useMemo(
+    () => new Map(activeMetals.map((metal) => [metal.id, metal])),
+    [activeMetals],
+  )
+
   const [open, setOpen] = useState(false)
-  const [items, setItems] = useState<ReceiptItem[]>([emptyReceiptItem()])
+  const [items, setItems] = useState<ReceiptItem[]>([emptyReceiptItem(defaultMetal)])
   const [labourCharge, setLabourCharge] = useState(0)
   const router = useRouter()
   const toast = useToast()
@@ -103,18 +119,46 @@ export function ReceiveItemsDialog({ jobId, products, fineness }: ReceiveItemsDi
     setItems((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)))
   }
 
+  const updateItemMetal = (key: string, metalTypeId: string) => {
+    const metal = metalById.get(metalTypeId)
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.key !== key) return item
+        if (!metal || metal.hasPurity) {
+          // Switching into (or staying in) a hasPurity metal: drop the
+          // "OTHER" sentinel back to a real purity if it was set.
+          return {
+            ...item,
+            metalTypeId,
+            purity: item.purity === "OTHER" ? "GOLD_22K" : item.purity,
+          }
+        }
+        // hasPurity=false: purity has no meaning, force the sentinel value
+        // the backend requires (KarigarReceiptItem.purity is non-nullable).
+        return { ...item, metalTypeId, purity: "OTHER" }
+      }),
+    )
+  }
+
   const applyProductToItem = (key: string, productId: string, product: ProductOption | undefined) => {
     if (!product) {
       updateItem(key, { productId: "" })
       return
     }
 
-    updateItem(key, {
-      productId,
-      itemName: product.name,
-      metalType: product.metalType ?? "GOLD",
-      purity: product.defaultPurity ?? "GOLD_22K",
-    })
+    // Only the item name comes from the product here — Product's own Metal
+    // Type is being converted to the same StoreMetal relation in a parallel
+    // change, so this dialog doesn't couple to that field's shape and lets
+    // the user pick Metal Type per returned item directly instead.
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.key !== key) return item
+        const metal = metalById.get(item.metalTypeId)
+        const nextPurity =
+          metal && !metal.hasPurity ? item.purity : product.defaultPurity ?? item.purity
+        return { ...item, productId, itemName: product.name, purity: nextPurity }
+      }),
+    )
   }
 
   const removeItem = (key: string) => {
@@ -144,7 +188,7 @@ export function ReceiveItemsDialog({ jobId, products, fineness }: ReceiveItemsDi
     items.map((item) => ({
       itemName: item.itemName || "Item",
       productId: item.productId || null,
-      metalType: item.metalType,
+      metalTypeId: item.metalTypeId,
       purity: item.purity,
       quantity: item.quantity || 1,
       grossWeight: item.grossWeight || null,
@@ -155,7 +199,9 @@ export function ReceiveItemsDialog({ jobId, products, fineness }: ReceiveItemsDi
     })),
   )
 
-  const canSubmit = items.every((item) => item.productId && item.netWeight > 0)
+  const canSubmit = items.every(
+    (item) => item.productId && item.netWeight > 0 && item.metalTypeId,
+  )
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -183,151 +229,177 @@ export function ReceiveItemsDialog({ jobId, products, fineness }: ReceiveItemsDi
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setItems((prev) => [...prev, emptyReceiptItem()])}
+                onClick={() => setItems((prev) => [...prev, emptyReceiptItem(defaultMetal)])}
               >
                 <Plus className="h-4 w-4 mr-1" /> Add Item
               </Button>
             </div>
 
             <div className="space-y-3">
-              {items.map((item) => (
-                <div key={item.key} className="rounded-lg border p-4 space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Product *</Label>
-                      <ProductSelect
-                        products={products}
-                        name={`product-${item.key}`}
-                        defaultValue={item.productId}
-                        placeholder="Select product"
-                        onChange={(productId, product) =>
-                          applyProductToItem(item.key, productId, product)
-                        }
-                      />
+              {items.map((item) => {
+                const selectedMetal = metalById.get(item.metalTypeId)
+                const hasPurity = selectedMetal?.hasPurity ?? true
+
+                return (
+                  <div key={item.key} className="rounded-lg border p-4 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Product *</Label>
+                        <ProductSelect
+                          products={products}
+                          name={`product-${item.key}`}
+                          defaultValue={item.productId}
+                          placeholder="Select product"
+                          onChange={(productId, product) =>
+                            applyProductToItem(item.key, productId, product)
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs">Item Name</Label>
+                        <Input
+                          value={item.itemName}
+                          onChange={(e) => updateItem(item.key, { itemName: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs">Metal Type</Label>
+                        <Select
+                          value={item.metalTypeId}
+                          onValueChange={(value) => updateItemMetal(item.key, value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select metal" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {activeMetals.map((metal) => (
+                              <SelectItem key={metal.id} value={metal.id}>
+                                {metal.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {hasPurity && (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Purity</Label>
+                          <Select
+                            value={item.purity}
+                            onValueChange={(value) => updateItem(item.key, { purity: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PURITY_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs">Item Name</Label>
-                      <Input
-                        value={item.itemName}
-                        onChange={(e) => updateItem(item.key, { itemName: e.target.value })}
-                      />
-                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Quantity</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={item.quantity}
+                          onChange={(e) =>
+                            updateItem(item.key, { quantity: Number(e.target.value) || 1 })
+                          }
+                        />
+                      </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs">Purity</Label>
-                      <Select
-                        value={item.purity}
-                        onValueChange={(value) => updateItem(item.key, { purity: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PURITY_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Gross Weight (g)</Label>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={item.grossWeight === 0 ? "" : item.grossWeight}
+                          onChange={(e) =>
+                            updateItem(item.key, { grossWeight: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Quantity</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={item.quantity}
-                        onChange={(e) =>
-                          updateItem(item.key, { quantity: Number(e.target.value) || 1 })
-                        }
-                      />
-                    </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Net Weight (g) *</Label>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={item.netWeight === 0 ? "" : item.netWeight}
+                          onChange={(e) =>
+                            updateItem(item.key, { netWeight: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs">Gross Weight (g)</Label>
-                      <Input
-                        type="number"
-                        step="0.001"
-                        value={item.grossWeight === 0 ? "" : item.grossWeight}
-                        onChange={(e) =>
-                          updateItem(item.key, { grossWeight: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Stone Weight (g)</Label>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={item.stoneWeight === 0 ? "" : item.stoneWeight}
+                          onChange={(e) =>
+                            updateItem(item.key, { stoneWeight: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs">Net Weight (g) *</Label>
-                      <Input
-                        type="number"
-                        step="0.001"
-                        value={item.netWeight === 0 ? "" : item.netWeight}
-                        onChange={(e) =>
-                          updateItem(item.key, { netWeight: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Dust/Making/Other Wt (g)</Label>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={item.dmoWeight === 0 ? "" : item.dmoWeight}
+                          onChange={(e) =>
+                            updateItem(item.key, { dmoWeight: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs">Stone Weight (g)</Label>
-                      <Input
-                        type="number"
-                        step="0.001"
-                        value={item.stoneWeight === 0 ? "" : item.stoneWeight}
-                        onChange={(e) =>
-                          updateItem(item.key, { stoneWeight: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Wastage %</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.wastagePercent === 0 ? "" : item.wastagePercent}
+                          onChange={(e) =>
+                            updateItem(item.key, {
+                              wastagePercent: Number(e.target.value) || 0,
+                            })
+                          }
+                        />
+                      </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs">Dust/Making/Other Wt (g)</Label>
-                      <Input
-                        type="number"
-                        step="0.001"
-                        value={item.dmoWeight === 0 ? "" : item.dmoWeight}
-                        onChange={(e) =>
-                          updateItem(item.key, { dmoWeight: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs">Wastage %</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={item.wastagePercent === 0 ? "" : item.wastagePercent}
-                        onChange={(e) =>
-                          updateItem(item.key, {
-                            wastagePercent: Number(e.target.value) || 0,
-                          })
-                        }
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs">Fine Weight (incl. wastage)</Label>
-                      <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-medium">
-                        {fineWeightOf(item).toFixed(3)}g
+                      <div className="space-y-1">
+                        <Label className="text-xs">Fine Weight (incl. wastage)</Label>
+                        <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-medium">
+                          {fineWeightOf(item).toFixed(3)}g
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {items.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.key)}
-                      className="inline-flex items-center gap-1 text-xs text-red-600 hover:underline"
-                    >
-                      <Trash2 className="h-3 w-3" /> Remove item
-                    </button>
-                  )}
-                </div>
-              ))}
+                    {items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.key)}
+                        className="inline-flex items-center gap-1 text-xs text-red-600 hover:underline"
+                      >
+                        <Trash2 className="h-3 w-3" /> Remove item
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
 

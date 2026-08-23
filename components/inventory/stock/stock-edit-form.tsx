@@ -20,12 +20,14 @@ import { StockForm } from "./stock-form";
 type StockEditFormProps = {
   stock: any;
   products: any[];
+  metals: any[];
 };
 
 
 export function StockEditForm({
   stock,
   products,
+  metals,
 }: StockEditFormProps) {
 
   const router = useRouter();
@@ -78,6 +80,7 @@ export function StockEditForm({
         mode="edit"
         stock={stock}
         products={products}
+        metals={metals}
         state={state}
         pending={pending}
       />

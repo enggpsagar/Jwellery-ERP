@@ -13,15 +13,19 @@ import {
 } from "@/components/ui/dialog"
 
 import { EditProductForm } from "@/components/inventory/products/edit-product-form"
+import type {
+  StoreCategoryOption,
+  StoreMetalOption,
+} from "@/components/inventory/products/product-form"
 
 type EditProductDialogProps = {
   product: {
     id: string
     productCode: string
     name: string
-    category: string
-    ornamentType: string | null
-    metalType: string
+    categoryId: string | null
+    categoryTypeId: string | null
+    metalTypeId: string | null
     defaultPurity: string | null
     defaultMakingCharge: string | null
     defaultStoneCharge: string | null
@@ -33,10 +37,12 @@ type EditProductDialogProps = {
     createdAt: string
     updatedAt: string
   }
+  metals: StoreMetalOption[]
+  categories: StoreCategoryOption[]
   children?: React.ReactNode
 }
 
-export function EditProductDialog({ product, children }: EditProductDialogProps) {
+export function EditProductDialog({ product, metals, categories, children }: EditProductDialogProps) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -58,7 +64,7 @@ export function EditProductDialog({ product, children }: EditProductDialogProps)
           <DialogTitle>Edit Product</DialogTitle>
         </DialogHeader>
 
-        <EditProductForm product={product} />
+        <EditProductForm product={product} metals={metals} categories={categories} />
       </DialogContent>
     </Dialog>
   )

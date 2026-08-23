@@ -200,7 +200,7 @@ export const MODULE_DEFINITIONS: {
   },
   {
     key: "ledger",
-    label: "Gold & Silver Ledger",
+    label: "Ledger",
     href: "/ledger",
     permissions: [PERMISSIONS.LEDGER_VIEW, PERMISSIONS.LEDGER_CREATE],
   },

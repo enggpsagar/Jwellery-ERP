@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
 import { Plus } from "lucide-react"
@@ -9,6 +9,7 @@ import {
   issueMaterialToKarigar,
   type StockActionState,
 } from "@/lib/actions/inventory-stock-actions"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { Button } from "@/components/ui/button"
@@ -32,8 +33,6 @@ import {
 
 const initialState: StockActionState = { success: false, message: "" }
 
-const METAL_OPTIONS = ["GOLD", "SILVER", "OTHER"] as const
-
 const PURITY_OPTIONS: { value: string; label: string }[] = [
   { value: "GOLD_24K", label: "Gold 24K" },
   { value: "GOLD_22K", label: "Gold 22K" },
@@ -45,16 +44,30 @@ const PURITY_OPTIONS: { value: string; label: string }[] = [
 
 type IssueMaterialDialogProps = {
   karigarId: string
+  metals: StoreMetalRow[]
 }
 
-export function IssueMaterialDialog({ karigarId }: IssueMaterialDialogProps) {
+export function IssueMaterialDialog({ karigarId, metals }: IssueMaterialDialogProps) {
+  const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
+  // Mirrors the old hardcoded default of "GOLD": prefer a hasPurity metal if
+  // one exists, otherwise just fall back to whatever is first in the list.
+  const defaultMetalId = useMemo(
+    () => activeMetals.find((m) => m.hasPurity)?.id ?? activeMetals[0]?.id ?? "",
+    [activeMetals],
+  )
+
   const [open, setOpen] = useState(false)
-  const [metalType, setMetalType] = useState("GOLD")
+  const [metalTypeId, setMetalTypeId] = useState(defaultMetalId)
   const [issuePurity, setIssuePurity] = useState("GOLD_22K")
   const router = useRouter()
   const toast = useToast()
 
-  const isPreciousMetal = metalType === "GOLD" || metalType === "SILVER"
+  useEffect(() => {
+    setMetalTypeId((current) => current || defaultMetalId)
+  }, [defaultMetalId])
+
+  const selectedMetal = activeMetals.find((m) => m.id === metalTypeId)
+  const isPreciousMetal = selectedMetal?.hasPurity ?? false
 
   const issueMaterialWithId = issueMaterialToKarigar.bind(null, karigarId)
   const [state, formAction, pending] = useActionState(issueMaterialWithId, initialState)
@@ -83,7 +96,7 @@ export function IssueMaterialDialog({ karigarId }: IssueMaterialDialogProps) {
         </DialogHeader>
 
         <form action={formAction} className="space-y-4">
-          <input type="hidden" name="metalType" value={metalType} />
+          <input type="hidden" name="metalTypeId" value={metalTypeId} />
           {isPreciousMetal && <input type="hidden" name="issuePurity" value={issuePurity} />}
 
           {!state.success && state.message && (
@@ -93,14 +106,14 @@ export function IssueMaterialDialog({ karigarId }: IssueMaterialDialogProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Metal Type</Label>
-              <Select value={metalType} onValueChange={setMetalType}>
+              <Select value={metalTypeId} onValueChange={setMetalTypeId}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select metal" />
                 </SelectTrigger>
                 <SelectContent>
-                  {METAL_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option.charAt(0) + option.slice(1).toLowerCase()}
+                  {activeMetals.map((metal) => (
+                    <SelectItem key={metal.id} value={metal.id}>
+                      {metal.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -159,7 +172,7 @@ export function IssueMaterialDialog({ karigarId }: IssueMaterialDialogProps) {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || !metalTypeId}>
               {pending ? "Issuing..." : "Issue Material"}
             </Button>
           </DialogFooter>

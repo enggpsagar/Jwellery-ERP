@@ -111,7 +111,7 @@ export default async function InventoryStockDetailsPage({
 
             <div>
               <p className="text-xs text-muted-foreground">Metal Type</p>
-              <p className="font-medium">{stock.metalType}</p>
+              <p className="font-medium">{stock.metalType?.name ?? "-"}</p>
             </div>
 
             <div>

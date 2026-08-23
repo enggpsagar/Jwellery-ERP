@@ -1,6 +1,5 @@
 import {
   PrismaClient,
-  MetalType,
   PurityType,
   InvoiceStatus,
   LedgerEntryType,
@@ -143,9 +142,19 @@ async function seedKarigars(storeId: string) {
 async function seedInvoicesAndLedger(
   customers: Awaited<ReturnType<typeof seedCustomers>>,
   karigars: Awaited<ReturnType<typeof seedKarigars>>,
-  storeId: string
+  storeId: string,
+  metalIdByName: Map<string, string>
 ) {
   console.log("Seeding invoices, invoice items and ledger entries...");
+
+  const goldMetalId = metalIdByName.get("Gold");
+  const silverMetalId = metalIdByName.get("Silver");
+
+  if (!goldMetalId || !silverMetalId) {
+    throw new Error(
+      "Expected seeded StoreMetal rows 'Gold' and 'Silver' for this store, but one was missing."
+    );
+  }
 
   const stockItems = await prisma.inventoryStock.findMany({
     where: { storeId },
@@ -248,9 +257,9 @@ async function seedInvoicesAndLedger(
         items: {
           create: seed.items.map((item) => ({
             itemName: item.itemName,
-            metalType: item.itemName.toLowerCase().includes("silver")
-              ? MetalType.SILVER
-              : MetalType.GOLD,
+            metalTypeId: item.itemName.toLowerCase().includes("silver")
+              ? silverMetalId
+              : goldMetalId,
             quantity: 1,
             netWeight: item.weight,
             rate: item.rate,
@@ -299,7 +308,7 @@ async function seedInvoicesAndLedger(
     {
       karigar: karigars[0],
       daysAgo: 10,
-      metalType: MetalType.GOLD,
+      metalTypeId: goldMetalId,
       issueWeight: 25,
       labourCharge: 3500,
       status: "issued",
@@ -308,7 +317,7 @@ async function seedInvoicesAndLedger(
     {
       karigar: karigars[1],
       daysAgo: 5,
-      metalType: MetalType.GOLD,
+      metalTypeId: goldMetalId,
       issueWeight: 40,
       receiveWeight: 38.5,
       labourCharge: 6200,
@@ -318,7 +327,7 @@ async function seedInvoicesAndLedger(
     {
       karigar: karigars[2],
       daysAgo: 2,
-      metalType: MetalType.SILVER,
+      metalTypeId: silverMetalId,
       issueWeight: 120,
       labourCharge: 1800,
       status: "issued",
@@ -347,7 +356,7 @@ async function seedInvoicesAndLedger(
         karigarId: job.karigar.id,
         issueDate,
         receivedDate: job.status === "received" ? new Date() : undefined,
-        metalType: job.metalType,
+        metalTypeId: job.metalTypeId,
         issueWeight: job.issueWeight,
         receiveWeight: job.receiveWeight,
         labourCharge: job.labourCharge,
@@ -363,7 +372,7 @@ async function seedInvoicesAndLedger(
         type: LedgerEntryType.DEBIT,
         sourceType: LedgerSourceType.KARIGAR_ISSUE,
         karigarId: job.karigar.id,
-        metalType: job.metalType,
+        metalTypeId: job.metalTypeId,
         metalWeight: job.issueWeight,
         amount: job.labourCharge,
         description: `Material issued for ${jobNumber}`,
@@ -378,7 +387,7 @@ async function seedInvoicesAndLedger(
           type: LedgerEntryType.CREDIT,
           sourceType: LedgerSourceType.KARIGAR_RECEIPT,
           karigarId: job.karigar.id,
-          metalType: job.metalType,
+          metalTypeId: job.metalTypeId,
           metalWeight: job.receiveWeight,
           amount: 0,
           description: `Finished goods received for ${jobNumber}`,
@@ -397,9 +406,14 @@ async function main() {
     create: { name: "Main Store", code: "MAIN" },
   });
 
+  const storeMetals = await prisma.storeMetal.findMany({
+    where: { storeId: store.id },
+  });
+  const metalIdByName = new Map(storeMetals.map((m) => [m.name, m.id]));
+
   const customers = await seedCustomers(store.id);
   const karigars = await seedKarigars(store.id);
-  await seedInvoicesAndLedger(customers, karigars, store.id);
+  await seedInvoicesAndLedger(customers, karigars, store.id, metalIdByName);
 }
 
 main()

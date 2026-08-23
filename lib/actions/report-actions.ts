@@ -33,7 +33,13 @@ export async function getSalesReport(range: DateRange = {}) {
     orderBy: { invoiceDate: "desc" },
     include: {
       customer: { select: { name: true } },
-      items: { select: { metalType: true, netWeight: true, lineTotal: true } },
+      items: {
+        select: {
+          metalType: { select: { id: true, name: true } },
+          netWeight: true,
+          lineTotal: true,
+        },
+      },
     },
   });
 
@@ -41,11 +47,12 @@ export async function getSalesReport(range: DateRange = {}) {
   const totalMakingCharges = invoices.reduce((sum, inv) => sum + Number(inv.makingCharges), 0);
   const totalOutstanding = invoices.reduce((sum, inv) => sum + Number(inv.balanceAmount), 0);
 
-  const byMetal = new Map<string, { weight: number; amount: number }>();
+  const byMetal = new Map<string, { name: string; weight: number; amount: number }>();
   for (const invoice of invoices) {
     for (const item of invoice.items) {
-      const key = item.metalType ?? "OTHER";
-      const entry = byMetal.get(key) ?? { weight: 0, amount: 0 };
+      const key = item.metalType?.id ?? "unassigned";
+      const name = item.metalType?.name ?? "Unassigned";
+      const entry = byMetal.get(key) ?? { name, weight: 0, amount: 0 };
       entry.weight += item.netWeight ? Number(item.netWeight) : 0;
       entry.amount += Number(item.lineTotal);
       byMetal.set(key, entry);
@@ -57,10 +64,7 @@ export async function getSalesReport(range: DateRange = {}) {
     totalRevenue,
     totalMakingCharges,
     totalOutstanding,
-    byMetal: Array.from(byMetal.entries()).map(([metalType, data]) => ({
-      metalType,
-      ...data,
-    })),
+    byMetal: Array.from(byMetal.values()),
     invoices: invoices.map((inv) => ({
       id: inv.id,
       invoiceNumber: inv.invoiceNumber,
@@ -124,7 +128,10 @@ export async function getKarigarOutstandingReport() {
   const openJobs = await prisma.karigarJob.findMany({
     where: { storeId, receivedDate: null },
     orderBy: { issueDate: "desc" },
-    include: { karigar: { select: { name: true, code: true } } },
+    include: {
+      karigar: { select: { name: true, code: true } },
+      metalType: { select: { name: true } },
+    },
   });
 
   const byKarigar = new Map<string, { name: string; jobs: number; weightOut: number }>();
@@ -151,7 +158,7 @@ export async function getKarigarOutstandingReport() {
       issueDate: job.issueDate.toISOString(),
       expectedDate: job.expectedDate?.toISOString() ?? null,
       issueWeight: job.issueWeight ? Number(job.issueWeight) : null,
-      metalType: job.metalType,
+      metalType: job.metalType?.name ?? null,
     })),
   };
 }

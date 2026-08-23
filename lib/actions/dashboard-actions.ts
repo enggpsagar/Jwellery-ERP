@@ -1,8 +1,6 @@
 // FILE PATH: lib/actions/dashboard-actions.ts
 "use server";
 
-import { MetalType } from "@prisma/client";
-
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 
@@ -32,7 +30,13 @@ export type DashboardStat = {
   change: string;
   trend: "up" | "down";
   sub: string;
-  icon: "rupee" | "trending" | "wallet" | "gold" | "silver" | "hammer";
+  icon: "rupee" | "trending" | "wallet" | "metal" | "hammer";
+};
+
+export type MetalStockStat = {
+  metalId: string;
+  metalName: string;
+  grams: number;
 };
 
 export async function getDashboardStats(): Promise<DashboardStat[]> {
@@ -47,14 +51,17 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     new Date(now.getFullYear(), now.getMonth() - 1, 1)
   );
 
+  const activeMetals = await prisma.storeMetal.findMany({
+    where: { storeId, isActive: true },
+  });
+
   const [
     todaySalesAgg,
     yesterdaySalesAgg,
     monthSalesAgg,
     lastMonthSalesAgg,
     outstandingAgg,
-    goldStock,
-    silverStock,
+    metalStockAggs,
     pendingJobs,
     overdueJobs,
   ] = await Promise.all([
@@ -79,14 +86,14 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
       _sum: { balanceAmount: true },
       _count: true,
     }),
-    prisma.inventoryStock.aggregate({
-      where: { storeId, metalType: MetalType.GOLD, isActive: true },
-      _sum: { netWeight: true },
-    }),
-    prisma.inventoryStock.aggregate({
-      where: { storeId, metalType: MetalType.SILVER, isActive: true },
-      _sum: { netWeight: true },
-    }),
+    Promise.all(
+      activeMetals.map((metal) =>
+        prisma.inventoryStock.aggregate({
+          where: { storeId, metalTypeId: metal.id, isActive: true },
+          _sum: { netWeight: true },
+        })
+      )
+    ),
     prisma.karigarJob.count({ where: { storeId, receivedDate: null } }),
     prisma.karigarJob.count({
       where: {
@@ -103,8 +110,12 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   const lastMonthSales = Number(lastMonthSalesAgg._sum.totalAmount ?? 0);
   const outstanding = Number(outstandingAgg._sum.balanceAmount ?? 0);
   const outstandingAccounts = outstandingAgg._count;
-  const goldGrams = Number(goldStock._sum.netWeight ?? 0);
-  const silverGrams = Number(silverStock._sum.netWeight ?? 0);
+
+  const metalStats: MetalStockStat[] = activeMetals.map((metal, index) => ({
+    metalId: metal.id,
+    metalName: metal.name,
+    grams: Number(metalStockAggs[index]._sum.netWeight ?? 0),
+  }));
 
   const todayChange = percentChange(todaySales, yesterdaySales);
   const monthChange = percentChange(monthSales, lastMonthSales);
@@ -134,22 +145,14 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
       sub: `across ${outstandingAccounts} account${outstandingAccounts === 1 ? "" : "s"}`,
       icon: "wallet",
     },
-    {
-      label: "Gold Stock",
-      value: `${goldGrams.toLocaleString("en-IN", { maximumFractionDigits: 1 })} g`,
+    ...metalStats.map((metal) => ({
+      label: `${metal.metalName} Stock`,
+      value: `${metal.grams.toLocaleString("en-IN", { maximumFractionDigits: 1 })} g`,
       change: "",
-      trend: "up",
-      sub: "active gold inventory",
-      icon: "gold",
-    },
-    {
-      label: "Silver Stock",
-      value: `${silverGrams.toLocaleString("en-IN", { maximumFractionDigits: 1 })} g`,
-      change: "",
-      trend: "up",
-      sub: "active silver inventory",
-      icon: "silver",
-    },
+      trend: "up" as const,
+      sub: `active ${metal.metalName.toLowerCase()} inventory`,
+      icon: "metal" as const,
+    })),
     {
       label: "Pending Karigar Orders",
       value: `${pendingJobs}`,
@@ -209,12 +212,12 @@ export async function getMonthlySalesTrend(
 export type CategoryRevenue = { category: string; value: number };
 
 const CATEGORY_LABELS: Record<string, string> = {
-  ORNAMENT: "Ornaments",
-  COIN: "Coins & Bars",
-  BAR: "Coins & Bars",
-  RAW_METAL: "Raw Metal",
-  STONE: "Stones",
-  OTHER: "Other",
+  Ornament: "Ornaments",
+  Coin: "Coins & Bars",
+  Bar: "Coins & Bars",
+  "Raw Metal": "Raw Metal",
+  Stone: "Stones",
+  Other: "Other",
 };
 
 export async function getRevenueByCategory(): Promise<CategoryRevenue[]> {
@@ -224,7 +227,7 @@ export async function getRevenueByCategory(): Promise<CategoryRevenue[]> {
     select: {
       lineTotal: true,
       inventoryStock: {
-        select: { product: { select: { category: true } } },
+        select: { product: { select: { category: { select: { name: true } } } } },
       },
     },
   });
@@ -232,7 +235,7 @@ export async function getRevenueByCategory(): Promise<CategoryRevenue[]> {
   const byCategory = new Map<string, number>();
 
   for (const item of items) {
-    const category = item.inventoryStock?.product?.category ?? "OTHER";
+    const category = item.inventoryStock?.product?.category?.name ?? "Other";
     const label = CATEGORY_LABELS[category] ?? "Other";
     byCategory.set(label, (byCategory.get(label) ?? 0) + Number(item.lineTotal));
   }
@@ -270,13 +273,18 @@ export async function getRecentTransactions(
     take: limit,
     include: {
       customer: { select: { name: true } },
-      items: { select: { metalType: true, netWeight: true } },
+      items: {
+        select: {
+          metalType: { select: { name: true } },
+          netWeight: true,
+        },
+      },
     },
   });
 
   return invoices.map((inv) => {
     const metals = new Set(
-      inv.items.map((item) => item.metalType).filter(Boolean)
+      inv.items.map((item) => item.metalType?.name).filter(Boolean)
     );
     const metal =
       metals.size === 0
@@ -351,6 +359,7 @@ export async function getRecentActivity(
     include: {
       customer: { select: { name: true } },
       karigar: { select: { name: true } },
+      metalType: { select: { name: true } },
     },
   });
 
@@ -369,7 +378,7 @@ export async function getRecentActivity(
 
     const detail =
       entry.metalWeight && entry.metalType
-        ? `${entry.metalType} · ${Number(entry.metalWeight).toFixed(1)} g`
+        ? `${entry.metalType.name} · ${Number(entry.metalWeight).toFixed(1)} g`
         : `₹${Number(entry.amount).toLocaleString("en-IN")}`;
 
     return {

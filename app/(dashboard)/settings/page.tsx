@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { UserRole } from "@prisma/client";
 
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { getCurrentUser } from "@/lib/auth/auth";
 
 import { SettingsForm } from "@/components/settings/settings-form";
+import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { PageBackHeader } from "@/components/shared/page-back-header";
 
 export default async function SettingsPage() {
@@ -26,14 +26,7 @@ export default async function SettingsPage() {
         backLabel="Back to Dashboard"
       />
 
-      <div className="flex gap-4 border-b text-sm">
-        <Link href="/settings" className="border-b-2 border-primary px-1 pb-2 font-medium">
-          Business Settings
-        </Link>
-        <Link href="/settings/purity" className="px-1 pb-2 text-muted-foreground hover:text-foreground">
-          Purity &amp; Carat
-        </Link>
-      </div>
+      <SettingsTabs active="business" />
 
       <SettingsForm settings={settings} canEdit={canEdit} />
     </main>

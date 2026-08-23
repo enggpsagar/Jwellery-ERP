@@ -50,7 +50,7 @@ export const PERMISSIONS = {
   KARIGAR_UPDATE: "karigar.update",
   KARIGAR_DELETE: "karigar.delete",
 
-  // Gold & Silver Ledger
+  // Ledger
   LEDGER_VIEW: "ledger.view",
   LEDGER_CREATE: "ledger.create",
 

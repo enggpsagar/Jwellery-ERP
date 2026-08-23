@@ -68,7 +68,7 @@ const mainNav: NavItem[] = [
     icon: Truck,
   },
   {
-    title: "Gold & Silver Ledger",
+    title: "Ledger",
     href: "/ledger",
     icon: CircleDollarSign,
   },

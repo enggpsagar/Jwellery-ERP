@@ -1,12 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import {
-  InventoryCategory,
-  MetalType,
-  OrnamentType,
-  PurityType,
-} from "@prisma/client";
+import { PurityType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -52,9 +47,12 @@ function serializeProduct(product: {
   id: string;
   productCode: string;
   name: string;
-  category: InventoryCategory;
-  ornamentType: OrnamentType | null;
-  metalType: MetalType;
+  categoryId: string | null;
+  categoryTypeId: string | null;
+  metalTypeId: string | null;
+  category: { id: string; name: string } | null;
+  categoryType: { id: string; name: string } | null;
+  metalType: { id: string; name: string } | null;
   defaultPurity: PurityType | null;
   defaultMakingCharge: { toString(): string } | null;
   defaultStoneCharge: { toString(): string } | null;
@@ -70,8 +68,11 @@ function serializeProduct(product: {
     id: product.id,
     productCode: product.productCode,
     name: product.name,
+    categoryId: product.categoryId,
+    categoryTypeId: product.categoryTypeId,
+    metalTypeId: product.metalTypeId,
     category: product.category,
-    ornamentType: product.ornamentType,
+    categoryType: product.categoryType,
     metalType: product.metalType,
     defaultPurity: product.defaultPurity,
     defaultMakingCharge: product.defaultMakingCharge?.toString() ?? null,
@@ -86,21 +87,28 @@ function serializeProduct(product: {
   };
 }
 
+const PRODUCT_RELATIONS = {
+  category: { select: { id: true, name: true } },
+  categoryType: { select: { id: true, name: true } },
+  metalType: { select: { id: true, name: true } },
+} as const;
+
 export async function getProducts() {
   const storeId = await requireStoreScope();
 
   const rows = await prisma.product.findMany({
     where: { storeId },
     orderBy: { createdAt: "desc" },
+    include: PRODUCT_RELATIONS,
   });
 
   return rows.map((row) => ({
     id: row.id,
     productCode: row.productCode,
     name: row.name,
-    category: row.category,
-    ornamentType: row.ornamentType,
-    metalType: row.metalType,
+    category: row.category?.name ?? "-",
+    ornamentType: row.categoryType?.name ?? null,
+    metalType: row.metalType?.name ?? "-",
     defaultPurity: row.defaultPurity,
     defaultMakingCharge:
       row.defaultMakingCharge != null ? Number(row.defaultMakingCharge) : null,
@@ -121,10 +129,64 @@ export async function getProductById(id: string) {
 
   const product = await prisma.product.findFirst({
     where: { id, storeId },
+    include: PRODUCT_RELATIONS,
   });
 
   if (!product) return null;
   return serializeProduct(product);
+}
+
+/**
+ * Validate that categoryId / metalTypeId / (optional) categoryTypeId
+ * reference real, store-scoped rows. Returns field errors for anything
+ * that doesn't resolve.
+ */
+async function validateTaxonomySelection(
+  storeId: string,
+  categoryId: string,
+  metalTypeId: string,
+  categoryTypeId: string | null,
+): Promise<Record<string, string[]>> {
+  const errors: Record<string, string[]> = {};
+
+  const [categoryRow, metalRow, typeRow] = await Promise.all([
+    categoryId
+      ? prisma.storeCategory.findFirst({
+          where: { id: categoryId, storeId },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    metalTypeId
+      ? prisma.storeMetal.findFirst({
+          where: { id: metalTypeId, storeId },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    categoryTypeId
+      ? prisma.storeCategoryType.findFirst({
+          where: { id: categoryTypeId, storeId, categoryId: categoryId || undefined },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  if (!categoryId) {
+    errors.categoryId = ["Category is required"];
+  } else if (!categoryRow) {
+    errors.categoryId = ["Selected category is invalid"];
+  }
+
+  if (!metalTypeId) {
+    errors.metalTypeId = ["Metal type is required"];
+  } else if (!metalRow) {
+    errors.metalTypeId = ["Selected metal type is invalid"];
+  }
+
+  if (categoryTypeId && !typeRow) {
+    errors.categoryTypeId = ["Selected type is invalid for this category"];
+  }
+
+  return errors;
 }
 
 export async function createProduct(
@@ -135,22 +197,9 @@ export async function createProduct(
     const productCode = String(formData.get("productCode") ?? "").trim();
     const name = String(formData.get("name") ?? "").trim();
 
-    const category =
-      (parseOptionalEnum(
-        formData.get("category"),
-        Object.values(InventoryCategory),
-      ) as InventoryCategory | null) ?? InventoryCategory.ORNAMENT;
-
-    const ornamentType = parseOptionalEnum(
-      formData.get("ornamentType"),
-      Object.values(OrnamentType),
-    ) as OrnamentType | null;
-
-    const metalType =
-      (parseOptionalEnum(
-        formData.get("metalType"),
-        Object.values(MetalType),
-      ) as MetalType | null) ?? MetalType.GOLD;
+    const categoryId = String(formData.get("categoryId") ?? "").trim();
+    const categoryTypeId = parseNullableString(formData.get("categoryTypeId"));
+    const metalTypeId = String(formData.get("metalTypeId") ?? "").trim();
 
     const defaultPurity = parseOptionalEnum(
       formData.get("defaultPurity"),
@@ -181,6 +230,18 @@ export async function createProduct(
       errors.name = ["Product name is required"];
     }
 
+    const storeId = await requireStoreScope();
+
+    Object.assign(
+      errors,
+      await validateTaxonomySelection(
+        storeId,
+        categoryId,
+        metalTypeId,
+        categoryTypeId,
+      ),
+    );
+
     if (Object.keys(errors).length > 0) {
       return {
         success: false,
@@ -188,8 +249,6 @@ export async function createProduct(
         errors,
       };
     }
-
-    const storeId = await requireStoreScope();
 
     const existing = await prisma.product.findFirst({
       where: { productCode, storeId },
@@ -211,9 +270,9 @@ export async function createProduct(
         storeId,
         productCode,
         name,
-        category,
-        ornamentType,
-        metalType,
+        categoryId,
+        categoryTypeId,
+        metalTypeId,
         defaultPurity,
         defaultMakingCharge,
         defaultStoneCharge,
@@ -253,22 +312,9 @@ export async function updateProduct(
     const productCode = String(formData.get("productCode") || "").trim();
     const name = String(formData.get("name") || "").trim();
 
-    const category =
-      (parseOptionalEnum(
-        formData.get("category"),
-        Object.values(InventoryCategory),
-      ) as InventoryCategory | null) ?? InventoryCategory.ORNAMENT;
-
-    const ornamentType = parseOptionalEnum(
-      formData.get("ornamentType"),
-      Object.values(OrnamentType),
-    ) as OrnamentType | null;
-
-    const metalType =
-      (parseOptionalEnum(
-        formData.get("metalType"),
-        Object.values(MetalType),
-      ) as MetalType | null) ?? MetalType.GOLD;
+    const categoryId = String(formData.get("categoryId") ?? "").trim();
+    const categoryTypeId = parseNullableString(formData.get("categoryTypeId"));
+    const metalTypeId = String(formData.get("metalTypeId") ?? "").trim();
 
     const defaultPurity = parseOptionalEnum(
       formData.get("defaultPurity"),
@@ -297,6 +343,18 @@ export async function updateProduct(
       errors.name = ["Product name is required"];
     }
 
+    const storeId = await requireStoreScope();
+
+    Object.assign(
+      errors,
+      await validateTaxonomySelection(
+        storeId,
+        categoryId,
+        metalTypeId,
+        categoryTypeId,
+      ),
+    );
+
     if (Object.keys(errors).length > 0) {
       return {
         success: false,
@@ -304,8 +362,6 @@ export async function updateProduct(
         errors,
       };
     }
-
-    const storeId = await requireStoreScope();
 
     const existing = await prisma.product.findFirst({
       where: {
@@ -331,9 +387,9 @@ export async function updateProduct(
   data: {
     productCode,
     name,
-    category,
-    ornamentType,
-    metalType,
+    categoryId,
+    categoryTypeId,
+    metalTypeId,
     defaultPurity,
     defaultMakingCharge,
     defaultStoneCharge,

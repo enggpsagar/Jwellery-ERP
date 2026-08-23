@@ -125,7 +125,7 @@ async function seedKachaSlips(storeId: string) {
             create: [
               {
                 itemName: plan.stock.product.name,
-                metalType: plan.stock.metalType,
+                metalTypeId: plan.stock.metalTypeId,
                 purity: plan.stock.purity,
                 quantity: 1,
                 grossWeight: plan.stock.grossWeight ?? undefined,
@@ -214,7 +214,7 @@ async function seedKachaSlips(storeId: string) {
               create: [
                 {
                   itemName: plan.stock.product.name,
-                  metalType: plan.stock.metalType,
+                  metalTypeId: plan.stock.metalTypeId,
                   purity: plan.stock.purity,
                   quantity: 1,
                   grossWeight: plan.stock.grossWeight ?? undefined,

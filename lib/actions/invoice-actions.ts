@@ -8,7 +8,6 @@ import {
   InventoryTransactionType,
   LedgerEntryType,
   LedgerSourceType,
-  MetalType,
   PurityType,
 } from "@prisma/client";
 
@@ -19,7 +18,7 @@ import { invoiceEmail } from "@/lib/email-templates";
 
 export type InvoiceLineItemInput = {
   itemName: string;
-  metalType?: MetalType | null;
+  metalTypeId?: string | null;
   purity?: PurityType | null;
   quantity: number;
   grossWeight?: number | null;
@@ -87,7 +86,7 @@ function mapInvoice(invoice: any) {
     items: (invoice.items ?? []).map((item: any) => ({
       id: item.id,
       itemName: item.itemName,
-      metalType: item.metalType,
+      metalTypeId: item.metalTypeId,
       purity: item.purity,
       quantity: item.quantity,
       grossWeight: item.grossWeight ? Number(item.grossWeight) : null,
@@ -201,14 +200,19 @@ export async function getInvoiceFormStockItems() {
   const stockItems = await prisma.inventoryStock.findMany({
     where: { storeId, status: InventoryStockStatus.IN_STOCK, isActive: true },
     orderBy: { stockCode: "asc" },
-    include: { product: { select: { name: true } } },
+    include: {
+      product: { select: { name: true } },
+      metalType: { select: { id: true, name: true } },
+    },
   });
 
   return stockItems.map((stock) => ({
     id: stock.id,
     stockCode: stock.stockCode,
     productName: stock.product.name,
-    metalType: stock.metalType,
+    metalType: stock.metalType
+      ? { id: stock.metalType.id, name: stock.metalType.name }
+      : null,
     purity: stock.purity,
     netWeight: stock.netWeight ? Number(stock.netWeight) : null,
     saleRate: stock.saleRate ? Number(stock.saleRate) : null,
@@ -297,7 +301,7 @@ export async function createInvoice(
           items: {
             create: items.map((item) => ({
               itemName: item.itemName,
-              metalType: item.metalType ?? undefined,
+              metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,

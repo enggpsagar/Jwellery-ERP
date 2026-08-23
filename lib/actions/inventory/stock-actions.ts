@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache"
 import {
   InventoryStockStatus,
   InventoryFinish,
-  MetalType,
   PurityType,
   Prisma,
 } from "@prisma/client"
@@ -60,14 +59,17 @@ export async function getInventoryStock() {
   const rows = await prisma.inventoryStock.findMany({
     where: { storeId },
     include: {
+      metalType: {
+        select: { id: true, name: true },
+      },
       product: {
         select: {
           id: true,
           productCode: true,
           name: true,
-          category: true,
-          ornamentType: true,
-          metalType: true,
+          category: { select: { id: true, name: true } },
+          categoryType: { select: { id: true, name: true } },
+          metalType: { select: { id: true, name: true } },
           defaultPurity: true,
         },
       },
@@ -108,10 +110,12 @@ export async function getInventoryStockFormProducts() {
       id: true,
       productCode: true,
       name: true,
-      category: true,
-      ornamentType: true,
-      metalType: true,
+      category: { select: { id: true, name: true } },
+      categoryType: { select: { id: true, name: true } },
+      metalType: { select: { id: true, name: true } },
       defaultPurity: true,
+      defaultMakingCharge: true,
+      defaultStoneCharge: true,
       isActive: true,
     },
   })
@@ -119,9 +123,11 @@ export async function getInventoryStockFormProducts() {
   return products.map((product) => ({
     ...product,
     category: product.category ?? null,
-    ornamentType: product.ornamentType ?? null,
+    categoryType: product.categoryType ?? null,
     metalType: product.metalType ?? null,
     defaultPurity: product.defaultPurity ?? null,
+    defaultMakingCharge: product.defaultMakingCharge?.toString() ?? null,
+    defaultStoneCharge: product.defaultStoneCharge?.toString() ?? null,
   }))
 }
 
@@ -131,14 +137,17 @@ export async function getInventoryStockById(id: string) {
   const row = await prisma.inventoryStock.findFirst({
     where: { id, storeId },
     include: {
+      metalType: {
+        select: { id: true, name: true },
+      },
       product: {
         select: {
           id: true,
           productCode: true,
           name: true,
-          category: true,
-          ornamentType: true,
-          metalType: true,
+          category: { select: { id: true, name: true } },
+          categoryType: { select: { id: true, name: true } },
+          metalType: { select: { id: true, name: true } },
           defaultPurity: true,
           defaultMakingCharge: true,
           defaultStoneCharge: true,
@@ -222,11 +231,7 @@ export async function createInventoryStock(
     const stockCode = String(formData.get("stockCode") || "").trim()
     const tagNumber = parseNullableString(formData.get("tagNumber"))
 
-    const metalType =
-      (parseOptionalEnum(
-        formData.get("metalType"),
-        Object.values(MetalType)
-      ) as MetalType | null) ?? MetalType.GOLD
+    const metalTypeId = String(formData.get("metalTypeId") || "").trim()
 
     const purity = parseOptionalEnum(
       formData.get("purity"),
@@ -280,6 +285,10 @@ export async function createInventoryStock(
       errors.stockCode = ["Stock code is required"]
     }
 
+    if (!metalTypeId) {
+      errors.metalTypeId = ["Metal type is required"]
+    }
+
     if (quantity < 1) {
       errors.quantity = ["Quantity must be at least 1"]
     }
@@ -309,6 +318,21 @@ export async function createInventoryStock(
       }
     }
 
+    const metalType = await prisma.storeMetal.findFirst({
+      where: { id: metalTypeId, storeId },
+      select: { id: true },
+    })
+
+    if (!metalType) {
+      return {
+        success: false,
+        message: "Selected metal type is invalid",
+        errors: {
+          metalTypeId: ["Selected metal type could not be found"],
+        },
+      }
+    }
+
     const existing = await prisma.inventoryStock.findFirst({
       where: { stockCode, storeId },
       select: { id: true },
@@ -330,7 +354,7 @@ export async function createInventoryStock(
         productId,
         stockCode,
         tagNumber,
-        metalType,
+        metalTypeId,
         purity,
         status,
         finish,
@@ -418,11 +442,7 @@ export async function updateInventoryStock(
     const stockCode = String(formData.get("stockCode") || "").trim()
     const tagNumber = parseNullableString(formData.get("tagNumber"))
 
-    const metalType =
-      (parseOptionalEnum(
-        formData.get("metalType"),
-        Object.values(MetalType)
-      ) as MetalType | null) ?? MetalType.GOLD
+    const metalTypeId = String(formData.get("metalTypeId") || "").trim()
 
     const purity = parseOptionalEnum(
       formData.get("purity"),
@@ -476,6 +496,10 @@ export async function updateInventoryStock(
       errors.stockCode = ["Stock code is required"]
     }
 
+    if (!metalTypeId) {
+      errors.metalTypeId = ["Metal type is required"]
+    }
+
     if (quantity < 1) {
       errors.quantity = ["Quantity must be at least 1"]
     }
@@ -522,6 +546,21 @@ export async function updateInventoryStock(
           },
         }
       }
+
+      const metalType = await prisma.storeMetal.findFirst({
+        where: { id: metalTypeId, storeId },
+        select: { id: true },
+      })
+
+      if (!metalType) {
+        return {
+          success: false,
+          message: "Selected metal type is invalid",
+          errors: {
+            metalTypeId: ["Selected metal type could not be found"],
+          },
+        }
+      }
     }
 
     /**
@@ -560,7 +599,7 @@ export async function updateInventoryStock(
         productId,
         stockCode,
         tagNumber,
-        metalType,
+        metalTypeId,
         purity,
         status,
         finish,

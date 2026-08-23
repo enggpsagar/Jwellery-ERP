@@ -55,6 +55,7 @@ export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
       customer: { select: { id: true, name: true } },
       karigar: { select: { id: true, name: true } },
       invoice: { select: { id: true, invoiceNumber: true } },
+      metalType: { select: { name: true } },
     },
   })
 
@@ -77,7 +78,7 @@ export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
       sourceLabel: formatLedgerSource(entry.sourceType),
       type: entry.type as "CREDIT" | "DEBIT",
       amount: Number(entry.amount ?? 0),
-      metalType: entry.metalType,
+      metalType: entry.metalType?.name ?? null,
       metalWeight: entry.metalWeight ? Number(entry.metalWeight) : null,
       description: entry.description ?? "",
       invoiceId: entry.invoiceId,

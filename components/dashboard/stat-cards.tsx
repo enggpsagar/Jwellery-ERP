@@ -2,7 +2,6 @@ import {
   IndianRupee,
   TrendingUp,
   Wallet,
-  CircleDollarSign,
   Coins,
   Hammer,
   ArrowUpRight,
@@ -17,8 +16,7 @@ const iconMap = {
   rupee: IndianRupee,
   trending: TrendingUp,
   wallet: Wallet,
-  gold: CircleDollarSign,
-  silver: Coins,
+  metal: Coins,
   hammer: Hammer,
 }
 

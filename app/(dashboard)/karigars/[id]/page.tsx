@@ -6,6 +6,7 @@ import { getKarigarById } from "@/lib/actions/karigar-actions";
 import { getKarigarLedger } from "@/lib/actions/ledger-actions";
 import { getPurityFineness } from "@/lib/actions/purity-actions";
 import { getInventoryStockFormProducts } from "@/lib/actions/inventory/stock-actions";
+import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 
@@ -40,10 +41,11 @@ export default async function KarigarDetailPage({ params }: Props) {
 
   const storeId = await requireStoreScope();
 
-  const [ledger, finenessRows, products, openJobs] = await Promise.all([
+  const [ledger, finenessRows, products, metals, openJobs] = await Promise.all([
     getKarigarLedger(id),
     getPurityFineness(),
     getInventoryStockFormProducts(),
+    getStoreMetals(),
     prisma.karigarJob.findMany({
       where: { storeId, karigarId: id, status: "issued" },
       orderBy: { issueDate: "desc" },
@@ -54,6 +56,20 @@ export default async function KarigarDetailPage({ params }: Props) {
     finenessRows.map((row) => [row.purity, row.finenessPercent]),
   );
 
+  // ProductSelect's shared ProductOption type expects category/ornamentType/metalType
+  // as flat display strings, not the relation objects getInventoryStockFormProducts()
+  // now returns.
+  const productSelectOptions = products.map((product) => ({
+    id: product.id,
+    productCode: product.productCode,
+    name: product.name,
+    category: product.category?.name ?? null,
+    ornamentType: product.categoryType?.name ?? null,
+    metalType: product.metalType?.name ?? null,
+    defaultPurity: product.defaultPurity ?? null,
+    isActive: product.isActive,
+  }));
+
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
@@ -63,7 +79,7 @@ export default async function KarigarDetailPage({ params }: Props) {
         backLabel="Back to Karigars"
         action={
           <div className="flex flex-wrap gap-2">
-            <IssueMaterialDialog karigarId={id} />
+            <IssueMaterialDialog karigarId={id} metals={metals} />
             <RecordKarigarPaymentDialog karigarId={id} />
           </div>
         }
@@ -134,7 +150,12 @@ export default async function KarigarDetailPage({ params }: Props) {
                     {job.expectedDate ? ` · Expected ${formatDate(job.expectedDate)}` : ""}
                   </div>
                 </div>
-                <ReceiveItemsDialog jobId={job.id} products={products} fineness={fineness} />
+                <ReceiveItemsDialog
+                  jobId={job.id}
+                  products={productSelectOptions}
+                  fineness={fineness}
+                  metals={metals}
+                />
               </div>
             ))
           )}

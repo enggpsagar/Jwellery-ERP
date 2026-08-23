@@ -1,15 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import {
-  InventoryCategory,
-  MetalType,
-  OrnamentType,
-  PurityType,
-} from "@prisma/client";
+import { PurityType } from "@prisma/client";
 
 import type { ProductFormState } from "@/lib/inventory/product-types";
+import { getStoreCategoryTypes } from "@/lib/actions/taxonomy-actions";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,13 +20,30 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+export type StoreMetalOption = {
+  id: string;
+  name: string;
+  hasPurity: boolean;
+};
+
+export type StoreCategoryOption = {
+  id: string;
+  name: string;
+};
+
+export type StoreCategoryTypeOption = {
+  id: string;
+  categoryId: string;
+  name: string;
+};
+
 type Product = {
   id?: string;
   productCode: string;
   name: string;
-  category: string;
-  ornamentType: string | null;
-  metalType: string;
+  categoryId: string | null;
+  categoryTypeId: string | null;
+  metalTypeId: string | null;
   defaultPurity: string | null;
   defaultMakingCharge: string | null;
   defaultStoneCharge: string | null;
@@ -46,6 +59,8 @@ type ProductFormProps = {
   product?: Product;
   state: ProductFormState;
   pending: boolean;
+  metals: StoreMetalOption[];
+  categories: StoreCategoryOption[];
 };
 
 function ErrorText({ error }: { error?: string[] }) {
@@ -59,18 +74,21 @@ export function ProductForm({
   product,
   state,
   pending,
+  metals,
+  categories,
 }: ProductFormProps) {
-  const [category, setCategory] = useState(
-    product?.category ?? InventoryCategory.ORNAMENT,
+  const [categoryId, setCategoryId] = useState(product?.categoryId ?? "");
+
+  const [categoryTypeId, setCategoryTypeId] = useState(
+    product?.categoryTypeId ?? "",
   );
 
-  const [ornamentType, setOrnamentType] = useState(
-    product?.ornamentType ?? "__none__",
-  );
+  const [metalTypeId, setMetalTypeId] = useState(product?.metalTypeId ?? "");
 
-  const [metalType, setMetalType] = useState(
-    product?.metalType ?? MetalType.GOLD,
-  );
+  const [types, setTypes] = useState<StoreCategoryTypeOption[]>([]);
+  const [loadingTypes, setLoadingTypes] = useState(false);
+
+  const previousCategoryIdRef = useRef(categoryId);
 
   const [defaultPurity, setDefaultPurity] = useState(
     product?.defaultPurity ?? "__none__",
@@ -79,6 +97,53 @@ export function ProductForm({
   const [isActive, setIsActive] = useState(
     product?.isActive === false ? "false" : "true",
   );
+
+  // Fetch the Types for whichever Category is currently selected, mirroring
+  // the State -> City cascading pattern used on the Customer form.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTypes() {
+      if (!categoryId) {
+        setTypes([]);
+        return;
+      }
+
+      try {
+        setLoadingTypes(true);
+        const data = await getStoreCategoryTypes(categoryId);
+
+        if (!cancelled) {
+          setTypes(data || []);
+        }
+      } catch (err) {
+        console.error("Failed to load category types:", err);
+        if (!cancelled) {
+          setTypes([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingTypes(false);
+        }
+      }
+    }
+
+    loadTypes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [categoryId]);
+
+  // Only reset the selected Type when the Category actually changes as a
+  // result of user interaction — not on initial mount (edit mode needs to
+  // keep the product's existing Type selected while its Types load).
+  useEffect(() => {
+    if (previousCategoryIdRef.current !== categoryId) {
+      setCategoryTypeId("");
+      previousCategoryIdRef.current = categoryId;
+    }
+  }, [categoryId]);
 
   return (
     <div className="space-y-8">
@@ -113,40 +178,54 @@ export function ProductForm({
           </div>
 
           <div>
-            <Label>Category</Label>
+            <Label>Category *</Label>
 
-            <Select value={category} onValueChange={setCategory}>
+            <Select value={categoryId} onValueChange={setCategoryId}>
               <SelectTrigger className="h-11 w-full">
-                <SelectValue />
+                <SelectValue placeholder="Select category" />
               </SelectTrigger>
 
               <SelectContent>
-                {Object.values(InventoryCategory).map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item.replaceAll("_", " ")}
+                {categories.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <input type="hidden" name="category" value={category} />
+            <input type="hidden" name="categoryId" value={categoryId} />
 
-            <ErrorText error={state.errors.category} />
+            <ErrorText error={state.errors.categoryId} />
           </div>
           <div>
-            <Label>Ornament Type</Label>
+            <Label>Type</Label>
 
-            <Select value={ornamentType} onValueChange={setOrnamentType}>
+            <Select
+              value={categoryTypeId || "__none__"}
+              onValueChange={(value) =>
+                setCategoryTypeId(value === "__none__" ? "" : value)
+              }
+              disabled={!categoryId || loadingTypes}
+            >
               <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="Select Ornament Type" />
+                <SelectValue
+                  placeholder={
+                    !categoryId
+                      ? "Select a category first"
+                      : loadingTypes
+                        ? "Loading types..."
+                        : "Select Type"
+                  }
+                />
               </SelectTrigger>
 
               <SelectContent>
                 <SelectItem value="__none__">None</SelectItem>
 
-                {Object.values(OrnamentType).map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item.replaceAll("_", " ")}
+                {types.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -154,11 +233,11 @@ export function ProductForm({
 
             <input
               type="hidden"
-              name="ornamentType"
-              value={ornamentType === "__none__" ? "" : ornamentType}
+              name="categoryTypeId"
+              value={categoryTypeId}
             />
 
-            <ErrorText error={state.errors.ornamentType} />
+            <ErrorText error={state.errors.categoryTypeId} />
           </div>
         </div>
       </div>
@@ -172,25 +251,25 @@ export function ProductForm({
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div>
-            <Label>Metal Type</Label>
+            <Label>Metal Type *</Label>
 
-            <Select value={metalType} onValueChange={setMetalType}>
+            <Select value={metalTypeId} onValueChange={setMetalTypeId}>
               <SelectTrigger className="h-11 w-full">
-                <SelectValue />
+                <SelectValue placeholder="Select metal type" />
               </SelectTrigger>
 
               <SelectContent>
-                {Object.values(MetalType).map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item.replaceAll("_", " ")}
+                {metals.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <input type="hidden" name="metalType" value={metalType} />
+            <input type="hidden" name="metalTypeId" value={metalTypeId} />
 
-            <ErrorText error={state.errors.metalType} />
+            <ErrorText error={state.errors.metalTypeId} />
           </div>
 
           <div>

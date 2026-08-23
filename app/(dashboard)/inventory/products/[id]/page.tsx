@@ -25,17 +25,17 @@ export default async function ProductDetailsPage({ params }: Props) {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <p className="text-sm text-muted-foreground">Category</p>
-            <p className="font-medium">{product.category}</p>
+            <p className="font-medium">{product.category?.name ?? "-"}</p>
           </div>
 
           <div>
             <p className="text-sm text-muted-foreground">Metal Type</p>
-            <p className="font-medium">{product.metalType}</p>
+            <p className="font-medium">{product.metalType?.name ?? "-"}</p>
           </div>
 
           <div>
-            <p className="text-sm text-muted-foreground">Ornament Type</p>
-            <p className="font-medium">{product.ornamentType ?? "-"}</p>
+            <p className="text-sm text-muted-foreground">Type</p>
+            <p className="font-medium">{product.categoryType?.name ?? "-"}</p>
           </div>
 
           <div>

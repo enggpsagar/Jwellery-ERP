@@ -36,7 +36,7 @@ type ProductOption = {
   name: string
   category: string | null
   ornamentType: string | null
-  metalType: string | null
+  metalType: { id: string; name: string } | null
   defaultPurity: string | null
   defaultMakingCharge: number | null
   defaultStoneCharge: number | null
@@ -47,7 +47,7 @@ type LineItem = {
   key: string
   productId: string
   itemName: string
-  metalType: string
+  metalTypeId: string
   purity: string
   quantity: number
   grossWeight: number
@@ -73,7 +73,7 @@ function emptyLineItem(): LineItem {
     key: crypto.randomUUID(),
     productId: "",
     itemName: "",
-    metalType: "GOLD",
+    metalTypeId: "",
     purity: "",
     quantity: 1,
     grossWeight: 0,
@@ -95,6 +95,14 @@ type PurchaseFormProps = {
 export function PurchaseForm({ vendors, products }: PurchaseFormProps) {
   const router = useRouter()
   const toast = useToast()
+
+  // ProductSelect's shared ProductOption type expects metalType as a flat
+  // display string, not the relation object; the full `products` array
+  // (with the metal's id) is still used for applyProductToItem's lookup.
+  const productSelectOptions = products.map((product) => ({
+    ...product,
+    metalType: product.metalType?.name ?? null,
+  }))
 
   const [vendorId, setVendorId] = useState("")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
@@ -133,7 +141,7 @@ export function PurchaseForm({ vendors, products }: PurchaseFormProps) {
     updateItem(key, {
       productId,
       itemName: product.name,
-      metalType: product.metalType ?? "GOLD",
+      metalTypeId: product.metalType?.id ?? "",
       purity: product.defaultPurity ?? "",
       makingCharge: product.defaultMakingCharge ?? 0,
       stoneCharge: product.defaultStoneCharge ?? 0,
@@ -167,7 +175,7 @@ export function PurchaseForm({ vendors, products }: PurchaseFormProps) {
     items.map((item) => ({
       productId: item.productId,
       itemName: item.itemName || "Item",
-      metalType: item.metalType || null,
+      metalTypeId: item.metalTypeId || null,
       purity: item.purity || null,
       quantity: item.quantity || 1,
       grossWeight: item.grossWeight || null,
@@ -235,7 +243,7 @@ export function PurchaseForm({ vendors, products }: PurchaseFormProps) {
                 <div className="md:col-span-2 space-y-1">
                   <Label className="text-xs">Product *</Label>
                   <ProductSelect
-                    products={products}
+                    products={productSelectOptions}
                     name={`product-${item.key}`}
                     defaultValue={item.productId}
                     onChange={(productId) => applyProductToItem(item.key, productId)}

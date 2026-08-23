@@ -8,7 +8,6 @@ import {
   InventoryTransactionType,
   LedgerEntryType,
   LedgerSourceType,
-  MetalType,
   PurityType,
 } from "@prisma/client";
 
@@ -23,7 +22,7 @@ import {
 
 export type KachaInvoiceLineItemInput = {
   itemName: string;
-  metalType?: MetalType | null;
+  metalTypeId?: string | null;
   purity?: PurityType | null;
   quantity: number;
   grossWeight?: number | null;
@@ -98,7 +97,7 @@ function mapKachaInvoice(kachaInvoice: any) {
     items: (kachaInvoice.items ?? []).map((item: any) => ({
       id: item.id,
       itemName: item.itemName,
-      metalType: item.metalType,
+      metalTypeId: item.metalTypeId,
       purity: item.purity,
       quantity: item.quantity,
       grossWeight: item.grossWeight ? Number(item.grossWeight) : null,
@@ -266,7 +265,7 @@ export async function createKachaInvoice(
           items: {
             create: items.map((item) => ({
               itemName: item.itemName,
-              metalType: item.metalType ?? undefined,
+              metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
@@ -460,7 +459,7 @@ export async function convertKachaToPakka(
           items: {
             create: kachaInvoice.items.map((item) => ({
               itemName: item.itemName,
-              metalType: item.metalType ?? undefined,
+              metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
               quantity: item.quantity,
               grossWeight: item.grossWeight ?? undefined,

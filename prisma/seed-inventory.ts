@@ -1,6 +1,14 @@
-import { PrismaClient, InventoryCategory, MetalType, OrnamentType, PurityType, InventoryStockStatus } from "@prisma/client"
+import { PrismaClient, PurityType, InventoryStockStatus } from "@prisma/client"
 
 const prisma = new PrismaClient()
+
+function requireId(map: Map<string, string>, name: string, label: string): string {
+  const id = map.get(name)
+  if (!id) {
+    throw new Error(`Expected a seeded ${label} named "${name}" for this store, but it was missing.`)
+  }
+  return id
+}
 
 async function main() {
   const store = await prisma.store.upsert({
@@ -13,13 +21,39 @@ async function main() {
   await prisma.inventoryStock.deleteMany()
   await prisma.product.deleteMany()
 
+  const metals = await prisma.storeMetal.findMany({ where: { storeId: store.id } })
+  const metalIdByName = new Map(metals.map((m) => [m.name, m.id]))
+
+  const categories = await prisma.storeCategory.findMany({ where: { storeId: store.id } })
+  const categoryIdByName = new Map(categories.map((c) => [c.name, c.id]))
+
+  const ornamentCategoryId = requireId(categoryIdByName, "Ornament", "StoreCategory")
+
+  const categoryTypes = await prisma.storeCategoryType.findMany({
+    where: { storeId: store.id, categoryId: ornamentCategoryId },
+  })
+  const categoryTypeIdByName = new Map(categoryTypes.map((t) => [t.name, t.id]))
+
+  const goldId = requireId(metalIdByName, "Gold", "StoreMetal")
+  const silverId = requireId(metalIdByName, "Silver", "StoreMetal")
+  const ornamentCategId = ornamentCategoryId
+  const coinCategId = requireId(categoryIdByName, "Coin", "StoreCategory")
+  const ringTypeId = requireId(categoryTypeIdByName, "Ring", "StoreCategoryType")
+  const necklaceTypeId = requireId(categoryTypeIdByName, "Necklace", "StoreCategoryType")
+  const chainTypeId = requireId(categoryTypeIdByName, "Chain", "StoreCategoryType")
+  const bangleTypeId = requireId(categoryTypeIdByName, "Bangle", "StoreCategoryType")
+  const payalTypeId = requireId(categoryTypeIdByName, "Payal", "StoreCategoryType")
+  const earringTypeId = requireId(categoryTypeIdByName, "Earring", "StoreCategoryType")
+  const mangalsutraTypeId = requireId(categoryTypeIdByName, "Mangalsutra", "StoreCategoryType")
+  const coinTypeId = requireId(categoryTypeIdByName, "Coin", "StoreCategoryType")
+
   const products = [
     {
       productCode: "PRD-RING-22K-001",
       name: "Classic Gold Ring",
-      category: InventoryCategory.ORNAMENT,
-      ornamentType: OrnamentType.RING,
-      metalType: MetalType.GOLD,
+      categoryId: ornamentCategId,
+      categoryTypeId: ringTypeId,
+      metalTypeId: goldId,
       defaultPurity: PurityType.GOLD_22K,
       defaultMakingCharge: 850,
       defaultStoneCharge: 0,
@@ -29,7 +63,7 @@ async function main() {
         create: [
           {
             stockCode: "STK-RING-001-A",
-            metalType: MetalType.GOLD,
+            metalTypeId: goldId,
             purity: PurityType.GOLD_22K,
             quantity: 1,
             status: InventoryStockStatus.IN_STOCK,
@@ -47,7 +81,7 @@ async function main() {
           },
           {
             stockCode: "STK-RING-001-B",
-            metalType: MetalType.GOLD,
+            metalTypeId: goldId,
             purity: PurityType.GOLD_22K,
             quantity: 1,
             status: InventoryStockStatus.IN_STOCK,
@@ -70,9 +104,9 @@ async function main() {
     {
       productCode: "PRD-NECK-22K-001",
       name: "Lakshmi Necklace Set",
-      category: InventoryCategory.ORNAMENT,
-      ornamentType: OrnamentType.NECKLACE,
-      metalType: MetalType.GOLD,
+      categoryId: ornamentCategId,
+      categoryTypeId: necklaceTypeId,
+      metalTypeId: goldId,
       defaultPurity: PurityType.GOLD_22K,
       defaultMakingCharge: 4500,
       defaultStoneCharge: 2500,
@@ -82,7 +116,7 @@ async function main() {
         create: [
           {
             stockCode: "STK-NECK-001-A",
-            metalType: MetalType.GOLD,
+            metalTypeId: goldId,
             purity: PurityType.GOLD_22K,
             quantity: 1,
             status: InventoryStockStatus.IN_STOCK,
@@ -106,9 +140,9 @@ async function main() {
     {
       productCode: "PRD-CHAIN-22K-001",
       name: "Machine Gold Chain",
-      category: InventoryCategory.ORNAMENT,
-      ornamentType: OrnamentType.CHAIN,
-      metalType: MetalType.GOLD,
+      categoryId: ornamentCategId,
+      categoryTypeId: chainTypeId,
+      metalTypeId: goldId,
       defaultPurity: PurityType.GOLD_22K,
       defaultMakingCharge: 1500,
       defaultStoneCharge: 0,
@@ -118,7 +152,7 @@ async function main() {
         create: [
           {
             stockCode: "STK-CHAIN-001-A",
-            metalType: MetalType.GOLD,
+            metalTypeId: goldId,
             purity: PurityType.GOLD_22K,
             quantity: 1,
             status: InventoryStockStatus.IN_STOCK,
@@ -140,9 +174,9 @@ async function main() {
     {
       productCode: "PRD-BANGLE-22K-001",
       name: "Plain Gold Bangle",
-      category: InventoryCategory.ORNAMENT,
-      ornamentType: OrnamentType.BANGLE,
-      metalType: MetalType.GOLD,
+      categoryId: ornamentCategId,
+      categoryTypeId: bangleTypeId,
+      metalTypeId: goldId,
       defaultPurity: PurityType.GOLD_22K,
       defaultMakingCharge: 2200,
       defaultStoneCharge: 0,
@@ -152,7 +186,7 @@ async function main() {
         create: [
           {
             stockCode: "STK-BANGLE-001-A",
-            metalType: MetalType.GOLD,
+            metalTypeId: goldId,
             purity: PurityType.GOLD_22K,
             quantity: 2,
             status: InventoryStockStatus.IN_STOCK,
@@ -174,9 +208,9 @@ async function main() {
     {
       productCode: "PRD-PAYAL-925-001",
       name: "Silver Payal Pair",
-      category: InventoryCategory.ORNAMENT,
-      ornamentType: OrnamentType.PAYAL,
-      metalType: MetalType.SILVER,
+      categoryId: ornamentCategId,
+      categoryTypeId: payalTypeId,
+      metalTypeId: silverId,
       defaultPurity: PurityType.SILVER_925,
       defaultMakingCharge: 450,
       defaultStoneCharge: 0,
@@ -186,7 +220,7 @@ async function main() {
         create: [
           {
             stockCode: "STK-PAYAL-001-A",
-            metalType: MetalType.SILVER,
+            metalTypeId: silverId,
             purity: PurityType.SILVER_925,
             quantity: 2,
             status: InventoryStockStatus.IN_STOCK,
@@ -208,9 +242,9 @@ async function main() {
     {
       productCode: "PRD-EAR-22K-001",
       name: "Gold Stud Earrings",
-      category: InventoryCategory.ORNAMENT,
-      ornamentType: OrnamentType.EARRING,
-      metalType: MetalType.GOLD,
+      categoryId: ornamentCategId,
+      categoryTypeId: earringTypeId,
+      metalTypeId: goldId,
       defaultPurity: PurityType.GOLD_22K,
       defaultMakingCharge: 700,
       defaultStoneCharge: 0,
@@ -220,7 +254,7 @@ async function main() {
         create: [
           {
             stockCode: "STK-EAR-001-A",
-            metalType: MetalType.GOLD,
+            metalTypeId: goldId,
             purity: PurityType.GOLD_22K,
             quantity: 1,
             status: InventoryStockStatus.IN_STOCK,
@@ -242,9 +276,9 @@ async function main() {
     {
       productCode: "PRD-MANG-22K-001",
       name: "Mangalsutra Black Bead",
-      category: InventoryCategory.ORNAMENT,
-      ornamentType: OrnamentType.MANGALSUTRA,
-      metalType: MetalType.GOLD,
+      categoryId: ornamentCategId,
+      categoryTypeId: mangalsutraTypeId,
+      metalTypeId: goldId,
       defaultPurity: PurityType.GOLD_22K,
       defaultMakingCharge: 2800,
       defaultStoneCharge: 0,
@@ -254,7 +288,7 @@ async function main() {
         create: [
           {
             stockCode: "STK-MANG-001-A",
-            metalType: MetalType.GOLD,
+            metalTypeId: goldId,
             purity: PurityType.GOLD_22K,
             quantity: 1,
             status: InventoryStockStatus.IN_STOCK,
@@ -276,9 +310,9 @@ async function main() {
     {
       productCode: "PRD-COIN-GOLD-001",
       name: "Gold Coin 10gm",
-      category: InventoryCategory.COIN,
-      ornamentType: OrnamentType.COIN,
-      metalType: MetalType.GOLD,
+      categoryId: coinCategId,
+      categoryTypeId: coinTypeId,
+      metalTypeId: goldId,
       defaultPurity: PurityType.GOLD_24K,
       defaultMakingCharge: 0,
       defaultStoneCharge: 0,
@@ -288,7 +322,7 @@ async function main() {
         create: [
           {
             stockCode: "STK-GCOIN-001-A",
-            metalType: MetalType.GOLD,
+            metalTypeId: goldId,
             purity: PurityType.GOLD_24K,
             quantity: 1,
             status: InventoryStockStatus.IN_STOCK,
@@ -309,9 +343,9 @@ async function main() {
     {
       productCode: "PRD-COIN-SILVER-001",
       name: "Silver Coin 20gm",
-      category: InventoryCategory.COIN,
-      ornamentType: OrnamentType.COIN,
-      metalType: MetalType.SILVER,
+      categoryId: coinCategId,
+      categoryTypeId: coinTypeId,
+      metalTypeId: silverId,
       defaultPurity: PurityType.SILVER_999,
       defaultMakingCharge: 0,
       defaultStoneCharge: 0,
@@ -321,7 +355,7 @@ async function main() {
         create: [
           {
             stockCode: "STK-SCOIN-001-A",
-            metalType: MetalType.SILVER,
+            metalTypeId: silverId,
             purity: PurityType.SILVER_999,
             quantity: 1,
             status: InventoryStockStatus.IN_STOCK,

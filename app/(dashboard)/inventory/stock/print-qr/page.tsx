@@ -13,6 +13,20 @@ type PrintQrPageProps = {
   }>
 }
 
+function formatDate(value: Date | string | null | undefined) {
+  if (!value) return null
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value))
+}
+
+function formatWeight(value: unknown) {
+  if (value === null || value === undefined || value === "") return null
+  return `${Number(value).toFixed(3)}g`
+}
+
 export default async function StockPrintQrPage({
   searchParams,
 }: PrintQrPageProps) {
@@ -35,6 +49,9 @@ export default async function StockPrintQrPage({
               productCode: true,
             },
           },
+          metalType: {
+            select: { name: true },
+          },
         },
         orderBy: { createdAt: "desc" },
       })
@@ -45,6 +62,12 @@ export default async function StockPrintQrPage({
       id: stock.id,
       stockCode: stock.stockCode,
       productName: stock.product?.name ?? "-",
+      tagNumber: stock.tagNumber || null,
+      metalName: stock.metalType?.name ?? null,
+      purity: stock.purity || null,
+      netWeight: formatWeight(stock.netWeight),
+      grossWeight: formatWeight(stock.grossWeight),
+      manufactureDate: formatDate(stock.manufactureDate),
       qrDataUrl: await QRCode.toDataURL(
         `${baseUrl}/inventory/stock/${stock.id}`
       ),
@@ -97,6 +120,12 @@ export default async function StockPrintQrPage({
           className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
         >
           {items.map((item) => (
+            // StockQrCard bundles its own scoped print styles, id, and a
+            // per-item Print button, none of which compose with this grid
+            // (which prints as a single #stock-qr-print-grid block and
+            // would otherwise get duplicate #stock-qr-print ids, one per
+            // cell) — so the same label content is replicated inline here
+            // instead of reusing that component.
             <div
               key={item.id}
               className="flex flex-col items-center gap-2 rounded-xl border bg-white p-4 text-center"
@@ -110,10 +139,44 @@ export default async function StockPrintQrPage({
                 height={128}
               />
               <div>
-                <p className="font-semibold">{item.stockCode}</p>
+                <p className="font-semibold">
+                  LR# {item.tagNumber ?? item.stockCode}
+                </p>
                 <p className="text-sm text-muted-foreground">
                   {item.productName}
                 </p>
+              </div>
+
+              <div className="w-full max-w-[220px] space-y-0.5 text-left text-xs text-muted-foreground">
+                {item.metalName && (
+                  <p>
+                    <span className="font-medium text-foreground">Metal:</span>{" "}
+                    {item.metalName}
+                  </p>
+                )}
+                {item.purity && (
+                  <p>
+                    <span className="font-medium text-foreground">Purity:</span>{" "}
+                    {item.purity}
+                  </p>
+                )}
+                {item.netWeight && (
+                  <p>
+                    <span className="font-medium text-foreground">
+                      Net Weight:
+                    </span>{" "}
+                    {item.netWeight}
+                  </p>
+                )}
+                {item.grossWeight && (
+                  <p>
+                    <span className="font-medium text-foreground">
+                      Gross Weight:
+                    </span>{" "}
+                    {item.grossWeight}
+                  </p>
+                )}
+                {item.manufactureDate && <p>MFG: {item.manufactureDate}</p>}
               </div>
             </div>
           ))}

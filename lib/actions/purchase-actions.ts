@@ -9,6 +9,7 @@ import {
   InventoryTransactionType,
   LedgerEntryType,
   LedgerSourceType,
+  PaymentMethod,
   PurityType,
   Prisma,
 } from "@prisma/client";
@@ -38,6 +39,38 @@ export type PurchaseFormState = {
 };
 
 const initialState: PurchaseFormState = { success: false, message: "" };
+
+export type PaymentEntryInput = {
+  method: string;
+  amount: number;
+  reference?: string | null;
+  bankName?: string | null;
+  attachmentUrl?: string | null;
+};
+
+function parsePayments(raw: string): PaymentEntryInput[] | null {
+  let payments: PaymentEntryInput[];
+  try {
+    payments = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (!Array.isArray(payments) || payments.length < 1 || payments.length > 2) {
+    return null;
+  }
+
+  for (const payment of payments) {
+    if (!Object.values(PaymentMethod).includes(payment.method as PaymentMethod)) {
+      return null;
+    }
+    if (!(Number(payment.amount) > 0)) {
+      return null;
+    }
+  }
+
+  return payments;
+}
 
 function toNumber(value: unknown, fallback = 0) {
   const num = Number(value);
@@ -455,9 +488,15 @@ export async function recordPurchasePayment(
   formData: FormData,
 ): Promise<PurchaseFormState> {
   try {
-    const amount = toNumber(formData.get("amount"));
+    const paymentsRaw = String(formData.get("paymentsJson") || "[]");
     const notes = String(formData.get("notes") || "").trim() || null;
 
+    const payments = parsePayments(paymentsRaw);
+    if (!payments) {
+      return { success: false, message: "Add 1-2 valid payment methods with an amount" };
+    }
+
+    const amount = payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
     if (amount <= 0) {
       return { success: false, message: "Enter a valid payment amount" };
     }
@@ -477,17 +516,25 @@ export async function recordPurchasePayment(
         where: { id: purchaseId },
         data: { paidAmount: newPaid, balanceAmount: newBalance, status },
       }),
-      prisma.ledgerEntry.create({
-        data: {
-          storeId,
-          type: LedgerEntryType.DEBIT,
-          sourceType: LedgerSourceType.PURCHASE,
-          vendorId: purchase.vendorId,
-          purchaseId,
-          amount,
-          description: notes ?? `Payment made for ${purchase.purchaseNumber}`,
-        },
-      }),
+      ...payments.map((payment, index) =>
+        prisma.ledgerEntry.create({
+          data: {
+            storeId,
+            type: LedgerEntryType.DEBIT,
+            sourceType: LedgerSourceType.PURCHASE,
+            vendorId: purchase.vendorId,
+            purchaseId,
+            amount: payment.amount,
+            paymentMethod: payment.method as PaymentMethod,
+            paymentReference: payment.reference ?? undefined,
+            bankName: payment.bankName ?? undefined,
+            attachmentUrl: payment.attachmentUrl ?? undefined,
+            description:
+              notes ??
+              (index === 0 ? `Payment made for ${purchase.purchaseNumber}` : undefined),
+          },
+        }),
+      ),
     ]);
 
     revalidatePath("/purchases");

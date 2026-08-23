@@ -8,9 +8,25 @@ type StockQrCardProps = {
   dataUrl: string
   stockCode: string
   productName: string
+  tagNumber: string | null
+  metalName: string | null
+  purity: string | null
+  netWeight: string | null
+  grossWeight: string | null
+  manufactureDate: string | null
 }
 
-export function StockQrCard({ dataUrl, stockCode, productName }: StockQrCardProps) {
+export function StockQrCard({
+  dataUrl,
+  stockCode,
+  productName,
+  tagNumber,
+  metalName,
+  purity,
+  netWeight,
+  grossWeight,
+  manufactureDate,
+}: StockQrCardProps) {
   return (
     <section className="rounded-xl border bg-white p-5">
       {/*
@@ -59,8 +75,36 @@ export function StockQrCard({ dataUrl, stockCode, productName }: StockQrCardProp
           height={160}
         />
         <div>
-          <p className="font-semibold">{stockCode}</p>
+          <p className="font-semibold">LR# {tagNumber ?? stockCode}</p>
           <p className="text-sm text-muted-foreground">{productName}</p>
+        </div>
+
+        <div className="w-full max-w-[220px] space-y-0.5 text-left text-xs text-muted-foreground">
+          {metalName && (
+            <p>
+              <span className="font-medium text-foreground">Metal:</span>{" "}
+              {metalName}
+            </p>
+          )}
+          {purity && (
+            <p>
+              <span className="font-medium text-foreground">Purity:</span>{" "}
+              {purity}
+            </p>
+          )}
+          {netWeight && (
+            <p>
+              <span className="font-medium text-foreground">Net Weight:</span>{" "}
+              {netWeight}
+            </p>
+          )}
+          {grossWeight && (
+            <p>
+              <span className="font-medium text-foreground">Gross Weight:</span>{" "}
+              {grossWeight}
+            </p>
+          )}
+          {manufactureDate && <p>MFG: {manufactureDate}</p>}
         </div>
       </div>
     </section>

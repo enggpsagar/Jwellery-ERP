@@ -275,6 +275,13 @@ export async function createInventoryStock(
     const purchaseDateValue = String(formData.get("purchaseDate") || "").trim()
     const purchaseDate = purchaseDateValue ? new Date(purchaseDateValue) : null
 
+    const manufactureDateValue = String(
+      formData.get("manufactureDate") || ""
+    ).trim()
+    const manufactureDate = manufactureDateValue
+      ? new Date(manufactureDateValue)
+      : null
+
     const errors: Record<string, string[]> = {}
 
     if (!productId) {
@@ -375,6 +382,7 @@ export async function createInventoryStock(
         saleAmount: toDecimal(saleAmount),
         vendorName,
         purchaseDate,
+        manufactureDate,
         location,
         remarks,
       },
@@ -485,6 +493,13 @@ export async function updateInventoryStock(
 
     const purchaseDateValue = String(formData.get("purchaseDate") || "").trim()
     const purchaseDate = purchaseDateValue ? new Date(purchaseDateValue) : null
+
+    const manufactureDateValue = String(
+      formData.get("manufactureDate") || ""
+    ).trim()
+    const manufactureDate = manufactureDateValue
+      ? new Date(manufactureDateValue)
+      : null
 
     const errors: Record<string, string[]> = {}
 
@@ -620,6 +635,7 @@ export async function updateInventoryStock(
         saleAmount: toDecimal(saleAmount),
         vendorName,
         purchaseDate,
+        manufactureDate,
         location,
         remarks,
       },

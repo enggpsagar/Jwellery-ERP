@@ -171,12 +171,21 @@ export function StockTable({
                   <td className="px-4 py-3">{formatDate(item.purchaseDate)}</td>
 
                   <td className="px-4 py-3">
-                    <Link
-                      href={`/inventory/stock/${item.id}`}
-                      className="text-sm font-medium text-blue-600 hover:underline"
-                    >
-                      View
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <Link
+                        href={`/inventory/stock/${item.id}`}
+                        className="text-sm font-medium text-blue-600 hover:underline"
+                      >
+                        View
+                      </Link>
+
+                      <Link
+                        href={`/inventory/stock/${item.id}/edit`}
+                        className="text-sm font-medium text-blue-600 hover:underline"
+                      >
+                        Edit
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               )

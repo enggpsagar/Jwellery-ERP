@@ -135,6 +135,20 @@ export default async function InventoryStockDetailsPage({
           dataUrl={qrDataUrl}
           stockCode={stock.stockCode}
           productName={stock.product?.name ?? "-"}
+          tagNumber={stock.tagNumber || null}
+          metalName={stock.metalType?.name ?? null}
+          purity={stock.purity || null}
+          netWeight={
+            stock.netWeight ? `${Number(stock.netWeight).toFixed(3)}g` : null
+          }
+          grossWeight={
+            stock.grossWeight
+              ? `${Number(stock.grossWeight).toFixed(3)}g`
+              : null
+          }
+          manufactureDate={
+            stock.manufactureDate ? formatDate(stock.manufactureDate) : null
+          }
         />
 
         <section className="rounded-xl border bg-white p-5">

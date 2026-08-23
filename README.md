@@ -31,6 +31,7 @@ pnpm dev
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM` | Outbound email (invites, invoice/ledger sharing) |
 | `GOLD_API_KEY` | Daily gold/silver rate fetch (`/api/cron/metal-rates`) |
 | `CRON_SECRET` | Authorizes the metal-rates cron endpoint |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob storage — payment receipt attachments. Get it from your Vercel project's Storage tab after creating a Blob store. |
 
 ### Database
 

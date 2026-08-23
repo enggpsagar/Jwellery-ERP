@@ -8,6 +8,7 @@ import {
   InventoryFinish,
   LedgerEntryType,
   LedgerSourceType,
+  PaymentMethod,
   PurityType,
 } from "@prisma/client";
 
@@ -30,6 +31,38 @@ export type StockActionState = {
 };
 
 const initialState: StockActionState = { success: false, message: "" };
+
+export type PaymentEntryInput = {
+  method: string;
+  amount: number;
+  reference?: string | null;
+  bankName?: string | null;
+  attachmentUrl?: string | null;
+};
+
+function parsePayments(raw: string): PaymentEntryInput[] | null {
+  let payments: PaymentEntryInput[];
+  try {
+    payments = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (!Array.isArray(payments) || payments.length < 1 || payments.length > 2) {
+    return null;
+  }
+
+  for (const payment of payments) {
+    if (!Object.values(PaymentMethod).includes(payment.method as PaymentMethod)) {
+      return null;
+    }
+    if (!(Number(payment.amount) > 0)) {
+      return null;
+    }
+  }
+
+  return payments;
+}
 
 function toDecimalOrNull(value: FormDataEntryValue | null) {
   const parsed = String(value ?? "").trim();
@@ -546,11 +579,12 @@ export async function recordKarigarPayment(
   formData: FormData,
 ): Promise<StockActionState> {
   try {
-    const amount = toDecimalOrNull(formData.get("amount"));
+    const paymentsRaw = String(formData.get("paymentsJson") || "[]");
     const notes = String(formData.get("notes") || "").trim() || null;
 
-    if (!amount || amount <= 0) {
-      return { success: false, message: "Enter a valid payment amount" };
+    const payments = parsePayments(paymentsRaw);
+    if (!payments) {
+      return { success: false, message: "Add 1-2 valid payment methods with an amount" };
     }
 
     const storeId = await requireStoreScope();
@@ -562,16 +596,24 @@ export async function recordKarigarPayment(
 
     if (!karigar) return { success: false, message: "Karigar not found" };
 
-    await prisma.ledgerEntry.create({
-      data: {
-        storeId,
-        type: LedgerEntryType.CREDIT,
-        sourceType: LedgerSourceType.MANUAL,
-        karigarId,
-        amount,
-        description: notes ?? `Payment made to ${karigar.name}`,
-      },
-    });
+    await prisma.$transaction(
+      payments.map((payment, index) =>
+        prisma.ledgerEntry.create({
+          data: {
+            storeId,
+            type: LedgerEntryType.CREDIT,
+            sourceType: LedgerSourceType.MANUAL,
+            karigarId,
+            amount: payment.amount,
+            paymentMethod: payment.method as PaymentMethod,
+            paymentReference: payment.reference ?? undefined,
+            bankName: payment.bankName ?? undefined,
+            attachmentUrl: payment.attachmentUrl ?? undefined,
+            description: notes ?? (index === 0 ? `Payment made to ${karigar.name}` : undefined),
+          },
+        }),
+      ),
+    );
 
     revalidatePath(`/karigars/${karigarId}`);
 

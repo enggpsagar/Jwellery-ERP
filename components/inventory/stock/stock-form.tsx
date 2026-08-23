@@ -94,6 +94,8 @@ type Stock = {
 
   purchaseDate: string | null;
 
+  manufactureDate: string | null;
+
   location: string | null;
 
   remarks: string | null;
@@ -567,6 +569,23 @@ export function StockForm({
             />
 
             <ErrorText error={state.errors.purchaseDate} />
+          </div>
+
+          <div>
+            <Label htmlFor="manufactureDate">Date of Manufacture</Label>
+
+            <Input
+              id="manufactureDate"
+              name="manufactureDate"
+              type="date"
+              defaultValue={
+                stock?.manufactureDate
+                  ? new Date(stock.manufactureDate).toISOString().substring(0, 10)
+                  : ""
+              }
+            />
+
+            <ErrorText error={state.errors.manufactureDate} />
           </div>
 
           <div>

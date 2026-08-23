@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
 
@@ -16,9 +16,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  PaymentMethodFields,
+  emptyPaymentMethodValue,
+  type PaymentMethodValue,
+} from "@/components/shared/payment-method-fields"
 
 const initialState: InvoiceFormState = { success: false, message: "" }
 
@@ -35,6 +39,10 @@ export function RecordPaymentDialog({
   const router = useRouter()
   const toast = useToast()
 
+  const [rows, setRows] = useState<PaymentMethodValue[]>([
+    { ...emptyPaymentMethodValue(), amount: balanceAmount },
+  ])
+
   const recordPaymentWithId = recordInvoicePayment.bind(null, invoiceId)
   const [state, formAction, pending] = useActionState(
     recordPaymentWithId,
@@ -50,7 +58,38 @@ export function RecordPaymentDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 
+  useEffect(() => {
+    if (open) {
+      setRows([{ ...emptyPaymentMethodValue(), amount: balanceAmount }])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
   if (balanceAmount <= 0) return null
+
+  const updateRow = (index: number, patch: Partial<PaymentMethodValue>) => {
+    setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)))
+  }
+
+  const addSplit = () => setRows((prev) => [...prev, emptyPaymentMethodValue()])
+  const removeSplit = (index: number) => setRows((prev) => prev.filter((_, i) => i !== index))
+
+  const total = useMemo(
+    () => rows.reduce((sum, row) => sum + (row.amount || 0), 0),
+    [rows],
+  )
+  const overBalance = total > balanceAmount
+  const invalidTotal = total <= 0 || overBalance
+
+  const paymentsJson = JSON.stringify(
+    rows.map((row) => ({
+      method: row.method,
+      amount: row.amount,
+      reference: row.reference || null,
+      bankName: row.bankName || null,
+      attachmentUrl: row.attachmentUrl || null,
+    })),
+  )
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -58,31 +97,71 @@ export function RecordPaymentDialog({
         <Button>Record Payment</Button>
       </DialogTrigger>
 
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Record Payment</DialogTitle>
         </DialogHeader>
 
         <form action={formAction} className="space-y-4">
+          <input type="hidden" name="paymentsJson" value={paymentsJson} />
+
           {!state.success && state.message && (
             <div className="text-red-600 text-sm">{state.message}</div>
           )}
 
-          <div className="space-y-2">
-            <Label>Amount (Balance: ₹{balanceAmount.toFixed(2)})</Label>
-            <Input
-              name="amount"
-              type="number"
-              step="0.01"
-              max={balanceAmount}
-              defaultValue={balanceAmount}
-              required
-            />
+          <div className="text-sm text-muted-foreground">
+            Balance: ₹{balanceAmount.toFixed(2)}
           </div>
+
+          <div className="space-y-3">
+            {rows.map((row, index) => (
+              <div key={index} className="rounded-lg border p-3 space-y-3">
+                {index > 0 && (
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-muted-foreground">
+                      Second payment method
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={() => removeSplit(index)}
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+                <PaymentMethodFields
+                  value={row}
+                  onChange={(patch) => updateRow(index, patch)}
+                  maxAmount={balanceAmount}
+                />
+              </div>
+            ))}
+          </div>
+
+          {rows.length < 2 && (
+            <button
+              type="button"
+              onClick={addSplit}
+              className="text-sm text-primary hover:underline"
+            >
+              + Split into a second payment method
+            </button>
+          )}
+
+          <div className="flex items-center justify-between text-sm font-medium border-t pt-3">
+            <span>Total</span>
+            <span className={overBalance ? "text-red-600" : ""}>₹{total.toFixed(2)}</span>
+          </div>
+          {overBalance && (
+            <div className="text-xs text-red-600">
+              Total exceeds the outstanding balance of ₹{balanceAmount.toFixed(2)}
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Notes</Label>
-            <Textarea name="notes" rows={2} placeholder="e.g. Cash, UPI, cheque #..." />
+            <Textarea name="notes" rows={2} placeholder="Optional notes..." />
           </div>
 
           <DialogFooter>
@@ -94,7 +173,7 @@ export function RecordPaymentDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || invalidTotal}>
               {pending ? "Saving..." : "Record Payment"}
             </Button>
           </DialogFooter>

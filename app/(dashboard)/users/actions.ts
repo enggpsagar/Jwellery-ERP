@@ -16,15 +16,19 @@ import {
   disableUser,
   enableUser,
   deleteUser,
+  getAllUsersForExport,
+  type UserSortBy,
+  type SortOrder,
 } from "@/lib/user";
 
 import { requireAuth, hasPermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { ROLE_LABELS } from "@/lib/roles";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getEffectiveStoreId } from "@/lib/store-context";
 import { prisma } from "@/lib/prisma";
 import { sendMail } from "@/lib/mailer";
 import { inviteUserEmail } from "@/lib/email-templates";
+import { buildExcelExport } from "@/lib/excel-export";
 
 export type UserActionState = {
   success: boolean;
@@ -247,6 +251,62 @@ export async function enableUserAction(id: string): Promise<UserActionState> {
   } catch (error) {
     console.error("enableUserAction error:", error);
     return { success: false, message: friendlyUserErrorMessage(error, "Failed to enable user") };
+  }
+}
+
+export type ExportUsersParams = {
+  search?: string;
+  sortBy?: string;
+  sortOrder?: SortOrder;
+};
+
+export async function exportUsersToExcel(params: ExportUsersParams = {}): Promise<{
+  success: boolean;
+  message: string;
+  fileName?: string;
+  fileBase64?: string;
+}> {
+  try {
+    await requireAuth();
+
+    const allowed = await hasPermission(PERMISSIONS.USER_VIEW);
+    if (!allowed) {
+      return { success: false, message: "You don't have permission to export users." };
+    }
+
+    const storeId = await getEffectiveStoreId();
+    const users = await getAllUsersForExport(storeId, {
+      search: params.search,
+      sortBy: params.sortBy as UserSortBy,
+      sortOrder: params.sortOrder,
+    });
+
+    if (!users.length) {
+      return { success: false, message: "No users found to export." };
+    }
+
+    const rows = users.map((user, index) => ({
+      "Sr. No.": index + 1,
+      Name: user.name ?? "",
+      Email: user.email ?? "",
+      Phone: user.phone ?? "",
+      Role: ROLE_LABELS[user.role] ?? user.role,
+      Status: user.status,
+      Store: user.store?.name ?? "",
+      "Created At": new Date(user.createdAt).toLocaleString("en-IN"),
+    }));
+
+    const { fileName, fileBase64 } = buildExcelExport(rows, "Users", "users");
+
+    return {
+      success: true,
+      message: "Users exported successfully.",
+      fileName,
+      fileBase64,
+    };
+  } catch (error) {
+    console.error("exportUsersToExcel error:", error);
+    return { success: false, message: "Failed to export users." };
   }
 }
 

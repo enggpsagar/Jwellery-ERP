@@ -1,29 +1,37 @@
-import Link from "next/link";
-
 import { getProducts } from "@/lib/actions/inventory/product-actions";
 
-import { ProductsTable } from "@/components/inventory/products/products-table";
-import { PageBackHeader } from "@/components/shared/page-back-header";
-import { Button } from "@/components/ui/button";
+import { ProductsClient } from "@/components/inventory/products/products-client";
 
-export default async function InventoryProductsPage() {
-  const products = await getProducts();
+type InventoryProductsPageProps = {
+  searchParams?: Promise<{
+    page?: string
+    pageSize?: string
+    search?: string
+    sortBy?: "name" | "productCode" | "createdAt"
+    sortOrder?: "asc" | "desc"
+  }>
+}
 
-  return (
-    <main className="space-y-6 p-6">
-      <PageBackHeader
-        title="Products"
-        description="Manage jewellery product masters."
-        backHref="/inventory"
-        backLabel="Back to Inventory"
-        action={
-          <Link href="/inventory/products/new">
-            <Button>Add Product</Button>
-          </Link>
-        }
-      />
+export const dynamic = "force-dynamic";
 
-      <ProductsTable products={products} />
-    </main>
-  );
+export default async function InventoryProductsPage({
+  searchParams,
+}: InventoryProductsPageProps) {
+  const params = (await searchParams) ?? {};
+
+  const page = Number(params.page || 1);
+  const pageSize = Number(params.pageSize || 10);
+  const search = params.search || "";
+  const sortBy = params.sortBy || "createdAt";
+  const sortOrder = params.sortOrder || "desc";
+
+  const { products, pagination } = await getProducts({
+    page,
+    pageSize,
+    search,
+    sortBy,
+    sortOrder,
+  });
+
+  return <ProductsClient products={products} pagination={pagination} />;
 }

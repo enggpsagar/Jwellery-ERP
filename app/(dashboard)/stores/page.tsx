@@ -1,25 +1,34 @@
-import { getStores } from "@/lib/actions/store-actions";
-import { StoreTable } from "@/components/stores/store-table";
-import { StoreFormDialog } from "@/components/stores/store-form-dialog";
+import { getStores, type StoreSortBy, type SortOrder } from "@/lib/actions/store-actions";
+import { StoresClient } from "@/components/stores/stores-client";
 
-export default async function StoresPage() {
-  const stores = await getStores();
+type StoresPageProps = {
+  searchParams?: Promise<{
+    page?: string;
+    pageSize?: string;
+    search?: string;
+    sortBy?: StoreSortBy;
+    sortOrder?: SortOrder;
+  }>;
+};
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Stores</h1>
-          <p className="text-muted-foreground">
-            Create stores and their admins. Use the store switcher in the
-            top bar to manage a store&apos;s data.
-          </p>
-        </div>
+export const dynamic = "force-dynamic";
 
-        <StoreFormDialog />
-      </div>
+export default async function StoresPage({ searchParams }: StoresPageProps) {
+  const params = (await searchParams) ?? {};
 
-      <StoreTable stores={stores} />
-    </div>
-  );
+  const page = Number(params.page || 1);
+  const pageSize = Number(params.pageSize || 10);
+  const search = params.search || "";
+  const sortBy = params.sortBy || "createdAt";
+  const sortOrder = params.sortOrder || "desc";
+
+  const { stores, pagination } = await getStores({
+    page,
+    pageSize,
+    search,
+    sortBy,
+    sortOrder,
+  });
+
+  return <StoresClient stores={stores} pagination={pagination} />;
 }

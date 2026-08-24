@@ -8,14 +8,25 @@ import type { getInventoryStock } from "@/lib/actions/inventory/stock-actions"
 
 import { StockStatusBadge } from "@/components/inventory/shared/stock-status-badge"
 import { FinishBadge } from "@/components/inventory/shared/finish-badge"
+import { DataTablePagination } from "@/components/shared/data-table-pagination"
 
 // Derived from the actual server action's return shape (rather than
 // hand-declared) so this table never drifts out of sync with whatever
 // fields getInventoryStock happens to select/spread.
-type StockRow = Awaited<ReturnType<typeof getInventoryStock>>[number]
+type StockRow = Awaited<ReturnType<typeof getInventoryStock>>["stockItems"][number]
+
+type Pagination = {
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPrevPage: boolean
+}
 
 type StockTableProps = {
   stockItems: StockRow[]
+  pagination: Pagination
   selectedIds: string[]
   onSelectionChange: (ids: string[]) => void
 }
@@ -42,6 +53,7 @@ function formatDate(value: Date | string | null | undefined) {
 
 export function StockTable({
   stockItems,
+  pagination,
   selectedIds,
   onSelectionChange,
 }: StockTableProps) {
@@ -193,6 +205,14 @@ export function StockTable({
           </tbody>
         </table>
       </div>
+
+      <DataTablePagination
+        page={pagination.page}
+        pageSize={pagination.pageSize}
+        totalCount={pagination.totalCount}
+        totalPages={pagination.totalPages}
+        itemLabel="stock items"
+      />
     </div>
   )
 }

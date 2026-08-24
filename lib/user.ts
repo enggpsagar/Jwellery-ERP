@@ -7,27 +7,112 @@ import type {
   UpdateUserInput,
 } from "@/lib/validation/user";
 
-export async function getUsers(storeId: string | null) {
+export type UserSortBy = "name" | "email" | "createdAt" | "role";
+export type SortOrder = "asc" | "desc";
+
+export type GetUsersParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  sortBy?: UserSortBy;
+  sortOrder?: SortOrder;
+};
+
+export type UsersPagination = {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+};
+
+const USER_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  role: true,
+  status: true,
+  isActive: true,
+  createdAt: true,
+  storeId: true,
+  karigarId: true,
+  permissions: true,
+  store: { select: { name: true } },
+  karigar: { select: { name: true } },
+} as const;
+
+function getUsersWhere(storeId: string | null, search?: string) {
+  const base = storeId ? { storeId } : { role: UserRole.SUPER_ADMIN };
+  const query = String(search || "").trim();
+
+  if (!query) return base;
+
+  return {
+    ...base,
+    OR: [
+      { name: { contains: query, mode: "insensitive" as const } },
+      { email: { contains: query, mode: "insensitive" as const } },
+      { phone: { contains: query, mode: "insensitive" as const } },
+    ],
+  };
+}
+
+function getUsersOrderBy(sortBy: UserSortBy = "createdAt", sortOrder: SortOrder = "desc") {
+  if (sortBy === "name") return { name: sortOrder };
+  if (sortBy === "email") return { email: sortOrder };
+  if (sortBy === "role") return { role: sortOrder };
+  return { createdAt: sortOrder };
+}
+
+export async function getUsers(storeId: string | null, params: GetUsersParams = {}) {
+  const page = Math.max(1, Number(params.page || 1));
+  const pageSize = Math.max(1, Number(params.pageSize || 10));
+  const search = String(params.search || "").trim();
+  const sortBy = params.sortBy || "createdAt";
+  const sortOrder = params.sortOrder || "desc";
+
+  const where = getUsersWhere(storeId, search);
+  const orderBy = getUsersOrderBy(sortBy, sortOrder);
+
+  const [totalCount, users] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: USER_SELECT,
+    }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  const pagination: UsersPagination = {
+    page,
+    pageSize,
+    totalCount,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPrevPage: page > 1,
+  };
+
+  return { users, pagination };
+}
+
+/** Same filter/sort as getUsers, but unpaginated — used by the Excel export. */
+export async function getAllUsersForExport(
+  storeId: string | null,
+  params: Pick<GetUsersParams, "search" | "sortBy" | "sortOrder"> = {}
+) {
+  const where = getUsersWhere(storeId, params.search);
+  const orderBy = getUsersOrderBy(params.sortBy || "createdAt", params.sortOrder || "desc");
+
   return prisma.user.findMany({
-    where: storeId ? { storeId } : { role: UserRole.SUPER_ADMIN },
-    orderBy: {
-      createdAt: "desc",
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      role: true,
-      status: true,
-      isActive: true,
-      createdAt: true,
-      storeId: true,
-      karigarId: true,
-      permissions: true,
-      store: { select: { name: true } },
-      karigar: { select: { name: true } },
-    },
+    where,
+    orderBy,
+    select: USER_SELECT,
   });
 }
 

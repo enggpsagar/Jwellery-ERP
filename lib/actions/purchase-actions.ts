@@ -16,6 +16,19 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { buildExcelExport } from "@/lib/excel-export";
+import type {
+  DataTableExportParams,
+  DataTableExportResult,
+} from "@/components/shared/data-table-toolbar";
+
+const PURCHASE_SORT_FIELDS = ["purchaseDate", "purchaseNumber", "totalAmount"] as const;
+
+function toPurchaseSortBy(value: string | undefined): PurchaseSortBy {
+  return (PURCHASE_SORT_FIELDS as readonly string[]).includes(value ?? "")
+    ? (value as PurchaseSortBy)
+    : "purchaseDate";
+}
 
 export type PurchaseLineItemInput = {
   productId: string;
@@ -159,21 +172,16 @@ function mapPurchase(purchase: any) {
   };
 }
 
-export type GetPurchasesParams = {
-  page?: number;
-  pageSize?: number;
-  search?: string;
-  status?: InvoiceStatus | "ALL";
-};
+export type PurchaseSortBy = "purchaseDate" | "purchaseNumber" | "totalAmount";
 
-export async function getPurchases(params: GetPurchasesParams = {}) {
-  const page = Math.max(1, Number(params.page || 1));
-  const pageSize = Math.max(1, Number(params.pageSize || 10));
+function buildPurchasesWhere(
+  storeId: string,
+  params: { search?: string; status?: InvoiceStatus | "ALL" },
+) {
   const search = String(params.search || "").trim();
   const status = params.status && params.status !== "ALL" ? params.status : undefined;
 
-  const storeId = await requireStoreScope();
-  const where = {
+  return {
     storeId,
     ...(status ? { status } : {}),
     ...(search
@@ -185,12 +193,38 @@ export async function getPurchases(params: GetPurchasesParams = {}) {
         }
       : {}),
   };
+}
+
+function buildPurchasesOrderBy(
+  sortBy: PurchaseSortBy,
+  sortOrder: "asc" | "desc",
+): Prisma.PurchaseOrderByWithRelationInput {
+  return { [sortBy]: sortOrder } as Prisma.PurchaseOrderByWithRelationInput;
+}
+
+export type GetPurchasesParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: InvoiceStatus | "ALL";
+  sortBy?: PurchaseSortBy;
+  sortOrder?: "asc" | "desc";
+};
+
+export async function getPurchases(params: GetPurchasesParams = {}) {
+  const page = Math.max(1, Number(params.page || 1));
+  const pageSize = Math.max(1, Number(params.pageSize || 10));
+  const sortBy = params.sortBy || "purchaseDate";
+  const sortOrder = params.sortOrder || "desc";
+
+  const storeId = await requireStoreScope();
+  const where = buildPurchasesWhere(storeId, params);
 
   const [totalCount, purchases] = await Promise.all([
     prisma.purchase.count({ where }),
     prisma.purchase.findMany({
       where,
-      orderBy: { purchaseDate: "desc" },
+      orderBy: buildPurchasesOrderBy(sortBy, sortOrder),
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: {
@@ -212,6 +246,72 @@ export async function getPurchases(params: GetPurchasesParams = {}) {
       hasPrevPage: page > 1,
     },
   };
+}
+
+function toPurchaseStatus(value: string | undefined): InvoiceStatus | "ALL" {
+  if (value && (Object.values(InvoiceStatus) as string[]).includes(value)) {
+    return value as InvoiceStatus;
+  }
+  return "ALL";
+}
+
+/** Exports either an explicit set of purchases (selectedIds) or the current
+ * search/status/sort-filtered list (mirrors getPurchases' own filtering so
+ * "export filtered results" matches exactly what's on screen). */
+export async function exportPurchasesToExcel(
+  params: DataTableExportParams = {},
+): Promise<DataTableExportResult> {
+  try {
+    const storeId = await requireStoreScope();
+    const sortBy = toPurchaseSortBy(params.sortBy);
+    const sortOrder = params.sortOrder || "desc";
+    const status = toPurchaseStatus(params.status);
+
+    const where =
+      params.selectedIds && params.selectedIds.length > 0
+        ? { id: { in: params.selectedIds }, storeId }
+        : buildPurchasesWhere(storeId, { search: params.search, status });
+
+    const purchases = await prisma.purchase.findMany({
+      where,
+      orderBy: buildPurchasesOrderBy(sortBy, sortOrder),
+      include: {
+        vendor: { select: { id: true, name: true, phone: true } },
+      },
+    });
+
+    if (!purchases.length) {
+      return { success: false, message: "No purchases found to export." };
+    }
+
+    const rows = purchases.map(mapPurchase).map((purchase, index) => ({
+      "Sr. No.": index + 1,
+      "Purchase Number": purchase.purchaseNumber,
+      Date: new Date(purchase.purchaseDate).toLocaleDateString("en-IN"),
+      Vendor: purchase.vendor?.name || "",
+      Status: purchase.status,
+      Subtotal: purchase.subtotal,
+      "Making Charges": purchase.makingCharges,
+      "Stone Charges": purchase.stoneCharges,
+      Discount: purchase.discount,
+      "Tax Amount": purchase.taxAmount,
+      "Total Amount": purchase.totalAmount,
+      "Paid Amount": purchase.paidAmount,
+      "Balance Amount": purchase.balanceAmount,
+    }));
+
+    const { fileName, fileBase64 } = buildExcelExport(rows, "Purchases", "purchases");
+
+    return {
+      success: true,
+      message: "Purchases exported successfully.",
+      fileName,
+      fileBase64,
+    };
+  } catch (error) {
+    console.error("exportPurchasesToExcel error:", error);
+    return { success: false, message: "Failed to export purchases." };
+  }
 }
 
 export async function getPurchaseById(id: string) {

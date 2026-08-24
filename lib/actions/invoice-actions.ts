@@ -16,6 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import { sendMail } from "@/lib/mailer";
 import { invoiceEmail } from "@/lib/email-templates";
+import { buildExcelExport } from "@/lib/excel-export";
 
 export type InvoiceLineItemInput = {
   itemName: string;
@@ -140,22 +141,48 @@ function mapInvoice(invoice: any) {
   };
 }
 
+export type InvoiceSortField = "invoiceDate" | "invoiceNumber" | "totalAmount";
+
+const INVOICE_SORT_FIELDS: InvoiceSortField[] = ["invoiceDate", "invoiceNumber", "totalAmount"];
+
+function isInvoiceSortField(value: unknown): value is InvoiceSortField {
+  return INVOICE_SORT_FIELDS.includes(value as InvoiceSortField);
+}
+
 export type GetInvoicesParams = {
   page?: number;
   pageSize?: number;
   search?: string;
-  status?: InvoiceStatus | "ALL";
+  status?: InvoiceStatus | "ALL" | string;
+  sortBy?: InvoiceSortField | string;
+  sortOrder?: "asc" | "desc";
 };
 
-export async function getInvoices(params: GetInvoicesParams = {}) {
-  const page = Math.max(1, Number(params.page || 1));
-  const pageSize = Math.max(1, Number(params.pageSize || 10));
-  const search = String(params.search || "").trim();
-  const status = params.status && params.status !== "ALL" ? params.status : undefined;
+type InvoiceQueryParams = {
+  search?: string;
+  status?: InvoiceStatus | "ALL" | string;
+  sortBy?: InvoiceSortField | string;
+  sortOrder?: "asc" | "desc" | string;
+  selectedIds?: string[];
+};
 
-  const storeId = await requireStoreScope();
+/**
+ * Shared where/orderBy builder for the invoice list and the export action,
+ * so the two never drift apart on what "the filtered set" means.
+ */
+function buildInvoiceQuery(params: InvoiceQueryParams, storeId: string) {
+  const search = String(params.search || "").trim();
+  const status =
+    params.status && params.status !== "ALL" && params.status in InvoiceStatus
+      ? (params.status as InvoiceStatus)
+      : undefined;
+  const sortBy = isInvoiceSortField(params.sortBy) ? params.sortBy : "invoiceDate";
+  const sortOrder = params.sortOrder === "asc" ? "asc" : "desc";
+  const selectedIds = params.selectedIds?.filter(Boolean) ?? [];
+
   const where = {
     storeId,
+    ...(selectedIds.length ? { id: { in: selectedIds } } : {}),
     ...(status ? { status } : {}),
     ...(search
       ? {
@@ -167,11 +194,23 @@ export async function getInvoices(params: GetInvoicesParams = {}) {
       : {}),
   };
 
+  const orderBy = { [sortBy]: sortOrder } as const;
+
+  return { where, orderBy };
+}
+
+export async function getInvoices(params: GetInvoicesParams = {}) {
+  const page = Math.max(1, Number(params.page || 1));
+  const pageSize = Math.max(1, Number(params.pageSize || 10));
+
+  const storeId = await requireStoreScope();
+  const { where, orderBy } = buildInvoiceQuery(params, storeId);
+
   const [totalCount, invoices] = await Promise.all([
     prisma.invoice.count({ where }),
     prisma.invoice.findMany({
       where,
-      orderBy: { invoiceDate: "desc" },
+      orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: {
@@ -194,6 +233,67 @@ export async function getInvoices(params: GetInvoicesParams = {}) {
       hasPrevPage: page > 1,
     },
   };
+}
+
+export type ExportInvoicesParams = {
+  selectedIds?: string[];
+  search?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  status?: string;
+};
+
+export type ExportInvoicesResult = {
+  success: boolean;
+  message: string;
+  fileName?: string;
+  fileBase64?: string;
+};
+
+/** Exports the same filtered/sorted set the Invoices list is currently showing. */
+export async function exportInvoicesToExcel(
+  params: ExportInvoicesParams = {},
+): Promise<ExportInvoicesResult> {
+  try {
+    const storeId = await requireStoreScope();
+    const { where, orderBy } = buildInvoiceQuery(params, storeId);
+
+    const invoices = await prisma.invoice.findMany({
+      where,
+      orderBy,
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        convertedFromKacha: { select: { id: true, slipNumber: true } },
+      },
+    });
+
+    if (!invoices.length) {
+      return { success: false, message: "No invoices found to export." };
+    }
+
+    const rows = invoices.map(mapInvoice).map((invoice, index) => ({
+      "Sr. No.": index + 1,
+      "Invoice #": invoice.invoiceNumber,
+      Date: new Date(invoice.invoiceDate).toLocaleDateString("en-IN"),
+      Customer: invoice.customer?.name || "",
+      Status: invoice.status,
+      Subtotal: invoice.subtotal,
+      "Making Charges": invoice.makingCharges,
+      "Stone Charges": invoice.stoneCharges,
+      Discount: invoice.discount,
+      Tax: invoice.taxAmount,
+      Total: invoice.totalAmount,
+      Paid: invoice.paidAmount,
+      Balance: invoice.balanceAmount,
+    }));
+
+    const { fileName, fileBase64 } = buildExcelExport(rows, "Invoices", "invoices");
+
+    return { success: true, message: "Invoices exported successfully.", fileName, fileBase64 };
+  } catch (error) {
+    console.error("exportInvoicesToExcel error:", error);
+    return { success: false, message: "Failed to export invoices." };
+  }
 }
 
 export async function getInvoiceById(id: string) {

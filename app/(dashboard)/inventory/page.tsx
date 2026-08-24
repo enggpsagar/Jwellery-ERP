@@ -26,9 +26,13 @@ function SummaryCard({
 }
 
 export default async function InventoryDashboardPage() {
-  const [products, stockItems] = await Promise.all([
-    getProducts(),
-    getInventoryStock(),
+  // Dashboard summary needs the full unfiltered dataset to compute
+  // accurate counts, unlike the list pages (which now paginate server-side)
+  // — fetch with a very large pageSize to preserve the previous "fetch
+  // everything" behaviour here specifically.
+  const [{ products }, { stockItems }] = await Promise.all([
+    getProducts({ pageSize: Number.MAX_SAFE_INTEGER }),
+    getInventoryStock({ pageSize: Number.MAX_SAFE_INTEGER }),
   ])
 
   const activeProducts = products.filter((item) => item.isActive).length

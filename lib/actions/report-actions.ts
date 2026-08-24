@@ -330,3 +330,142 @@ export async function getGoldFlowReport(range: DateRange = {}) {
     reconciliationGap,
   };
 }
+
+type MetalWiseRow = {
+  metalId: string;
+  metalName: string;
+  purchasedCount: number;
+  purchasedWeight: number;
+  purchasedAmount: number;
+  soldCount: number;
+  soldWeight: number;
+  soldAmount: number;
+  inStockCount: number;
+  inStockWeight: number;
+  inStockValue: number;
+  withKarigarWeight: number;
+  reconciliationGap: number;
+};
+
+function emptyMetalWiseRow(metalId: string, metalName: string): MetalWiseRow {
+  return {
+    metalId,
+    metalName,
+    purchasedCount: 0,
+    purchasedWeight: 0,
+    purchasedAmount: 0,
+    soldCount: 0,
+    soldWeight: 0,
+    soldAmount: 0,
+    inStockCount: 0,
+    inStockWeight: 0,
+    inStockValue: 0,
+    withKarigarWeight: 0,
+    reconciliationGap: 0,
+  };
+}
+
+/**
+ * Per-metal status — purchased/sold/in-stock/with-karigar, in raw weight
+ * (not fine-weight; unlike getGoldFlowReport this must also work for
+ * non-purity metals like Diamond). Rows come from whatever `StoreMetal`
+ * rows the store actually has, so adding a new metal in Settings makes it
+ * appear here automatically on the next load — nothing here is hardcoded
+ * to Gold/Silver. Purchased/sold are date-ranged; in-stock/with-karigar
+ * are point-in-time (current), same convention as getGoldFlowReport.
+ */
+export async function getMetalWiseReport(range: DateRange = {}) {
+  const storeId = await requireStoreScope();
+
+  const metals = await prisma.storeMetal.findMany({
+    where: { storeId, isActive: true },
+    orderBy: { name: "asc" },
+  });
+
+  const [purchaseItems, invoiceItems, kachaInvoiceItems, stockRows, openKarigarJobs] =
+    await Promise.all([
+      prisma.purchaseItem.findMany({
+        where: { purchase: { storeId, ...toDateRangeWhere(range, "purchaseDate") } },
+        select: { metalTypeId: true, netWeight: true, lineTotal: true },
+      }),
+      prisma.invoiceItem.findMany({
+        where: { invoice: { storeId, ...toDateRangeWhere(range, "invoiceDate") } },
+        select: { metalTypeId: true, netWeight: true, lineTotal: true },
+      }),
+      prisma.kachaInvoiceItem.findMany({
+        where: { kachaInvoice: { storeId, ...toDateRangeWhere(range, "invoiceDate") } },
+        select: { metalTypeId: true, netWeight: true, lineTotal: true },
+      }),
+      prisma.inventoryStock.findMany({
+        where: {
+          storeId,
+          status: { in: [InventoryStockStatus.IN_STOCK, InventoryStockStatus.RESERVED] },
+        },
+        select: {
+          metalTypeId: true,
+          netWeight: true,
+          saleRate: true,
+          quantity: true,
+          purchaseAmount: true,
+        },
+      }),
+      prisma.karigarJob.findMany({
+        where: { storeId, receivedDate: null },
+        select: { metalTypeId: true, issueWeight: true },
+      }),
+    ]);
+
+  const byMetal = new Map<string, MetalWiseRow>(
+    metals.map((metal) => [metal.id, emptyMetalWiseRow(metal.id, metal.name)]),
+  );
+
+  function getRow(metalTypeId: string | null) {
+    const key = metalTypeId ?? "unassigned";
+    let row = byMetal.get(key);
+    if (!row) {
+      row = emptyMetalWiseRow(key, metalTypeId ? "Unknown Metal" : "Unassigned");
+      byMetal.set(key, row);
+    }
+    return row;
+  }
+
+  for (const item of purchaseItems) {
+    const row = getRow(item.metalTypeId);
+    row.purchasedCount += 1;
+    row.purchasedWeight += Number(item.netWeight ?? 0);
+    row.purchasedAmount += Number(item.lineTotal ?? 0);
+  }
+
+  for (const item of [...invoiceItems, ...kachaInvoiceItems]) {
+    const row = getRow(item.metalTypeId);
+    row.soldCount += 1;
+    row.soldWeight += Number(item.netWeight ?? 0);
+    row.soldAmount += Number(item.lineTotal ?? 0);
+  }
+
+  for (const stock of stockRows) {
+    const row = getRow(stock.metalTypeId);
+    row.inStockCount += 1;
+    row.inStockWeight += Number(stock.netWeight ?? 0);
+    row.inStockValue += stock.saleRate
+      ? Number(stock.saleRate) * stock.quantity
+      : Number(stock.purchaseAmount ?? 0);
+  }
+
+  for (const job of openKarigarJobs) {
+    const row = getRow(job.metalTypeId);
+    row.withKarigarWeight += Number(job.issueWeight ?? 0);
+  }
+
+  for (const row of byMetal.values()) {
+    row.reconciliationGap =
+      Math.round(
+        (row.purchasedWeight - row.soldWeight - row.inStockWeight - row.withKarigarWeight) *
+          1000,
+      ) / 1000;
+  }
+
+  return {
+    metals: Array.from(byMetal.values()).sort((a, b) => a.metalName.localeCompare(b.metalName)),
+  };
+}

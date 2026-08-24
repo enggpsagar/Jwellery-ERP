@@ -8,6 +8,7 @@ import { UserRole, UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/auth";
 import { ACTIVE_STORE_COOKIE } from "@/lib/store-context";
+import { buildExcelExport } from "@/lib/excel-export";
 
 export type StoreFormState = {
   success: boolean;
@@ -15,24 +16,151 @@ export type StoreFormState = {
   errors?: Record<string, string[]>;
 };
 
+export type StoreSortBy = "name" | "code" | "createdAt";
+export type SortOrder = "asc" | "desc";
+
+export type GetStoresParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  sortBy?: StoreSortBy;
+  sortOrder?: SortOrder;
+};
+
+export type StoresPagination = {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+};
+
+type ExportStoresParams = {
+  search?: string;
+  sortBy?: string;
+  sortOrder?: SortOrder;
+};
+
+const STORE_INCLUDE = {
+  _count: {
+    select: { users: true, customers: true, invoices: true },
+  },
+} as const;
+
 function toOptionalString(value: FormDataEntryValue | null) {
   const str = String(value ?? "").trim();
   return str || null;
 }
 
-export async function getStores() {
+function getStoresWhere(search?: string) {
+  const query = String(search || "").trim();
+
+  if (!query) return {};
+
+  return {
+    OR: [
+      { name: { contains: query, mode: "insensitive" as const } },
+      { code: { contains: query, mode: "insensitive" as const } },
+      { city: { contains: query, mode: "insensitive" as const } },
+    ],
+  };
+}
+
+function getStoresOrderBy(sortBy: StoreSortBy = "createdAt", sortOrder: SortOrder = "desc") {
+  if (sortBy === "name") return { name: sortOrder };
+  if (sortBy === "code") return { code: sortOrder };
+  return { createdAt: sortOrder };
+}
+
+export async function getStores(params: GetStoresParams = {}) {
   await requireRole(UserRole.SUPER_ADMIN);
 
-  const stores = await prisma.store.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: {
-        select: { users: true, customers: true, invoices: true },
-      },
-    },
-  });
+  const page = Math.max(1, Number(params.page || 1));
+  const pageSize = Math.max(1, Number(params.pageSize || 10));
+  const search = String(params.search || "").trim();
+  const sortBy = params.sortBy || "createdAt";
+  const sortOrder = params.sortOrder || "desc";
 
-  return stores;
+  const where = getStoresWhere(search);
+  const orderBy = getStoresOrderBy(sortBy, sortOrder);
+
+  const [totalCount, stores] = await Promise.all([
+    prisma.store.count({ where }),
+    prisma.store.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: STORE_INCLUDE,
+    }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  const pagination: StoresPagination = {
+    page,
+    pageSize,
+    totalCount,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPrevPage: page > 1,
+  };
+
+  return { stores, pagination };
+}
+
+export async function exportStoresToExcel(params: ExportStoresParams = {}): Promise<{
+  success: boolean;
+  message: string;
+  fileName?: string;
+  fileBase64?: string;
+}> {
+  try {
+    await requireRole(UserRole.SUPER_ADMIN);
+
+    const where = getStoresWhere(params.search);
+    const orderBy = getStoresOrderBy(
+      (params.sortBy as StoreSortBy) || "createdAt",
+      params.sortOrder || "desc"
+    );
+
+    const stores = await prisma.store.findMany({
+      where,
+      orderBy,
+      include: STORE_INCLUDE,
+    });
+
+    if (!stores.length) {
+      return { success: false, message: "No stores found to export." };
+    }
+
+    const rows = stores.map((store, index) => ({
+      "Sr. No.": index + 1,
+      "Store Name": store.name,
+      Code: store.code,
+      City: store.city || "",
+      Phone: store.phone || "",
+      Email: store.email || "",
+      Status: store.isActive ? "Active" : "Inactive",
+      Users: store._count.users,
+      Customers: store._count.customers,
+      Invoices: store._count.invoices,
+      "Created At": store.createdAt.toLocaleString("en-IN"),
+    }));
+
+    const { fileName, fileBase64 } = buildExcelExport(rows, "Stores", "stores");
+
+    return {
+      success: true,
+      message: "Stores exported successfully.",
+      fileName,
+      fileBase64,
+    };
+  } catch (error) {
+    console.error("exportStoresToExcel error:", error);
+    return { success: false, message: "Failed to export stores." };
+  }
 }
 
 /**

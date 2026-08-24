@@ -19,6 +19,7 @@ import {
   getInvoiceFormCustomers,
   getInvoiceFormStockItems,
 } from "@/lib/actions/invoice-actions";
+import { buildExcelExport } from "@/lib/excel-export";
 
 export type KachaInvoiceLineItemInput = {
   itemName: string;
@@ -112,22 +113,52 @@ function mapKachaInvoice(kachaInvoice: any) {
   };
 }
 
+export type KachaInvoiceSortField = "invoiceDate" | "slipNumber" | "totalAmount";
+
+const KACHA_INVOICE_SORT_FIELDS: KachaInvoiceSortField[] = [
+  "invoiceDate",
+  "slipNumber",
+  "totalAmount",
+];
+
+function isKachaInvoiceSortField(value: unknown): value is KachaInvoiceSortField {
+  return KACHA_INVOICE_SORT_FIELDS.includes(value as KachaInvoiceSortField);
+}
+
 export type GetKachaInvoicesParams = {
   page?: number;
   pageSize?: number;
   search?: string;
-  status?: InvoiceStatus | "ALL";
+  status?: InvoiceStatus | "ALL" | string;
+  sortBy?: KachaInvoiceSortField | string;
+  sortOrder?: "asc" | "desc";
 };
 
-export async function getKachaInvoices(params: GetKachaInvoicesParams = {}) {
-  const page = Math.max(1, Number(params.page || 1));
-  const pageSize = Math.max(1, Number(params.pageSize || 10));
-  const search = String(params.search || "").trim();
-  const status = params.status && params.status !== "ALL" ? params.status : undefined;
+type KachaInvoiceQueryParams = {
+  search?: string;
+  status?: InvoiceStatus | "ALL" | string;
+  sortBy?: KachaInvoiceSortField | string;
+  sortOrder?: "asc" | "desc" | string;
+  selectedIds?: string[];
+};
 
-  const storeId = await requireStoreScope();
+/**
+ * Shared where/orderBy builder for the Kacha slip list and the export
+ * action, so the two never drift apart on what "the filtered set" means.
+ */
+function buildKachaInvoiceQuery(params: KachaInvoiceQueryParams, storeId: string) {
+  const search = String(params.search || "").trim();
+  const status =
+    params.status && params.status !== "ALL" && params.status in InvoiceStatus
+      ? (params.status as InvoiceStatus)
+      : undefined;
+  const sortBy = isKachaInvoiceSortField(params.sortBy) ? params.sortBy : "invoiceDate";
+  const sortOrder = params.sortOrder === "asc" ? "asc" : "desc";
+  const selectedIds = params.selectedIds?.filter(Boolean) ?? [];
+
   const where = {
     storeId,
+    ...(selectedIds.length ? { id: { in: selectedIds } } : {}),
     ...(status ? { status } : {}),
     ...(search
       ? {
@@ -139,11 +170,23 @@ export async function getKachaInvoices(params: GetKachaInvoicesParams = {}) {
       : {}),
   };
 
+  const orderBy = { [sortBy]: sortOrder } as const;
+
+  return { where, orderBy };
+}
+
+export async function getKachaInvoices(params: GetKachaInvoicesParams = {}) {
+  const page = Math.max(1, Number(params.page || 1));
+  const pageSize = Math.max(1, Number(params.pageSize || 10));
+
+  const storeId = await requireStoreScope();
+  const { where, orderBy } = buildKachaInvoiceQuery(params, storeId);
+
   const [totalCount, kachaInvoices] = await Promise.all([
     prisma.kachaInvoice.count({ where }),
     prisma.kachaInvoice.findMany({
       where,
-      orderBy: { invoiceDate: "desc" },
+      orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: {
@@ -166,6 +209,72 @@ export async function getKachaInvoices(params: GetKachaInvoicesParams = {}) {
       hasPrevPage: page > 1,
     },
   };
+}
+
+export type ExportKachaInvoicesParams = {
+  selectedIds?: string[];
+  search?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  status?: string;
+};
+
+export type ExportKachaInvoicesResult = {
+  success: boolean;
+  message: string;
+  fileName?: string;
+  fileBase64?: string;
+};
+
+/** Exports the same filtered/sorted set the Kacha Slips list is currently showing. */
+export async function exportKachaInvoicesToExcel(
+  params: ExportKachaInvoicesParams = {},
+): Promise<ExportKachaInvoicesResult> {
+  try {
+    const storeId = await requireStoreScope();
+    const { where, orderBy } = buildKachaInvoiceQuery(params, storeId);
+
+    const kachaInvoices = await prisma.kachaInvoice.findMany({
+      where,
+      orderBy,
+      include: {
+        customer: { select: { id: true, name: true, phone: true, gstin: true } },
+        convertedTo: { select: { id: true, invoiceNumber: true } },
+      },
+    });
+
+    if (!kachaInvoices.length) {
+      return { success: false, message: "No Kacha slips found to export." };
+    }
+
+    const rows = kachaInvoices.map(mapKachaInvoice).map((kachaInvoice, index) => ({
+      "Sr. No.": index + 1,
+      "Slip #": kachaInvoice.slipNumber,
+      Date: new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN"),
+      Customer: kachaInvoice.customer?.name || "",
+      Status: kachaInvoice.status,
+      Subtotal: kachaInvoice.subtotal,
+      "Making Charges": kachaInvoice.makingCharges,
+      "Stone Charges": kachaInvoice.stoneCharges,
+      Discount: kachaInvoice.discount,
+      Total: kachaInvoice.totalAmount,
+      Paid: kachaInvoice.paidAmount,
+      Balance: kachaInvoice.balanceAmount,
+      "Converted To Invoice #": kachaInvoice.convertedTo?.invoiceNumber || "",
+    }));
+
+    const { fileName, fileBase64 } = buildExcelExport(rows, "Kacha Slips", "kacha-slips");
+
+    return {
+      success: true,
+      message: "Kacha slips exported successfully.",
+      fileName,
+      fileBase64,
+    };
+  } catch (error) {
+    console.error("exportKachaInvoicesToExcel error:", error);
+    return { success: false, message: "Failed to export Kacha slips." };
+  }
 }
 
 export async function getKachaInvoiceById(id: string) {

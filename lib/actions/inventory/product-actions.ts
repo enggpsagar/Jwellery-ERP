@@ -6,6 +6,7 @@ import { PurityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import type { ProductFormState } from "@/lib/inventory/product-types";
+import { buildExcelExport } from "@/lib/excel-export";
 
 function parseNullableString(value: FormDataEntryValue | null) {
   const parsed = String(value || "").trim();
@@ -93,16 +94,69 @@ const PRODUCT_RELATIONS = {
   metalType: { select: { id: true, name: true } },
 } as const;
 
-export async function getProducts() {
-  const storeId = await requireStoreScope();
+export type ProductSortBy = "name" | "productCode" | "createdAt";
+export type ProductSortOrder = "asc" | "desc";
 
-  const rows = await prisma.product.findMany({
-    where: { storeId },
-    orderBy: { createdAt: "desc" },
-    include: PRODUCT_RELATIONS,
-  });
+export type GetProductsParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  sortBy?: ProductSortBy;
+  sortOrder?: ProductSortOrder;
+};
 
-  return rows.map((row) => ({
+type ExportProductsParams = {
+  selectedIds?: string[];
+  search?: string;
+  sortBy?: string;
+  sortOrder?: ProductSortOrder;
+};
+
+function getProductWhere(storeId: string, search?: string) {
+  const query = String(search || "").trim();
+
+  return {
+    storeId,
+    ...(query
+      ? {
+          OR: [
+            { name: { contains: query, mode: "insensitive" as const } },
+            { productCode: { contains: query, mode: "insensitive" as const } },
+            { designCode: { contains: query, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
+}
+
+function getProductOrderBy(
+  sortBy: ProductSortBy = "createdAt",
+  sortOrder: ProductSortOrder = "desc",
+) {
+  if (sortBy === "name") return { name: sortOrder };
+  if (sortBy === "productCode") return { productCode: sortOrder };
+  return { createdAt: sortOrder };
+}
+
+function mapProductRow(row: {
+  id: string;
+  productCode: string;
+  name: string;
+  category: { name: string } | null;
+  categoryType: { name: string } | null;
+  metalType: { name: string } | null;
+  defaultPurity: PurityType | null;
+  defaultMakingCharge: { toString(): string } | null;
+  defaultStoneCharge: { toString(): string } | null;
+  designCode: string | null;
+  hsnCode: string | null;
+  description: string | null;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
     id: row.id,
     productCode: row.productCode,
     name: row.name,
@@ -121,7 +175,128 @@ export async function getProducts() {
     isActive: row.isActive,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-  }));
+  };
+}
+
+export async function getProducts(params: GetProductsParams = {}) {
+  const page = Math.max(1, Number(params.page || 1));
+  const pageSize = Math.max(1, Number(params.pageSize || 10));
+  const search = String(params.search || "").trim();
+  const sortBy: ProductSortBy = params.sortBy || "createdAt";
+  const sortOrder: ProductSortOrder = params.sortOrder || "desc";
+
+  const storeId = await requireStoreScope();
+  const where = getProductWhere(storeId, search);
+  const orderBy = getProductOrderBy(sortBy, sortOrder);
+
+  const [totalCount, rows] = await Promise.all([
+    prisma.product.count({ where }),
+    prisma.product.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: PRODUCT_RELATIONS,
+    }),
+  ]);
+
+  const products = rows.map(mapProductRow);
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  return {
+    products,
+    pagination: {
+      page,
+      pageSize,
+      totalCount,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+    },
+  };
+}
+
+async function getAllProductsForExport(params: ExportProductsParams = {}) {
+  const validSortBy: ProductSortBy[] = ["name", "productCode", "createdAt"];
+  const sortBy: ProductSortBy = validSortBy.includes(params.sortBy as ProductSortBy)
+    ? (params.sortBy as ProductSortBy)
+    : "createdAt";
+  const sortOrder: ProductSortOrder = params.sortOrder || "desc";
+
+  const storeId = await requireStoreScope();
+  const where = params.selectedIds?.length
+    ? {
+        id: { in: params.selectedIds },
+        storeId,
+      }
+    : getProductWhere(storeId, params.search);
+
+  const rows = await prisma.product.findMany({
+    where,
+    orderBy: getProductOrderBy(sortBy, sortOrder),
+    include: PRODUCT_RELATIONS,
+  });
+
+  return rows.map(mapProductRow);
+}
+
+export async function exportProductsToExcel(
+  params: ExportProductsParams = {},
+): Promise<{
+  success: boolean;
+  message: string;
+  fileName?: string;
+  fileBase64?: string;
+}> {
+  try {
+    const products = await getAllProductsForExport(params);
+
+    if (!products.length) {
+      return {
+        success: false,
+        message: "No products found to export.",
+      };
+    }
+
+    const rows = products.map((product, index) => ({
+      "Sr. No.": index + 1,
+      "Product Code": product.productCode,
+      Name: product.name,
+      Category: product.category || "-",
+      Type: product.ornamentType || "-",
+      "Metal Type": product.metalType || "-",
+      Purity: product.defaultPurity || "-",
+      "Design Code": product.designCode || "-",
+      "HSN Code": product.hsnCode || "-",
+      "Default Making Charge": product.defaultMakingCharge ?? "-",
+      "Default Stone Charge": product.defaultStoneCharge ?? "-",
+      Description: product.description || "-",
+      Notes: product.notes || "-",
+      Status: product.isActive ? "Active" : "Inactive",
+      "Created At": product.createdAt
+        ? new Date(product.createdAt).toLocaleString("en-IN")
+        : "-",
+    }));
+
+    const { fileName, fileBase64 } = buildExcelExport(
+      rows,
+      "Products",
+      "products",
+    );
+
+    return {
+      success: true,
+      message: "Products exported successfully.",
+      fileName,
+      fileBase64,
+    };
+  } catch (error) {
+    console.error("exportProductsToExcel error:", error);
+    return {
+      success: false,
+      message: "Failed to export products.",
+    };
+  }
 }
 
 export async function getProductById(id: string) {

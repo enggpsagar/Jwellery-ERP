@@ -9,10 +9,16 @@ import {
   LedgerEntryType,
   LedgerSourceType,
   PurityType,
+  Prisma,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { buildExcelExport } from "@/lib/excel-export";
+import type {
+  DataTableExportParams,
+  DataTableExportResult,
+} from "@/components/shared/data-table-toolbar";
 
 export type QuotationLineItemInput = {
   itemName: string;
@@ -117,21 +123,16 @@ function mapQuotation(quotation: any) {
   };
 }
 
-export type GetQuotationsParams = {
-  page?: number;
-  pageSize?: number;
-  search?: string;
-  status?: string | "ALL";
-};
+export type QuotationSortBy = "quotationDate" | "quotationNumber" | "totalAmount";
 
-export async function getQuotations(params: GetQuotationsParams = {}) {
-  const page = Math.max(1, Number(params.page || 1));
-  const pageSize = Math.max(1, Number(params.pageSize || 10));
+function buildQuotationsWhere(
+  storeId: string,
+  params: { search?: string; status?: string | "ALL" },
+) {
   const search = String(params.search || "").trim();
   const status = params.status && params.status !== "ALL" ? params.status : undefined;
 
-  const storeId = await requireStoreScope();
-  const where = {
+  return {
     storeId,
     ...(status ? { status } : {}),
     ...(search
@@ -143,12 +144,38 @@ export async function getQuotations(params: GetQuotationsParams = {}) {
         }
       : {}),
   };
+}
+
+function buildQuotationsOrderBy(
+  sortBy: QuotationSortBy,
+  sortOrder: "asc" | "desc",
+): Prisma.QuotationOrderByWithRelationInput {
+  return { [sortBy]: sortOrder } as Prisma.QuotationOrderByWithRelationInput;
+}
+
+export type GetQuotationsParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string | "ALL";
+  sortBy?: QuotationSortBy;
+  sortOrder?: "asc" | "desc";
+};
+
+export async function getQuotations(params: GetQuotationsParams = {}) {
+  const page = Math.max(1, Number(params.page || 1));
+  const pageSize = Math.max(1, Number(params.pageSize || 10));
+  const sortBy = params.sortBy || "quotationDate";
+  const sortOrder = params.sortOrder || "desc";
+
+  const storeId = await requireStoreScope();
+  const where = buildQuotationsWhere(storeId, params);
 
   const [totalCount, quotations] = await Promise.all([
     prisma.quotation.count({ where }),
     prisma.quotation.findMany({
       where,
-      orderBy: { quotationDate: "desc" },
+      orderBy: buildQuotationsOrderBy(sortBy, sortOrder),
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: {
@@ -171,6 +198,77 @@ export async function getQuotations(params: GetQuotationsParams = {}) {
       hasPrevPage: page > 1,
     },
   };
+}
+
+const QUOTATION_SORT_FIELDS = ["quotationDate", "quotationNumber", "totalAmount"] as const;
+
+function toQuotationSortBy(value: string | undefined): QuotationSortBy {
+  return (QUOTATION_SORT_FIELDS as readonly string[]).includes(value ?? "")
+    ? (value as QuotationSortBy)
+    : "quotationDate";
+}
+
+/** Exports either an explicit set of quotations (selectedIds) or the current
+ * search/status/sort-filtered list (mirrors getQuotations' own filtering so
+ * "export filtered results" matches exactly what's on screen). Quotation
+ * status is a plain string (open/converted/expired), not an enum, so unlike
+ * purchases' status it needs no allow-list validation before use in `where`. */
+export async function exportQuotationsToExcel(
+  params: DataTableExportParams = {},
+): Promise<DataTableExportResult> {
+  try {
+    const storeId = await requireStoreScope();
+    const sortBy = toQuotationSortBy(params.sortBy);
+    const sortOrder = params.sortOrder || "desc";
+
+    const where =
+      params.selectedIds && params.selectedIds.length > 0
+        ? { id: { in: params.selectedIds }, storeId }
+        : buildQuotationsWhere(storeId, { search: params.search, status: params.status });
+
+    const quotations = await prisma.quotation.findMany({
+      where,
+      orderBy: buildQuotationsOrderBy(sortBy, sortOrder),
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        convertedTo: { select: { id: true, invoiceNumber: true } },
+      },
+    });
+
+    if (!quotations.length) {
+      return { success: false, message: "No quotations found to export." };
+    }
+
+    const rows = quotations.map(mapQuotation).map((quotation, index) => ({
+      "Sr. No.": index + 1,
+      "Quotation Number": quotation.quotationNumber,
+      Date: new Date(quotation.quotationDate).toLocaleDateString("en-IN"),
+      "Valid Until": quotation.validUntil
+        ? new Date(quotation.validUntil).toLocaleDateString("en-IN")
+        : "",
+      Customer: quotation.customer?.name || "",
+      Status: quotation.status,
+      Subtotal: quotation.subtotal,
+      "Making Charges": quotation.makingCharges,
+      "Stone Charges": quotation.stoneCharges,
+      Discount: quotation.discount,
+      "Tax Amount": quotation.taxAmount,
+      "Total Amount": quotation.totalAmount,
+      "Converted To Invoice": quotation.convertedTo?.invoiceNumber || "",
+    }));
+
+    const { fileName, fileBase64 } = buildExcelExport(rows, "Quotations", "quotations");
+
+    return {
+      success: true,
+      message: "Quotations exported successfully.",
+      fileName,
+      fileBase64,
+    };
+  } catch (error) {
+    console.error("exportQuotationsToExcel error:", error);
+    return { success: false, message: "Failed to export quotations." };
+  }
 }
 
 export async function getQuotationById(id: string) {

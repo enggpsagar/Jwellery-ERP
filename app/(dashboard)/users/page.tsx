@@ -3,14 +3,25 @@
 import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 
-import { getUsers } from "@/lib/user";
+import { getUsers, type UserSortBy, type SortOrder } from "@/lib/user";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { getEffectiveStoreId } from "@/lib/store-context";
-import { UserTable } from "@/components/users/user-table";
-import { UserFormDialog } from "@/components/users/user-form-dialog";
+import { UsersClient } from "@/components/users/users-client";
 
-export default async function UsersPage() {
+type UsersPageProps = {
+  searchParams?: Promise<{
+    page?: string;
+    pageSize?: string;
+    search?: string;
+    sortBy?: UserSortBy;
+    sortOrder?: SortOrder;
+  }>;
+};
+
+export const dynamic = "force-dynamic";
+
+export default async function UsersPage({ searchParams }: UsersPageProps) {
   const currentUser = await getCurrentUser();
 
   if (
@@ -20,10 +31,18 @@ export default async function UsersPage() {
     redirect("/profile");
   }
 
+  const params = (await searchParams) ?? {};
+
+  const page = Number(params.page || 1);
+  const pageSize = Number(params.pageSize || 10);
+  const search = params.search || "";
+  const sortBy = params.sortBy || "createdAt";
+  const sortOrder = params.sortOrder || "desc";
+
   const storeId = await getEffectiveStoreId();
 
-  const [users, karigars] = await Promise.all([
-    getUsers(storeId),
+  const [{ users, pagination }, karigars] = await Promise.all([
+    getUsers(storeId, { page, pageSize, search, sortBy, sortOrder }),
     storeId
       ? prisma.karigar.findMany({
           where: { storeId, isActive: true },
@@ -36,23 +55,11 @@ export default async function UsersPage() {
   const allowSuperAdmin = currentUser?.role === UserRole.SUPER_ADMIN;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Users</h1>
-          <p className="text-muted-foreground">
-            Manage ERP users and their roles.
-          </p>
-        </div>
-
-        <UserFormDialog
-          mode="create"
-          karigars={karigars}
-          allowSuperAdmin={allowSuperAdmin}
-        />
-      </div>
-
-      <UserTable users={users} karigars={karigars} allowSuperAdmin={allowSuperAdmin} />
-    </div>
+    <UsersClient
+      users={users}
+      karigars={karigars}
+      allowSuperAdmin={allowSuperAdmin}
+      pagination={pagination}
+    />
   );
 }

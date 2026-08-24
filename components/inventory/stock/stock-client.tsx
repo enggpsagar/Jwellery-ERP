@@ -9,11 +9,21 @@ import { PageBackHeader } from "@/components/shared/page-back-header"
 import { StockTable } from "@/components/inventory/stock/stock-table"
 import { StockToolbar } from "@/components/inventory/stock/stock-toolbar"
 
-type StockClientProps = {
-  stockItems: React.ComponentProps<typeof StockTable>["stockItems"]
+type Pagination = {
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPrevPage: boolean
 }
 
-export function StockClient({ stockItems }: StockClientProps) {
+type StockClientProps = {
+  stockItems: React.ComponentProps<typeof StockTable>["stockItems"]
+  pagination: Pagination
+}
+
+export function StockClient({ stockItems, pagination }: StockClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
 
   React.useEffect(() => {
@@ -42,6 +52,7 @@ export function StockClient({ stockItems }: StockClientProps) {
 
       <StockTable
         stockItems={stockItems}
+        pagination={pagination}
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
       />

@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation"
 import { Printer } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { DataTableToolbar } from "@/components/shared/data-table-toolbar"
+import { exportInventoryStockToExcel } from "@/lib/actions/inventory/stock-actions"
 
 type StockToolbarProps = {
   selectedIds: string[]
@@ -18,23 +20,39 @@ export function StockToolbar({ selectedIds }: StockToolbarProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm text-muted-foreground">
-        {selectedIds.length > 0
-          ? `${selectedIds.length} item${selectedIds.length === 1 ? "" : "s"} selected`
-          : "Select stock items to print their QR codes."}
-      </p>
+    <div className="space-y-3">
+      <DataTableToolbar
+        searchPlaceholder="Search by stock code, tag number, product..."
+        sortOptions={[
+          { value: "createdAt", label: "Sort by Created Date" },
+          { value: "stockCode", label: "Sort by Stock Code" },
+          { value: "netWeight", label: "Sort by Net Weight" },
+          { value: "saleAmount", label: "Sort by Sale Amount" },
+        ]}
+        defaultSortBy="createdAt"
+        selectedIds={selectedIds}
+        entityLabel="stock items"
+        exportAction={exportInventoryStockToExcel}
+      />
 
-      <Button
-        type="button"
-        variant="outline"
-        className="gap-2"
-        disabled={selectedIds.length === 0}
-        onClick={handlePrintQr}
-      >
-        <Printer className="h-4 w-4" />
-        Print QR ({selectedIds.length})
-      </Button>
+      <div className="flex flex-col gap-3 rounded-xl border bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          {selectedIds.length > 0
+            ? `${selectedIds.length} item${selectedIds.length === 1 ? "" : "s"} selected`
+            : "Select stock items to print their QR codes."}
+        </p>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="gap-2"
+          disabled={selectedIds.length === 0}
+          onClick={handlePrintQr}
+        >
+          <Printer className="h-4 w-4" />
+          Print QR ({selectedIds.length})
+        </Button>
+      </div>
     </div>
   )
 }

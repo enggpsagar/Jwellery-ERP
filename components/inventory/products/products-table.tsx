@@ -1,9 +1,11 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { Eye, Pencil } from "lucide-react"
 
 import { DeleteProductButton } from "@/components/inventory/products/delete-product-button"
+import { DataTablePagination } from "@/components/shared/data-table-pagination"
 
 type ProductRow = {
   id: string
@@ -17,11 +19,63 @@ type ProductRow = {
   createdAt: Date | string
 }
 
-type ProductsTableProps = {
-  products: ProductRow[]
+type Pagination = {
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPrevPage: boolean
 }
 
-export function ProductsTable({ products }: ProductsTableProps) {
+type ProductsTableProps = {
+  products: ProductRow[]
+  pagination: Pagination
+  selectedIds: string[]
+  onSelectionChange: (ids: string[]) => void
+}
+
+export function ProductsTable({
+  products,
+  pagination,
+  selectedIds,
+  onSelectionChange,
+}: ProductsTableProps) {
+  const allIds = React.useMemo(() => products.map((product) => product.id), [products])
+
+  const allSelected =
+    allIds.length > 0 && allIds.every((id) => selectedIds.includes(id))
+
+  const someSelected =
+    allIds.some((id) => selectedIds.includes(id)) && !allSelected
+
+  const headerCheckboxRef = React.useRef<HTMLInputElement | null>(null)
+
+  React.useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = someSelected
+    }
+  }, [someSelected])
+
+  const toggleAll = (checked: boolean) => {
+    if (checked) {
+      const merged = Array.from(new Set([...selectedIds, ...allIds]))
+      onSelectionChange(merged)
+      return
+    }
+
+    onSelectionChange(selectedIds.filter((id) => !allIds.includes(id)))
+  }
+
+  const toggleOne = (id: string, checked: boolean) => {
+    if (checked) {
+      onSelectionChange(Array.from(new Set([...selectedIds, id])))
+      return
+    }
+
+    onSelectionChange(selectedIds.filter((selectedId) => selectedId !== id))
+  }
+
   if (!products.length) {
     return (
       <div className="rounded-xl border bg-white p-6 text-sm text-muted-foreground">
@@ -36,6 +90,16 @@ export function ProductsTable({ products }: ProductsTableProps) {
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40">
             <tr className="border-b">
+              <th className="w-12 px-4 py-3">
+                <input
+                  ref={headerCheckboxRef}
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={(e) => toggleAll(e.target.checked)}
+                  aria-label="Select all products"
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+              </th>
               <th className="px-4 py-3 text-left font-medium">Product Code</th>
               <th className="px-4 py-3 text-left font-medium">Name</th>
               <th className="px-4 py-3 text-left font-medium">Category</th>
@@ -48,54 +112,75 @@ export function ProductsTable({ products }: ProductsTableProps) {
           </thead>
 
           <tbody>
-            {products.map((product) => (
-              <tr key={product.id} className="border-b last:border-0">
-                <td className="px-4 py-3">{product.productCode}</td>
-                <td className="px-4 py-3 font-medium">{product.name}</td>
-                <td className="px-4 py-3">{product.category}</td>
-                <td className="px-4 py-3">{product.ornamentType ?? "-"}</td>
-                <td className="px-4 py-3">{product.metalType}</td>
-                <td className="px-4 py-3">{product.defaultPurity ?? "-"}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                      product.isActive
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    {product.isActive ? "Active" : "Inactive"}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/inventory/products/${product.id}`}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
-                      title="View product"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Link>
+            {products.map((product) => {
+              const checked = selectedIds.includes(product.id)
 
-                    <Link
-                      href={`/inventory/products/${product.id}/edit`}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-amber-700 hover:bg-amber-50"
-                      title="Edit product"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Link>
-
-                    <DeleteProductButton
-                      productId={product.id}
-                      productName={product.name}
+              return (
+                <tr key={product.id} className="border-b last:border-0">
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => toggleOne(product.id, e.target.checked)}
+                      aria-label={`Select ${product.name}`}
+                      className="h-4 w-4 rounded border-gray-300"
                     />
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-4 py-3">{product.productCode}</td>
+                  <td className="px-4 py-3 font-medium">{product.name}</td>
+                  <td className="px-4 py-3">{product.category}</td>
+                  <td className="px-4 py-3">{product.ornamentType ?? "-"}</td>
+                  <td className="px-4 py-3">{product.metalType}</td>
+                  <td className="px-4 py-3">{product.defaultPurity ?? "-"}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                        product.isActive
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {product.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/inventory/products/${product.id}`}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
+                        title="View product"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Link>
+
+                      <Link
+                        href={`/inventory/products/${product.id}/edit`}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-amber-700 hover:bg-amber-50"
+                        title="Edit product"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Link>
+
+                      <DeleteProductButton
+                        productId={product.id}
+                        productName={product.name}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
+
+      <DataTablePagination
+        page={pagination.page}
+        pageSize={pagination.pageSize}
+        totalCount={pagination.totalCount}
+        totalPages={pagination.totalPages}
+        itemLabel="products"
+      />
     </div>
   )
 }

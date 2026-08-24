@@ -12,6 +12,7 @@ import {
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import type { StockFormState } from "@/lib/inventory/stock-types"
+import { buildExcelExport } from "@/lib/excel-export"
 
 function parseNullableString(value: FormDataEntryValue | null) {
   const parsed = String(value || "").trim()
@@ -53,31 +54,74 @@ function toDecimal(value: number | null | undefined): Prisma.Decimal | undefined
   return new Prisma.Decimal(value)
 }
 
-export async function getInventoryStock() {
-  const storeId = await requireStoreScope()
+export type StockSortBy = "createdAt" | "stockCode" | "netWeight" | "saleAmount"
+export type StockSortOrder = "asc" | "desc"
 
-  const rows = await prisma.inventoryStock.findMany({
-    where: { storeId },
-    include: {
-      metalType: {
-        select: { id: true, name: true },
-      },
-      product: {
-        select: {
-          id: true,
-          productCode: true,
-          name: true,
-          category: { select: { id: true, name: true } },
-          categoryType: { select: { id: true, name: true } },
-          metalType: { select: { id: true, name: true } },
-          defaultPurity: true,
-        },
-      },
+export type GetInventoryStockParams = {
+  page?: number
+  pageSize?: number
+  search?: string
+  sortBy?: StockSortBy
+  sortOrder?: StockSortOrder
+}
+
+type ExportInventoryStockParams = {
+  selectedIds?: string[]
+  search?: string
+  sortBy?: string
+  sortOrder?: StockSortOrder
+}
+
+const STOCK_INCLUDE = {
+  metalType: {
+    select: { id: true, name: true },
+  },
+  product: {
+    select: {
+      id: true,
+      productCode: true,
+      name: true,
+      category: { select: { id: true, name: true } },
+      categoryType: { select: { id: true, name: true } },
+      metalType: { select: { id: true, name: true } },
+      defaultPurity: true,
     },
-    orderBy: { createdAt: "desc" },
-  })
+  },
+} as const
 
-  return rows.map((row) => ({
+function getStockWhere(storeId: string, search?: string) {
+  const query = String(search || "").trim()
+
+  return {
+    storeId,
+    ...(query
+      ? {
+          OR: [
+            { stockCode: { contains: query, mode: "insensitive" as const } },
+            { tagNumber: { contains: query, mode: "insensitive" as const } },
+            {
+              product: {
+                name: { contains: query, mode: "insensitive" as const },
+              },
+            },
+          ],
+        }
+      : {}),
+  }
+}
+
+function getStockOrderBy(
+  sortBy: StockSortBy = "createdAt",
+  sortOrder: StockSortOrder = "desc"
+) {
+  if (sortBy === "stockCode") return { stockCode: sortOrder }
+  if (sortBy === "netWeight") return { netWeight: sortOrder }
+  if (sortBy === "saleAmount") return { saleAmount: sortOrder }
+  return { createdAt: sortOrder }
+}
+
+function mapStockRow(row: any) {
+  return {
     ...row,
     grossWeight: row.grossWeight?.toString() ?? null,
     lessWeight: row.lessWeight?.toString() ?? null,
@@ -92,7 +136,139 @@ export async function getInventoryStock() {
     otherCharge: row.otherCharge?.toString() ?? null,
     purchaseAmount: row.purchaseAmount?.toString() ?? null,
     saleAmount: row.saleAmount?.toString() ?? null,
-  }))
+  }
+}
+
+export async function getInventoryStock(params: GetInventoryStockParams = {}) {
+  const page = Math.max(1, Number(params.page || 1))
+  const pageSize = Math.max(1, Number(params.pageSize || 10))
+  const search = String(params.search || "").trim()
+  const sortBy: StockSortBy = params.sortBy || "createdAt"
+  const sortOrder: StockSortOrder = params.sortOrder || "desc"
+
+  const storeId = await requireStoreScope()
+  const where = getStockWhere(storeId, search)
+  const orderBy = getStockOrderBy(sortBy, sortOrder)
+
+  const [totalCount, rows] = await Promise.all([
+    prisma.inventoryStock.count({ where }),
+    prisma.inventoryStock.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: STOCK_INCLUDE,
+    }),
+  ])
+
+  const stockItems = rows.map(mapStockRow)
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+
+  return {
+    stockItems,
+    pagination: {
+      page,
+      pageSize,
+      totalCount,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+    },
+  }
+}
+
+async function getAllInventoryStockForExport(
+  params: ExportInventoryStockParams = {}
+) {
+  const validSortBy: StockSortBy[] = ["createdAt", "stockCode", "netWeight", "saleAmount"]
+  const sortBy: StockSortBy = validSortBy.includes(params.sortBy as StockSortBy)
+    ? (params.sortBy as StockSortBy)
+    : "createdAt"
+  const sortOrder: StockSortOrder = params.sortOrder || "desc"
+
+  const storeId = await requireStoreScope()
+  const where = params.selectedIds?.length
+    ? {
+        id: { in: params.selectedIds },
+        storeId,
+      }
+    : getStockWhere(storeId, params.search)
+
+  const rows = await prisma.inventoryStock.findMany({
+    where,
+    orderBy: getStockOrderBy(sortBy, sortOrder),
+    include: STOCK_INCLUDE,
+  })
+
+  return rows.map(mapStockRow)
+}
+
+export async function exportInventoryStockToExcel(
+  params: ExportInventoryStockParams = {}
+): Promise<{
+  success: boolean
+  message: string
+  fileName?: string
+  fileBase64?: string
+}> {
+  try {
+    const stockItems = await getAllInventoryStockForExport(params)
+
+    if (!stockItems.length) {
+      return {
+        success: false,
+        message: "No stock items found to export.",
+      }
+    }
+
+    const rows = stockItems.map((item, index) => ({
+      "Sr. No.": index + 1,
+      "Stock Code": item.stockCode,
+      "Tag Number": item.tagNumber || "-",
+      "Product Name": item.product?.name || "-",
+      "Product Code": item.product?.productCode || "-",
+      "Metal Type": item.metalType?.name || "-",
+      Purity: item.purity || "-",
+      Quantity: item.quantity,
+      "Gross Weight (g)": item.grossWeight || "-",
+      "Net Weight (g)": item.netWeight || "-",
+      "Stone Weight (g)": item.stoneWeight || "-",
+      "Purchase Rate": item.purchaseRate || "-",
+      "Sale Rate": item.saleRate || "-",
+      "Making Charge": item.makingCharge || "-",
+      "Purchase Amount": item.purchaseAmount || "-",
+      "Sale Amount": item.saleAmount || "-",
+      Status: item.status || "-",
+      Finish: item.finish || "-",
+      Location: item.location || "-",
+      "Vendor Name": item.vendorName || "-",
+      "Purchase Date": item.purchaseDate
+        ? new Date(item.purchaseDate).toLocaleDateString("en-IN")
+        : "-",
+      "Created At": item.createdAt
+        ? new Date(item.createdAt).toLocaleString("en-IN")
+        : "-",
+    }))
+
+    const { fileName, fileBase64 } = buildExcelExport(
+      rows,
+      "Inventory Stock",
+      "inventory-stock"
+    )
+
+    return {
+      success: true,
+      message: "Stock exported successfully.",
+      fileName,
+      fileBase64,
+    }
+  } catch (error) {
+    console.error("exportInventoryStockToExcel error:", error)
+    return {
+      success: false,
+      message: "Failed to export stock.",
+    }
+  }
 }
 export async function getInventoryStockFormProducts() {
   const storeId = await requireStoreScope()

@@ -59,12 +59,33 @@ type GoldFlow = {
   reconciliationGap: number
 }
 
+type MetalWiseRow = {
+  metalId: string
+  metalName: string
+  purchasedCount: number
+  purchasedWeight: number
+  purchasedAmount: number
+  soldCount: number
+  soldWeight: number
+  soldAmount: number
+  inStockCount: number
+  inStockWeight: number
+  inStockValue: number
+  withKarigarWeight: number
+  reconciliationGap: number
+}
+
+type MetalWise = {
+  metals: MetalWiseRow[]
+}
+
 type ReportsTabsProps = {
   sales: SalesReport
   valuation: InventoryValuation
   karigarOutstanding: KarigarOutstanding
   customerDues: CustomerDues
   goldFlow: GoldFlow
+  metalWise: MetalWise
 }
 
 const TABS = [
@@ -73,6 +94,7 @@ const TABS = [
   { key: "karigar", label: "Karigar Outstanding" },
   { key: "dues", label: "Customer Dues" },
   { key: "goldFlow", label: "Gold Flow" },
+  { key: "metalWise", label: "By Metal" },
 ] as const
 
 type TabKey = (typeof TABS)[number]["key"]
@@ -92,6 +114,7 @@ export function ReportsTabs({
   karigarOutstanding,
   customerDues,
   goldFlow,
+  metalWise,
 }: ReportsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("sales")
 
@@ -326,6 +349,77 @@ export function ReportsTabs({
                 ? "Purchased fine weight does not fully reconcile against sold, wastage, remaining stock, and karigar work-in-progress — investigate the shortfall."
                 : "Everything purchased is accounted for across sales, wastage, remaining stock, and karigar work-in-progress."}
             </p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "metalWise" && (
+        <div className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            One row per metal your store has configured in Settings → Metals &amp; Categories —
+            add a new metal there and it appears here automatically, no code change needed.
+          </p>
+
+          <div className="overflow-x-auto rounded-xl border bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/40">
+                <tr className="border-b">
+                  <th className="px-4 py-3 text-left font-medium">Metal</th>
+                  <th className="px-4 py-3 text-left font-medium">Purchased</th>
+                  <th className="px-4 py-3 text-left font-medium">Sold</th>
+                  <th className="px-4 py-3 text-left font-medium">In Stock</th>
+                  <th className="px-4 py-3 text-left font-medium">With Karigar</th>
+                  <th className="px-4 py-3 text-left font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {metalWise.metals.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                      No metals configured yet — add one in Settings → Metals &amp; Categories.
+                    </td>
+                  </tr>
+                ) : (
+                  metalWise.metals.map((row) => (
+                    <tr key={row.metalId} className="border-b last:border-0 align-top">
+                      <td className="px-4 py-3 font-medium">{row.metalName}</td>
+                      <td className="px-4 py-3">
+                        <div>{row.purchasedWeight.toFixed(3)}g</div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.purchasedCount} item(s) · ₹{row.purchasedAmount.toFixed(2)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>{row.soldWeight.toFixed(3)}g</div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.soldCount} item(s) · ₹{row.soldAmount.toFixed(2)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>{row.inStockWeight.toFixed(3)}g</div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.inStockCount} item(s) · ₹{row.inStockValue.toFixed(2)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">{row.withKarigarWeight.toFixed(3)}g</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+                            Math.abs(row.reconciliationGap) > 0.01
+                              ? "bg-red-50 text-red-700"
+                              : "bg-green-50 text-green-700"
+                          }`}
+                        >
+                          {Math.abs(row.reconciliationGap) > 0.01
+                            ? `Gap: ${row.reconciliationGap.toFixed(3)}g`
+                            : "Reconciled"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

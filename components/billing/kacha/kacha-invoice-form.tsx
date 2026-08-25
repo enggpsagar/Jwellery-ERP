@@ -52,6 +52,7 @@ type LineItem = {
   netWeight: number
   rate: number
   makingCharge: number
+  makingChargeType: "FIXED" | "PERCENTAGE"
   stoneCharge: number
   dmoWeight: number
   inventoryStockId: string
@@ -68,6 +69,7 @@ function emptyLineItem(): LineItem {
     netWeight: 0,
     rate: 0,
     makingCharge: 0,
+    makingChargeType: "FIXED",
     stoneCharge: 0,
     dmoWeight: 0,
     inventoryStockId: "",
@@ -160,6 +162,7 @@ export function KachaInvoiceForm({ customers, stockItems }: KachaInvoiceFormProp
       netWeight: item.netWeight || null,
       rate: item.rate || null,
       makingCharge: item.makingCharge,
+      makingChargeType: item.makingChargeType,
       stoneCharge: item.stoneCharge,
       dmoWeight: item.dmoWeight || null,
       inventoryStockId: item.inventoryStockId || null,
@@ -292,6 +295,8 @@ export function KachaInvoiceForm({ customers, stockItems }: KachaInvoiceFormProp
                   netWeight={item.netWeight}
                   value={item.makingCharge}
                   onChange={(v) => updateItem(item.key, { makingCharge: v })}
+                  chargeType={item.makingChargeType}
+                  onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
                 />
 
                 <div className="space-y-1">

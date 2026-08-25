@@ -11,6 +11,7 @@ import {
   LedgerSourceType,
   PaymentMethod,
   PurityType,
+  ChargeType,
   Prisma,
 } from "@prisma/client";
 
@@ -40,9 +41,16 @@ export type PurchaseLineItemInput = {
   netWeight?: number | null;
   rate?: number | null;
   makingCharge: number;
+  makingChargeType?: ChargeType | string | null;
   stoneCharge: number;
   dmoWeight?: number | null;
 };
+
+/** Never trust client input for the making-charge mode — anything other
+ * than a valid ChargeType falls back to FIXED. */
+function toChargeType(value: unknown): ChargeType {
+  return value === ChargeType.PERCENTAGE ? ChargeType.PERCENTAGE : ChargeType.FIXED;
+}
 
 export type PurchaseFormState = {
   success: boolean;
@@ -164,6 +172,7 @@ function mapPurchase(purchase: any) {
       netWeight: item.netWeight ? Number(item.netWeight) : null,
       rate: item.rate ? Number(item.rate) : null,
       makingCharge: Number(item.makingCharge),
+      makingChargeType: item.makingChargeType as ChargeType,
       stoneCharge: Number(item.stoneCharge),
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
       lineTotal: Number(item.lineTotal),
@@ -359,6 +368,7 @@ export async function getPurchaseFormProducts() {
       metalType: { select: { id: true, name: true } },
       defaultPurity: true,
       defaultMakingCharge: true,
+      defaultMakingChargeType: true,
       defaultStoneCharge: true,
       isActive: true,
     },
@@ -410,6 +420,13 @@ export async function createPurchase(
     if (items.some((item) => !item.productId)) {
       return { success: false, message: "Every line item must have a product selected" };
     }
+
+    // Don't trust client-submitted charge type — coerce anything unexpected
+    // (missing, malformed, or a value outside the enum) down to FIXED.
+    items = items.map((item) => ({
+      ...item,
+      makingChargeType: toChargeType(item.makingChargeType),
+    }));
 
     const discount = toNumber(formData.get("discount"));
     const taxAmount = toNumber(formData.get("taxAmount"));
@@ -518,6 +535,7 @@ export async function createPurchase(
               netWeight: item.netWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,
+              makingChargeType: toChargeType(item.makingChargeType),
               stoneCharge: item.stoneCharge,
               dmoWeight: item.dmoWeight ?? undefined,
               lineTotal: lineTotal(item),

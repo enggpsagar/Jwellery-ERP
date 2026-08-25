@@ -39,6 +39,7 @@ type ProductOption = {
   metalType: { id: string; name: string } | null
   defaultPurity: string | null
   defaultMakingCharge: number | null
+  defaultMakingChargeType: "FIXED" | "PERCENTAGE"
   defaultStoneCharge: number | null
   isActive: boolean
 }
@@ -54,6 +55,7 @@ type LineItem = {
   netWeight: number
   rate: number
   makingCharge: number
+  makingChargeType: "FIXED" | "PERCENTAGE"
   stoneCharge: number
   dmoWeight: number
 }
@@ -80,6 +82,7 @@ function emptyLineItem(): LineItem {
     netWeight: 0,
     rate: 0,
     makingCharge: 0,
+    makingChargeType: "FIXED",
     stoneCharge: 0,
     dmoWeight: 0,
   }
@@ -144,6 +147,7 @@ export function PurchaseForm({ vendors, products }: PurchaseFormProps) {
       metalTypeId: product.metalType?.id ?? "",
       purity: product.defaultPurity ?? "",
       makingCharge: product.defaultMakingCharge ?? 0,
+      makingChargeType: product.defaultMakingChargeType ?? "FIXED",
       stoneCharge: product.defaultStoneCharge ?? 0,
     })
   }
@@ -182,6 +186,7 @@ export function PurchaseForm({ vendors, products }: PurchaseFormProps) {
       netWeight: item.netWeight || null,
       rate: item.rate || null,
       makingCharge: item.makingCharge,
+      makingChargeType: item.makingChargeType,
       stoneCharge: item.stoneCharge,
       dmoWeight: item.dmoWeight || null,
     })),
@@ -346,6 +351,8 @@ export function PurchaseForm({ vendors, products }: PurchaseFormProps) {
                   netWeight={item.netWeight}
                   value={item.makingCharge}
                   onChange={(v) => updateItem(item.key, { makingCharge: v })}
+                  chargeType={item.makingChargeType}
+                  onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
                 />
 
                 <div className="space-y-1">

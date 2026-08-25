@@ -9,6 +9,7 @@ import {
   LedgerEntryType,
   LedgerSourceType,
   PurityType,
+  ChargeType,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -30,6 +31,7 @@ export type KachaInvoiceLineItemInput = {
   netWeight?: number | null;
   rate?: number | null;
   makingCharge: number;
+  makingChargeType?: ChargeType | string | null;
   stoneCharge: number;
   dmoWeight?: number | null;
   inventoryStockId?: string | null;
@@ -47,6 +49,12 @@ const initialState: KachaInvoiceFormState = { success: false, message: "" };
 function toNumber(value: unknown, fallback = 0) {
   const num = Number(value);
   return Number.isNaN(num) ? fallback : num;
+}
+
+/** Never trust client input for the making-charge mode — anything other
+ * than a valid ChargeType falls back to FIXED. */
+function toChargeType(value: unknown): ChargeType {
+  return value === ChargeType.PERCENTAGE ? ChargeType.PERCENTAGE : ChargeType.FIXED;
 }
 
 function lineTotal(item: KachaInvoiceLineItemInput) {
@@ -105,6 +113,7 @@ function mapKachaInvoice(kachaInvoice: any) {
       netWeight: item.netWeight ? Number(item.netWeight) : null,
       rate: item.rate ? Number(item.rate) : null,
       makingCharge: Number(item.makingCharge),
+      makingChargeType: item.makingChargeType as ChargeType,
       stoneCharge: Number(item.stoneCharge),
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
       lineTotal: Number(item.lineTotal),

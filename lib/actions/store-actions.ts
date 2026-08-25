@@ -236,6 +236,66 @@ export async function createStoreWithAdmin(
   }
 }
 
+/**
+ * Archiving a store marks it inactive (Store.isActive = false) and blocks
+ * further sign-in for that store's own ADMIN/STAFF/KARIGAR users (enforced
+ * in lib/auth/auth-options.ts's signIn callback and otp-auth.ts) — it does
+ * not touch any already-issued session, which stays valid until it expires.
+ */
+export async function archiveStore(storeId: string): Promise<StoreFormState> {
+  try {
+    await requireRole(UserRole.SUPER_ADMIN);
+
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { name: true },
+    });
+
+    if (!store) {
+      return { success: false, message: "Store not found" };
+    }
+
+    await prisma.store.update({
+      where: { id: storeId },
+      data: { isActive: false },
+    });
+
+    revalidatePath("/stores");
+
+    return { success: true, message: `Store "${store.name}" archived` };
+  } catch (error) {
+    console.error("archiveStore error:", error);
+    return { success: false, message: "Failed to archive store" };
+  }
+}
+
+export async function restoreStore(storeId: string): Promise<StoreFormState> {
+  try {
+    await requireRole(UserRole.SUPER_ADMIN);
+
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { name: true },
+    });
+
+    if (!store) {
+      return { success: false, message: "Store not found" };
+    }
+
+    await prisma.store.update({
+      where: { id: storeId },
+      data: { isActive: true },
+    });
+
+    revalidatePath("/stores");
+
+    return { success: true, message: `Store "${store.name}" restored` };
+  } catch (error) {
+    console.error("restoreStore error:", error);
+    return { success: false, message: "Failed to restore store" };
+  }
+}
+
 export async function setActiveStoreAction(storeId: string) {
   await requireRole(UserRole.SUPER_ADMIN);
 

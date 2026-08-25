@@ -12,6 +12,11 @@ const SUPER_ADMIN_EMAILS = (process.env.SUPER_ADMIN_EMAILS ?? "")
   .map((email) => email.trim().toLowerCase())
   .filter(Boolean)
 
+const SUPER_ADMIN_PHONES = (process.env.SUPER_ADMIN_PHONES ?? "")
+  .split(",")
+  .map((phone) => phone.trim())
+  .filter(Boolean)
+
 export const authOptions: NextAuthOptions = {
   adapter,
 
@@ -61,6 +66,23 @@ export const authOptions: NextAuthOptions = {
   },
 
   callbacks: {
+    async signIn({ user }) {
+      const dbUser = user as unknown as { storeId: string | null }
+
+      if (dbUser.storeId) {
+        const store = await prisma.store.findUnique({
+          where: { id: dbUser.storeId },
+          select: { isActive: true },
+        })
+
+        if (store && !store.isActive) {
+          return false
+        }
+      }
+
+      return true
+    },
+
     async jwt({ token, user }) {
       if (user) {
         const dbUser = user as unknown as {
@@ -77,8 +99,13 @@ export const authOptions: NextAuthOptions = {
 
         const email = user.email?.toLowerCase()
         const isSuperAdminEmail = !!email && SUPER_ADMIN_EMAILS.includes(email)
+        const isSuperAdminPhone =
+          !!dbUser.phone && SUPER_ADMIN_PHONES.includes(dbUser.phone)
 
-        if (isSuperAdminEmail && (role !== UserRole.SUPER_ADMIN || storeId !== null)) {
+        if (
+          (isSuperAdminEmail || isSuperAdminPhone) &&
+          (role !== UserRole.SUPER_ADMIN || storeId !== null)
+        ) {
           role = UserRole.SUPER_ADMIN
           storeId = null
           await prisma.user.update({

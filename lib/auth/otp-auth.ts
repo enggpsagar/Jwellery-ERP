@@ -35,5 +35,16 @@ export async function verifyOtpLogin(phone: string, otpInput: string) {
     throw new Error("Your account has been disabled.")
   }
 
+  if (user.storeId) {
+    const store = await prisma.store.findUnique({
+      where: { id: user.storeId },
+      select: { isActive: true },
+    })
+
+    if (store && !store.isActive) {
+      throw new Error("This store has been archived. Contact your administrator.")
+    }
+  }
+
   return user
 }

@@ -28,6 +28,7 @@ pnpm dev
 | `NEXTAUTH_SECRET` / `NEXTAUTH_URL` | NextAuth session signing + base URL |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth login |
 | `SUPER_ADMIN_EMAILS` | Comma-separated Google account emails auto-promoted to Super Admin on first sign-in |
+| `SUPER_ADMIN_PHONES` | Comma-separated registered mobile numbers auto-promoted to Super Admin on OTP sign-in |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM` | Outbound email (invites, invoice/ledger sharing) |
 | `GOLD_API_KEY` | Daily gold/silver rate fetch (`/api/cron/metal-rates`) |
 | `CRON_SECRET` | Authorizes the metal-rates cron endpoint |
@@ -50,7 +51,7 @@ The database is shared between local development and the deployed app (a single 
 
 | Role | Scope |
 |---|---|
-| **Super Admin** | Every store. Creates new stores and their initial Admin from `/stores`. Signs in via a Google account listed in `SUPER_ADMIN_EMAILS`. |
+| **Super Admin** | Every store. Creates new stores and their initial Admin from `/stores`. Signs in via a Google account listed in `SUPER_ADMIN_EMAILS` or a mobile number listed in `SUPER_ADMIN_PHONES`. |
 | **Admin** ("Store Owner") | Full control of their own store — settings, users, all data. |
 | **Staff** | Day-to-day sales/inventory/billing. An Admin can restrict a Staff user to specific sections (Customers, Vendors, Inventory, Billing, Quotations, Purchases, Karigar Management, Reports, Ledger) from the Users page — unrestricted by default. |
 | **Karigar** | Logs in and sees only their own assigned jobs (`/my-jobs`) — nothing else in the app. |

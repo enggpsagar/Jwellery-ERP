@@ -49,7 +49,11 @@ export function KachaInvoiceTable({ kachaInvoices }: KachaInvoiceTableProps) {
           <tbody>
             {kachaInvoices.map((kachaInvoice) => (
               <tr key={kachaInvoice.id} className="border-b last:border-0">
-                <td className="px-4 py-3 font-medium">{kachaInvoice.slipNumber}</td>
+                <td className="px-4 py-3 font-medium">
+                  <Link href={`/billing/kacha/${kachaInvoice.id}`} className="hover:underline">
+                    {kachaInvoice.slipNumber}
+                  </Link>
+                </td>
                 <td className="px-4 py-3">
                   {new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN")}
                 </td>

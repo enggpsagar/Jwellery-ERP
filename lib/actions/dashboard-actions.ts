@@ -247,6 +247,7 @@ export async function getRevenueByCategory(): Promise<CategoryRevenue[]> {
 
 export type DashboardTransaction = {
   id: string;
+  invoiceId: string;
   customer: string;
   type: "Sale";
   metal: string;
@@ -300,6 +301,7 @@ export async function getRecentTransactions(
 
     return {
       id: inv.invoiceNumber,
+      invoiceId: inv.id,
       customer: inv.customer.name,
       type: "Sale" as const,
       metal,

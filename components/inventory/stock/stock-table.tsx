@@ -152,7 +152,11 @@ export function StockTable({
                     />
                   </td>
 
-                  <td className="px-4 py-3 font-medium">{item.stockCode}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <Link href={`/inventory/stock/${item.id}`} className="hover:underline">
+                      {item.stockCode}
+                    </Link>
+                  </td>
 
                   <td className="px-4 py-3">
                     <div className="font-medium">{item.product?.name ?? "-"}</div>

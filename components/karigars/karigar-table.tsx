@@ -2,6 +2,8 @@
 // REPLACES the existing file at this path
 "use client"
 
+import Link from "next/link"
+
 import { KarigarRowActions } from "@/components/karigars/karigar-row-actions"
 import { KarigarsPagination } from "@/components/karigars/karigars-pagination"
 import type { Karigar } from "@/lib/actions/karigar-actions"
@@ -97,7 +99,11 @@ export function KarigarTable({
                     aria-label={`Select ${karigar.name}`}
                   />
                 </td>
-                <td className="px-4 py-3">{karigar.code || "-"}</td>
+                <td className="px-4 py-3">
+                  <Link href={`/karigars/${karigar.id}`} className="hover:underline">
+                    {karigar.code || "-"}
+                  </Link>
+                </td>
                 <td className="px-4 py-3 font-medium">{karigar.name}</td>
                 <td className="px-4 py-3">{karigar.mobile || "-"}</td>
                 <td className="px-4 py-3">{karigar.specialization || "-"}</td>

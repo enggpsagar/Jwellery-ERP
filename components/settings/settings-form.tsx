@@ -1,19 +1,26 @@
 "use client";
 
 import { useActionState } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import {
   updateBusinessSettings,
   type BusinessSettings,
   type SettingsFormState,
 } from "@/lib/actions/settings-actions";
+import {
+  ALL_BUSINESS_UNITS,
+  BUSINESS_UNIT_LABELS,
+  BUSINESS_UNIT_DESCRIPTIONS,
+  type BusinessUnit,
+} from "@/lib/business-units";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 type SettingsFormProps = {
   settings: BusinessSettings;
@@ -27,6 +34,18 @@ export function SettingsForm({ settings, canEdit }: SettingsFormProps) {
     updateBusinessSettings,
     initialState,
   );
+
+  const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>(
+    settings.businessUnits,
+  );
+
+  function toggleUnit(unit: BusinessUnit) {
+    setBusinessUnits((current) =>
+      current.includes(unit)
+        ? current.filter((u) => u !== unit)
+        : [...current, unit],
+    );
+  }
 
   useEffect(() => {
     if (state.message && state.success) {
@@ -184,6 +203,68 @@ export function SettingsForm({ settings, canEdit }: SettingsFormProps) {
             <Label htmlFor="pincode">Pincode</Label>
             <Input id="pincode" name="pincode" defaultValue={settings.pincode} />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Business Model</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            What does this business transact and settle balances in? This
+            drives which totals the Ledger and customer statements show.
+            Select one or more.
+          </p>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {ALL_BUSINESS_UNITS.map((unit) => {
+              const checked = businessUnits.includes(unit);
+
+              return (
+                <label
+                  key={unit}
+                  className={cn(
+                    "flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm transition-colors",
+                    checked
+                      ? "border-primary bg-primary/5"
+                      : "border-input hover:bg-accent",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    name="businessUnits"
+                    value={unit}
+                    checked={checked}
+                    onChange={() => toggleUnit(unit)}
+                    className="mt-0.5 size-4"
+                  />
+
+                  <span>
+                    <span className="block font-medium">
+                      {BUSINESS_UNIT_LABELS[unit]}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {BUSINESS_UNIT_DESCRIPTIONS[unit]}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+
+          {businessUnits.length === 0 ? (
+            <p className="text-xs text-red-600">
+              Select at least one unit — Money will be used by default if
+              none are selected.
+            </p>
+          ) : null}
+
+          {state.errors?.businessUnits ? (
+            <p className="text-xs text-red-600">
+              {state.errors.businessUnits[0]}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 

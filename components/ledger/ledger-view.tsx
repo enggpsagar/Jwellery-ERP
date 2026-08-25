@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 
 import type { LedgerEntryRow, LedgerTotals } from "@/lib/actions/ledger-actions"
+import { classifyMetalName } from "@/lib/business-units"
 import { cn } from "@/lib/utils"
 import {
   Card,
@@ -50,6 +51,17 @@ function formatCurrency(value: number, withSign = false) {
   const formatted = `₹${abs.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
   if (withSign) return `${value >= 0 ? "+" : "-"}${formatted}`
   return formatted
+}
+
+/** Gold/silver entries are settled by weight, not rupees — show the weight instead of ₹ for those rows. */
+function formatEntryValue(entry: LedgerEntryRow) {
+  const family = classifyMetalName(entry.metalType)
+
+  if ((family === "GOLD" || family === "SILVER") && entry.metalWeight != null) {
+    return `${Math.abs(entry.metalWeight).toLocaleString("en-IN", { maximumFractionDigits: 3 })} g`
+  }
+
+  return formatCurrency(entry.amount)
 }
 
 function daysAgo(dateISO: string) {
@@ -134,21 +146,46 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
     setDrawerOpen(true)
   }
 
+  const formatUnitTotal = (unit: LedgerTotals["unitTotals"][number], value: number) =>
+    unit.unit === "DIAMOND"
+      ? formatCurrency(value)
+      : `${Math.abs(value).toLocaleString("en-IN", { maximumFractionDigits: 3 })} g`
+
   const summaryCards = [
-    {
-      label: "Total Debit",
-      value: formatCurrency(totals.totalDebit),
-      sub: "Amount owed by customers",
-      icon: ArrowUpCircle,
-      accent: "text-destructive bg-destructive/10",
-    },
-    {
-      label: "Total Credit",
-      value: formatCurrency(totals.totalCredit),
-      sub: "Payments received",
-      icon: ArrowDownCircle,
-      accent: "text-emerald-600 bg-emerald-50",
-    },
+    ...(totals.moneyActive
+      ? [
+          {
+            label: "Total Debit",
+            value: formatCurrency(totals.totalDebit),
+            sub: "Amount owed by customers",
+            icon: ArrowUpCircle,
+            accent: "text-destructive bg-destructive/10",
+          },
+          {
+            label: "Total Credit",
+            value: formatCurrency(totals.totalCredit),
+            sub: "Payments received",
+            icon: ArrowDownCircle,
+            accent: "text-emerald-600 bg-emerald-50",
+          },
+        ]
+      : []),
+    ...totals.unitTotals.flatMap((unit) => [
+      {
+        label: `${unit.label} Debit`,
+        value: formatUnitTotal(unit, unit.debit),
+        sub: `Owed in ${unit.label.toLowerCase()}`,
+        icon: ArrowUpCircle,
+        accent: "text-destructive bg-destructive/10",
+      },
+      {
+        label: `${unit.label} Credit`,
+        value: formatUnitTotal(unit, unit.credit),
+        sub: `Received in ${unit.label.toLowerCase()}`,
+        icon: ArrowDownCircle,
+        accent: "text-emerald-600 bg-emerald-50",
+      },
+    ]),
     {
       label: "Today's Transactions",
       value: String(totals.todayCount),
@@ -160,7 +197,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {summaryCards.map((card) => (
           <Card key={card.label}>
             <CardHeader className="flex flex-row items-start justify-between gap-2">
@@ -337,7 +374,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
                       {entry.type === "DEBIT" ? (
                         <span className="inline-flex items-center gap-1 text-destructive">
                           <ArrowUpRight className="size-3.5" />
-                          {formatCurrency(entry.amount)}
+                          {formatEntryValue(entry)}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
@@ -347,7 +384,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
                       {entry.type === "CREDIT" ? (
                         <span className="inline-flex items-center gap-1 text-emerald-600">
                           <ArrowDownLeft className="size-3.5" />
-                          {formatCurrency(entry.amount)}
+                          {formatEntryValue(entry)}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>

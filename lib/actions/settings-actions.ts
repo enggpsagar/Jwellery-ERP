@@ -3,9 +3,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { UserRole } from "@prisma/client";
+import { UserRole, BusinessUnit } from "@prisma/client";
 import { requireStoreScope } from "@/lib/store-context";
 import { requireRole } from "@/lib/auth/auth";
+import { ALL_BUSINESS_UNITS } from "@/lib/business-units";
 
 export type BusinessSettings = {
   storeId: string;
@@ -27,6 +28,7 @@ export type BusinessSettings = {
   invoiceNotes: string;
   defaultGstRate: number;
   financialYearStartMonth: number;
+  businessUnits: BusinessUnit[];
 };
 
 export type SettingsFormState = {
@@ -67,7 +69,21 @@ function mapSettings(settings: any): BusinessSettings {
     invoiceNotes: settings.invoiceNotes ?? "",
     defaultGstRate: Number(settings.defaultGstRate ?? 3.0),
     financialYearStartMonth: settings.financialYearStartMonth ?? 4,
+    businessUnits: settings.businessUnits?.length
+      ? settings.businessUnits
+      : [BusinessUnit.MONEY],
   };
+}
+
+function parseBusinessUnits(formData: FormData): BusinessUnit[] {
+  const selected = formData
+    .getAll("businessUnits")
+    .map((value) => String(value))
+    .filter((value): value is BusinessUnit =>
+      ALL_BUSINESS_UNITS.includes(value as BusinessUnit),
+    );
+
+  return selected.length ? selected : [BusinessUnit.MONEY];
 }
 
 /**
@@ -127,6 +143,7 @@ export async function updateBusinessSettings(
     }
 
     const storeId = await requireStoreScope();
+    const businessUnits = parseBusinessUnits(formData);
 
     await prisma.businessSettings.upsert({
       where: { storeId },
@@ -152,6 +169,7 @@ export async function updateBusinessSettings(
           formData.get("financialYearStartMonth"),
           4,
         ),
+        businessUnits,
       },
       create: {
         storeId,
@@ -176,10 +194,13 @@ export async function updateBusinessSettings(
           formData.get("financialYearStartMonth"),
           4,
         ),
+        businessUnits,
       },
     });
 
     revalidatePath("/settings");
+    revalidatePath("/ledger");
+    revalidatePath("/customers");
 
     return { success: true, message: "Settings updated successfully" };
   } catch (error) {

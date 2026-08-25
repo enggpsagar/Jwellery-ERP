@@ -20,17 +20,6 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  Legend,
-} from "recharts";
-
 type MetalRate = {
   id: string;
   date: string;
@@ -117,14 +106,6 @@ export function MetalPriceChart() {
     };
   }, [data]);
 
-  const chartData = data.map((item) => ({
-    ...item,
-    label: new Date(item.date).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-    }),
-  }));
-
   if (loading) {
     return (
       <Card>
@@ -133,7 +114,7 @@ export function MetalPriceChart() {
         </CardHeader>
 
         <CardContent>
-          <div className="h-[420px] animate-pulse rounded-lg bg-muted" />
+          <div className="h-[140px] animate-pulse rounded-lg bg-muted" />
         </CardContent>
       </Card>
     );
@@ -165,7 +146,7 @@ export function MetalPriceChart() {
 
       <CardContent>
 
-        <div className="mb-8 grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-4">
 
           <Card>
             <CardContent className="pt-6">
@@ -269,89 +250,6 @@ export function MetalPriceChart() {
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        <div className="h-[420px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={chartData}
-              margin={{
-                top: 10,
-                right: 20,
-                left: 10,
-                bottom: 10,
-              }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                opacity={0.2}
-              />
-
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 12 }}
-              />
-
-              <YAxis
-                tick={{ fontSize: 12 }}
-              />
-
-              <Tooltip
-                formatter={(value: number) => [
-                  `₹${value.toFixed(2)}`,
-                ]}
-              />
-
-              <Legend />
-
-              <Line
-                type="monotone"
-                dataKey="gold24k"
-                name="Gold 24K"
-                stroke="#d4af37"
-                strokeWidth={3}
-                dot={{
-                  r: 4,
-                }}
-                activeDot={{
-                  r: 6,
-                }}
-              />
-
-              <Line
-                type="monotone"
-                dataKey="gold22k"
-                name="Gold 22K"
-                stroke="#f59e0b"
-                strokeWidth={3}
-                dot={{
-                  r: 4,
-                }}
-              />
-
-              <Line
-                type="monotone"
-                dataKey="gold18k"
-                name="Gold 18K"
-                stroke="#ea580c"
-                strokeWidth={3}
-                dot={{
-                  r: 4,
-                }}
-              />
-
-              <Line
-                type="monotone"
-                dataKey="silver"
-                name="Silver"
-                stroke="#6b7280"
-                strokeWidth={3}
-                dot={{
-                  r: 4,
-                }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
         </div>
       </CardContent>
     </Card>

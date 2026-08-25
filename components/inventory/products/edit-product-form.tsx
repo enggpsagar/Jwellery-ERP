@@ -26,7 +26,9 @@ type EditProductFormProps = {
     metalTypeId: string | null;
     defaultPurity: string | null;
     defaultMakingCharge: string | null;
+    defaultMakingChargeType: "FIXED" | "PERCENTAGE" | null;
     defaultStoneCharge: string | null;
+    defaultStoneChargeType: "FIXED" | "PERCENTAGE" | null;
     designCode: string | null;
     hsnCode: string | null;
     description: string | null;

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -53,12 +54,31 @@ type ReceiptItem = {
   purity: string
   quantity: number
   grossWeight: number
+  lessWeight: number
   netWeight: number
   stoneWeight: number
   dmoWeight: number
   wastagePercent: number
+  tagNumber: string
+  purchaseRate: number
+  saleRate: number
+  makingCharge: number
+  stoneCharge: number
+  otherCharge: number
+  purchaseAmount: number
+  saleAmount: number
+  vendorName: string
+  purchaseDate: string
+  manufactureDate: string
+  location: string
+  remarks: string
 }
 
+// Every returned item becomes brand-new sellable InventoryStock (see
+// receiveItemsFromKarigar) — a "fresh product" exactly like one entered via
+// the Add Stock form, so it carries the same field set as StockForm
+// (components/inventory/stock/stock-form.tsx), not just the weight fields
+// needed for the karigar fine-gold ledger calc.
 function emptyReceiptItem(defaultMetal?: StoreMetalRow): ReceiptItem {
   return {
     key: crypto.randomUUID(),
@@ -68,10 +88,24 @@ function emptyReceiptItem(defaultMetal?: StoreMetalRow): ReceiptItem {
     purity: defaultMetal && !defaultMetal.hasPurity ? "OTHER" : "GOLD_22K",
     quantity: 1,
     grossWeight: 0,
+    lessWeight: 0,
     netWeight: 0,
     stoneWeight: 0,
     dmoWeight: 0,
     wastagePercent: 0,
+    tagNumber: "",
+    purchaseRate: 0,
+    saleRate: 0,
+    makingCharge: 0,
+    stoneCharge: 0,
+    otherCharge: 0,
+    purchaseAmount: 0,
+    saleAmount: 0,
+    vendorName: "",
+    purchaseDate: "",
+    manufactureDate: "",
+    location: "",
+    remarks: "",
   }
 }
 
@@ -192,10 +226,24 @@ export function ReceiveItemsDialog({ jobId, products, fineness, metals }: Receiv
       purity: item.purity,
       quantity: item.quantity || 1,
       grossWeight: item.grossWeight || null,
+      lessWeight: item.lessWeight || null,
       netWeight: item.netWeight || null,
       stoneWeight: item.stoneWeight || null,
       dmoWeight: item.dmoWeight || null,
       wastagePercent: item.wastagePercent || null,
+      tagNumber: item.tagNumber || null,
+      purchaseRate: item.purchaseRate || null,
+      saleRate: item.saleRate || null,
+      makingCharge: item.makingCharge || null,
+      stoneCharge: item.stoneCharge || null,
+      otherCharge: item.otherCharge || null,
+      purchaseAmount: item.purchaseAmount || null,
+      saleAmount: item.saleAmount || null,
+      vendorName: item.vendorName || null,
+      purchaseDate: item.purchaseDate || null,
+      manufactureDate: item.manufactureDate || null,
+      location: item.location || null,
+      remarks: item.remarks || null,
     })),
   )
 
@@ -331,6 +379,18 @@ export function ReceiveItemsDialog({ jobId, products, fineness, metals }: Receiv
                       </div>
 
                       <div className="space-y-1">
+                        <Label className="text-xs">Less Weight (g)</Label>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={item.lessWeight === 0 ? "" : item.lessWeight}
+                          onChange={(e) =>
+                            updateItem(item.key, { lessWeight: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-1">
                         <Label className="text-xs">Net Weight (g) *</Label>
                         <Input
                           type="number"
@@ -385,6 +445,155 @@ export function ReceiveItemsDialog({ jobId, products, fineness, metals }: Receiv
                         <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-medium">
                           {fineWeightOf(item).toFixed(3)}g
                         </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 border-t pt-3">
+                      <Label className="text-xs font-medium text-muted-foreground">
+                        Pricing &amp; Purchase Details
+                      </Label>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Tag Number</Label>
+                          <Input
+                            value={item.tagNumber}
+                            placeholder="TAG-001"
+                            onChange={(e) => updateItem(item.key, { tagNumber: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Purchase Rate</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.purchaseRate === 0 ? "" : item.purchaseRate}
+                            onChange={(e) =>
+                              updateItem(item.key, { purchaseRate: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Sale Rate</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.saleRate === 0 ? "" : item.saleRate}
+                            onChange={(e) =>
+                              updateItem(item.key, { saleRate: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Making Charge</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.makingCharge === 0 ? "" : item.makingCharge}
+                            onChange={(e) =>
+                              updateItem(item.key, { makingCharge: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Stone Charge</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.stoneCharge === 0 ? "" : item.stoneCharge}
+                            onChange={(e) =>
+                              updateItem(item.key, { stoneCharge: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Other Charge</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.otherCharge === 0 ? "" : item.otherCharge}
+                            onChange={(e) =>
+                              updateItem(item.key, { otherCharge: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Purchase Amount</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.purchaseAmount === 0 ? "" : item.purchaseAmount}
+                            onChange={(e) =>
+                              updateItem(item.key, { purchaseAmount: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Sale Amount</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.saleAmount === 0 ? "" : item.saleAmount}
+                            onChange={(e) =>
+                              updateItem(item.key, { saleAmount: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Vendor Name</Label>
+                          <Input
+                            value={item.vendorName}
+                            onChange={(e) => updateItem(item.key, { vendorName: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Purchase Date</Label>
+                          <Input
+                            type="date"
+                            value={item.purchaseDate}
+                            onChange={(e) =>
+                              updateItem(item.key, { purchaseDate: e.target.value })
+                            }
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Date of Manufacture</Label>
+                          <Input
+                            type="date"
+                            value={item.manufactureDate}
+                            onChange={(e) =>
+                              updateItem(item.key, { manufactureDate: e.target.value })
+                            }
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Location</Label>
+                          <Input
+                            value={item.location}
+                            placeholder="Store / Locker"
+                            onChange={(e) => updateItem(item.key, { location: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs">Remarks</Label>
+                        <Textarea
+                          rows={2}
+                          value={item.remarks}
+                          onChange={(e) => updateItem(item.key, { remarks: e.target.value })}
+                        />
                       </div>
                     </div>
 

@@ -248,10 +248,24 @@ export type KarigarReceiptItemInput = {
   purity: PurityType;
   quantity: number;
   grossWeight?: number | null;
+  lessWeight?: number | null;
   netWeight?: number | null;
   stoneWeight?: number | null;
   dmoWeight?: number | null;
   wastagePercent?: number | null;
+  tagNumber?: string | null;
+  purchaseRate?: number | null;
+  saleRate?: number | null;
+  makingCharge?: number | null;
+  stoneCharge?: number | null;
+  otherCharge?: number | null;
+  purchaseAmount?: number | null;
+  saleAmount?: number | null;
+  vendorName?: string | null;
+  purchaseDate?: string | null;
+  manufactureDate?: string | null;
+  location?: string | null;
+  remarks?: string | null;
 };
 
 /** JOB-${year}-0001, incrementing per store per year — matches the numbering
@@ -381,9 +395,12 @@ export async function issueMaterialToKarigar(
 
 /**
  * Receive one or more finished items back from a karigar against an open
- * job. Each item becomes new sellable IN_STOCK inventory. Sums the items'
- * weight (raw and fine-gold-equivalent) onto the job, closes it, and logs
- * a CREDIT ledger entry for the gold returned plus a separate DEBIT entry
+ * job. Each item is a brand-new fresh product, so it becomes new sellable
+ * IN_STOCK inventory carrying the same field set as the Add Stock form
+ * (tag number, weights, pricing, purchase details) — not just the weight
+ * fields the karigar fine-gold ledger calc needs. Sums the items' weight
+ * (raw and fine-gold-equivalent) onto the job, closes it, and logs a
+ * CREDIT ledger entry for the gold returned plus a separate DEBIT entry
  * for any labour charge owed.
  */
 export async function receiveItemsFromKarigar(
@@ -472,16 +489,30 @@ export async function receiveItemsFromKarigar(
             storeId,
             productId: item.productId!,
             stockCode,
+            tagNumber: item.tagNumber || undefined,
             metalTypeId: item.metalTypeId,
             purity: item.purity,
             quantity: item.quantity || 1,
             status: InventoryStockStatus.IN_STOCK,
             finish: InventoryFinish.PAKKA,
             grossWeight: item.grossWeight ?? undefined,
+            lessWeight: item.lessWeight ?? undefined,
             netWeight: item.netWeight ?? undefined,
             stoneWeight: item.stoneWeight ?? undefined,
             dmoWeight: item.dmoWeight ?? undefined,
             wastagePercent: item.wastagePercent ?? undefined,
+            purchaseRate: item.purchaseRate ?? undefined,
+            saleRate: item.saleRate ?? undefined,
+            makingCharge: item.makingCharge ?? undefined,
+            stoneCharge: item.stoneCharge ?? undefined,
+            otherCharge: item.otherCharge ?? undefined,
+            purchaseAmount: item.purchaseAmount ?? undefined,
+            saleAmount: item.saleAmount ?? undefined,
+            vendorName: item.vendorName || undefined,
+            purchaseDate: item.purchaseDate ? new Date(item.purchaseDate) : undefined,
+            manufactureDate: item.manufactureDate ? new Date(item.manufactureDate) : undefined,
+            location: item.location || undefined,
+            remarks: item.remarks || undefined,
           },
         });
 

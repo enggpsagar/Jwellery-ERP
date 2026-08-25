@@ -334,6 +334,13 @@ export async function createKachaInvoice(
       return { success: false, message: "Add at least one line item" };
     }
 
+    // Don't trust client-submitted charge type — coerce anything unexpected
+    // (missing, malformed, or a value outside the enum) down to FIXED.
+    items = items.map((item) => ({
+      ...item,
+      makingChargeType: toChargeType(item.makingChargeType),
+    }));
+
     const discount = toNumber(formData.get("discount"));
     const paidAmount = toNumber(formData.get("paidAmount"));
     const invoiceDateRaw = String(formData.get("invoiceDate") || "");
@@ -390,6 +397,7 @@ export async function createKachaInvoice(
               netWeight: item.netWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,
+              makingChargeType: toChargeType(item.makingChargeType),
               stoneCharge: item.stoneCharge,
               dmoWeight: item.dmoWeight ?? undefined,
               lineTotal: lineTotal(item),
@@ -584,6 +592,7 @@ export async function convertKachaToPakka(
               netWeight: item.netWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,
+              makingChargeType: item.makingChargeType,
               stoneCharge: item.stoneCharge,
               dmoWeight: item.dmoWeight ?? undefined,
               lineTotal: item.lineTotal,

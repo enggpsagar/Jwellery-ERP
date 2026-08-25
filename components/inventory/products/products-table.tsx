@@ -126,7 +126,11 @@ export function ProductsTable({
                       className="h-4 w-4 rounded border-gray-300"
                     />
                   </td>
-                  <td className="px-4 py-3">{product.productCode}</td>
+                  <td className="px-4 py-3">
+                    <Link href={`/inventory/products/${product.id}`} className="hover:underline">
+                      {product.productCode}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 font-medium">{product.name}</td>
                   <td className="px-4 py-3">{product.category}</td>
                   <td className="px-4 py-3">{product.ornamentType ?? "-"}</td>

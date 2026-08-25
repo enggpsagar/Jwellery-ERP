@@ -49,7 +49,11 @@ export function QuotationTable({ quotations }: QuotationTableProps) {
           <tbody>
             {quotations.map((quotation) => (
               <tr key={quotation.id} className="border-b last:border-0">
-                <td className="px-4 py-3 font-medium">{quotation.quotationNumber}</td>
+                <td className="px-4 py-3 font-medium">
+                  <Link href={`/quotations/${quotation.id}`} className="hover:underline">
+                    {quotation.quotationNumber}
+                  </Link>
+                </td>
                 <td className="px-4 py-3">
                   {new Date(quotation.quotationDate).toLocaleDateString("en-IN")}
                 </td>

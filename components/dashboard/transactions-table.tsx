@@ -68,7 +68,9 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
             {transactions.map((t) => (
               <TableRow key={t.id}>
                 <TableCell className="font-medium tabular-nums">
-                  {t.id}
+                  <Link href={`/billing/${t.invoiceId}`} className="hover:underline">
+                    {t.id}
+                  </Link>
                 </TableCell>
                 <TableCell className="max-w-[180px] truncate">
                   {t.customer}

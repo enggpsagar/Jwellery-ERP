@@ -49,7 +49,11 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
           <tbody>
             {invoices.map((invoice) => (
               <tr key={invoice.id} className="border-b last:border-0">
-                <td className="px-4 py-3 font-medium">{invoice.invoiceNumber}</td>
+                <td className="px-4 py-3 font-medium">
+                  <Link href={`/billing/${invoice.id}`} className="hover:underline">
+                    {invoice.invoiceNumber}
+                  </Link>
+                </td>
                 <td className="px-4 py-3">
                   {new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}
                 </td>

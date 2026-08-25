@@ -47,7 +47,11 @@ export function PurchaseTable({ purchases }: PurchaseTableProps) {
           <tbody>
             {purchases.map((purchase) => (
               <tr key={purchase.id} className="border-b last:border-0">
-                <td className="px-4 py-3 font-medium">{purchase.purchaseNumber}</td>
+                <td className="px-4 py-3 font-medium">
+                  <Link href={`/purchases/${purchase.id}`} className="hover:underline">
+                    {purchase.purchaseNumber}
+                  </Link>
+                </td>
                 <td className="px-4 py-3">
                   {new Date(purchase.purchaseDate).toLocaleDateString("en-IN")}
                 </td>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { UserPlus } from "lucide-react"
 
 import {
   Select,
@@ -10,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { QuickAddCustomerDialog } from "@/components/customers/quick-add-customer-dialog"
 
 export type CustomerOption = {
   id: string
@@ -40,18 +42,31 @@ export function CustomerSelect({
 }: CustomerSelectProps) {
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState(defaultValue ?? "")
+  const [localCustomers, setLocalCustomers] = useState(customers)
+  const [selectOpen, setSelectOpen] = useState(false)
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return customers
+    if (!query) return localCustomers
 
-    return customers.filter(
+    return localCustomers.filter(
       (customer) =>
         customer.name.toLowerCase().includes(query) ||
         (customer.phone ?? "").toLowerCase().includes(query) ||
         (customer.customerCode ?? "").toLowerCase().includes(query),
     )
-  }, [customers, search])
+  }, [localCustomers, search])
+
+  function selectCustomer(customer: CustomerOption) {
+    setSelected(customer.id)
+    onChange?.(customer.id, customer)
+  }
+
+  function openQuickAdd() {
+    setSelectOpen(false)
+    setQuickAddOpen(true)
+  }
 
   return (
     <div className="space-y-2">
@@ -59,9 +74,11 @@ export function CustomerSelect({
 
       <Select
         value={selected}
+        open={selectOpen}
+        onOpenChange={setSelectOpen}
         onValueChange={(value) => {
           setSelected(value)
-          onChange?.(value, customers.find((customer) => customer.id === value))
+          onChange?.(value, localCustomers.find((customer) => customer.id === value))
         }}
       >
         <SelectTrigger>
@@ -80,7 +97,7 @@ export function CustomerSelect({
 
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
-              No customers found
+              No customers found{search ? ` for "${search}"` : ""}
             </div>
           ) : (
             filtered.map((customer) => (
@@ -92,8 +109,30 @@ export function CustomerSelect({
               </SelectItem>
             ))
           )}
+
+          <div className="mt-1 border-t p-1">
+            <button
+              type="button"
+              onClick={openQuickAdd}
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-primary hover:bg-accent"
+            >
+              <UserPlus className="h-4 w-4" />
+              Create new customer
+            </button>
+          </div>
         </SelectContent>
       </Select>
+
+      <QuickAddCustomerDialog
+        open={quickAddOpen}
+        onOpenChange={setQuickAddOpen}
+        initialName={search}
+        onCreated={(customer) => {
+          setLocalCustomers((prev) => [customer, ...prev])
+          selectCustomer(customer)
+          setSearch("")
+        }}
+      />
     </div>
   )
 }

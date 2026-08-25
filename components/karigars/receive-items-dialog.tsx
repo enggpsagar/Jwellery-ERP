@@ -209,7 +209,7 @@ export function ReceiveItemsDialog({ jobId, products, fineness, metals }: Receiv
         Receive Items
       </Button>
 
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Receive Items from Karigar</DialogTitle>
         </DialogHeader>
@@ -242,7 +242,7 @@ export function ReceiveItemsDialog({ jobId, products, fineness, metals }: Receiv
 
                 return (
                   <div key={item.key} className="rounded-lg border p-4 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       <div className="space-y-1">
                         <Label className="text-xs">Product *</Label>
                         <ProductSelect
@@ -305,7 +305,7 @@ export function ReceiveItemsDialog({ jobId, products, fineness, metals }: Receiv
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                       <div className="space-y-1">
                         <Label className="text-xs">Quantity</Label>
                         <Input

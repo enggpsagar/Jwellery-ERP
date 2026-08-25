@@ -38,6 +38,13 @@ export type CustomerFormState = {
   success: boolean
   message: string
   errors?: Record<string, string[]>
+  /** Set on a successful addCustomer — lets callers (e.g. an inline "create customer" picker) select the new row without a full reload. */
+  customer?: {
+    id: string
+    name: string
+    phone: string | null
+    customerCode: string | null
+  }
 }
 
 export type CustomerSortBy = "name" | "createdAt" | "openingBalance"
@@ -437,7 +444,7 @@ export async function addCustomer(
       }
     }
 
-    await prisma.customer.create({
+    const customer = await prisma.customer.create({
       data: {
         storeId,
         name,
@@ -452,6 +459,7 @@ export async function addCustomer(
         notes: notes || null,
         openingBalance,
       },
+      select: { id: true, name: true, phone: true, customerCode: true },
     })
 
     revalidatePath("/customers")
@@ -459,6 +467,7 @@ export async function addCustomer(
     return {
       success: true,
       message: "Customer added successfully",
+      customer,
     }
   } catch (error: any) {
     if (error?.code === "P2002") {

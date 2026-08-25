@@ -73,30 +73,10 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    // Email can only be set once
-    let email = user.email;
-
-    if (!user.email && body.email) {
-      const exists = await prisma.user.findUnique({
-        where: {
-          email: body.email,
-        },
-      });
-
-      if (exists) {
-        return NextResponse.json(
-          {
-            message: "Email already exists.",
-          },
-          {
-            status: 400,
-          }
-        );
-      }
-
-      email = body.email;
-    }
-
+    // Email and phone are sign-in identifiers — they can only be changed
+    // through the OTP-verified flow (lib/actions/profile-security-actions.ts),
+    // not this general-purpose PATCH, so any email/phone in the body is
+    // ignored here rather than trusted from the client.
     const updated = await prisma.user.update({
       where: {
         id: user.id,
@@ -104,9 +84,6 @@ export async function PATCH(req: NextRequest) {
 
       data: {
         name: body.name,
-        phone: body.phone,
-
-        email,
 
         image: body.image,
 

@@ -244,16 +244,14 @@ export function ProfileForm() {
                 name="email"
                 type="email"
                 value={form.email}
-                disabled={!!currentEmail}
-                onChange={handleChange}
+                disabled
                 placeholder="Enter email"
               />
 
-              {!currentEmail && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Email can only be added once.
-                </p>
-              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                Your email is also your sign-in identifier — use Security
+                Settings to add or change it (OTP-verified).
+              </p>
             </div>
 
             <div>
@@ -264,8 +262,13 @@ export function ProfileForm() {
                 name="phone"
                 maxLength={10}
                 value={form.phone}
-                onChange={handleChange}
+                disabled
               />
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                Your phone is also your sign-in identifier — use Security
+                Settings to add or change it (OTP-verified).
+              </p>
             </div>
 
             <div>

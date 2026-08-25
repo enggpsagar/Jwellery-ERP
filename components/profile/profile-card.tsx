@@ -163,7 +163,11 @@ export function ProfileCard() {
         </div>
 
         <div className="mt-8 w-full space-y-2">
-          <ChangePasswordDialog />
+          <ChangePasswordDialog
+            currentPhone={profile?.phone ?? null}
+            currentEmail={profile?.email ?? null}
+            onProfileUpdated={loadProfile}
+          />
           <DeleteAccountDialog />
         </div>
       </CardContent>

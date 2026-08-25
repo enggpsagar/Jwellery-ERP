@@ -6,6 +6,9 @@ import {
   getCustomerLedgerEntries,
   getCustomerLedgerSummary,
 } from "@/lib/actions/customer-ledger-actions"
+import { classifyMetalName } from "@/lib/business-units"
+import { getActiveBusinessUnits } from "@/lib/business-units.server"
+import { getStoreMetals } from "@/lib/actions/taxonomy-actions"
 import { AddCustomerSaleEntryDialog } from "@/components/customers/ledger/add-customer-sale-entry-dialog"
 import { AddCustomerRefundEntryDialog } from "@/components/customers/ledger/add-customer-refund-entry-dialog"
 import { EmailLedgerStatementButton } from "@/components/customers/ledger/email-ledger-statement-button"
@@ -21,12 +24,31 @@ function formatAmount(value: number) {
   })}`
 }
 
+function formatWeight(value: number) {
+  return `${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  })} g`
+}
+
+function formatEntryAmount(entry: { metalType: string | null; metalWeight: number | null; amount: number }) {
+  const family = classifyMetalName(entry.metalType)
+
+  if ((family === "GOLD" || family === "SILVER") && entry.metalWeight != null) {
+    return formatWeight(entry.metalWeight)
+  }
+
+  return formatAmount(entry.amount)
+}
+
 export async function CustomerLedgerCard({
   customerId,
 }: CustomerLedgerCardProps) {
-  const [entries, summary] = await Promise.all([
+  const [entries, summary, activeUnits, metals] = await Promise.all([
     getCustomerLedgerEntries(customerId),
     getCustomerLedgerSummary(customerId),
+    getActiveBusinessUnits(),
+    getStoreMetals(),
   ])
 
   return (
@@ -43,48 +65,95 @@ export async function CustomerLedgerCard({
 
         <div className="flex flex-col gap-3 sm:flex-row">
           <EmailLedgerStatementButton customerId={customerId} />
-          <AddCustomerSaleEntryDialog customerId={customerId} />
-          <AddCustomerRefundEntryDialog customerId={customerId} />
+          <AddCustomerSaleEntryDialog
+            customerId={customerId}
+            activeUnits={activeUnits}
+            metals={metals}
+          />
+          <AddCustomerRefundEntryDialog
+            customerId={customerId}
+            activeUnits={activeUnits}
+            metals={metals}
+          />
         </div>
       </div>
 
       {summary && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-lg border bg-white p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Opening Balance
-            </p>
-            <p className="mt-1 text-sm font-semibold text-gray-900">
-              {formatAmount(summary.openingBalance)}
-            </p>
-          </div>
+        <div className="space-y-4">
+          {summary.moneyActive && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-lg border bg-white p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Opening Balance
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">
+                  {formatAmount(summary.openingBalance)}
+                </p>
+              </div>
 
-          <div className="rounded-lg border bg-white p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Total Sales (Debit)
-            </p>
-            <p className="mt-1 text-sm font-semibold text-red-600">
-              {formatAmount(summary.ledgerDebitTotal)}
-            </p>
-          </div>
+              <div className="rounded-lg border bg-white p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Total Sales (Debit)
+                </p>
+                <p className="mt-1 text-sm font-semibold text-red-600">
+                  {formatAmount(summary.ledgerDebitTotal)}
+                </p>
+              </div>
 
-          <div className="rounded-lg border bg-white p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Total Refund / Received (Credit)
-            </p>
-            <p className="mt-1 text-sm font-semibold text-green-600">
-              {formatAmount(summary.ledgerCreditTotal)}
-            </p>
-          </div>
+              <div className="rounded-lg border bg-white p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Total Refund / Received (Credit)
+                </p>
+                <p className="mt-1 text-sm font-semibold text-green-600">
+                  {formatAmount(summary.ledgerCreditTotal)}
+                </p>
+              </div>
 
-          <div className="rounded-lg border bg-white p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Current Ledger Balance
-            </p>
-            <p className="mt-1 text-sm font-semibold text-gray-900">
-              {formatAmount(summary.currentBalance)}
-            </p>
-          </div>
+              <div className="rounded-lg border bg-white p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Current Ledger Balance
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900">
+                  {formatAmount(summary.currentBalance)}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {summary.unitSummaries.map((unit) => {
+            const format = unit.unit === "DIAMOND" ? formatAmount : formatWeight
+
+            return (
+              <div key={unit.unit} className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="rounded-lg border bg-white p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    {unit.label} Debit
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-red-600">
+                    {format(unit.debitTotal)}
+                  </p>
+                </div>
+
+                <div className="rounded-lg border bg-white p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    {unit.label} Credit
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-green-600">
+                    {format(unit.creditTotal)}
+                  </p>
+                </div>
+
+                <div className="rounded-lg border bg-white p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    {unit.label} Balance
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                    {format(unit.currentBalance)}
+                  </p>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -104,6 +173,7 @@ export async function CustomerLedgerCard({
                 <tr className="text-left text-gray-600">
                   <th className="px-4 py-3 font-medium">Date</th>
                   <th className="px-4 py-3 font-medium">Entry Type</th>
+                  <th className="px-4 py-3 font-medium">Unit</th>
                   <th className="px-4 py-3 font-medium">Source</th>
                   <th className="px-4 py-3 font-medium">Description</th>
                   <th className="px-4 py-3 font-medium">Invoice</th>
@@ -125,6 +195,9 @@ export async function CustomerLedgerCard({
                       >
                         {entry.type}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">
+                      {entry.metalType ?? "Money"}
                     </td>
                     <td className="px-4 py-3 text-gray-700">{entry.sourceType}</td>
                     <td className="px-4 py-3 text-gray-700">
@@ -148,7 +221,7 @@ export async function CustomerLedgerCard({
                         entry.type === "DEBIT" ? "text-red-600" : "text-green-600"
                       }`}
                     >
-                      {formatAmount(entry.amount)}
+                      {formatEntryAmount(entry)}
                     </td>
                   </tr>
                 ))}

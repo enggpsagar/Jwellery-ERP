@@ -6,6 +6,12 @@ import { LedgerEntryType } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { formatLedgerSource } from "@/lib/ledger-format"
+import {
+  classifyMetalName,
+  BUSINESS_UNIT_LABELS,
+  type BusinessUnit,
+} from "@/lib/business-units"
+import { getActiveBusinessUnits } from "@/lib/business-units.server"
 
 export type LedgerEntryRow = {
   id: string
@@ -149,10 +155,20 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
   }
 }
 
+export type LedgerUnitTotal = {
+  unit: BusinessUnit
+  label: string
+  debit: number
+  credit: number
+}
+
 export type LedgerTotals = {
   totalDebit: number
   totalCredit: number
   todayCount: number
+  moneyActive: boolean
+  /** Debit/credit totals for each non-money unit this store is configured to also deal in. */
+  unitTotals: LedgerUnitTotal[]
 }
 
 export async function getLedgerTotals(): Promise<LedgerTotals> {
@@ -161,7 +177,10 @@ export async function getLedgerTotals(): Promise<LedgerTotals> {
   const startOfToday = new Date()
   startOfToday.setHours(0, 0, 0, 0)
 
-  const [debitAgg, creditAgg, todayCount] = await Promise.all([
+  const activeUnits = await getActiveBusinessUnits()
+  const nonMoneyUnits = activeUnits.filter((unit) => unit !== "MONEY")
+
+  const [debitAgg, creditAgg, todayCount, metalEntries] = await Promise.all([
     prisma.ledgerEntry.aggregate({
       where: { storeId, type: LedgerEntryType.DEBIT },
       _sum: { amount: true },
@@ -173,11 +192,51 @@ export async function getLedgerTotals(): Promise<LedgerTotals> {
     prisma.ledgerEntry.count({
       where: { storeId, entryDate: { gte: startOfToday } },
     }),
+    nonMoneyUnits.length
+      ? prisma.ledgerEntry.findMany({
+          where: { storeId, metalTypeId: { not: null } },
+          select: {
+            type: true,
+            amount: true,
+            metalWeight: true,
+            metalWeightFine: true,
+            metalType: { select: { name: true } },
+          },
+        })
+      : Promise.resolve([]),
   ])
+
+  const weightTotals: Record<string, { debit: number; credit: number }> = {
+    GOLD: { debit: 0, credit: 0 },
+    SILVER: { debit: 0, credit: 0 },
+    DIAMOND: { debit: 0, credit: 0 },
+  }
+
+  for (const entry of metalEntries) {
+    const family = classifyMetalName(entry.metalType?.name)
+    if (family === "OTHER") continue
+
+    const isDebit = entry.type === LedgerEntryType.DEBIT
+    const value =
+      family === "DIAMOND"
+        ? Number(entry.amount ?? 0)
+        : Number(entry.metalWeightFine ?? entry.metalWeight ?? 0)
+
+    weightTotals[family][isDebit ? "debit" : "credit"] += value
+  }
+
+  const unitTotals: LedgerUnitTotal[] = nonMoneyUnits.map((unit) => ({
+    unit,
+    label: BUSINESS_UNIT_LABELS[unit],
+    debit: weightTotals[unit]?.debit ?? 0,
+    credit: weightTotals[unit]?.credit ?? 0,
+  }))
 
   return {
     totalDebit: Number(debitAgg._sum.amount ?? 0),
     totalCredit: Number(creditAgg._sum.amount ?? 0),
     todayCount,
+    moneyActive: activeUnits.includes("MONEY"),
+    unitTotals,
   }
 }

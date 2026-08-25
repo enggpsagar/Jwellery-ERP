@@ -716,6 +716,10 @@ model BusinessSettings {
   // Financial year
   financialYearStartMonth Int @default(4) // April = 4, common in India
 
+  // Which unit(s) this business transacts and settles balances in.
+  // Drives how the ledger (general + per-customer) totals/entries are denominated.
+  businessUnits BusinessUnit[] @default([MONEY])
+
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 }
@@ -878,6 +882,13 @@ enum InvoiceStatus {
 enum ChargeType {
   FIXED
   PERCENTAGE
+}
+
+enum BusinessUnit {
+  MONEY
+  GOLD
+  SILVER
+  DIAMOND
 }
 
 enum PurityType {

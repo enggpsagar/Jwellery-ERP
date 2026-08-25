@@ -6,6 +6,7 @@ import {
   InventoryStockStatus,
   InventoryFinish,
   PurityType,
+  ChargeType,
 } from "@prisma/client";
 
 import type { StockFormState } from "@/lib/inventory/stock-types";
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/select";
 
 import { ProductSelect } from "@/components/inventory/shared/product-select";
+import { MakingChargeInput } from "@/components/shared/making-charge-input";
 
 type ProductOption = {
   id: string;
@@ -81,6 +83,8 @@ type Stock = {
   saleRate: string | null;
 
   makingCharge: string | null;
+
+  makingChargeType: ChargeType | null;
 
   stoneCharge: string | null;
 
@@ -149,7 +153,20 @@ export function StockForm({
     stock?.isActive === false ? "false" : "true",
   );
 
-  const [makingCharge, setMakingCharge] = useState(stock?.makingCharge ?? "");
+  // Controlled so `MakingChargeInput` can react to them live for its %
+  // calculation (rate x netWeight) — every other Pricing Details field stays
+  // an uncontrolled `defaultValue` input, these two are the exception.
+  const [purchaseRate, setPurchaseRate] = useState(stock?.purchaseRate ?? "");
+  const [netWeight, setNetWeight] = useState(stock?.netWeight ?? "");
+
+  const [makingCharge, setMakingCharge] = useState(
+    stock?.makingCharge ? Number(stock.makingCharge) : 0,
+  );
+  const [makingChargeType, setMakingChargeType] = useState<ChargeType>(
+    stock?.makingChargeType === ChargeType.PERCENTAGE
+      ? ChargeType.PERCENTAGE
+      : ChargeType.FIXED,
+  );
   const [stoneCharge, setStoneCharge] = useState(stock?.stoneCharge ?? "");
 
   function applyProductDefaults(productId: string) {
@@ -158,7 +175,7 @@ export function StockForm({
 
     setMetalTypeId(product.metalType?.id ?? "");
     setPurity(product.defaultPurity ?? "__none__");
-    if (product.defaultMakingCharge) setMakingCharge(product.defaultMakingCharge);
+    if (product.defaultMakingCharge) setMakingCharge(Number(product.defaultMakingCharge));
     if (product.defaultStoneCharge) setStoneCharge(product.defaultStoneCharge);
   }
 
@@ -375,7 +392,8 @@ export function StockForm({
               name="netWeight"
               type="number"
               step="0.001"
-              defaultValue={stock?.netWeight ?? ""}
+              value={netWeight}
+              onChange={(event) => setNetWeight(event.target.value)}
             />
 
             <ErrorText error={state.errors.netWeight} />
@@ -440,7 +458,8 @@ export function StockForm({
               name="purchaseRate"
               type="number"
               step="0.01"
-              defaultValue={stock?.purchaseRate ?? ""}
+              value={purchaseRate}
+              onChange={(event) => setPurchaseRate(event.target.value)}
             />
 
             <ErrorText error={state.errors.purchaseRate} />
@@ -461,16 +480,18 @@ export function StockForm({
           </div>
 
           <div>
-            <Label htmlFor="makingCharge">Making Charge</Label>
-
-            <Input
-              id="makingCharge"
-              name="makingCharge"
-              type="number"
-              step="0.01"
+            <MakingChargeInput
+              rate={Number(purchaseRate) || 0}
+              netWeight={Number(netWeight) || 0}
               value={makingCharge}
-              onChange={(event) => setMakingCharge(event.target.value)}
+              onChange={setMakingCharge}
+              chargeType={makingChargeType}
+              onChargeTypeChange={setMakingChargeType}
+              label="Making Charge"
             />
+
+            <input type="hidden" name="makingCharge" value={makingCharge} />
+            <input type="hidden" name="makingChargeType" value={makingChargeType} />
 
             <ErrorText error={state.errors.makingCharge} />
           </div>

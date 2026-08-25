@@ -10,6 +10,7 @@ import {
   LedgerSourceType,
   PurityType,
   Prisma,
+  ChargeType,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -29,6 +30,7 @@ export type QuotationLineItemInput = {
   netWeight?: number | null;
   rate?: number | null;
   makingCharge: number;
+  makingChargeType?: ChargeType | string | null;
   stoneCharge: number;
   inventoryStockId?: string | null;
 };
@@ -45,6 +47,12 @@ const initialState: QuotationFormState = { success: false, message: "" };
 function toNumber(value: unknown, fallback = 0) {
   const num = Number(value);
   return Number.isNaN(num) ? fallback : num;
+}
+
+/** Never trust client input for the making-charge mode — anything other
+ * than a valid ChargeType falls back to FIXED. */
+function toChargeType(value: unknown): ChargeType {
+  return value === ChargeType.PERCENTAGE ? ChargeType.PERCENTAGE : ChargeType.FIXED;
 }
 
 function lineTotal(item: QuotationLineItemInput) {
@@ -116,6 +124,7 @@ function mapQuotation(quotation: any) {
       netWeight: item.netWeight ? Number(item.netWeight) : null,
       rate: item.rate ? Number(item.rate) : null,
       makingCharge: Number(item.makingCharge),
+      makingChargeType: item.makingChargeType as ChargeType,
       stoneCharge: Number(item.stoneCharge),
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
@@ -403,6 +412,7 @@ export async function createQuotation(
             netWeight: item.netWeight ?? undefined,
             rate: item.rate ?? undefined,
             makingCharge: item.makingCharge,
+            makingChargeType: toChargeType(item.makingChargeType),
             stoneCharge: item.stoneCharge,
             lineTotal: lineTotal(item),
             inventoryStockId: item.inventoryStockId || undefined,
@@ -528,6 +538,7 @@ export async function convertQuotationToInvoice(
               netWeight: item.netWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,
+              makingChargeType: item.makingChargeType,
               stoneCharge: item.stoneCharge,
               lineTotal: item.lineTotal,
               inventoryStockId: item.inventoryStockId ?? undefined,

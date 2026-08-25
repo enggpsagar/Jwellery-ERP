@@ -10,6 +10,7 @@ import {
   LedgerSourceType,
   PaymentMethod,
   PurityType,
+  ChargeType,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -27,6 +28,7 @@ export type InvoiceLineItemInput = {
   netWeight?: number | null;
   rate?: number | null;
   makingCharge: number;
+  makingChargeType?: ChargeType | string | null;
   stoneCharge: number;
   dmoWeight?: number | null;
   inventoryStockId?: string | null;
@@ -75,6 +77,12 @@ function parsePayments(raw: string): PaymentEntryInput[] | null {
 function toNumber(value: unknown, fallback = 0) {
   const num = Number(value);
   return Number.isNaN(num) ? fallback : num;
+}
+
+/** Never trust client input for the making-charge mode — anything other
+ * than a valid ChargeType falls back to FIXED. */
+function toChargeType(value: unknown): ChargeType {
+  return value === ChargeType.PERCENTAGE ? ChargeType.PERCENTAGE : ChargeType.FIXED;
 }
 
 function lineTotal(item: InvoiceLineItemInput) {
@@ -127,6 +135,7 @@ function mapInvoice(invoice: any) {
       netWeight: item.netWeight ? Number(item.netWeight) : null,
       rate: item.rate ? Number(item.rate) : null,
       makingCharge: Number(item.makingCharge),
+      makingChargeType: item.makingChargeType as ChargeType,
       stoneCharge: Number(item.stoneCharge),
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
       lineTotal: Number(item.lineTotal),
@@ -441,6 +450,7 @@ export async function createInvoice(
               netWeight: item.netWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,
+              makingChargeType: toChargeType(item.makingChargeType),
               stoneCharge: item.stoneCharge,
               dmoWeight: item.dmoWeight ?? undefined,
               lineTotal: lineTotal(item),

@@ -17,6 +17,7 @@ type QuotationItemRow = {
   netWeight: number | null
   rate: number | null
   makingCharge: number
+  makingChargeType?: string
   stoneCharge: number
   lineTotal: number
 }
@@ -138,7 +139,14 @@ export default async function QuotationDetailPage({ params }: Props) {
                 <td className="px-4 py-3">{item.quantity}</td>
                 <td className="px-4 py-3">{item.netWeight?.toFixed(3) ?? "-"}</td>
                 <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
-                <td className="px-4 py-3">₹{item.makingCharge.toFixed(2)}</td>
+                <td className="px-4 py-3">
+                  ₹{item.makingCharge.toFixed(2)}
+                  {item.makingChargeType === "PERCENTAGE" && item.rate && item.netWeight ? (
+                    <span className="block text-xs text-muted-foreground">
+                      ({((item.makingCharge / (item.rate * item.netWeight)) * 100).toFixed(2)}% of metal value)
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
                 <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
               </tr>

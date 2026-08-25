@@ -6,6 +6,7 @@ import {
   InventoryStockStatus,
   InventoryFinish,
   PurityType,
+  ChargeType,
   Prisma,
 } from "@prisma/client"
 
@@ -47,6 +48,15 @@ function parseOptionalEnum<T extends string>(
   const parsed = String(value || "").trim()
   if (!parsed) return null
   return allowed.includes(parsed as T) ? (parsed as T) : null
+}
+
+// Don't trust the client's toggle state blindly — anything other than an
+// exact "PERCENTAGE" match falls back to FIXED, same default as the schema
+// column.
+function parseChargeType(value: FormDataEntryValue | null): ChargeType {
+  return String(value || "").trim() === ChargeType.PERCENTAGE
+    ? ChargeType.PERCENTAGE
+    : ChargeType.FIXED
 }
 
 function toDecimal(value: number | null | undefined): Prisma.Decimal | undefined {

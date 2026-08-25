@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
+type ChargeType = "FIXED" | "PERCENTAGE"
+
 type MakingChargeInputProps = {
   /** Per-gram metal rate for this line, used to derive the flat amount in % mode. */
   rate: number
@@ -14,6 +16,10 @@ type MakingChargeInputProps = {
   /** The stored making charge — always a flat ₹ amount, in both modes. */
   value: number
   onChange: (value: number) => void
+  /** Which mode this line was last saved as — defaults to FIXED for new lines. */
+  chargeType?: ChargeType
+  /** Reports the mode so the parent can persist it alongside the resolved ₹ value. */
+  onChargeTypeChange?: (chargeType: ChargeType) => void
   label?: string
   className?: string
 }
@@ -21,25 +27,37 @@ type MakingChargeInputProps = {
 /**
  * A making-charge field that can be entered as a flat ₹ amount or as a % of
  * metal value (rate x netWeight) — in % mode the computed flat amount is
- * what's actually reported via onChange, so the stored/submitted value is
- * always a plain ₹ number, unchanged from how every making-charge column is
- * modeled today. The % toggle is purely a data-entry convenience.
+ * what's reported via onChange, so the stored/submitted amount is always a
+ * plain ₹ number, unchanged from how every making-charge column is modeled.
+ * The chosen mode is reported separately via onChargeTypeChange so the
+ * parent can persist it (ChargeType) and restore the % framing on edit —
+ * the % itself isn't stored, so on mount with chargeType="PERCENTAGE" it's
+ * back-derived from value/metalValue.
  */
 export function MakingChargeInput({
   rate,
   netWeight,
   value,
   onChange,
+  chargeType,
+  onChargeTypeChange,
   label = "Making Charge",
   className,
 }: MakingChargeInputProps) {
-  const [mode, setMode] = useState<"flat" | "percent">("flat")
-  const [percent, setPercent] = useState(0)
-
   const metalValue = rate * netWeight
+
+  const [mode, setMode] = useState<"flat" | "percent">(
+    chargeType === "PERCENTAGE" ? "percent" : "flat",
+  )
+  const [percent, setPercent] = useState(() =>
+    chargeType === "PERCENTAGE" && metalValue > 0
+      ? Number(((value / metalValue) * 100).toFixed(2))
+      : 0,
+  )
 
   const switchToPercent = () => {
     setMode("percent")
+    onChargeTypeChange?.("PERCENTAGE")
     if (metalValue > 0) {
       setPercent(Number(((value / metalValue) * 100).toFixed(2)))
     }
@@ -47,6 +65,7 @@ export function MakingChargeInput({
 
   const switchToFlat = () => {
     setMode("flat")
+    onChargeTypeChange?.("FIXED")
   }
 
   const handlePercentChange = (raw: string) => {

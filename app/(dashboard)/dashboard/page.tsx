@@ -1,5 +1,4 @@
 import { StatCards } from "@/components/dashboard/stat-cards";
-import { MetalPriceChart } from "@/components/dashboard/metal-price-chart";
 import { SalesChart } from "@/components/dashboard/sales-chart";
 import { CategoryChart } from "@/components/dashboard/category-chart";
 import { TransactionsTable } from "@/components/dashboard/transactions-table";
@@ -45,9 +44,6 @@ export default async function DashboardPage() {
 
       {/* KPI Cards */}
       <StatCards stats={stats} />
-
-      {/* Metal Price Trend */}
-      <MetalPriceChart />
 
       {/* Existing Dashboard Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

@@ -220,6 +220,7 @@ model InventoryStock {
   purchaseRate        Decimal?               @db.Decimal(12, 2)
   saleRate            Decimal?               @db.Decimal(12, 2)
   makingCharge        Decimal?               @db.Decimal(12, 2)
+  makingChargeType    ChargeType             @default(FIXED)
   stoneCharge         Decimal?               @db.Decimal(12, 2)
   otherCharge         Decimal?               @db.Decimal(12, 2)
   purchaseAmount      Decimal?               @db.Decimal(12, 2)
@@ -355,6 +356,7 @@ model KachaInvoiceItem {
   dmoWeight        Decimal?        @db.Decimal(10, 3)
   rate             Decimal?        @db.Decimal(12, 2)
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
+  makingChargeType ChargeType      @default(FIXED)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
   lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId String?
@@ -379,6 +381,7 @@ model InvoiceItem {
   dmoWeight        Decimal?        @db.Decimal(10, 3)
   rate             Decimal?        @db.Decimal(12, 2)
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
+  makingChargeType ChargeType      @default(FIXED)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
   lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
   createdAt        DateTime        @default(now())
@@ -542,6 +545,7 @@ model PurchaseItem {
   dmoWeight        Decimal?        @db.Decimal(10, 3)
   rate             Decimal?        @db.Decimal(12, 2)
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
+  makingChargeType ChargeType      @default(FIXED)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
   lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId String?
@@ -634,6 +638,7 @@ model QuotationItem {
   netWeight        Decimal?        @db.Decimal(10, 3)
   rate             Decimal?        @db.Decimal(12, 2)
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
+  makingChargeType ChargeType      @default(FIXED)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
   lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId String?
@@ -823,7 +828,8 @@ model InviteToken {
 
 model OtpCode {
   id         String     @id @default(cuid())
-  phone      String
+  phone      String?
+  email      String?
   codeHash   String
   purpose    OtpPurpose
   expiresAt  DateTime
@@ -833,6 +839,7 @@ model OtpCode {
   user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([phone, purpose])
+  @@index([email, purpose])
   @@index([userId])
 }
 
@@ -945,4 +952,6 @@ enum UserStatus {
 enum OtpPurpose {
   LOGIN
   PHONE_VERIFY
+  PROFILE_PHONE_CHANGE
+  PROFILE_EMAIL_CHANGE
 }

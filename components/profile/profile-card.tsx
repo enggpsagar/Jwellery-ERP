@@ -50,21 +50,21 @@ export function ProfileCard() {
 
   const [profile, setProfile] = useState<Profile | null>(null);
 
-  useEffect(() => {
-    async function loadProfile() {
-      try {
-        const res = await fetch("/api/profile");
+  async function loadProfile() {
+    try {
+      const res = await fetch("/api/profile");
 
-        if (!res.ok) return;
+      if (!res.ok) return;
 
-        const data = await res.json();
+      const data = await res.json();
 
-        setProfile(data);
-      } catch (error) {
-        console.error(error);
-      }
+      setProfile(data);
+    } catch (error) {
+      console.error(error);
     }
+  }
 
+  useEffect(() => {
     loadProfile();
   }, []);
 

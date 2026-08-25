@@ -171,7 +171,9 @@ model Product {
   metalTypeId         String?
   defaultPurity       PurityType?
   defaultMakingCharge Decimal?             @db.Decimal(12, 2)
+  defaultMakingChargeType ChargeType       @default(FIXED)
   defaultStoneCharge  Decimal?             @db.Decimal(12, 2)
+  defaultStoneChargeType  ChargeType       @default(FIXED)
   designCode          String?
   hsnCode             String?
   description         String?
@@ -871,6 +873,11 @@ enum InvoiceStatus {
   PAID
   PARTIAL
   CANCELLED
+}
+
+enum ChargeType {
+  FIXED
+  PERCENTAGE
 }
 
 enum PurityType {

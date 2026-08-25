@@ -46,7 +46,9 @@ type Product = {
   metalTypeId: string | null;
   defaultPurity: string | null;
   defaultMakingCharge: string | null;
+  defaultMakingChargeType: "FIXED" | "PERCENTAGE" | null;
   defaultStoneCharge: string | null;
+  defaultStoneChargeType: "FIXED" | "PERCENTAGE" | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -67,6 +69,38 @@ function ErrorText({ error }: { error?: string[] }) {
   if (!error?.length) return null;
 
   return <p className="mt-1 text-sm text-red-600">{error[0]}</p>;
+}
+
+function ChargeTypeToggle({
+  value,
+  onChange,
+}: {
+  value: "FIXED" | "PERCENTAGE";
+  onChange: (value: "FIXED" | "PERCENTAGE") => void;
+}) {
+  return (
+    <div className="flex rounded-md border p-0.5 text-xs">
+      <Button
+        type="button"
+        size="sm"
+        variant={value === "FIXED" ? "default" : "ghost"}
+        className="h-6 px-2"
+        onClick={() => onChange("FIXED")}
+      >
+        ₹
+      </Button>
+
+      <Button
+        type="button"
+        size="sm"
+        variant={value === "PERCENTAGE" ? "default" : "ghost"}
+        className="h-6 px-2"
+        onClick={() => onChange("PERCENTAGE")}
+      >
+        %
+      </Button>
+    </div>
+  );
 }
 
 export function ProductForm({
@@ -96,6 +130,14 @@ export function ProductForm({
 
   const [isActive, setIsActive] = useState(
     product?.isActive === false ? "false" : "true",
+  );
+
+  const [defaultMakingChargeType, setDefaultMakingChargeType] = useState(
+    product?.defaultMakingChargeType ?? "FIXED",
+  );
+
+  const [defaultStoneChargeType, setDefaultStoneChargeType] = useState(
+    product?.defaultStoneChargeType ?? "FIXED",
   );
 
   // Fetch the Types for whichever Category is currently selected, mirroring
@@ -301,7 +343,14 @@ export function ProductForm({
           </div>
 
           <div>
-            <Label htmlFor="defaultMakingCharge">Default Making Charge</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="defaultMakingCharge">Default Making Charge</Label>
+
+              <ChargeTypeToggle
+                value={defaultMakingChargeType}
+                onChange={setDefaultMakingChargeType}
+              />
+            </div>
 
             <Input
               id="defaultMakingCharge"
@@ -309,14 +358,27 @@ export function ProductForm({
               type="number"
               step="0.01"
               defaultValue={product?.defaultMakingCharge ?? ""}
-              placeholder="0.00"
+              placeholder={defaultMakingChargeType === "PERCENTAGE" ? "0.00 %" : "0.00"}
+            />
+
+            <input
+              type="hidden"
+              name="defaultMakingChargeType"
+              value={defaultMakingChargeType}
             />
 
             <ErrorText error={state.errors.defaultMakingCharge} />
           </div>
 
           <div>
-            <Label htmlFor="defaultStoneCharge">Default Stone Charge</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="defaultStoneCharge">Default Stone Charge</Label>
+
+              <ChargeTypeToggle
+                value={defaultStoneChargeType}
+                onChange={setDefaultStoneChargeType}
+              />
+            </div>
 
             <Input
               id="defaultStoneCharge"
@@ -324,7 +386,13 @@ export function ProductForm({
               type="number"
               step="0.01"
               defaultValue={product?.defaultStoneCharge ?? ""}
-              placeholder="0.00"
+              placeholder={defaultStoneChargeType === "PERCENTAGE" ? "0.00 %" : "0.00"}
+            />
+
+            <input
+              type="hidden"
+              name="defaultStoneChargeType"
+              value={defaultStoneChargeType}
             />
 
             <ErrorText error={state.errors.defaultStoneCharge} />

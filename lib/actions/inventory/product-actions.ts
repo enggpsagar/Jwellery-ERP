@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { PurityType } from "@prisma/client";
+import { ChargeType, PurityType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -56,7 +56,9 @@ function serializeProduct(product: {
   metalType: { id: string; name: string } | null;
   defaultPurity: PurityType | null;
   defaultMakingCharge: { toString(): string } | null;
+  defaultMakingChargeType: ChargeType;
   defaultStoneCharge: { toString(): string } | null;
+  defaultStoneChargeType: ChargeType;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -77,7 +79,9 @@ function serializeProduct(product: {
     metalType: product.metalType,
     defaultPurity: product.defaultPurity,
     defaultMakingCharge: product.defaultMakingCharge?.toString() ?? null,
+    defaultMakingChargeType: product.defaultMakingChargeType,
     defaultStoneCharge: product.defaultStoneCharge?.toString() ?? null,
+    defaultStoneChargeType: product.defaultStoneChargeType,
     designCode: product.designCode,
     hsnCode: product.hsnCode,
     description: product.description,
@@ -147,7 +151,9 @@ function mapProductRow(row: {
   metalType: { name: string } | null;
   defaultPurity: PurityType | null;
   defaultMakingCharge: { toString(): string } | null;
+  defaultMakingChargeType: ChargeType;
   defaultStoneCharge: { toString(): string } | null;
+  defaultStoneChargeType: ChargeType;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -166,8 +172,10 @@ function mapProductRow(row: {
     defaultPurity: row.defaultPurity,
     defaultMakingCharge:
       row.defaultMakingCharge != null ? Number(row.defaultMakingCharge) : null,
+    defaultMakingChargeType: row.defaultMakingChargeType,
     defaultStoneCharge:
       row.defaultStoneCharge != null ? Number(row.defaultStoneCharge) : null,
+    defaultStoneChargeType: row.defaultStoneChargeType,
     designCode: row.designCode,
     hsnCode: row.hsnCode,
     description: row.description,
@@ -269,7 +277,9 @@ export async function exportProductsToExcel(
       "Design Code": product.designCode || "-",
       "HSN Code": product.hsnCode || "-",
       "Default Making Charge": product.defaultMakingCharge ?? "-",
+      "Making Charge Type": product.defaultMakingChargeType,
       "Default Stone Charge": product.defaultStoneCharge ?? "-",
+      "Stone Charge Type": product.defaultStoneChargeType,
       Description: product.description || "-",
       Notes: product.notes || "-",
       Status: product.isActive ? "Active" : "Inactive",
@@ -385,9 +395,21 @@ export async function createProduct(
       formData.get("defaultMakingCharge"),
     );
 
+    const defaultMakingChargeType =
+      parseOptionalEnum(
+        formData.get("defaultMakingChargeType"),
+        Object.values(ChargeType),
+      ) ?? ChargeType.FIXED;
+
     const defaultStoneCharge = parseNullableDecimal(
       formData.get("defaultStoneCharge"),
     );
+
+    const defaultStoneChargeType =
+      parseOptionalEnum(
+        formData.get("defaultStoneChargeType"),
+        Object.values(ChargeType),
+      ) ?? ChargeType.FIXED;
 
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
@@ -450,7 +472,9 @@ export async function createProduct(
         metalTypeId,
         defaultPurity,
         defaultMakingCharge,
+        defaultMakingChargeType,
         defaultStoneCharge,
+        defaultStoneChargeType,
         designCode,
         hsnCode,
         description,
@@ -499,9 +523,22 @@ export async function updateProduct(
       formData.get("defaultMakingCharge"),
     );
 
+    const defaultMakingChargeType =
+      parseOptionalEnum(
+        formData.get("defaultMakingChargeType"),
+        Object.values(ChargeType),
+      ) ?? ChargeType.FIXED;
+
     const defaultStoneCharge = parseNullableDecimal(
       formData.get("defaultStoneCharge"),
     );
+
+    const defaultStoneChargeType =
+      parseOptionalEnum(
+        formData.get("defaultStoneChargeType"),
+        Object.values(ChargeType),
+      ) ?? ChargeType.FIXED;
+
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
     const description = parseNullableString(formData.get("description"));
@@ -567,7 +604,9 @@ export async function updateProduct(
     metalTypeId,
     defaultPurity,
     defaultMakingCharge,
+    defaultMakingChargeType,
     defaultStoneCharge,
+    defaultStoneChargeType,
     designCode,
     hsnCode,
     description,

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Plus, Trash2 } from "lucide-react"
 
+import type { ChargeType } from "@prisma/client"
+
 import {
   receiveItemsFromKarigar,
   type StockActionState,
@@ -19,6 +21,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import {
   Select,
   SelectContent,
@@ -58,6 +61,7 @@ type ReceiptItem = {
   purchaseRate: number
   saleRate: number
   makingCharge: number
+  makingChargeType: ChargeType
   stoneCharge: number
   otherCharge: number
   purchaseAmount: number
@@ -92,6 +96,7 @@ function emptyReceiptItem(defaultMetal?: StoreMetalRow): ReceiptItem {
     purchaseRate: 0,
     saleRate: 0,
     makingCharge: 0,
+    makingChargeType: "FIXED",
     stoneCharge: 0,
     otherCharge: 0,
     purchaseAmount: 0,
@@ -242,6 +247,7 @@ export function ReceiveItemsForm({
       purchaseRate: item.purchaseRate || null,
       saleRate: item.saleRate || null,
       makingCharge: item.makingCharge || null,
+      makingChargeType: item.makingChargeType,
       stoneCharge: item.stoneCharge || null,
       otherCharge: item.otherCharge || null,
       purchaseAmount: item.purchaseAmount || null,
@@ -513,14 +519,16 @@ export function ReceiveItemsForm({
                     </div>
 
                     <div className="space-y-1">
-                      <Label className="text-xs">Making Charge</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={item.makingCharge === 0 ? "" : item.makingCharge}
-                        onChange={(e) =>
-                          updateItem(item.key, { makingCharge: Number(e.target.value) || 0 })
+                      <MakingChargeInput
+                        rate={item.purchaseRate}
+                        netWeight={item.netWeight}
+                        value={item.makingCharge}
+                        onChange={(value) => updateItem(item.key, { makingCharge: value })}
+                        chargeType={item.makingChargeType}
+                        onChargeTypeChange={(type) =>
+                          updateItem(item.key, { makingChargeType: type })
                         }
+                        label="Making Charge"
                       />
                     </div>
 

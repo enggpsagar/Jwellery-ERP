@@ -1,14 +1,18 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
+
+import type { ChargeType } from "@prisma/client"
 
 import { updateInventoryStock } from "@/lib/actions/inventory/stock-actions"
 import {
   initialStockFormState,
   type StockFormState,
 } from "@/lib/inventory/stock-types"
+
+import { MakingChargeInput } from "@/components/shared/making-charge-input"
 
 type ProductOption = {
   id: string
@@ -47,6 +51,7 @@ type StockData = {
   purchaseRate?: string | null
   saleRate?: string | null
   makingCharge?: string | null
+  makingChargeType?: ChargeType | null
   stoneCharge?: string | null
   otherCharge?: string | null
   purchaseAmount?: string | null
@@ -69,6 +74,19 @@ export function EditStockForm({ stock, products }: EditStockFormProps) {
   const [state, formAction, pending] = useActionState<StockFormState, FormData>(
     updateStockAction,
     initialStockFormState
+  )
+
+  // Controlled so MakingChargeInput can react to them live for its %
+  // calculation (purchaseRate x netWeight).
+  const [purchaseRate, setPurchaseRate] = useState(stock.purchaseRate ?? "")
+  const [netWeight, setNetWeight] = useState(stock.netWeight ?? "")
+  const [makingCharge, setMakingCharge] = useState(
+    stock.makingCharge ? Number(stock.makingCharge) : 0
+  )
+  // Seeded from the existing row so a PERCENTAGE-mode stock item is shown
+  // back in % mode on edit, not silently flattened to FIXED.
+  const [makingChargeType, setMakingChargeType] = useState<ChargeType>(
+    (stock.makingChargeType as ChargeType) ?? "FIXED"
   )
 
 useEffect(() => {
@@ -247,7 +265,8 @@ useEffect(() => {
           <input
             id="netWeight"
             name="netWeight"
-            defaultValue={stock.netWeight ?? ""}
+            value={netWeight}
+            onChange={(event) => setNetWeight(event.target.value)}
             className="w-full rounded-md border px-3 py-2 text-sm"
           />
         </div>
@@ -283,7 +302,8 @@ useEffect(() => {
           <input
             id="purchaseRate"
             name="purchaseRate"
-            defaultValue={stock.purchaseRate ?? ""}
+            value={purchaseRate}
+            onChange={(event) => setPurchaseRate(event.target.value)}
             className="w-full rounded-md border px-3 py-2 text-sm"
           />
         </div>
@@ -301,15 +321,17 @@ useEffect(() => {
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="makingCharge" className="text-sm font-medium">
-            Making Charge
-          </label>
-          <input
-            id="makingCharge"
-            name="makingCharge"
-            defaultValue={stock.makingCharge ?? ""}
-            className="w-full rounded-md border px-3 py-2 text-sm"
+          <MakingChargeInput
+            rate={Number(purchaseRate) || 0}
+            netWeight={Number(netWeight) || 0}
+            value={makingCharge}
+            onChange={setMakingCharge}
+            chargeType={makingChargeType}
+            onChargeTypeChange={setMakingChargeType}
+            label="Making Charge"
           />
+          <input type="hidden" name="makingCharge" value={makingCharge} />
+          <input type="hidden" name="makingChargeType" value={makingChargeType} />
         </div>
 
         <div className="space-y-2">

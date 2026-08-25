@@ -449,6 +449,7 @@ export async function createInventoryStock(
     const purchaseRate = parseOptionalNumber(formData.get("purchaseRate"))
     const saleRate = parseOptionalNumber(formData.get("saleRate"))
     const makingCharge = parseOptionalNumber(formData.get("makingCharge"))
+    const makingChargeType = parseChargeType(formData.get("makingChargeType"))
     const stoneCharge = parseOptionalNumber(formData.get("stoneCharge"))
     const otherCharge = parseOptionalNumber(formData.get("otherCharge"))
     const purchaseAmount = parseOptionalNumber(formData.get("purchaseAmount"))
@@ -562,6 +563,7 @@ export async function createInventoryStock(
         purchaseRate: toDecimal(purchaseRate),
         saleRate: toDecimal(saleRate),
         makingCharge: toDecimal(makingCharge),
+        makingChargeType,
         stoneCharge: toDecimal(stoneCharge),
         otherCharge: toDecimal(otherCharge),
         purchaseAmount: toDecimal(purchaseAmount),
@@ -668,6 +670,7 @@ export async function updateInventoryStock(
     const purchaseRate = parseOptionalNumber(formData.get("purchaseRate"))
     const saleRate = parseOptionalNumber(formData.get("saleRate"))
     const makingCharge = parseOptionalNumber(formData.get("makingCharge"))
+    const makingChargeType = parseChargeType(formData.get("makingChargeType"))
     const stoneCharge = parseOptionalNumber(formData.get("stoneCharge"))
     const otherCharge = parseOptionalNumber(formData.get("otherCharge"))
     const purchaseAmount = parseOptionalNumber(formData.get("purchaseAmount"))
@@ -815,6 +818,7 @@ export async function updateInventoryStock(
         purchaseRate: toDecimal(purchaseRate),
         saleRate: toDecimal(saleRate),
         makingCharge: toDecimal(makingCharge),
+        makingChargeType,
         stoneCharge: toDecimal(stoneCharge),
         otherCharge: toDecimal(otherCharge),
         purchaseAmount: toDecimal(purchaseAmount),

@@ -10,6 +10,7 @@ import {
   LedgerSourceType,
   PaymentMethod,
   PurityType,
+  ChargeType,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -62,6 +63,13 @@ function parsePayments(raw: string): PaymentEntryInput[] | null {
   }
 
   return payments;
+}
+
+// Client-supplied JSON, not FormData — validate against the enum rather
+// than trusting the toggle state; anything else falls back to FIXED, same
+// default as the schema column.
+function parseChargeType(value: unknown): ChargeType {
+  return value === ChargeType.PERCENTAGE ? ChargeType.PERCENTAGE : ChargeType.FIXED;
 }
 
 function toDecimalOrNull(value: FormDataEntryValue | null) {
@@ -257,6 +265,7 @@ export type KarigarReceiptItemInput = {
   purchaseRate?: number | null;
   saleRate?: number | null;
   makingCharge?: number | null;
+  makingChargeType?: ChargeType | string | null;
   stoneCharge?: number | null;
   otherCharge?: number | null;
   purchaseAmount?: number | null;
@@ -504,6 +513,7 @@ export async function receiveItemsFromKarigar(
             purchaseRate: item.purchaseRate ?? undefined,
             saleRate: item.saleRate ?? undefined,
             makingCharge: item.makingCharge ?? undefined,
+            makingChargeType: parseChargeType(item.makingChargeType),
             stoneCharge: item.stoneCharge ?? undefined,
             otherCharge: item.otherCharge ?? undefined,
             purchaseAmount: item.purchaseAmount ?? undefined,

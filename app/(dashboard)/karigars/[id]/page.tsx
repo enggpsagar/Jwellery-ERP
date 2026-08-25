@@ -1,11 +1,10 @@
 // FILE PATH: app/(dashboard)/karigars/[id]/page.tsx
 
 import { notFound } from "next/navigation";
+import Link from "next/link";
 
 import { getKarigarById } from "@/lib/actions/karigar-actions";
 import { getKarigarLedger } from "@/lib/actions/ledger-actions";
-import { getPurityFineness } from "@/lib/actions/purity-actions";
-import { getInventoryStockFormProducts } from "@/lib/actions/inventory/stock-actions";
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -13,8 +12,8 @@ import { requireStoreScope } from "@/lib/store-context";
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { IssueMaterialDialog } from "@/components/karigars/issue-material-dialog";
-import { ReceiveItemsDialog } from "@/components/karigars/receive-items-dialog";
 import { RecordKarigarPaymentDialog } from "@/components/karigars/record-karigar-payment-dialog";
 import { KarigarLedgerTable } from "@/components/karigars/karigar-ledger-table";
 
@@ -41,34 +40,14 @@ export default async function KarigarDetailPage({ params }: Props) {
 
   const storeId = await requireStoreScope();
 
-  const [ledger, finenessRows, products, metals, openJobs] = await Promise.all([
+  const [ledger, metals, openJobs] = await Promise.all([
     getKarigarLedger(id),
-    getPurityFineness(),
-    getInventoryStockFormProducts(),
     getStoreMetals(),
     prisma.karigarJob.findMany({
       where: { storeId, karigarId: id, status: "issued" },
       orderBy: { issueDate: "desc" },
     }),
   ]);
-
-  const fineness = Object.fromEntries(
-    finenessRows.map((row) => [row.purity, row.finenessPercent]),
-  );
-
-  // ProductSelect's shared ProductOption type expects category/ornamentType/metalType
-  // as flat display strings, not the relation objects getInventoryStockFormProducts()
-  // now returns.
-  const productSelectOptions = products.map((product) => ({
-    id: product.id,
-    productCode: product.productCode,
-    name: product.name,
-    category: product.category?.name ?? null,
-    ornamentType: product.categoryType?.name ?? null,
-    metalType: product.metalType?.name ?? null,
-    defaultPurity: product.defaultPurity ?? null,
-    isActive: product.isActive,
-  }));
 
   return (
     <main className="space-y-6 p-6">
@@ -150,12 +129,11 @@ export default async function KarigarDetailPage({ params }: Props) {
                     {job.expectedDate ? ` · Expected ${formatDate(job.expectedDate)}` : ""}
                   </div>
                 </div>
-                <ReceiveItemsDialog
-                  jobId={job.id}
-                  products={productSelectOptions}
-                  fineness={fineness}
-                  metals={metals}
-                />
+                <Link href={`/karigars/${id}/receive-items/${job.id}`}>
+                  <Button type="button" size="sm">
+                    Receive Items
+                  </Button>
+                </Link>
               </div>
             ))
           )}

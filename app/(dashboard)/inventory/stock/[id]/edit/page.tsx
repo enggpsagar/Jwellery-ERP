@@ -6,6 +6,7 @@ import {
   getInventoryStockById,
   getInventoryStockFormProducts,
 } from "@/lib/actions/inventory/stock-actions";
+import { getStoreLocations } from "@/lib/actions/store-location-actions";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { StockEditForm } from "@/components/inventory/stock/stock-edit-form";
@@ -25,9 +26,10 @@ export default async function EditInventoryStockPage({
   const { id } = await params;
 
 
-  const [stock, products] = await Promise.all([
+  const [stock, products, locations] = await Promise.all([
     getInventoryStockById(id),
     getInventoryStockFormProducts(),
+    getStoreLocations(),
   ]);
 
 
@@ -50,6 +52,7 @@ export default async function EditInventoryStockPage({
       <StockEditForm
         stock={stock}
         products={products}
+        locations={locations}
       />
 
     </main>

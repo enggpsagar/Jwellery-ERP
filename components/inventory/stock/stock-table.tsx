@@ -183,7 +183,7 @@ export function StockTable({
                     <FinishBadge finish={item.finish as InventoryFinish} />
                   </td>
 
-                  <td className="px-4 py-3">{item.location ?? "-"}</td>
+                  <td className="px-4 py-3">{item.location?.name ?? "-"}</td>
                   <td className="px-4 py-3">{formatDate(item.purchaseDate)}</td>
 
                   <td className="px-4 py-3">

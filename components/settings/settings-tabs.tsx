@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-type SettingsTab = "business" | "purity" | "taxonomy";
+type SettingsTab = "business" | "purity" | "taxonomy" | "locations";
 
 type SettingsTabsProps = {
   active: SettingsTab;
@@ -10,6 +10,7 @@ const TABS: { id: SettingsTab; href: string; label: string }[] = [
   { id: "business", href: "/settings", label: "Business Settings" },
   { id: "purity", href: "/settings/purity", label: "Purity & Carat" },
   { id: "taxonomy", href: "/settings/taxonomy", label: "Metals & Categories" },
+  { id: "locations", href: "/settings/locations", label: "Locations" },
 ];
 
 export function SettingsTabs({ active }: SettingsTabsProps) {

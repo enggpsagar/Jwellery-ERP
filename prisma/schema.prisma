@@ -40,8 +40,22 @@ model Store {
   quotations       Quotation[]
   storeMetals      StoreMetal[]
   storeCategories  StoreCategory[]
+  storeLocations   StoreLocation[]
 
   @@index([code])
+}
+
+model StoreLocation {
+  id              String           @id @default(cuid())
+  storeId         String
+  name            String
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  store           Store            @relation(fields: [storeId], references: [id])
+  inventoryStocks InventoryStock[]
+
+  @@unique([storeId, name])
 }
 
 model StoreMetal {
@@ -228,7 +242,7 @@ model InventoryStock {
   vendorName          String?
   purchaseDate        DateTime?
   manufactureDate     DateTime?
-  location            String?
+  locationId          String?
   remarks             String?
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
@@ -244,6 +258,7 @@ model InventoryStock {
   karigarReceiptItems KarigarReceiptItem[]
   quotationItems      QuotationItem[]
   metalType           StoreMetal?            @relation(fields: [metalTypeId], references: [id])
+  location            StoreLocation?         @relation(fields: [locationId], references: [id])
 
   @@unique([storeId, stockCode])
   @@unique([storeId, tagNumber])
@@ -255,7 +270,7 @@ model InventoryStock {
   @@index([status])
   @@index([finish])
   @@index([purchaseDate])
-  @@index([location])
+  @@index([locationId])
   @@index([vendorId])
   @@index([storeId])
 }

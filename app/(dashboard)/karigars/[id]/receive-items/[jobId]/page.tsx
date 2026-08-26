@@ -6,6 +6,7 @@ import { getKarigarById } from "@/lib/actions/karigar-actions";
 import { getPurityFineness } from "@/lib/actions/purity-actions";
 import { getInventoryStockFormProducts } from "@/lib/actions/inventory/stock-actions";
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
+import { getStoreLocations } from "@/lib/actions/store-location-actions";
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 
@@ -43,10 +44,11 @@ export default async function ReceiveItemsPage({ params }: Props) {
     notFound();
   }
 
-  const [finenessRows, products, metals] = await Promise.all([
+  const [finenessRows, products, metals, locations] = await Promise.all([
     getPurityFineness(),
     getInventoryStockFormProducts(),
     getStoreMetals(),
+    getStoreLocations(),
   ]);
 
   const fineness = Object.fromEntries(
@@ -86,6 +88,7 @@ export default async function ReceiveItemsPage({ params }: Props) {
         products={productSelectOptions}
         fineness={fineness}
         metals={metals}
+        locations={locations}
       />
     </main>
   );

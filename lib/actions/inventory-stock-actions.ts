@@ -273,7 +273,7 @@ export type KarigarReceiptItemInput = {
   vendorName?: string | null;
   purchaseDate?: string | null;
   manufactureDate?: string | null;
-  location?: string | null;
+  locationId?: string | null;
   remarks?: string | null;
 };
 
@@ -453,6 +453,15 @@ export async function receiveItemsFromKarigar(
       : [];
     const productIdSet = new Set(products.map((p) => p.id));
 
+    const locationIds = [...new Set(items.map((item) => item.locationId).filter(Boolean))];
+    const locationRows = locationIds.length
+      ? await prisma.storeLocation.findMany({
+          where: { id: { in: locationIds as string[] }, storeId },
+          select: { id: true },
+        })
+      : [];
+    const locationIdSet = new Set(locationRows.map((l) => l.id));
+
     for (const item of items) {
       // Product is optional here — an item with no productId gets a brand-new
       // Product auto-created for it below (name from itemName). A productId
@@ -465,6 +474,9 @@ export async function receiveItemsFromKarigar(
       }
       if (!Object.values(PurityType).includes(item.purity)) {
         return { success: false, message: "Each returned item needs a valid purity" };
+      }
+      if (item.locationId && !locationIdSet.has(item.locationId)) {
+        return { success: false, message: "Selected location not found" };
       }
     }
 
@@ -555,7 +567,7 @@ export async function receiveItemsFromKarigar(
             vendorName: item.vendorName || undefined,
             purchaseDate: item.purchaseDate ? new Date(item.purchaseDate) : undefined,
             manufactureDate: item.manufactureDate ? new Date(item.manufactureDate) : undefined,
-            location: item.location || undefined,
+            locationId: item.locationId || undefined,
             remarks: item.remarks || undefined,
           },
         });

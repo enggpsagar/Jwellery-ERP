@@ -89,6 +89,9 @@ const STOCK_INCLUDE = {
   metalType: {
     select: { id: true, name: true },
   },
+  location: {
+    select: { id: true, name: true },
+  },
   product: {
     select: {
       id: true,
@@ -253,7 +256,7 @@ export async function exportInventoryStockToExcel(
       "Sale Amount": item.saleAmount || "-",
       Status: item.status || "-",
       Finish: item.finish || "-",
-      Location: item.location || "-",
+      Location: item.location?.name || "-",
       "Vendor Name": item.vendorName || "-",
       "Purchase Date": item.purchaseDate
         ? new Date(item.purchaseDate).toLocaleDateString("en-IN")
@@ -327,6 +330,9 @@ export async function getInventoryStockById(id: string) {
     where: { id, storeId },
     include: {
       metalType: {
+        select: { id: true, name: true },
+      },
+      location: {
         select: { id: true, name: true },
       },
       product: {
@@ -453,7 +459,7 @@ export async function createInventoryStock(
     const saleAmount = parseOptionalNumber(formData.get("saleAmount"))
 
     const vendorName = parseNullableString(formData.get("vendorName"))
-    const location = parseNullableString(formData.get("location"))
+    const locationId = parseNullableString(formData.get("locationId"))
     const remarks = parseNullableString(formData.get("remarks"))
 
     const purchaseDateValue = String(formData.get("purchaseDate") || "").trim()
@@ -509,6 +515,23 @@ export async function createInventoryStock(
         errors: {
           productId: ["Selected product could not be found"],
         },
+      }
+    }
+
+    if (locationId) {
+      const location = await prisma.storeLocation.findFirst({
+        where: { id: locationId, storeId },
+        select: { id: true },
+      })
+
+      if (!location) {
+        return {
+          success: false,
+          message: "Selected location is invalid",
+          errors: {
+            locationId: ["Selected location could not be found"],
+          },
+        }
       }
     }
 
@@ -593,7 +616,7 @@ export async function createInventoryStock(
           vendorName,
           purchaseDate,
           manufactureDate,
-          location,
+          locationId,
           remarks,
         },
       }),
@@ -723,7 +746,7 @@ export async function updateInventoryStock(
     const saleAmount = parseOptionalNumber(formData.get("saleAmount"))
 
     const vendorName = parseNullableString(formData.get("vendorName"))
-    const location = parseNullableString(formData.get("location"))
+    const locationId = parseNullableString(formData.get("locationId"))
     const remarks = parseNullableString(formData.get("remarks"))
 
     const purchaseDateValue = String(formData.get("purchaseDate") || "").trim()
@@ -774,6 +797,23 @@ export async function updateInventoryStock(
         errors: {
           stockCode: ["This stock code is already in use"],
         },
+      }
+    }
+
+    if (locationId) {
+      const location = await prisma.storeLocation.findFirst({
+        where: { id: locationId, storeId },
+        select: { id: true },
+      })
+
+      if (!location) {
+        return {
+          success: false,
+          message: "Selected location is invalid",
+          errors: {
+            locationId: ["Selected location could not be found"],
+          },
+        }
       }
     }
 
@@ -829,7 +869,7 @@ export async function updateInventoryStock(
           status,
           finish,
           isActive,
-          location,
+          locationId,
           remarks,
           vendorName,
         },
@@ -877,7 +917,7 @@ export async function updateInventoryStock(
         vendorName,
         purchaseDate,
         manufactureDate,
-        location,
+        locationId,
         remarks,
       },
     })

@@ -13,9 +13,10 @@ import { StockForm } from "./stock-form";
 
 type StockCreateFormProps = {
   products: any[];
+  locations: any[];
 };
 
-export function StockCreateForm({ products }: StockCreateFormProps) {
+export function StockCreateForm({ products, locations }: StockCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
 
@@ -46,6 +47,7 @@ export function StockCreateForm({ products }: StockCreateFormProps) {
       <StockForm
         mode="create"
         products={products}
+        locations={locations}
         state={state}
         pending={pending}
       />

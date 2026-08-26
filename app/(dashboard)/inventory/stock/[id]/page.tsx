@@ -239,7 +239,7 @@ export default async function InventoryStockDetailsPage({
 
             <div>
               <p className="text-xs text-muted-foreground">Location</p>
-              <p className="font-medium">{stock.location || "-"}</p>
+              <p className="font-medium">{stock.location?.name || "-"}</p>
             </div>
 
             <div className="sm:col-span-2">

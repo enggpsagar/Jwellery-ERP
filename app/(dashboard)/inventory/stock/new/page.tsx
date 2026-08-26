@@ -1,4 +1,5 @@
 import { getInventoryStockFormProducts } from "@/lib/actions/inventory/stock-actions";
+import { getStoreLocations } from "@/lib/actions/store-location-actions";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { StockCreateForm } from "@/components/inventory/stock/stock-create-form";
@@ -6,8 +7,9 @@ import { StockCreateForm } from "@/components/inventory/stock/stock-create-form"
 
 export default async function NewStockPage() {
 
-  const [products] = await Promise.all([
+  const [products, locations] = await Promise.all([
     getInventoryStockFormProducts(),
+    getStoreLocations(),
   ]);
 
   return (
@@ -22,6 +24,7 @@ export default async function NewStockPage() {
 
       <StockCreateForm
         products={products}
+        locations={locations}
       />
 
     </main>

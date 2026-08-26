@@ -68,7 +68,7 @@ type ReceiptItem = {
   saleAmount: number
   purchaseDate: string
   manufactureDate: string
-  location: string
+  locationId: string
   remarks: string
 }
 
@@ -102,9 +102,14 @@ function emptyReceiptItem(defaultMetal?: StoreMetalRow): ReceiptItem {
     saleAmount: 0,
     purchaseDate: "",
     manufactureDate: "",
-    location: "",
+    locationId: "",
     remarks: "",
   }
+}
+
+type LocationOption = {
+  id: string
+  name: string
 }
 
 type ReceiveItemsFormProps = {
@@ -113,6 +118,7 @@ type ReceiveItemsFormProps = {
   products: ProductOption[]
   fineness: Record<string, number>
   metals: StoreMetalRow[]
+  locations: LocationOption[]
 }
 
 export function ReceiveItemsForm({
@@ -121,6 +127,7 @@ export function ReceiveItemsForm({
   products,
   fineness,
   metals,
+  locations,
 }: ReceiveItemsFormProps) {
   const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
   // Mirrors the old hardcoded default of "GOLD": prefer a hasPurity metal if
@@ -270,7 +277,7 @@ export function ReceiveItemsForm({
       saleAmount: item.saleAmount || null,
       purchaseDate: item.purchaseDate || null,
       manufactureDate: item.manufactureDate || null,
-      location: item.location || null,
+      locationId: item.locationId || null,
       remarks: item.remarks || null,
     })),
   )
@@ -615,11 +622,24 @@ export function ReceiveItemsForm({
 
                     <div className="space-y-1">
                       <Label className="text-xs">Location</Label>
-                      <Input
-                        value={item.location}
-                        placeholder="Store / Locker"
-                        onChange={(e) => updateItem(item.key, { location: e.target.value })}
-                      />
+                      <Select
+                        value={item.locationId || "__none__"}
+                        onValueChange={(value) =>
+                          updateItem(item.key, { locationId: value === "__none__" ? "" : value })
+                        }
+                      >
+                        <SelectTrigger className="h-11 w-full">
+                          <SelectValue placeholder="Select location" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {locations.map((location) => (
+                            <SelectItem key={location.id} value={location.id}>
+                              {location.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 

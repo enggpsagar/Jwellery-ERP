@@ -25,6 +25,11 @@ import {
 
 import { ProductSelect } from "@/components/inventory/shared/product-select";
 
+type LocationOption = {
+  id: string;
+  name: string;
+};
+
 type ProductOption = {
   id: string;
   productCode: string;
@@ -91,7 +96,7 @@ type Stock = {
 
   manufactureDate: string | null;
 
-  location: string | null;
+  locationId: string | null;
 
   remarks: string | null;
 
@@ -105,6 +110,7 @@ type StockFormProps = {
 
   products: ProductOption[];
 
+  locations: LocationOption[];
 
   state: StockFormState;
 
@@ -121,12 +127,15 @@ export function StockForm({
   mode,
   stock,
   products,
+  locations,
   state,
   pending,
 }: StockFormProps) {
   const [status, setStatus] = useState(
     stock?.status ?? InventoryStockStatus.IN_STOCK,
   );
+
+  const [locationId, setLocationId] = useState(stock?.locationId ?? "");
 
   const [finish, setFinish] = useState(
     stock?.finish ?? InventoryFinish.KACHA,
@@ -565,16 +574,29 @@ export function StockForm({
           </div>
 
           <div>
-            <Label htmlFor="location">Location</Label>
+            <Label>Location</Label>
 
-            <Input
-              id="location"
-              name="location"
-              defaultValue={stock?.location ?? ""}
-              placeholder="Store / Locker"
-            />
+            <Select
+              value={locationId || "__none__"}
+              onValueChange={(value) => setLocationId(value === "__none__" ? "" : value)}
+            >
+              <SelectTrigger className="h-11 w-full">
+                <SelectValue placeholder="Select location" />
+              </SelectTrigger>
 
-            <ErrorText error={state.errors.location} />
+              <SelectContent>
+                <SelectItem value="__none__">None</SelectItem>
+                {locations.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <input type="hidden" name="locationId" value={locationId} />
+
+            <ErrorText error={state.errors.locationId} />
           </div>
 
           <div>

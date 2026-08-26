@@ -10,12 +10,19 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { StoreRowActions } from "@/components/stores/store-row-actions"
+import { EditStoreDialog } from "@/components/stores/edit-store-dialog"
 
 type StoreRow = {
   id: string
   name: string
   code: string
+  address: string | null
   city: string | null
+  state: string | null
+  pincode: string | null
+  phone: string | null
+  email: string | null
+  gstNumber: string | null
   isActive: boolean
   createdAt: Date
   _count: { users: number; customers: number; invoices: number }
@@ -60,11 +67,14 @@ export function StoreTable({ stores }: { stores: StoreRow[] }) {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <StoreRowActions
-                    storeId={store.id}
-                    storeName={store.name}
-                    isActive={store.isActive}
-                  />
+                  <div className="flex items-center justify-end gap-2">
+                    <EditStoreDialog store={store} />
+                    <StoreRowActions
+                      storeId={store.id}
+                      storeName={store.name}
+                      isActive={store.isActive}
+                    />
+                  </div>
                 </TableCell>
               </TableRow>
             ))

@@ -3,12 +3,13 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { UserRole, UserStatus } from "@prisma/client";
+import { UserRole, UserStatus, InventoryStockStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/auth";
 import { ACTIVE_STORE_COOKIE } from "@/lib/store-context";
 import { buildExcelExport } from "@/lib/excel-export";
+import { classifyMetalName } from "@/lib/business-units";
 
 export type StoreFormState = {
   success: boolean;
@@ -293,6 +294,138 @@ export async function restoreStore(storeId: string): Promise<StoreFormState> {
   } catch (error) {
     console.error("restoreStore error:", error);
     return { success: false, message: "Failed to restore store" };
+  }
+}
+
+export type StoreDetail = {
+  id: string;
+  name: string;
+  code: string;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+  phone: string | null;
+  email: string | null;
+  gstNumber: string | null;
+};
+
+export type PlatformGoldStoreBreakdown = {
+  storeId: string;
+  storeName: string;
+  storeCode: string;
+  goldWeight: number;
+};
+
+export type PlatformGoldSummary = {
+  totalGoldWeight: number;
+  byStore: PlatformGoldStoreBreakdown[];
+};
+
+/**
+ * Physical gold currently IN_STOCK, summed across every store — a
+ * platform-wide view only Super Admin can see, since each store's own
+ * Dashboard only shows its own stock in isolation.
+ */
+export async function getPlatformGoldInventory(): Promise<PlatformGoldSummary> {
+  await requireRole(UserRole.SUPER_ADMIN);
+
+  const rows = await prisma.inventoryStock.findMany({
+    where: { status: InventoryStockStatus.IN_STOCK },
+    select: {
+      netWeight: true,
+      store: { select: { id: true, name: true, code: true } },
+      metalType: { select: { name: true } },
+    },
+  });
+
+  const byStoreMap = new Map<string, PlatformGoldStoreBreakdown>();
+
+  for (const row of rows) {
+    if (classifyMetalName(row.metalType?.name) !== "GOLD") continue;
+
+    const weight = Number(row.netWeight ?? 0);
+    const existing = byStoreMap.get(row.store.id) ?? {
+      storeId: row.store.id,
+      storeName: row.store.name,
+      storeCode: row.store.code,
+      goldWeight: 0,
+    };
+    existing.goldWeight += weight;
+    byStoreMap.set(row.store.id, existing);
+  }
+
+  const byStore = Array.from(byStoreMap.values()).sort(
+    (a, b) => b.goldWeight - a.goldWeight
+  );
+  const totalGoldWeight = byStore.reduce((sum, s) => sum + s.goldWeight, 0);
+
+  return { totalGoldWeight, byStore };
+}
+
+export async function getStoreById(storeId: string): Promise<StoreDetail | null> {
+  await requireRole(UserRole.SUPER_ADMIN);
+
+  return prisma.store.findUnique({
+    where: { id: storeId },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      address: true,
+      city: true,
+      state: true,
+      pincode: true,
+      phone: true,
+      email: true,
+      gstNumber: true,
+    },
+  });
+}
+
+export async function updateStore(
+  storeId: string,
+  prevState: StoreFormState,
+  formData: FormData
+): Promise<StoreFormState> {
+  try {
+    await requireRole(UserRole.SUPER_ADMIN);
+
+    const name = String(formData.get("name") || "").trim();
+    const code = String(formData.get("code") || "").trim().toUpperCase();
+
+    const errors: Record<string, string[]> = {};
+    if (!name) errors.name = ["Store name is required"];
+    if (!code) errors.code = ["Store code is required"];
+
+    if (Object.keys(errors).length > 0) {
+      return { success: false, message: "Please fix the form errors", errors };
+    }
+
+    await prisma.store.update({
+      where: { id: storeId },
+      data: {
+        name,
+        code,
+        address: toOptionalString(formData.get("address")),
+        city: toOptionalString(formData.get("city")),
+        state: toOptionalString(formData.get("state")),
+        pincode: toOptionalString(formData.get("pincode")),
+        phone: toOptionalString(formData.get("phone")),
+        email: toOptionalString(formData.get("email")),
+        gstNumber: toOptionalString(formData.get("gstNumber")),
+      },
+    });
+
+    revalidatePath("/stores");
+
+    return { success: true, message: `Store "${name}" updated` };
+  } catch (error: any) {
+    if (error.code === "P2002") {
+      return { success: false, message: "A store with that code already exists" };
+    }
+    console.error("updateStore error:", error);
+    return { success: false, message: "Failed to update store" };
   }
 }
 

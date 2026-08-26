@@ -50,6 +50,16 @@ type KarigarSeed = {
   received: boolean;
 };
 
+type StockSeed = {
+  itemName: string;
+  metal: string;
+  purity?: PurityType;
+  netWeight: number;
+  purchaseRate: number;
+  saleRate: number;
+  makingCharge?: number;
+};
+
 type DemoStore = {
   code: string;
   name: string;
@@ -63,6 +73,7 @@ type DemoStore = {
   }[];
   invoices: InvoiceSeed[];
   karigar?: KarigarSeed;
+  stock: StockSeed[];
 };
 
 const STORES: DemoStore[] = [
@@ -120,6 +131,26 @@ const STORES: DemoStore[] = [
       labourCharge: 4200,
       received: true,
     },
+    stock: [
+      {
+        itemName: "Gold Ring 22K",
+        metal: "Gold",
+        purity: PurityType.GOLD_22K,
+        netWeight: 8.5,
+        purchaseRate: 6300,
+        saleRate: 6450,
+        makingCharge: 950,
+      },
+      {
+        itemName: "Gold Chain 22K",
+        metal: "Gold",
+        purity: PurityType.GOLD_22K,
+        netWeight: 22.3,
+        purchaseRate: 6300,
+        saleRate: 6450,
+        makingCharge: 2800,
+      },
+    ],
   },
   {
     code: "DEMO-SILVER",
@@ -167,6 +198,24 @@ const STORES: DemoStore[] = [
       labourCharge: 2800,
       received: false,
     },
+    stock: [
+      {
+        itemName: "Silver Anklet Pair",
+        metal: "Silver",
+        netWeight: 45,
+        purchaseRate: 88,
+        saleRate: 96,
+        makingCharge: 450,
+      },
+      {
+        itemName: "Silver Utensil Set",
+        metal: "Silver",
+        netWeight: 580,
+        purchaseRate: 88,
+        saleRate: 96,
+        makingCharge: 1200,
+      },
+    ],
   },
   {
     code: "DEMO-DIAMOND",
@@ -201,6 +250,16 @@ const STORES: DemoStore[] = [
       labourCharge: 3500,
       received: true,
     },
+    stock: [
+      {
+        itemName: "Diamond Solitaire Ring",
+        metal: "Diamond",
+        netWeight: 3.2,
+        purchaseRate: 6300,
+        saleRate: 6450,
+        makingCharge: 120000,
+      },
+    ],
   },
   {
     code: "DEMO-MIXED",
@@ -265,6 +324,33 @@ const STORES: DemoStore[] = [
       labourCharge: 3000,
       received: true,
     },
+    stock: [
+      {
+        itemName: "Gold Earrings 22K",
+        metal: "Gold",
+        purity: PurityType.GOLD_22K,
+        netWeight: 6.8,
+        purchaseRate: 6300,
+        saleRate: 6450,
+        makingCharge: 1100,
+      },
+      {
+        itemName: "Silver Bracelet",
+        metal: "Silver",
+        netWeight: 38,
+        purchaseRate: 88,
+        saleRate: 96,
+        makingCharge: 350,
+      },
+      {
+        itemName: "Diamond Pendant",
+        metal: "Diamond",
+        netWeight: 1.9,
+        purchaseRate: 6300,
+        saleRate: 6450,
+        makingCharge: 58000,
+      },
+    ],
   },
 ];
 
@@ -507,8 +593,59 @@ async function seedStore(demo: DemoStore) {
     }
   }
 
+  // Products + inventory stock (in-stock, available inventory)
+  if (demo.stock.length) {
+    const category = await prisma.storeCategory.upsert({
+      where: { storeId_name: { storeId: store.id, name: "Ornaments" } },
+      update: {},
+      create: { storeId: store.id, name: "Ornaments" },
+    });
+
+    let stockCounter = 1;
+    for (const s of demo.stock) {
+      const productCode = `${demo.code}-P${String(stockCounter).padStart(2, "0")}`;
+      const stockCode = `${demo.code}-STK${String(stockCounter).padStart(2, "0")}`;
+      stockCounter += 1;
+
+      const product = await prisma.product.upsert({
+        where: { storeId_productCode: { storeId: store.id, productCode } },
+        update: { name: s.itemName },
+        create: {
+          storeId: store.id,
+          productCode,
+          name: s.itemName,
+          categoryId: category.id,
+          metalTypeId: metalIdByName.get(s.metal),
+          defaultPurity: s.purity,
+        },
+      });
+
+      const existingStock = await prisma.inventoryStock.findFirst({
+        where: { storeId: store.id, stockCode },
+      });
+      if (existingStock) continue;
+
+      await prisma.inventoryStock.create({
+        data: {
+          storeId: store.id,
+          stockCode,
+          productId: product.id,
+          metalTypeId: metalIdByName.get(s.metal),
+          purity: s.purity,
+          netWeight: s.netWeight,
+          grossWeight: s.netWeight,
+          purchaseRate: s.purchaseRate,
+          saleRate: s.saleRate,
+          makingCharge: s.makingCharge,
+          purchaseAmount: s.netWeight * s.purchaseRate,
+          saleAmount: s.netWeight * s.saleRate,
+        },
+      });
+    }
+  }
+
   console.log(
-    `Seeded ${demo.code} — units: ${demo.businessUnits.join(", ")}, customers: ${demo.customers.length}, invoices: ${demo.invoices.length}, karigar: ${demo.karigar ? "yes" : "no"}`
+    `Seeded ${demo.code} — units: ${demo.businessUnits.join(", ")}, customers: ${demo.customers.length}, invoices: ${demo.invoices.length}, karigar: ${demo.karigar ? "yes" : "no"}, stock: ${demo.stock.length}`
   );
 }
 

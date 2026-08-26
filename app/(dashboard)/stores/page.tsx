@@ -1,4 +1,9 @@
-import { getStores, type StoreSortBy, type SortOrder } from "@/lib/actions/store-actions";
+import {
+  getStores,
+  getPlatformGoldInventory,
+  type StoreSortBy,
+  type SortOrder,
+} from "@/lib/actions/store-actions";
 import { StoresClient } from "@/components/stores/stores-client";
 
 type StoresPageProps = {
@@ -22,13 +27,16 @@ export default async function StoresPage({ searchParams }: StoresPageProps) {
   const sortBy = params.sortBy || "createdAt";
   const sortOrder = params.sortOrder || "desc";
 
-  const { stores, pagination } = await getStores({
-    page,
-    pageSize,
-    search,
-    sortBy,
-    sortOrder,
-  });
+  const [{ stores, pagination }, goldSummary] = await Promise.all([
+    getStores({ page, pageSize, search, sortBy, sortOrder }),
+    getPlatformGoldInventory(),
+  ]);
 
-  return <StoresClient stores={stores} pagination={pagination} />;
+  return (
+    <StoresClient
+      stores={stores}
+      pagination={pagination}
+      goldSummary={goldSummary}
+    />
+  );
 }

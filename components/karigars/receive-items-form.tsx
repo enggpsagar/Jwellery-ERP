@@ -220,6 +220,17 @@ export function ReceiveItemsForm({
     return fineWeight + (fineWeight * (item.wastagePercent || 0)) / 100
   }
 
+  // A product already picked on one returned item can't be picked again on
+  // another — each row still sees its own current pick (so re-opening the
+  // dropdown doesn't hide the selection), just not the other rows' picks.
+  // Leaving Product blank (auto-create) is unaffected either way.
+  const selectedProductIds = useMemo(
+    () => new Set(items.map((item) => item.productId).filter(Boolean)),
+    [items],
+  )
+  const productsFor = (item: ReceiptItem) =>
+    products.filter((product) => product.id === item.productId || !selectedProductIds.has(product.id))
+
   const totalNetWeight = useMemo(
     () => items.reduce((sum, item) => sum + (item.netWeight || 0), 0),
     [items],
@@ -315,7 +326,7 @@ export function ReceiveItemsForm({
                   <div className="space-y-1">
                     <Label className="text-xs">Product</Label>
                     <ProductSelect
-                      products={products}
+                      products={productsFor(item)}
                       name={`product-${item.key}`}
                       defaultValue={item.productId}
                       placeholder="Optional — leave blank to auto-create"

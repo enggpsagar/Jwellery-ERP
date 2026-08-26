@@ -26,6 +26,8 @@ interface User {
 interface KarigarOption {
   id: string;
   name: string;
+  mobile: string | null;
+  email: string | null;
 }
 
 type Pagination = {

@@ -5,6 +5,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireStoreScope } from "@/lib/store-context";
+import { UserRole, UserStatus } from "@prisma/client";
 import * as XLSX from "xlsx";
 
 export type Karigar = {
@@ -194,6 +195,37 @@ function buildKarigarData(formData: FormData) {
   };
 }
 
+/**
+ * Mobile/email are the app's login identifiers (User.phone/User.email are
+ * globally unique), so any contact info captured for a Karigar has to be
+ * checked against every existing User (and the linked User of any other
+ * Karigar) before it's saved — otherwise a karigar could silently be given
+ * someone else's login credential.
+ */
+async function checkContactUniqueness(
+  mobile: string | null,
+  email: string | null,
+  excludeUserId?: string,
+): Promise<Record<string, string[]>> {
+  const errors: Record<string, string[]> = {};
+
+  if (mobile) {
+    const existing = await prisma.user.findUnique({ where: { phone: mobile } });
+    if (existing && existing.id !== excludeUserId) {
+      errors.mobile = ["This phone number is already in use as another user's login"];
+    }
+  }
+
+  if (email) {
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing && existing.id !== excludeUserId) {
+      errors.email = ["This email is already in use as another user's login"];
+    }
+  }
+
+  return errors;
+}
+
 export async function createKarigar(
   prevState: KarigarFormState,
   formData: FormData,
@@ -213,16 +245,54 @@ export async function createKarigar(
     // isActive should default to true on create, not depend on a checkbox being present
     if (formData.get("isActive") === null) data.isActive = true;
 
-    const storeId = await requireStoreScope();
-    await prisma.karigar.create({ data: { ...data, storeId } });
-    revalidatePath("/karigars");
+    const contactErrors = await checkContactUniqueness(data.mobile, data.email);
+    if (Object.keys(contactErrors).length > 0) {
+      return {
+        success: false,
+        message: "Please fix the form errors",
+        errors: contactErrors,
+      };
+    }
 
-    return { success: true, message: "Karigar created successfully" };
+    const storeId = await requireStoreScope();
+
+    // A mobile or email doubles as the karigar's login — create their User
+    // account in the same step, matching how a Store's initial Admin is
+    // created alongside the Store itself.
+    await prisma.$transaction(async (tx) => {
+      const karigar = await tx.karigar.create({ data: { ...data, storeId } });
+
+      if (data.mobile || data.email) {
+        await tx.user.create({
+          data: {
+            name: data.name,
+            phone: data.mobile,
+            email: data.email,
+            role: UserRole.KARIGAR,
+            status: UserStatus.INVITED,
+            isActive: true,
+            storeId,
+            karigarId: karigar.id,
+          },
+        });
+      }
+    });
+
+    revalidatePath("/karigars");
+    revalidatePath("/users");
+
+    return {
+      success: true,
+      message:
+        data.mobile || data.email
+          ? "Karigar created — they can now sign in with this mobile/email"
+          : "Karigar created successfully",
+    };
   } catch (error: any) {
     if (error.code === "P2002") {
       return {
         success: false,
-        message: "Karigar code or mobile already exists",
+        message: "Karigar code, mobile, or email already exists",
       };
     }
     console.error("createKarigar error:", error);
@@ -247,23 +317,67 @@ export async function updateKarigar(
     }
 
     const data = buildKarigarData(formData);
-
     const storeId = await requireStoreScope();
-    const { count } = await prisma.karigar.updateMany({ where: { id, storeId }, data });
 
-    if (count === 0) {
+    const existing = await prisma.karigar.findFirst({
+      where: { id, storeId },
+      include: { loginUser: { select: { id: true } } },
+    });
+
+    if (!existing) {
       return { success: false, message: "Karigar not found" };
     }
 
+    const contactErrors = await checkContactUniqueness(
+      data.mobile,
+      data.email,
+      existing.loginUser?.id,
+    );
+    if (Object.keys(contactErrors).length > 0) {
+      return {
+        success: false,
+        message: "Please fix the form errors",
+        errors: contactErrors,
+      };
+    }
+
+    // Keep the karigar's contact info and login credential in sync — either
+    // update their existing login User, or (if this karigar never had one,
+    // e.g. created before a mobile/email was on file) create it now.
+    await prisma.$transaction(async (tx) => {
+      await tx.karigar.update({ where: { id }, data });
+
+      if (existing.loginUser) {
+        await tx.user.update({
+          where: { id: existing.loginUser.id },
+          data: { name: data.name, phone: data.mobile, email: data.email },
+        });
+      } else if (data.mobile || data.email) {
+        await tx.user.create({
+          data: {
+            name: data.name,
+            phone: data.mobile,
+            email: data.email,
+            role: UserRole.KARIGAR,
+            status: UserStatus.INVITED,
+            isActive: true,
+            storeId,
+            karigarId: id,
+          },
+        });
+      }
+    });
+
     revalidatePath("/karigars");
     revalidatePath(`/karigars/${id}`);
+    revalidatePath("/users");
 
     return { success: true, message: "Karigar updated successfully" };
   } catch (error: any) {
     if (error.code === "P2002") {
       return {
         success: false,
-        message: "Karigar code or mobile already exists",
+        message: "Karigar code, mobile, or email already exists",
       };
     }
     console.error("updateKarigar error:", error);
@@ -285,6 +399,7 @@ export async function deleteKarigar(id: string): Promise<KarigarFormState> {
         name: true,
         karigarJobs: { select: { id: true }, take: 1 },
         ledgerEntries: { select: { id: true }, take: 1 },
+        loginUser: { select: { id: true } },
       },
     });
 
@@ -300,8 +415,17 @@ export async function deleteKarigar(id: string): Promise<KarigarFormState> {
       };
     }
 
-    await prisma.karigar.delete({ where: { id } });
+    // Their login (if any) has nowhere else to point once the karigar row
+    // is gone, so it's removed in the same transaction.
+    await prisma.$transaction(async (tx) => {
+      if (karigar.loginUser) {
+        await tx.user.delete({ where: { id: karigar.loginUser.id } });
+      }
+      await tx.karigar.delete({ where: { id } });
+    });
+
     revalidatePath("/karigars");
+    revalidatePath("/users");
 
     return { success: true, message: "Karigar deleted successfully" };
   } catch (error) {

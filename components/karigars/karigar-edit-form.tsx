@@ -35,7 +35,7 @@ export function KarigarEditForm({ karigar }: Props) {
         </div>
       )}
 
-      <KarigarForm pending={pending} karigar={karigar} />
+      <KarigarForm pending={pending} karigar={karigar} errors={state.errors} />
     </form>
   )
 }

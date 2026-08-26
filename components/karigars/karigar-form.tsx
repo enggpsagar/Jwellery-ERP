@@ -8,11 +8,13 @@ import type { Karigar } from "@/lib/actions/karigar-actions"
 type Props = {
   pending?: boolean
   karigar?: Karigar | null
+  errors?: Record<string, string[]>
 }
 
 export function KarigarForm({
   pending = false,
   karigar = null,
+  errors,
 }: Props) {
 
   return (
@@ -46,6 +48,12 @@ export function KarigarForm({
             placeholder="Mobile number"
             defaultValue={karigar?.mobile}
           />
+          <p className="text-xs text-muted-foreground">
+            Doubles as this karigar&apos;s login — must be unique.
+          </p>
+          {errors?.mobile?.[0] && (
+            <p className="text-xs text-red-600">{errors.mobile[0]}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -64,6 +72,9 @@ export function KarigarForm({
             type="email"
             defaultValue={karigar?.email}
           />
+          {errors?.email?.[0] && (
+            <p className="text-xs text-red-600">{errors.email[0]}</p>
+          )}
         </div>
 
         <div className="space-y-2">

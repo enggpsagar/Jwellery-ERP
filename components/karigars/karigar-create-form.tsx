@@ -67,6 +67,7 @@ export function KarigarCreateForm(){
 
       <KarigarForm
         pending={pending}
+        errors={state.errors}
       />
 
 

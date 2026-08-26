@@ -126,27 +126,35 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-gray-500" />
-              Phone
+              Phone <span className="text-red-500">*</span>
             </label>
             <input
               name="phone"
               type="tel"
               defaultValue={store.phone ?? ""}
               className="w-full rounded-md border px-3 py-2 text-sm"
+              required
             />
+            {state.errors?.phone?.[0] && (
+              <p className="text-sm text-red-600">{state.errors.phone[0]}</p>
+            )}
           </div>
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Mail className="h-4 w-4 text-gray-500" />
-              Email
+              Email <span className="text-red-500">*</span>
             </label>
             <input
               name="email"
               type="email"
               defaultValue={store.email ?? ""}
               className="w-full rounded-md border px-3 py-2 text-sm"
+              required
             />
+            {state.errors?.email?.[0] && (
+              <p className="text-sm text-red-600">{state.errors.email[0]}</p>
+            )}
           </div>
 
           <div className="md:col-span-2 flex justify-end gap-3 pt-2 border-t mt-2">

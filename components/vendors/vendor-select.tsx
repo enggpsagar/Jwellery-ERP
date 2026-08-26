@@ -13,6 +13,14 @@ import {
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 
+/**
+ * Sentinel value for the "Add New Vendor" row. It is a real SelectItem rather
+ * than a plain <button> inside SelectContent: Radix owns pointer handling
+ * in there and can swallow a bare button's click, and as an item it is also
+ * keyboard-reachable. Cannot collide with a record id — those are cuids.
+ */
+const ADD_NEW_VALUE = "__add_new_vendor__"
+
 export type VendorOption = {
   id: string
   name: string
@@ -75,6 +83,16 @@ export function VendorSelect({
         open={open}
         onOpenChange={setOpen}
         onValueChange={(value) => {
+          if (value === ADD_NEW_VALUE) {
+            // Not a selection — leave `selected` untouched so the field
+            // keeps whatever was already chosen if the user comes back
+            // without creating anything.
+            setOpen(false)
+            onBeforeAddNew?.()
+            if (addNewHref) router.push(addNewHref)
+            return
+          }
+
           setSelected(value)
           onChange?.(value, vendors.find((vendor) => vendor.id === value))
         }}
@@ -108,21 +126,20 @@ export function VendorSelect({
             ))
           )}
 
+          {/* Rendered outside the empty/non-empty branch above, so it is
+              offered whether or not the store has any vendors yet — creating
+              the first one has to be possible from here. */}
           {addNewHref && (
-            <div className="mt-1 border-t p-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false)
-                  onBeforeAddNew?.()
-                  router.push(addNewHref)
-                }}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-medium text-primary hover:bg-accent"
+            <>
+              <div className="my-1 border-t" />
+              <SelectItem
+                value={ADD_NEW_VALUE}
+                className="font-medium text-primary"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="mr-1 h-4 w-4" />
                 Add New Vendor
-              </button>
-            </div>
+              </SelectItem>
+            </>
           )}
         </SelectContent>
       </Select>

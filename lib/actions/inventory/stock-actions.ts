@@ -105,11 +105,12 @@ const STOCK_INCLUDE = {
   },
 } as const
 
-function getStockWhere(storeId: string, search?: string) {
+function getStockWhere(storeId: string, search: string | undefined, scope: LocationScope) {
   const query = String(search || "").trim()
 
   return {
     storeId,
+    ...locationWhere(scope),
     ...(query
       ? {
           OR: [

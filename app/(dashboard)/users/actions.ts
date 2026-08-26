@@ -33,8 +33,8 @@ export type UserActionState = {
   message: string;
 };
 
-function parsePermissionsField(formData: FormData): string[] {
-  const raw = formData.get("permissions");
+function parseJsonStringArrayField(formData: FormData, field: string): string[] {
+  const raw = formData.get(field);
   if (typeof raw !== "string" || !raw) return [];
 
   try {
@@ -43,6 +43,14 @@ function parsePermissionsField(formData: FormData): string[] {
   } catch {
     return [];
   }
+}
+
+function parsePermissionsField(formData: FormData): string[] {
+  return parseJsonStringArrayField(formData, "permissions");
+}
+
+function parseLocationIdsField(formData: FormData): string[] {
+  return parseJsonStringArrayField(formData, "locationIds");
 }
 
 function assertNoPrivilegeEscalation(
@@ -98,6 +106,7 @@ export async function createUserAction(
       isActive: formData.get("isActive") === "true",
       karigarId: formData.get("karigarId"),
       permissions: parsePermissionsField(formData),
+      locationIds: parseLocationIdsField(formData),
     });
 
     assertNoPrivilegeEscalation(currentUser.role as UserRole, payload.role);
@@ -153,6 +162,7 @@ export async function updateUserAction(
       isActive: formData.get("isActive") === "true",
       karigarId: formData.get("karigarId"),
       permissions: parsePermissionsField(formData),
+      locationIds: parseLocationIdsField(formData),
     });
 
     assertNoPrivilegeEscalation(currentUser.role as UserRole, payload.role);

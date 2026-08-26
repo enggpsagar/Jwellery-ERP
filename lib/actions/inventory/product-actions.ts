@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ChargeType, PurityType } from "@prisma/client";
+import { ChargeType, PurityType, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -484,12 +484,93 @@ export async function createProduct(
       },
     });
 
+    // Optional stock entry, opted into on the product form. Everything the
+    // row needs beyond a quantity already lives on the product, so nothing
+    // is asked twice. A blank quantity means 0 — the product becomes
+    // stockable with none on hand, which is the requested default rather
+    // than an error.
+    let stockCreated = false;
+
+    if (String(formData.get("createStockEntry") ?? "") === "true") {
+      const rawQuantity = String(formData.get("stockQuantity") ?? "").trim();
+      const quantity = rawQuantity === "" ? 0 : Number(rawQuantity);
+
+      if (!Number.isFinite(quantity) || quantity < 0) {
+        return {
+          success: false,
+          message: "Stock quantity must be 0 or more.",
+          errors: { stockQuantity: ["Enter 0 or a positive whole number"] },
+        };
+      }
+
+      // Same max-based derivation as the product code above: a COUNT
+      // regresses after a delete onto a code that already exists, and a
+      // retry would recount to the identical value and collide again.
+      const existingCodes = await prisma.inventoryStock.findMany({
+        where: { storeId, stockCode: { startsWith: "STK-" } },
+        select: { stockCode: true },
+      });
+
+      const highest = existingCodes.reduce((max, row) => {
+        const match = /^STK-(?:\d{4}-)?(\d+)$/.exec(row.stockCode);
+        return match ? Math.max(max, Number(match[1])) : max;
+      }, 0);
+
+      const year = new Date().getFullYear();
+
+      // The product row is already committed by this point, so a failure
+      // here must not be reported as "product creation failed" — that would
+      // send the user back to create a product that already exists. Retry a
+      // colliding stock code, and if it still won't take, keep the success
+      // and say the stock entry is the part that didn't happen.
+      for (let attempt = 0; attempt < 5 && !stockCreated; attempt += 1) {
+        try {
+          await prisma.inventoryStock.create({
+            data: {
+              storeId,
+              productId: createdProduct.id,
+              stockCode: `STK-${year}-${String(highest + 1 + attempt).padStart(4, "0")}`,
+              quantity: Math.trunc(quantity),
+              metalTypeId: metalTypeId || null,
+              purity: defaultPurity,
+              makingCharge: defaultMakingCharge,
+              makingChargeType: defaultMakingChargeType,
+              stoneCharge: defaultStoneCharge,
+            },
+          });
+
+          stockCreated = true;
+        } catch (error) {
+          const isDuplicateCode =
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === "P2002";
+
+          if (!isDuplicateCode) throw error;
+        }
+      }
+
+      if (!stockCreated) {
+        revalidatePath("/inventory/products");
+
+        return {
+          success: true,
+          message:
+            "Product created, but the stock entry could not be — add it from Inventory → Stock.",
+          errors: {},
+          product: createdProduct,
+        };
+      }
+    }
+
+
     revalidatePath("/inventory");
     revalidatePath("/inventory/products");
 
     return {
       success: true,
-      message: "Product created successfully.",
+      message: stockCreated
+        ? "Product created, with a stock entry."
+        : "Product created successfully.",
       errors: {},
       product: createdProduct,
     };

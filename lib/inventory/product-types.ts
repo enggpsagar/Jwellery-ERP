@@ -17,6 +17,7 @@ export type ProductFormState = {
     description?: string[]
     notes?: string[]
     isActive?: string[]
+    stockQuantity?: string[]
   }
   /** Set on a successful createProduct — lets a caller that navigated here
    * to create a product mid-flow (e.g. a purchase in progress) come back

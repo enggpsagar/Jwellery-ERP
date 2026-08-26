@@ -22,7 +22,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { PanelLeftIcon } from "lucide-react"
+import { MenuIcon, PanelLeftIcon } from "lucide-react"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -186,7 +186,12 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          className={cn(
+            "w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden",
+            // Without this the drawer ignores the palette AppSidebar sets,
+            // rendering light on mobile and dark on desktop.
+            className
+          )}
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -270,7 +275,15 @@ function SidebarTrigger({
       }}
       {...props}
     >
-      <PanelLeftIcon />
+      {/* A hamburger reads as "menu" at the widths where this opens the nav
+          drawer; the panel icon is kept on desktop, where it collapses an
+          already-visible sidebar rather than revealing a hidden one. These
+          use `lg:` to match MOBILE_BREAKPOINT (1024) in hooks/use-mobile —
+          with `md:` the icon would flip at 768 while the drawer behaviour
+          flipped at 1024, showing a collapse icon that actually opens a
+          drawer. */}
+      <MenuIcon className="lg:hidden" />
+      <PanelLeftIcon className="hidden lg:block" />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   )

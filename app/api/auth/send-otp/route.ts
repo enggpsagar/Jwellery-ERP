@@ -6,6 +6,9 @@ import { OtpPurpose } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generateOTP, hashOTP } from "@/lib/auth/otp";
 import { sendMail } from "@/lib/mailer";
+import { otpEmail } from "@/lib/email-templates";
+import { resolveStoreName } from "@/lib/invite-email";
+import { APP_NAME } from "@/lib/constants/app";
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 
@@ -56,11 +59,32 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Name the store the code was issued for. A Super Admin has no store
+      // (`storeId` is always null) and an unrecognized address has no user
+      // at all — both send a code that names only the application, and the
+      // response below stays identical either way so this never becomes a
+      // way to probe which email addresses have accounts.
+      const recipient = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+        select: { name: true, storeId: true },
+      });
+
+      const { subject, html, text } = otpEmail({
+        code: otp,
+        appName: APP_NAME,
+        storeName: recipient?.storeId
+          ? await resolveStoreName(recipient.storeId)
+          : null,
+        expiryMinutes: OTP_TTL_MS / 60_000,
+        recipientName: recipient?.name,
+        purpose: "login",
+      });
+
       const result = await sendMail({
         to: normalizedEmail,
-        subject: "Your sign-in code",
-        html: `<p>Your sign-in code is:</p><p style="font-size:24px;font-weight:700;letter-spacing:4px;">${otp}</p><p>This code expires in 5 minutes. If you didn't request this, you can ignore this email.</p>`,
-        text: `Your sign-in code is ${otp}. It expires in 5 minutes.`,
+        subject,
+        html,
+        text,
       });
 
       if (!result.sent) {

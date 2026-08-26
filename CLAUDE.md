@@ -65,6 +65,8 @@ Roles: `SUPER_ADMIN` (all stores), `ADMIN` (full control of their own store — 
 
 Module access is enforced once, centrally, in `middleware.ts` (redirects a Staff user away from a route their permissions don't cover) rather than duplicated across the ~20 page files under the 6 module directories — extend that check, don't add per-page guards. The sidebar (`components/dashboard/app-sidebar.tsx`) mirrors the same logic client-side to hide nav items, reading `session.user.permissions` (added to the JWT/session in `lib/auth/auth-options.ts` and `lib/types/next-auth.d.ts`).
 
+Any *other* UI shortcut that jumps straight into a module — currently the top bar's "New Invoice" button and its account-menu "Billing" item (`components/dashboard/top-bar.tsx`) — must gate on `hasModuleAccess(moduleKey, user)` from `lib/roles.ts` rather than re-deriving the rule, or it renders a link middleware immediately bounces to `/dashboard`. That helper encodes the same two quirks as the other two enforcement points and they must not drift apart: only `STAFF` is restrictable (Admin/Super Admin always pass, `KARIGAR` always fails), and an empty `permissions` array means "not customized" → full access. The sidebar predates the helper and still inlines the check in `getNavForRole()` — a safe consolidation if you touch it, not a bug.
+
 Because the session is JWT-based, a role/store/permissions change made by an Admin does not take effect for an already-logged-in user until they sign out and back in — the `jwt` callback only re-derives these fields from the DB `if (user)`, i.e. at sign-in.
 
 ### Auth
@@ -82,6 +84,8 @@ The database migration and the code deploy are two independent steps — running
 ### Email
 
 `lib/mailer.ts` wraps a single `nodemailer` SMTP transporter built from `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`MAIL_FROM`. `sendMail()` never throws — a missing config or send failure returns `{ sent: false, message }` so callers can toast a status without failing the action that triggered it. Templates live in `lib/email-templates.ts`. Wired into: user creation (welcome/invite email, `app/(dashboard)/users/actions.ts`), invoice/Kacha-slip "Email Invoice"/"Email Slip" buttons, and the customer ledger card's "Email Statement" button.
+
+Every outgoing email names the store via `resolveStoreName(storeId)` (`lib/invite-email.ts`) — use it instead of reading `BusinessSettings.businessName` directly. `BusinessSettings` is only created lazily on the first Settings read, so a store whose owner has never opened Settings has **no row at all**, and a direct read falls through to a generic "your store"/"Your Store" label. `resolveStoreName` prefers `businessName`, then falls back to `Store.name` (a required column set at store creation, so effectively always present), then the generic label. Five call sites got this wrong independently before it was centralized — don't reintroduce a sixth.
 
 ### Notifications
 

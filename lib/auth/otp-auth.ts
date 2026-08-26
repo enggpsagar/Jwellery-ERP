@@ -1,14 +1,13 @@
 import { prisma } from "@/lib/prisma"
-import { OtpPurpose } from "@prisma/client"
+import { OtpPurpose, type User } from "@prisma/client"
 import { hashOTP } from "@/lib/auth/otp"
 
-export async function verifyOtpLogin(phone: string, otpInput: string) {
+async function verifyAndConsumeOtp(
+  where: { phone: string } | { email: string },
+  otpInput: string
+) {
   const otp = await prisma.otpCode.findFirst({
-    where: {
-      phone,
-      purpose: OtpPurpose.LOGIN,
-      consumedAt: null,
-    },
+    where: { ...where, purpose: OtpPurpose.LOGIN, consumedAt: null },
     orderBy: { createdAt: "desc" },
   })
 
@@ -20,14 +19,15 @@ export async function verifyOtpLogin(phone: string, otpInput: string) {
     where: { id: otp.id },
     data: { consumedAt: new Date() },
   })
+}
 
-  const user = await prisma.user.findUnique({
-    where: { phone },
-  })
-
+async function assertCanSignIn(
+  user: User | null,
+  identifierLabel: string
+): Promise<User> {
   if (!user) {
     throw new Error(
-      "No account found for this phone number. Ask your admin to add you as a user first."
+      `No account found for this ${identifierLabel}. Ask your admin to add you as a user first.`
     )
   }
 
@@ -47,4 +47,17 @@ export async function verifyOtpLogin(phone: string, otpInput: string) {
   }
 
   return user
+}
+
+export async function verifyOtpLogin(phone: string, otpInput: string) {
+  await verifyAndConsumeOtp({ phone }, otpInput)
+  const user = await prisma.user.findUnique({ where: { phone } })
+  return assertCanSignIn(user, "phone number")
+}
+
+export async function verifyEmailOtpLogin(email: string, otpInput: string) {
+  const normalizedEmail = email.trim().toLowerCase()
+  await verifyAndConsumeOtp({ email: normalizedEmail }, otpInput)
+  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } })
+  return assertCanSignIn(user, "email address")
 }

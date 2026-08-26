@@ -3,7 +3,7 @@ import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
 
 import { adapter } from "@/lib/auth/prisma-adapter"
-import { verifyOtpLogin } from "@/lib/auth/otp-auth"
+import { verifyOtpLogin, verifyEmailOtpLogin } from "@/lib/auth/otp-auth"
 import { prisma } from "@/lib/prisma"
 import { UserRole } from "@prisma/client"
 
@@ -33,24 +33,30 @@ export const authOptions: NextAuthOptions = {
 
     CredentialsProvider({
       id: "credentials",
-      name: "Mobile OTP",
+      name: "OTP",
 
+      // Either phone or email is supplied per sign-in attempt — never both —
+      // so authorize() branches on whichever one is present.
       credentials: {
         phone: { label: "Phone", type: "text" },
+        email: { label: "Email", type: "text" },
         otp: { label: "OTP", type: "text" },
       },
 
       async authorize(credentials) {
-        if (!credentials?.phone || !credentials?.otp) {
-          throw new Error("Phone and OTP are required.")
+        if (!credentials?.otp) {
+          throw new Error("OTP is required.")
         }
 
-        const user = await verifyOtpLogin(
-          credentials.phone,
-          credentials.otp
-        )
+        if (credentials.phone) {
+          return verifyOtpLogin(credentials.phone, credentials.otp)
+        }
 
-        return user
+        if (credentials.email) {
+          return verifyEmailOtpLogin(credentials.email, credentials.otp)
+        }
+
+        throw new Error("Phone number or email is required.")
       },
     }),
   ],

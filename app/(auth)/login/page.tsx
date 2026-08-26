@@ -5,15 +5,25 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 
+type Mode = "phone" | "email";
+
 export default function LoginPage() {
-  const [phone, setPhone] = useState("");
+  const [mode, setMode] = useState<Mode>("phone");
+  const [identifier, setIdentifier] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  function switchMode(next: Mode) {
+    setMode(next);
+    setIdentifier("");
+    setOtp("");
+    setOtpSent(false);
+  }
+
   async function sendOTP() {
-    if (!phone) {
-      alert("Please enter your mobile number.");
+    if (!identifier) {
+      alert(mode === "phone" ? "Please enter your mobile number." : "Please enter your email.");
       return;
     }
 
@@ -25,7 +35,7 @@ export default function LoginPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify(mode === "phone" ? { phone: identifier } : { email: identifier }),
       });
 
       const data = await response.json();
@@ -45,8 +55,8 @@ export default function LoginPage() {
   }
 
   async function loginWithOTP() {
-    if (!phone || !otp) {
-      alert("Please enter both mobile number and OTP.");
+    if (!identifier || !otp) {
+      alert(mode === "phone" ? "Please enter both mobile number and OTP." : "Please enter both email and OTP.");
       return;
     }
 
@@ -54,7 +64,7 @@ export default function LoginPage() {
 
     try {
       await signIn("credentials", {
-        phone,
+        ...(mode === "phone" ? { phone: identifier } : { email: identifier }),
         otp,
         callbackUrl: "/dashboard",
         redirect: true,
@@ -75,7 +85,7 @@ export default function LoginPage() {
         </h1>
 
         <p className="mt-2 text-sm text-gray-600">
-          Login using Google or your registered mobile number.
+          Login using Google, your registered mobile number, or email.
         </p>
 
         <button
@@ -93,18 +103,39 @@ export default function LoginPage() {
           ───── OR ─────
         </div>
 
+        <div className="mb-4 flex rounded-md border p-0.5 text-sm">
+          <button
+            type="button"
+            onClick={() => switchMode("phone")}
+            className={`flex-1 rounded-md px-3 py-1.5 ${
+              mode === "phone" ? "bg-black text-white" : "text-gray-600"
+            }`}
+          >
+            Mobile Number
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode("email")}
+            className={`flex-1 rounded-md px-3 py-1.5 ${
+              mode === "email" ? "bg-black text-white" : "text-gray-600"
+            }`}
+          >
+            Email
+          </button>
+        </div>
+
         <div className="space-y-4">
 
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Mobile Number
+              {mode === "phone" ? "Mobile Number" : "Email"}
             </label>
 
             <input
-              type="tel"
-              placeholder="9876543210"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              type={mode === "phone" ? "tel" : "email"}
+              placeholder={mode === "phone" ? "9876543210" : "you@example.com"}
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               className="w-full rounded-md border px-3 py-2"
             />
           </div>

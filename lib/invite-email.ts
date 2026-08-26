@@ -1,8 +1,22 @@
 import { UserRole } from "@prisma/client";
 
+import { prisma } from "@/lib/prisma";
 import { sendMail } from "@/lib/mailer";
 import { inviteUserEmail } from "@/lib/email-templates";
 import { ROLE_LABELS } from "@/lib/roles";
+
+/**
+ * The business name a store has set on its own Settings page, falling
+ * back to a generic label for a store that hasn't visited Settings yet.
+ */
+export async function resolveStoreName(storeId: string): Promise<string> {
+  const settings = await prisma.businessSettings.findUnique({
+    where: { storeId },
+    select: { businessName: true },
+  });
+
+  return settings?.businessName || "your store";
+}
 
 /**
  * Best-effort welcome email for a newly created user (a store's own Admin

@@ -385,6 +385,19 @@ export async function createQuotation(
       return { success: false, message: "Please select a customer" };
     }
 
+    // Every referenced stock item must belong to this store — otherwise a
+    // crafted itemsJson could link a line item to another store's stock.
+    const requestedStockIds = [
+      ...new Set(items.map((item) => item.inventoryStockId).filter((id): id is string => !!id)),
+    ];
+    const validStock = requestedStockIds.length
+      ? await prisma.inventoryStock.findMany({
+          where: { id: { in: requestedStockIds }, storeId },
+          select: { id: true },
+        })
+      : [];
+    const validStockIds = new Set(validStock.map((s) => s.id));
+
     const quotationNumber = await generateQuotationNumber(storeId);
 
     const quotation = await prisma.quotation.create({
@@ -415,7 +428,10 @@ export async function createQuotation(
             makingChargeType: toChargeType(item.makingChargeType),
             stoneCharge: item.stoneCharge,
             lineTotal: lineTotal(item),
-            inventoryStockId: item.inventoryStockId || undefined,
+            inventoryStockId:
+              item.inventoryStockId && validStockIds.has(item.inventoryStockId)
+                ? item.inventoryStockId
+                : undefined,
           })),
         },
       },

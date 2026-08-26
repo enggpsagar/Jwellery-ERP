@@ -444,11 +444,20 @@ export async function receiveItemsFromKarigar(
     const storeMetals = await prisma.storeMetal.findMany({ where: { storeId } });
     const metalById = new Map(storeMetals.map((metal) => [metal.id, metal]));
 
+    const productIds = [...new Set(items.map((item) => item.productId).filter(Boolean))];
+    const products = productIds.length
+      ? await prisma.product.findMany({
+          where: { id: { in: productIds as string[] }, storeId },
+          select: { id: true },
+        })
+      : [];
+    const productIdSet = new Set(products.map((p) => p.id));
+
     for (const item of items) {
-      if (!item.productId) {
+      if (!item.productId || !productIdSet.has(item.productId)) {
         return {
           success: false,
-          message: "Each returned item must have a product selected",
+          message: "Each returned item must have a valid product selected",
         };
       }
       if (!item.metalTypeId || !metalById.has(item.metalTypeId)) {

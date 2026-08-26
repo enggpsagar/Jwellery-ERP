@@ -1,12 +1,13 @@
 "use client"
 
-import { Gem } from "lucide-react"
+import Link from "next/link"
+import { Gem, Plus } from "lucide-react"
 
 import { StoreTable } from "@/components/stores/store-table"
-import { StoreFormDialog } from "@/components/stores/store-form-dialog"
 import { DataTableToolbar } from "@/components/shared/data-table-toolbar"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { exportStoresToExcel } from "@/lib/actions/store-actions"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 
 type StoreRow = {
@@ -61,7 +62,12 @@ export function StoresClient({ stores, pagination, goldSummary }: StoresClientPr
           </p>
         </div>
 
-        <StoreFormDialog />
+        <Button asChild className="gap-2">
+          <Link href="/stores/new">
+            <Plus className="h-4 w-4" />
+            Add Store
+          </Link>
+        </Button>
       </div>
 
       <Card>

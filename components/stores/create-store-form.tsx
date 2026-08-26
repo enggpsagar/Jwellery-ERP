@@ -2,25 +2,19 @@
 
 import { useActionState, useEffect, useRef, useState, type FormEvent } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Store as StoreIcon, User, Mail, Phone, MapPin, Hash } from "lucide-react"
+import { Store as StoreIcon, User, Mail, Phone, MapPin, Hash } from "lucide-react"
 
 import { createStoreWithAdmin, type StoreFormState } from "@/lib/actions/store-actions"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
 
 const initialState: StoreFormState = { success: false, message: "", errors: {} }
 
-export function StoreFormDialog() {
+export function CreateStoreForm() {
   const router = useRouter()
   const toast = useToast()
   const formRef = useRef<HTMLFormElement>(null)
-  const [open, setOpen] = useState(false)
   const [contactError, setContactError] = useState("")
 
   const [state, formAction, pending] = useActionState(createStoreWithAdmin, initialState)
@@ -42,9 +36,7 @@ export function StoreFormDialog() {
   useEffect(() => {
     if (state.success) {
       toast.success(state.message || "Store created")
-      setOpen(false)
-      formRef.current?.reset()
-      setContactError("")
+      router.push("/stores")
       router.refresh()
       return
     }
@@ -55,27 +47,18 @@ export function StoreFormDialog() {
   }, [state, router, toast])
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Button type="button" className="gap-2" onClick={() => setOpen(true)}>
-        <Plus className="h-4 w-4" />
-        Add Store
-      </Button>
+    <Card>
+      <CardHeader>
+        <CardTitle>Store Details</CardTitle>
+      </CardHeader>
 
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Create Store</DialogTitle>
-        </DialogHeader>
-
+      <CardContent>
         <form
           ref={formRef}
           action={formAction}
           onSubmit={handleSubmit}
           className="grid grid-cols-1 gap-4 md:grid-cols-2"
         >
-          <div className="space-y-1 md:col-span-2">
-            <p className="text-sm font-semibold text-muted-foreground">Store details</p>
-          </div>
-
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <StoreIcon className="h-4 w-4 text-gray-500" />
@@ -203,11 +186,11 @@ export function StoreFormDialog() {
             <p className="text-sm text-red-600 md:col-span-2">{contactError}</p>
           )}
 
-          <div className="md:col-span-2 flex justify-end gap-3 pt-2">
+          <div className="md:col-span-2 flex justify-end gap-3 pt-2 border-t mt-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
+              onClick={() => router.push("/stores")}
               disabled={pending}
             >
               Cancel
@@ -218,7 +201,7 @@ export function StoreFormDialog() {
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CardContent>
+    </Card>
   )
 }

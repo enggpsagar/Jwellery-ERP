@@ -225,7 +225,12 @@ function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string })
   );
 }
 
-export function AppSidebar() {
+type AppSidebarProps = {
+  storeName?: string | null;
+  storeLogoUrl?: string | null;
+};
+
+export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const role = session?.user?.role;

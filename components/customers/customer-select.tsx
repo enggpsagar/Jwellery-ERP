@@ -13,6 +13,14 @@ import {
 import { Input } from "@/components/ui/input"
 import { QuickAddCustomerDialog } from "@/components/customers/quick-add-customer-dialog"
 
+/**
+ * Sentinel for the "Create new customer" row. A real SelectItem rather than
+ * a plain <button> inside SelectContent: Radix owns pointer handling there
+ * and can swallow a bare button's click, and a button is not reachable by
+ * arrow keys in the item list. Cannot collide with a customer id — cuids.
+ */
+const ADD_NEW_VALUE = "__add_new_customer__"
+
 export type CustomerOption = {
   id: string
   name: string
@@ -77,6 +85,13 @@ export function CustomerSelect({
         open={selectOpen}
         onOpenChange={setSelectOpen}
         onValueChange={(value) => {
+          if (value === ADD_NEW_VALUE) {
+            // Not a selection — leave `selected` alone so dismissing the
+            // dialog keeps whatever was already chosen.
+            openQuickAdd()
+            return
+          }
+
           setSelected(value)
           onChange?.(value, localCustomers.find((customer) => customer.id === value))
         }}
@@ -110,16 +125,13 @@ export function CustomerSelect({
             ))
           )}
 
-          <div className="mt-1 border-t p-1">
-            <button
-              type="button"
-              onClick={openQuickAdd}
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-primary hover:bg-accent"
-            >
-              <UserPlus className="h-4 w-4" />
-              Create new customer
-            </button>
-          </div>
+          {/* Outside the empty/non-empty branch above, so it is offered even
+              when the store has no customers at all. */}
+          <div className="my-1 border-t" />
+          <SelectItem value={ADD_NEW_VALUE} className="font-medium text-primary">
+            <UserPlus className="mr-1 h-4 w-4" />
+            Create new customer
+          </SelectItem>
         </SelectContent>
       </Select>
 

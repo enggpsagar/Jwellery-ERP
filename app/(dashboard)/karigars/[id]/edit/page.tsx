@@ -3,6 +3,7 @@
 import { notFound } from "next/navigation";
 
 import { getKarigarById } from "@/lib/actions/karigar-actions";
+import { getStoreLocations } from "@/lib/actions/store-location-actions";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { KarigarEditForm } from "@/components/karigars/karigar-edit-form";
@@ -13,7 +14,10 @@ type Props = {
 
 export default async function EditKarigarPage({ params }: Props) {
   const { id } = await params;
-  const karigar = await getKarigarById(id);
+  const [karigar, locations] = await Promise.all([
+    getKarigarById(id),
+    getStoreLocations(),
+  ]);
 
   if (!karigar) {
     notFound();
@@ -28,7 +32,7 @@ export default async function EditKarigarPage({ params }: Props) {
         backLabel="Back to Karigars"
       />
 
-      <KarigarEditForm karigar={karigar} />
+      <KarigarEditForm karigar={karigar} locations={locations} />
     </main>
   );
 }

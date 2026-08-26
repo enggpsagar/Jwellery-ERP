@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState } from "react"
 
 import type { MetalDailyLedgerResult } from "@/lib/actions/ledger-actions"
-import { formatUnitValue, WEIGHT_BASED_UNITS } from "@/lib/business-units"
+import { BUSINESS_UNIT_LABELS, formatUnitValue } from "@/lib/business-units"
 import {
   Card,
   CardContent,
@@ -100,7 +100,7 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
               <TableHead className="pl-6">Date</TableHead>
               {data.activeUnits.map((unit) => (
                 <TableHead key={unit} colSpan={3} className="text-center border-l">
-                  {unit === "GOLD" ? "Gold" : unit === "SILVER" ? "Silver" : "Diamond"}
+                  {BUSINESS_UNIT_LABELS[unit]}
                 </TableHead>
               ))}
             </TableRow>
@@ -133,7 +133,6 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
                   </TableCell>
                   {data.activeUnits.map((unit) => {
                     const entry = row.units.find((u) => u.unit === unit)
-                    const weightBased = WEIGHT_BASED_UNITS.includes(unit)
 
                     return (
                       <Fragment key={unit}>
@@ -157,7 +156,7 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
                         </TableCell>
                         <TableCell className="text-right font-medium tabular-nums">
                           {entry ? (
-                            weightBased && entry.closingBalance < 0 ? (
+                            entry.closingBalance < 0 ? (
                               <span className="text-destructive">
                                 -{formatUnitValue(unit, entry.closingBalance)}
                               </span>

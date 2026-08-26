@@ -454,11 +454,11 @@ export async function receiveItemsFromKarigar(
     const productIdSet = new Set(products.map((p) => p.id));
 
     for (const item of items) {
-      if (!item.productId || !productIdSet.has(item.productId)) {
-        return {
-          success: false,
-          message: "Each returned item must have a valid product selected",
-        };
+      // Product is optional here — an item with no productId gets a brand-new
+      // Product auto-created for it below (name from itemName). A productId
+      // that *was* supplied still has to resolve to a real, same-store row.
+      if (item.productId && !productIdSet.has(item.productId)) {
+        return { success: false, message: "Selected product not found" };
       }
       if (!item.metalTypeId || !metalById.has(item.metalTypeId)) {
         return { success: false, message: "Each returned item needs a valid metal type" };
@@ -475,14 +475,39 @@ export async function receiveItemsFromKarigar(
     const baseStockCount = await prisma.inventoryStock.count({
       where: { storeId, stockCode: { startsWith: `STK-${year}-` } },
     });
+    const baseProductCount = await prisma.product.count({
+      where: { storeId, productCode: { startsWith: `KRG-${year}-` } },
+    });
 
     let receiveWeight = 0;
     let receiveFineWeight = 0;
     let plainFineWeightTotal = 0;
+    let autoCreatedProducts = 0;
 
     await prisma.$transaction(async (tx) => {
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
+
+        // No product picked from the existing catalog — auto-create one from
+        // this item so the karigar's delivered piece becomes sellable stock
+        // without forcing a separate "add product first" step.
+        let productId = item.productId;
+        if (!productId) {
+          const productCode = `KRG-${year}-${String(baseProductCount + autoCreatedProducts + 1).padStart(4, "0")}`;
+          autoCreatedProducts++;
+          const metal = metalById.get(item.metalTypeId);
+          const newProduct = await tx.product.create({
+            data: {
+              storeId,
+              productCode,
+              name: item.itemName || "Item",
+              metalTypeId: item.metalTypeId,
+              defaultPurity: metal?.hasPurity ? item.purity : undefined,
+            },
+            select: { id: true },
+          });
+          productId = newProduct.id;
+        }
         const netWeight = item.netWeight ?? 0;
         // Pure embedded-metal calc — stored as-is on KarigarReceiptItem.fineWeight,
         // unaffected by wastage%.
@@ -505,7 +530,7 @@ export async function receiveItemsFromKarigar(
         const stock = await tx.inventoryStock.create({
           data: {
             storeId,
-            productId: item.productId!,
+            productId,
             stockCode,
             tagNumber: item.tagNumber || undefined,
             metalTypeId: item.metalTypeId,
@@ -549,7 +574,7 @@ export async function receiveItemsFromKarigar(
           data: {
             karigarJobId: jobId,
             itemName: item.itemName || "Item",
-            productId: item.productId,
+            productId,
             metalTypeId: item.metalTypeId,
             purity: item.purity,
             quantity: item.quantity || 1,

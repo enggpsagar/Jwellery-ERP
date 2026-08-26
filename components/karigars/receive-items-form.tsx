@@ -260,9 +260,7 @@ export function ReceiveItemsForm({
     })),
   )
 
-  const canSubmit = items.every(
-    (item) => item.productId && item.netWeight > 0 && item.metalTypeId,
-  )
+  const canSubmit = items.every((item) => item.netWeight > 0 && item.metalTypeId)
 
   return (
     <form action={formAction} className="space-y-6">
@@ -315,12 +313,12 @@ export function ReceiveItemsForm({
                 ============================ */}
                 <div className="grid gap-4 lg:grid-cols-4">
                   <div className="space-y-1">
-                    <Label className="text-xs">Product *</Label>
+                    <Label className="text-xs">Product</Label>
                     <ProductSelect
                       products={products}
                       name={`product-${item.key}`}
                       defaultValue={item.productId}
-                      placeholder="Select product"
+                      placeholder="Optional — leave blank to auto-create"
                       onChange={(productId, product) =>
                         applyProductToItem(item.key, productId, product)
                       }

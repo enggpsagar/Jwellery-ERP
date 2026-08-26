@@ -10,6 +10,7 @@ import { requireRole } from "@/lib/auth/auth";
 import { ACTIVE_STORE_COOKIE } from "@/lib/store-context";
 import { buildExcelExport } from "@/lib/excel-export";
 import { classifyMetalName } from "@/lib/business-units";
+import { sendInviteEmailSafely } from "@/lib/invite-email";
 
 export type StoreFormState = {
   success: boolean;
@@ -194,8 +195,35 @@ export async function createStoreWithAdmin(
       return { success: false, message: "Please fix the form errors", errors };
     }
 
-    await prisma.$transaction(async (tx) => {
-      const store = await tx.store.create({
+    // Email/phone are globally-unique sign-in identifiers across every
+    // store — check up front so the error names exactly which field
+    // collided, rather than relying on the DB's generic P2002 message.
+    if (adminEmail || adminPhone) {
+      const existing = await prisma.user.findFirst({
+        where: {
+          OR: [
+            adminEmail ? { email: adminEmail } : undefined,
+            adminPhone ? { phone: adminPhone } : undefined,
+          ].filter((clause): clause is NonNullable<typeof clause> => !!clause),
+        },
+        select: { email: true, phone: true },
+      });
+
+      if (existing) {
+        const field = existing.email === adminEmail ? "adminEmail" : "adminPhone";
+        return {
+          success: false,
+          message:
+            field === "adminEmail"
+              ? "This email is already registered to a user at another store."
+              : "This phone number is already registered to a user at another store.",
+          errors: { [field]: ["Already in use by another store's user"] },
+        };
+      }
+    }
+
+    const store = await prisma.$transaction(async (tx) => {
+      const createdStore = await tx.store.create({
         data: {
           name,
           code,
@@ -217,14 +245,32 @@ export async function createStoreWithAdmin(
           role: UserRole.ADMIN,
           status: UserStatus.INVITED,
           isActive: true,
-          storeId: store.id,
+          storeId: createdStore.id,
         },
       });
+
+      return createdStore;
     });
 
     revalidatePath("/stores");
 
-    return { success: true, message: `Store "${name}" created` };
+    const emailSent = await sendInviteEmailSafely({
+      email: adminEmail,
+      phone: adminPhone,
+      name: adminName,
+      role: UserRole.ADMIN,
+      storeName: store.name,
+    });
+
+    return {
+      success: true,
+      message:
+        adminEmail && emailSent
+          ? `Store "${name}" created and a welcome email was sent to ${adminEmail}`
+          : adminEmail
+            ? `Store "${name}" created, but the welcome email could not be sent`
+            : `Store "${name}" created`,
+    };
   } catch (error: any) {
     if (error.code === "P2002") {
       return {

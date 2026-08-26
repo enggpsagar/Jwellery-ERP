@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { OtpPurpose, type User } from "@prisma/client"
 import { hashOTP } from "@/lib/auth/otp"
+import { sendDisabledAccountEmailSafely } from "@/lib/invite-email"
 
 async function verifyAndConsumeOtp(
   where: { phone: string } | { email: string },
@@ -32,6 +33,12 @@ async function assertCanSignIn(
   }
 
   if (!user.isActive) {
+    await sendDisabledAccountEmailSafely({
+      email: user.email,
+      name: user.name || "there",
+      role: user.role,
+      storeId: user.storeId,
+    })
     throw new Error("Your account has been disabled.")
   }
 

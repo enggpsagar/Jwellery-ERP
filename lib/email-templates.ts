@@ -74,6 +74,25 @@ function summaryRow(label: string, value: string, bold = false) {
   </div>`;
 }
 
+export function disabledAccountEmail(params: {
+  name: string;
+  storeName: string;
+  contactInstruction: string;
+}) {
+  const { name, storeName, contactInstruction } = params;
+
+  const body = `
+    <p>Hi ${name},</p>
+    <p>Someone just tried to sign in to your account at <strong>${storeName}</strong>, but this account is currently <strong>disabled</strong> and cannot access the application.</p>
+    <p>If this wasn't you, no action is needed. To regain access, please ${contactInstruction} to have your account re-enabled.</p>
+  `;
+
+  return {
+    subject: `Sign-in blocked — your ${storeName} account is disabled`,
+    html: wrapEmail(storeName, "Account access blocked", body),
+  };
+}
+
 export function inviteUserEmail(params: {
   name: string;
   roleLabel: string;

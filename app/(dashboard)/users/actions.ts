@@ -26,8 +26,7 @@ import { PERMISSIONS } from "@/lib/permissions";
 import { ROLE_LABELS } from "@/lib/roles";
 import { requireStoreScope, getEffectiveStoreId } from "@/lib/store-context";
 import { prisma } from "@/lib/prisma";
-import { sendMail } from "@/lib/mailer";
-import { inviteUserEmail } from "@/lib/email-templates";
+import { sendInviteEmailSafely } from "@/lib/invite-email";
 import { buildExcelExport } from "@/lib/excel-export";
 
 export type UserActionState = {
@@ -80,43 +79,13 @@ function friendlyUserErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-/**
- * Best-effort welcome email for a newly created user — never throws,
- * since a failed/skipped send shouldn't undo the user that was just created.
- */
-async function sendInviteEmailSafely(params: {
-  email: string | null;
-  phone: string | null;
-  name: string;
-  role: UserRole;
-  storeId: string;
-}): Promise<boolean> {
-  if (!params.email) return false;
+async function resolveStoreName(storeId: string): Promise<string> {
+  const settings = await prisma.businessSettings.findUnique({
+    where: { storeId },
+    select: { businessName: true },
+  });
 
-  try {
-    const settings = await prisma.businessSettings.findUnique({
-      where: { storeId: params.storeId },
-      select: { businessName: true },
-    });
-
-    const storeName = settings?.businessName || "your store";
-    const loginUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/login`;
-
-    const { subject, html } = inviteUserEmail({
-      name: params.name,
-      roleLabel: ROLE_LABELS[params.role],
-      storeName,
-      hasEmailLogin: true,
-      hasPhoneLogin: !!params.phone,
-      loginUrl,
-    });
-
-    const result = await sendMail({ to: params.email, subject, html });
-    return result.sent;
-  } catch (error) {
-    console.error("sendInviteEmailSafely error:", error);
-    return false;
-  }
+  return settings?.businessName || "your store";
 }
 
 export async function createUserAction(
@@ -153,7 +122,7 @@ export async function createUserAction(
       phone: payload.phone || null,
       name: payload.name,
       role: payload.role,
-      storeId,
+      storeName: await resolveStoreName(storeId),
     });
 
     const action = claimed ? "linked to this store" : "created";

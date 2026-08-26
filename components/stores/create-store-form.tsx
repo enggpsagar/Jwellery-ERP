@@ -180,6 +180,9 @@ export function CreateStoreForm() {
               placeholder="Used for OTP sign-in"
               onChange={() => setContactError("")}
             />
+            {state.errors?.adminPhone?.[0] && (
+              <p className="text-sm text-red-600">{state.errors.adminPhone[0]}</p>
+            )}
           </div>
 
           {contactError && (

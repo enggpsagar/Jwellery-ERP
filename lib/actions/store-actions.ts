@@ -179,6 +179,8 @@ export async function createStoreWithAdmin(
 
     const name = String(formData.get("name") || "").trim();
     const code = String(formData.get("code") || "").trim().toUpperCase();
+    const phone = toOptionalString(formData.get("phone"));
+    const email = toOptionalString(formData.get("email"));
     const adminName = String(formData.get("adminName") || "").trim();
     const adminEmail = toOptionalString(formData.get("adminEmail"));
     const adminPhone = toOptionalString(formData.get("adminPhone"));
@@ -186,6 +188,11 @@ export async function createStoreWithAdmin(
     const errors: Record<string, string[]> = {};
     if (!name) errors.name = ["Store name is required"];
     if (!code) errors.code = ["Store code is required"];
+    if (!phone) errors.phone = ["Store phone number is required"];
+    if (!email) errors.email = ["Store email is required"];
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = ["Enter a valid email address"];
+    }
     if (!adminName) errors.adminName = ["Admin name is required"];
     if (!adminEmail && !adminPhone) {
       errors.adminEmail = ["Provide an admin email or phone number"];
@@ -231,8 +238,8 @@ export async function createStoreWithAdmin(
           city: toOptionalString(formData.get("city")),
           state: toOptionalString(formData.get("state")),
           pincode: toOptionalString(formData.get("pincode")),
-          phone: toOptionalString(formData.get("phone")),
-          email: toOptionalString(formData.get("email")),
+          phone,
+          email,
           gstNumber: toOptionalString(formData.get("gstNumber")),
         },
       });
@@ -439,10 +446,17 @@ export async function updateStore(
 
     const name = String(formData.get("name") || "").trim();
     const code = String(formData.get("code") || "").trim().toUpperCase();
+    const phone = toOptionalString(formData.get("phone"));
+    const email = toOptionalString(formData.get("email"));
 
     const errors: Record<string, string[]> = {};
     if (!name) errors.name = ["Store name is required"];
     if (!code) errors.code = ["Store code is required"];
+    if (!phone) errors.phone = ["Store phone number is required"];
+    if (!email) errors.email = ["Store email is required"];
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = ["Enter a valid email address"];
+    }
 
     if (Object.keys(errors).length > 0) {
       return { success: false, message: "Please fix the form errors", errors };
@@ -457,8 +471,8 @@ export async function updateStore(
         city: toOptionalString(formData.get("city")),
         state: toOptionalString(formData.get("state")),
         pincode: toOptionalString(formData.get("pincode")),
-        phone: toOptionalString(formData.get("phone")),
-        email: toOptionalString(formData.get("email")),
+        phone,
+        email,
         gstNumber: toOptionalString(formData.get("gstNumber")),
       },
     });

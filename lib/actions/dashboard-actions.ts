@@ -1,8 +1,33 @@
 // FILE PATH: lib/actions/dashboard-actions.ts
 "use server";
 
+import { InventoryStockStatus } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+
+/**
+ * What counts as metal still on hand.
+ *
+ * Selling a piece (via an invoice or a kacha slip) flips its stock row to
+ * SOLD; it is never deleted. So a sum that filters only on `isActive` keeps
+ * counting metal that has already left the shop, and the figure only ever
+ * grows — purchases add to it and sales never take anything away.
+ *
+ * RESERVED is included because the piece is physically still here, just
+ * earmarked. ISSUED_TO_KARIGAR is deliberately excluded: that metal is out
+ * with a goldsmith and is reported separately as "Still with Karigar", and
+ * counting it here would double-count it against that figure. DAMAGED and
+ * ARCHIVED are not sellable stock.
+ *
+ * Same definition as "Remaining Stock" in `getGoldFlowReport`
+ * (lib/actions/report-actions.ts), so the Dashboard and Reports cannot
+ * disagree about how much metal the store holds.
+ */
+const ON_HAND_STOCK_STATUSES = [
+  InventoryStockStatus.IN_STOCK,
+  InventoryStockStatus.RESERVED,
+];
 
 function startOfDay(date: Date) {
   const d = new Date(date);
@@ -89,7 +114,12 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     Promise.all(
       activeMetals.map((metal) =>
         prisma.inventoryStock.aggregate({
-          where: { storeId, metalTypeId: metal.id, isActive: true },
+          where: {
+            storeId,
+            metalTypeId: metal.id,
+            isActive: true,
+            status: { in: ON_HAND_STOCK_STATUSES },
+          },
           _sum: { netWeight: true },
         })
       )
@@ -150,7 +180,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
       value: `${metal.grams.toLocaleString("en-IN", { maximumFractionDigits: 1 })} g`,
       change: "",
       trend: "up" as const,
-      sub: `active ${metal.metalName.toLowerCase()} inventory`,
+      sub: `${metal.metalName.toLowerCase()} on hand, excluding sold`,
       icon: "metal" as const,
     })),
     {

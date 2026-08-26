@@ -122,6 +122,26 @@ export async function getUserById(id: string, storeId: string | null) {
   });
 }
 
+/** Filters a set of client-supplied location ids down to ones that actually
+ * belong to this store — the same IDOR-prevention pattern used for
+ * productId/metalTypeId elsewhere, so a Staff user can't be granted (or
+ * grant themselves, if this ever became self-serve) access to another
+ * store's location by id. */
+async function validStoreLocationIds(
+  locationIds: string[] | undefined,
+  storeId: string
+): Promise<string[]> {
+  const ids = [...new Set((locationIds ?? []).filter(Boolean))];
+  if (!ids.length) return [];
+
+  const rows = await prisma.storeLocation.findMany({
+    where: { id: { in: ids }, storeId },
+    select: { id: true },
+  });
+
+  return rows.map((row) => row.id);
+}
+
 async function assertKarigarInStore(karigarId: string | null, storeId: string) {
   if (!karigarId) return;
 
@@ -158,6 +178,9 @@ export async function createUser(
 
   await assertKarigarInStore(karigarId, storeId);
 
+  const locationIds =
+    data.role === UserRole.STAFF ? await validStoreLocationIds(data.locationIds, storeId) : [];
+
   const existing = await prisma.user.findFirst({
     where: {
       OR: [email ? { email } : undefined, phone ? { phone } : undefined].filter(
@@ -192,6 +215,10 @@ export async function createUser(
         karigarId,
         status: UserStatus.ACTIVE,
         permissions: data.role === UserRole.STAFF ? data.permissions : [],
+        locationAccess: {
+          deleteMany: {},
+          create: locationIds.map((locationId) => ({ locationId })),
+        },
       },
     });
 
@@ -209,6 +236,7 @@ export async function createUser(
       storeId,
       karigarId,
       permissions: data.role === UserRole.STAFF ? data.permissions : [],
+      locationAccess: { create: locationIds.map((locationId) => ({ locationId })) },
     },
   });
 

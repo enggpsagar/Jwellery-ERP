@@ -33,6 +33,11 @@ export const createUserSchema = z.object({
   // Only meaningful when role is STAFF — per-user module access overrides.
   // Empty/omitted means "use the default full Staff bundle."
   permissions: z.array(z.string()).optional().default([]),
+
+  // Only meaningful when role is STAFF — which locations this user can see
+  // data for. Empty/omitted means unrestricted (all locations), same
+  // "empty = unrestricted" convention as permissions above.
+  locationIds: z.array(z.string()).optional().default([]),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

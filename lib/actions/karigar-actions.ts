@@ -5,7 +5,12 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireStoreScope } from "@/lib/store-context";
-import { getLocationScope, locationWhere, isLocationAllowed } from "@/lib/location-scope";
+import {
+  getLocationScope,
+  locationWhere,
+  isLocationAllowed,
+  type LocationScope,
+} from "@/lib/location-scope";
 import { UserRole, UserStatus } from "@prisma/client";
 import * as XLSX from "xlsx";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
@@ -105,21 +110,26 @@ function mapKarigar(karigar: any): Karigar {
     openingGold: Number(karigar.openingGold),
     openingCash: Number(karigar.openingCash),
     isActive: karigar.isActive,
+    locationId: karigar.locationId ?? null,
     createdAt: karigar.createdAt?.toISOString?.() ?? undefined,
   };
 }
 
-function getWhere(storeId: string, search?: string) {
+function getWhere(storeId: string, search: string | undefined, scope: LocationScope) {
   const query = String(search || "").trim();
-  if (!query) return { storeId };
 
   return {
     storeId,
-    OR: [
-      { name: { contains: query, mode: "insensitive" as const } },
-      { code: { contains: query, mode: "insensitive" as const } },
-      { mobile: { contains: query, mode: "insensitive" as const } },
-    ],
+    ...locationWhere(scope),
+    ...(query
+      ? {
+          OR: [
+            { name: { contains: query, mode: "insensitive" as const } },
+            { code: { contains: query, mode: "insensitive" as const } },
+            { mobile: { contains: query, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
   };
 }
 
@@ -143,7 +153,8 @@ export async function getKarigars(
   const sortBy = params.sortBy || "createdAt";
   const sortOrder = params.sortOrder || "desc";
   const storeId = await requireStoreScope();
-  const where = getWhere(storeId, search);
+  const scope = await getLocationScope();
+  const where = getWhere(storeId, search, scope);
 
   const [totalCount, karigars] = await Promise.all([
     prisma.karigar.count({ where }),
@@ -172,7 +183,10 @@ export async function getKarigars(
 
 export async function getKarigarById(id: string): Promise<Karigar | null> {
   const storeId = await requireStoreScope();
-  const karigar = await prisma.karigar.findFirst({ where: { id, storeId } });
+  const scope = await getLocationScope();
+  const karigar = await prisma.karigar.findFirst({
+    where: { id, storeId, ...locationWhere(scope) },
+  });
   if (!karigar) return null;
   return mapKarigar(karigar);
 }
@@ -195,6 +209,7 @@ function buildKarigarData(formData: FormData) {
     openingGold: toNumber(formData.get("openingGold")),
     openingCash: toNumber(formData.get("openingCash")),
     isActive: formData.get("isActive") === "on" || formData.get("isActive") === "true",
+    locationId: toOptionalString(formData.get("locationId")),
   };
 }
 
@@ -258,6 +273,20 @@ export async function createKarigar(
     }
 
     const storeId = await requireStoreScope();
+
+    if (data.locationId) {
+      const location = await prisma.storeLocation.findFirst({
+        where: { id: data.locationId, storeId },
+        select: { id: true },
+      });
+      if (!location) {
+        return {
+          success: false,
+          message: "Selected location is invalid",
+          errors: { locationId: ["Selected location could not be found"] },
+        };
+      }
+    }
 
     // A mobile or email doubles as the karigar's login — create their User
     // account in the same step, matching how a Store's initial Admin is
@@ -334,6 +363,20 @@ export async function updateKarigar(
 
     const data = buildKarigarData(formData);
     const storeId = await requireStoreScope();
+
+    if (data.locationId) {
+      const location = await prisma.storeLocation.findFirst({
+        where: { id: data.locationId, storeId },
+        select: { id: true },
+      });
+      if (!location) {
+        return {
+          success: false,
+          message: "Selected location is invalid",
+          errors: { locationId: ["Selected location could not be found"] },
+        };
+      }
+    }
 
     const existing = await prisma.karigar.findFirst({
       where: { id, storeId },

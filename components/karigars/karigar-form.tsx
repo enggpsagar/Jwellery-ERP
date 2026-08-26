@@ -1,21 +1,34 @@
 "use client"
 
+import { useState } from "react"
+
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { Karigar } from "@/lib/actions/karigar-actions"
+import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
 
 type Props = {
   pending?: boolean
   karigar?: Karigar | null
   errors?: Record<string, string[]>
+  locations?: StoreLocationRow[]
 }
 
 export function KarigarForm({
   pending = false,
   karigar = null,
   errors,
+  locations = [],
 }: Props) {
+  const [locationId, setLocationId] = useState(karigar?.locationId ?? "")
 
   return (
     <div className="space-y-6">
@@ -100,6 +113,30 @@ export function KarigarForm({
             placeholder="e.g. Chain making, Stone setting"
             defaultValue={karigar?.specialization}
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Location</Label>
+          <Select
+            value={locationId || "__none__"}
+            onValueChange={(value) => setLocationId(value === "__none__" ? "" : value)}
+          >
+            <SelectTrigger className="h-11 w-full">
+              <SelectValue placeholder="Select location" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">None</SelectItem>
+              {locations.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <input type="hidden" name="locationId" value={locationId} />
+          {errors?.locationId?.[0] && (
+            <p className="text-xs text-red-600">{errors.locationId[0]}</p>
+          )}
         </div>
 
         <div className="space-y-2">

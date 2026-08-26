@@ -387,6 +387,298 @@ export async function getPurchaseFormProducts() {
 }
 
 /**
+ * Shapes returned by the two loaders above. The quick-add actions below
+ * must return exactly these, since the purchase form appends their result
+ * straight into the same arrays the pickers are reading from.
+ */
+export type PurchaseFormVendor = Awaited<
+  ReturnType<typeof getPurchaseFormVendors>
+>[number];
+
+export type PurchaseFormProduct = Awaited<
+  ReturnType<typeof getPurchaseFormProducts>
+>[number];
+
+export type QuickAddVendorResult = {
+  success: boolean;
+  message: string;
+  errors?: Record<string, string[]>;
+  vendor?: PurchaseFormVendor;
+};
+
+export type QuickAddProductResult = {
+  success: boolean;
+  message: string;
+  errors?: Record<string, string[]>;
+  product?: PurchaseFormProduct;
+};
+
+/**
+ * Creates a vendor mid-purchase and hands the new row straight back, so the
+ * purchase screen can select it without a page reload.
+ *
+ * Required fields deliberately mirror `addVendor` (name + phone) — a quick
+ * add must not be able to create a vendor the full Vendors form would have
+ * rejected. Everything else is left blank for later editing.
+ */
+export async function quickAddVendorForPurchase(
+  formData: FormData,
+): Promise<QuickAddVendorResult> {
+  try {
+    const name = String(formData.get("name") || "").trim();
+    const phone = String(formData.get("phone") || "").trim();
+    const gstNumber = String(formData.get("gstNumber") || "").trim();
+    const city = String(formData.get("city") || "").trim();
+
+    const errors: Record<string, string[]> = {};
+    if (!name) errors.name = ["Vendor name is required"];
+    if (!phone) errors.phone = ["Phone number is required"];
+
+    if (Object.keys(errors).length > 0) {
+      return { success: false, message: "Please fix the form errors", errors };
+    }
+
+    const storeId = await requireStoreScope();
+
+    const existing = await prisma.vendor.findFirst({
+      where: { storeId, phone },
+      select: { name: true },
+    });
+
+    if (existing) {
+      return {
+        success: false,
+        message: `"${existing.name}" already uses this phone number.`,
+        errors: { phone: ["A vendor with this phone already exists"] },
+      };
+    }
+
+    const vendor = await prisma.vendor.create({
+      data: {
+        storeId,
+        name,
+        phone,
+        gstin: gstNumber || null,
+        city: city || null,
+      },
+      select: { id: true, name: true, phone: true, vendorCode: true },
+    });
+
+    revalidatePath("/vendors");
+
+    return { success: true, message: `Vendor "${vendor.name}" added`, vendor };
+  } catch (error) {
+    console.error("quickAddVendorForPurchase error:", error);
+    return { success: false, message: "Failed to add vendor" };
+  }
+}
+
+/**
+ * Next free auto product code for a store, e.g. PRD-0010. Only used when
+ * the operator leaves the code blank on a quick add — the full product form
+ * still expects a hand-typed code.
+ *
+ * Derived from the highest existing `PRD-<digits>` code, NOT from a COUNT
+ * like `generateSlipNumber`/`generate*Number` do elsewhere in this codebase.
+ * A count regresses the moment a row is deleted: with PRD-0001..PRD-0009
+ * present and PRD-0003 removed, a count yields PRD-0009 — already taken —
+ * and since a retry recounts to that same number, every attempt collides
+ * and the quick add fails permanently. A max always moves forward, and
+ * `offset` advances it per retry so a concurrent insert resolves rather
+ * than re-colliding.
+ *
+ * The max is computed in JS rather than with `orderBy: { productCode:
+ * "desc" }` because real stores already hold hand-written codes like
+ * `PRD-RING-22K-001`. Letters sort above digits, so a SQL desc sort returns
+ * one of those, it parses to NaN, and the generator would hand out
+ * PRD-0001 forever. Only codes that are `PRD-` followed by digits count
+ * here. Product counts per store are small enough that reading the codes
+ * is cheaper than the raw SQL a regex-filtered MAX() would need.
+ */
+async function generateProductCode(storeId: string, offset = 0) {
+  const rows = await prisma.product.findMany({
+    where: { storeId, productCode: { startsWith: "PRD-" } },
+    select: { productCode: true },
+  });
+
+  const highest = rows.reduce((max, row) => {
+    const match = /^PRD-(\d+)$/.exec(row.productCode);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+
+  return `PRD-${String(highest + 1 + offset).padStart(4, "0")}`;
+}
+
+/**
+ * Creates a product mid-purchase and hands the new row back in picker
+ * shape. Scoped to the fields the purchase line items actually consume
+ * (metal, purity, default charges) — category *type* is left unset rather
+ * than forcing a cascading second dropdown into a dialog that sits inside
+ * another form; it is nullable and editable on the full product page.
+ */
+export async function quickAddProductForPurchase(
+  formData: FormData,
+): Promise<QuickAddProductResult> {
+  try {
+    const name = String(formData.get("name") || "").trim();
+    const typedCode = String(formData.get("productCode") || "").trim();
+    const categoryId = String(formData.get("categoryId") || "").trim();
+    const metalTypeId = String(formData.get("metalTypeId") || "").trim();
+    const purityRaw = String(formData.get("defaultPurity") || "").trim();
+
+    const errors: Record<string, string[]> = {};
+    if (!name) errors.name = ["Product name is required"];
+
+    const purity =
+      purityRaw && purityRaw in PurityType ? (purityRaw as PurityType) : null;
+    if (purityRaw && !purity) errors.defaultPurity = ["Invalid purity"];
+
+    if (Object.keys(errors).length > 0) {
+      return { success: false, message: "Please fix the form errors", errors };
+    }
+
+    const storeId = await requireStoreScope();
+
+    // Anything referenced from client input has to be proven to belong to
+    // this store, or a crafted id could attach another store's taxonomy row.
+    if (categoryId) {
+      const category = await prisma.storeCategory.findFirst({
+        where: { id: categoryId, storeId },
+        select: { id: true },
+      });
+      if (!category) {
+        return {
+          success: false,
+          message: "That category is not available for this store.",
+          errors: { categoryId: ["Unknown category"] },
+        };
+      }
+    }
+
+    if (metalTypeId) {
+      const metal = await prisma.storeMetal.findFirst({
+        where: { id: metalTypeId, storeId },
+        select: { id: true },
+      });
+      if (!metal) {
+        return {
+          success: false,
+          message: "That metal is not available for this store.",
+          errors: { metalTypeId: ["Unknown metal"] },
+        };
+      }
+    }
+
+    if (typedCode) {
+      const clash = await prisma.product.findFirst({
+        where: { storeId, productCode: typedCode },
+        select: { id: true },
+      });
+      if (clash) {
+        return {
+          success: false,
+          message: "That product code is already in use.",
+          errors: { productCode: ["This product code is already in use"] },
+        };
+      }
+    }
+
+    const makingCharge = formData.get("defaultMakingCharge");
+    const stoneCharge = formData.get("defaultStoneCharge");
+
+    const data = {
+      storeId,
+      name,
+      categoryId: categoryId || null,
+      metalTypeId: metalTypeId || null,
+      defaultPurity: purity,
+      defaultMakingCharge:
+        String(makingCharge ?? "").trim() === ""
+          ? null
+          : new Prisma.Decimal(toNumber(makingCharge)),
+      defaultMakingChargeType:
+        formData.get("defaultMakingChargeType") === ChargeType.PERCENTAGE
+          ? ChargeType.PERCENTAGE
+          : ChargeType.FIXED,
+      defaultStoneCharge:
+        String(stoneCharge ?? "").trim() === ""
+          ? null
+          : new Prisma.Decimal(toNumber(stoneCharge)),
+    };
+
+    const select = {
+      id: true,
+      productCode: true,
+      name: true,
+      category: { select: { name: true } },
+      categoryType: { select: { name: true } },
+      metalType: { select: { id: true, name: true } },
+      defaultPurity: true,
+      defaultMakingCharge: true,
+      defaultMakingChargeType: true,
+      defaultStoneCharge: true,
+      isActive: true,
+    } as const;
+
+    // A generated code races another concurrent quick add: both COUNT the
+    // same total and derive the same code, and the unique constraint rejects
+    // the loser. Recount and retry rather than surfacing a P2002 the
+    // operator can do nothing about.
+    let created: Prisma.ProductGetPayload<{ select: typeof select }> | null = null;
+
+    for (let attempt = 0; attempt < 5 && !created; attempt += 1) {
+      const productCode =
+        typedCode || (await generateProductCode(storeId, attempt));
+
+      try {
+        created = await prisma.product.create({
+          data: { ...data, productCode },
+          select,
+        });
+      } catch (error) {
+        const isDuplicate =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002";
+
+        if (!isDuplicate || typedCode) throw error;
+      }
+    }
+
+    if (!created) {
+      return {
+        success: false,
+        message: "Could not allocate a product code. Please enter one manually.",
+        errors: { productCode: ["Enter a product code"] },
+      };
+    }
+
+    revalidatePath("/inventory/products");
+
+    return {
+      success: true,
+      message: `Product "${created.name}" added`,
+      product: {
+        ...created,
+        category: created.category?.name ?? null,
+        ornamentType: created.categoryType?.name ?? null,
+        metalType: created.metalType ?? null,
+        defaultMakingCharge:
+          created.defaultMakingCharge !== null
+            ? Number(created.defaultMakingCharge)
+            : null,
+        defaultStoneCharge:
+          created.defaultStoneCharge !== null
+            ? Number(created.defaultStoneCharge)
+            : null,
+      },
+    };
+  } catch (error) {
+    console.error("quickAddProductForPurchase error:", error);
+    return { success: false, message: "Failed to add product" };
+  }
+}
+
+/**
  * Create a purchase with its line items in one transaction. Unlike an
  * invoice (which marks existing stock SOLD), every purchase line creates a
  * brand new InventoryStock row — stock comes IN, it doesn't go out. If the

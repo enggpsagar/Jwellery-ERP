@@ -21,6 +21,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { VendorSelect } from "@/components/vendors/vendor-select"
 import { ProductSelect } from "@/components/inventory/shared/product-select"
+import { QuickAddVendorDialog } from "@/components/purchases/quick-add-vendor-dialog"
+import {
+  QuickAddProductDialog,
+  type TaxonomyOption,
+} from "@/components/purchases/quick-add-product-dialog"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 
 type VendorOption = {
@@ -93,11 +98,32 @@ const initialState: PurchaseFormState = { success: false, message: "" }
 type PurchaseFormProps = {
   vendors: VendorOption[]
   products: ProductOption[]
+  metals: TaxonomyOption[]
+  categories: TaxonomyOption[]
 }
 
-export function PurchaseForm({ vendors, products }: PurchaseFormProps) {
+export function PurchaseForm({
+  vendors: initialVendors,
+  products: initialProducts,
+  metals,
+  categories,
+}: PurchaseFormProps) {
   const router = useRouter()
   const toast = useToast()
+
+  // Held in state, not read straight from props, so a vendor or product
+  // created mid-purchase can be appended and picked without a page reload.
+  const [vendors, setVendors] = useState(initialVendors)
+  const [products, setProducts] = useState(initialProducts)
+
+  // Both pickers keep their own selection in internal state seeded from
+  // `defaultValue`, so changing that prop alone will not move them.
+  // Bumping these remount keys is what makes a freshly created record show
+  // up as the active selection.
+  const [vendorSelectKey, setVendorSelectKey] = useState(0)
+  const [productSelectKeys, setProductSelectKeys] = useState<
+    Record<string, number>
+  >({})
 
   // ProductSelect's shared ProductOption type expects metalType as a flat
   // display string, not the relation object; the full `products` array
@@ -134,8 +160,18 @@ export function PurchaseForm({ vendors, products }: PurchaseFormProps) {
     )
   }
 
-  const applyProductToItem = (key: string, productId: string) => {
-    const product = products.find((p) => p.id === productId)
+  /**
+   * `justCreated` is passed by the quick-add dialog. `setProducts` has not
+   * flushed yet at that point, so the `products` array still in this
+   * closure does not contain the new product and the lookup below would
+   * fail — clearing the selection instead of applying it.
+   */
+  const applyProductToItem = (
+    key: string,
+    productId: string,
+    justCreated?: ProductOption,
+  ) => {
+    const product = justCreated ?? products.find((p) => p.id === productId)
     if (!product) {
       updateItem(key, { productId: "" })
       return
@@ -209,8 +245,18 @@ export function PurchaseForm({ vendors, products }: PurchaseFormProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2">
-          <Label>Vendor *</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label>Vendor *</Label>
+            <QuickAddVendorDialog
+              onCreated={(vendor) => {
+                setVendors((prev) => [...prev, vendor])
+                setVendorId(vendor.id)
+                setVendorSelectKey((key) => key + 1)
+              }}
+            />
+          </div>
           <VendorSelect
+            key={vendorSelectKey}
             vendors={vendors}
             name="vendorId"
             defaultValue={vendorId}
@@ -246,8 +292,23 @@ export function PurchaseForm({ vendors, products }: PurchaseFormProps) {
             <div key={item.key} className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="md:col-span-2 space-y-1">
-                  <Label className="text-xs">Product *</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs">Product *</Label>
+                    <QuickAddProductDialog
+                      metals={metals}
+                      categories={categories}
+                      onCreated={(product) => {
+                        setProducts((prev) => [...prev, product])
+                        applyProductToItem(item.key, product.id, product)
+                        setProductSelectKeys((prev) => ({
+                          ...prev,
+                          [item.key]: (prev[item.key] ?? 0) + 1,
+                        }))
+                      }}
+                    />
+                  </div>
                   <ProductSelect
+                    key={productSelectKeys[item.key] ?? 0}
                     products={productSelectOptions}
                     name={`product-${item.key}`}
                     defaultValue={item.productId}

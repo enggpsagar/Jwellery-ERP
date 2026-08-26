@@ -16,6 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import { sendMail } from "@/lib/mailer";
 import { kachaSlipEmail } from "@/lib/email-templates";
+import { resolveStoreName } from "@/lib/invite-email";
 import {
   getInvoiceFormCustomers,
   getInvoiceFormStockItems,
@@ -683,7 +684,7 @@ export async function emailKachaInvoiceAction(
   try {
     const storeId = await requireStoreScope();
 
-    const [kachaInvoice, settings] = await Promise.all([
+    const [kachaInvoice, storeName] = await Promise.all([
       prisma.kachaInvoice.findFirst({
         where: { id: kachaInvoiceId, storeId },
         include: {
@@ -691,10 +692,7 @@ export async function emailKachaInvoiceAction(
           items: true,
         },
       }),
-      prisma.businessSettings.findUnique({
-        where: { storeId },
-        select: { businessName: true },
-      }),
+      resolveStoreName(storeId),
     ]);
 
     if (!kachaInvoice) return { success: false, message: "Kacha slip not found" };
@@ -704,7 +702,7 @@ export async function emailKachaInvoiceAction(
     }
 
     const { subject, html } = kachaSlipEmail({
-      storeName: settings?.businessName || "Your Store",
+      storeName,
       slipNumber: kachaInvoice.slipNumber,
       invoiceDate: kachaInvoice.invoiceDate.toISOString(),
       customerName: kachaInvoice.customer.name,

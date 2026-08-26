@@ -6,16 +6,28 @@ import { inviteUserEmail, disabledAccountEmail } from "@/lib/email-templates";
 import { ROLE_LABELS } from "@/lib/roles";
 
 /**
- * The business name a store has set on its own Settings page, falling
- * back to a generic label for a store that hasn't visited Settings yet.
+ * The display name to use for a store in outgoing email. Prefers the
+ * business name the store set on its own Settings page, then falls back to
+ * `Store.name` — a required column set when the store is created — before
+ * the generic label. `BusinessSettings` is only created lazily on the first
+ * Settings read, so a store whose owner hasn't opened Settings yet has no
+ * row at all; without the `Store.name` step every email to that store said
+ * "your store" instead of naming it.
  */
 export async function resolveStoreName(storeId: string): Promise<string> {
-  const settings = await prisma.businessSettings.findUnique({
-    where: { storeId },
-    select: { businessName: true },
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: {
+      name: true,
+      businessSettings: { select: { businessName: true } },
+    },
   });
 
-  return settings?.businessName || "your store";
+  return (
+    store?.businessSettings?.businessName?.trim() ||
+    store?.name?.trim() ||
+    "your store"
+  );
 }
 
 /**

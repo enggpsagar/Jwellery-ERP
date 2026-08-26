@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { hasModuleAccess } from "@/lib/roles";
 import { GlobalSearch } from "@/components/dashboard/global-search";
 import { StoreSwitcher } from "@/components/dashboard/store-switcher";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
@@ -35,6 +36,12 @@ type TopBarProps = {
 export function TopBar({ stores = [], activeStoreId = null }: TopBarProps) {
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
+  // A user whose module access doesn't cover Billing gets no billing entry
+  // points in the header — middleware would bounce them off /billing anyway.
+  const canAccessBilling = hasModuleAccess("billing", {
+    role: session?.user?.role,
+    permissions: session?.user?.permissions,
+  });
   const userName = session?.user?.name ?? "User";
   const userInitials = userName
     .split(" ")
@@ -57,12 +64,14 @@ export function TopBar({ stores = [], activeStoreId = null }: TopBarProps) {
       )}
 
       <div className="ml-auto flex items-center gap-2">
-        <Button size="sm" asChild>
-          <Link href="/billing/new">
-            <Plus className="mr-1 h-4 w-4" />
-            New Invoice
-          </Link>
-        </Button>
+        {canAccessBilling && (
+          <Button size="sm" asChild>
+            <Link href="/billing/new">
+              <Plus className="mr-1 h-4 w-4" />
+              New Invoice
+            </Link>
+          </Button>
+        )}
 
         <NotificationBell />
 
@@ -95,9 +104,11 @@ export function TopBar({ stores = [], activeStoreId = null }: TopBarProps) {
                 <Link href="/settings">Store Settings</Link>
               </DropdownMenuItem>
 
-              <DropdownMenuItem asChild>
-                <Link href="/billing">Billing</Link>
-              </DropdownMenuItem>
+              {canAccessBilling && (
+                <DropdownMenuItem asChild>
+                  <Link href="/billing">Billing</Link>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuGroup>
 
             <DropdownMenuSeparator />

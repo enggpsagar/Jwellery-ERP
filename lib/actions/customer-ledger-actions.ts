@@ -9,6 +9,7 @@ import { requireStoreScope } from "@/lib/store-context"
 import { formatLedgerSource } from "@/lib/ledger-format"
 import { sendMail } from "@/lib/mailer"
 import { ledgerStatementEmail } from "@/lib/email-templates"
+import { resolveStoreName } from "@/lib/invite-email"
 import {
   classifyMetalName,
   BUSINESS_UNIT_LABELS,
@@ -377,13 +378,10 @@ export async function emailLedgerStatementAction(
       return { success: false, message: "This customer has no email on file" }
     }
 
-    const [entries, summary, settings] = await Promise.all([
+    const [entries, summary, storeName] = await Promise.all([
       getCustomerLedgerEntries(customerId),
       getCustomerLedgerSummary(customerId),
-      prisma.businessSettings.findUnique({
-        where: { storeId },
-        select: { businessName: true },
-      }),
+      resolveStoreName(storeId),
     ])
 
     if (!summary) {
@@ -391,7 +389,7 @@ export async function emailLedgerStatementAction(
     }
 
     const { subject, html } = ledgerStatementEmail({
-      storeName: settings?.businessName || "Your Store",
+      storeName,
       customerName: customer.name,
       openingBalance: summary.openingBalance,
       ledgerDebitTotal: summary.ledgerDebitTotal,

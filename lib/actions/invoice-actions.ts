@@ -420,6 +420,21 @@ export async function createInvoice(
       return { success: false, message: "Please select a customer" };
     }
 
+    // Every referenced stock item must belong to this store — otherwise a
+    // crafted itemsJson could link a line item to another store's stock,
+    // leaking its details (and, via the SOLD-status update below, its
+    // invoice/customer info) into this invoice.
+    const requestedStockIds = [
+      ...new Set(items.map((item) => item.inventoryStockId).filter((id): id is string => !!id)),
+    ];
+    const validStock = requestedStockIds.length
+      ? await prisma.inventoryStock.findMany({
+          where: { id: { in: requestedStockIds }, storeId },
+          select: { id: true },
+        })
+      : [];
+    const validStockIds = new Set(validStock.map((s) => s.id));
+
     const invoiceNumber = await generateInvoiceNumber(storeId);
 
     const invoice = await prisma.$transaction(async (tx) => {
@@ -454,14 +469,17 @@ export async function createInvoice(
               stoneCharge: item.stoneCharge,
               dmoWeight: item.dmoWeight ?? undefined,
               lineTotal: lineTotal(item),
-              inventoryStockId: item.inventoryStockId || undefined,
+              inventoryStockId:
+                item.inventoryStockId && validStockIds.has(item.inventoryStockId)
+                  ? item.inventoryStockId
+                  : undefined,
             })),
           },
         },
       });
 
       for (const item of items) {
-        if (!item.inventoryStockId) continue;
+        if (!item.inventoryStockId || !validStockIds.has(item.inventoryStockId)) continue;
 
         const { count } = await tx.inventoryStock.updateMany({
           where: { id: item.inventoryStockId, storeId },

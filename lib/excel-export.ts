@@ -58,3 +58,49 @@ export function buildExcelExport(
 
   return { fileName, fileBase64: Buffer.from(buffer).toString("base64") };
 }
+
+/**
+ * Same as `buildExcelExport` but writes several named sheets into one
+ * workbook. Needed wherever a flat sheet would lose data — a backup taken
+ * before a destructive operation, for instance, has to carry parent rows
+ * and their line items, and must be complete enough to rebuild from.
+ *
+ * A sheet with no rows is still written (as headers only, when `columns`
+ * is given) so the workbook's shape stays predictable for whoever reads it.
+ */
+export function buildMultiSheetExcelExport(
+  sheets: { name: string; rows: Record<string, unknown>[]; columns?: string[] }[],
+  filePrefix: string,
+): { fileName: string; fileBase64: string } {
+  const workbook = XLSX.utils.book_new();
+
+  for (const sheet of sheets) {
+    const worksheet = sheet.rows.length
+      ? XLSX.utils.json_to_sheet(sheet.rows)
+      : XLSX.utils.aoa_to_sheet([sheet.columns ?? []]);
+
+    // Excel rejects sheet names over 31 characters outright.
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name.slice(0, 31));
+  }
+
+  const fileName = timestampedFileName(filePrefix, "xlsx");
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+  return { fileName, fileBase64: Buffer.from(buffer).toString("base64") };
+}
+
+/** Reads the first sheet of an uploaded .xlsx/.csv into plain-object rows. */
+export function parseExcelUpload(fileBuffer: ArrayBuffer): Record<string, unknown>[] {
+  const workbook = XLSX.read(fileBuffer, { type: "array", cellDates: true });
+  const firstSheetName = workbook.SheetNames[0];
+
+  if (!firstSheetName) return [];
+
+  // `defval: ""` keeps blank cells as empty strings rather than dropping the
+  // key entirely, so a missing required column reads as empty instead of
+  // silently looking like a row that never had that field.
+  return XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], {
+    defval: "",
+    raw: false,
+  });
+}

@@ -199,6 +199,80 @@ export function otpEmail(params: {
   };
 }
 
+/**
+ * Accompanies the backup file attached before a destructive bulk delete.
+ * This email IS the safety net — if it does not arrive, the delete does not
+ * happen — so it states plainly what was captured and what is about to go.
+ */
+export function dataBackupEmail(params: {
+  storeName: string;
+  appName: string;
+  recordLabel: string;
+  recordCount: number;
+  fileName: string;
+  triggeredBy: string;
+}) {
+  const {
+    storeName,
+    appName,
+    recordLabel,
+    recordCount,
+    fileName,
+    triggeredBy,
+  } = params;
+
+  const body = `
+    <p style="margin-top: 0;">A bulk delete of <strong>${recordLabel}</strong> was requested for <strong>${storeName}</strong>.</p>
+    <p>The complete backup is attached to this email. Keep it somewhere safe — once the delete completes, this file is the only remaining copy of these records.</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+      <tbody>
+        <tr>
+          <td style="padding: 8px 0; font-size: 13px; color: #6b7280; width: 150px; border-bottom: 1px solid #f3f4f6;">Records backed up</td>
+          <td style="padding: 8px 0; font-size: 13px; color: #111827; font-weight: bold; border-bottom: 1px solid #f3f4f6;">${recordCount}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-size: 13px; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Attached file</td>
+          <td style="padding: 8px 0; font-size: 13px; color: #111827; font-weight: bold; border-bottom: 1px solid #f3f4f6;">${fileName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-size: 13px; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Requested by</td>
+          <td style="padding: 8px 0; font-size: 13px; color: #111827; font-weight: bold; border-bottom: 1px solid #f3f4f6;">${triggeredBy}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-size: 13px; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Application</td>
+          <td style="padding: 8px 0; font-size: 13px; color: #111827; font-weight: bold; border-bottom: 1px solid #f3f4f6;">${appName}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="padding: 14px 16px; background: #fef2f2; border-left: 3px solid #dc2626; border-radius: 0 6px 6px 0;">
+      <p style="margin: 0; font-size: 13px; color: #7f1d1d; line-height: 1.6;">
+        <strong>This action cannot be undone.</strong> If you did not request this, contact your Store Owner immediately and keep this email — the attachment is the only way these records can be restored.
+      </p>
+    </div>
+  `;
+
+  const text = [
+    `A bulk delete of ${recordLabel} was requested for ${storeName}.`,
+    "",
+    "The complete backup is attached to this email. Once the delete completes, this file is the only remaining copy of these records.",
+    "",
+    `Records backed up: ${recordCount}`,
+    `Attached file: ${fileName}`,
+    `Requested by: ${triggeredBy}`,
+    `Application: ${appName}`,
+    "",
+    "This action cannot be undone. If you did not request this, contact your Store Owner immediately and keep this email.",
+  ].join("\n");
+
+  return {
+    subject: `Backup before deletion — ${recordCount} ${recordLabel} from ${storeName}`,
+    html: wrapEmail(storeName, `Backup of your ${recordLabel}`, body),
+    text,
+  };
+}
+
 export function inviteUserEmail(params: {
   name: string;
   roleLabel: string;

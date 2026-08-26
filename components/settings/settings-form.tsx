@@ -140,6 +140,22 @@ export function SettingsForm({ settings, canEdit }: SettingsFormProps) {
             <Label htmlFor="website">Website</Label>
             <Input id="website" name="website" defaultValue={settings.website} />
           </div>
+
+          <div className="space-y-1.5 md:col-span-2">
+            <Label htmlFor="backupEmail">Backup email</Label>
+            <Input
+              id="backupEmail"
+              name="backupEmail"
+              type="email"
+              defaultValue={settings.backupEmail}
+              placeholder="owner@example.com"
+            />
+            <p className="text-xs text-muted-foreground">
+              Where backups are sent before any bulk delete. Deleting all Kacha
+              slips is blocked until this is set, and again if the backup email
+              fails to send.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

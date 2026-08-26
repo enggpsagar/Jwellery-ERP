@@ -5,6 +5,9 @@ import { KachaInvoiceTable } from "@/components/billing/kacha/kacha-invoice-tabl
 import { KachaInvoicesToolbar } from "@/components/billing/kacha/kacha-invoices-toolbar"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import { KachaImportDialog } from "@/components/billing/kacha/kacha-import-dialog"
+import { DeleteAllKachaDialog } from "@/components/billing/kacha/delete-all-kacha-dialog"
+import { getCurrentUser } from "@/lib/auth/auth"
 import { Button } from "@/components/ui/button"
 
 type KachaBillingPageProps = {
@@ -30,6 +33,11 @@ export default async function KachaBillingPage({ searchParams }: KachaBillingPag
   const sortOrder = params.sortOrder || "desc"
   const status = params.status || "ALL"
 
+  // Wiping every slip is owner-only, mirroring the role check the
+  // `deleteAllKachaInvoices` action enforces server-side.
+  const user = await getCurrentUser()
+  const canDeleteAll = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN"
+
   const { kachaInvoices, pagination } = await getKachaInvoices({
     page,
     pageSize,
@@ -47,9 +55,13 @@ export default async function KachaBillingPage({ searchParams }: KachaBillingPag
         backHref="/billing"
         backLabel="Back to Billing"
         action={
-          <Link href="/billing/kacha/new">
-            <Button>New Kacha Slip</Button>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {canDeleteAll && <DeleteAllKachaDialog />}
+            <KachaImportDialog />
+            <Link href="/billing/kacha/new">
+              <Button>New Kacha Slip</Button>
+            </Link>
+          </div>
         }
       />
 

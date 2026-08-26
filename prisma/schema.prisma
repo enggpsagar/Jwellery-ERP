@@ -710,6 +710,11 @@ model BusinessSettings {
   email   String?
   website String?
 
+  // Where destructive bulk operations send their backup before deleting
+  // anything. Kept separate from `email` above (the store's public contact
+  // address) so a backup can be routed to an owner/accountant inbox.
+  backupEmail String?
+
   // Invoice preferences
   invoicePrefix     String  @default("INV")
   invoiceStartingNo Int     @default(1)

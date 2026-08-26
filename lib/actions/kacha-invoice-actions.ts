@@ -10,18 +10,25 @@ import {
   LedgerSourceType,
   PurityType,
   ChargeType,
+  UserRole,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { requireAuth, requireRole } from "@/lib/auth/auth";
 import { sendMail } from "@/lib/mailer";
-import { kachaSlipEmail } from "@/lib/email-templates";
+import { kachaSlipEmail, dataBackupEmail } from "@/lib/email-templates";
 import { resolveStoreName } from "@/lib/invite-email";
+import { APP_NAME } from "@/lib/constants/app";
 import {
   getInvoiceFormCustomers,
   getInvoiceFormStockItems,
 } from "@/lib/actions/invoice-actions";
-import { buildExcelExport } from "@/lib/excel-export";
+import {
+  buildExcelExport,
+  buildMultiSheetExcelExport,
+  parseExcelUpload,
+} from "@/lib/excel-export";
 
 export type KachaInvoiceLineItemInput = {
   itemName: string;
@@ -674,6 +681,528 @@ export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormSt
   } catch (error) {
     console.error("deleteKachaInvoice error:", error);
     return { success: false, message: "Failed to delete Kacha slip" };
+  }
+}
+
+/**
+ * Column headers the importer reads. Also the template's header row.
+ *
+ * Deliberately NOT exported: a "use server" module may only export async
+ * functions, and exporting this array would break the Next build even
+ * though `tsc` is perfectly happy with it.
+ */
+const KACHA_IMPORT_COLUMNS = [
+  "Slip Ref",
+  "Customer Phone",
+  "Customer Name",
+  "Date",
+  "Item Name",
+  "Metal",
+  "Purity",
+  "Quantity",
+  "Gross Weight",
+  "Net Weight",
+  "Rate",
+  "Making Charge",
+  "Making Charge Type",
+  "Stone Charge",
+  "Discount",
+  "Paid Amount",
+  "Notes",
+] as const;
+
+export type KachaImportResult = {
+  success: boolean;
+  message: string;
+  createdCount?: number;
+  /** Row-level problems. Populated only when nothing was created. */
+  errors?: string[];
+};
+
+/**
+ * A downloadable .xlsx showing the expected columns and one filled-in
+ * example row, so nobody has to guess the header spelling.
+ */
+export async function getKachaImportTemplate(): Promise<{
+  fileName: string;
+  fileBase64: string;
+}> {
+  await requireStoreScope();
+
+  const example = {
+    "Slip Ref": "A1",
+    "Customer Phone": "9876543210",
+    "Customer Name": "Walk-in customer",
+    Date: new Date().toLocaleDateString("en-IN"),
+    "Item Name": "Gold Chain 22K",
+    Metal: "Gold",
+    Purity: "K22",
+    Quantity: 1,
+    "Gross Weight": 10.5,
+    "Net Weight": 10.2,
+    Rate: 6200,
+    "Making Charge": 1500,
+    "Making Charge Type": "FIXED",
+    "Stone Charge": 0,
+    Discount: 0,
+    "Paid Amount": 0,
+    Notes: "Rows sharing a Slip Ref become one slip",
+  };
+
+  return buildMultiSheetExcelExport(
+    [{ name: "Kacha Slips", rows: [example], columns: [...KACHA_IMPORT_COLUMNS] }],
+    "kacha-import-template",
+  );
+}
+
+function cell(row: Record<string, unknown>, key: string): string {
+  return String(row[key] ?? "").trim();
+}
+
+/**
+ * Bulk-creates Kacha slips from an uploaded spreadsheet.
+ *
+ * One row is one line item; rows sharing a **Slip Ref** are collapsed into a
+ * single slip, which is what makes multi-item slips expressible in a flat
+ * sheet. Slip-level values (customer, date, discount, paid, notes) are taken
+ * from the first row of each group.
+ *
+ * Validation is all-or-nothing on purpose: the whole file is checked before
+ * anything is written, and a single bad row rejects the import. A partial
+ * import would leave the operator having to work out which half of their
+ * spreadsheet made it in.
+ *
+ * Slips are created sequentially rather than in one transaction because
+ * `generateSlipNumber()` derives the next number from a COUNT of committed
+ * rows — inside a single transaction every slip would read the same count
+ * and collide on the `@@unique([storeId, slipNumber])` constraint.
+ */
+export async function importKachaInvoicesFromExcel(
+  formData: FormData,
+): Promise<KachaImportResult> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.STAFF]);
+  } catch {
+    return { success: false, message: "You do not have access to import Kacha slips." };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+    const file = formData.get("file");
+
+    if (!(file instanceof File) || file.size === 0) {
+      return { success: false, message: "Choose a .xlsx or .csv file to import." };
+    }
+
+    const rows = parseExcelUpload(await file.arrayBuffer());
+
+    if (!rows.length) {
+      return { success: false, message: "That file has no rows to import." };
+    }
+
+    // Group rows into slips. A blank Slip Ref means "this row is its own
+    // slip" — otherwise every unreferenced row would merge into one.
+    const groups = new Map<string, { row: Record<string, unknown>; line: number }[]>();
+
+    rows.forEach((row, index) => {
+      const ref = cell(row, "Slip Ref") || `__row_${index}`;
+      const existing = groups.get(ref);
+      // +2 = one for the header row, one for 1-based spreadsheet numbering.
+      const entry = { row, line: index + 2 };
+      if (existing) existing.push(entry);
+      else groups.set(ref, [entry]);
+    });
+
+    const [customers, metals] = await Promise.all([
+      prisma.customer.findMany({
+        where: { storeId },
+        select: { id: true, name: true, phone: true },
+      }),
+      prisma.storeMetal.findMany({ where: { storeId }, select: { id: true, name: true } }),
+    ]);
+
+    const byPhone = new Map(
+      customers.filter((c) => c.phone).map((c) => [c.phone!.trim(), c.id]),
+    );
+    const byName = new Map(customers.map((c) => [c.name.trim().toLowerCase(), c.id]));
+    const metalByName = new Map(metals.map((m) => [m.name.trim().toLowerCase(), m.id]));
+
+    const errors: string[] = [];
+    const parsed: {
+      customerId: string;
+      invoiceDate: Date;
+      discount: number;
+      paidAmount: number;
+      notes: string | null;
+      items: KachaInvoiceLineItemInput[];
+    }[] = [];
+
+    for (const [ref, entries] of groups) {
+      const head = entries[0];
+      const label = cell(head.row, "Slip Ref")
+        ? `Slip Ref "${ref}"`
+        : `Row ${head.line}`;
+
+      const phone = cell(head.row, "Customer Phone");
+      const name = cell(head.row, "Customer Name");
+      const customerId =
+        (phone && byPhone.get(phone)) || (name && byName.get(name.toLowerCase()));
+
+      if (!customerId) {
+        errors.push(
+          `${label}: no customer matches phone "${phone}" or name "${name}". Add the customer first.`,
+        );
+        continue;
+      }
+
+      const dateRaw = cell(head.row, "Date");
+      const invoiceDate = dateRaw ? new Date(dateRaw) : new Date();
+
+      if (dateRaw && Number.isNaN(invoiceDate.getTime())) {
+        errors.push(`${label}: "${dateRaw}" is not a valid date.`);
+        continue;
+      }
+
+      const items: KachaInvoiceLineItemInput[] = [];
+
+      for (const { row, line } of entries) {
+        const itemName = cell(row, "Item Name");
+
+        if (!itemName) {
+          errors.push(`Row ${line}: Item Name is required.`);
+          continue;
+        }
+
+        const metalName = cell(row, "Metal");
+        const metalTypeId = metalName
+          ? metalByName.get(metalName.toLowerCase())
+          : undefined;
+
+        if (metalName && !metalTypeId) {
+          errors.push(
+            `Row ${line}: metal "${metalName}" is not configured for this store (Settings → Taxonomy).`,
+          );
+          continue;
+        }
+
+        const purityRaw = cell(row, "Purity").toUpperCase();
+        const purity =
+          purityRaw && purityRaw in PurityType
+            ? (purityRaw as PurityType)
+            : null;
+
+        if (purityRaw && !purity) {
+          errors.push(`Row ${line}: "${purityRaw}" is not a valid purity.`);
+          continue;
+        }
+
+        items.push({
+          itemName,
+          metalTypeId: metalTypeId ?? null,
+          purity,
+          quantity: Math.max(1, Math.trunc(toNumber(cell(row, "Quantity"), 1))),
+          grossWeight: cell(row, "Gross Weight") ? toNumber(cell(row, "Gross Weight")) : null,
+          netWeight: cell(row, "Net Weight") ? toNumber(cell(row, "Net Weight")) : null,
+          rate: cell(row, "Rate") ? toNumber(cell(row, "Rate")) : null,
+          makingCharge: toNumber(cell(row, "Making Charge")),
+          makingChargeType: toChargeType(cell(row, "Making Charge Type").toUpperCase()),
+          stoneCharge: toNumber(cell(row, "Stone Charge")),
+        });
+      }
+
+      if (!items.length) {
+        errors.push(`${label}: no valid line items.`);
+        continue;
+      }
+
+      parsed.push({
+        customerId,
+        invoiceDate,
+        discount: toNumber(cell(head.row, "Discount")),
+        paidAmount: toNumber(cell(head.row, "Paid Amount")),
+        notes: cell(head.row, "Notes") || null,
+        items,
+      });
+    }
+
+    if (errors.length) {
+      return {
+        success: false,
+        message: `Import cancelled — ${errors.length} problem${errors.length === 1 ? "" : "s"} found. Nothing was created.`,
+        errors: errors.slice(0, 50),
+      };
+    }
+
+    let createdCount = 0;
+
+    for (const slip of parsed) {
+      const subtotal = slip.items.reduce(
+        (sum, item) => sum + toNumber(item.rate) * toNumber(item.netWeight),
+        0,
+      );
+      const makingCharges = slip.items.reduce(
+        (sum, item) => sum + toNumber(item.makingCharge),
+        0,
+      );
+      const stoneCharges = slip.items.reduce(
+        (sum, item) => sum + toNumber(item.stoneCharge),
+        0,
+      );
+      const totalAmount = subtotal + makingCharges + stoneCharges - slip.discount;
+      const balanceAmount = Math.max(0, totalAmount - slip.paidAmount);
+
+      let status: InvoiceStatus = InvoiceStatus.PAID;
+      if (balanceAmount > 0 && slip.paidAmount > 0) status = InvoiceStatus.PARTIAL;
+      else if (balanceAmount > 0 && slip.paidAmount === 0) status = InvoiceStatus.DRAFT;
+
+      const slipNumber = await generateSlipNumber(storeId);
+
+      await prisma.kachaInvoice.create({
+        data: {
+          storeId,
+          slipNumber,
+          customerId: slip.customerId,
+          invoiceDate: slip.invoiceDate,
+          status,
+          subtotal,
+          makingCharges,
+          stoneCharges,
+          discount: slip.discount,
+          totalAmount,
+          paidAmount: slip.paidAmount,
+          balanceAmount,
+          notes: slip.notes,
+          items: {
+            create: slip.items.map((item) => ({
+              itemName: item.itemName,
+              metalTypeId: item.metalTypeId ?? undefined,
+              purity: item.purity ?? undefined,
+              quantity: item.quantity,
+              grossWeight: item.grossWeight ?? undefined,
+              netWeight: item.netWeight ?? undefined,
+              rate: item.rate ?? undefined,
+              makingCharge: item.makingCharge,
+              makingChargeType: toChargeType(item.makingChargeType),
+              stoneCharge: item.stoneCharge,
+              lineTotal: lineTotal(item),
+            })),
+          },
+        },
+      });
+
+      createdCount += 1;
+    }
+
+    revalidatePath("/billing/kacha");
+
+    return {
+      success: true,
+      createdCount,
+      message: `Imported ${createdCount} Kacha slip${createdCount === 1 ? "" : "s"}.`,
+    };
+  } catch (error) {
+    console.error("importKachaInvoicesFromExcel error:", error);
+    return { success: false, message: "Failed to import Kacha slips." };
+  }
+}
+
+export type DeleteAllKachaResult = {
+  success: boolean;
+  message: string;
+  deletedCount?: number;
+  backupSentTo?: string;
+};
+
+/** Counts shown in the confirmation dialog so the click is an informed one. */
+export async function getKachaDeleteAllSummary(): Promise<{
+  total: number;
+  converted: number;
+  withPayments: number;
+  backupEmail: string | null;
+}> {
+  const storeId = await requireStoreScope();
+
+  const [total, converted, withPayments, settings] = await Promise.all([
+    prisma.kachaInvoice.count({ where: { storeId } }),
+    prisma.kachaInvoice.count({ where: { storeId, convertedToId: { not: null } } }),
+    prisma.kachaInvoice.count({ where: { storeId, paidAmount: { gt: 0 } } }),
+    prisma.businessSettings.findUnique({
+      where: { storeId },
+      select: { backupEmail: true },
+    }),
+  ]);
+
+  return {
+    total,
+    converted,
+    withPayments,
+    backupEmail: settings?.backupEmail?.trim() || null,
+  };
+}
+
+/**
+ * Deletes every Kacha slip in the store — but only ever after a complete
+ * backup has actually landed in the configured backup inbox.
+ *
+ * The ordering here is the whole feature, so it is deliberate and must not
+ * be rearranged: read the records, build the workbook, send it, and treat a
+ * failed send as a hard stop. `sendMail` never throws (it reports
+ * `{ sent: false }` for a missing SMTP config as well as a send failure),
+ * so the `sent` flag has to be checked explicitly — an unchecked call would
+ * silently delete everything on a server with no SMTP configured at all.
+ *
+ * The delete is scoped to the exact ids that went into the backup rather
+ * than to `{ storeId }`, so a slip created by someone else between the read
+ * and the delete is not destroyed without a copy of it existing.
+ *
+ * Unlike `deleteKachaInvoice` (single-slip), this deliberately does NOT
+ * spare converted or paid slips — "delete all" means all, and the emailed
+ * backup is what makes that recoverable. The confirmation dialog surfaces
+ * those counts via `getKachaDeleteAllSummary()` first.
+ */
+export async function deleteAllKachaInvoices(): Promise<DeleteAllKachaResult> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return {
+      success: false,
+      message: "Only the Store Owner can delete all Kacha slips.",
+    };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+    const user = await requireAuth();
+
+    const settings = await prisma.businessSettings.findUnique({
+      where: { storeId },
+      select: { backupEmail: true },
+    });
+
+    const backupEmail = settings?.backupEmail?.trim();
+
+    if (!backupEmail) {
+      return {
+        success: false,
+        message:
+          "No backup email is configured. Add one in Settings → Backup email before deleting all Kacha slips.",
+      };
+    }
+
+    const kachaInvoices = await prisma.kachaInvoice.findMany({
+      where: { storeId },
+      orderBy: { invoiceDate: "desc" },
+      include: {
+        customer: { select: { name: true, phone: true, gstin: true } },
+        convertedTo: { select: { invoiceNumber: true } },
+        items: { include: { metalType: { select: { name: true } } } },
+      },
+    });
+
+    if (!kachaInvoices.length) {
+      return { success: false, message: "There are no Kacha slips to delete." };
+    }
+
+    const slipRows = kachaInvoices.map((kachaInvoice, index) => ({
+      "Sr. No.": index + 1,
+      "Slip #": kachaInvoice.slipNumber,
+      Date: new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN"),
+      Customer: kachaInvoice.customer?.name || "",
+      "Customer Phone": kachaInvoice.customer?.phone || "",
+      "Customer GSTIN": kachaInvoice.customer?.gstin || "",
+      Status: kachaInvoice.status,
+      Subtotal: Number(kachaInvoice.subtotal),
+      "Making Charges": Number(kachaInvoice.makingCharges),
+      "Stone Charges": Number(kachaInvoice.stoneCharges),
+      Discount: Number(kachaInvoice.discount),
+      Total: Number(kachaInvoice.totalAmount),
+      Paid: Number(kachaInvoice.paidAmount),
+      Balance: Number(kachaInvoice.balanceAmount),
+      "Converted To Invoice": kachaInvoice.convertedTo?.invoiceNumber || "",
+      Notes: kachaInvoice.notes || "",
+    }));
+
+    // Line items live on their own sheet keyed by slip number — a single
+    // flat sheet would drop them, and a backup that cannot rebuild the
+    // slips it replaced is not a backup.
+    const itemRows = kachaInvoices.flatMap((kachaInvoice) =>
+      kachaInvoice.items.map((item) => ({
+        "Slip #": kachaInvoice.slipNumber,
+        Item: item.itemName,
+        Metal: item.metalType?.name || "",
+        Purity: item.purity || "",
+        Quantity: item.quantity,
+        "Gross Weight": item.grossWeight ? Number(item.grossWeight) : "",
+        "Net Weight": item.netWeight ? Number(item.netWeight) : "",
+        "DMO Weight": item.dmoWeight ? Number(item.dmoWeight) : "",
+        Rate: item.rate ? Number(item.rate) : "",
+        "Making Charge": Number(item.makingCharge),
+        "Making Charge Type": item.makingChargeType,
+        "Stone Charge": Number(item.stoneCharge),
+        "Line Total": Number(item.lineTotal),
+      })),
+    );
+
+    const { fileName, fileBase64 } = buildMultiSheetExcelExport(
+      [
+        { name: "Kacha Slips", rows: slipRows },
+        { name: "Kacha Slip Items", rows: itemRows, columns: ["Slip #", "Item"] },
+      ],
+      "kacha-slips-backup",
+    );
+
+    const storeName = await resolveStoreName(storeId);
+
+    const { subject, html, text } = dataBackupEmail({
+      storeName,
+      appName: APP_NAME,
+      recordLabel: "Kacha slips",
+      recordCount: kachaInvoices.length,
+      fileName,
+      triggeredBy: user.name || user.email || "Unknown user",
+    });
+
+    const result = await sendMail({
+      to: backupEmail,
+      subject,
+      html,
+      text,
+      attachments: [
+        {
+          filename: fileName,
+          contentBase64: fileBase64,
+          contentType:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        },
+      ],
+    });
+
+    // Hard stop: nothing is deleted unless the backup actually went out.
+    if (!result.sent) {
+      return {
+        success: false,
+        message: `Backup email could not be sent (${result.message}). No Kacha slips were deleted.`,
+      };
+    }
+
+    const { count } = await prisma.kachaInvoice.deleteMany({
+      where: { storeId, id: { in: kachaInvoices.map((k) => k.id) } },
+    });
+
+    revalidatePath("/billing/kacha");
+
+    return {
+      success: true,
+      deletedCount: count,
+      backupSentTo: backupEmail,
+      message: `Backup of ${kachaInvoices.length} Kacha slips sent to ${backupEmail}. ${count} slips deleted.`,
+    };
+  } catch (error) {
+    console.error("deleteAllKachaInvoices error:", error);
+    return {
+      success: false,
+      message: "Failed to delete Kacha slips. No slips were deleted.",
+    };
   }
 }
 

@@ -41,13 +41,20 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
 
   const storeId = await getEffectiveStoreId();
 
-  const [{ users, pagination }, karigars] = await Promise.all([
+  const [{ users, pagination }, karigars, locations] = await Promise.all([
     getUsers(storeId, { page, pageSize, search, sortBy, sortOrder }),
     storeId
       ? prisma.karigar.findMany({
           where: { storeId, isActive: true },
           orderBy: { name: "asc" },
           select: { id: true, name: true, mobile: true, email: true },
+        })
+      : Promise.resolve([]),
+    storeId
+      ? prisma.storeLocation.findMany({
+          where: { storeId, isActive: true },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
         })
       : Promise.resolve([]),
   ]);
@@ -58,6 +65,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
     <UsersClient
       users={users}
       karigars={karigars}
+      locations={locations}
       allowSuperAdmin={allowSuperAdmin}
       pagination={pagination}
     />

@@ -21,6 +21,7 @@ interface User {
   createdAt: Date;
   karigarId?: string | null;
   permissions?: string[] | null;
+  locationAccess?: { locationId: string }[] | null;
 }
 
 interface KarigarOption {
@@ -28,6 +29,11 @@ interface KarigarOption {
   name: string;
   mobile: string | null;
   email: string | null;
+}
+
+interface LocationOption {
+  id: string;
+  name: string;
 }
 
 type Pagination = {
@@ -42,6 +48,7 @@ type Pagination = {
 interface UsersClientProps {
   users: User[];
   karigars: KarigarOption[];
+  locations: LocationOption[];
   allowSuperAdmin: boolean;
   pagination: Pagination;
 }
@@ -49,6 +56,7 @@ interface UsersClientProps {
 export function UsersClient({
   users,
   karigars,
+  locations,
   allowSuperAdmin,
   pagination,
 }: UsersClientProps) {
@@ -66,6 +74,7 @@ export function UsersClient({
         <UserFormDialog
           mode="create"
           karigars={karigars}
+          locations={locations}
           allowSuperAdmin={allowSuperAdmin}
         />
       </div>
@@ -84,7 +93,12 @@ export function UsersClient({
       />
 
       <div className="space-y-3">
-        <UserTable users={users} karigars={karigars} allowSuperAdmin={allowSuperAdmin} />
+        <UserTable
+          users={users}
+          karigars={karigars}
+          locations={locations}
+          allowSuperAdmin={allowSuperAdmin}
+        />
 
         <div className="rounded-xl border">
           <DataTablePagination

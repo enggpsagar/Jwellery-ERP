@@ -5,12 +5,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireStoreScope } from "@/lib/store-context";
-import {
-  getLocationScope,
-  locationWhere,
-  isLocationAllowed,
-  type LocationScope,
-} from "@/lib/location-scope";
+import { getLocationScope, locationWhere, type LocationScope } from "@/lib/location-scope";
 import { UserRole, UserStatus } from "@prisma/client";
 import * as XLSX from "xlsx";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
@@ -539,9 +534,10 @@ export async function exportKarigarsToExcel(
     const { selectedIds, search, sortBy = "createdAt", sortOrder = "desc" } = params;
 
     const storeId = await requireStoreScope();
+    const scope = await getLocationScope();
     const where = selectedIds?.length
-      ? { id: { in: selectedIds }, storeId }
-      : getWhere(storeId, search);
+      ? { id: { in: selectedIds }, storeId, ...locationWhere(scope) }
+      : getWhere(storeId, search, scope);
 
     const karigars = await prisma.karigar.findMany({
       where,

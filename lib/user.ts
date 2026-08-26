@@ -41,6 +41,7 @@ const USER_SELECT = {
   permissions: true,
   store: { select: { name: true } },
   karigar: { select: { name: true } },
+  locationAccess: { select: { locationId: true } },
 } as const;
 
 function getUsersWhere(storeId: string | null, search?: string) {
@@ -249,6 +250,11 @@ export async function updateUser(data: UpdateUserInput, storeId: string) {
 
   await assertKarigarInStore(karigarId, storeId);
 
+  const locationIds =
+    payload.role === UserRole.STAFF
+      ? await validStoreLocationIds(payload.locationIds, storeId)
+      : [];
+
   const { count } = await prisma.user.updateMany({
     where: { id, storeId },
     data: {
@@ -265,6 +271,19 @@ export async function updateUser(data: UpdateUserInput, storeId: string) {
   if (count === 0) {
     throw new Error("User not found");
   }
+
+  // updateMany can't do nested relation writes — sync location grants
+  // separately now that ownership (id + storeId) is already confirmed above.
+  await prisma.$transaction([
+    prisma.userLocationAccess.deleteMany({ where: { userId: id } }),
+    ...(locationIds.length
+      ? [
+          prisma.userLocationAccess.createMany({
+            data: locationIds.map((locationId) => ({ userId: id, locationId })),
+          }),
+        ]
+      : []),
+  ]);
 }
 
 export async function disableUser(id: string, storeId: string) {

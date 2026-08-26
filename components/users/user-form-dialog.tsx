@@ -41,6 +41,7 @@ type UserFormDialogUser = {
   isActive: boolean
   karigarId?: string | null
   permissions?: string[] | null
+  locationAccess?: { locationId: string }[] | null
 }
 
 type KarigarOption = {
@@ -50,11 +51,17 @@ type KarigarOption = {
   email: string | null
 }
 
+type LocationOption = {
+  id: string
+  name: string
+}
+
 type UserFormDialogProps = {
   mode: "create" | "edit"
   user?: UserFormDialogUser
   children?: React.ReactNode
   karigars?: KarigarOption[]
+  locations?: LocationOption[]
   allowSuperAdmin?: boolean
 }
 
@@ -69,6 +76,7 @@ export function UserFormDialog({
   user,
   children,
   karigars = [],
+  locations = [],
   allowSuperAdmin = false,
 }: UserFormDialogProps) {
   const [open, setOpen] = useState(false)
@@ -113,6 +121,21 @@ export function UserFormDialog({
     })
   }
 
+  // Unlike modules, no-selection here means "unrestricted" (see every
+  // location) — so this starts empty, not pre-filled with every location.
+  const [selectedLocations, setSelectedLocations] = useState<Set<string>>(
+    () => new Set((user?.locationAccess ?? []).map((grant) => grant.locationId)),
+  )
+
+  const toggleLocation = (id: string, checked: boolean) => {
+    setSelectedLocations((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+
   const router = useRouter()
   const toast = useToast()
 
@@ -139,8 +162,10 @@ export function UserFormDialog({
         selectedModules.has(module.key),
       ).flatMap((module) => module.permissions)
       formData.set("permissions", JSON.stringify(permissions))
+      formData.set("locationIds", JSON.stringify([...selectedLocations]))
     } else {
       formData.set("permissions", "[]")
+      formData.set("locationIds", "[]")
     }
 
     startTransition(async () => {
@@ -246,6 +271,41 @@ export function UserFormDialog({
                 Choose which sections this user can access. Unchecked sections
                 are hidden and blocked entirely.
               </p>
+            </div>
+          )}
+
+          {role === UserRole.STAFF && (
+            <div className="space-y-2">
+              <Label>Location Access</Label>
+              {locations.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No locations configured yet — this user will see all data.
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2 rounded-md border p-3">
+                    {locations.map((location) => (
+                      <label
+                        key={location.id}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={selectedLocations.has(location.id)}
+                          onChange={(event) => toggleLocation(location.id, event.target.checked)}
+                        />
+                        {location.name}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Leave everything unchecked for unrestricted access to
+                    every location. Checking any location restricts this
+                    user to only those.
+                  </p>
+                </>
+              )}
             </div>
           )}
 

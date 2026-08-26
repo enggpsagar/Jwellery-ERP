@@ -41,6 +41,7 @@ interface User {
   createdAt: Date;
   karigarId?: string | null;
   permissions?: string[] | null;
+  locationAccess?: { locationId: string }[] | null;
 }
 
 interface KarigarOption {
@@ -50,13 +51,24 @@ interface KarigarOption {
   email: string | null;
 }
 
+interface LocationOption {
+  id: string;
+  name: string;
+}
+
 interface Props {
   users: User[];
   karigars?: KarigarOption[];
+  locations?: LocationOption[];
   allowSuperAdmin?: boolean;
 }
 
-export function UserTable({ users, karigars = [], allowSuperAdmin = false }: Props) {
+export function UserTable({
+  users,
+  karigars = [],
+  locations = [],
+  allowSuperAdmin = false,
+}: Props) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const toast = useToast();
@@ -155,6 +167,7 @@ export function UserTable({ users, karigars = [], allowSuperAdmin = false }: Pro
                       mode="edit"
                       user={user}
                       karigars={karigars}
+                      locations={locations}
                       allowSuperAdmin={allowSuperAdmin}
                     />
 

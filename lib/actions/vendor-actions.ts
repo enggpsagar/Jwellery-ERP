@@ -39,6 +39,15 @@ export type VendorFormState = {
   success: boolean
   message: string
   errors?: Record<string, string[]>
+  /** Set on a successful addVendor — lets a caller that navigated here to
+   * create a vendor mid-flow (e.g. the purchase form) come back and select
+   * the new row. Mirrors CustomerFormState.customer. */
+  vendor?: {
+    id: string
+    name: string
+    phone: string | null
+    vendorCode: string | null
+  }
 }
 
 export type VendorSortBy = "name" | "createdAt" | "openingBalance"
@@ -452,7 +461,8 @@ export async function addVendor(
 
     const storeId = await requireStoreScope()
 
-    await prisma.vendor.create({
+    const created = await prisma.vendor.create({
+      select: { id: true, name: true, phone: true, vendorCode: true },
       data: {
         storeId,
         name,
@@ -474,6 +484,7 @@ export async function addVendor(
     return {
       success: true,
       message: "Vendor added successfully",
+      vendor: created,
     }
   } catch (error) {
     console.error("addVendor error:", error)

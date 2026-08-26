@@ -18,6 +18,14 @@ export type ProductFormState = {
     notes?: string[]
     isActive?: string[]
   }
+  /** Set on a successful createProduct — lets a caller that navigated here
+   * to create a product mid-flow (e.g. a purchase in progress) come back
+   * and select the new row. Mirrors CustomerFormState.customer. */
+  product?: {
+    id: string
+    name: string
+    productCode: string
+  }
 }
 
 export const initialProductFormState: ProductFormState = {

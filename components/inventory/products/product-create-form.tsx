@@ -16,11 +16,15 @@ import {
 type ProductCreateFormProps = {
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
+  /** Where to go after saving; the new product's id is appended so the
+   * calling screen can select it. */
+  returnTo?: string
 };
 
 export function ProductCreateForm({
   metals,
   categories,
+  returnTo,
 }: ProductCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -35,7 +39,16 @@ export function ProductCreateForm({
       toast.success(state.message || "Product created successfully");
 
       const timer = setTimeout(() => {
-        router.push("/inventory/products");
+        // Hand the new id back to whoever sent us here (e.g. a purchase in
+        // progress) so it can be selected on arrival instead of the user
+        // having to find it in the list.
+        if (returnTo && state.product) {
+          const separator = returnTo.includes("?") ? "&" : "?";
+          router.push(`${returnTo}${separator}newProductId=${state.product.id}`);
+        } else {
+          router.push("/inventory/products");
+        }
+
         router.refresh();
       }, 800);
 
@@ -45,7 +58,7 @@ export function ProductCreateForm({
     if (state && !state.success && state.message) {
       toast.error(state.message);
     }
-  }, [state, router, toast]);
+  }, [state, router, toast, returnTo]);
 
   return (
     <form action={formAction}>

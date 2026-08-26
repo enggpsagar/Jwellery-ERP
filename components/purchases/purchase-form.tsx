@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
 
@@ -21,11 +21,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { VendorSelect } from "@/components/vendors/vendor-select"
 import { ProductSelect } from "@/components/inventory/shared/product-select"
-import { QuickAddVendorDialog } from "@/components/purchases/quick-add-vendor-dialog"
-import {
-  QuickAddProductDialog,
-  type TaxonomyOption,
-} from "@/components/purchases/quick-add-product-dialog"
+
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 
 type VendorOption = {
@@ -98,23 +94,38 @@ const initialState: PurchaseFormState = { success: false, message: "" }
 type PurchaseFormProps = {
   vendors: VendorOption[]
   products: ProductOption[]
-  metals: TaxonomyOption[]
-  categories: TaxonomyOption[]
+}
+
+/**
+ * Where an in-progress purchase is parked while the user is away creating a
+ * vendor or product. sessionStorage (not localStorage) so it dies with the
+ * tab and can never resurrect a stale purchase days later.
+ */
+const DRAFT_KEY = "purchase-form-draft"
+
+const RETURN_TO = "/purchases/new"
+
+type PurchaseDraft = {
+  vendorId: string
+  items: LineItem[]
+  discount: number
+  taxAmount: number
+  paidAmount: number
+  purchaseDate: string
+  notes: string
+  /** Which line item asked for the new product, so it lands on that row. */
+  pendingProductForKey?: string
 }
 
 export function PurchaseForm({
-  vendors: initialVendors,
-  products: initialProducts,
-  metals,
-  categories,
+  vendors,
+  products,
 }: PurchaseFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const toast = useToast()
 
-  // Held in state, not read straight from props, so a vendor or product
-  // created mid-purchase can be appended and picked without a page reload.
-  const [vendors, setVendors] = useState(initialVendors)
-  const [products, setProducts] = useState(initialProducts)
+  const formRef = useRef<HTMLFormElement>(null)
 
   // Both pickers keep their own selection in internal state seeded from
   // `defaultValue`, so changing that prop alone will not move them.
@@ -153,6 +164,138 @@ export function PurchaseForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
+
+  /**
+   * Parks the whole in-progress purchase before we navigate off to create a
+   * vendor or product. Without this, "Add New Vendor" would silently throw
+   * away every line item the user had already entered.
+   *
+   * Purchase date and notes are uncontrolled inputs, so they are read off
+   * the form element rather than from state.
+   */
+  const saveDraft = (pendingProductForKey?: string) => {
+    const formData = formRef.current ? new FormData(formRef.current) : null
+
+    const draft: PurchaseDraft = {
+      vendorId,
+      items,
+      discount,
+      taxAmount,
+      paidAmount,
+      purchaseDate: formData ? String(formData.get("purchaseDate") ?? "") : "",
+      notes: formData ? String(formData.get("notes") ?? "") : "",
+      pendingProductForKey,
+    }
+
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    } catch {
+      // A full or blocked sessionStorage shouldn't stop the user getting to
+      // the create page — they just lose the draft, same as before.
+    }
+  }
+
+  // Restore-on-return. Runs once: reads any parked draft, then selects the
+  // record that was just created. Deliberately not dependent on
+  // searchParams — re-running after the URL is cleaned would wipe edits
+  // made since.
+  const restoredRef = useRef(false)
+
+  useEffect(() => {
+    if (restoredRef.current) return
+    restoredRef.current = true
+
+    const newVendorId = searchParams.get("newVendorId")
+    const newProductId = searchParams.get("newProductId")
+
+    let raw: string | null = null
+    try {
+      raw = sessionStorage.getItem(DRAFT_KEY)
+      if (raw) sessionStorage.removeItem(DRAFT_KEY)
+    } catch {
+      raw = null
+    }
+
+    let draft: PurchaseDraft | null = null
+    if (raw) {
+      try {
+        draft = JSON.parse(raw) as PurchaseDraft
+      } catch {
+        draft = null
+      }
+    }
+
+    if (draft) {
+      setVendorId(newVendorId || draft.vendorId || "")
+      setDiscount(draft.discount ?? 0)
+      setTaxAmount(draft.taxAmount ?? 0)
+      setPaidAmount(draft.paidAmount ?? 0)
+
+      let nextItems =
+        draft.items && draft.items.length ? draft.items : [emptyLineItem()]
+
+      // The page refetched on the way back in, so a product created a moment
+      // ago is already in `products` — it only needs applying to the line
+      // that went looking for it.
+      if (newProductId && draft.pendingProductForKey) {
+        const product = products.find((p) => p.id === newProductId)
+
+        if (product) {
+          nextItems = nextItems.map((item) =>
+            item.key === draft?.pendingProductForKey
+              ? {
+                  ...item,
+                  productId: product.id,
+                  itemName: item.itemName || product.name,
+                  metalTypeId: product.metalType?.id ?? "",
+                  purity: product.defaultPurity ?? "",
+                  makingCharge: product.defaultMakingCharge ?? 0,
+                  makingChargeType: product.defaultMakingChargeType ?? "FIXED",
+                  stoneCharge: product.defaultStoneCharge ?? 0,
+                }
+              : item,
+          )
+        }
+      }
+
+      setItems(nextItems)
+
+      if (formRef.current) {
+        const dateInput = formRef.current.elements.namedItem(
+          "purchaseDate",
+        ) as HTMLInputElement | null
+        if (dateInput && draft.purchaseDate) dateInput.value = draft.purchaseDate
+
+        const notesInput = formRef.current.elements.namedItem(
+          "notes",
+        ) as HTMLTextAreaElement | null
+        if (notesInput && draft.notes) notesInput.value = draft.notes
+      }
+
+      // Both pickers seed their selection from `defaultValue` into internal
+      // state, so a restored value only shows once they remount.
+      setVendorSelectKey((key) => key + 1)
+      setProductSelectKeys((prev) => {
+        const next = { ...prev }
+        nextItems.forEach((item) => {
+          next[item.key] = (next[item.key] ?? 0) + 1
+        })
+        return next
+      })
+
+      toast.success("Picked up where you left off")
+    } else if (newVendorId) {
+      setVendorId(newVendorId)
+      setVendorSelectKey((key) => key + 1)
+    }
+
+    // Strip the one-shot params via history rather than router.replace, so
+    // Next doesn't re-render the route and undo what we just restored.
+    if (newVendorId || newProductId) {
+      window.history.replaceState({}, "", RETURN_TO)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const updateItem = (key: string, patch: Partial<LineItem>) => {
     setItems((prev) =>
@@ -232,6 +375,7 @@ export function PurchaseForm({
 
   return (
     <form
+      ref={formRef}
       action={formAction}
       onSubmit={() => {
         if (state.success) return
@@ -245,22 +389,15 @@ export function PurchaseForm({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2">
-          <div className="flex items-center justify-between gap-2">
-            <Label>Vendor *</Label>
-            <QuickAddVendorDialog
-              onCreated={(vendor) => {
-                setVendors((prev) => [...prev, vendor])
-                setVendorId(vendor.id)
-                setVendorSelectKey((key) => key + 1)
-              }}
-            />
-          </div>
+          <Label>Vendor *</Label>
           <VendorSelect
             key={vendorSelectKey}
             vendors={vendors}
             name="vendorId"
             defaultValue={vendorId}
             onChange={(id) => setVendorId(id)}
+            addNewHref={`/vendors/new?returnTo=${encodeURIComponent(RETURN_TO)}`}
+            onBeforeAddNew={() => saveDraft()}
           />
         </div>
 
@@ -292,27 +429,15 @@ export function PurchaseForm({
             <div key={item.key} className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="md:col-span-2 space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <Label className="text-xs">Product *</Label>
-                    <QuickAddProductDialog
-                      metals={metals}
-                      categories={categories}
-                      onCreated={(product) => {
-                        setProducts((prev) => [...prev, product])
-                        applyProductToItem(item.key, product.id, product)
-                        setProductSelectKeys((prev) => ({
-                          ...prev,
-                          [item.key]: (prev[item.key] ?? 0) + 1,
-                        }))
-                      }}
-                    />
-                  </div>
+                  <Label className="text-xs">Product *</Label>
                   <ProductSelect
                     key={productSelectKeys[item.key] ?? 0}
                     products={productSelectOptions}
                     name={`product-${item.key}`}
                     defaultValue={item.productId}
                     onChange={(productId) => applyProductToItem(item.key, productId)}
+                    addNewHref={`/inventory/products/new?returnTo=${encodeURIComponent(RETURN_TO)}`}
+                    onBeforeAddNew={() => saveDraft(item.key)}
                   />
                 </div>
 

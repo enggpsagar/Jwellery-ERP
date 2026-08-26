@@ -4,8 +4,18 @@ import {
   getStoreCategories,
   getStoreMetals,
 } from "@/lib/actions/taxonomy-actions";
+import { safeReturnTo } from "@/lib/safe-return-to";
 
-export default async function NewProductPage() {
+type NewProductPageProps = {
+  searchParams?: Promise<{ returnTo?: string }>;
+};
+
+export default async function NewProductPage({
+  searchParams,
+}: NewProductPageProps) {
+  const params = (await searchParams) ?? {};
+  const returnTo = safeReturnTo(params.returnTo);
+
   const [metals, categories] = await Promise.all([
     getStoreMetals(),
     getStoreCategories(),
@@ -16,11 +26,15 @@ export default async function NewProductPage() {
       <PageBackHeader
         title="Add Product"
         description="Create a new jewellery product master."
-        backHref="/inventory/products"
-        backLabel="Back to Products"
+        backHref={returnTo ?? "/inventory/products"}
+        backLabel={returnTo ? "Back without saving" : "Back to Products"}
       />
 
-      <ProductCreateForm metals={metals} categories={categories} />
+      <ProductCreateForm
+        metals={metals}
+        categories={categories}
+        returnTo={returnTo}
+      />
     </main>
   );
 }

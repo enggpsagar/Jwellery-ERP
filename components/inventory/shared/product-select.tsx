@@ -1,6 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import { Plus } from "lucide-react"
 
 import {
   Select,
@@ -28,6 +30,13 @@ type ProductSelectProps = {
   defaultValue?: string
   placeholder?: string
   onChange?: (productId: string, product: ProductOption | undefined) => void
+  /** When set, an "Add New Product" row appears at the bottom of the list
+   * and navigates here. Opt-in, so the stock and receive-items forms that
+   * only pick existing products are unaffected. */
+  addNewHref?: string
+  /** Runs just before navigating away, so the caller can stash state it
+   * would otherwise lose. */
+  onBeforeAddNew?: () => void
 }
 
 /**
@@ -41,9 +50,13 @@ export function ProductSelect({
   defaultValue,
   placeholder = "Select a product",
   onChange,
+  addNewHref,
+  onBeforeAddNew,
 }: ProductSelectProps) {
+  const router = useRouter()
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState(defaultValue ?? "")
+  const [open, setOpen] = useState(false)
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -62,6 +75,8 @@ export function ProductSelect({
 
       <Select
         value={selected}
+        open={open}
+        onOpenChange={setOpen}
         onValueChange={(value) => {
           setSelected(value)
           onChange?.(value, products.find((product) => product.id === value))
@@ -94,6 +109,23 @@ export function ProductSelect({
                 </span>
               </SelectItem>
             ))
+          )}
+
+          {addNewHref && (
+            <div className="mt-1 border-t p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  onBeforeAddNew?.()
+                  router.push(addNewHref)
+                }}
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-medium text-primary hover:bg-accent"
+              >
+                <Plus className="h-4 w-4" />
+                Add New Product
+              </button>
+            </div>
           )}
         </SelectContent>
       </Select>

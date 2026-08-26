@@ -462,7 +462,8 @@ export async function createProduct(
       };
     }
 
-    await prisma.product.create({
+    const createdProduct = await prisma.product.create({
+      select: { id: true, name: true, productCode: true },
       data: {
         storeId,
         productCode,
@@ -490,6 +491,7 @@ export async function createProduct(
       success: true,
       message: "Product created successfully.",
       errors: {},
+      product: createdProduct,
     };
   } catch (error) {
     console.error("createProduct error:", error);

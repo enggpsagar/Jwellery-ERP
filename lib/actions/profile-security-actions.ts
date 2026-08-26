@@ -7,6 +7,9 @@ import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth/auth"
 import { generateOTP, hashOTP } from "@/lib/auth/otp"
 import { sendMail } from "@/lib/mailer"
+import { otpEmail } from "@/lib/email-templates"
+import { resolveStoreName } from "@/lib/invite-email"
+import { APP_NAME } from "@/lib/constants/app"
 
 export type ProfileSecurityState = {
   success: boolean
@@ -161,12 +164,16 @@ export async function sendProfileEmailChangeOtp(
     },
   })
 
-  const result = await sendMail({
-    to: email,
-    subject: "Verify your new email address",
-    html: `<p>Your verification code is:</p><p style="font-size:24px;font-weight:700;letter-spacing:4px;">${otp}</p><p>This code expires in 5 minutes. If you didn't request this, you can ignore this email.</p>`,
-    text: `Your verification code is ${otp}. It expires in 5 minutes.`,
+  const { subject, html, text } = otpEmail({
+    code: otp,
+    appName: APP_NAME,
+    storeName: user.storeId ? await resolveStoreName(user.storeId) : null,
+    expiryMinutes: OTP_TTL_MS / 60_000,
+    recipientName: user.name,
+    purpose: "email-change",
   })
+
+  const result = await sendMail({ to: email, subject, html, text })
 
   if (!result.sent) {
     console.log("=================================")

@@ -93,6 +93,112 @@ export function disabledAccountEmail(params: {
   };
 }
 
+/**
+ * One-time code email, used for both the sign-in code and the profile
+ * email-change code — only the heading and intro line differ, so they
+ * share one layout rather than drifting apart as two near-copies.
+ *
+ * `storeName` is null when no store could be resolved for the recipient —
+ * a Super Admin (whose `storeId` is always null) or an address with no
+ * matching user. The Store row is then dropped entirely rather than
+ * printed with a placeholder: a code that names the wrong store is worse
+ * than one that names no store at all.
+ *
+ * Laid out with tables and inline styles only. Flexbox/grid are
+ * unreliable in email clients — note the older `summaryRow()` helper above
+ * uses `display: flex` and renders poorly in Outlook, which is why this
+ * template does not reuse it.
+ */
+export function otpEmail(params: {
+  code: string;
+  appName: string;
+  storeName: string | null;
+  expiryMinutes: number;
+  recipientName?: string | null;
+  purpose: "login" | "email-change";
+}) {
+  const { code, appName, storeName, expiryMinutes, recipientName, purpose } =
+    params;
+
+  const isLogin = purpose === "login";
+  const greeting = recipientName ? recipientName : "there";
+
+  const heading = isLogin
+    ? "Your sign-in code"
+    : "Verify your new email address";
+
+  const intro = isLogin
+    ? `Use the code below to sign in to <strong>${appName}</strong>.`
+    : `Use the code below to confirm this email address on your <strong>${appName}</strong> account.`;
+
+  const detailRow = (label: string, value: string) => `
+        <tr>
+          <td style="padding: 8px 0; font-size: 13px; color: #6b7280; width: 132px; border-bottom: 1px solid #f3f4f6;">${label}</td>
+          <td style="padding: 8px 0; font-size: 13px; color: #111827; font-weight: bold; border-bottom: 1px solid #f3f4f6;">${value}</td>
+        </tr>`;
+
+  const details = [
+    storeName ? detailRow("Store", storeName) : "",
+    detailRow("Application", appName),
+    detailRow("Valid for", `${expiryMinutes} minutes`),
+  ].join("");
+
+  const body = `
+    <p style="margin-top: 0;">Hi ${greeting},</p>
+    <p>${intro}</p>
+
+    <div style="margin: 24px 0; padding: 20px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center;">
+      <div style="font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #6b7280;">One-time code</div>
+      <div style="margin-top: 10px; font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #111827;">${code}</div>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 0 0 22px;">
+      <tbody>${details}</tbody>
+    </table>
+
+    <div style="padding: 14px 16px; background: #fffbeb; border-left: 3px solid #d97706; border-radius: 0 6px 6px 0;">
+      <p style="margin: 0; font-size: 13px; color: #78350f; line-height: 1.6;">
+        <strong>Keep this code to yourself.</strong> ${appName} will never ask you for it by phone, email or message. Anyone who has this code can sign in as you.
+      </p>
+    </div>
+
+    <p style="margin-bottom: 0; font-size: 13px; color: #6b7280;">
+      Didn't request this? You can safely ignore this email — the code expires on its own and your account stays secure.
+    </p>
+  `;
+
+  // The store is the recipient's real-world context, so it leads the
+  // subject and the header bar; the app name is carried in the details.
+  const scopeLabel = storeName || appName;
+
+  const text = [
+    `Hi ${greeting},`,
+    "",
+    isLogin
+      ? `Use this code to sign in to ${appName}: ${code}`
+      : `Use this code to confirm your new email address on ${appName}: ${code}`,
+    "",
+    // Spread rather than filtering empty strings out afterwards — the ""
+    // entries above and below are deliberate blank lines, and a filter
+    // that drops the absent store line flattens those too.
+    ...(storeName ? [`Store: ${storeName}`] : []),
+    `Application: ${appName}`,
+    `Valid for: ${expiryMinutes} minutes`,
+    "",
+    `Keep this code to yourself. ${appName} will never ask you for it by phone, email or message. Anyone who has this code can sign in as you.`,
+    "",
+    "Didn't request this? You can safely ignore this email.",
+  ].join("\n");
+
+  return {
+    subject: isLogin
+      ? `Your sign-in code for ${scopeLabel}`
+      : `Verify your new email address for ${scopeLabel}`,
+    html: wrapEmail(scopeLabel, heading, body),
+    text,
+  };
+}
+
 export function inviteUserEmail(params: {
   name: string;
   roleLabel: string;

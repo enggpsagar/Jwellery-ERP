@@ -21,11 +21,19 @@ function getTransporter() {
   return transporter;
 }
 
+export type MailAttachment = {
+  filename: string;
+  /** File bytes, base64-encoded — matches what `lib/excel-export.ts` returns. */
+  contentBase64: string;
+  contentType?: string;
+};
+
 export type SendMailInput = {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  attachments?: MailAttachment[];
 };
 
 export type SendMailResult = { sent: boolean; message: string };
@@ -40,6 +48,7 @@ export async function sendMail({
   subject,
   html,
   text,
+  attachments,
 }: SendMailInput): Promise<SendMailResult> {
   if (!to) {
     return { sent: false, message: "No recipient email on file." };
@@ -61,6 +70,11 @@ export async function sendMail({
       subject,
       html,
       text: text ?? html.replace(/<[^>]+>/g, " "),
+      attachments: attachments?.map((attachment) => ({
+        filename: attachment.filename,
+        content: Buffer.from(attachment.contentBase64, "base64"),
+        contentType: attachment.contentType,
+      })),
     });
 
     return { sent: true, message: `Email sent to ${to}` };

@@ -23,6 +23,7 @@ export type BusinessSettings = {
   phone: string;
   email: string;
   website: string;
+  backupEmail: string;
   invoicePrefix: string;
   invoiceStartingNo: number;
   invoiceTerms: string;
@@ -65,6 +66,7 @@ function mapSettings(settings: any): BusinessSettings {
     phone: settings.phone ?? "",
     email: settings.email ?? "",
     website: settings.website ?? "",
+    backupEmail: settings.backupEmail ?? "",
     invoicePrefix: settings.invoicePrefix ?? "INV",
     invoiceStartingNo: settings.invoiceStartingNo ?? 1,
     invoiceTerms: settings.invoiceTerms ?? "",
@@ -144,6 +146,17 @@ export async function updateBusinessSettings(
       };
     }
 
+    // A malformed backup address would only surface later, at the moment a
+    // destructive operation tries to send its backup and refuses to proceed.
+    const backupEmail = toOptionalString(formData.get("backupEmail"));
+    if (backupEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(backupEmail)) {
+      return {
+        success: false,
+        message: "Invalid backup email address",
+        errors: { backupEmail: ["Enter a valid email address"] },
+      };
+    }
+
     const storeId = await requireStoreScope();
     const businessUnits = parseBusinessUnits(formData);
 
@@ -162,6 +175,7 @@ export async function updateBusinessSettings(
         phone: toOptionalString(formData.get("phone")),
         email: toOptionalString(formData.get("email")),
         website: toOptionalString(formData.get("website")),
+        backupEmail: toOptionalString(formData.get("backupEmail")),
         invoicePrefix: String(formData.get("invoicePrefix") || "INV").trim(),
         invoiceStartingNo: toNumber(formData.get("invoiceStartingNo"), 1),
         invoiceTerms: toOptionalString(formData.get("invoiceTerms")),
@@ -187,6 +201,7 @@ export async function updateBusinessSettings(
         phone: toOptionalString(formData.get("phone")),
         email: toOptionalString(formData.get("email")),
         website: toOptionalString(formData.get("website")),
+        backupEmail: toOptionalString(formData.get("backupEmail")),
         invoicePrefix: String(formData.get("invoicePrefix") || "INV").trim(),
         invoiceStartingNo: toNumber(formData.get("invoiceStartingNo"), 1),
         invoiceTerms: toOptionalString(formData.get("invoiceTerms")),

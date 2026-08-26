@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useEffect, useRef, useState } from "react"
+import { useActionState, useEffect, useRef, useState, type FormEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Plus, Store as StoreIcon, User, Mail, Phone, MapPin, Hash } from "lucide-react"
 
@@ -21,14 +21,30 @@ export function StoreFormDialog() {
   const toast = useToast()
   const formRef = useRef<HTMLFormElement>(null)
   const [open, setOpen] = useState(false)
+  const [contactError, setContactError] = useState("")
 
   const [state, formAction, pending] = useActionState(createStoreWithAdmin, initialState)
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    const formEl = event.currentTarget
+    const email = (formEl.elements.namedItem("adminEmail") as HTMLInputElement)?.value.trim()
+    const phone = (formEl.elements.namedItem("adminPhone") as HTMLInputElement)?.value.trim()
+
+    if (!email && !phone) {
+      event.preventDefault()
+      setContactError("Provide an admin email or phone number — it's required to sign in to the Store Dashboard")
+      return
+    }
+
+    setContactError("")
+  }
 
   useEffect(() => {
     if (state.success) {
       toast.success(state.message || "Store created")
       setOpen(false)
       formRef.current?.reset()
+      setContactError("")
       router.refresh()
       return
     }
@@ -53,6 +69,7 @@ export function StoreFormDialog() {
         <form
           ref={formRef}
           action={formAction}
+          onSubmit={handleSubmit}
           className="grid grid-cols-1 gap-4 md:grid-cols-2"
         >
           <div className="space-y-1 md:col-span-2">
@@ -127,6 +144,9 @@ export function StoreFormDialog() {
             <p className="text-sm font-semibold text-muted-foreground">
               Store Admin — they&apos;ll manage this store day to day
             </p>
+            <p className="text-xs text-muted-foreground">
+              Email or Phone is required — it&apos;s what the admin uses to sign in to the Store Dashboard from the login screen.
+            </p>
           </div>
 
           <div className="space-y-1">
@@ -149,13 +169,15 @@ export function StoreFormDialog() {
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Mail className="h-4 w-4 text-gray-500" />
-              Admin Email
+              Admin Email <span className="text-red-500">*</span>
+              <span className="font-normal text-xs text-muted-foreground">(or Phone)</span>
             </label>
             <input
               name="adminEmail"
               type="email"
               className="w-full rounded-md border px-3 py-2 text-sm"
               placeholder="Used for Google sign-in"
+              onChange={() => setContactError("")}
             />
             {state.errors?.adminEmail?.[0] && (
               <p className="text-sm text-red-600">{state.errors.adminEmail[0]}</p>
@@ -165,15 +187,21 @@ export function StoreFormDialog() {
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-gray-500" />
-              Admin Phone
+              Admin Phone <span className="text-red-500">*</span>
+              <span className="font-normal text-xs text-muted-foreground">(or Email)</span>
             </label>
             <input
               name="adminPhone"
               type="tel"
               className="w-full rounded-md border px-3 py-2 text-sm"
               placeholder="Used for OTP sign-in"
+              onChange={() => setContactError("")}
             />
           </div>
+
+          {contactError && (
+            <p className="text-sm text-red-600 md:col-span-2">{contactError}</p>
+          )}
 
           <div className="md:col-span-2 flex justify-end gap-3 pt-2">
             <Button

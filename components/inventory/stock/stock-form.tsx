@@ -5,7 +5,6 @@ import { useState } from "react";
 import {
   InventoryStockStatus,
   InventoryFinish,
-  PurityType,
   ChargeType,
 } from "@prisma/client";
 
@@ -25,7 +24,6 @@ import {
 } from "@/components/ui/select";
 
 import { ProductSelect } from "@/components/inventory/shared/product-select";
-import { MakingChargeInput } from "@/components/shared/making-charge-input";
 
 type ProductOption = {
   id: string;
@@ -37,13 +35,6 @@ type ProductOption = {
   defaultPurity: string | null;
   defaultMakingCharge: string | null;
   defaultStoneCharge: string | null;
-  isActive: boolean;
-};
-
-type StoreMetalOption = {
-  id: string;
-  name: string;
-  hasPurity: boolean;
   isActive: boolean;
 };
 
@@ -114,7 +105,6 @@ type StockFormProps = {
 
   products: ProductOption[];
 
-  metals: StoreMetalOption[];
 
   state: StockFormState;
 
@@ -131,16 +121,9 @@ export function StockForm({
   mode,
   stock,
   products,
-  metals,
   state,
   pending,
 }: StockFormProps) {
-  const [metalTypeId, setMetalTypeId] = useState(
-    stock?.metalTypeId ?? "",
-  );
-
-  const [purity, setPurity] = useState(stock?.purity ?? "__none__");
-
   const [status, setStatus] = useState(
     stock?.status ?? InventoryStockStatus.IN_STOCK,
   );
@@ -159,25 +142,14 @@ export function StockForm({
   const [purchaseRate, setPurchaseRate] = useState(stock?.purchaseRate ?? "");
   const [netWeight, setNetWeight] = useState(stock?.netWeight ?? "");
 
-  const [makingCharge, setMakingCharge] = useState(
-    stock?.makingCharge ? Number(stock.makingCharge) : 0,
+  // Metal, purity and the two charges are no longer entered here — the
+  // server copies them from the product. This only tracks which product is
+  // picked so the read-only summary can show what will be inherited.
+  const [selectedProductId, setSelectedProductId] = useState(
+    stock?.productId ?? "",
   );
-  const [makingChargeType, setMakingChargeType] = useState<ChargeType>(
-    stock?.makingChargeType === ChargeType.PERCENTAGE
-      ? ChargeType.PERCENTAGE
-      : ChargeType.FIXED,
-  );
-  const [stoneCharge, setStoneCharge] = useState(stock?.stoneCharge ?? "");
 
-  function applyProductDefaults(productId: string) {
-    const product = products.find((item) => item.id === productId);
-    if (!product) return;
-
-    setMetalTypeId(product.metalType?.id ?? "");
-    setPurity(product.defaultPurity ?? "__none__");
-    if (product.defaultMakingCharge) setMakingCharge(Number(product.defaultMakingCharge));
-    if (product.defaultStoneCharge) setStoneCharge(product.defaultStoneCharge);
-  }
+  const selectedProduct = products.find((item) => item.id === selectedProductId);
 
   // `ProductSelect` is a shared component whose `ProductOption` type
   // expects `category`/`ornamentType`/`metalType` as display strings, not
@@ -213,7 +185,7 @@ export function StockForm({
               name="productId"
               defaultValue={stock?.productId}
               placeholder="Select Product"
-              onChange={(productId) => applyProductDefaults(productId)}
+              onChange={(productId) => setSelectedProductId(productId)}
             />
 
             <ErrorText error={state.errors.productId} />
@@ -245,52 +217,64 @@ export function StockForm({
             <ErrorText error={state.errors.tagNumber} />
           </div>
 
-          <div>
-            <Label>Metal Type</Label>
+          {/*
+            Metal, purity, making charge and stone charge are NOT asked for
+            here. They are defined once on the product and copied onto the
+            stock row server-side, so the same information is never entered
+            twice. Shown read-only so it stays clear what the saved row will
+            carry — to change any of it, edit the product.
+          */}
+          <div className="lg:col-span-3">
+            <Label>From the product</Label>
 
-            <Select value={metalTypeId} onValueChange={setMetalTypeId}>
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="Select Metal Type" />
-              </SelectTrigger>
+            {selectedProduct ? (
+              <dl className="mt-1.5 grid gap-x-6 gap-y-2 rounded-md border bg-muted/40 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div className="flex justify-between gap-2 sm:block">
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Metal
+                  </dt>
+                  <dd className="font-medium">
+                    {selectedProduct.metalType?.name ?? (
+                      <span className="text-destructive">Not set</span>
+                    )}
+                  </dd>
+                </div>
 
-              <SelectContent>
-                {metals.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <div className="flex justify-between gap-2 sm:block">
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Purity
+                  </dt>
+                  <dd className="font-medium">
+                    {selectedProduct.defaultPurity?.replaceAll("_", " ") ?? "—"}
+                  </dd>
+                </div>
 
-            <input type="hidden" name="metalTypeId" value={metalTypeId} />
+                <div className="flex justify-between gap-2 sm:block">
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Making charge
+                  </dt>
+                  <dd className="font-medium tabular-nums">
+                    {selectedProduct.defaultMakingCharge ?? "—"}
+                  </dd>
+                </div>
+
+                <div className="flex justify-between gap-2 sm:block">
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Stone charge
+                  </dt>
+                  <dd className="font-medium tabular-nums">
+                    {selectedProduct.defaultStoneCharge ?? "—"}
+                  </dd>
+                </div>
+              </dl>
+            ) : (
+              <p className="mt-1.5 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                Pick a product and its metal, purity and charges are applied
+                automatically.
+              </p>
+            )}
 
             <ErrorText error={state.errors.metalTypeId} />
-          </div>
-
-          <div>
-            <Label>Purity</Label>
-
-            <Select value={purity} onValueChange={setPurity}>
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="Select Purity" />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
-
-                {Object.values(PurityType).map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item.replaceAll("_", " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <input
-              type="hidden"
-              name="purity"
-              value={purity === "__none__" ? "" : purity}
-            />
           </div>
 
           <div>
@@ -479,37 +463,8 @@ export function StockForm({
             <ErrorText error={state.errors.saleRate} />
           </div>
 
-          <div>
-            <MakingChargeInput
-              rate={Number(purchaseRate) || 0}
-              netWeight={Number(netWeight) || 0}
-              value={makingCharge}
-              onChange={setMakingCharge}
-              chargeType={makingChargeType}
-              onChargeTypeChange={setMakingChargeType}
-              label="Making Charge"
-            />
-
-            <input type="hidden" name="makingCharge" value={makingCharge} />
-            <input type="hidden" name="makingChargeType" value={makingChargeType} />
-
-            <ErrorText error={state.errors.makingCharge} />
-          </div>
-
-          <div>
-            <Label htmlFor="stoneCharge">Stone Charge</Label>
-
-            <Input
-              id="stoneCharge"
-              name="stoneCharge"
-              type="number"
-              step="0.01"
-              value={stoneCharge}
-              onChange={(event) => setStoneCharge(event.target.value)}
-            />
-
-            <ErrorText error={state.errors.stoneCharge} />
-          </div>
+          {/* Making charge and stone charge come from the product's defaults
+              (see the note in Stock Information above). */}
 
           <div>
             <Label htmlFor="otherCharge">Other Charge</Label>

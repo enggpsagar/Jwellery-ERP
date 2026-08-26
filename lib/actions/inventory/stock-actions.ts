@@ -417,12 +417,9 @@ export async function createInventoryStock(
     const stockCode = String(formData.get("stockCode") || "").trim()
     const tagNumber = parseNullableString(formData.get("tagNumber"))
 
-    const metalTypeId = String(formData.get("metalTypeId") || "").trim()
-
-    const purity = parseOptionalEnum(
-      formData.get("purity"),
-      Object.values(PurityType)
-    ) as PurityType | null
+    // Metal, purity and the making/stone charges are no longer submitted by
+    // the form — they are read off the product below, so the same facts are
+    // never captured in two places.
 
     const status =
       (parseOptionalEnum(
@@ -448,9 +445,6 @@ export async function createInventoryStock(
 
     const purchaseRate = parseOptionalNumber(formData.get("purchaseRate"))
     const saleRate = parseOptionalNumber(formData.get("saleRate"))
-    const makingCharge = parseOptionalNumber(formData.get("makingCharge"))
-    const makingChargeType = parseChargeType(formData.get("makingChargeType"))
-    const stoneCharge = parseOptionalNumber(formData.get("stoneCharge"))
     const otherCharge = parseOptionalNumber(formData.get("otherCharge"))
     const purchaseAmount = parseOptionalNumber(formData.get("purchaseAmount"))
     const saleAmount = parseOptionalNumber(formData.get("saleAmount"))
@@ -479,10 +473,6 @@ export async function createInventoryStock(
       errors.stockCode = ["Stock code is required"]
     }
 
-    if (!metalTypeId) {
-      errors.metalTypeId = ["Metal type is required"]
-    }
-
     if (quantity < 1) {
       errors.quantity = ["Quantity must be at least 1"]
     }
@@ -499,7 +489,14 @@ export async function createInventoryStock(
 
     const product = await prisma.product.findFirst({
       where: { id: productId, storeId },
-      select: { id: true },
+      select: {
+        id: true,
+        metalTypeId: true,
+        defaultPurity: true,
+        defaultMakingCharge: true,
+        defaultMakingChargeType: true,
+        defaultStoneCharge: true,
+      },
     })
 
     if (!product) {
@@ -512,20 +509,27 @@ export async function createInventoryStock(
       }
     }
 
-    const metalType = await prisma.storeMetal.findFirst({
-      where: { id: metalTypeId, storeId },
-      select: { id: true },
-    })
-
-    if (!metalType) {
+    // Metal was a required field on this form. It still must not be null —
+    // the fine-weight maths in the karigar ledger and the gold-flow report
+    // depend on it — so the requirement moves onto the product rather than
+    // disappearing. No separate store check is needed: the product was
+    // already matched on storeId.
+    if (!product.metalTypeId) {
       return {
         success: false,
-        message: "Selected metal type is invalid",
+        message:
+          "This product has no metal set. Add one on the product, then create the stock entry.",
         errors: {
-          metalTypeId: ["Selected metal type could not be found"],
+          productId: ["Product is missing a metal type"],
         },
       }
     }
+
+    const metalTypeId = product.metalTypeId
+    const purity = product.defaultPurity
+    const makingCharge = product.defaultMakingCharge
+    const makingChargeType = product.defaultMakingChargeType
+    const stoneCharge = product.defaultStoneCharge
 
     const existing = await prisma.inventoryStock.findFirst({
       where: { stockCode, storeId },
@@ -562,9 +566,9 @@ export async function createInventoryStock(
         wastagePercent: toDecimal(wastagePercent),
         purchaseRate: toDecimal(purchaseRate),
         saleRate: toDecimal(saleRate),
-        makingCharge: toDecimal(makingCharge),
+        makingCharge,
         makingChargeType,
-        stoneCharge: toDecimal(stoneCharge),
+        stoneCharge,
         otherCharge: toDecimal(otherCharge),
         purchaseAmount: toDecimal(purchaseAmount),
         saleAmount: toDecimal(saleAmount),
@@ -606,6 +610,14 @@ export async function updateInventoryStock(
       where: { id, storeId },
       select: {
         id: true,
+        // Fallback values for when the row is locked for core changes: the
+        // form no longer submits these, so without them a locked edit would
+        // null out metal/purity/charges on save.
+        metalTypeId: true,
+        purity: true,
+        makingCharge: true,
+        makingChargeType: true,
+        stoneCharge: true,
         invoiceItems: {
           select: { id: true },
           take: 1,
@@ -638,12 +650,13 @@ export async function updateInventoryStock(
     const stockCode = String(formData.get("stockCode") || "").trim()
     const tagNumber = parseNullableString(formData.get("tagNumber"))
 
-    const metalTypeId = String(formData.get("metalTypeId") || "").trim()
-
-    const purity = parseOptionalEnum(
-      formData.get("purity"),
-      Object.values(PurityType)
-    ) as PurityType | null
+    // Not submitted by the form any more; inherited from the product below
+    // when the row is still editable, otherwise kept exactly as-is.
+    let metalTypeId = existingStock.metalTypeId
+    let purity = existingStock.purity
+    let makingCharge = existingStock.makingCharge
+    let makingChargeType = existingStock.makingChargeType
+    let stoneCharge = existingStock.stoneCharge
 
     const status =
       (parseOptionalEnum(
@@ -669,9 +682,6 @@ export async function updateInventoryStock(
 
     const purchaseRate = parseOptionalNumber(formData.get("purchaseRate"))
     const saleRate = parseOptionalNumber(formData.get("saleRate"))
-    const makingCharge = parseOptionalNumber(formData.get("makingCharge"))
-    const makingChargeType = parseChargeType(formData.get("makingChargeType"))
-    const stoneCharge = parseOptionalNumber(formData.get("stoneCharge"))
     const otherCharge = parseOptionalNumber(formData.get("otherCharge"))
     const purchaseAmount = parseOptionalNumber(formData.get("purchaseAmount"))
     const saleAmount = parseOptionalNumber(formData.get("saleAmount"))
@@ -698,10 +708,6 @@ export async function updateInventoryStock(
 
     if (!stockCode) {
       errors.stockCode = ["Stock code is required"]
-    }
-
-    if (!metalTypeId) {
-      errors.metalTypeId = ["Metal type is required"]
     }
 
     if (quantity < 1) {
@@ -738,7 +744,14 @@ export async function updateInventoryStock(
     if (!isLockedForCoreChanges) {
       const product = await prisma.product.findFirst({
         where: { id: productId, storeId },
-        select: { id: true },
+        select: {
+          id: true,
+          metalTypeId: true,
+          defaultPurity: true,
+          defaultMakingCharge: true,
+          defaultMakingChargeType: true,
+          defaultStoneCharge: true,
+        },
       })
 
       if (!product) {
@@ -751,20 +764,22 @@ export async function updateInventoryStock(
         }
       }
 
-      const metalType = await prisma.storeMetal.findFirst({
-        where: { id: metalTypeId, storeId },
-        select: { id: true },
-      })
-
-      if (!metalType) {
+      if (!product.metalTypeId) {
         return {
           success: false,
-          message: "Selected metal type is invalid",
+          message:
+            "This product has no metal set. Add one on the product, then save the stock entry.",
           errors: {
-            metalTypeId: ["Selected metal type could not be found"],
+            productId: ["Product is missing a metal type"],
           },
         }
       }
+
+      metalTypeId = product.metalTypeId
+      purity = product.defaultPurity
+      makingCharge = product.defaultMakingCharge
+      makingChargeType = product.defaultMakingChargeType
+      stoneCharge = product.defaultStoneCharge
     }
 
     /**
@@ -817,9 +832,9 @@ export async function updateInventoryStock(
         wastagePercent: toDecimal(wastagePercent),
         purchaseRate: toDecimal(purchaseRate),
         saleRate: toDecimal(saleRate),
-        makingCharge: toDecimal(makingCharge),
+        makingCharge,
         makingChargeType,
-        stoneCharge: toDecimal(stoneCharge),
+        stoneCharge,
         otherCharge: toDecimal(otherCharge),
         purchaseAmount: toDecimal(purchaseAmount),
         saleAmount: toDecimal(saleAmount),

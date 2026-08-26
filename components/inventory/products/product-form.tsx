@@ -132,6 +132,10 @@ export function ProductForm({
     product?.isActive === false ? "false" : "true",
   );
 
+  // Create-only: offer to open the stock entry in the same step, so a new
+  // product doesn't need a second trip to Inventory to become stockable.
+  const [createStock, setCreateStock] = useState(false);
+
   const [defaultMakingChargeType, setDefaultMakingChargeType] = useState(
     product?.defaultMakingChargeType ?? "FIXED",
   );
@@ -494,6 +498,47 @@ export function ProductForm({
           </div>
         </div>
       </div>
+
+      {mode === "create" && (
+        <div className="rounded-xl border p-6">
+          <h3 className="mb-1 text-lg font-semibold">Stock entry</h3>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Metal, purity and charges come from this product, so a stock entry
+            started here needs nothing but a quantity.
+          </p>
+
+          <label className="flex items-center gap-3 text-sm font-medium">
+            <input
+              type="checkbox"
+              name="createStockEntry"
+              value="true"
+              checked={createStock}
+              onChange={(event) => setCreateStock(event.target.checked)}
+              className="h-4 w-4 rounded border-input"
+            />
+            Do you want to create a stock entry as well?
+          </label>
+
+          {createStock && (
+            <div className="mt-4 max-w-xs">
+              <Label htmlFor="stockQuantity">Quantity</Label>
+              <Input
+                id="stockQuantity"
+                name="stockQuantity"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="0"
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Leave blank and the entry is created with a quantity of 0 —
+                the product is stockable, with none on hand yet.
+              </p>
+              <ErrorText error={state.errors.stockQuantity} />
+            </div>
+          )}
+        </div>
+      )}
 
       {state.message && (
         <div

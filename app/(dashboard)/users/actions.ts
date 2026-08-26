@@ -25,8 +25,7 @@ import { requireAuth, hasPermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { ROLE_LABELS } from "@/lib/roles";
 import { requireStoreScope, getEffectiveStoreId } from "@/lib/store-context";
-import { prisma } from "@/lib/prisma";
-import { sendInviteEmailSafely } from "@/lib/invite-email";
+import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
 import { buildExcelExport } from "@/lib/excel-export";
 
 export type UserActionState = {
@@ -77,15 +76,6 @@ function friendlyUserErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error) return error.message;
 
   return fallback;
-}
-
-async function resolveStoreName(storeId: string): Promise<string> {
-  const settings = await prisma.businessSettings.findUnique({
-    where: { storeId },
-    select: { businessName: true },
-  });
-
-  return settings?.businessName || "your store";
 }
 
 export async function createUserAction(

@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { requireStoreScope } from "@/lib/store-context";
 import { UserRole, UserStatus } from "@prisma/client";
 import * as XLSX from "xlsx";
+import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
 
 export type Karigar = {
   id: string;
@@ -281,11 +282,24 @@ export async function createKarigar(
     revalidatePath("/karigars");
     revalidatePath("/users");
 
+    let emailSent = false;
+    if (data.email) {
+      emailSent = await sendInviteEmailSafely({
+        email: data.email,
+        phone: data.mobile,
+        name: data.name,
+        role: UserRole.KARIGAR,
+        storeName: await resolveStoreName(storeId),
+      });
+    }
+
     return {
       success: true,
       message:
         data.mobile || data.email
-          ? "Karigar created — they can now sign in with this mobile/email"
+          ? data.email && emailSent
+            ? "Karigar created — a welcome email was sent so they can sign in"
+            : "Karigar created — they can now sign in with this mobile/email"
           : "Karigar created successfully",
     };
   } catch (error: any) {
@@ -344,6 +358,7 @@ export async function updateKarigar(
     // Keep the karigar's contact info and login credential in sync — either
     // update their existing login User, or (if this karigar never had one,
     // e.g. created before a mobile/email was on file) create it now.
+    let loginJustCreated = false;
     await prisma.$transaction(async (tx) => {
       await tx.karigar.update({ where: { id }, data });
 
@@ -365,12 +380,25 @@ export async function updateKarigar(
             karigarId: id,
           },
         });
+        loginJustCreated = true;
       }
     });
 
     revalidatePath("/karigars");
     revalidatePath(`/karigars/${id}`);
     revalidatePath("/users");
+
+    // Only the moment this karigar first gets login access deserves a
+    // welcome email — not every subsequent edit to an existing login.
+    if (loginJustCreated && data.email) {
+      await sendInviteEmailSafely({
+        email: data.email,
+        phone: data.mobile,
+        name: data.name,
+        role: UserRole.KARIGAR,
+        storeName: await resolveStoreName(storeId),
+      });
+    }
 
     return { success: true, message: "Karigar updated successfully" };
   } catch (error: any) {

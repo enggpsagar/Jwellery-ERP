@@ -123,6 +123,31 @@ export function CustomerSelect({
         </SelectContent>
       </Select>
 
+      {/*
+        A store with no customers at all can't discover the "Create new
+        customer" item above: it only exists once the dropdown is open, at
+        the bottom of an otherwise empty list. On a brand new store — which
+        is exactly when you must create a customer before you can bill
+        anyone — the way forward has to be visible without opening
+        anything. Keyed off the full list, not `filtered`, so it appears
+        only for a genuinely empty store rather than every no-match search.
+      */}
+      {localCustomers.length === 0 && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-dashed px-3 py-2">
+          <span className="text-sm text-muted-foreground">
+            No customers yet.
+          </span>
+          <button
+            type="button"
+            onClick={() => setQuickAddOpen(true)}
+            className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            Add your first customer
+          </button>
+        </div>
+      )}
+
       <QuickAddCustomerDialog
         open={quickAddOpen}
         onOpenChange={setQuickAddOpen}

@@ -66,7 +66,6 @@ type ReceiptItem = {
   otherCharge: number
   purchaseAmount: number
   saleAmount: number
-  vendorName: string
   purchaseDate: string
   manufactureDate: string
   location: string
@@ -101,7 +100,6 @@ function emptyReceiptItem(defaultMetal?: StoreMetalRow): ReceiptItem {
     otherCharge: 0,
     purchaseAmount: 0,
     saleAmount: 0,
-    vendorName: "",
     purchaseDate: "",
     manufactureDate: "",
     location: "",
@@ -270,7 +268,6 @@ export function ReceiveItemsForm({
       otherCharge: item.otherCharge || null,
       purchaseAmount: item.purchaseAmount || null,
       saleAmount: item.saleAmount || null,
-      vendorName: item.vendorName || null,
       purchaseDate: item.purchaseDate || null,
       manufactureDate: item.manufactureDate || null,
       location: item.location || null,
@@ -593,14 +590,6 @@ export function ReceiveItemsForm({
                         onChange={(e) =>
                           updateItem(item.key, { saleAmount: Number(e.target.value) || 0 })
                         }
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs">Vendor Name</Label>
-                      <Input
-                        value={item.vendorName}
-                        onChange={(e) => updateItem(item.key, { vendorName: e.target.value })}
                       />
                     </div>
 

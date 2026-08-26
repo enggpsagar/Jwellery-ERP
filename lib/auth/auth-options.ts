@@ -5,6 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { adapter } from "@/lib/auth/prisma-adapter"
 import { verifyOtpLogin, verifyEmailOtpLogin } from "@/lib/auth/otp-auth"
 import { prisma } from "@/lib/prisma"
+import { sendDisabledAccountEmailSafely } from "@/lib/invite-email"
 import { UserRole } from "@prisma/client"
 
 const SUPER_ADMIN_EMAILS = (process.env.SUPER_ADMIN_EMAILS ?? "")
@@ -73,7 +74,27 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async signIn({ user }) {
-      const dbUser = user as unknown as { storeId: string | null }
+      const dbUser = user as unknown as {
+        storeId: string | null
+        isActive: boolean | null
+        role: UserRole | null
+        name: string | null
+        email: string | null
+      }
+
+      // Only the Prisma-adapter (Google) path reaches this callback with a
+      // full DB user row — dbUser.isActive is undefined for the Credentials
+      // (OTP) provider, which already rejects a disabled account itself in
+      // lib/auth/otp-auth.ts's assertCanSignIn before signIn() ever runs.
+      if (dbUser.isActive === false) {
+        await sendDisabledAccountEmailSafely({
+          email: dbUser.email,
+          name: dbUser.name || "there",
+          role: dbUser.role ?? UserRole.STAFF,
+          storeId: dbUser.storeId,
+        })
+        return false
+      }
 
       if (dbUser.storeId) {
         const store = await prisma.store.findUnique({

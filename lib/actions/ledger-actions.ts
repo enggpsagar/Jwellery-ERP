@@ -155,6 +155,111 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
   }
 }
 
+export type KarigarLedgerSummaryRow = {
+  id: string
+  name: string
+  code: string | null
+  openingGold: number
+  openingCash: number
+  goldIssued: number
+  goldUsed: number
+  outstandingGold: number
+  itemsDelivered: number
+  totalEarned: number
+  totalPaid: number
+  outstandingCash: number
+}
+
+export type KarigarLedgerSummary = {
+  rows: KarigarLedgerSummaryRow[]
+  totals: {
+    outstandingGold: number
+    totalEarned: number
+    totalPaid: number
+    outstandingCash: number
+  }
+}
+
+/**
+ * One row per karigar across the whole store: lifetime gold issued vs. gold
+ * used in delivered items (so the two "how much gold" halves of the ask are
+ * both visible), the resulting outstanding fine-gold balance, items
+ * delivered, and the cash side (labour earned vs. paid). Outstanding
+ * gold/cash are derived the same way getKarigarLedger's running balance is
+ * (walking DEBIT/CREDIT entries only) — opening gold/cash are shown as their
+ * own reference columns, not folded in, to match the per-karigar detail page.
+ */
+export async function getKarigarLedgerSummary(): Promise<KarigarLedgerSummary> {
+  const storeId = await requireStoreScope()
+
+  const karigars = await prisma.karigar.findMany({
+    where: { storeId },
+    select: { id: true, name: true, code: true, openingGold: true, openingCash: true },
+    orderBy: { name: "asc" },
+  })
+
+  const grouped = await prisma.ledgerEntry.groupBy({
+    by: ["karigarId", "type", "sourceType"],
+    where: { storeId, karigarId: { not: null } },
+    _sum: { metalWeightFine: true, amount: true },
+  })
+
+  const receivedJobs = await prisma.karigarJob.findMany({
+    where: { storeId, status: "received" },
+    select: { karigarId: true, _count: { select: { receiptItems: true } } },
+  })
+  const itemsByKarigar = new Map<string, number>()
+  for (const job of receivedJobs) {
+    itemsByKarigar.set(job.karigarId, (itemsByKarigar.get(job.karigarId) ?? 0) + job._count.receiptItems)
+  }
+
+  const rows = karigars.map((karigar) => {
+    let goldIssued = 0
+    let goldUsed = 0
+    let totalEarned = 0
+    let totalPaid = 0
+
+    for (const g of grouped) {
+      if (g.karigarId !== karigar.id) continue
+      const fine = Number(g._sum.metalWeightFine ?? 0)
+      const amt = Number(g._sum.amount ?? 0)
+
+      if (g.type === "DEBIT" && g.sourceType === "KARIGAR_ISSUE") goldIssued += fine
+      else if (g.type === "CREDIT" && g.sourceType === "KARIGAR_RECEIPT") goldUsed += fine
+      else if (g.type === "DEBIT") totalEarned += amt
+      else if (g.type === "CREDIT") totalPaid += amt
+    }
+
+    return {
+      id: karigar.id,
+      name: karigar.name,
+      code: karigar.code,
+      openingGold: Number(karigar.openingGold),
+      openingCash: Number(karigar.openingCash),
+      goldIssued,
+      goldUsed,
+      outstandingGold: goldIssued - goldUsed,
+      itemsDelivered: itemsByKarigar.get(karigar.id) ?? 0,
+      totalEarned,
+      totalPaid,
+      outstandingCash: totalEarned - totalPaid,
+    }
+  })
+
+  const totals = rows.reduce(
+    (acc, row) => {
+      acc.outstandingGold += row.outstandingGold
+      acc.totalEarned += row.totalEarned
+      acc.totalPaid += row.totalPaid
+      acc.outstandingCash += row.outstandingCash
+      return acc
+    },
+    { outstandingGold: 0, totalEarned: 0, totalPaid: 0, outstandingCash: 0 },
+  )
+
+  return { rows, totals }
+}
+
 export type LedgerUnitTotal = {
   unit: BusinessUnit
   label: string

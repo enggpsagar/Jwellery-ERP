@@ -46,16 +46,48 @@ model Store {
 }
 
 model StoreLocation {
-  id              String           @id @default(cuid())
+  id              String               @id @default(cuid())
   storeId         String
   name            String
-  isActive        Boolean          @default(true)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  store           Store            @relation(fields: [storeId], references: [id])
+  isActive        Boolean              @default(true)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  store           Store                @relation(fields: [storeId], references: [id])
   inventoryStocks InventoryStock[]
+  karigars        Karigar[]
+  purchases       Purchase[]
+  invoices        Invoice[]
+  kachaInvoices   KachaInvoice[]
+  karigarJobs     KarigarJob[]
+  ledgerEntries   LedgerEntry[]
+  userAccess      UserLocationAccess[]
 
   @@unique([storeId, name])
+}
+
+/**
+ * Grants a Staff user access to one or more locations. Mirrors the
+ * User.permissions convention: zero rows for a user means unrestricted
+ * (sees every location), same as an empty `permissions` array meaning
+ * "not customized" falls back to full module access — the two axes are
+ * independent (a module permission and a location grant), but both use
+ * the same "empty = unrestricted" rule so they don't have to be reasoned
+ * about differently. Only Staff is ever actually restricted — Admin/Super
+ * Admin/Karigar are never gated by this table (Karigar's own scoping goes
+ * through Karigar.locationId instead, since a User with role KARIGAR is
+ * always 1:1 with a Karigar row via User.karigarId).
+ */
+model UserLocationAccess {
+  id         String        @id @default(cuid())
+  userId     String
+  locationId String
+  createdAt  DateTime      @default(now())
+  user       User          @relation(fields: [userId], references: [id])
+  location   StoreLocation @relation(fields: [locationId], references: [id])
+
+  @@unique([userId, locationId])
+  @@index([userId])
+  @@index([locationId])
 }
 
 model StoreMetal {
@@ -167,11 +199,14 @@ model Karigar {
   karigarJobs    KarigarJob[]
   ledgerEntries  LedgerEntry[]
   loginUser      User?
+  locationId     String?
+  location       StoreLocation? @relation(fields: [locationId], references: [id])
 
   @@unique([storeId, code])
   @@index([name])
   @@index([mobile])
   @@index([code])
+  @@index([locationId])
   @@index([storeId])
 }
 
@@ -319,6 +354,8 @@ model Invoice {
   ledgerEntries          LedgerEntry[]
   convertedFromKacha     KachaInvoice? @relation("KachaConvertedToPakka")
   convertedFromQuotation Quotation?    @relation("QuotationConvertedToInvoice")
+  locationId             String?
+  location               StoreLocation? @relation(fields: [locationId], references: [id])
 
   @@unique([storeId, invoiceNumber])
   @@index([customerId])
@@ -326,6 +363,7 @@ model Invoice {
   @@index([status])
   @@index([invoiceNumber])
   @@index([storeId])
+  @@index([locationId])
 }
 
 model KachaInvoice {
@@ -350,6 +388,8 @@ model KachaInvoice {
   store         Store              @relation(fields: [storeId], references: [id])
   customer      Customer           @relation(fields: [customerId], references: [id])
   items         KachaInvoiceItem[]
+  locationId    String?
+  location      StoreLocation?     @relation(fields: [locationId], references: [id])
 
   @@unique([storeId, slipNumber])
   @@index([customerId])
@@ -357,6 +397,7 @@ model KachaInvoice {
   @@index([status])
   @@index([slipNumber])
   @@index([storeId])
+  @@index([locationId])
 }
 
 model KachaInvoiceItem {
@@ -440,6 +481,8 @@ model LedgerEntry {
   purchase         Purchase?        @relation(fields: [purchaseId], references: [id])
   vendor           Vendor?          @relation(fields: [vendorId], references: [id])
   metalType        StoreMetal?      @relation(fields: [metalTypeId], references: [id])
+  locationId       String?
+  location         StoreLocation?   @relation(fields: [locationId], references: [id])
 
   @@index([entryDate])
   @@index([customerId])
@@ -450,6 +493,7 @@ model LedgerEntry {
   @@index([type])
   @@index([sourceType])
   @@index([storeId])
+  @@index([locationId])
 }
 
 model KarigarJob {
@@ -477,6 +521,8 @@ model KarigarJob {
   karigar           Karigar              @relation(fields: [karigarId], references: [id])
   receiptItems      KarigarReceiptItem[]
   metalType         StoreMetal?          @relation(fields: [metalTypeId], references: [id])
+  locationId        String?
+  location          StoreLocation?       @relation(fields: [locationId], references: [id])
 
   @@unique([storeId, jobNumber])
   @@index([inventoryStockId])
@@ -484,6 +530,7 @@ model KarigarJob {
   @@index([jobNumber])
   @@index([karigarId])
   @@index([storeId])
+  @@index([locationId])
 }
 
 model Vendor {
@@ -539,12 +586,15 @@ model Purchase {
   vendor         Vendor         @relation(fields: [vendorId], references: [id])
   items          PurchaseItem[]
   ledgerEntries  LedgerEntry[]
+  locationId     String?
+  location       StoreLocation? @relation(fields: [locationId], references: [id])
 
   @@unique([storeId, purchaseNumber])
   @@index([vendorId])
   @@index([purchaseDate])
   @@index([status])
   @@index([storeId])
+  @@index([locationId])
 }
 
 model PurchaseItem {
@@ -783,6 +833,7 @@ model User {
   sessions            Session[]
   invitedBy           User?         @relation("UserInvites", fields: [invitedById], references: [id])
   invitedUsers        User[]        @relation("UserInvites")
+  locationAccess      UserLocationAccess[]
 
   @@index([storeId])
 }

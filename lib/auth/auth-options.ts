@@ -141,12 +141,22 @@ export const authOptions: NextAuthOptions = {
           })
         }
 
+        // Location grants aren't a plain column on User (unlike permissions),
+        // so the adapter's default user object never carries them — a
+        // one-off lookup here, same as the store isActive check above,
+        // matches how permissions/role/store all only re-derive at sign-in.
+        const locationGrants = await prisma.userLocationAccess.findMany({
+          where: { userId: dbUser.id },
+          select: { locationId: true },
+        })
+
         token.id = dbUser.id
         token.role = role
         token.storeId = storeId
         token.karigarId = dbUser.karigarId
         token.phone = dbUser.phone
         token.permissions = dbUser.permissions ?? []
+        token.locationIds = locationGrants.map((grant) => grant.locationId)
       }
       return token
     },
@@ -159,6 +169,7 @@ export const authOptions: NextAuthOptions = {
         session.user.karigarId = token.karigarId ?? null
         session.user.phone = token.phone ?? null
         session.user.permissions = token.permissions ?? []
+        session.user.locationIds = token.locationIds ?? []
       }
       return session
     },

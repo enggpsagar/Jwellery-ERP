@@ -13,6 +13,7 @@ declare module "next-auth" {
       storeId: string | null
       karigarId: string | null
       permissions: string[]
+      locationIds: string[]
       name?: string | null
       email?: string | null
       image?: string | null
@@ -28,5 +29,6 @@ declare module "next-auth/jwt" {
     storeId?: string | null
     karigarId?: string | null
     permissions?: string[]
+    locationIds?: string[]
   }
 }

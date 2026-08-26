@@ -5,6 +5,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireStoreScope } from "@/lib/store-context";
+import { getLocationScope, locationWhere, isLocationAllowed } from "@/lib/location-scope";
 import { UserRole, UserStatus } from "@prisma/client";
 import * as XLSX from "xlsx";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
@@ -27,6 +28,7 @@ export type Karigar = {
   openingGold: number;
   openingCash: number;
   isActive: boolean;
+  locationId: string | null;
   createdAt?: string;
 };
 

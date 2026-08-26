@@ -39,9 +39,14 @@ export function KarigarsClient({ karigars, pagination }: KarigarsClientProps) {
         backHref="/dashboard"
         backLabel="Back to Dashboard"
         action={
-          <Link href="/karigars/new">
-            <Button>Add Karigar</Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/karigars/ledger">
+              <Button variant="outline">Karigar Ledger</Button>
+            </Link>
+            <Link href="/karigars/new">
+              <Button>Add Karigar</Button>
+            </Link>
+          </div>
         }
       />
 

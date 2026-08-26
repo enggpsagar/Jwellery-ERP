@@ -1,5 +1,8 @@
 "use client"
 
+import Link from "next/link"
+import { Pencil } from "lucide-react"
+
 import {
   Table,
   TableBody,
@@ -10,7 +13,6 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { StoreRowActions } from "@/components/stores/store-row-actions"
-import { EditStoreDialog } from "@/components/stores/edit-store-dialog"
 
 type StoreRow = {
   id: string
@@ -68,7 +70,14 @@ export function StoreTable({ stores }: { stores: StoreRow[] }) {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
-                    <EditStoreDialog store={store} />
+                    <Link
+                      href={`/stores/${store.id}/edit`}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-accent"
+                      aria-label={`Edit ${store.name}`}
+                      title="Edit store"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Link>
                     <StoreRowActions
                       storeId={store.id}
                       storeName={store.name}

@@ -1,41 +1,23 @@
 "use client"
 
-import { useActionState, useEffect, useRef, useState } from "react"
+import { useActionState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Pencil, Store as StoreIcon, Mail, Phone, MapPin, Hash } from "lucide-react"
+import { Store as StoreIcon, Mail, Phone, MapPin, Hash } from "lucide-react"
 
-import { updateStore, type StoreFormState } from "@/lib/actions/store-actions"
+import { updateStore, type StoreFormState, type StoreDetail } from "@/lib/actions/store-actions"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
 
 const initialState: StoreFormState = { success: false, message: "", errors: {} }
 
-type EditStoreDialogProps = {
-  store: {
-    id: string
-    name: string
-    code: string
-    address: string | null
-    city: string | null
-    state: string | null
-    pincode: string | null
-    phone: string | null
-    email: string | null
-    gstNumber: string | null
-  }
+type EditStoreFormProps = {
+  store: StoreDetail
 }
 
-export function EditStoreDialog({ store }: EditStoreDialogProps) {
+export function EditStoreForm({ store }: EditStoreFormProps) {
   const router = useRouter()
   const toast = useToast()
-  const formRef = useRef<HTMLFormElement>(null)
-  const [open, setOpen] = useState(false)
 
   const updateAction = updateStore.bind(null, store.id)
   const [state, formAction, pending] = useActionState(updateAction, initialState)
@@ -43,7 +25,7 @@ export function EditStoreDialog({ store }: EditStoreDialogProps) {
   useEffect(() => {
     if (state.success) {
       toast.success(state.message || "Store updated")
-      setOpen(false)
+      router.push("/stores")
       router.refresh()
       return
     }
@@ -54,27 +36,13 @@ export function EditStoreDialog({ store }: EditStoreDialogProps) {
   }, [state, router, toast])
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-accent"
-        aria-label={`Edit ${store.name}`}
-        title="Edit store"
-      >
-        <Pencil className="h-4 w-4" />
-      </button>
+    <Card>
+      <CardHeader>
+        <CardTitle>Store Details</CardTitle>
+      </CardHeader>
 
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Edit Store</DialogTitle>
-        </DialogHeader>
-
-        <form
-          ref={formRef}
-          action={formAction}
-          className="grid grid-cols-1 gap-4 md:grid-cols-2"
-        >
+      <CardContent>
+        <form action={formAction} className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <StoreIcon className="h-4 w-4 text-gray-500" />
@@ -181,11 +149,11 @@ export function EditStoreDialog({ store }: EditStoreDialogProps) {
             />
           </div>
 
-          <div className="md:col-span-2 flex justify-end gap-3 pt-2">
+          <div className="md:col-span-2 flex justify-end gap-3 pt-2 border-t mt-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
+              onClick={() => router.push("/stores")}
               disabled={pending}
             >
               Cancel
@@ -196,7 +164,7 @@ export function EditStoreDialog({ store }: EditStoreDialogProps) {
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CardContent>
+    </Card>
   )
 }

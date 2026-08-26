@@ -68,7 +68,19 @@ export function ToastProvider({
     <ToastContext.Provider value={value}>
       {children}
 
-      <div className="pointer-events-none fixed top-5 left-1/2 z-[9999] flex w-full max-w-md -translate-x-1/2 flex-col gap-3 px-4">
+      {/*
+        Sits below the dashboard top bar rather than over it. That bar is
+        `h-16` (4rem) and sticky at `top-0` with `z-30`, so the old `top-5`
+        put toasts inside it and the `z-[9999]` here painted them over the
+        store switcher and search box. `top-20` clears the bar with a 1rem
+        gap. Kept above z-30 (and above Radix's z-50 overlays) so a toast
+        confirming an action taken in a dialog is still visible.
+
+        `fixed` + `pointer-events-none` on the container means this never
+        affects page layout or swallows clicks; only the cards themselves
+        take pointer events.
+      */}
+      <div className="pointer-events-none fixed top-20 left-1/2 z-[9999] flex w-full max-w-md -translate-x-1/2 flex-col gap-3 px-4">
         {toasts.map((toast) => (
           <ToastCard
             key={toast.id}

@@ -23,9 +23,18 @@ type Pagination = {
 type ProductsClientProps = {
   products: ProductRow[]
   pagination: Pagination
+  /** PRODUCT_CREATE — resolved on the server; the route enforces it too. */
+  canCreate?: boolean
+  /** PRODUCT_UPDATE — hides per-row edit for view-only users. */
+  canEdit?: boolean
 }
 
-export function ProductsClient({ products, pagination }: ProductsClientProps) {
+export function ProductsClient({
+  products,
+  pagination,
+  canCreate = false,
+  canEdit = false,
+}: ProductsClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
 
   React.useEffect(() => {
@@ -40,9 +49,11 @@ export function ProductsClient({ products, pagination }: ProductsClientProps) {
         backHref="/inventory"
         backLabel="Back to Inventory"
         action={
-          <Link href="/inventory/products/new">
-            <Button>Add Product</Button>
-          </Link>
+          canCreate ? (
+            <Link href="/inventory/products/new">
+              <Button>Add Product</Button>
+            </Link>
+          ) : undefined
         }
       />
 
@@ -60,6 +71,7 @@ export function ProductsClient({ products, pagination }: ProductsClientProps) {
       />
 
       <ProductsTable
+        canEdit={canEdit}
         products={products}
         pagination={pagination}
         selectedIds={selectedIds}

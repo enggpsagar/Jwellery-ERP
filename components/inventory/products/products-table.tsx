@@ -33,6 +33,9 @@ type ProductsTableProps = {
   pagination: Pagination
   selectedIds: string[]
   onSelectionChange: (ids: string[]) => void
+  /** PRODUCT_UPDATE. Edit and delete are hidden without it; View stays, so a
+   * view-only user still reaches the full read-only detail page. */
+  canEdit?: boolean
 }
 
 export function ProductsTable({
@@ -40,6 +43,7 @@ export function ProductsTable({
   pagination,
   selectedIds,
   onSelectionChange,
+  canEdit = false,
 }: ProductsTableProps) {
   const allIds = React.useMemo(() => products.map((product) => product.id), [products])
 
@@ -157,18 +161,22 @@ export function ProductsTable({
                         <Eye className="h-4 w-4" />
                       </Link>
 
-                      <Link
-                        href={`/inventory/products/${product.id}/edit`}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-amber-700 hover:bg-amber-50"
-                        title="Edit product"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Link>
+                      {canEdit && (
+                        <>
+                          <Link
+                            href={`/inventory/products/${product.id}/edit`}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-amber-700 hover:bg-amber-50"
+                            title="Edit product"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Link>
 
-                      <DeleteProductButton
-                        productId={product.id}
-                        productName={product.name}
-                      />
+                          <DeleteProductButton
+                            productId={product.id}
+                            productName={product.name}
+                          />
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

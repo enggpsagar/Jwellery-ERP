@@ -1,4 +1,6 @@
 import { getProducts } from "@/lib/actions/inventory/product-actions";
+import { hasPermission } from "@/lib/auth/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 import { ProductsClient } from "@/components/inventory/products/products-client";
 
@@ -25,13 +27,21 @@ export default async function InventoryProductsPage({
   const sortBy = params.sortBy || "createdAt";
   const sortOrder = params.sortOrder || "desc";
 
-  const { products, pagination } = await getProducts({
-    page,
-    pageSize,
-    search,
-    sortBy,
-    sortOrder,
-  });
+  // Resolved here rather than in the client component: session permissions
+  // are on the JWT, and a client-side check would be advisory only. The
+  // create/edit routes enforce the same permissions themselves.
+  const [{ products, pagination }, canCreate, canEdit] = await Promise.all([
+    getProducts({ page, pageSize, search, sortBy, sortOrder }),
+    hasPermission(PERMISSIONS.PRODUCT_CREATE),
+    hasPermission(PERMISSIONS.PRODUCT_UPDATE),
+  ]);
 
-  return <ProductsClient products={products} pagination={pagination} />;
+  return (
+    <ProductsClient
+      products={products}
+      pagination={pagination}
+      canCreate={canCreate}
+      canEdit={canEdit}
+    />
+  );
 }

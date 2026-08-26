@@ -8,12 +8,15 @@ import {
   PurityType,
   ChargeType,
   Prisma,
+  LedgerEntryType,
+  LedgerSourceType,
 } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import type { StockFormState } from "@/lib/inventory/stock-types"
 import { buildExcelExport } from "@/lib/excel-export"
+import { getFinenessMap, toFineWeight } from "@/lib/purity"
 
 function parseNullableString(value: FormDataEntryValue | null) {
   const parsed = String(value || "").trim()
@@ -546,42 +549,75 @@ export async function createInventoryStock(
       }
     }
 
-    await prisma.inventoryStock.create({
-      data: {
-        storeId,
-        productId,
-        stockCode,
-        tagNumber,
-        metalTypeId,
-        purity,
-        status,
-        finish,
-        quantity,
-        isActive,
-        grossWeight: toDecimal(grossWeight),
-        lessWeight: toDecimal(lessWeight),
-        netWeight: toDecimal(netWeight),
-        stoneWeight: toDecimal(stoneWeight),
-        dmoWeight: toDecimal(dmoWeight),
-        wastagePercent: toDecimal(wastagePercent),
-        purchaseRate: toDecimal(purchaseRate),
-        saleRate: toDecimal(saleRate),
-        makingCharge,
-        makingChargeType,
-        stoneCharge,
-        otherCharge: toDecimal(otherCharge),
-        purchaseAmount: toDecimal(purchaseAmount),
-        saleAmount: toDecimal(saleAmount),
-        vendorName,
-        purchaseDate,
-        manufactureDate,
-        location,
-        remarks,
-      },
+    // A manual stock add has no vendor/karigar counterparty (unlike a
+    // Purchase or a karigar receipt, both of which already log this), so
+    // without this entry the gold never appears anywhere on the Ledger.
+    const storeMetal = await prisma.storeMetal.findFirst({
+      where: { id: metalTypeId, storeId },
+      select: { hasPurity: true },
     })
+
+    let metalWeightFine: number | undefined
+    if (storeMetal?.hasPurity && purity && netWeight) {
+      const fineness = await getFinenessMap(storeId)
+      metalWeightFine = toFineWeight(netWeight, purity, fineness)
+    }
+
+    await prisma.$transaction([
+      prisma.inventoryStock.create({
+        data: {
+          storeId,
+          productId,
+          stockCode,
+          tagNumber,
+          metalTypeId,
+          purity,
+          status,
+          finish,
+          quantity,
+          isActive,
+          grossWeight: toDecimal(grossWeight),
+          lessWeight: toDecimal(lessWeight),
+          netWeight: toDecimal(netWeight),
+          stoneWeight: toDecimal(stoneWeight),
+          dmoWeight: toDecimal(dmoWeight),
+          wastagePercent: toDecimal(wastagePercent),
+          purchaseRate: toDecimal(purchaseRate),
+          saleRate: toDecimal(saleRate),
+          makingCharge,
+          makingChargeType,
+          stoneCharge,
+          otherCharge: toDecimal(otherCharge),
+          purchaseAmount: toDecimal(purchaseAmount),
+          saleAmount: toDecimal(saleAmount),
+          vendorName,
+          purchaseDate,
+          manufactureDate,
+          location,
+          remarks,
+        },
+      }),
+      ...(netWeight && netWeight > 0
+        ? [
+            prisma.ledgerEntry.create({
+              data: {
+                storeId,
+                type: LedgerEntryType.DEBIT,
+                sourceType: LedgerSourceType.ADJUSTMENT,
+                metalTypeId,
+                metalWeight: storeMetal?.hasPurity ? undefined : netWeight,
+                metalWeightFine,
+                amount: 0,
+                description: `Stock added — ${stockCode}${tagNumber ? ` (Tag ${tagNumber})` : ""}`,
+              },
+            }),
+          ]
+        : []),
+    ])
 
     revalidatePath("/inventory")
     revalidatePath("/inventory/stock")
+    revalidatePath("/ledger")
 
     return {
       success: true,

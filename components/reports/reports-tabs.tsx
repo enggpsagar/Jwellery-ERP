@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 
+import { ExportMenu } from "@/components/shared/export-menu"
+
 type SalesReport = {
   invoiceCount: number
   totalRevenue: number
@@ -120,20 +122,29 @@ export function ReportsTabs({
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2 border-b">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-              activeTab === tab.key
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b">
+        <div className="flex gap-2">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+                activeTab === tab.key
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="pb-2">
+          <ExportMenu
+            href={`/reports/export?type=${activeTab}`}
+            label={`Export ${TABS.find((tab) => tab.key === activeTab)?.label}`}
+          />
+        </div>
       </div>
 
       {activeTab === "sales" && (

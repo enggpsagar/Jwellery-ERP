@@ -45,6 +45,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { LedgerDetailDrawer } from "@/components/ledger/ledger-detail-drawer"
+import { ExportMenu } from "@/components/shared/export-menu"
 
 function formatCurrency(value: number, withSign = false) {
   const abs = Math.abs(value)
@@ -225,11 +226,14 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
 
       <Card>
         <CardHeader className="gap-4 border-b">
-          <div className="flex flex-col gap-1">
-            <CardTitle>Ledger Entries</CardTitle>
-            <CardDescription>
-              Money movement across all customer and karigar accounts.
-            </CardDescription>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-1">
+              <CardTitle>Ledger Entries</CardTitle>
+              <CardDescription>
+                Money movement across all customer and karigar accounts.
+              </CardDescription>
+            </div>
+            <ExportMenu href="/ledger/export?scope=entries" label="Export" />
           </div>
 
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

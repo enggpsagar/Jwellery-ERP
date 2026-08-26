@@ -240,3 +240,159 @@ export async function getLedgerTotals(): Promise<LedgerTotals> {
     unitTotals,
   }
 }
+
+export type MetalDailyUnitEntry = {
+  unit: BusinessUnit
+  label: string
+  /** Grams for GOLD/SILVER, rupee value for DIAMOND — same convention as getLedgerTotals's weightTotals. */
+  purchasedValue: number
+  purchasedAmount: number
+  soldValue: number
+  soldAmount: number
+  /** Running (purchasedValue - soldValue) since the earliest transaction, as of the end of this day. */
+  closingBalance: number
+}
+
+export type MetalDailyRow = {
+  dateISO: string
+  date: string
+  units: MetalDailyUnitEntry[]
+}
+
+export type MetalDailyLedgerResult = {
+  /** Oldest first, one row per day that had at least one purchase or sale — matches a running balance reading top-to-bottom. */
+  rows: MetalDailyRow[]
+  activeUnits: BusinessUnit[]
+}
+
+/**
+ * Daily Gold/Silver/Diamond purchased-vs-sold breakdown with a running
+ * closing balance per metal, built from PurchaseItem/InvoiceItem/
+ * KachaInvoiceItem (not LedgerEntry — a SALE/PURCHASE LedgerEntry only
+ * carries a money balance-due amount, never metal weight/type, and is only
+ * created when a balance is outstanding, so it can't answer "how much gold
+ * moved today"). Only days with actual purchase/sale activity are
+ * included; a metal absent from the store's configured business units
+ * (Settings → Business Units) is omitted the same way getLedgerTotals
+ * drops it from unitTotals.
+ */
+export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
+  const storeId = await requireStoreScope()
+
+  const activeUnits = (await getActiveBusinessUnits()).filter((unit) => unit !== "MONEY")
+  if (activeUnits.length === 0) {
+    return { rows: [], activeUnits: [] }
+  }
+
+  const [purchaseItems, invoiceItems, kachaInvoiceItems] = await Promise.all([
+    prisma.purchaseItem.findMany({
+      where: { purchase: { storeId } },
+      select: {
+        netWeight: true,
+        lineTotal: true,
+        metalType: { select: { name: true } },
+        purchase: { select: { purchaseDate: true } },
+      },
+    }),
+    prisma.invoiceItem.findMany({
+      where: { invoice: { storeId } },
+      select: {
+        netWeight: true,
+        lineTotal: true,
+        metalType: { select: { name: true } },
+        invoice: { select: { invoiceDate: true } },
+      },
+    }),
+    prisma.kachaInvoiceItem.findMany({
+      where: { kachaInvoice: { storeId } },
+      select: {
+        netWeight: true,
+        lineTotal: true,
+        metalType: { select: { name: true } },
+        kachaInvoice: { select: { invoiceDate: true } },
+      },
+    }),
+  ])
+
+  type DayTotals = Record<string, { purchasedValue: number; purchasedAmount: number; soldValue: number; soldAmount: number }>
+  const byDay = new Map<string, DayTotals>()
+
+  function dayTotals(dateISO: string): DayTotals {
+    let totals = byDay.get(dateISO)
+    if (!totals) {
+      totals = {}
+      byDay.set(dateISO, totals)
+    }
+    return totals
+  }
+
+  function unitTotals(totals: DayTotals, unit: BusinessUnit) {
+    let entry = totals[unit]
+    if (!entry) {
+      entry = { purchasedValue: 0, purchasedAmount: 0, soldValue: 0, soldAmount: 0 }
+      totals[unit] = entry
+    }
+    return entry
+  }
+
+  function valueFor(family: BusinessUnit, netWeight: unknown, amount: number) {
+    return family === "DIAMOND" ? amount : Number(netWeight ?? 0)
+  }
+
+  for (const item of purchaseItems) {
+    const family = classifyMetalName(item.metalType?.name)
+    if (family === "OTHER" || !activeUnits.includes(family)) continue
+
+    const dateISO = item.purchase.purchaseDate.toISOString().slice(0, 10)
+    const amount = Number(item.lineTotal ?? 0)
+    const entry = unitTotals(dayTotals(dateISO), family)
+    entry.purchasedValue += valueFor(family, item.netWeight, amount)
+    entry.purchasedAmount += amount
+  }
+
+  for (const item of [...invoiceItems, ...kachaInvoiceItems]) {
+    const family = classifyMetalName(item.metalType?.name)
+    if (family === "OTHER" || !activeUnits.includes(family)) continue
+
+    const invoiceDate = "invoice" in item ? item.invoice.invoiceDate : item.kachaInvoice.invoiceDate
+    const dateISO = invoiceDate.toISOString().slice(0, 10)
+    const amount = Number(item.lineTotal ?? 0)
+    const entry = unitTotals(dayTotals(dateISO), family)
+    entry.soldValue += valueFor(family, item.netWeight, amount)
+    entry.soldAmount += amount
+  }
+
+  const sortedDays = Array.from(byDay.keys()).sort()
+  const runningBalance: Record<string, number> = {}
+
+  const rows: MetalDailyRow[] = sortedDays.map((dateISO) => {
+    const totals = byDay.get(dateISO)!
+
+    const units: MetalDailyUnitEntry[] = activeUnits
+      .filter((unit) => totals[unit])
+      .map((unit) => {
+        const entry = totals[unit]!
+        const opening = runningBalance[unit] ?? 0
+        const closingBalance = opening + entry.purchasedValue - entry.soldValue
+        runningBalance[unit] = closingBalance
+
+        return {
+          unit,
+          label: BUSINESS_UNIT_LABELS[unit],
+          purchasedValue: entry.purchasedValue,
+          purchasedAmount: entry.purchasedAmount,
+          soldValue: entry.soldValue,
+          soldAmount: entry.soldAmount,
+          closingBalance,
+        }
+      })
+
+    return {
+      dateISO,
+      date: formatDate(new Date(dateISO)),
+      units,
+    }
+  })
+
+  return { rows, activeUnits }
+}

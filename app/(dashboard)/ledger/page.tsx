@@ -1,10 +1,15 @@
-import { getLedgerEntries, getLedgerTotals } from "@/lib/actions/ledger-actions"
-import { LedgerView } from "@/components/ledger/ledger-view"
+import {
+  getLedgerEntries,
+  getLedgerTotals,
+  getMetalDailyLedger,
+} from "@/lib/actions/ledger-actions"
+import { LedgerTabs } from "@/components/ledger/ledger-tabs"
 
 export default async function LedgerPage() {
-  const [entries, totals] = await Promise.all([
+  const [entries, totals, metalDaily] = await Promise.all([
     getLedgerEntries(),
     getLedgerTotals(),
+    getMetalDailyLedger(),
   ])
 
   return (
@@ -21,7 +26,7 @@ export default async function LedgerPage() {
         </div>
       </div>
 
-      <LedgerView entries={entries} totals={totals} />
+      <LedgerTabs entries={entries} totals={totals} metalDaily={metalDaily} />
     </div>
   )
 }

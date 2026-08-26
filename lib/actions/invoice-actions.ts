@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import { sendMail } from "@/lib/mailer";
 import { invoiceEmail } from "@/lib/email-templates";
+import { resolveStoreName } from "@/lib/invite-email";
 import { buildExcelExport } from "@/lib/excel-export";
 
 export type InvoiceLineItemInput = {
@@ -632,7 +633,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
   try {
     const storeId = await requireStoreScope();
 
-    const [invoice, settings] = await Promise.all([
+    const [invoice, storeName] = await Promise.all([
       prisma.invoice.findFirst({
         where: { id: invoiceId, storeId },
         include: {
@@ -640,10 +641,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
           items: true,
         },
       }),
-      prisma.businessSettings.findUnique({
-        where: { storeId },
-        select: { businessName: true },
-      }),
+      resolveStoreName(storeId),
     ]);
 
     if (!invoice) return { success: false, message: "Invoice not found" };
@@ -653,7 +651,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
     }
 
     const { subject, html } = invoiceEmail({
-      storeName: settings?.businessName || "Your Store",
+      storeName,
       invoiceNumber: invoice.invoiceNumber,
       invoiceDate: invoice.invoiceDate.toISOString(),
       customerName: invoice.customer.name,

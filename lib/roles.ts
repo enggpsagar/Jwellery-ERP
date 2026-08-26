@@ -207,6 +207,36 @@ export const MODULE_DEFINITIONS: {
 ];
 
 /**
+ * Whether a user can reach a module's routes. Mirrors the two existing
+ * enforcement points exactly — `middleware.ts`'s route gating and
+ * `app-sidebar.tsx`'s nav filter: only Staff can be restricted, and an
+ * empty `permissions` array means "not customized" and falls back to full
+ * access. Use this for any UI shortcut that jumps straight into a module
+ * (e.g. the top bar's "New Invoice" button) so we never render a link that
+ * middleware would immediately bounce back to /dashboard.
+ */
+export function hasModuleAccess(
+  moduleKey: ModuleKey,
+  user: { role?: string | null; permissions?: string[] | null }
+): boolean {
+  if (user.role === "KARIGAR") return false;
+  if (user.role !== "STAFF") return true;
+
+  const permissions = user.permissions ?? [];
+  if (permissions.length === 0) return true;
+
+  const module = MODULE_DEFINITIONS.find(
+    (definition) => definition.key === moduleKey
+  );
+
+  if (!module) return true;
+
+  return module.permissions.every((permission) =>
+    permissions.includes(permission)
+  );
+}
+
+/**
  * Effective permission list for a user. Admin/Super Admin always get the
  * full role bundle — module customization only applies to Staff, so an
  * Admin can't accidentally lock themselves out. A Staff user with no

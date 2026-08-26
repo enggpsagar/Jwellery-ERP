@@ -46,6 +46,8 @@ type UserFormDialogUser = {
 type KarigarOption = {
   id: string
   name: string
+  mobile: string | null
+  email: string | null
 }
 
 type UserFormDialogProps = {
@@ -73,6 +75,18 @@ export function UserFormDialog({
   const [isPending, startTransition] = useTransition()
   const [role, setRole] = useState<UserRole>(user?.role ?? UserRole.STAFF)
   const [karigarId, setKarigarId] = useState(user?.karigarId ?? "")
+  const [email, setEmail] = useState(user?.email ?? "")
+  const [phone, setPhone] = useState(user?.phone ?? "")
+
+  // Picking a karigar syncs their login to whatever contact info is already
+  // on file for them, so the two can't silently drift apart — the whole
+  // point of them doubling as a login identifier.
+  function handleKarigarSelect(id: string) {
+    setKarigarId(id)
+    const karigar = karigars.find((k) => k.id === id)
+    if (karigar?.mobile) setPhone(karigar.mobile)
+    if (karigar?.email) setEmail(karigar.email)
+  }
 
   // A module is "on" if every one of its permissions is present on the user.
   // A brand-new Staff user defaults to every module enabled (matches the
@@ -178,13 +192,18 @@ export function UserFormDialog({
             <Input
               name="email"
               type="email"
-              defaultValue={user?.email ?? ""}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
             />
           </div>
 
           <div className="space-y-2">
             <Label>Phone</Label>
-            <Input name="phone" defaultValue={user?.phone ?? ""} />
+            <Input
+              name="phone"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+            />
           </div>
 
           <div className="space-y-2">
@@ -233,7 +252,7 @@ export function UserFormDialog({
           {role === UserRole.KARIGAR && (
             <div className="space-y-2">
               <Label>Linked Karigar</Label>
-              <Select value={karigarId} onValueChange={setKarigarId}>
+              <Select value={karigarId} onValueChange={handleKarigarSelect}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select karigar" />
                 </SelectTrigger>
@@ -246,7 +265,9 @@ export function UserFormDialog({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                This karigar will only see their own jobs after logging in.
+                Selecting a karigar fills in Email/Phone from their contact
+                record, so their login always matches it. This karigar will
+                only see their own jobs after logging in.
               </p>
             </div>
           )}

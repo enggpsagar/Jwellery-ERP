@@ -47,7 +47,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       ? prisma.karigar.findMany({
           where: { storeId, isActive: true },
           orderBy: { name: "asc" },
-          select: { id: true, name: true },
+          select: { id: true, name: true, mobile: true, email: true },
         })
       : Promise.resolve([]),
   ]);

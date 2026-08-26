@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StoreLogoUpload } from "@/components/settings/store-logo-upload";
 import { cn } from "@/lib/utils";
 
 type SettingsFormProps = {
@@ -75,6 +76,22 @@ export function SettingsForm({ settings, canEdit }: SettingsFormProps) {
       ) : null}
 
       <fieldset disabled={!canEdit} className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Branding</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <StoreLogoUpload
+            logoUrl={settings.logoUrl}
+            storeName={settings.businessName}
+            canEdit={canEdit}
+          />
+          <p className="mt-3 text-xs text-muted-foreground">
+            Shown in the sidebar next to your store name after you log in. PNG or JPG, up to 2MB.
+          </p>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Business Details</CardTitle>

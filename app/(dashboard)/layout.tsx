@@ -27,20 +27,29 @@ export default async function DashboardLayout({
 
   const isSuperAdmin = session.user.role === UserRole.SUPER_ADMIN;
 
-  const [stores, activeStoreId] = isSuperAdmin
-    ? await Promise.all([
-        prisma.store.findMany({
+  const [stores, activeStoreId, storeBranding] = await Promise.all([
+    isSuperAdmin
+      ? prisma.store.findMany({
           where: { isActive: true },
           orderBy: { name: "asc" },
           select: { id: true, name: true, code: true },
-        }),
-        getEffectiveStoreId(),
-      ])
-    : [[], null];
+        })
+      : Promise.resolve([]),
+    isSuperAdmin ? getEffectiveStoreId() : Promise.resolve(null),
+    !isSuperAdmin && session.user.storeId
+      ? prisma.store.findUnique({
+          where: { id: session.user.storeId },
+          select: { name: true, businessSettings: { select: { logoUrl: true } } },
+        })
+      : Promise.resolve(null),
+  ]);
 
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <AppSidebar
+        storeName={storeBranding?.name}
+        storeLogoUrl={storeBranding?.businessSettings?.logoUrl}
+      />
 
       <SidebarInset>
         <TopBar stores={stores} activeStoreId={activeStoreId} />

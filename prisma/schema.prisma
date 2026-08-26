@@ -694,6 +694,7 @@ model BusinessSettings {
   // Business identity
   businessName String
   legalName    String?
+  logoUrl      String?
 
   // Tax / compliance
   gstNumber String?

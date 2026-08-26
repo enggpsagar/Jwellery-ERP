@@ -12,6 +12,7 @@ export type BusinessSettings = {
   storeId: string;
   businessName: string;
   legalName: string;
+  logoUrl: string;
   gstNumber: string;
   panNumber: string;
   stateCode: string;
@@ -53,6 +54,7 @@ function mapSettings(settings: any): BusinessSettings {
     storeId: settings.storeId,
     businessName: settings.businessName ?? "",
     legalName: settings.legalName ?? "",
+    logoUrl: settings.logoUrl ?? "",
     gstNumber: settings.gstNumber ?? "",
     panNumber: settings.panNumber ?? "",
     stateCode: settings.stateCode ?? "",
@@ -206,5 +208,33 @@ export async function updateBusinessSettings(
   } catch (error) {
     console.error("updateBusinessSettings error:", error);
     return { success: false, message: "Failed to update settings" };
+  }
+}
+
+export async function removeStoreLogo(): Promise<SettingsFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return {
+      success: false,
+      message: "Only the Store Owner can update these settings.",
+    };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    await prisma.businessSettings.updateMany({
+      where: { storeId },
+      data: { logoUrl: null },
+    });
+
+    revalidatePath("/settings");
+    revalidatePath("/dashboard");
+
+    return { success: true, message: "Logo removed" };
+  } catch (error) {
+    console.error("removeStoreLogo error:", error);
+    return { success: false, message: "Failed to remove logo" };
   }
 }

@@ -1,5 +1,6 @@
 import { ProfileCard } from "@/components/profile/profile-card";
 import { ProfileForm } from "@/components/profile/profile-form";
+import { AccessPermissionsCard } from "@/components/profile/access-permissions-card";
 
 export default function ProfilePage() {
   return (
@@ -19,8 +20,9 @@ export default function ProfilePage() {
           <ProfileCard />
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="space-y-6 lg:col-span-2">
           <ProfileForm />
+          <AccessPermissionsCard />
         </div>
       </div>
     </div>

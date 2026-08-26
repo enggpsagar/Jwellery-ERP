@@ -240,6 +240,13 @@ export function ReceiveItemsForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items, fineness],
   )
+  // Basis for Labour Charge's "% of metal value" mode — sum of each item's
+  // own purchaseRate x netWeight, i.e. the same per-line "metal value"
+  // MakingChargeInput already uses, just totalled across the whole job.
+  const totalMetalValue = useMemo(
+    () => items.reduce((sum, item) => sum + (item.purchaseRate || 0) * (item.netWeight || 0), 0),
+    [items],
+  )
 
   const itemsJson = JSON.stringify(
     items.map((item) => ({
@@ -644,14 +651,13 @@ export function ReceiveItemsForm({
 
       <Card>
         <CardContent className="space-y-4">
-          <div className="max-w-xs space-y-2">
-            <Label>Labour Charge</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={labourCharge === 0 ? "" : labourCharge}
-              onChange={(e) => setLabourCharge(Number(e.target.value) || 0)}
+          <div className="max-w-xs">
+            <MakingChargeInput
+              rate={totalMetalValue}
+              netWeight={1}
+              value={labourCharge}
+              onChange={setLabourCharge}
+              label="Labour Charge"
             />
           </div>
 

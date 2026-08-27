@@ -73,16 +73,23 @@ function emptyLineItem(): LineItem {
 
 const initialState: QuotationFormState = { success: false, message: "" }
 
+type LocationOption = {
+  id: string
+  name: string
+}
+
 type QuotationFormProps = {
   customers: CustomerOption[]
   stockItems: StockOption[]
+  locations?: LocationOption[]
 }
 
-export function QuotationForm({ customers, stockItems }: QuotationFormProps) {
+export function QuotationForm({ customers, stockItems, locations = [] }: QuotationFormProps) {
   const router = useRouter()
   const toast = useToast()
 
   const [customerId, setCustomerId] = useState("")
+  const [locationId, setLocationId] = useState("")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
   const [taxAmount, setTaxAmount] = useState(0)
@@ -198,6 +205,27 @@ export function QuotationForm({ customers, stockItems }: QuotationFormProps) {
         <div className="space-y-2">
           <Label>Valid Until</Label>
           <Input type="date" name="validUntil" />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Location</Label>
+          <Select
+            value={locationId || "__none__"}
+            onValueChange={(value) => setLocationId(value === "__none__" ? "" : value)}
+          >
+            <SelectTrigger className="h-11 w-full">
+              <SelectValue placeholder="Select location" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">None</SelectItem>
+              {locations.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <input type="hidden" name="locationId" value={locationId} />
         </div>
       </div>
 

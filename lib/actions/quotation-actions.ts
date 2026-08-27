@@ -15,6 +15,12 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import {
+  getLocationScope,
+  locationWhere,
+  isLocationAllowed,
+  type LocationScope,
+} from "@/lib/location-scope";
 import { buildExcelExport } from "@/lib/excel-export";
 import type {
   DataTableExportParams,
@@ -137,12 +143,14 @@ export type QuotationSortBy = "quotationDate" | "quotationNumber" | "totalAmount
 function buildQuotationsWhere(
   storeId: string,
   params: { search?: string; status?: string | "ALL" },
+  scope: LocationScope,
 ) {
   const search = String(params.search || "").trim();
   const status = params.status && params.status !== "ALL" ? params.status : undefined;
 
   return {
     storeId,
+    ...locationWhere(scope),
     ...(status ? { status } : {}),
     ...(search
       ? {
@@ -178,7 +186,8 @@ export async function getQuotations(params: GetQuotationsParams = {}) {
   const sortOrder = params.sortOrder || "desc";
 
   const storeId = await requireStoreScope();
-  const where = buildQuotationsWhere(storeId, params);
+  const scope = await getLocationScope();
+  const where = buildQuotationsWhere(storeId, params, scope);
 
   const [totalCount, quotations] = await Promise.all([
     prisma.quotation.count({ where }),
@@ -227,13 +236,14 @@ export async function exportQuotationsToExcel(
 ): Promise<DataTableExportResult> {
   try {
     const storeId = await requireStoreScope();
+    const scope = await getLocationScope();
     const sortBy = toQuotationSortBy(params.sortBy);
     const sortOrder = params.sortOrder || "desc";
 
     const where =
       params.selectedIds && params.selectedIds.length > 0
-        ? { id: { in: params.selectedIds }, storeId }
-        : buildQuotationsWhere(storeId, { search: params.search, status: params.status });
+        ? { id: { in: params.selectedIds }, storeId, ...locationWhere(scope) }
+        : buildQuotationsWhere(storeId, { search: params.search, status: params.status }, scope);
 
     const quotations = await prisma.quotation.findMany({
       where,
@@ -344,6 +354,7 @@ export async function createQuotation(
 ): Promise<QuotationFormState> {
   try {
     const customerId = String(formData.get("customerId") || "");
+    const locationId = String(formData.get("locationId") || "").trim() || null;
     const itemsRaw = String(formData.get("itemsJson") || "[]");
 
     if (!customerId) {
@@ -398,6 +409,21 @@ export async function createQuotation(
       : [];
     const validStockIds = new Set(validStock.map((s) => s.id));
 
+    if (locationId) {
+      const location = await prisma.storeLocation.findFirst({
+        where: { id: locationId, storeId },
+        select: { id: true },
+      });
+      if (!location) {
+        return { success: false, message: "Selected location is invalid" };
+      }
+
+      const scope = await getLocationScope();
+      if (!isLocationAllowed(scope, locationId)) {
+        return { success: false, message: "You don't have access to file a quotation against this location" };
+      }
+    }
+
     const quotationNumber = await generateQuotationNumber(storeId);
 
     const quotation = await prisma.quotation.create({
@@ -415,6 +441,7 @@ export async function createQuotation(
         taxAmount,
         totalAmount,
         notes,
+        locationId: locationId ?? undefined,
         items: {
           create: items.map((item) => ({
             itemName: item.itemName,
@@ -544,6 +571,7 @@ export async function convertQuotationToInvoice(
           paidAmount,
           balanceAmount,
           notes,
+          locationId: quotation.locationId ?? undefined,
           items: {
             create: quotation.items.map((item) => ({
               itemName: item.itemName,
@@ -593,6 +621,7 @@ export async function convertQuotationToInvoice(
             invoiceId: created.id,
             amount: balanceAmount,
             description: `Invoice ${invoiceNumber} balance due (from Quotation ${quotation.quotationNumber})`,
+            locationId: quotation.locationId ?? undefined,
           },
         });
       }

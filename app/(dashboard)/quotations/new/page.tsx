@@ -2,14 +2,16 @@ import {
   getQuotationFormCustomers,
   getQuotationFormStockItems,
 } from "@/lib/actions/quotation-actions"
+import { getStoreLocations } from "@/lib/actions/store-location-actions"
 
 import { QuotationForm } from "@/components/quotations/quotation-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 export default async function NewQuotationPage() {
-  const [customers, stockItems] = await Promise.all([
+  const [customers, stockItems, locations] = await Promise.all([
     getQuotationFormCustomers(),
     getQuotationFormStockItems(),
+    getStoreLocations(),
   ])
 
   return (
@@ -21,7 +23,7 @@ export default async function NewQuotationPage() {
         backLabel="Back to Quotations"
       />
 
-      <QuotationForm customers={customers} stockItems={stockItems} />
+      <QuotationForm customers={customers} stockItems={stockItems} locations={locations} />
     </main>
   )
 }

@@ -60,6 +60,7 @@ model StoreLocation {
   kachaInvoices   KachaInvoice[]
   karigarJobs     KarigarJob[]
   ledgerEntries   LedgerEntry[]
+  quotations      Quotation[]
   userAccess      UserLocationAccess[]
 
   @@unique([storeId, name])
@@ -685,11 +686,14 @@ model Quotation {
   customer        Customer        @relation(fields: [customerId], references: [id])
   convertedTo     Invoice?        @relation("QuotationConvertedToInvoice", fields: [convertedToId], references: [id])
   items           QuotationItem[]
+  locationId      String?
+  location        StoreLocation?  @relation(fields: [locationId], references: [id])
 
   @@unique([storeId, quotationNumber])
   @@index([customerId])
   @@index([quotationDate])
   @@index([storeId])
+  @@index([locationId])
 }
 
 model QuotationItem {

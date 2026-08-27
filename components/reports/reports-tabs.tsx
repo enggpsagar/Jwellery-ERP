@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+
 import { useState } from "react"
 
 import { ExportMenu } from "@/components/shared/export-menu"
@@ -176,7 +178,14 @@ export function ReportsTabs({
                 ) : (
                   sales.invoices.map((invoice) => (
                     <tr key={invoice.id} className="border-b last:border-0">
-                      <td className="px-4 py-3 font-medium">{invoice.invoiceNumber}</td>
+                      <td className="px-4 py-3 font-medium">
+                        <Link
+                          href={`/billing/${invoice.id}?from=${encodeURIComponent("/reports")}`}
+                          className="text-primary underline-offset-4 hover:underline"
+                        >
+                          {invoice.invoiceNumber}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3">
                         {new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}
                       </td>
@@ -289,7 +298,14 @@ export function ReportsTabs({
                 ) : (
                   customerDues.customers.map((customer) => (
                     <tr key={customer.id} className="border-b last:border-0">
-                      <td className="px-4 py-3 font-medium">{customer.name}</td>
+                      <td className="px-4 py-3 font-medium">
+                        <Link
+                          href={`/customers/${customer.id}?from=${encodeURIComponent("/reports")}`}
+                          className="text-primary underline-offset-4 hover:underline"
+                        >
+                          {customer.name}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3">{customer.phone ?? "-"}</td>
                       <td className="px-4 py-3">{customer.invoiceCount}</td>
                       <td className="px-4 py-3 text-red-600 font-medium">

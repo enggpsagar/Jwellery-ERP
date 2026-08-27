@@ -4,6 +4,7 @@ import { Pencil } from "lucide-react"
 
 import { getProductById } from "@/lib/actions/inventory/product-actions"
 import { hasPermission } from "@/lib/auth/auth"
+import { resolveBackLink } from "@/lib/safe-return-to"
 import { PERMISSIONS } from "@/lib/permissions"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 
 type Props = {
   params: Promise<{ id: string }>
+  searchParams?: Promise<{ from?: string }>
 }
 
 /**
@@ -75,8 +77,15 @@ function formatDate(value: string) {
   }).format(new Date(value))
 }
 
-export default async function ProductDetailsPage({ params }: Props) {
+export default async function ProductDetailsPage({ params, searchParams }: Props) {
   const { id } = await params
+
+  // Products are opened from the catalogue and from a stock row, so "back"
+  // follows whoever linked here rather than always the products list.
+  const backTo = resolveBackLink((await searchParams)?.from, {
+    href: "/inventory/products",
+    label: "Back to Products",
+  })
 
   const [product, canEdit] = await Promise.all([
     getProductById(id),
@@ -90,8 +99,8 @@ export default async function ProductDetailsPage({ params }: Props) {
       <PageBackHeader
         title={product.name}
         description={`Product Code: ${product.productCode}`}
-        backHref="/inventory/products"
-        backLabel="Back to Products"
+        backHref={backTo.href}
+        backLabel={backTo.label}
         action={
           // Editing is gated on PRODUCT_UPDATE. Without it the page still
           // shows everything — it just offers no way through to the form,

@@ -2,7 +2,7 @@
 import { notFound } from "next/navigation"
 
 import { getCustomerById } from "@/lib/actions/customer-actions"
-import { safeReturnTo } from "@/lib/safe-return-to"
+import { resolveBackLink } from "@/lib/safe-return-to"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { getStates } from "@/lib/actions/location-actions"
 import { CustomerRowActions } from "@/components/customers/customer-row-actions"
@@ -13,30 +13,6 @@ type CustomerDetailsPageProps = {
     id: string
   }>
   searchParams?: Promise<{ from?: string }>
-}
-
-/**
- * Where "back" goes. Customers are reached from several places — the
- * Customers list, an invoice, a kacha slip — and landing here used to be a
- * dead end with no way back at all. Callers pass `?from=<path>`.
- *
- * The label is derived from a fixed set of known paths rather than taken
- * from the query string, so nothing a caller puts in the URL can be
- * rendered as text. `safeReturnTo` separately keeps the href same-origin.
- */
-function resolveBackTo(from: string | undefined) {
-  const href = safeReturnTo(from)
-
-  if (!href) return { href: "/customers", label: "Back to Customers" }
-
-  if (href === "/billing") return { href, label: "Back to Invoices" }
-  if (href === "/billing/kacha") return { href, label: "Back to Kacha Slips" }
-  if (href.startsWith("/billing/kacha/")) return { href, label: "Back to Kacha Slip" }
-  if (href.startsWith("/billing/")) return { href, label: "Back to Invoice" }
-  if (href.startsWith("/quotations")) return { href, label: "Back to Quotation" }
-  if (href.startsWith("/ledger")) return { href, label: "Back to Ledger" }
-
-  return { href, label: "Back" }
 }
 
 function DetailItem({
@@ -63,7 +39,10 @@ export default async function CustomerDetailsPage({
   searchParams,
 }: CustomerDetailsPageProps) {
   const { id } = await params
-  const backTo = resolveBackTo((await searchParams)?.from)
+  const backTo = resolveBackLink((await searchParams)?.from, {
+    href: "/customers",
+    label: "Back to Customers",
+  })
 
   const [customer, states] = await Promise.all([
     getCustomerById(id),

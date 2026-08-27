@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { ArrowLeftCircle } from "lucide-react"
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
+import { resolveBackLink } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog"
@@ -12,10 +13,18 @@ import { PageBackHeader } from "@/components/shared/page-back-header"
 
 type Props = {
   params: Promise<{ id: string }>
+  searchParams?: Promise<{ from?: string }>
 }
 
-export default async function InvoiceDetailPage({ params }: Props) {
+export default async function InvoiceDetailPage({ params, searchParams }: Props) {
   const { id } = await params
+
+  // Invoices are opened from the billing list, the ledger and Reports, so
+  // "back" follows whoever linked here.
+  const backTo = resolveBackLink((await searchParams)?.from, {
+    href: "/billing",
+    label: "Back to Billing",
+  })
   const [invoice, settings] = await Promise.all([
     getInvoiceById(id),
     getBusinessSettings(),
@@ -30,8 +39,8 @@ export default async function InvoiceDetailPage({ params }: Props) {
       <PageBackHeader
         title={invoice.invoiceNumber}
         description={invoice.customer?.name ?? ""}
-        backHref="/billing"
-        backLabel="Back to Billing"
+        backHref={backTo.href}
+        backLabel={backTo.label}
         action={
           <div className="flex items-center gap-2">
             <ShareWhatsAppButton

@@ -22,19 +22,37 @@ const STATUS_STYLES: Record<InventoryStockStatus, string> = {
 
 type StockStatusBadgeProps = {
   status: InventoryStockStatus;
+  /**
+   * Pieces remaining. Optional so existing callers keep working, but pass it
+   * wherever it is known: a row can sit at IN_STOCK holding nothing — a
+   * stock entry opened from Add Product defaults to a quantity of 0 — and
+   * "In Stock" against zero pieces is the wrong answer.
+   */
+  quantity?: number;
   className?: string;
 };
 
-export function StockStatusBadge({ status, className }: StockStatusBadgeProps) {
+export function StockStatusBadge({
+  status,
+  quantity,
+  className,
+}: StockStatusBadgeProps) {
+  // Only IN_STOCK/RESERVED claim availability, so only those can contradict
+  // a zero quantity. SOLD, DAMAGED and the rest already say why the piece
+  // isn't there and should keep saying it.
+  const claimsAvailable =
+    status === "IN_STOCK" || status === "RESERVED";
+  const isEmpty = claimsAvailable && quantity !== undefined && quantity <= 0;
+
   return (
     <span
       className={cn(
         "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
-        STATUS_STYLES[status],
+        isEmpty ? "bg-orange-100 text-orange-700" : STATUS_STYLES[status],
         className,
       )}
     >
-      {STATUS_LABELS[status]}
+      {isEmpty ? "Out of Stock" : STATUS_LABELS[status]}
     </span>
   );
 }

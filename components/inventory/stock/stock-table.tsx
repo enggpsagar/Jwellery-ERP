@@ -159,10 +159,21 @@ export function StockTable({
                   </td>
 
                   <td className="px-4 py-3">
-                    <div className="font-medium">{item.product?.name ?? "-"}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {item.product?.productCode}
-                    </div>
+                    {item.product ? (
+                      <Link
+                        href={`/inventory/products/${item.product.id}?from=${encodeURIComponent("/inventory/stock")}`}
+                        className="hover:underline"
+                      >
+                        <div className="font-medium text-primary">
+                          {item.product.name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {item.product.productCode}
+                        </div>
+                      </Link>
+                    ) : (
+                      <div className="font-medium">-</div>
+                    )}
                   </td>
 
                   <td className="px-4 py-3">{item.metalType?.name ?? "-"}</td>
@@ -176,6 +187,7 @@ export function StockTable({
                   <td className="px-4 py-3">
                     <StockStatusBadge
                       status={item.status as InventoryStockStatus}
+                      quantity={item.quantity}
                     />
                   </td>
 

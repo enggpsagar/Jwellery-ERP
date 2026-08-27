@@ -76,6 +76,10 @@ const mainNav: NavItem[] = [
     title: "Inventory",
     href: "/inventory",
     icon: Package,
+    items: [
+      { title: "Products", href: "/inventory/products" },
+      { title: "Stock", href: "/inventory/stock" },
+    ],
   },
   {
     title: "Purchases",

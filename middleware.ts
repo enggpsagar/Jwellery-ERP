@@ -19,6 +19,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Set by the jwt callback when a re-read finds the account deleted or
+  // deactivated — someone who left a store keeps a valid-looking token until
+  // it expires, so the flag is what actually ends their access.
+  if (token.disabled === true) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
   const role = token.role as string | undefined;
 
   if (pathname.startsWith("/stores") && role !== "SUPER_ADMIN") {

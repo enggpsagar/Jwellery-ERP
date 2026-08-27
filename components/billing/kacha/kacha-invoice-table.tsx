@@ -57,7 +57,18 @@ export function KachaInvoiceTable({ kachaInvoices }: KachaInvoiceTableProps) {
                 <td className="px-4 py-3">
                   {new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN")}
                 </td>
-                <td className="px-4 py-3">{kachaInvoice.customer?.name ?? "-"}</td>
+                <td className="px-4 py-3">
+                  {kachaInvoice.customer ? (
+                    <Link
+                      href={`/customers/${kachaInvoice.customer.id}`}
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      {kachaInvoice.customer.name}
+                    </Link>
+                  ) : (
+                    "-"
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <InvoiceStatusBadge status={kachaInvoice.status as any} />
                 </td>

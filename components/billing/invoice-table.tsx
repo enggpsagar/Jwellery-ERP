@@ -57,7 +57,18 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                 <td className="px-4 py-3">
                   {new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}
                 </td>
-                <td className="px-4 py-3">{invoice.customer?.name ?? "-"}</td>
+                <td className="px-4 py-3">
+                  {invoice.customer ? (
+                    <Link
+                      href={`/customers/${invoice.customer.id}`}
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      {invoice.customer.name}
+                    </Link>
+                  ) : (
+                    "-"
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   {invoice.convertedFromKacha ? (
                     <Link

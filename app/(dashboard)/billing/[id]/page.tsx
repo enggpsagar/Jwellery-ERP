@@ -83,9 +83,20 @@ export default async function InvoiceDetailPage({ params }: Props) {
 
           <div>
             <p className="text-sm text-muted-foreground">Customer</p>
-            <p className="font-medium">
-              {invoice.customer?.name} {invoice.customer?.phone ? `(${invoice.customer.phone})` : ""}
-            </p>
+            {invoice.customer ? (
+              <Link
+                href={`/customers/${invoice.customer.id}`}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {invoice.customer.name}
+                {invoice.customer.phone ? ` (${invoice.customer.phone})` : ""}
+              </Link>
+            ) : (
+              // An invoice always has a customer in practice, but the mapped
+              // shape allows null — render plain text rather than a link to
+              // /customers/undefined.
+              <p className="font-medium">—</p>
+            )}
           </div>
         </div>
       </div>

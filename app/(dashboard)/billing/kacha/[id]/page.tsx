@@ -78,10 +78,19 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
 
           <div>
             <p className="text-sm text-muted-foreground">Customer</p>
-            <p className="font-medium">
-              {kachaInvoice.customer?.name}{" "}
-              {kachaInvoice.customer?.phone ? `(${kachaInvoice.customer.phone})` : ""}
-            </p>
+            {kachaInvoice.customer ? (
+              <Link
+                href={`/customers/${kachaInvoice.customer.id}`}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {kachaInvoice.customer.name}
+                {kachaInvoice.customer.phone
+                  ? ` (${kachaInvoice.customer.phone})`
+                  : ""}
+              </Link>
+            ) : (
+              <p className="font-medium">—</p>
+            )}
           </div>
         </div>
       </div>

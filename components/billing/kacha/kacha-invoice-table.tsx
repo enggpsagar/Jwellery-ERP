@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { Eye, ArrowRightCircle } from "lucide-react"
 
@@ -18,9 +19,56 @@ type KachaInvoiceRow = {
 
 type KachaInvoiceTableProps = {
   kachaInvoices: KachaInvoiceRow[]
+  selectedIds?: string[]
+  onSelectionChange?: (ids: string[]) => void
 }
 
-export function KachaInvoiceTable({ kachaInvoices }: KachaInvoiceTableProps) {
+export function KachaInvoiceTable({
+  kachaInvoices,
+  selectedIds = [],
+  onSelectionChange,
+}: KachaInvoiceTableProps) {
+  const allIds = React.useMemo(
+    () => kachaInvoices.map((invoice) => invoice.id),
+    [kachaInvoices],
+  )
+
+  const allSelected =
+    allIds.length > 0 && allIds.every((id) => selectedIds.includes(id))
+
+  const someSelected =
+    allIds.some((id) => selectedIds.includes(id)) && !allSelected
+
+  const headerCheckboxRef = React.useRef<HTMLInputElement | null>(null)
+
+  // "Some but not all" has no checked state of its own — it has to be set on
+  // the DOM node, so the header box reads as partial rather than empty.
+  React.useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = someSelected
+    }
+  }, [someSelected])
+
+  // Merge/subtract rather than replace: selection survives paging, so a user
+  // can gather slips across pages before exporting or deleting.
+  const toggleAll = (checked: boolean) => {
+    if (!onSelectionChange) return
+    onSelectionChange(
+      checked
+        ? Array.from(new Set([...selectedIds, ...allIds]))
+        : selectedIds.filter((id) => !allIds.includes(id)),
+    )
+  }
+
+  const toggleOne = (id: string, checked: boolean) => {
+    if (!onSelectionChange) return
+    onSelectionChange(
+      checked
+        ? Array.from(new Set([...selectedIds, id]))
+        : selectedIds.filter((selectedId) => selectedId !== id),
+    )
+  }
+
   if (!kachaInvoices.length) {
     return (
       <div className="rounded-xl border bg-white p-6 text-sm text-muted-foreground">
@@ -35,6 +83,16 @@ export function KachaInvoiceTable({ kachaInvoices }: KachaInvoiceTableProps) {
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40">
             <tr className="border-b">
+              <th className="w-12 px-4 py-3">
+                <input
+                  ref={headerCheckboxRef}
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={(event) => toggleAll(event.target.checked)}
+                  aria-label="Select all kacha slips on this page"
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+              </th>
               <th className="px-4 py-3 text-left font-medium">Slip #</th>
               <th className="px-4 py-3 text-left font-medium">Date</th>
               <th className="px-4 py-3 text-left font-medium">Customer</th>
@@ -49,6 +107,17 @@ export function KachaInvoiceTable({ kachaInvoices }: KachaInvoiceTableProps) {
           <tbody>
             {kachaInvoices.map((kachaInvoice) => (
               <tr key={kachaInvoice.id} className="border-b last:border-0">
+                <td className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(kachaInvoice.id)}
+                    onChange={(event) =>
+                      toggleOne(kachaInvoice.id, event.target.checked)
+                    }
+                    aria-label={`Select slip ${kachaInvoice.slipNumber}`}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                </td>
                 <td className="px-4 py-3 font-medium">
                   <Link href={`/billing/kacha/${kachaInvoice.id}`} className="hover:underline">
                     {kachaInvoice.slipNumber}

@@ -28,7 +28,7 @@ import {
 import {
   buildExcelExport,
   buildMultiSheetExcelExport,
-  parseExcelUpload,
+  parseExcelWorkbook,
 } from "@/lib/excel-export";
 
 export type KachaInvoiceLineItemInput = {
@@ -807,6 +807,92 @@ function cell(row: Record<string, unknown>, key: string): string {
 }
 
 /**
+ * Parses a date from a spreadsheet cell.
+ *
+ * `new Date("01/02/2026")` is read as 2 January by JS, but the backup writes
+ * dates with `toLocaleDateString("en-IN")`, which emits 1 February — so a
+ * plain `new Date()` silently shifts day and month on every re-import, and on
+ * any hand-filled sheet written the Indian way. Slash/dash/dot separated
+ * values are therefore read day-first, and anything else (ISO, a real Excel
+ * date cell) falls through to the built-in parser.
+ */
+function parseSheetDate(raw: string): Date | null {
+  if (!raw) return null;
+
+  const dayFirst = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/.exec(raw);
+
+  if (dayFirst) {
+    const [, d, m, y] = dayFirst;
+    const day = Number(d);
+    const month = Number(m);
+
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      // Midday avoids a timezone shift pushing the date onto the day before.
+      const parsed = new Date(Number(y), month - 1, day, 12);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+  }
+
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * Sheet names written by the delete-all backup. A workbook carrying both is
+ * treated as a backup to restore rather than a hand-filled template.
+ */
+const BACKUP_SLIPS_SHEET = "Kacha Slips";
+const BACKUP_ITEMS_SHEET = "Kacha Slip Items";
+
+/**
+ * Flattens a backup workbook into the same one-row-per-line-item shape the
+ * import template uses, so both formats share one validation and creation
+ * path.
+ *
+ * Without this the backup could not be restored at all: the parser reads
+ * only the first sheet, so it saw the slip headers and never the items, and
+ * the column names differ on both sheets ("Slip #" vs "Slip Ref", "Customer"
+ * vs "Customer Name", "Item" vs "Item Name").
+ */
+function flattenBackupWorkbook(
+  slips: Record<string, unknown>[],
+  items: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const slipByNumber = new Map<string, Record<string, unknown>>();
+  for (const slip of slips) {
+    const key = cell(slip, "Slip #");
+    if (key) slipByNumber.set(key, slip);
+  }
+
+  return items.map((item) => {
+    const slipNumber = cell(item, "Slip #");
+    const slip = slipByNumber.get(slipNumber) ?? {};
+
+    return {
+      // Grouping key: rows of the same original slip rebuild as one slip.
+      "Slip Ref": slipNumber,
+      "Customer Phone": cell(slip, "Customer Phone"),
+      "Customer Name": cell(slip, "Customer"),
+      Date: cell(slip, "Date"),
+      "Item Name": cell(item, "Item"),
+      Metal: cell(item, "Metal"),
+      Purity: cell(item, "Purity"),
+      Quantity: cell(item, "Quantity"),
+      "Gross Weight": cell(item, "Gross Weight"),
+      "Net Weight": cell(item, "Net Weight"),
+      Rate: cell(item, "Rate"),
+      "Making Charge": cell(item, "Making Charge"),
+      "Making Charge Type": cell(item, "Making Charge Type"),
+      "Stone Charge": cell(item, "Stone Charge"),
+      // Slip-level totals live on the other sheet.
+      Discount: cell(slip, "Discount"),
+      "Paid Amount": cell(slip, "Paid"),
+      Notes: cell(slip, "Notes"),
+    };
+  });
+}
+
+/**
  * Bulk-creates Kacha slips from an uploaded spreadsheet.
  *
  * One row is one line item; rows sharing a **Slip Ref** are collapsed into a
@@ -841,10 +927,30 @@ export async function importKachaInvoicesFromExcel(
       return { success: false, message: "Choose a .xlsx or .csv file to import." };
     }
 
-    const rows = parseExcelUpload(await file.arrayBuffer());
+    const sheets = parseExcelWorkbook(await file.arrayBuffer());
+    const sheetNames = Object.keys(sheets);
+
+    // A backup produced by "Delete all" carries both sheets; anything else is
+    // treated as the flat template. Restoring a backup and filling in the
+    // template then run through identical validation and creation.
+    const isBackup =
+      sheetNames.includes(BACKUP_SLIPS_SHEET) &&
+      sheetNames.includes(BACKUP_ITEMS_SHEET);
+
+    const rows = isBackup
+      ? flattenBackupWorkbook(
+          sheets[BACKUP_SLIPS_SHEET] ?? [],
+          sheets[BACKUP_ITEMS_SHEET] ?? [],
+        )
+      : (sheets[sheetNames[0]] ?? []);
 
     if (!rows.length) {
-      return { success: false, message: "That file has no rows to import." };
+      return {
+        success: false,
+        message: isBackup
+          ? "That backup has no line items to restore."
+          : "That file has no rows to import.",
+      };
     }
 
     // Group rows into slips. A blank Slip Ref means "this row is its own
@@ -903,12 +1009,14 @@ export async function importKachaInvoicesFromExcel(
       }
 
       const dateRaw = cell(head.row, "Date");
-      const invoiceDate = dateRaw ? new Date(dateRaw) : new Date();
+      const parsedDate = parseSheetDate(dateRaw);
 
-      if (dateRaw && Number.isNaN(invoiceDate.getTime())) {
+      if (dateRaw && !parsedDate) {
         errors.push(`${label}: "${dateRaw}" is not a valid date.`);
         continue;
       }
+
+      const invoiceDate = parsedDate ?? new Date();
 
       const items: KachaInvoiceLineItemInput[] = [];
 
@@ -1061,7 +1169,7 @@ export type DeleteAllKachaResult = {
 };
 
 /** Counts shown in the confirmation dialog so the click is an informed one. */
-export async function getKachaDeleteAllSummary(): Promise<{
+export async function getKachaDeleteAllSummary(selectedIds?: string[]): Promise<{
   total: number;
   converted: number;
   withPayments: number;
@@ -1069,10 +1177,14 @@ export async function getKachaDeleteAllSummary(): Promise<{
 }> {
   const storeId = await requireStoreScope();
 
+  // An explicit selection narrows every count; without one this describes
+  // the whole store, as before.
+  const scope = selectedIds?.length ? { id: { in: selectedIds } } : {};
+
   const [total, converted, withPayments, settings] = await Promise.all([
-    prisma.kachaInvoice.count({ where: { storeId } }),
-    prisma.kachaInvoice.count({ where: { storeId, convertedToId: { not: null } } }),
-    prisma.kachaInvoice.count({ where: { storeId, paidAmount: { gt: 0 } } }),
+    prisma.kachaInvoice.count({ where: { storeId, ...scope } }),
+    prisma.kachaInvoice.count({ where: { storeId, ...scope, convertedToId: { not: null } } }),
+    prisma.kachaInvoice.count({ where: { storeId, ...scope, paidAmount: { gt: 0 } } }),
     prisma.businessSettings.findUnique({
       where: { storeId },
       select: { backupEmail: true },
@@ -1107,7 +1219,9 @@ export async function getKachaDeleteAllSummary(): Promise<{
  * backup is what makes that recoverable. The confirmation dialog surfaces
  * those counts via `getKachaDeleteAllSummary()` first.
  */
-export async function deleteAllKachaInvoices(): Promise<DeleteAllKachaResult> {
+export async function deleteAllKachaInvoices(
+  selectedIds?: string[],
+): Promise<DeleteAllKachaResult> {
   try {
     await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
   } catch {
@@ -1136,8 +1250,14 @@ export async function deleteAllKachaInvoices(): Promise<DeleteAllKachaResult> {
       };
     }
 
+    // Backing up and deleting the same set: when specific slips are ticked,
+    // only those are captured and only those go. The backup is still built
+    // from this exact list, so the guarantee that nothing is deleted without
+    // a copy of it holds either way.
+    const selection = selectedIds?.length ? { id: { in: selectedIds } } : {};
+
     const kachaInvoices = await prisma.kachaInvoice.findMany({
-      where: { storeId },
+      where: { storeId, ...selection },
       orderBy: { invoiceDate: "desc" },
       include: {
         customer: { select: { name: true, phone: true, gstin: true } },
@@ -1147,7 +1267,12 @@ export async function deleteAllKachaInvoices(): Promise<DeleteAllKachaResult> {
     });
 
     if (!kachaInvoices.length) {
-      return { success: false, message: "There are no Kacha slips to delete." };
+      return {
+        success: false,
+        message: selectedIds?.length
+          ? "None of the selected slips could be found."
+          : "There are no Kacha slips to delete.",
+      };
     }
 
     const slipRows = kachaInvoices.map((kachaInvoice, index) => ({
@@ -1203,7 +1328,7 @@ export async function deleteAllKachaInvoices(): Promise<DeleteAllKachaResult> {
     const { subject, html, text } = dataBackupEmail({
       storeName,
       appName: APP_NAME,
-      recordLabel: "Kacha slips",
+      recordLabel: selectedIds?.length ? "selected Kacha slips" : "Kacha slips",
       recordCount: kachaInvoices.length,
       fileName,
       triggeredBy: user.name || user.email || "Unknown user",

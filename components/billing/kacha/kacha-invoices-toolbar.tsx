@@ -17,7 +17,12 @@ const STATUS_OPTIONS = [
 ]
 
 /** Search+sort+status-filter+export toolbar for the Kacha Slips list. */
-export function KachaInvoicesToolbar() {
+export function KachaInvoicesToolbar({
+  selectedIds,
+}: {
+  /** When rows are ticked, export covers only those. */
+  selectedIds?: string[]
+}) {
   return (
     <DataTableToolbar
       searchPlaceholder="Search by slip number, customer..."
@@ -25,6 +30,7 @@ export function KachaInvoicesToolbar() {
       defaultSortBy="invoiceDate"
       statusOptions={STATUS_OPTIONS}
       entityLabel="kacha slips"
+      selectedIds={selectedIds}
       exportAction={exportKachaInvoicesToExcel}
     />
   )

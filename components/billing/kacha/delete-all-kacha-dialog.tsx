@@ -33,7 +33,12 @@ const CONFIRM_WORD = "DELETE"
  * to be destroyed. Converted and paid slips are called out separately
  * because, unlike the per-slip delete, this operation does not spare them.
  */
-export function DeleteAllKachaDialog() {
+export function DeleteAllKachaDialog({
+  selectedIds = [],
+}: {
+  /** Ticked rows. Empty means the whole store, the original behaviour. */
+  selectedIds?: string[]
+}) {
   const [open, setOpen] = useState(false)
   const [summary, setSummary] = useState<Summary | null>(null)
   const [confirmText, setConfirmText] = useState("")
@@ -47,13 +52,13 @@ export function DeleteAllKachaDialog() {
 
     if (next) {
       setSummary(null)
-      startLoad(async () => setSummary(await getKachaDeleteAllSummary()))
+      startLoad(async () => setSummary(await getKachaDeleteAllSummary(selectedIds)))
     }
   }
 
   const handleDelete = () => {
     startDelete(async () => {
-      const result = await deleteAllKachaInvoices()
+      const result = await deleteAllKachaInvoices(selectedIds)
 
       if (result.success) {
         toast.success(result.message)
@@ -76,13 +81,17 @@ export function DeleteAllKachaDialog() {
     <>
       <Button variant="destructive" onClick={() => handleOpenChange(true)}>
         <Trash2 className="mr-1 h-4 w-4" />
-        Delete all
+        {selectedIds.length ? `Delete ${selectedIds.length} selected` : "Delete all"}
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Delete all Kacha slips</DialogTitle>
+            <DialogTitle>
+              {selectedIds.length
+                ? `Delete ${selectedIds.length} selected Kacha slip${selectedIds.length === 1 ? "" : "s"}`
+                : "Delete all Kacha slips"}
+            </DialogTitle>
             <DialogDescription>
               A backup is emailed first. If that email does not send, nothing
               is deleted.

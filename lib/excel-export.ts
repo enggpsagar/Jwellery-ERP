@@ -89,6 +89,27 @@ export function buildMultiSheetExcelExport(
   return { fileName, fileBase64: Buffer.from(buffer).toString("base64") };
 }
 
+/**
+ * Reads every sheet of an uploaded workbook, keyed by sheet name. Needed to
+ * re-import a backup, which splits parent rows and line items across two
+ * sheets — reading only the first would silently drop every line item.
+ */
+export function parseExcelWorkbook(
+  fileBuffer: ArrayBuffer,
+): Record<string, Record<string, unknown>[]> {
+  const workbook = XLSX.read(fileBuffer, { type: "array", cellDates: true });
+  const sheets: Record<string, Record<string, unknown>[]> = {};
+
+  for (const name of workbook.SheetNames) {
+    sheets[name] = XLSX.utils.sheet_to_json(workbook.Sheets[name], {
+      defval: "",
+      raw: false,
+    });
+  }
+
+  return sheets;
+}
+
 /** Reads the first sheet of an uploaded .xlsx/.csv into plain-object rows. */
 export function parseExcelUpload(fileBuffer: ArrayBuffer): Record<string, unknown>[] {
   const workbook = XLSX.read(fileBuffer, { type: "array", cellDates: true });

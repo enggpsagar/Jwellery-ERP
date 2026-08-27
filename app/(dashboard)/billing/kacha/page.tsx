@@ -1,12 +1,10 @@
 import Link from "next/link"
 
 import { getKachaInvoices, type KachaInvoiceSortField } from "@/lib/actions/kacha-invoice-actions"
-import { KachaInvoiceTable } from "@/components/billing/kacha/kacha-invoice-table"
-import { KachaInvoicesToolbar } from "@/components/billing/kacha/kacha-invoices-toolbar"
+import { KachaInvoicesClient } from "@/components/billing/kacha/kacha-invoices-client"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { KachaImportDialog } from "@/components/billing/kacha/kacha-import-dialog"
-import { DeleteAllKachaDialog } from "@/components/billing/kacha/delete-all-kacha-dialog"
 import { getCurrentUser } from "@/lib/auth/auth"
 import { Button } from "@/components/ui/button"
 
@@ -56,7 +54,6 @@ export default async function KachaBillingPage({ searchParams }: KachaBillingPag
         backLabel="Back to Billing"
         action={
           <div className="flex flex-wrap items-center gap-2">
-            {canDeleteAll && <DeleteAllKachaDialog />}
             <KachaImportDialog />
             <Link href="/billing/kacha/new">
               <Button>New Kacha Slip</Button>
@@ -65,9 +62,10 @@ export default async function KachaBillingPage({ searchParams }: KachaBillingPag
         }
       />
 
-      <KachaInvoicesToolbar />
-
-      <KachaInvoiceTable kachaInvoices={kachaInvoices} />
+      <KachaInvoicesClient
+        kachaInvoices={kachaInvoices}
+        canDelete={canDeleteAll}
+      />
 
       {kachaInvoices.length > 0 ? (
         <DataTablePagination

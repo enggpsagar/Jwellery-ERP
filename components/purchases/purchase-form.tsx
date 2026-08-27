@@ -91,9 +91,15 @@ function emptyLineItem(): LineItem {
 
 const initialState: PurchaseFormState = { success: false, message: "" }
 
+type LocationOption = {
+  id: string
+  name: string
+}
+
 type PurchaseFormProps = {
   vendors: VendorOption[]
   products: ProductOption[]
+  locations?: LocationOption[]
 }
 
 /**
@@ -120,6 +126,7 @@ type PurchaseDraft = {
 export function PurchaseForm({
   vendors,
   products,
+  locations = [],
 }: PurchaseFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -145,6 +152,7 @@ export function PurchaseForm({
   }))
 
   const [vendorId, setVendorId] = useState("")
+  const [locationId, setLocationId] = useState("")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
   const [taxAmount, setTaxAmount] = useState(0)
@@ -408,6 +416,24 @@ export function PurchaseForm({
             name="purchaseDate"
             defaultValue={new Date().toISOString().slice(0, 10)}
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Location</Label>
+          <Select value={locationId || "__none__"} onValueChange={(value) => setLocationId(value === "__none__" ? "" : value)}>
+            <SelectTrigger className="h-11 w-full">
+              <SelectValue placeholder="Select location" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">None</SelectItem>
+              {locations.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <input type="hidden" name="locationId" value={locationId} />
         </div>
       </div>
 

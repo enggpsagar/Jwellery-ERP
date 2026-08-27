@@ -15,6 +15,7 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { getLocationScope, locationWhere, type LocationScope } from "@/lib/location-scope";
 import { requireAuth, requireRole } from "@/lib/auth/auth";
 import { sendMail } from "@/lib/mailer";
 import { kachaSlipEmail, dataBackupEmail } from "@/lib/email-templates";
@@ -163,7 +164,11 @@ type KachaInvoiceQueryParams = {
  * Shared where/orderBy builder for the Kacha slip list and the export
  * action, so the two never drift apart on what "the filtered set" means.
  */
-function buildKachaInvoiceQuery(params: KachaInvoiceQueryParams, storeId: string) {
+function buildKachaInvoiceQuery(
+  params: KachaInvoiceQueryParams,
+  storeId: string,
+  scope: LocationScope,
+) {
   const search = String(params.search || "").trim();
   const status =
     params.status && params.status !== "ALL" && params.status in InvoiceStatus
@@ -175,6 +180,7 @@ function buildKachaInvoiceQuery(params: KachaInvoiceQueryParams, storeId: string
 
   const where = {
     storeId,
+    ...locationWhere(scope),
     ...(selectedIds.length ? { id: { in: selectedIds } } : {}),
     ...(status ? { status } : {}),
     ...(search
@@ -197,7 +203,8 @@ export async function getKachaInvoices(params: GetKachaInvoicesParams = {}) {
   const pageSize = Math.max(1, Number(params.pageSize || 10));
 
   const storeId = await requireStoreScope();
-  const { where, orderBy } = buildKachaInvoiceQuery(params, storeId);
+  const scope = await getLocationScope();
+  const { where, orderBy } = buildKachaInvoiceQuery(params, storeId, scope);
 
   const [totalCount, kachaInvoices] = await Promise.all([
     prisma.kachaInvoice.count({ where }),
@@ -249,7 +256,8 @@ export async function exportKachaInvoicesToExcel(
 ): Promise<ExportKachaInvoicesResult> {
   try {
     const storeId = await requireStoreScope();
-    const { where, orderBy } = buildKachaInvoiceQuery(params, storeId);
+    const scope = await getLocationScope();
+    const { where, orderBy } = buildKachaInvoiceQuery(params, storeId, scope);
 
     const kachaInvoices = await prisma.kachaInvoice.findMany({
       where,

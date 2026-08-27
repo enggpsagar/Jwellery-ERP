@@ -5,6 +5,7 @@ import { LedgerEntryType } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
+import { getLocationScope, locationWhere } from "@/lib/location-scope"
 import { formatLedgerSource } from "@/lib/ledger-format"
 import {
   classifyMetalName,
@@ -52,9 +53,10 @@ function initials(name: string) {
 /** Recent ledger activity across every customer and karigar account in the store. */
 export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
   const storeId = await requireStoreScope()
+  const scope = await getLocationScope()
 
   const entries = await prisma.ledgerEntry.findMany({
-    where: { storeId },
+    where: { storeId, ...locationWhere(scope) },
     orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
     take: 500,
     include: {
@@ -278,6 +280,7 @@ export type LedgerTotals = {
 
 export async function getLedgerTotals(): Promise<LedgerTotals> {
   const storeId = await requireStoreScope()
+  const scope = await getLocationScope()
 
   const startOfToday = new Date()
   startOfToday.setHours(0, 0, 0, 0)
@@ -287,19 +290,19 @@ export async function getLedgerTotals(): Promise<LedgerTotals> {
 
   const [debitAgg, creditAgg, todayCount, metalEntries] = await Promise.all([
     prisma.ledgerEntry.aggregate({
-      where: { storeId, type: LedgerEntryType.DEBIT },
+      where: { storeId, type: LedgerEntryType.DEBIT, ...locationWhere(scope) },
       _sum: { amount: true },
     }),
     prisma.ledgerEntry.aggregate({
-      where: { storeId, type: LedgerEntryType.CREDIT },
+      where: { storeId, type: LedgerEntryType.CREDIT, ...locationWhere(scope) },
       _sum: { amount: true },
     }),
     prisma.ledgerEntry.count({
-      where: { storeId, entryDate: { gte: startOfToday } },
+      where: { storeId, entryDate: { gte: startOfToday }, ...locationWhere(scope) },
     }),
     nonMoneyUnits.length
       ? prisma.ledgerEntry.findMany({
-          where: { storeId, metalTypeId: { not: null } },
+          where: { storeId, metalTypeId: { not: null }, ...locationWhere(scope) },
           select: {
             type: true,
             amount: true,
@@ -389,9 +392,11 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
     return { rows: [], activeUnits: [] }
   }
 
+  const scope = await getLocationScope()
+
   const [purchaseItems, invoiceItems, kachaInvoiceItems] = await Promise.all([
     prisma.purchaseItem.findMany({
-      where: { purchase: { storeId } },
+      where: { purchase: { storeId, ...locationWhere(scope) } },
       select: {
         netWeight: true,
         lineTotal: true,
@@ -400,7 +405,7 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
       },
     }),
     prisma.invoiceItem.findMany({
-      where: { invoice: { storeId } },
+      where: { invoice: { storeId, ...locationWhere(scope) } },
       select: {
         netWeight: true,
         lineTotal: true,
@@ -409,7 +414,7 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
       },
     }),
     prisma.kachaInvoiceItem.findMany({
-      where: { kachaInvoice: { storeId } },
+      where: { kachaInvoice: { storeId, ...locationWhere(scope) } },
       select: {
         netWeight: true,
         lineTotal: true,

@@ -5,6 +5,7 @@ import { InventoryStockStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { getLocationScope, locationWhere } from "@/lib/location-scope";
 import { getFinenessMap, toFineWeight } from "@/lib/purity";
 
 export type DateRange = { from?: string; to?: string };
@@ -26,7 +27,8 @@ function toDateRangeWhere(range: DateRange, field: string) {
  */
 export async function getSalesReport(range: DateRange = {}) {
   const storeId = await requireStoreScope();
-  const where = { storeId, ...toDateRangeWhere(range, "invoiceDate") };
+  const scope = await getLocationScope();
+  const where = { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "invoiceDate") };
 
   const invoices = await prisma.invoice.findMany({
     where,
@@ -83,8 +85,9 @@ export async function getSalesReport(range: DateRange = {}) {
  */
 export async function getInventoryValuationReport() {
   const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
   const stockItems = await prisma.inventoryStock.findMany({
-    where: { storeId, isActive: true },
+    where: { storeId, isActive: true, ...locationWhere(scope) },
     include: { product: { select: { name: true, category: true } } },
   });
 
@@ -125,8 +128,9 @@ export async function getInventoryValuationReport() {
  */
 export async function getKarigarOutstandingReport() {
   const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
   const openJobs = await prisma.karigarJob.findMany({
-    where: { storeId, receivedDate: null },
+    where: { storeId, receivedDate: null, ...locationWhere(scope) },
     orderBy: { issueDate: "desc" },
     include: {
       karigar: { select: { name: true, code: true } },
@@ -211,10 +215,13 @@ export async function getCustomerDuesReport() {
  */
 export async function getGoldFlowReport(range: DateRange = {}) {
   const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
   const fineness = await getFinenessMap(storeId);
 
   const purchaseItems = await prisma.purchaseItem.findMany({
-    where: { purchase: { storeId, ...toDateRangeWhere(range, "purchaseDate") } },
+    where: {
+      purchase: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "purchaseDate") },
+    },
     include: { purchase: { select: { purchaseDate: true } } },
   });
 
@@ -228,19 +235,27 @@ export async function getGoldFlowReport(range: DateRange = {}) {
   ).length;
 
   const issuedAgg = await prisma.karigarJob.aggregate({
-    where: { storeId, ...toDateRangeWhere(range, "issueDate") },
+    where: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "issueDate") },
     _sum: { issueFineWeight: true },
   });
   const issuedToKarigarFine = Number(issuedAgg._sum.issueFineWeight ?? 0);
 
   const receivedAgg = await prisma.karigarJob.aggregate({
-    where: { storeId, receivedDate: { not: null }, ...toDateRangeWhere(range, "receivedDate") },
+    where: {
+      storeId,
+      receivedDate: { not: null },
+      ...locationWhere(scope),
+      ...toDateRangeWhere(range, "receivedDate"),
+    },
     _sum: { receiveFineWeight: true },
   });
   const receivedFromKarigarFine = Number(receivedAgg._sum.receiveFineWeight ?? 0);
 
   const karigarReceiptItems = await prisma.karigarReceiptItem.findMany({
-    where: { karigarJob: { storeId }, ...toDateRangeWhere(range, "createdAt") },
+    where: {
+      karigarJob: { storeId, ...locationWhere(scope) },
+      ...toDateRangeWhere(range, "createdAt"),
+    },
   });
 
   const wastageFine = karigarReceiptItems.reduce(
@@ -252,11 +267,19 @@ export async function getGoldFlowReport(range: DateRange = {}) {
 
   const [invoiceItems, kachaInvoiceItems] = await Promise.all([
     prisma.invoiceItem.findMany({
-      where: { invoice: { storeId, ...toDateRangeWhere(range, "invoiceDate") } },
+      where: {
+        invoice: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "invoiceDate") },
+      },
       include: { inventoryStock: { select: { purity: true } } },
     }),
     prisma.kachaInvoiceItem.findMany({
-      where: { kachaInvoice: { storeId, ...toDateRangeWhere(range, "invoiceDate") } },
+      where: {
+        kachaInvoice: {
+          storeId,
+          ...locationWhere(scope),
+          ...toDateRangeWhere(range, "invoiceDate"),
+        },
+      },
       include: { inventoryStock: { select: { purity: true } } },
     }),
   ]);
@@ -291,6 +314,7 @@ export async function getGoldFlowReport(range: DateRange = {}) {
     where: {
       storeId,
       status: { in: [InventoryStockStatus.IN_STOCK, InventoryStockStatus.RESERVED] },
+      ...locationWhere(scope),
     },
     select: { netWeight: true, purity: true },
   });
@@ -300,13 +324,13 @@ export async function getGoldFlowReport(range: DateRange = {}) {
   );
 
   const withKarigarAgg = await prisma.karigarJob.aggregate({
-    where: { storeId, receivedDate: null },
+    where: { storeId, receivedDate: null, ...locationWhere(scope) },
     _sum: { issueFineWeight: true },
   });
   const withKarigarFine = Number(withKarigarAgg._sum.issueFineWeight ?? 0);
 
   const itemsRemainingCount = await prisma.inventoryStock.count({
-    where: { storeId, status: InventoryStockStatus.IN_STOCK },
+    where: { storeId, status: InventoryStockStatus.IN_STOCK, ...locationWhere(scope) },
   });
 
   const itemsCreatedCount = itemsCreatedFromPurchaseCount + itemsCreatedFromKarigarCount;
@@ -376,6 +400,7 @@ function emptyMetalWiseRow(metalId: string, metalName: string): MetalWiseRow {
  */
 export async function getMetalWiseReport(range: DateRange = {}) {
   const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
 
   const metals = await prisma.storeMetal.findMany({
     where: { storeId, isActive: true },
@@ -385,21 +410,32 @@ export async function getMetalWiseReport(range: DateRange = {}) {
   const [purchaseItems, invoiceItems, kachaInvoiceItems, stockRows, openKarigarJobs] =
     await Promise.all([
       prisma.purchaseItem.findMany({
-        where: { purchase: { storeId, ...toDateRangeWhere(range, "purchaseDate") } },
+        where: {
+          purchase: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "purchaseDate") },
+        },
         select: { metalTypeId: true, netWeight: true, lineTotal: true },
       }),
       prisma.invoiceItem.findMany({
-        where: { invoice: { storeId, ...toDateRangeWhere(range, "invoiceDate") } },
+        where: {
+          invoice: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "invoiceDate") },
+        },
         select: { metalTypeId: true, netWeight: true, lineTotal: true },
       }),
       prisma.kachaInvoiceItem.findMany({
-        where: { kachaInvoice: { storeId, ...toDateRangeWhere(range, "invoiceDate") } },
+        where: {
+          kachaInvoice: {
+            storeId,
+            ...locationWhere(scope),
+            ...toDateRangeWhere(range, "invoiceDate"),
+          },
+        },
         select: { metalTypeId: true, netWeight: true, lineTotal: true },
       }),
       prisma.inventoryStock.findMany({
         where: {
           storeId,
           status: { in: [InventoryStockStatus.IN_STOCK, InventoryStockStatus.RESERVED] },
+          ...locationWhere(scope),
         },
         select: {
           metalTypeId: true,
@@ -410,7 +446,7 @@ export async function getMetalWiseReport(range: DateRange = {}) {
         },
       }),
       prisma.karigarJob.findMany({
-        where: { storeId, receivedDate: null },
+        where: { storeId, receivedDate: null, ...locationWhere(scope) },
         select: { metalTypeId: true, issueWeight: true },
       }),
     ]);

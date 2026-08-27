@@ -61,6 +61,8 @@ export async function upsertStoreLocation(
   try {
     const id = String(formData.get("id") || "").trim();
     const name = String(formData.get("name") || "").trim();
+    const state = String(formData.get("state") || "").trim() || null;
+    const city = String(formData.get("city") || "").trim() || null;
 
     if (!name) {
       return {
@@ -88,7 +90,7 @@ export async function upsertStoreLocation(
     if (id) {
       const { count } = await prisma.storeLocation.updateMany({
         where: { id, storeId },
-        data: { name },
+        data: { name, state, city },
       });
 
       if (count === 0) {
@@ -96,7 +98,7 @@ export async function upsertStoreLocation(
       }
     } else {
       await prisma.storeLocation.create({
-        data: { storeId, name },
+        data: { storeId, name, state, city },
       });
     }
 

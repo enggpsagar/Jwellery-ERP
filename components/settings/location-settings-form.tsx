@@ -10,6 +10,7 @@ import {
   type StoreLocationRow,
   type LocationFormState,
 } from "@/lib/actions/store-location-actions";
+import { getCitiesByStateId } from "@/lib/actions/location-actions";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,12 +22,18 @@ import { useToast } from "@/components/providers/toast-provider";
 
 const initialState: LocationFormState = { success: false, message: "" };
 
+const FIELD = "w-full rounded-md border bg-background px-3 py-2 text-sm";
+
+type StateItem = { id: string; name: string };
+type CityItem = { id: string; name: string };
+
 type LocationSettingsFormProps = {
   locations: StoreLocationRow[];
+  states: StateItem[];
   canEdit: boolean;
 };
 
-export function LocationSettingsForm({ locations, canEdit }: LocationSettingsFormProps) {
+export function LocationSettingsForm({ locations, states, canEdit }: LocationSettingsFormProps) {
   const router = useRouter();
   const toast = useToast();
 
@@ -72,6 +79,7 @@ export function LocationSettingsForm({ locations, canEdit }: LocationSettingsFor
             <LocationFormRow
               key={location.id}
               location={location}
+              states={states}
               onDone={() => setEditingId(null)}
             />
           ) : (
@@ -79,9 +87,14 @@ export function LocationSettingsForm({ locations, canEdit }: LocationSettingsFor
               key={location.id}
               className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
             >
-              <span className={location.isActive ? "" : "text-muted-foreground line-through"}>
-                {location.name}
-              </span>
+              <div className={location.isActive ? "" : "text-muted-foreground line-through"}>
+                <div>{location.name}</div>
+                {(location.city || location.state) && (
+                  <div className="text-xs text-muted-foreground">
+                    {[location.city, location.state].filter(Boolean).join(", ")}
+                  </div>
+                )}
+              </div>
 
               {canEdit ? (
                 <div className="flex items-center gap-3">
@@ -111,7 +124,7 @@ export function LocationSettingsForm({ locations, canEdit }: LocationSettingsFor
 
         {canEdit ? (
           showAdd ? (
-            <LocationFormRow onDone={() => setShowAdd(false)} />
+            <LocationFormRow states={states} onDone={() => setShowAdd(false)} />
           ) : (
             <Button
               type="button"
@@ -131,14 +144,26 @@ export function LocationSettingsForm({ locations, canEdit }: LocationSettingsFor
 
 function LocationFormRow({
   location,
+  states,
   onDone,
 }: {
   location?: StoreLocationRow;
+  states: StateItem[];
   onDone: () => void;
 }) {
   const router = useRouter();
   const toast = useToast();
   const [state, formAction, pending] = useActionState(upsertStoreLocation, initialState);
+
+  // Keyed/driven by id (to fetch cities), but the form submits the state's
+  // name — StoreLocation.state is a plain text column, same convention as
+  // Vendor/Customer's state/city fields.
+  const [selectedStateId, setSelectedStateId] = useState(
+    () => states.find((item) => item.name === location?.state)?.id ?? "",
+  );
+  const [selectedCity, setSelectedCity] = useState(location?.city ?? "");
+  const [cities, setCities] = useState<CityItem[]>([]);
+  const [loadingCities, setLoadingCities] = useState(false);
 
   useEffect(() => {
     if (state.success) {
@@ -151,12 +176,44 @@ function LocationFormRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCities() {
+      if (!selectedStateId) {
+        setCities([]);
+        return;
+      }
+
+      try {
+        setLoadingCities(true);
+        const data = await getCitiesByStateId(selectedStateId);
+        if (!cancelled) setCities(data || []);
+      } catch (error) {
+        console.error("Failed to load cities:", error);
+        if (!cancelled) setCities([]);
+      } finally {
+        if (!cancelled) setLoadingCities(false);
+      }
+    }
+
+    loadCities();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStateId]);
+
   return (
     <form
       action={formAction}
       className="flex flex-wrap items-end gap-3 rounded-md border border-dashed p-3"
     >
       <input type="hidden" name="id" value={location?.id ?? ""} />
+      <input
+        type="hidden"
+        name="state"
+        value={states.find((item) => item.id === selectedStateId)?.name ?? ""}
+      />
 
       <div className="space-y-1.5">
         <Label htmlFor="location-name">Name</Label>
@@ -170,6 +227,51 @@ function LocationFormRow({
         {state.errors?.name?.[0] ? (
           <p className="text-sm text-red-600">{state.errors.name[0]}</p>
         ) : null}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="location-state">State</Label>
+        <select
+          id="location-state"
+          className={FIELD}
+          value={selectedStateId}
+          onChange={(event) => {
+            setSelectedStateId(event.target.value);
+            setSelectedCity("");
+          }}
+        >
+          <option value="">Select state</option>
+          {states.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="location-city">City</Label>
+        <select
+          id="location-city"
+          name="city"
+          className={FIELD}
+          value={selectedCity}
+          onChange={(event) => setSelectedCity(event.target.value)}
+          disabled={!selectedStateId || loadingCities}
+        >
+          <option value="">
+            {loadingCities
+              ? "Loading cities..."
+              : selectedStateId
+                ? "Select city"
+                : "Select a state first"}
+          </option>
+          {cities.map((city) => (
+            <option key={city.id} value={city.name}>
+              {city.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="flex gap-2 pb-0.5">

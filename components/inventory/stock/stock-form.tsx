@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 
 import { ProductSelect } from "@/components/inventory/shared/product-select";
+import { LocationSelect } from "@/components/shared/location-select";
 
 type LocationOption = {
   id: string;
@@ -576,25 +577,12 @@ export function StockForm({
           <div>
             <Label>Location</Label>
 
-            <Select
-              value={locationId || "__none__"}
-              onValueChange={(value) => setLocationId(value === "__none__" ? "" : value)}
-            >
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="Select location" />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
-                {locations.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <input type="hidden" name="locationId" value={locationId} />
+            <LocationSelect
+              locations={locations}
+              name="locationId"
+              defaultValue={locationId}
+              onChange={setLocationId}
+            />
 
             <ErrorText error={state.errors.locationId} />
           </div>

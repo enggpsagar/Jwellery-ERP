@@ -60,7 +60,7 @@ export function KachaInvoiceTable({ kachaInvoices }: KachaInvoiceTableProps) {
                 <td className="px-4 py-3">
                   {kachaInvoice.customer ? (
                     <Link
-                      href={`/customers/${kachaInvoice.customer.id}`}
+                      href={`/customers/${kachaInvoice.customer.id}?from=${encodeURIComponent("/billing/kacha")}`}
                       className="text-primary underline-offset-4 hover:underline"
                     >
                       {kachaInvoice.customer.name}

@@ -80,7 +80,7 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
             <p className="text-sm text-muted-foreground">Customer</p>
             {kachaInvoice.customer ? (
               <Link
-                href={`/customers/${kachaInvoice.customer.id}`}
+                href={`/customers/${kachaInvoice.customer.id}?from=${encodeURIComponent(`/billing/kacha/${kachaInvoice.id}`)}`}
                 className="font-medium text-primary underline-offset-4 hover:underline"
               >
                 {kachaInvoice.customer.name}

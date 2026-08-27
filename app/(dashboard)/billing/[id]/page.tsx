@@ -85,7 +85,7 @@ export default async function InvoiceDetailPage({ params }: Props) {
             <p className="text-sm text-muted-foreground">Customer</p>
             {invoice.customer ? (
               <Link
-                href={`/customers/${invoice.customer.id}`}
+                href={`/customers/${invoice.customer.id}?from=${encodeURIComponent(`/billing/${invoice.id}`)}`}
                 className="font-medium text-primary underline-offset-4 hover:underline"
               >
                 {invoice.customer.name}

@@ -15,6 +15,12 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import {
+  getLocationScope,
+  locationWhere,
+  isLocationAllowed,
+  type LocationScope,
+} from "@/lib/location-scope";
 import { sendMail } from "@/lib/mailer";
 import { invoiceEmail } from "@/lib/email-templates";
 import { resolveStoreName } from "@/lib/invite-email";
@@ -180,7 +186,7 @@ type InvoiceQueryParams = {
  * Shared where/orderBy builder for the invoice list and the export action,
  * so the two never drift apart on what "the filtered set" means.
  */
-function buildInvoiceQuery(params: InvoiceQueryParams, storeId: string) {
+function buildInvoiceQuery(params: InvoiceQueryParams, storeId: string, scope: LocationScope) {
   const search = String(params.search || "").trim();
   const status =
     params.status && params.status !== "ALL" && params.status in InvoiceStatus
@@ -192,6 +198,7 @@ function buildInvoiceQuery(params: InvoiceQueryParams, storeId: string) {
 
   const where = {
     storeId,
+    ...locationWhere(scope),
     ...(selectedIds.length ? { id: { in: selectedIds } } : {}),
     ...(status ? { status } : {}),
     ...(search
@@ -214,7 +221,8 @@ export async function getInvoices(params: GetInvoicesParams = {}) {
   const pageSize = Math.max(1, Number(params.pageSize || 10));
 
   const storeId = await requireStoreScope();
-  const { where, orderBy } = buildInvoiceQuery(params, storeId);
+  const scope = await getLocationScope();
+  const { where, orderBy } = buildInvoiceQuery(params, storeId, scope);
 
   const [totalCount, invoices] = await Promise.all([
     prisma.invoice.count({ where }),
@@ -266,7 +274,8 @@ export async function exportInvoicesToExcel(
 ): Promise<ExportInvoicesResult> {
   try {
     const storeId = await requireStoreScope();
-    const { where, orderBy } = buildInvoiceQuery(params, storeId);
+    const scope = await getLocationScope();
+    const { where, orderBy } = buildInvoiceQuery(params, storeId, scope);
 
     const invoices = await prisma.invoice.findMany({
       where,

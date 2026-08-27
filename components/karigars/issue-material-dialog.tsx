@@ -42,12 +42,22 @@ const PURITY_OPTIONS: { value: string; label: string }[] = [
   { value: "SILVER_925", label: "Silver 925" },
 ]
 
+type LocationOption = {
+  id: string
+  name: string
+}
+
 type IssueMaterialDialogProps = {
   karigarId: string
   metals: StoreMetalRow[]
+  locations?: LocationOption[]
 }
 
-export function IssueMaterialDialog({ karigarId, metals }: IssueMaterialDialogProps) {
+export function IssueMaterialDialog({
+  karigarId,
+  metals,
+  locations = [],
+}: IssueMaterialDialogProps) {
   const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
   // Mirrors the old hardcoded default of "GOLD": prefer a hasPurity metal if
   // one exists, otherwise just fall back to whatever is first in the list.
@@ -59,6 +69,7 @@ export function IssueMaterialDialog({ karigarId, metals }: IssueMaterialDialogPr
   const [open, setOpen] = useState(false)
   const [metalTypeId, setMetalTypeId] = useState(defaultMetalId)
   const [issuePurity, setIssuePurity] = useState("GOLD_22K")
+  const [locationId, setLocationId] = useState("")
   const router = useRouter()
   const toast = useToast()
 
@@ -147,6 +158,27 @@ export function IssueMaterialDialog({ karigarId, metals }: IssueMaterialDialogPr
           <div className="space-y-2">
             <Label>Expected Return Date</Label>
             <Input name="expectedDate" type="date" />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Location</Label>
+            <Select
+              value={locationId || "__none__"}
+              onValueChange={(value) => setLocationId(value === "__none__" ? "" : value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None</SelectItem>
+                {locations.map((location) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    {location.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <input type="hidden" name="locationId" value={locationId} />
           </div>
 
           <div className="space-y-2">

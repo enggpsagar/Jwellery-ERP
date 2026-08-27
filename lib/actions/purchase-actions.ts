@@ -17,6 +17,12 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import {
+  getLocationScope,
+  locationWhere,
+  isLocationAllowed,
+  type LocationScope,
+} from "@/lib/location-scope";
 import { buildExcelExport } from "@/lib/excel-export";
 import type {
   DataTableExportParams,
@@ -186,12 +192,14 @@ export type PurchaseSortBy = "purchaseDate" | "purchaseNumber" | "totalAmount";
 function buildPurchasesWhere(
   storeId: string,
   params: { search?: string; status?: InvoiceStatus | "ALL" },
+  scope: LocationScope,
 ) {
   const search = String(params.search || "").trim();
   const status = params.status && params.status !== "ALL" ? params.status : undefined;
 
   return {
     storeId,
+    ...locationWhere(scope),
     ...(status ? { status } : {}),
     ...(search
       ? {
@@ -227,7 +235,8 @@ export async function getPurchases(params: GetPurchasesParams = {}) {
   const sortOrder = params.sortOrder || "desc";
 
   const storeId = await requireStoreScope();
-  const where = buildPurchasesWhere(storeId, params);
+  const scope = await getLocationScope();
+  const where = buildPurchasesWhere(storeId, params, scope);
 
   const [totalCount, purchases] = await Promise.all([
     prisma.purchase.count({ where }),
@@ -272,14 +281,15 @@ export async function exportPurchasesToExcel(
 ): Promise<DataTableExportResult> {
   try {
     const storeId = await requireStoreScope();
+    const scope = await getLocationScope();
     const sortBy = toPurchaseSortBy(params.sortBy);
     const sortOrder = params.sortOrder || "desc";
     const status = toPurchaseStatus(params.status);
 
     const where =
       params.selectedIds && params.selectedIds.length > 0
-        ? { id: { in: params.selectedIds }, storeId }
-        : buildPurchasesWhere(storeId, { search: params.search, status });
+        ? { id: { in: params.selectedIds }, storeId, ...locationWhere(scope) }
+        : buildPurchasesWhere(storeId, { search: params.search, status }, scope);
 
     const purchases = await prisma.purchase.findMany({
       where,
@@ -400,6 +410,7 @@ export async function createPurchase(
 ): Promise<PurchaseFormState> {
   try {
     const vendorId = String(formData.get("vendorId") || "");
+    const locationId = String(formData.get("locationId") || "").trim() || null;
     const itemsRaw = String(formData.get("itemsJson") || "[]");
 
     if (!vendorId) {
@@ -466,6 +477,21 @@ export async function createPurchase(
       return { success: false, message: "One or more selected products are invalid" };
     }
 
+    if (locationId) {
+      const location = await prisma.storeLocation.findFirst({
+        where: { id: locationId, storeId },
+        select: { id: true },
+      });
+      if (!location) {
+        return { success: false, message: "Selected location is invalid" };
+      }
+
+      const scope = await getLocationScope();
+      if (!isLocationAllowed(scope, locationId)) {
+        return { success: false, message: "You don't have access to file a purchase against this location" };
+      }
+    }
+
     const purchaseNumber = await generatePurchaseNumber(storeId);
     const purchaseDate = purchaseDateRaw ? new Date(purchaseDateRaw) : new Date();
 
@@ -500,6 +526,7 @@ export async function createPurchase(
             vendorId,
             vendorName: vendor.name,
             purchaseDate,
+            locationId: locationId ?? undefined,
           },
           select: { id: true },
         });
@@ -524,6 +551,7 @@ export async function createPurchase(
           paidAmount,
           balanceAmount,
           notes,
+          locationId: locationId ?? undefined,
           items: {
             create: items.map((item, i) => ({
               productId: item.productId,
@@ -574,6 +602,7 @@ export async function createPurchase(
             purchaseId: created.id,
             amount: balanceAmount,
             description: `Purchase ${purchaseNumber} balance due`,
+            locationId: locationId ?? undefined,
           },
         });
       }

@@ -14,6 +14,7 @@ import {
 
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
+import { getLocationScope, locationWhere, isLocationAllowed, type LocationScope } from "@/lib/location-scope"
 import type { StockFormState } from "@/lib/inventory/stock-types"
 import { buildExcelExport } from "@/lib/excel-export"
 import { getFinenessMap, toFineWeight } from "@/lib/purity"
@@ -164,7 +165,8 @@ export async function getInventoryStock(params: GetInventoryStockParams = {}) {
   const sortOrder: StockSortOrder = params.sortOrder || "desc"
 
   const storeId = await requireStoreScope()
-  const where = getStockWhere(storeId, search)
+  const scope = await getLocationScope()
+  const where = getStockWhere(storeId, search, scope)
   const orderBy = getStockOrderBy(sortBy, sortOrder)
 
   const [totalCount, rows] = await Promise.all([
@@ -204,12 +206,14 @@ async function getAllInventoryStockForExport(
   const sortOrder: StockSortOrder = params.sortOrder || "desc"
 
   const storeId = await requireStoreScope()
+  const scope = await getLocationScope()
   const where = params.selectedIds?.length
     ? {
         id: { in: params.selectedIds },
         storeId,
+        ...locationWhere(scope),
       }
-    : getStockWhere(storeId, params.search)
+    : getStockWhere(storeId, params.search, scope)
 
   const rows = await prisma.inventoryStock.findMany({
     where,
@@ -534,6 +538,17 @@ export async function createInventoryStock(
           },
         }
       }
+
+      const scope = await getLocationScope()
+      if (!isLocationAllowed(scope, locationId)) {
+        return {
+          success: false,
+          message: "You don't have access to file stock against this location",
+          errors: {
+            locationId: ["Outside your assigned locations"],
+          },
+        }
+      }
     }
 
     // Metal was a required field on this form. It still must not be null —
@@ -813,6 +828,17 @@ export async function updateInventoryStock(
           message: "Selected location is invalid",
           errors: {
             locationId: ["Selected location could not be found"],
+          },
+        }
+      }
+
+      const scope = await getLocationScope()
+      if (!isLocationAllowed(scope, locationId)) {
+        return {
+          success: false,
+          message: "You don't have access to file stock against this location",
+          errors: {
+            locationId: ["Outside your assigned locations"],
           },
         }
       }

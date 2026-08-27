@@ -4,14 +4,16 @@ import {
   getPurchaseFormVendors,
   getPurchaseFormProducts,
 } from "@/lib/actions/purchase-actions"
+import { getStoreLocations } from "@/lib/actions/store-location-actions"
 
 import { PurchaseForm } from "@/components/purchases/purchase-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 export default async function NewPurchasePage() {
-  const [vendors, products] = await Promise.all([
+  const [vendors, products, locations] = await Promise.all([
     getPurchaseFormVendors(),
     getPurchaseFormProducts(),
+    getStoreLocations(),
   ])
 
   return (
@@ -27,7 +29,7 @@ export default async function NewPurchasePage() {
           which needs a Suspense boundary to avoid opting the whole route out
           of static optimisation. */}
       <Suspense fallback={null}>
-        <PurchaseForm vendors={vendors} products={products} />
+        <PurchaseForm vendors={vendors} products={products} locations={locations} />
       </Suspense>
     </main>
   )

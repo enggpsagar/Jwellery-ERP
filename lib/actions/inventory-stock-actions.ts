@@ -15,6 +15,7 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
 import { getFinenessMap, toFineWeight } from "@/lib/purity";
 
 /**
@@ -325,9 +326,25 @@ export async function issueMaterialToKarigar(
     const issueWeight = toDecimalOrNull(formData.get("issueWeight"));
     const expectedDateRaw = String(formData.get("expectedDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
+    const locationId = String(formData.get("locationId") || "").trim() || null;
 
     if (!metalTypeId) {
       return { success: false, message: "Select a valid metal type" };
+    }
+
+    if (locationId) {
+      const location = await prisma.storeLocation.findFirst({
+        where: { id: locationId, storeId },
+        select: { id: true },
+      });
+      if (!location) {
+        return { success: false, message: "Selected location is invalid" };
+      }
+
+      const scope = await getLocationScope();
+      if (!isLocationAllowed(scope, locationId)) {
+        return { success: false, message: "You don't have access to issue material against this location" };
+      }
     }
 
     const storeMetal = await prisma.storeMetal.findFirst({
@@ -372,6 +389,7 @@ export async function issueMaterialToKarigar(
           expectedDate: expectedDateRaw ? new Date(expectedDateRaw) : undefined,
           status: "issued",
           notes,
+          locationId: locationId ?? undefined,
         },
       });
 
@@ -388,6 +406,7 @@ export async function issueMaterialToKarigar(
           description: isPreciousMetal
             ? `${issueWeight}g ${issuePurity} issued (${(issueFineWeight ?? 0).toFixed(3)}g fine) — Job ${jobNumber}`
             : `${issueWeight}g ${notes ? notes : storeMetal.name} issued — Job ${jobNumber}`,
+          locationId: locationId ?? undefined,
         },
       });
     });
@@ -461,6 +480,7 @@ export async function receiveItemsFromKarigar(
         })
       : [];
     const locationIdSet = new Set(locationRows.map((l) => l.id));
+    const scope = await getLocationScope();
 
     for (const item of items) {
       // Product is optional here — an item with no productId gets a brand-new
@@ -477,6 +497,9 @@ export async function receiveItemsFromKarigar(
       }
       if (item.locationId && !locationIdSet.has(item.locationId)) {
         return { success: false, message: "Selected location not found" };
+      }
+      if (item.locationId && !isLocationAllowed(scope, item.locationId)) {
+        return { success: false, message: "You don't have access to file stock against this location" };
       }
     }
 
@@ -624,6 +647,7 @@ export async function receiveItemsFromKarigar(
           metalWeightFine: receiveFineWeight,
           amount: 0,
           description: `Received ${items.length} item(s) — ${receiveFineWeight.toFixed(3)}g fine (incl. ${wastageFineWeight.toFixed(3)}g wastage) — Job ${job.jobNumber ?? jobId}`,
+          locationId: job.locationId ?? undefined,
         },
       });
 
@@ -639,6 +663,7 @@ export async function receiveItemsFromKarigar(
             karigarId: job.karigarId,
             amount: labourCharge,
             description: `Labour charge for Job ${job.jobNumber ?? jobId}`,
+            locationId: job.locationId ?? undefined,
           },
         });
       }

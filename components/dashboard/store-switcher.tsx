@@ -65,7 +65,10 @@ export function StoreSwitcher({ stores, activeStoreId }: StoreSwitcherProps) {
         if (!open) setSearch("")
       }}
     >
-      <SelectTrigger className="w-[200px] gap-2">
+      {/* Pill to match the search field and account chip, with the shop icon
+          in gold — this is "which shop am I in", the most consequential piece
+          of state in the bar for anyone working across stores. */}
+      <SelectTrigger className="h-10 w-[200px] gap-2 rounded-full border-transparent bg-muted/70 shadow-inner [&>svg]:opacity-70 [&_svg:first-child]:text-[var(--chart-2)]">
         <StoreIcon className="h-4 w-4 text-muted-foreground" />
         <SelectValue placeholder="Select a store" />
       </SelectTrigger>

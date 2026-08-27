@@ -108,6 +108,14 @@ export function GlobalSearch() {
     >
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
+      {/* Affordance only — hidden as soon as there is a query so it never
+          sits behind the text the user is typing. */}
+      {!query && (
+        <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 select-none items-center gap-0.5 rounded border bg-background px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground sm:flex">
+          Ctrl K
+        </kbd>
+      )}
+
       <Input
         type="search"
         value={query}
@@ -118,7 +126,10 @@ export function GlobalSearch() {
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
         placeholder="Search customers, invoices, products..."
-        className="h-9 bg-muted/60 pl-9"
+        // Recessed well rather than a bordered box, and the focus ring picks
+        // up the app's gold so focus reads as part of the theme instead of
+        // the browser default.
+        className="h-10 rounded-full border-transparent bg-muted/70 pl-9 pr-16 shadow-inner transition-colors placeholder:text-muted-foreground/70 focus-visible:border-transparent focus-visible:bg-background focus-visible:ring-[3px] focus-visible:ring-[color-mix(in_oklab,var(--chart-2)_30%,transparent)]"
         role="combobox"
         aria-expanded={showDropdown}
         aria-controls="global-search-results"

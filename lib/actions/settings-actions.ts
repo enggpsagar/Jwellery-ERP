@@ -7,6 +7,7 @@ import { UserRole, BusinessUnit } from "@prisma/client";
 import { requireStoreScope } from "@/lib/store-context";
 import { requireRole } from "@/lib/auth/auth";
 import { ALL_BUSINESS_UNITS } from "@/lib/business-units";
+import { LEGACY_PLACEHOLDER_BUSINESS_NAME } from "@/lib/constants/app";
 
 export type BusinessSettings = {
   storeId: string;
@@ -102,10 +103,20 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
   });
 
   if (!settings) {
+    // Seed the trading name from the store's own name rather than a generic
+    // placeholder. This row is created the first time anyone opens Settings,
+    // and whatever lands in `businessName` is what every invoice and email
+    // then calls the business — a placeholder here meant real stores sent
+    // mail signed "My Jewellery Store".
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { name: true },
+    });
+
     settings = await prisma.businessSettings.create({
       data: {
         storeId,
-        businessName: "My Jewellery Store",
+        businessName: store?.name?.trim() || LEGACY_PLACEHOLDER_BUSINESS_NAME,
       },
     });
   }

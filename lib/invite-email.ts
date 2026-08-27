@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { sendMail } from "@/lib/mailer";
 import { inviteUserEmail, disabledAccountEmail } from "@/lib/email-templates";
 import { ROLE_LABELS } from "@/lib/roles";
+import { LEGACY_PLACEHOLDER_BUSINESS_NAME } from "@/lib/constants/app";
 
 /**
  * The display name to use for a store in outgoing email. Prefers the
@@ -23,11 +24,19 @@ export async function resolveStoreName(storeId: string): Promise<string> {
     },
   });
 
-  return (
-    store?.businessSettings?.businessName?.trim() ||
-    store?.name?.trim() ||
-    "your store"
-  );
+  const businessName = store?.businessSettings?.businessName?.trim();
+
+  // Settings rows created before the seeding fix carry a generic
+  // placeholder, which is non-empty and so would win over the store's real
+  // name — that is exactly how live stores ended up emailing under "My
+  // Jewellery Store". Treat it as unset. A business name the owner actually
+  // typed still takes precedence, even if it happens to match.
+  const usableBusinessName =
+    businessName && businessName !== LEGACY_PLACEHOLDER_BUSINESS_NAME
+      ? businessName
+      : null;
+
+  return usableBusinessName || store?.name?.trim() || "your store";
 }
 
 /**

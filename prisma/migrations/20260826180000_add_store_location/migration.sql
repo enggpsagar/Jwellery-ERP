@@ -18,10 +18,17 @@ ALTER TABLE "StoreLocation" ADD CONSTRAINT "StoreLocation_storeId_fkey" FOREIGN 
 
 -- Backfill: turn every distinct existing free-text InventoryStock.location value
 -- into a real StoreLocation row, scoped per store, before the column is dropped.
+-- Dedup on (storeId, location) MUST happen before gen_random_uuid() is
+-- generated per row — SELECT DISTINCT on a query that already includes a
+-- fresh random id per row never actually deduplicates anything, since every
+-- row's id column differs even for the same (storeId, location) pair.
 INSERT INTO "StoreLocation" ("id", "storeId", "name", "isActive", "createdAt", "updatedAt")
-SELECT DISTINCT gen_random_uuid()::text, "storeId", "location", true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-FROM "InventoryStock"
-WHERE "location" IS NOT NULL AND "location" != '';
+SELECT gen_random_uuid()::text, t."storeId", t."location", true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+FROM (
+  SELECT DISTINCT "storeId", "location"
+  FROM "InventoryStock"
+  WHERE "location" IS NOT NULL AND "location" != ''
+) t;
 
 -- AlterTable
 ALTER TABLE "InventoryStock" ADD COLUMN "locationId" TEXT;

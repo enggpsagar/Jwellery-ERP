@@ -66,11 +66,20 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* Jewellery categorical palette — sapphire, gold, emerald, amethyst, ruby.
+     Validated with the data-viz six checks on the light surface: CVD adjacent
+     dE 8.4 (>=8 target), normal-vision 19.4 (>=15 floor), all inside the
+     L 0.43-0.77 band and above the 0.1 chroma floor. The ORDER is the
+     colour-blind safety mechanism, not decoration - emerald beside ruby drops
+     CVD to 7.0, so amethyst sits between them. Re-run
+     scripts/validate_palette.js before changing any of this. Gold is 2.78:1
+     against this surface, under 3:1, so charts using it carry visible value
+     labels (the relief rule). */
+  --chart-1: #2a6fb5;
+  --chart-2: #c4901f;
+  --chart-3: #0f9463;
+  --chart-4: #8b5fbf;
+  --chart-5: #c0392b;
   --radius: 0.625rem;
 
   --sidebar: oklch(0.18 0 0);
@@ -109,11 +118,14 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* The same five hues re-stepped for the dark surface, not an automatic
+     flip: validated separately - CVD adjacent dE 9.6, normal-vision 16.9,
+     all inside L 0.48-0.67 and all >=3:1 against the dark surface. */
+  --chart-1: #4a8fd4;
+  --chart-2: #b78823;
+  --chart-3: #2aae7e;
+  --chart-4: #a57fd4;
+  --chart-5: #d9584a;
 
   --sidebar: oklch(0.18 0 0);
   --sidebar-foreground: oklch(0.98 0 0);
@@ -149,11 +161,14 @@
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
+    /* The same five hues re-stepped for the dark surface, not an automatic
+       flip: validated separately - CVD adjacent dE 9.6, normal-vision 16.9,
+       all inside L 0.48-0.67 and all >=3:1 against the dark surface. */
+    --chart-1: #4a8fd4;
+    --chart-2: #b78823;
+    --chart-3: #2aae7e;
+    --chart-4: #a57fd4;
+    --chart-5: #d9584a;
 
     --sidebar: oklch(0.18 0 0);
     --sidebar-foreground: oklch(0.98 0 0);

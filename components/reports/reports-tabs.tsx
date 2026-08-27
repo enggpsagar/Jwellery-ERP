@@ -105,9 +105,9 @@ type TabKey = (typeof TABS)[number]["key"]
 
 function StatCard({ title, value }: { title: string; value: string | number }) {
   return (
-    <div className="rounded-xl border bg-white p-5 shadow-sm">
-      <p className="text-sm text-gray-500">{title}</p>
-      <p className="mt-2 text-2xl font-semibold text-gray-900">{value}</p>
+    <div className="rounded-xl border bg-card p-5 shadow-sm">
+      <p className="text-sm text-muted-foreground">{title}</p>
+      <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
     </div>
   )
 }
@@ -157,7 +157,7 @@ export function ReportsTabs({
             <StatCard title="Outstanding" value={`₹${sales.totalOutstanding.toFixed(2)}`} />
           </div>
 
-          <div className="overflow-hidden rounded-xl border bg-white">
+          <div className="overflow-hidden rounded-xl border bg-card">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="border-b">
@@ -211,7 +211,7 @@ export function ReportsTabs({
             />
           </div>
 
-          <div className="overflow-hidden rounded-xl border bg-white">
+          <div className="overflow-hidden rounded-xl border bg-card">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="border-b">
@@ -240,7 +240,7 @@ export function ReportsTabs({
         <div className="space-y-6">
           <StatCard title="Open Jobs" value={karigarOutstanding.openJobCount} />
 
-          <div className="overflow-hidden rounded-xl border bg-white">
+          <div className="overflow-hidden rounded-xl border bg-card">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="border-b">
@@ -278,7 +278,7 @@ export function ReportsTabs({
             <StatCard title="Total Outstanding" value={`₹${customerDues.totalDue.toFixed(2)}`} />
           </div>
 
-          <div className="overflow-hidden rounded-xl border bg-white">
+          <div className="overflow-hidden rounded-xl border bg-card">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="border-b">
@@ -387,7 +387,7 @@ export function ReportsTabs({
             add a new metal there and it appears here automatically, no code change needed.
           </p>
 
-          <div className="overflow-x-auto rounded-xl border bg-white">
+          <div className="overflow-x-auto rounded-xl border bg-card">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="border-b">

@@ -53,12 +53,12 @@ export async function CustomerLedgerCard({
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-col gap-4 rounded-xl border bg-white p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-foreground">
             Customer Ledger
           </h2>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Add sale and refund/payment entries for this customer.
           </p>
         </div>
@@ -82,17 +82,17 @@ export async function CustomerLedgerCard({
         <div className="space-y-4">
           {summary.moneyActive && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-lg border bg-white p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-lg border bg-card p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Opening Balance
                 </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
+                <p className="mt-1 text-sm font-semibold text-foreground">
                   {formatAmount(summary.openingBalance)}
                 </p>
               </div>
 
-              <div className="rounded-lg border bg-white p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-lg border bg-card p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Total Sales (Debit)
                 </p>
                 <p className="mt-1 text-sm font-semibold text-red-600">
@@ -100,8 +100,8 @@ export async function CustomerLedgerCard({
                 </p>
               </div>
 
-              <div className="rounded-lg border bg-white p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-lg border bg-card p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Total Refund / Received (Credit)
                 </p>
                 <p className="mt-1 text-sm font-semibold text-green-600">
@@ -109,11 +109,11 @@ export async function CustomerLedgerCard({
                 </p>
               </div>
 
-              <div className="rounded-lg border bg-white p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-lg border bg-card p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Current Ledger Balance
                 </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
+                <p className="mt-1 text-sm font-semibold text-foreground">
                   {formatAmount(summary.currentBalance)}
                 </p>
               </div>
@@ -125,8 +125,8 @@ export async function CustomerLedgerCard({
 
             return (
               <div key={unit.unit} className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="rounded-lg border bg-white p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {unit.label} Debit
                   </p>
                   <p className="mt-1 text-sm font-semibold text-red-600">
@@ -134,8 +134,8 @@ export async function CustomerLedgerCard({
                   </p>
                 </div>
 
-                <div className="rounded-lg border bg-white p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {unit.label} Credit
                   </p>
                   <p className="mt-1 text-sm font-semibold text-green-600">
@@ -143,11 +143,11 @@ export async function CustomerLedgerCard({
                   </p>
                 </div>
 
-                <div className="rounded-lg border bg-white p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {unit.label} Balance
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                  <p className="mt-1 text-sm font-semibold text-foreground">
                     {format(unit.currentBalance)}
                   </p>
                 </div>
@@ -157,20 +157,20 @@ export async function CustomerLedgerCard({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="border-b px-4 py-4">
-          <h3 className="text-sm font-semibold text-gray-900">Ledger History</h3>
+          <h3 className="text-sm font-semibold text-foreground">Ledger History</h3>
         </div>
 
         {entries.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-500">
+          <div className="p-8 text-center text-sm text-muted-foreground">
             No ledger entries found for this customer.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full border-collapse text-sm">
               <thead className="bg-muted/40">
-                <tr className="text-left text-gray-600">
+                <tr className="text-left text-muted-foreground">
                   <th className="px-4 py-3 font-medium">Date</th>
                   <th className="px-4 py-3 font-medium">Entry Type</th>
                   <th className="px-4 py-3 font-medium">Unit</th>
@@ -184,7 +184,7 @@ export async function CustomerLedgerCard({
               <tbody>
                 {entries.map((entry) => (
                   <tr key={entry.id} className="border-t">
-                    <td className="px-4 py-3 text-gray-700">{entry.entryDate}</td>
+                    <td className="px-4 py-3 text-foreground">{entry.entryDate}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
@@ -196,11 +196,11 @@ export async function CustomerLedgerCard({
                         {entry.type}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td className="px-4 py-3 text-foreground">
                       {entry.metalType ?? "Money"}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">{entry.sourceType}</td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td className="px-4 py-3 text-foreground">{entry.sourceType}</td>
+                    <td className="px-4 py-3 text-foreground">
                       {entry.description || "-"}
                     </td>
                     <td className="px-4 py-3">
@@ -213,7 +213,7 @@ export async function CustomerLedgerCard({
                           {entry.invoiceNumber}
                         </Link>
                       ) : (
-                        <span className="text-xs text-gray-400">-</span>
+                        <span className="text-xs text-muted-foreground">-</span>
                       )}
                     </td>
                     <td

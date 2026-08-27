@@ -23,11 +23,11 @@ function DetailItem({
   value?: string | number | null
 }) {
   return (
-    <div className="rounded-lg border bg-white p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+    <div className="rounded-lg border bg-card p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-sm font-medium text-gray-900">
+      <p className="mt-1 text-sm font-medium text-foreground">
         {value !== undefined && value !== null && value !== "" ? value : "-"}
       </p>
     </div>
@@ -66,10 +66,10 @@ export default async function CustomerDetailsPage({
       {/* Customer Details */}
       <section className="space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-foreground">
             Customer Information
           </h2>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Complete profile information of this customer.
           </p>
         </div>
@@ -103,16 +103,16 @@ export default async function CustomerDetailsPage({
 
       {/* Address + Notes */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Address</h2>
-          <p className="mt-3 whitespace-pre-line text-sm text-gray-700">
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">Address</h2>
+          <p className="mt-3 whitespace-pre-line text-sm text-foreground">
             {customer.address || "-"}
           </p>
         </div>
 
-        <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Notes</h2>
-          <p className="mt-3 whitespace-pre-line text-sm text-gray-700">
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">Notes</h2>
+          <p className="mt-3 whitespace-pre-line text-sm text-foreground">
             {customer.notes || "-"}
           </p>
         </div>
@@ -121,10 +121,10 @@ export default async function CustomerDetailsPage({
       {/* Business Summary */}
       <section className="space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-foreground">
             Business Summary
           </h2>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Order and financial summary for this customer.
           </p>
         </div>

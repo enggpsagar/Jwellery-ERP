@@ -22,14 +22,14 @@ type PurchaseTableProps = {
 export function PurchaseTable({ purchases }: PurchaseTableProps) {
   if (!purchases.length) {
     return (
-      <div className="rounded-xl border bg-white p-6 text-sm text-muted-foreground">
+      <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
         No purchases found yet.
       </div>
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-white">
+    <div className="overflow-hidden rounded-xl border bg-card">
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40">

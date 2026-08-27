@@ -74,7 +74,7 @@ export default async function InventoryStockDetailsPage({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border bg-white p-5">
+        <section className="rounded-xl border bg-card p-5">
           <h2 className="mb-4 text-lg font-semibold">Basic Information</h2>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -151,7 +151,7 @@ export default async function InventoryStockDetailsPage({
           }
         />
 
-        <section className="rounded-xl border bg-white p-5">
+        <section className="rounded-xl border bg-card p-5">
           <h2 className="mb-4 text-lg font-semibold">Weight Details</h2>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -182,7 +182,7 @@ export default async function InventoryStockDetailsPage({
           </div>
         </section>
 
-        <section className="rounded-xl border bg-white p-5">
+        <section className="rounded-xl border bg-card p-5">
           <h2 className="mb-4 text-lg font-semibold">Pricing Details</h2>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -223,7 +223,7 @@ export default async function InventoryStockDetailsPage({
           </div>
         </section>
 
-        <section className="rounded-xl border bg-white p-5">
+        <section className="rounded-xl border bg-card p-5">
           <h2 className="mb-4 text-lg font-semibold">Source / Extra Details</h2>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

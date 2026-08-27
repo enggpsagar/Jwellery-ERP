@@ -77,14 +77,14 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md rounded-xl border bg-white p-6 shadow-sm">
+    <main className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
+      <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-sm">
 
         <h1 className="text-2xl font-semibold">
           Jewellery ERP
         </h1>
 
-        <p className="mt-2 text-sm text-gray-600">
+        <p className="mt-2 text-sm text-muted-foreground">
           Login using Google, your registered mobile number, or email.
         </p>
 
@@ -99,7 +99,7 @@ export default function LoginPage() {
           Continue with Google
         </button>
 
-        <div className="my-6 text-center text-sm text-gray-500">
+        <div className="my-6 text-center text-sm text-muted-foreground">
           ───── OR ─────
         </div>
 
@@ -108,7 +108,7 @@ export default function LoginPage() {
             type="button"
             onClick={() => switchMode("phone")}
             className={`flex-1 rounded-md px-3 py-1.5 ${
-              mode === "phone" ? "bg-black text-white" : "text-gray-600"
+              mode === "phone" ? "bg-black text-white" : "text-muted-foreground"
             }`}
           >
             Mobile Number
@@ -117,7 +117,7 @@ export default function LoginPage() {
             type="button"
             onClick={() => switchMode("email")}
             className={`flex-1 rounded-md px-3 py-1.5 ${
-              mode === "email" ? "bg-black text-white" : "text-gray-600"
+              mode === "email" ? "bg-black text-white" : "text-muted-foreground"
             }`}
           >
             Email

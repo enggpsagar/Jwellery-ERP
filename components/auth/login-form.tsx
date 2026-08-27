@@ -4,7 +4,7 @@ import { signIn } from "next-auth/react"
 
 export function LoginForm() {
   return (
-    <div className="w-full max-w-md rounded-xl border bg-white p-6 shadow-sm">
+    <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-sm">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Login</h1>
         <p className="text-sm text-muted-foreground">

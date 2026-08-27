@@ -85,7 +85,7 @@ export function ConvertToPakkaForm({
     <form action={formAction} className="space-y-6">
       <input type="hidden" name="taxAmount" value={taxAmount} />
 
-      <div className="rounded-xl border bg-white p-6 space-y-4">
+      <div className="rounded-xl border bg-card p-6 space-y-4">
         <h2 className="text-lg font-semibold">From Kacha Slip {kachaInvoice.slipNumber}</h2>
 
         <div className="overflow-hidden rounded-lg border">
@@ -114,7 +114,7 @@ export function ConvertToPakkaForm({
         </div>
       </div>
 
-      <div className="rounded-xl border bg-white p-6 space-y-4">
+      <div className="rounded-xl border bg-card p-6 space-y-4">
         <h2 className="text-lg font-semibold">GST Details</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

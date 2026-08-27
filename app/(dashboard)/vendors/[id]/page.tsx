@@ -20,11 +20,11 @@ function DetailItem({
   value?: string | number | null
 }) {
   return (
-    <div className="rounded-lg border bg-white p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+    <div className="rounded-lg border bg-card p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-sm font-medium text-gray-900">
+      <p className="mt-1 text-sm font-medium text-foreground">
         {value !== undefined && value !== null && value !== "" ? value : "-"}
       </p>
     </div>
@@ -48,12 +48,12 @@ export default async function VendorDetailsPage({
   return (
     <main className="space-y-6 p-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 rounded-xl border bg-white p-6 shadow-sm sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className="text-2xl font-semibold text-foreground">
             {vendor.name}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-muted-foreground">
             Vendor details and account information
           </p>
         </div>
@@ -64,10 +64,10 @@ export default async function VendorDetailsPage({
       {/* Vendor Details */}
       <section className="space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-foreground">
             Vendor Information
           </h2>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Complete profile information of this vendor.
           </p>
         </div>
@@ -101,16 +101,16 @@ export default async function VendorDetailsPage({
 
       {/* Address + Notes */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Address</h2>
-          <p className="mt-3 whitespace-pre-line text-sm text-gray-700">
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">Address</h2>
+          <p className="mt-3 whitespace-pre-line text-sm text-foreground">
             {vendor.address || "-"}
           </p>
         </div>
 
-        <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Notes</h2>
-          <p className="mt-3 whitespace-pre-line text-sm text-gray-700">
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">Notes</h2>
+          <p className="mt-3 whitespace-pre-line text-sm text-foreground">
             {vendor.notes || "-"}
           </p>
         </div>
@@ -119,10 +119,10 @@ export default async function VendorDetailsPage({
       {/* Business Summary */}
       <section className="space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-foreground">
             Business Summary
           </h2>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Order and financial summary for this vendor.
           </p>
         </div>

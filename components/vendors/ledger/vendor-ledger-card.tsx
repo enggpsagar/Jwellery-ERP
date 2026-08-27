@@ -17,28 +17,28 @@ export async function VendorLedgerCard({ vendorId }: VendorLedgerCardProps) {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl border bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900">Vendor Ledger</h2>
-        <p className="text-sm text-gray-500">
+      <div className="rounded-xl border bg-card p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-foreground">Vendor Ledger</h2>
+        <p className="text-sm text-muted-foreground">
           Ledger entries recorded against this vendor from purchases and
           payments.
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="border-b px-4 py-4">
-          <h3 className="text-sm font-semibold text-gray-900">Ledger History</h3>
+          <h3 className="text-sm font-semibold text-foreground">Ledger History</h3>
         </div>
 
         {entries.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-500">
+          <div className="p-8 text-center text-sm text-muted-foreground">
             No ledger entries found for this vendor.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full border-collapse text-sm">
               <thead className="bg-muted/40">
-                <tr className="text-left text-gray-600">
+                <tr className="text-left text-muted-foreground">
                   <th className="px-4 py-3 font-medium">Date</th>
                   <th className="px-4 py-3 font-medium">Entry Type</th>
                   <th className="px-4 py-3 font-medium">Source</th>
@@ -50,7 +50,7 @@ export async function VendorLedgerCard({ vendorId }: VendorLedgerCardProps) {
               <tbody>
                 {entries.map((entry) => (
                   <tr key={entry.id} className="border-t">
-                    <td className="px-4 py-3 text-gray-700">{entry.entryDate}</td>
+                    <td className="px-4 py-3 text-foreground">{entry.entryDate}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
@@ -62,8 +62,8 @@ export async function VendorLedgerCard({ vendorId }: VendorLedgerCardProps) {
                         {entry.type}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">{entry.sourceType}</td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td className="px-4 py-3 text-foreground">{entry.sourceType}</td>
+                    <td className="px-4 py-3 text-foreground">
                       {entry.description || "-"}
                     </td>
                     <td

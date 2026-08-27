@@ -17,7 +17,7 @@ const STATUS_STYLES: Record<InventoryStockStatus, string> = {
   RESERVED: "bg-yellow-100 text-yellow-700",
   ISSUED_TO_KARIGAR: "bg-purple-100 text-purple-700",
   DAMAGED: "bg-red-100 text-red-700",
-  ARCHIVED: "bg-gray-100 text-gray-600",
+  ARCHIVED: "bg-muted text-muted-foreground",
 };
 
 type StockStatusBadgeProps = {

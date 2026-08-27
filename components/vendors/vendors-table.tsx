@@ -72,18 +72,18 @@ export function VendorsTable({
 
   if (!vendors.length) {
     return (
-      <div className="rounded-lg border bg-white p-8 text-center text-sm text-gray-500">
+      <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
         No vendors found.
       </div>
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse text-sm">
           <thead className="bg-muted/40">
-            <tr className="text-left text-gray-600">
+            <tr className="text-left text-muted-foreground">
               <th className="w-12 px-4 py-3">
                 <input
                   ref={headerCheckboxRef}
@@ -91,7 +91,7 @@ export function VendorsTable({
                   checked={allSelected}
                   onChange={(e) => toggleAll(e.target.checked)}
                   aria-label="Select all vendors"
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-4 w-4 rounded border-input"
                 />
               </th>
               <th className="px-4 py-3 font-medium">Vendor Name</th>
@@ -115,11 +115,11 @@ export function VendorsTable({
                       checked={checked}
                       onChange={(e) => toggleOne(vendor.id, e.target.checked)}
                       aria-label={`Select ${vendor.name}`}
-                      className="h-4 w-4 rounded border-gray-300"
+                      className="h-4 w-4 rounded border-input"
                     />
                   </td>
 
-                  <td className="px-4 py-3 font-medium text-gray-900">
+                  <td className="px-4 py-3 font-medium text-foreground">
                     <Link
                       href={`/vendors/${vendor.id}`}
                       className="hover:underline"
@@ -128,19 +128,19 @@ export function VendorsTable({
                     </Link>
                   </td>
 
-                  <td className="px-4 py-3 text-gray-700">
+                  <td className="px-4 py-3 text-foreground">
                     {vendor.phone || "-"}
                   </td>
 
-                  <td className="px-4 py-3 text-gray-700">
+                  <td className="px-4 py-3 text-foreground">
                     {vendor.city || "-"}
                   </td>
 
-                  <td className="px-4 py-3 text-gray-700">
+                  <td className="px-4 py-3 text-foreground">
                     {vendor.state || "-"}
                   </td>
 
-                  <td className="px-4 py-3 text-gray-700">
+                  <td className="px-4 py-3 text-foreground">
                     ₹ {Number(vendor.openingBalance || 0).toLocaleString("en-IN")}
                   </td>
 

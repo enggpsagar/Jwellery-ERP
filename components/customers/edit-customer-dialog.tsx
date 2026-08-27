@@ -122,7 +122,7 @@ export function EditCustomerDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 text-gray-700 transition hover:bg-gray-50"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-foreground transition hover:bg-muted/40"
         aria-label={`Edit ${customer.name}`}
         title="Edit customer"
       >
@@ -138,7 +138,7 @@ export function EditCustomerDialog({
           {/* Name */}
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <User className="h-4 w-4 text-gray-500" />
+              <User className="h-4 w-4 text-muted-foreground" />
               Customer Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -155,7 +155,7 @@ export function EditCustomerDialog({
           {/* Phone */}
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Phone className="h-4 w-4 text-gray-500" />
+              <Phone className="h-4 w-4 text-muted-foreground" />
               Phone <span className="text-red-500">*</span>
             </label>
             <input
@@ -173,7 +173,7 @@ export function EditCustomerDialog({
           {/* Alternate Phone */}
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Phone className="h-4 w-4 text-gray-500" />
+              <Phone className="h-4 w-4 text-muted-foreground" />
               Alternate Phone
             </label>
             <input
@@ -186,7 +186,7 @@ export function EditCustomerDialog({
           {/* Email */}
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Mail className="h-4 w-4 text-gray-500" />
+              <Mail className="h-4 w-4 text-muted-foreground" />
               Email
             </label>
             <input
@@ -200,7 +200,7 @@ export function EditCustomerDialog({
           {/* Address */}
           <div className="space-y-1 md:col-span-2">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <MapPin className="h-4 w-4 text-gray-500" />
+              <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
             </label>
             <textarea
@@ -214,7 +214,7 @@ export function EditCustomerDialog({
           {/* State */}
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <MapPin className="h-4 w-4 text-gray-500" />
+              <MapPin className="h-4 w-4 text-muted-foreground" />
               State
             </label>
             <select
@@ -240,7 +240,7 @@ export function EditCustomerDialog({
           {/* City */}
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <MapPin className="h-4 w-4 text-gray-500" />
+              <MapPin className="h-4 w-4 text-muted-foreground" />
               City
             </label>
             <select
@@ -263,7 +263,7 @@ export function EditCustomerDialog({
           {/* Pincode */}
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Hash className="h-4 w-4 text-gray-500" />
+              <Hash className="h-4 w-4 text-muted-foreground" />
               Pincode
             </label>
             <input
@@ -276,7 +276,7 @@ export function EditCustomerDialog({
           {/* GST */}
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Hash className="h-4 w-4 text-gray-500" />
+              <Hash className="h-4 w-4 text-muted-foreground" />
               GST Number
             </label>
             <input
@@ -289,7 +289,7 @@ export function EditCustomerDialog({
           {/* Opening Balance */}
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <IndianRupee className="h-4 w-4 text-gray-500" />
+              <IndianRupee className="h-4 w-4 text-muted-foreground" />
               Opening Balance
             </label>
             <input

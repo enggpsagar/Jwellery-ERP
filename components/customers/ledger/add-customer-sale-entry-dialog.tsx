@@ -106,7 +106,7 @@ export function AddCustomerSaleEntryDialog({
           {(unit === "DIAMOND" || isWeightBased) && (
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-sm font-medium">
-                <Scale className="h-4 w-4 text-gray-500" />
+                <Scale className="h-4 w-4 text-muted-foreground" />
                 {BUSINESS_UNIT_LABELS[unit]} Type <span className="text-red-500">*</span>
               </label>
               <select
@@ -130,7 +130,7 @@ export function AddCustomerSaleEntryDialog({
           {isWeightBased ? (
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-sm font-medium">
-                <Scale className="h-4 w-4 text-gray-500" />
+                <Scale className="h-4 w-4 text-muted-foreground" />
                 Weight (grams) <span className="text-red-500">*</span>
               </label>
               <input
@@ -149,7 +149,7 @@ export function AddCustomerSaleEntryDialog({
           ) : (
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-sm font-medium">
-                <IndianRupee className="h-4 w-4 text-gray-500" />
+                <IndianRupee className="h-4 w-4 text-muted-foreground" />
                 Sale Amount <span className="text-red-500">*</span>
               </label>
               <input
@@ -169,7 +169,7 @@ export function AddCustomerSaleEntryDialog({
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <NotebookText className="h-4 w-4 text-gray-500" />
+              <NotebookText className="h-4 w-4 text-muted-foreground" />
               Description
             </label>
             <textarea

@@ -45,7 +45,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
         <form action={formAction} className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <StoreIcon className="h-4 w-4 text-gray-500" />
+              <StoreIcon className="h-4 w-4 text-muted-foreground" />
               Store Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -61,7 +61,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Hash className="h-4 w-4 text-gray-500" />
+              <Hash className="h-4 w-4 text-muted-foreground" />
               Store Code <span className="text-red-500">*</span>
             </label>
             <input
@@ -77,7 +77,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
 
           <div className="space-y-1 md:col-span-2">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <MapPin className="h-4 w-4 text-gray-500" />
+              <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
             </label>
             <input
@@ -125,7 +125,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Phone className="h-4 w-4 text-gray-500" />
+              <Phone className="h-4 w-4 text-muted-foreground" />
               Phone <span className="text-red-500">*</span>
             </label>
             <input
@@ -142,7 +142,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Mail className="h-4 w-4 text-gray-500" />
+              <Mail className="h-4 w-4 text-muted-foreground" />
               Email <span className="text-red-500">*</span>
             </label>
             <input

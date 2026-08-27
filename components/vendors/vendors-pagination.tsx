@@ -30,8 +30,8 @@ export function VendorsPagination({
   const end = Math.min(page * pageSize, totalCount)
 
   return (
-    <div className="flex flex-col gap-3 rounded-b-xl border-t bg-gray-50 px-4 py-3 text-sm md:flex-row md:items-center md:justify-between">
-      <p className="text-gray-600">
+    <div className="flex flex-col gap-3 rounded-b-xl border-t bg-muted/40 px-4 py-3 text-sm md:flex-row md:items-center md:justify-between">
+      <p className="text-muted-foreground">
         Showing <span className="font-medium">{start}</span> to{" "}
         <span className="font-medium">{end}</span> of{" "}
         <span className="font-medium">{totalCount}</span> vendors
@@ -46,7 +46,7 @@ export function VendorsPagination({
           Previous
         </Button>
 
-        <span className="px-2 text-sm text-gray-600">
+        <span className="px-2 text-sm text-muted-foreground">
           Page {page} of {totalPages}
         </span>
 

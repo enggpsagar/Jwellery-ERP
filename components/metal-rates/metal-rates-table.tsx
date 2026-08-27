@@ -68,7 +68,7 @@ export function MetalRatesTable({ data }: Props) {
 
   function getTrend(current: number, previous?: number) {
     if (previous === undefined) {
-      return <Minus className="h-4 w-4 text-gray-400" />;
+      return <Minus className="h-4 w-4 text-muted-foreground" />;
     }
 
     if (current > previous) {
@@ -79,7 +79,7 @@ export function MetalRatesTable({ data }: Props) {
       return <TrendingDown className="h-4 w-4 text-red-600" />;
     }
 
-    return <Minus className="h-4 w-4 text-gray-400" />;
+    return <Minus className="h-4 w-4 text-muted-foreground" />;
   }
   function renderPrice(current: number, previous?: number) {
     if (previous === undefined || previous === null) {
@@ -89,7 +89,7 @@ export function MetalRatesTable({ data }: Props) {
             ₹{current.toFixed(2)}
           </span>
 
-          <span className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+          <span className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
             <Minus className="h-3 w-3" />
             --
           </span>
@@ -133,7 +133,7 @@ export function MetalRatesTable({ data }: Props) {
       <div className="flex flex-col items-end">
         <span className="font-bold text-orange-600">₹{current.toFixed(2)}</span>
 
-        <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+        <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
           <Minus className="h-3 w-3" />
           ₹0.00
         </span>

@@ -28,7 +28,7 @@ export function StockQrCard({
   manufactureDate,
 }: StockQrCardProps) {
   return (
-    <section className="rounded-xl border bg-white p-5">
+    <section className="rounded-xl border bg-card p-5">
       {/*
         Scoped print stylesheet: this is the only place in the app that
         prints anything, so the rule is kept fully self-contained here

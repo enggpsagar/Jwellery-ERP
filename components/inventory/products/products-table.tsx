@@ -82,14 +82,14 @@ export function ProductsTable({
 
   if (!products.length) {
     return (
-      <div className="rounded-xl border bg-white p-6 text-sm text-muted-foreground">
+      <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
         No products found yet.
       </div>
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-white">
+    <div className="overflow-hidden rounded-xl border bg-card">
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40">
@@ -101,7 +101,7 @@ export function ProductsTable({
                   checked={allSelected}
                   onChange={(e) => toggleAll(e.target.checked)}
                   aria-label="Select all products"
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-4 w-4 rounded border-input"
                 />
               </th>
               <th className="px-4 py-3 text-left font-medium">Product Code</th>
@@ -127,7 +127,7 @@ export function ProductsTable({
                       checked={checked}
                       onChange={(e) => toggleOne(product.id, e.target.checked)}
                       aria-label={`Select ${product.name}`}
-                      className="h-4 w-4 rounded border-gray-300"
+                      className="h-4 w-4 rounded border-input"
                     />
                   </td>
                   <td className="px-4 py-3">
@@ -145,7 +145,7 @@ export function ProductsTable({
                       className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
                         product.isActive
                           ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-600"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {product.isActive ? "Active" : "Inactive"}

@@ -54,14 +54,14 @@ export function KarigarTable({
 
   if (!karigars.length) {
     return (
-      <div className="rounded-xl border bg-white p-6 text-sm text-muted-foreground">
+      <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
         No karigars found yet.
       </div>
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-white">
+    <div className="overflow-hidden rounded-xl border bg-card">
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40">
@@ -115,7 +115,7 @@ export function KarigarTable({
                     className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
                       karigar.isActive
                         ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-600"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {karigar.isActive ? "Active" : "Inactive"}

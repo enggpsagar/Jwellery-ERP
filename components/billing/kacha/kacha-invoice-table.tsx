@@ -71,14 +71,14 @@ export function KachaInvoiceTable({
 
   if (!kachaInvoices.length) {
     return (
-      <div className="rounded-xl border bg-white p-6 text-sm text-muted-foreground">
+      <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
         No Kacha slips found yet.
       </div>
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-white">
+    <div className="overflow-hidden rounded-xl border bg-card">
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40">
@@ -90,7 +90,7 @@ export function KachaInvoiceTable({
                   checked={allSelected}
                   onChange={(event) => toggleAll(event.target.checked)}
                   aria-label="Select all kacha slips on this page"
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-4 w-4 rounded border-input"
                 />
               </th>
               <th className="px-4 py-3 text-left font-medium">Slip #</th>
@@ -115,7 +115,7 @@ export function KachaInvoiceTable({
                       toggleOne(kachaInvoice.id, event.target.checked)
                     }
                     aria-label={`Select slip ${kachaInvoice.slipNumber}`}
-                    className="h-4 w-4 rounded border-gray-300"
+                    className="h-4 w-4 rounded border-input"
                   />
                 </td>
                 <td className="px-4 py-3 font-medium">

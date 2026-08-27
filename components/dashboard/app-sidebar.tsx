@@ -170,7 +170,7 @@ const ACTIVE_NAV_CLASS = [
   "data-active:border-l-[var(--chart-2)]",
   // Inactive items sit back until hovered, so the active one is the only
   // thing competing for attention.
-  "text-white/70 hover:text-white hover:bg-white/5",
+  "text-white/70 hover:text-white hover:bg-card/5",
 ].join(" ");
 
 function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string }) {

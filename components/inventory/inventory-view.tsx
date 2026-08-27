@@ -25,13 +25,13 @@ function SummaryCard({
   icon: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl border bg-white p-5 shadow-sm">
+    <div className="rounded-xl border bg-card p-5 shadow-sm">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-gray-500">{title}</p>
-          <p className="mt-2 text-2xl font-semibold text-gray-900">{value}</p>
+          <p className="text-sm text-muted-foreground">{title}</p>
+          <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
         </div>
-        <div className="rounded-lg bg-gray-50 p-2 text-gray-700">{icon}</div>
+        <div className="rounded-lg bg-muted/40 p-2 text-foreground">{icon}</div>
       </div>
     </div>
   )
@@ -80,9 +80,9 @@ export function InventoryView({ products, stockItems }: InventoryViewProps) {
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Products</h2>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">Products</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             Product masters define the design / catalogue level of jewellery.
           </p>
           <div className="mt-4">
@@ -95,9 +95,9 @@ export function InventoryView({ products, stockItems }: InventoryViewProps) {
           </div>
         </div>
 
-        <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Stock</h2>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">Stock</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             Stock entries are the actual physical items with their real
             weight, purity, pricing and status.
           </p>

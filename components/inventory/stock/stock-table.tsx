@@ -97,14 +97,14 @@ export function StockTable({
 
   if (!stockItems.length) {
     return (
-      <div className="rounded-xl border bg-white p-6 text-sm text-muted-foreground">
+      <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
         No inventory stock found yet.
       </div>
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-white">
+    <div className="overflow-hidden rounded-xl border bg-card">
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40">
@@ -116,7 +116,7 @@ export function StockTable({
                   checked={allSelected}
                   onChange={(e) => toggleAll(e.target.checked)}
                   aria-label="Select all stock items"
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-4 w-4 rounded border-input"
                 />
               </th>
               <th className="px-4 py-3 text-left font-medium">Stock Code</th>
@@ -148,7 +148,7 @@ export function StockTable({
                       checked={checked}
                       onChange={(e) => toggleOne(item.id, e.target.checked)}
                       aria-label={`Select ${item.stockCode}`}
-                      className="h-4 w-4 rounded border-gray-300"
+                      className="h-4 w-4 rounded border-input"
                     />
                   </td>
 

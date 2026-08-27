@@ -35,7 +35,7 @@ export function StockToolbar({ selectedIds }: StockToolbarProps) {
         exportAction={exportInventoryStockToExcel}
       />
 
-      <div className="flex flex-col gap-3 rounded-xl border bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           {selectedIds.length > 0
             ? `${selectedIds.length} item${selectedIds.length === 1 ? "" : "s"} selected`

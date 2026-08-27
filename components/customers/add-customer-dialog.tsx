@@ -132,7 +132,7 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
         >
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <User className="h-4 w-4 text-gray-500" />
+              <User className="h-4 w-4 text-muted-foreground" />
               Customer Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -148,7 +148,7 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Phone className="h-4 w-4 text-gray-500" />
+              <Phone className="h-4 w-4 text-muted-foreground" />
               Phone <span className="text-red-500">*</span>
             </label>
             <input
@@ -165,7 +165,7 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Phone className="h-4 w-4 text-gray-500" />
+              <Phone className="h-4 w-4 text-muted-foreground" />
               Alternate Phone
             </label>
             <input
@@ -178,7 +178,7 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Mail className="h-4 w-4 text-gray-500" />
+              <Mail className="h-4 w-4 text-muted-foreground" />
               Email
             </label>
             <input
@@ -191,7 +191,7 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
 
           <div className="space-y-1 md:col-span-2">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <MapPin className="h-4 w-4 text-gray-500" />
+              <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
             </label>
             <textarea
@@ -204,7 +204,7 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <MapPin className="h-4 w-4 text-gray-500" />
+              <MapPin className="h-4 w-4 text-muted-foreground" />
               State
             </label>
             <select
@@ -229,7 +229,7 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <MapPin className="h-4 w-4 text-gray-500" />
+              <MapPin className="h-4 w-4 text-muted-foreground" />
               City
             </label>
             <select
@@ -251,7 +251,7 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Hash className="h-4 w-4 text-gray-500" />
+              <Hash className="h-4 w-4 text-muted-foreground" />
               Pincode
             </label>
             <input
@@ -263,7 +263,7 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Hash className="h-4 w-4 text-gray-500" />
+              <Hash className="h-4 w-4 text-muted-foreground" />
               GST Number
             </label>
             <input
@@ -275,7 +275,7 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <IndianRupee className="h-4 w-4 text-gray-500" />
+              <IndianRupee className="h-4 w-4 text-muted-foreground" />
               Opening Balance
             </label>
             <input

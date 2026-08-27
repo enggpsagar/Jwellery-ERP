@@ -75,7 +75,7 @@ export default async function QuotationDetailPage({ params }: Props) {
         }
       />
 
-      <div className="rounded-xl border bg-white p-6 space-y-4">
+      <div className="rounded-xl border bg-card p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground">Status</p>
@@ -119,7 +119,7 @@ export default async function QuotationDetailPage({ params }: Props) {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border bg-white">
+      <div className="overflow-hidden rounded-xl border bg-card">
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40">
             <tr className="border-b">
@@ -155,7 +155,7 @@ export default async function QuotationDetailPage({ params }: Props) {
         </table>
       </div>
 
-      <div className="rounded-xl border bg-white p-6 max-w-sm ml-auto space-y-1 text-sm">
+      <div className="rounded-xl border bg-card p-6 max-w-sm ml-auto space-y-1 text-sm">
         <div className="flex justify-between">
           <span>Subtotal</span>
           <span>₹{quotation.subtotal.toFixed(2)}</span>
@@ -183,7 +183,7 @@ export default async function QuotationDetailPage({ params }: Props) {
       </div>
 
       {quotation.notes && (
-        <div className="rounded-xl border bg-white p-6">
+        <div className="rounded-xl border bg-card p-6">
           <p className="text-sm text-muted-foreground">Notes</p>
           <p className="font-medium">{quotation.notes}</p>
         </div>

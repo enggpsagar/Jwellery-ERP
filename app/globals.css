@@ -197,3 +197,53 @@
     @apply font-sans;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Data tables
+   ---------------------------------------------------------------------------
+   Styled here rather than in each component: the app has 24 tables, 17 of
+   them raw <table> markup with their own class strings, so a sweep across
+   files would drift the moment someone adds the 25th. These rules key off
+   structure every one of them already has.
+
+   Scoped to tables inside a bordered card, which is how every data table in
+   the app is wrapped — this deliberately does not touch a bare <table> used
+   for layout (the email templates build their own, and are server-rendered
+   strings that never see this stylesheet anyway).
+--------------------------------------------------------------------------- */
+@layer components {
+  /* Header: small, tracked, uppercase — the convention that reads as a
+     considered table rather than bold body text. */
+  table thead th {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+  }
+
+  /* A gold hairline under the header, matching the top bar's divider, so the
+     header reads as a distinct band without a heavy fill. */
+  table thead tr {
+    border-bottom: 1px solid
+      color-mix(in oklab, var(--chart-2) 28%, var(--border));
+  }
+
+  /* Row hover: the affordance that makes a long list feel navigable. Applied
+     to tbody only, so the header row never lights up. */
+  table tbody tr {
+    transition: background-color 120ms ease;
+  }
+
+  table tbody tr:hover {
+    background-color: color-mix(in oklab, var(--chart-2) 6%, transparent);
+  }
+
+  /* Figures line up in columns. Applied to the whole table because these are
+     financial tables where nearly every numeric column matters, and a
+     per-cell class would have to be added by hand in 17 files. */
+  table tbody td {
+    font-variant-numeric: tabular-nums;
+  }
+}

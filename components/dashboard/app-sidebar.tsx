@@ -158,8 +158,20 @@ function isNavItemActive(pathname: string, href: string) {
 // The sidebar is hardcoded dark (bg-zinc-950) regardless of the app's light/dark
 // mode, so the active state must use the sidebar-specific accent tokens — the
 // plain `primary` token resolves to near-black in light mode and is invisible here.
-const ACTIVE_NAV_CLASS =
-  "data-active:!bg-sidebar-primary/25 data-active:!text-sidebar-primary data-active:font-semibold data-active:border-l-2 data-active:border-sidebar-primary";
+// The sidebar is a fixed dark surface, so it cannot use the theme's
+// `sidebar-primary` token — that resolves near-black in light mode and
+// disappears here. Gold from the chart palette instead: a left rail plus a
+// faint wash, which marks the active item without a heavy filled pill.
+const ACTIVE_NAV_CLASS = [
+  "data-active:!bg-[color-mix(in_oklab,var(--chart-2)_16%,transparent)]",
+  "data-active:!text-[color-mix(in_oklab,var(--chart-2)_75%,white)]",
+  "data-active:font-semibold",
+  "data-active:border-l-2",
+  "data-active:border-l-[var(--chart-2)]",
+  // Inactive items sit back until hovered, so the active one is the only
+  // thing competing for attention.
+  "text-white/70 hover:text-white hover:bg-white/5",
+].join(" ");
 
 function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string }) {
   const Icon = item.icon;
@@ -248,11 +260,16 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
   return (
     <Sidebar
       collapsible="icon"
-      className="bg-zinc-950 text-white border-r border-zinc-800"
+      // A warm near-black rather than flat zinc: zinc is a cool grey, which
+      // fights the gold accent. The right edge carries the same gold hairline
+      // as the top bar so the two chrome surfaces agree.
+      className="border-r border-r-transparent bg-[#12100d] text-white [border-image:linear-gradient(180deg,color-mix(in_oklab,var(--chart-2)_34%,transparent),transparent_60%)_1]"
     >
-      <SidebarHeader className="border-b">
+      <SidebarHeader className="border-b border-white/10">
         <div className="flex items-center gap-3 px-2 py-2">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary text-primary-foreground">
+          {/* Gold, not `bg-primary` — primary resolves to near-black, which
+              is invisible against this surface. */}
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[color-mix(in_oklab,var(--chart-2)_88%,black)] text-white shadow-[0_0_0_1px_color-mix(in_oklab,var(--chart-2)_45%,transparent)]">
             {storeLogoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -274,7 +291,9 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
+            Workspace
+          </SidebarGroupLabel>
 
           <SidebarGroupContent>
             <SidebarMenu>
@@ -287,7 +306,9 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
 
         {showSettings && (
           <SidebarGroup>
-            <SidebarGroupLabel>System</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
+              System
+            </SidebarGroupLabel>
 
             <SidebarGroupContent>
               <SidebarMenu>
@@ -310,7 +331,7 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t">
+      <SidebarFooter className="border-t border-white/10">
         <div className="flex items-center gap-3 px-2 py-2">
           <Avatar className="h-8 w-8">
             <AvatarFallback className="font-semibold" style={avatar.style}>

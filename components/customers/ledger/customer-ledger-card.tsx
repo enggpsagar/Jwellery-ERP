@@ -169,7 +169,7 @@ export async function CustomerLedgerCard({
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full border-collapse text-sm">
-              <thead className="bg-gray-50">
+              <thead className="bg-muted/40">
                 <tr className="text-left text-gray-600">
                   <th className="px-4 py-3 font-medium">Date</th>
                   <th className="px-4 py-3 font-medium">Entry Type</th>

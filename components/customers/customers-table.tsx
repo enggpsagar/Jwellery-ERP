@@ -82,7 +82,7 @@ export function CustomersTable({
     <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse text-sm">
-          <thead className="bg-gray-50">
+          <thead className="bg-muted/40">
             <tr className="text-left text-gray-600">
               <th className="w-12 px-4 py-3">
                 <input

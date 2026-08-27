@@ -109,6 +109,28 @@ async function generateInvoiceNumber(storeId: string) {
   return `INV-${year}-${String(count + 1).padStart(4, "0")}`;
 }
 
+/**
+ * One line item as the UI sees it. `mapInvoice` takes `any`, so without
+ * naming this the mapped items came out as `any[]` and every consumer's
+ * `.map(item => ...)` callback was an implicit any.
+ */
+export type InvoiceItemView = {
+  id: string;
+  itemName: string;
+  metalTypeId: string | null;
+  purity: PurityType | null;
+  quantity: number;
+  grossWeight: number | null;
+  netWeight: number | null;
+  rate: number | null;
+  makingCharge: number;
+  makingChargeType: ChargeType;
+  stoneCharge: number;
+  dmoWeight: number | null;
+  lineTotal: number;
+  inventoryStockId: string | null;
+};
+
 function mapInvoice(invoice: any) {
   return {
     id: invoice.id,
@@ -132,7 +154,10 @@ function mapInvoice(invoice: any) {
           phone: invoice.customer.phone,
         }
       : null,
-    items: (invoice.items ?? []).map((item: any) => ({
+    // Cast the array, not just the callback: `.map()` on an `any` returns
+    // `any` whatever the callback is annotated to produce, so without this
+    // the typed item shape never reaches consumers.
+    items: ((invoice.items ?? []) as any[]).map((item): InvoiceItemView => ({
       id: item.id,
       itemName: item.itemName,
       metalTypeId: item.metalTypeId,

@@ -31,9 +31,15 @@ type StoreOption = {
 type TopBarProps = {
   stores?: StoreOption[];
   activeStoreId?: string | null;
+  /** Super Admin, or anyone holding more than one store membership. */
+  canSwitchStores?: boolean;
 };
 
-export function TopBar({ stores = [], activeStoreId = null }: TopBarProps) {
+export function TopBar({
+  stores = [],
+  activeStoreId = null,
+  canSwitchStores = false,
+}: TopBarProps) {
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
   // A user whose module access doesn't cover Billing gets no billing entry
@@ -59,7 +65,9 @@ export function TopBar({ stores = [], activeStoreId = null }: TopBarProps) {
 
       <GlobalSearch />
 
-      {isSuperAdmin && (
+      {/* Shown to a Super Admin, and to any user who belongs to more than
+          one store. A single-store user has nothing to choose. */}
+      {canSwitchStores && stores.length > 0 && (
         <StoreSwitcher stores={stores} activeStoreId={activeStoreId} />
       )}
 

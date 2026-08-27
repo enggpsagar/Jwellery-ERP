@@ -165,6 +165,30 @@ async function assertKarigarInStore(karigarId: string | null, storeId: string) {
  * already belong to a store, or to Super Admin, are never silently
  * reassigned — that would let one store's Admin hijack another store's user.
  */
+/**
+ * Records this user's access to the store, which is what store scoping and
+ * permission checks now read. Written alongside the User row rather than
+ * instead of it: `User.storeId`/`role`/`permissions` stay as the fallback for
+ * accounts that predate this table.
+ *
+ * Upsert rather than create — a person rejoining a store they previously
+ * left already has a row, and it must be reactivated with the access the new
+ * invitation grants, not left carrying whatever it held before.
+ */
+async function upsertMembership(
+  userId: string,
+  storeId: string,
+  data: Pick<CreateUserInput, "role" | "permissions" | "isActive">,
+) {
+  const permissions = data.role === UserRole.STAFF ? (data.permissions ?? []) : [];
+
+  await prisma.userStoreMembership.upsert({
+    where: { userId_storeId: { userId, storeId } },
+    update: { role: data.role, permissions, isActive: data.isActive },
+    create: { userId, storeId, role: data.role, permissions, isActive: data.isActive },
+  });
+}
+
 export async function createUser(
   data: CreateUserInput,
   storeId: string
@@ -241,6 +265,8 @@ export async function createUser(
       },
     });
 
+    await upsertMembership(user.id, storeId, data);
+
     return { user, claimed: true };
   }
 
@@ -258,6 +284,8 @@ export async function createUser(
       locationAccess: { create: locationIds.map((locationId) => ({ locationId })) },
     },
   });
+
+  await upsertMembership(user.id, storeId, data);
 
   return { user, claimed: false };
 }
@@ -290,10 +318,21 @@ export async function updateUser(data: UpdateUserInput, storeId: string) {
     throw new Error("User not found");
   }
 
+  // Access for the store being edited. Without this the User row would say
+  // one thing and the membership another, and permission checks read the
+  // membership — so changing someone's role here would have had no effect.
+  await upsertMembership(id, storeId, payload);
+
   // updateMany can't do nested relation writes — sync location grants
   // separately now that ownership (id + storeId) is already confirmed above.
+  //
+  // Scoped to this store's locations: a plain `{ userId: id }` delete would
+  // also wipe the grants a multi-store user holds in every other store,
+  // silently revoking access the editing store never had any say over.
   await prisma.$transaction([
-    prisma.userLocationAccess.deleteMany({ where: { userId: id } }),
+    prisma.userLocationAccess.deleteMany({
+      where: { userId: id, location: { storeId } },
+    }),
     ...(locationIds.length
       ? [
           prisma.userLocationAccess.createMany({

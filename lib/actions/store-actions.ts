@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import { UserRole, UserStatus, InventoryStockStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth/auth";
+import { requireAuth, requireRole } from "@/lib/auth/auth";
 import { ACTIVE_STORE_COOKIE } from "@/lib/store-context";
 import { buildExcelExport } from "@/lib/excel-export";
 import { classifyMetalName } from "@/lib/business-units";
@@ -490,7 +490,27 @@ export async function updateStore(
 }
 
 export async function setActiveStoreAction(storeId: string) {
-  await requireRole(UserRole.SUPER_ADMIN);
+  // Switching is no longer Super-Admin-only: a person who works across two
+  // shops picks between them here too. Membership is what authorises it, so
+  // the check is "may this user act on this store", not "is this user a
+  // Super Admin" — otherwise the cookie could be pointed at any store.
+  const user = await requireAuth();
+
+  if (user.role !== UserRole.SUPER_ADMIN) {
+    const membership = await prisma.userStoreMembership.findFirst({
+      where: {
+        userId: user.id,
+        storeId,
+        isActive: true,
+        store: { isActive: true },
+      },
+      select: { id: true },
+    });
+
+    if (!membership) {
+      throw new Error("You do not have access to that store.");
+    }
+  }
 
   const store = await prisma.store.findUnique({ where: { id: storeId } });
   if (!store) throw new Error("Store not found");
@@ -507,7 +527,9 @@ export async function setActiveStoreAction(storeId: string) {
 }
 
 export async function clearActiveStoreAction() {
-  await requireRole(UserRole.SUPER_ADMIN);
+  // Anyone may clear their own selection; it only removes a cookie, and
+  // resolution falls back to their own membership.
+  await requireAuth();
 
   const cookieStore = await cookies();
   cookieStore.delete(ACTIVE_STORE_COOKIE);

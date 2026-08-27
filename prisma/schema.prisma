@@ -23,6 +23,7 @@ model Store {
   updatedAt DateTime @updatedAt
 
   users            User[]
+  userMemberships  UserStoreMembership[]
   customers        Customer[]
   karigars         Karigar[]
   products         Product[]
@@ -80,6 +81,38 @@ model StoreLocation {
  * through Karigar.locationId instead, since a User with role KARIGAR is
  * always 1:1 with a Karigar row via User.karigarId).
  */
+/**
+ * A person's access to one store. Someone who works across several stores
+ * has one row per store, each carrying its own role and module permissions.
+ *
+ * `User` stays globally unique on email and phone and is NOT duplicated per
+ * store: the NextAuth Prisma adapter resolves Google sign-in through
+ * `findUnique({ where: { email } })`, and OTP login does the same on phone,
+ * so a second row for the same person would break authentication outright.
+ * One login, many memberships.
+ *
+ * `User.storeId` / `User.role` / `User.permissions` remain as the default
+ * membership for accounts that predate this table, and are what a single-
+ * store user still resolves to. Membership rows win when present.
+ */
+model UserStoreMembership {
+  id          String   @id @default(cuid())
+  userId      String
+  storeId     String
+  role        UserRole @default(STAFF)
+  permissions String[] @default([])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, storeId])
+  @@index([userId])
+  @@index([storeId])
+}
+
 model UserLocationAccess {
   id         String        @id @default(cuid())
   userId     String
@@ -832,6 +865,7 @@ model User {
   accounts            Account[]
   employee            Employee?
   store               Store?        @relation(fields: [storeId], references: [id])
+  storeMemberships    UserStoreMembership[]
   karigar             Karigar?      @relation(fields: [karigarId], references: [id])
   createdInviteTokens InviteToken[] @relation("UserCreatedInvites")
   inviteTokens        InviteToken[] @relation("InviteTokenUser")

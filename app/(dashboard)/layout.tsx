@@ -4,7 +4,10 @@ import { UserRole } from "@prisma/client";
 
 import { authOptions } from "@/lib/auth/auth-options";
 import { prisma } from "@/lib/prisma";
-import { getEffectiveStoreId } from "@/lib/store-context";
+import {
+  getEffectiveStoreId,
+  getUserStoreMemberships,
+} from "@/lib/store-context";
 
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { TopBar } from "@/components/dashboard/top-bar";
@@ -27,7 +30,11 @@ export default async function DashboardLayout({
 
   const isSuperAdmin = session.user.role === UserRole.SUPER_ADMIN;
 
-  const [stores, activeStoreId, storeBranding] = await Promise.all([
+  // Super Admin reaches every store; everyone else reaches the stores they
+  // hold a membership in. Someone who works across two shops now gets the
+  // same switcher, rather than being pinned to whichever store their User
+  // row happened to name.
+  const [allStores, memberships, activeStoreId] = await Promise.all([
     isSuperAdmin
       ? prisma.store.findMany({
           where: { isActive: true },
@@ -35,14 +42,26 @@ export default async function DashboardLayout({
           select: { id: true, name: true, code: true },
         })
       : Promise.resolve([]),
-    isSuperAdmin ? getEffectiveStoreId() : Promise.resolve(null),
-    !isSuperAdmin && session.user.storeId
-      ? prisma.store.findUnique({
-          where: { id: session.user.storeId },
-          select: { name: true, businessSettings: { select: { logoUrl: true } } },
-        })
-      : Promise.resolve(null),
+    isSuperAdmin ? Promise.resolve([]) : getUserStoreMemberships(),
+    getEffectiveStoreId(),
   ]);
+
+  const stores = isSuperAdmin
+    ? allStores
+    : memberships.map((m) => ({
+        id: m.storeId,
+        name: m.storeName,
+        code: m.storeCode,
+      }));
+
+  // Brand the sidebar with the store actually being worked in, not the one
+  // on the User row — those differ the moment someone switches.
+  const storeBranding = activeStoreId
+    ? await prisma.store.findUnique({
+        where: { id: activeStoreId },
+        select: { name: true, businessSettings: { select: { logoUrl: true } } },
+      })
+    : null;
 
   return (
     <SidebarProvider>
@@ -52,7 +71,11 @@ export default async function DashboardLayout({
       />
 
       <SidebarInset>
-        <TopBar stores={stores} activeStoreId={activeStoreId} />
+        <TopBar
+          stores={stores}
+          activeStoreId={activeStoreId}
+          canSwitchStores={isSuperAdmin || stores.length > 1}
+        />
 
         <main className="flex flex-1 flex-col bg-slate-50 p-6">
           {children}

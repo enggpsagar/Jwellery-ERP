@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { getPurchaseById } from "@/lib/actions/purchase-actions"
@@ -46,9 +47,17 @@ export default async function PurchaseDetailPage({ params }: Props) {
 
           <div>
             <p className="text-sm text-muted-foreground">Vendor</p>
-            <p className="font-medium">
-              {purchase.vendor?.name} {purchase.vendor?.phone ? `(${purchase.vendor.phone})` : ""}
-            </p>
+            {purchase.vendor ? (
+              <Link
+                href={`/vendors/${purchase.vendor.id}?from=${encodeURIComponent(`/purchases/${purchase.id}`)}`}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {purchase.vendor.name}
+                {purchase.vendor.phone ? ` (${purchase.vendor.phone})` : ""}
+              </Link>
+            ) : (
+              <p className="font-medium">—</p>
+            )}
           </div>
         </div>
       </div>

@@ -1,9 +1,15 @@
 // app/customers/[id]/page.tsx
 import { notFound } from "next/navigation"
+import { IndianRupee, MapPin, User } from "lucide-react"
 
 import { getCustomerById } from "@/lib/actions/customer-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import {
+  DetailField,
+  DetailGrid,
+  DetailSection,
+} from "@/components/shared/detail-section"
 import { getStates } from "@/lib/actions/location-actions"
 import { CustomerRowActions } from "@/components/customers/customer-row-actions"
 import { CustomerLedgerCard } from "@/components/customers/ledger/customer-ledger-card"
@@ -13,25 +19,6 @@ type CustomerDetailsPageProps = {
     id: string
   }>
   searchParams?: Promise<{ from?: string }>
-}
-
-function DetailItem({
-  label,
-  value,
-}: {
-  label: string
-  value?: string | number | null
-}) {
-  return (
-    <div className="rounded-lg border bg-card p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-medium text-foreground">
-        {value !== undefined && value !== null && value !== "" ? value : "-"}
-      </p>
-    </div>
-  )
 }
 
 export default async function CustomerDetailsPage({
@@ -53,6 +40,9 @@ export default async function CustomerDetailsPage({
     notFound()
   }
 
+  const money = (value: unknown) =>
+    `₹ ${Number(value || 0).toLocaleString("en-IN")}`
+
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
@@ -63,90 +53,82 @@ export default async function CustomerDetailsPage({
         action={<CustomerRowActions customer={customer} states={states} />}
       />
 
-      {/* Customer Details */}
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">
-            Customer Information
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Complete profile information of this customer.
-          </p>
-        </div>
+      <DetailSection
+        title="Customer Information"
+        description="Contact details and identifiers."
+        icon={User}
+        tint="var(--chart-1)"
+      >
+        <DetailGrid>
+          <DetailField label="Customer Name" value={customer.name} />
+          <DetailField label="Phone" value={customer.phone} />
+          <DetailField label="Alternate Phone" value={customer.altPhone} />
+          <DetailField label="Email" value={customer.email} />
+          <DetailField label="GST Number" value={customer.gstNumber} />
+          <DetailField label="Customer Type" value={customer.customerType} />
+        </DetailGrid>
+      </DetailSection>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <DetailItem label="Customer Name" value={customer.name} />
-          <DetailItem label="Phone" value={customer.phone} />
-          <DetailItem label="Alternate Phone" value={customer.altPhone} />
-          <DetailItem label="Email" value={customer.email} />
-          <DetailItem label="City" value={customer.city} />
-          <DetailItem label="State" value={customer.state} />
-          <DetailItem label="Pincode" value={customer.pincode} />
-          <DetailItem label="GST Number" value={customer.gstNumber} />
-          <DetailItem
-            label="Opening Balance"
-            value={`₹ ${Number(customer.openingBalance || 0).toLocaleString(
-              "en-IN"
-            )}`}
+      <DetailSection
+        title="Address"
+        description="Where this customer is based."
+        icon={MapPin}
+        tint="var(--chart-3)"
+      >
+        <DetailGrid>
+          <DetailField label="City" value={customer.city} />
+          <DetailField label="State" value={customer.state} />
+          <DetailField label="Pincode" value={customer.pincode} />
+          <DetailField
+            label="Full Address"
+            span
+            value={
+              customer.address ? (
+                <span className="whitespace-pre-line">{customer.address}</span>
+              ) : null
+            }
           />
-          <DetailItem label="Current Balance" value={customer.pendingAmount} />
-          <DetailItem
-            label="Last Purchase Date"
+          <DetailField
+            label="Notes"
+            span
+            value={
+              customer.notes ? (
+                <span className="whitespace-pre-line">{customer.notes}</span>
+              ) : null
+            }
+          />
+        </DetailGrid>
+      </DetailSection>
+
+      <DetailSection
+        title="Business Summary"
+        description="Order and financial summary for this customer."
+        icon={IndianRupee}
+        tint="var(--chart-2)"
+      >
+        <DetailGrid>
+          <DetailField label="Total Orders" value={customer.totalOrders ?? 0} />
+          <DetailField
+            label="Total Purchase Value"
+            value={customer.totalPurchaseValue ?? money(0)}
+          />
+          <DetailField
+            label="Opening Balance"
+            value={money(customer.openingBalance)}
+          />
+          <DetailField
+            label="Current Balance"
+            value={customer.pendingAmount}
+          />
+          <DetailField label="Balance Type" value={customer.balanceType} />
+          <DetailField
+            label="Last Purchase"
             value={customer.lastPurchaseDate}
           />
-          <DetailItem
-            label="Last Payment Date"
-            value={customer.lastPaymentDate}
-          />
-        </div>
-      </section>
+          <DetailField label="Last Payment" value={customer.lastPaymentDate} />
+        </DetailGrid>
+      </DetailSection>
 
-      {/* Address + Notes */}
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">Address</h2>
-          <p className="mt-3 whitespace-pre-line text-sm text-foreground">
-            {customer.address || "-"}
-          </p>
-        </div>
-
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">Notes</h2>
-          <p className="mt-3 whitespace-pre-line text-sm text-foreground">
-            {customer.notes || "-"}
-          </p>
-        </div>
-      </section>
-
-      {/* Business Summary */}
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">
-            Business Summary
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Order and financial summary for this customer.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <DetailItem label="Total Orders" value={customer.totalOrders ?? 0} />
-          <DetailItem
-            label="Total Purchase Value"
-            value={customer.totalPurchaseValue ?? "₹ 0"}
-          />
-          <DetailItem
-            label="Pending Amount"
-            value={customer.pendingAmount ?? "₹ 0"}
-          />
-          <DetailItem
-            label="Balance Type"
-            value={customer.balanceType ?? "-"}
-          />
-        </div>
-      </section>
-
-      {/* Ledger Section */}
       <CustomerLedgerCard customerId={customer.id} />
     </main>
   )

@@ -1,8 +1,16 @@
 // app/vendors/[id]/page.tsx
 import { notFound } from "next/navigation"
+import { IndianRupee, MapPin, Truck } from "lucide-react"
 
 import { getVendorById } from "@/lib/actions/vendor-actions"
 import { getStates } from "@/lib/actions/location-actions"
+import { resolveBackLink } from "@/lib/safe-return-to"
+import { PageBackHeader } from "@/components/shared/page-back-header"
+import {
+  DetailField,
+  DetailGrid,
+  DetailSection,
+} from "@/components/shared/detail-section"
 import { VendorRowActions } from "@/components/vendors/vendor-row-actions"
 import { VendorLedgerCard } from "@/components/vendors/ledger/vendor-ledger-card"
 
@@ -10,141 +18,108 @@ type VendorDetailsPageProps = {
   params: Promise<{
     id: string
   }>
-}
-
-function DetailItem({
-  label,
-  value,
-}: {
-  label: string
-  value?: string | number | null
-}) {
-  return (
-    <div className="rounded-lg border bg-card p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-medium text-foreground">
-        {value !== undefined && value !== null && value !== "" ? value : "-"}
-      </p>
-    </div>
-  )
+  searchParams?: Promise<{ from?: string }>
 }
 
 export default async function VendorDetailsPage({
   params,
+  searchParams,
 }: VendorDetailsPageProps) {
   const { id } = await params
+  const backTo = resolveBackLink((await searchParams)?.from, {
+    href: "/vendors",
+    label: "Back to Vendors",
+  })
 
-  const [vendor, states] = await Promise.all([
-    getVendorById(id),
-    getStates(),
-  ])
+  const [vendor, states] = await Promise.all([getVendorById(id), getStates()])
 
   if (!vendor) {
     notFound()
   }
 
+  const money = (value: unknown) =>
+    `₹ ${Number(value || 0).toLocaleString("en-IN")}`
+
   return (
     <main className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">
-            {vendor.name}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Vendor details and account information
-          </p>
-        </div>
+      {/* This page had no back link at all — the only way out was the sidebar. */}
+      <PageBackHeader
+        title={vendor.name}
+        description="Vendor details and account information"
+        backHref={backTo.href}
+        backLabel={backTo.label}
+        action={<VendorRowActions vendor={vendor} states={states} />}
+      />
 
-        <VendorRowActions vendor={vendor} states={states} />
-      </div>
+      <DetailSection
+        title="Vendor Information"
+        description="Contact details and identifiers."
+        icon={Truck}
+        tint="var(--chart-1)"
+      >
+        <DetailGrid>
+          <DetailField label="Vendor Name" value={vendor.name} />
+          <DetailField label="Phone" value={vendor.phone} />
+          <DetailField label="Alternate Phone" value={vendor.altPhone} />
+          <DetailField label="Email" value={vendor.email} />
+          <DetailField label="GST Number" value={vendor.gstNumber} />
+        </DetailGrid>
+      </DetailSection>
 
-      {/* Vendor Details */}
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">
-            Vendor Information
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Complete profile information of this vendor.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <DetailItem label="Vendor Name" value={vendor.name} />
-          <DetailItem label="Phone" value={vendor.phone} />
-          <DetailItem label="Alternate Phone" value={vendor.altPhone} />
-          <DetailItem label="Email" value={vendor.email} />
-          <DetailItem label="City" value={vendor.city} />
-          <DetailItem label="State" value={vendor.state} />
-          <DetailItem label="Pincode" value={vendor.pincode} />
-          <DetailItem label="GST Number" value={vendor.gstNumber} />
-          <DetailItem
-            label="Opening Balance"
-            value={`₹ ${Number(vendor.openingBalance || 0).toLocaleString(
-              "en-IN"
-            )}`}
+      <DetailSection
+        title="Address"
+        description="Where this vendor is based."
+        icon={MapPin}
+        tint="var(--chart-3)"
+      >
+        <DetailGrid>
+          <DetailField label="City" value={vendor.city} />
+          <DetailField label="State" value={vendor.state} />
+          <DetailField label="Pincode" value={vendor.pincode} />
+          <DetailField
+            label="Full Address"
+            span
+            value={
+              vendor.address ? (
+                <span className="whitespace-pre-line">{vendor.address}</span>
+              ) : null
+            }
           />
-          <DetailItem label="Current Balance" value={vendor.pendingAmount} />
-          <DetailItem
-            label="Last Purchase Date"
-            value={vendor.lastPurchaseDate}
+          <DetailField
+            label="Notes"
+            span
+            value={
+              vendor.notes ? (
+                <span className="whitespace-pre-line">{vendor.notes}</span>
+              ) : null
+            }
           />
-          <DetailItem
-            label="Last Payment Date"
-            value={vendor.lastPaymentDate}
-          />
-        </div>
-      </section>
+        </DetailGrid>
+      </DetailSection>
 
-      {/* Address + Notes */}
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">Address</h2>
-          <p className="mt-3 whitespace-pre-line text-sm text-foreground">
-            {vendor.address || "-"}
-          </p>
-        </div>
-
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">Notes</h2>
-          <p className="mt-3 whitespace-pre-line text-sm text-foreground">
-            {vendor.notes || "-"}
-          </p>
-        </div>
-      </section>
-
-      {/* Business Summary */}
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">
-            Business Summary
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Order and financial summary for this vendor.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <DetailItem label="Total Orders" value={vendor.totalOrders ?? 0} />
-          <DetailItem
+      <DetailSection
+        title="Business Summary"
+        description="Purchase and payment summary for this vendor."
+        icon={IndianRupee}
+        tint="var(--chart-2)"
+      >
+        <DetailGrid>
+          <DetailField label="Total Orders" value={vendor.totalOrders ?? 0} />
+          <DetailField
             label="Total Purchase Value"
-            value={vendor.totalPurchaseValue ?? "₹ 0"}
+            value={vendor.totalPurchaseValue ?? money(0)}
           />
-          <DetailItem
-            label="Pending Amount"
-            value={vendor.pendingAmount ?? "₹ 0"}
+          <DetailField
+            label="Opening Balance"
+            value={money(vendor.openingBalance)}
           />
-          <DetailItem
-            label="Balance Type"
-            value={vendor.balanceType ?? "-"}
-          />
-        </div>
-      </section>
+          <DetailField label="Current Balance" value={vendor.pendingAmount} />
+          <DetailField label="Balance Type" value={vendor.balanceType} />
+          <DetailField label="Last Purchase" value={vendor.lastPurchaseDate} />
+          <DetailField label="Last Payment" value={vendor.lastPaymentDate} />
+        </DetailGrid>
+      </DetailSection>
 
-      {/* Ledger Section */}
       <VendorLedgerCard vendorId={vendor.id} />
     </main>
   )

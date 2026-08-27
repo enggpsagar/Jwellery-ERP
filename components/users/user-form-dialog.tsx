@@ -63,6 +63,13 @@ type UserFormDialogProps = {
   karigars?: KarigarOption[]
   locations?: LocationOption[]
   allowSuperAdmin?: boolean
+  /**
+   * Render the form on its own, without the Dialog shell. Editing a user is
+   * a full page now; the same body is reused rather than duplicated so the
+   * karigar contact sync, module toggles and location grants can't drift
+   * between the two surfaces.
+   */
+  asPage?: boolean
 }
 
 const ASSIGNABLE_ROLES: UserRole[] = [
@@ -78,6 +85,7 @@ export function UserFormDialog({
   karigars = [],
   locations = [],
   allowSuperAdmin = false,
+  asPage = false,
 }: UserFormDialogProps) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -181,7 +189,13 @@ export function UserFormDialog({
         }
 
         toast.success(result.message)
-        setOpen(false)
+
+        if (asPage) {
+          router.push("/users")
+        } else {
+          setOpen(false)
+        }
+
         router.refresh()
       } catch (error) {
         toast.error(
@@ -191,22 +205,8 @@ export function UserFormDialog({
     })
   }
 
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {children ?? (
-          <Button variant={mode === "create" ? "default" : "outline"} size={mode === "create" ? "default" : "sm"}>
-            {mode === "create" ? "Add User" : "Edit"}
-          </Button>
-        )}
-      </DialogTrigger>
-
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{mode === "create" ? "Add User" : "Edit User"}</DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+  const formBody = (
+    <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>Name</Label>
             <Input name="name" defaultValue={user?.name ?? ""} required />
@@ -348,7 +348,7 @@ export function UserFormDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
+              onClick={() => (asPage ? router.push("/users") : setOpen(false))}
               disabled={isPending}
             >
               Cancel
@@ -357,7 +357,29 @@ export function UserFormDialog({
               {isPending ? "Saving..." : mode === "create" ? "Create User" : "Save Changes"}
             </Button>
           </DialogFooter>
-        </form>
+    </form>
+  )
+
+  if (asPage) {
+    return <div className="rounded-xl border bg-card p-6">{formBody}</div>
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {children ?? (
+          <Button variant={mode === "create" ? "default" : "outline"} size={mode === "create" ? "default" : "sm"}>
+            {mode === "create" ? "Add User" : "Edit"}
+          </Button>
+        )}
+      </DialogTrigger>
+
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{mode === "create" ? "Add User" : "Edit User"}</DialogTitle>
+        </DialogHeader>
+
+        {formBody}
       </DialogContent>
     </Dialog>
   )

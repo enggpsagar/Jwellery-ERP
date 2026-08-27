@@ -1,7 +1,9 @@
+
 // File: src/components/users/user-table.tsx
 
 "use client";
 
+import Link from "next/link";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -163,13 +165,12 @@ export function UserTable({
 
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
-                    <UserFormDialog
-                      mode="edit"
-                      user={user}
-                      karigars={karigars}
-                      locations={locations}
-                      allowSuperAdmin={allowSuperAdmin}
-                    />
+                    {/* Editing is a full page now, not a popup — the form
+                        carries role, module access and location grants, which
+                        is more than a dialog should hold. */}
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/users/${user.id}/edit`}>Edit</Link>
+                    </Button>
 
                     <Button
                       variant="outline"

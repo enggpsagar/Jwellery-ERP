@@ -440,10 +440,33 @@ export async function createInvoice(
     const validStock = requestedStockIds.length
       ? await prisma.inventoryStock.findMany({
           where: { id: { in: requestedStockIds }, storeId },
-          select: { id: true },
+          select: { id: true, stockCode: true, quantity: true },
         })
       : [];
     const validStockIds = new Set(validStock.map((s) => s.id));
+
+    // A stock row can hold many pieces (qty 100 of a stud, say). Selling
+    // some of them must not be allowed to exceed what is on hand, and two
+    // line items can point at the same row, so the check sums per row
+    // rather than looking at each line in isolation.
+    const requestedQtyByStock = new Map<string, number>();
+    for (const item of items) {
+      if (!item.inventoryStockId || !validStockIds.has(item.inventoryStockId)) continue;
+      requestedQtyByStock.set(
+        item.inventoryStockId,
+        (requestedQtyByStock.get(item.inventoryStockId) ?? 0) + Math.max(1, item.quantity || 1),
+      );
+    }
+
+    for (const stock of validStock) {
+      const wanted = requestedQtyByStock.get(stock.id) ?? 0;
+      if (wanted > stock.quantity) {
+        return {
+          success: false,
+          message: `Only ${stock.quantity} left of stock ${stock.stockCode}, but ${wanted} were billed.`,
+        };
+      }
+    }
 
     const invoiceNumber = await generateInvoiceNumber(storeId);
 
@@ -491,9 +514,28 @@ export async function createInvoice(
       for (const item of items) {
         if (!item.inventoryStockId || !validStockIds.has(item.inventoryStockId)) continue;
 
+        // Decrement rather than flipping the whole row to SOLD: a row of
+        // 100 pieces that sells 2 still has 98 on hand. Marking it SOLD
+        // outright made the remainder disappear from stock entirely.
+        // `decrement` is applied by the database, so concurrent sales of the
+        // same row cannot both read the same starting quantity.
+        const soldQty = Math.max(1, item.quantity || 1);
+        const currentStock = await tx.inventoryStock.findFirst({
+          where: { id: item.inventoryStockId, storeId },
+          select: { quantity: true },
+        });
+        if (!currentStock) continue;
+
+        const remaining = currentStock.quantity - soldQty;
+
         const { count } = await tx.inventoryStock.updateMany({
           where: { id: item.inventoryStockId, storeId },
-          data: { status: InventoryStockStatus.SOLD, saleAmount: lineTotal(item) },
+          data: {
+            quantity: { decrement: soldQty },
+            // Only the last piece leaving turns the row SOLD.
+            ...(remaining <= 0 ? { status: InventoryStockStatus.SOLD } : {}),
+            saleAmount: lineTotal(item),
+          },
         });
         if (count === 0) continue;
 

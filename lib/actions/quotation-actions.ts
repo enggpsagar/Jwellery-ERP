@@ -594,9 +594,30 @@ export async function convertQuotationToInvoice(
       for (const item of quotation.items) {
         if (!item.inventoryStockId) continue;
 
+        // Decrement rather than flipping the whole row to SOLD: a row of
+        // 100 pieces that sells 2 still has 98 on hand.
+        //
+        // Clamped at zero instead of refusing: a quotation reserves nothing,
+        // so between quoting and converting the stock may legitimately have
+        // been sold elsewhere. Going negative would be worse than clamping,
+        // and blocking the conversion outright would strand the quotation.
+        const soldQty = Math.max(1, item.quantity || 1);
+        const currentStock = await tx.inventoryStock.findFirst({
+          where: { id: item.inventoryStockId, storeId },
+          select: { quantity: true },
+        });
+        if (!currentStock) continue;
+
+        const takeQty = Math.min(soldQty, currentStock.quantity);
+        const remaining = currentStock.quantity - takeQty;
+
         const { count } = await tx.inventoryStock.updateMany({
           where: { id: item.inventoryStockId, storeId },
-          data: { status: InventoryStockStatus.SOLD, saleAmount: item.lineTotal },
+          data: {
+            ...(takeQty > 0 ? { quantity: { decrement: takeQty } } : {}),
+            ...(remaining <= 0 ? { status: InventoryStockStatus.SOLD } : {}),
+            saleAmount: item.lineTotal,
+          },
         });
         if (count === 0) continue;
 

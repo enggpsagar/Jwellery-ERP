@@ -178,7 +178,7 @@ export function EditCustomerDialog({
             </label>
             <input
               name="altPhone"
-              defaultValue={customer.alternatePhone ?? ""}
+              defaultValue={customer.altPhone ?? ""}
               className="w-full rounded-md border px-3 py-2 text-sm"
             />
           </div>
@@ -205,7 +205,7 @@ export function EditCustomerDialog({
             </label>
             <textarea
               name="address"
-              defaultValue={customer.addressLine1 ?? ""}
+              defaultValue={customer.address ?? ""}
               className="w-full rounded-md border px-3 py-2 text-sm"
               rows={3}
             />
@@ -281,7 +281,7 @@ export function EditCustomerDialog({
             </label>
             <input
               name="gstNumber"
-              defaultValue={customer.gstin ?? ""}
+              defaultValue={customer.gstNumber ?? ""}
               className="w-full rounded-md border px-3 py-2 text-sm"
             />
           </div>

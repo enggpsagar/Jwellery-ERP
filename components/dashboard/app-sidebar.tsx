@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
+import { avatarColor, initialsOf } from "@/lib/avatar-color";
 
 import {
   Sidebar,
@@ -241,13 +242,8 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
   const navItems = getNavForRole(role, session?.user?.permissions);
   const showSettings = role !== "STAFF" && role !== "KARIGAR" && role !== "MANAGER";
   const userName = session?.user?.name ?? "User";
-  const userInitials = userName
-    .split(" ")
-    .map((part) => part[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  const userInitials = initialsOf(userName);
+  const avatar = avatarColor(userName);
 
   return (
     <Sidebar
@@ -317,7 +313,9 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
       <SidebarFooter className="border-t">
         <div className="flex items-center gap-3 px-2 py-2">
           <Avatar className="h-8 w-8">
-            <AvatarFallback>{userInitials || "U"}</AvatarFallback>
+            <AvatarFallback className="font-semibold" style={avatar.style}>
+              {userInitials}
+            </AvatarFallback>
           </Avatar>
 
           <div className="group-data-[collapsible=icon]:hidden">

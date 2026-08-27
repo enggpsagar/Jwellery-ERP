@@ -96,11 +96,19 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" className="relative">
+        <Button
+          variant="outline"
+          size="icon"
+          className="relative text-[var(--chart-2)] hover:text-[var(--chart-2)]"
+        >
+          {/* Gold, from the chart palette's slot 2 — the same hue the gold
+              KPI tile and gold bars use, so "gold" means one colour across
+              the app. The unread dot stays a separate, higher-contrast mark:
+              gold on white is 2.78:1, too weak to signal on its own. */}
           <Bell className="h-4 w-4" />
 
           {visibleCount > 0 && (
-            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />
+            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
           )}
 
           <span className="sr-only">Notifications</span>

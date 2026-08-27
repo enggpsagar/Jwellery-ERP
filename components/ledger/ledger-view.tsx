@@ -85,6 +85,23 @@ type LedgerViewProps = {
   totals: LedgerTotals
 }
 
+/**
+ * Debit and credit are a polarity, not a status, so they get opposing poles
+ * rather than good/bad colours. Gold-unit tiles keep the same poles: the unit
+ * is carried by its own chip, so colour never has to encode both at once.
+ */
+const POLARITY_RAIL: Record<"debit" | "credit" | "net", string> = {
+  debit: "border-l-destructive/70",
+  credit: "border-l-emerald-500/70",
+  net: "border-l-primary/60",
+}
+
+const POLARITY_TEXT: Record<"debit" | "credit" | "net", string> = {
+  debit: "text-destructive",
+  credit: "text-emerald-700 dark:text-emerald-400",
+  net: "text-foreground",
+}
+
 export function LedgerView({ entries, totals }: LedgerViewProps) {
   const [search, setSearch] = useState("")
   const [dateRange, setDateRange] = useState("30d")
@@ -161,6 +178,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
             sub: "Amount owed by customers",
             icon: ArrowUpCircle,
             accent: "text-destructive bg-destructive/10",
+            polarity: "debit" as const,
           },
           {
             label: "Total Credit",
@@ -168,6 +186,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
             sub: "Payments received",
             icon: ArrowDownCircle,
             accent: "text-emerald-600 bg-emerald-50",
+            polarity: "credit" as const,
           },
         ]
       : []),
@@ -178,6 +197,8 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
         sub: `Owed in ${unit.label.toLowerCase()}`,
         icon: ArrowUpCircle,
         accent: "text-destructive bg-destructive/10",
+        polarity: "debit" as const,
+        unit: unit.label,
       },
       {
         label: `${unit.label} Credit`,
@@ -185,6 +206,8 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
         sub: `Received in ${unit.label.toLowerCase()}`,
         icon: ArrowDownCircle,
         accent: "text-emerald-600 bg-emerald-50",
+        polarity: "credit" as const,
+        unit: unit.label,
       },
     ]),
     {
@@ -193,6 +216,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
       sub: "Recorded today",
       icon: ArrowRightLeft,
       accent: "text-primary bg-primary/10",
+      polarity: "net" as const,
     },
   ]
 
@@ -200,11 +224,38 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
     <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {summaryCards.map((card) => (
-          <Card key={card.label}>
+          <Card
+            key={card.label}
+            className={cn(
+              // Polarity as a rail, so Debit and Credit are separable at a
+              // glance rather than only by reading the label or the small
+              // icon. Two encodings carry it — rail plus tinted numeral —
+              // and the label still names it, so neither rests on colour.
+              "relative overflow-hidden border-l-[3px]",
+              POLARITY_RAIL[card.polarity],
+            )}
+          >
             <CardHeader className="flex flex-row items-start justify-between gap-2">
-              <div className="flex flex-col gap-1">
-                <CardDescription>{card.label}</CardDescription>
-                <CardTitle className="text-2xl tabular-nums">
+              <div className="flex min-w-0 flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <CardDescription className="truncate">
+                    {card.label}
+                  </CardDescription>
+                  {/* Which metal, independent of polarity — "Gold Debit" and
+                      "Silver Debit" share a rail colour, so the unit needs
+                      its own mark. */}
+                  {"unit" in card && card.unit ? (
+                    <span className="shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {card.unit}
+                    </span>
+                  ) : null}
+                </div>
+                <CardTitle
+                  className={cn(
+                    "text-2xl tabular-nums",
+                    POLARITY_TEXT[card.polarity],
+                  )}
+                >
                   {card.value}
                 </CardTitle>
               </div>

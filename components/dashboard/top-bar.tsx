@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { hasModuleAccess } from "@/lib/roles";
+import { avatarColor, initialsOf } from "@/lib/avatar-color";
 import { GlobalSearch } from "@/components/dashboard/global-search";
 import { StoreSwitcher } from "@/components/dashboard/store-switcher";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
@@ -49,13 +50,9 @@ export function TopBar({
     permissions: session?.user?.permissions,
   });
   const userName = session?.user?.name ?? "User";
-  const userInitials = userName
-    .split(" ")
-    .map((part) => part[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  const userInitials = initialsOf(userName);
+  // Same colour for the same person everywhere, derived from the name.
+  const avatar = avatarColor(userName);
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md md:px-6">
@@ -86,8 +83,11 @@ export function TopBar({
         <DropdownMenu>
           <DropdownMenuTrigger className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 hover:bg-accent">
             <Avatar className="h-7 w-7">
-              <AvatarFallback className="bg-accent text-xs text-accent-foreground">
-                {userInitials || "U"}
+              <AvatarFallback
+                className="text-xs font-semibold"
+                style={avatar.style}
+              >
+                {userInitials}
               </AvatarFallback>
             </Avatar>
 

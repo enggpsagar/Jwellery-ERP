@@ -6,6 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { avatarColor } from "@/lib/avatar-color"
 import type { DashboardActivity } from "@/lib/actions/dashboard-actions"
 
 type ActivityFeedProps = {
@@ -32,7 +33,13 @@ export function ActivityFeed({ activity }: ActivityFeedProps) {
               className="flex items-start gap-3 border-b py-4 last:border-0"
             >
               <Avatar className="size-9 shrink-0">
-                <AvatarFallback className="bg-accent text-accent-foreground text-xs font-medium">
+                {/* Keyed off the full name, not the initials — the top bar
+                    hashes the name, and hashing a different string here would
+                    give the same person two different colours. */}
+                <AvatarFallback
+                  className="text-xs font-semibold"
+                  style={avatarColor(a.name).style}
+                >
                   {a.initials}
                 </AvatarFallback>
               </Avatar>

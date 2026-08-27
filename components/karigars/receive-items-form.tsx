@@ -13,6 +13,7 @@ import {
   type StockActionState,
 } from "@/lib/actions/inventory-stock-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import { classifyMetalName } from "@/lib/business-units"
 import { useToast } from "@/components/providers/toast-provider"
 import { ProductSelect, type ProductOption } from "@/components/inventory/shared/product-select"
 
@@ -83,7 +84,12 @@ function emptyReceiptItem(defaultMetal?: StoreMetalRow): ReceiptItem {
     itemName: "",
     productId: "",
     metalTypeId: defaultMetal?.id ?? "",
-    purity: defaultMetal && !defaultMetal.hasPurity ? "OTHER" : "GOLD_22K",
+    purity:
+      defaultMetal && !defaultMetal.hasPurity
+        ? "OTHER"
+        : classifyMetalName(defaultMetal?.name) === "SILVER"
+          ? "SILVER_999"
+          : "GOLD_22K",
     quantity: 1,
     grossWeight: 0,
     lessWeight: 0,
@@ -170,19 +176,31 @@ export function ReceiveItemsForm({
     setItems((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)))
   }
 
+  // Purity values are Gold-only or Silver-only (see PURITY_OPTIONS below) —
+  // switching metal must re-pick a purity that's actually valid for the new
+  // metal, not just keep whatever was set for the old one (e.g. Gold ->
+  // Silver must not leave "GOLD_22K" silently selected).
+  const purityOptionsForMetal = (metal: StoreMetalRow | undefined) => {
+    const family = classifyMetalName(metal?.name)
+    if (family === "SILVER") return PURITY_OPTIONS.filter((o) => o.value.startsWith("SILVER_"))
+    if (family === "GOLD") return PURITY_OPTIONS.filter((o) => o.value.startsWith("GOLD_"))
+    return PURITY_OPTIONS
+  }
+
   const updateItemMetal = (key: string, metalTypeId: string) => {
     const metal = metalById.get(metalTypeId)
     setItems((prev) =>
       prev.map((item) => {
         if (item.key !== key) return item
         if (!metal || metal.hasPurity) {
-          // Switching into (or staying in) a hasPurity metal: drop the
-          // "OTHER" sentinel back to a real purity if it was set.
-          return {
-            ...item,
-            metalTypeId,
-            purity: item.purity === "OTHER" ? "GOLD_22K" : item.purity,
-          }
+          // Switching into (or staying in) a hasPurity metal: keep the
+          // current purity only if it's still valid for this metal's family,
+          // otherwise fall back to that family's first option.
+          const validOptions = purityOptionsForMetal(metal)
+          const purity = validOptions.some((o) => o.value === item.purity)
+            ? item.purity
+            : (validOptions[0]?.value ?? "GOLD_22K")
+          return { ...item, metalTypeId, purity }
         }
         // hasPurity=false: purity has no meaning, force the sentinel value
         // the backend requires (KarigarReceiptItem.purity is non-nullable).
@@ -385,7 +403,7 @@ export function ReceiveItemsForm({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {PURITY_OPTIONS.map((option) => (
+                          {purityOptionsForMetal(selectedMetal).map((option) => (
                             <SelectItem key={option.value} value={option.value}>
                               {option.label}
                             </SelectItem>

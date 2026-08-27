@@ -15,6 +15,8 @@ import { requireRole } from "@/lib/auth/auth";
 export type StoreLocationRow = {
   id: string;
   name: string;
+  state: string | null;
+  city: string | null;
   isActive: boolean;
 };
 
@@ -37,6 +39,8 @@ export async function getStoreLocations(): Promise<StoreLocationRow[]> {
   return locations.map((location) => ({
     id: location.id,
     name: location.name,
+    state: location.state,
+    city: location.city,
     isActive: location.isActive,
   }));
 }

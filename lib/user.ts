@@ -202,10 +202,28 @@ export async function createUser(
     }
 
     if (existing.storeId && existing.storeId !== storeId) {
-      throw new Error("This email or phone is already associated with another store.");
+      // Staff move between stores that both run this software, reusing the
+      // same email and phone. The handover is the previous store
+      // deactivating them: that is what releases the account. An account
+      // still active elsewhere is never taken, so one store cannot quietly
+      // pull another store's staff — or their store context — across.
+      if (existing.isActive) {
+        throw new Error(
+          "This email or phone is active in another store. Ask that store to deactivate the user first, then add them here."
+        );
+      }
     }
 
-    // Existing account has no store yet (e.g. self-registered via Google) — claim it.
+    // Claim the existing account into this store. Reached either because it
+    // had no store (self-registered via Google) or because its previous
+    // store deactivated it.
+    //
+    // Everything that grants access is rewritten here rather than merged:
+    // `storeId` moves, `permissions` are replaced with what this store
+    // chose, and `locationAccess` is wiped before the new rows are added.
+    // Carrying any of those over would leave the user holding access derived
+    // from the store they left. Their old store's records are untouched and
+    // stay scoped to that store, so they simply become unreachable.
     const user = await prisma.user.update({
       where: { id: existing.id },
       data: {

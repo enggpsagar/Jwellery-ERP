@@ -9,6 +9,7 @@ import { sendDisabledAccountEmailSafely } from "@/lib/invite-email"
 import { UserRole } from "@prisma/client"
 
 const SUPER_ADMIN_EMAILS = (process.env.SUPER_ADMIN_EMAILS ?? "")
+
   .split(",")
   .map((email) => email.trim().toLowerCase())
   .filter(Boolean)
@@ -17,6 +18,14 @@ const SUPER_ADMIN_PHONES = (process.env.SUPER_ADMIN_PHONES ?? "")
   .split(",")
   .map((phone) => phone.trim())
   .filter(Boolean)
+
+/**
+ * How stale a session's cached role/store/permissions may get before the
+ * JWT callback re-reads them. Bounds how long a moved or deactivated user
+ * keeps their old store context, without a database round-trip on every
+ * session read.
+ */
+const SESSION_REVALIDATE_MS = 60_000
 
 export const authOptions: NextAuthOptions = {
   adapter,
@@ -157,7 +166,56 @@ export const authOptions: NextAuthOptions = {
         token.phone = dbUser.phone
         token.permissions = dbUser.permissions ?? []
         token.locationIds = locationGrants.map((grant) => grant.locationId)
+        token.disabled = false
+        token.checkedAt = Date.now()
+
+        return token
       }
+
+      // No `user` means an existing session, where every field above was
+      // frozen at sign-in. That is a problem once a person moves store: they
+      // are deactivated in store A and added to store B, but their live
+      // token still says store A, so they keep reading store A's data until
+      // it expires. Role changes, permission changes and plain deactivation
+      // have the same lag.
+      //
+      // Re-read on a timer rather than every call: this runs on each session
+      // read, so an unthrottled query would add a round-trip to every page.
+      const checkedAt = typeof token.checkedAt === "number" ? token.checkedAt : 0
+
+      if (Date.now() - checkedAt < SESSION_REVALIDATE_MS) {
+        return token
+      }
+
+      const fresh = await prisma.user.findUnique({
+        where: { id: token.id as string },
+        select: {
+          role: true,
+          storeId: true,
+          karigarId: true,
+          isActive: true,
+          permissions: true,
+          locationAccess: { select: { locationId: true } },
+        },
+      })
+
+      token.checkedAt = Date.now()
+
+      if (!fresh || !fresh.isActive) {
+        // Deleted or deactivated. Flagged rather than mutated into something
+        // half-valid, so middleware can bounce them to /login instead of a
+        // page failing deep in a query with no store scope.
+        token.disabled = true
+        return token
+      }
+
+      token.disabled = false
+      token.role = fresh.role
+      token.storeId = fresh.storeId
+      token.karigarId = fresh.karigarId
+      token.permissions = fresh.permissions ?? []
+      token.locationIds = fresh.locationAccess.map((grant) => grant.locationId)
+
       return token
     },
 

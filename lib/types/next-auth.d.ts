@@ -30,5 +30,10 @@ declare module "next-auth/jwt" {
     karigarId?: string | null
     permissions?: string[]
     locationIds?: string[]
+    /** Set when a periodic re-read finds the account deleted or deactivated;
+     * middleware redirects these to /login. */
+    disabled?: boolean
+    /** Epoch ms of the last re-read, used to throttle it. */
+    checkedAt?: number
   }
 }

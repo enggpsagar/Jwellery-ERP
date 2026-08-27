@@ -49,6 +49,8 @@ model StoreLocation {
   id              String               @id @default(cuid())
   storeId         String
   name            String
+  state           String?
+  city            String?
   isActive        Boolean              @default(true)
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt

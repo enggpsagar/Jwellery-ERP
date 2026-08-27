@@ -10,6 +10,7 @@ import {
   type StockActionState,
 } from "@/lib/actions/inventory-stock-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import { classifyMetalName } from "@/lib/business-units"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { Button } from "@/components/ui/button"
@@ -80,6 +81,26 @@ export function IssueMaterialDialog({
   const selectedMetal = activeMetals.find((m) => m.id === metalTypeId)
   const isPreciousMetal = selectedMetal?.hasPurity ?? false
 
+  // Purity options depend on which metal is selected — Silver should never
+  // offer Gold purities and vice versa. A custom precious metal this codebase
+  // doesn't recognize as Gold/Silver (e.g. Platinum) falls back to the full
+  // list, since PurityType has no values for it either way.
+  const metalFamily = classifyMetalName(selectedMetal?.name)
+  const purityOptions = useMemo(() => {
+    if (metalFamily === "GOLD") return PURITY_OPTIONS.filter((o) => o.value.startsWith("GOLD_"))
+    if (metalFamily === "SILVER") return PURITY_OPTIONS.filter((o) => o.value.startsWith("SILVER_"))
+    return PURITY_OPTIONS
+  }, [metalFamily])
+
+  // Keep the selected purity valid whenever the metal (and so the available
+  // options) changes — e.g. switching Gold -> Silver must not silently submit
+  // a leftover "GOLD_22K".
+  useEffect(() => {
+    if (!purityOptions.some((option) => option.value === issuePurity)) {
+      setIssuePurity(purityOptions[0]?.value ?? "")
+    }
+  }, [purityOptions, issuePurity])
+
   const issueMaterialWithId = issueMaterialToKarigar.bind(null, karigarId)
   const [state, formAction, pending] = useActionState(issueMaterialWithId, initialState)
 
@@ -139,7 +160,7 @@ export function IssueMaterialDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {PURITY_OPTIONS.map((option) => (
+                    {purityOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>

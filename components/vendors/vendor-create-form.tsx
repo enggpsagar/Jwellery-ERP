@@ -28,9 +28,10 @@ type VendorCreateFormProps = {
 }
 
 /**
- * Full-page vendor create form. Same fields as the Vendors page dialog
- * (components/vendors/add-vendor-dialog.tsx), on its own route so it can be
- * linked to from other flows instead of only opening as a popup.
+ * Full-page vendor create form — the only way to add a vendor now (the
+ * Vendors list's "Add Vendor" used to open this as a popup dialog; that
+ * dialog is gone, this page is linked to directly instead). Also reused
+ * mid-flow by other forms' "Add New Vendor" option via a `returnTo`.
  */
 export function VendorCreateForm({ states, returnTo }: VendorCreateFormProps) {
   const router = useRouter()
@@ -172,8 +173,10 @@ export function VendorCreateForm({ states, returnTo }: VendorCreateFormProps) {
 
           <div className="space-y-1">
             <label className="text-sm font-medium">State</label>
+            {/* Selected/keyed by id (to drive the city fetch below), but the
+                form field itself must submit the state's name — Vendor.state
+                is a plain text column, same convention as City. */}
             <select
-              name="state"
               className={FIELD}
               value={selectedStateId}
               onChange={(event) => setSelectedStateId(event.target.value)}
@@ -185,6 +188,11 @@ export function VendorCreateForm({ states, returnTo }: VendorCreateFormProps) {
                 </option>
               ))}
             </select>
+            <input
+              type="hidden"
+              name="state"
+              value={states.find((item) => item.id === selectedStateId)?.name ?? ""}
+            />
           </div>
 
           <div className="space-y-1">

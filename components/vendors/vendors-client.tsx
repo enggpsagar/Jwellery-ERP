@@ -1,9 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { AddVendorDialog } from "@/components/vendors/add-vendor-dialog"
+import Link from "next/link"
 import { VendorsTable } from "@/components/vendors/vendors-table"
 import { VendorsToolbar } from "@/components/vendors/vendors-toolbar"
+import { Button } from "@/components/ui/button"
 import type { Vendor } from "@/lib/actions/vendor-actions"
 
 type StateItem = {
@@ -45,7 +46,9 @@ export function VendorsClient({
           </p>
         </div>
 
-        <AddVendorDialog states={states} />
+        <Link href="/vendors/new">
+          <Button>Add Vendor</Button>
+        </Link>
       </div>
 
       <VendorsToolbar selectedVendorIds={selectedVendorIds} />

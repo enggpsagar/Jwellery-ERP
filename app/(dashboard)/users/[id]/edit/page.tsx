@@ -6,6 +6,8 @@ import { getCurrentUser } from "@/lib/auth/auth";
 import { getEffectiveStoreId } from "@/lib/store-context";
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { UserFormDialog } from "@/components/users/user-form-dialog";
+import { UserStoreAccess } from "@/components/users/user-store-access";
+import { getUserStoreAccess } from "@/lib/actions/user-membership-actions";
 
 type EditUserPageProps = {
   params: Promise<{ id: string }>;
@@ -64,6 +66,12 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
 
   if (!user) notFound();
 
+  // Which stores this person works in. Super Admin only — a store's own Admin
+  // manages people inside their store through the form above, and the action
+  // enforces the same rule server-side.
+  const isSuperAdmin = currentUser?.role === UserRole.SUPER_ADMIN;
+  const storeAccess = isSuperAdmin ? await getUserStoreAccess(id) : [];
+
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
@@ -79,8 +87,12 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
         user={user}
         karigars={karigars}
         locations={locations}
-        allowSuperAdmin={currentUser?.role === UserRole.SUPER_ADMIN}
+        allowSuperAdmin={isSuperAdmin}
       />
+
+      {isSuperAdmin && user.role !== UserRole.SUPER_ADMIN && (
+        <UserStoreAccess userId={user.id} rows={storeAccess} />
+      )}
     </main>
   );
 }

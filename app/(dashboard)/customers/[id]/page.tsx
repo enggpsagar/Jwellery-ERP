@@ -2,6 +2,8 @@
 import { notFound } from "next/navigation"
 
 import { getCustomerById } from "@/lib/actions/customer-actions"
+import { safeReturnTo } from "@/lib/safe-return-to"
+import { PageBackHeader } from "@/components/shared/page-back-header"
 import { getStates } from "@/lib/actions/location-actions"
 import { CustomerRowActions } from "@/components/customers/customer-row-actions"
 import { CustomerLedgerCard } from "@/components/customers/ledger/customer-ledger-card"
@@ -10,6 +12,31 @@ type CustomerDetailsPageProps = {
   params: Promise<{
     id: string
   }>
+  searchParams?: Promise<{ from?: string }>
+}
+
+/**
+ * Where "back" goes. Customers are reached from several places — the
+ * Customers list, an invoice, a kacha slip — and landing here used to be a
+ * dead end with no way back at all. Callers pass `?from=<path>`.
+ *
+ * The label is derived from a fixed set of known paths rather than taken
+ * from the query string, so nothing a caller puts in the URL can be
+ * rendered as text. `safeReturnTo` separately keeps the href same-origin.
+ */
+function resolveBackTo(from: string | undefined) {
+  const href = safeReturnTo(from)
+
+  if (!href) return { href: "/customers", label: "Back to Customers" }
+
+  if (href === "/billing") return { href, label: "Back to Invoices" }
+  if (href === "/billing/kacha") return { href, label: "Back to Kacha Slips" }
+  if (href.startsWith("/billing/kacha/")) return { href, label: "Back to Kacha Slip" }
+  if (href.startsWith("/billing/")) return { href, label: "Back to Invoice" }
+  if (href.startsWith("/quotations")) return { href, label: "Back to Quotation" }
+  if (href.startsWith("/ledger")) return { href, label: "Back to Ledger" }
+
+  return { href, label: "Back" }
 }
 
 function DetailItem({
@@ -33,8 +60,10 @@ function DetailItem({
 
 export default async function CustomerDetailsPage({
   params,
+  searchParams,
 }: CustomerDetailsPageProps) {
   const { id } = await params
+  const backTo = resolveBackTo((await searchParams)?.from)
 
   const [customer, states] = await Promise.all([
     getCustomerById(id),
@@ -47,19 +76,13 @@ export default async function CustomerDetailsPage({
 
   return (
     <main className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 rounded-xl border bg-white p-6 shadow-sm sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
-            {customer.name}
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Customer details and account information
-          </p>
-        </div>
-
-        <CustomerRowActions customer={customer} states={states} />
-      </div>
+      <PageBackHeader
+        title={customer.name}
+        description="Customer details and account information"
+        backHref={backTo.href}
+        backLabel={backTo.label}
+        action={<CustomerRowActions customer={customer} states={states} />}
+      />
 
       {/* Customer Details */}
       <section className="space-y-4">

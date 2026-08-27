@@ -60,7 +60,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                 <td className="px-4 py-3">
                   {invoice.customer ? (
                     <Link
-                      href={`/customers/${invoice.customer.id}`}
+                      href={`/customers/${invoice.customer.id}?from=${encodeURIComponent("/billing")}`}
                       className="text-primary underline-offset-4 hover:underline"
                     >
                       {invoice.customer.name}

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select"
 import type { Karigar } from "@/lib/actions/karigar-actions"
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
+import { LocationSelect } from "@/components/shared/location-select"
 
 type Props = {
   pending?: boolean
@@ -117,23 +118,12 @@ export function KarigarForm({
 
         <div className="space-y-2">
           <Label>Location</Label>
-          <Select
-            value={locationId || "__none__"}
-            onValueChange={(value) => setLocationId(value === "__none__" ? "" : value)}
-          >
-            <SelectTrigger className="h-11 w-full">
-              <SelectValue placeholder="Select location" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">None</SelectItem>
-              {locations.map((location) => (
-                <SelectItem key={location.id} value={location.id}>
-                  {location.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <input type="hidden" name="locationId" value={locationId} />
+          <LocationSelect
+            locations={locations}
+            name="locationId"
+            defaultValue={locationId}
+            onChange={setLocationId}
+          />
           {errors?.locationId?.[0] && (
             <p className="text-xs text-red-600">{errors.locationId[0]}</p>
           )}

@@ -1,6 +1,7 @@
 import { UserRole } from "@prisma/client";
 
 import { getStoreLocations } from "@/lib/actions/store-location-actions";
+import { getStates } from "@/lib/actions/location-actions";
 import { getCurrentUser } from "@/lib/auth/auth";
 
 import { LocationSettingsForm } from "@/components/settings/location-settings-form";
@@ -8,8 +9,9 @@ import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { PageBackHeader } from "@/components/shared/page-back-header";
 
 export default async function LocationsSettingsPage() {
-  const [locations, currentUser] = await Promise.all([
+  const [locations, states, currentUser] = await Promise.all([
     getStoreLocations(),
+    getStates(),
     getCurrentUser(),
   ]);
 
@@ -28,7 +30,7 @@ export default async function LocationsSettingsPage() {
 
       <SettingsTabs active="locations" />
 
-      <LocationSettingsForm locations={locations} canEdit={canEdit} />
+      <LocationSettingsForm locations={locations} states={states} canEdit={canEdit} />
     </main>
   );
 }

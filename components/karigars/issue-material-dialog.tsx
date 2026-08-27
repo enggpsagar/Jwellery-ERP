@@ -11,6 +11,7 @@ import {
 } from "@/lib/actions/inventory-stock-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { classifyMetalName } from "@/lib/business-units"
+import { LocationSelect } from "@/components/shared/location-select"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { Button } from "@/components/ui/button"
@@ -183,23 +184,12 @@ export function IssueMaterialDialog({
 
           <div className="space-y-2">
             <Label>Location</Label>
-            <Select
-              value={locationId || "__none__"}
-              onValueChange={(value) => setLocationId(value === "__none__" ? "" : value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select location" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
-                {locations.map((location) => (
-                  <SelectItem key={location.id} value={location.id}>
-                    {location.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <input type="hidden" name="locationId" value={locationId} />
+            <LocationSelect
+              locations={locations}
+              name="locationId"
+              defaultValue={locationId}
+              onChange={setLocationId}
+            />
           </div>
 
           <div className="space-y-2">

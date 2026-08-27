@@ -14,6 +14,7 @@ import {
 } from "@/lib/actions/inventory-stock-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { classifyMetalName } from "@/lib/business-units"
+import { LocationSelect } from "@/components/shared/location-select"
 import { useToast } from "@/components/providers/toast-provider"
 import { ProductSelect, type ProductOption } from "@/components/inventory/shared/product-select"
 
@@ -640,24 +641,11 @@ export function ReceiveItemsForm({
 
                     <div className="space-y-1">
                       <Label className="text-xs">Location</Label>
-                      <Select
-                        value={item.locationId || "__none__"}
-                        onValueChange={(value) =>
-                          updateItem(item.key, { locationId: value === "__none__" ? "" : value })
-                        }
-                      >
-                        <SelectTrigger className="h-11 w-full">
-                          <SelectValue placeholder="Select location" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">None</SelectItem>
-                          {locations.map((location) => (
-                            <SelectItem key={location.id} value={location.id}>
-                              {location.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <LocationSelect
+                        locations={locations}
+                        defaultValue={item.locationId}
+                        onChange={(locationId) => updateItem(item.key, { locationId })}
+                      />
                     </div>
                   </div>
 

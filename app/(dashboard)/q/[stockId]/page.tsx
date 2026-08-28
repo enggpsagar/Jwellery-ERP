@@ -3,6 +3,15 @@ import { redirect } from "next/navigation"
 import { ScanLine, ShieldAlert } from "lucide-react"
 
 import { verifyQuickSaleToken } from "@/lib/quick-sale-token"
+import { getEffectiveStoreId } from "@/lib/store-context"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 
 import {
   getQuickSaleCustomers,
@@ -179,8 +188,47 @@ export default async function QuickSalePage({
     customers = await getQuickSaleCustomers(storeId)
   }
 
+  // The stock page is scoped by the active-store cookie, while this page is
+  // scoped by the token. For someone who belongs to several shops those can
+  // point at different stores, and the link would then lead to a page that
+  // cannot find the piece — so it is only a link when the two agree.
+  const stockPageReachable = (await getEffectiveStoreId()) === storeId
+
   return (
     <main className="mx-auto w-full max-w-lg space-y-4 p-4 sm:p-6">
+      {/* A scan arrives with no history behind it — the phone opened this URL
+          cold, so there is nothing to go "back" to. The trail says where the
+          piece sits and gives a way into the app from a standing start. */}
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/inventory/stock">Stock</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+
+          <BreadcrumbSeparator />
+
+          <BreadcrumbItem>
+            {stockPageReachable ? (
+              <BreadcrumbLink asChild>
+                <Link href={`/inventory/stock/${target.stockId}`}>
+                  {target.stockCode}
+                </Link>
+              </BreadcrumbLink>
+            ) : (
+              <span className="font-mono">{target.stockCode}</span>
+            )}
+          </BreadcrumbItem>
+
+          <BreadcrumbSeparator />
+
+          <BreadcrumbItem>
+            <BreadcrumbPage>Quick sale</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Quick sale</h1>
         <p className="text-sm text-muted-foreground">

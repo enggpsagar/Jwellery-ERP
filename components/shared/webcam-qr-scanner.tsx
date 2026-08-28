@@ -87,6 +87,7 @@ export function WebcamQrScanner({
   )
   const [message, setMessage] = useState<string | null>(null)
   const [lastCode, setLastCode] = useState<string | null>(null)
+  const [resolution, setResolution] = useState<string | null>(null)
 
   // A counter often has two cameras — the laptop's own, facing the operator,
   // and a scanner pointed at the desk. The browser picks one for you, and on
@@ -149,10 +150,22 @@ export function WebcamQrScanner({
         // honoured rather than treated as a hint. Otherwise fall back to
         // preferring a rear camera, which is what a tablet at the counter
         // would use; a laptop simply has the one.
+        // Resolution is the whole game. Left to itself a browser hands back
+        // 640x480, and a jewellery tag across the desk is then perhaps forty
+        // pixels of QR — below what any decoder can read. Asking for 1080p
+        // gives it roughly nine times the detail on the same tag.
+        //
+        // `ideal` rather than `exact`: a camera that cannot manage it returns
+        // its best instead of refusing to open at all.
+        const resolution = {
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        }
+
         const stream = await navigator.mediaDevices.getUserMedia({
           video: deviceId
-            ? { deviceId: { exact: deviceId } }
-            : { facingMode: "environment" },
+            ? { deviceId: { exact: deviceId }, ...resolution }
+            : { facingMode: "environment", ...resolution },
         })
 
         if (cancelled) {
@@ -186,6 +199,12 @@ export function WebcamQrScanner({
           }
         } catch {
           // Without the list there is no picker, but scanning still works.
+        }
+
+        const track = stream.getVideoTracks()[0]
+        const settings = track?.getSettings?.()
+        if (settings?.width && settings?.height && !cancelled) {
+          setResolution(`${settings.width}x${settings.height}`)
         }
 
         setStatus("scanning")
@@ -291,7 +310,7 @@ export function WebcamQrScanner({
           as the column allows. A short full-width band cropped most of the
           frame away; a small one threw away the resolution the decoder needs
           to read a tag from arm's length. */}
-      <div className="relative mx-auto mt-3 aspect-[4/3] w-full max-w-3xl overflow-hidden rounded-md bg-black">
+      <div className="relative mx-auto mt-3 aspect-[4/3] w-full max-w-4xl overflow-hidden rounded-md bg-black">
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         {/* `contain`, not `cover`: nothing the camera sees is cropped out of
             view, so what is on screen is exactly what the decoder is given.
@@ -327,7 +346,7 @@ export function WebcamQrScanner({
                 stays a sensible target on a large screen and a small one. A
                 cramped target makes people bring the label closer than a
                 fixed-focus camera can resolve. */}
-            <div className="aspect-square h-[70%] rounded-lg border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.3)]" />
+            <div className="aspect-square h-[88%] rounded-lg border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.2)]" />
           </div>
         ) : null}
       </div>
@@ -354,6 +373,14 @@ export function WebcamQrScanner({
           </select>
         </div>
       ) : null}
+
+      <p className="mt-2 text-xs text-muted-foreground">
+        Fill as much of the frame as you can — the whole picture is read, not
+        just inside the square.
+        {resolution ? (
+          <span className="ml-1">Camera: {resolution}.</span>
+        ) : null}
+      </p>
 
       {lastCode ? (
         <p className="mt-2 text-xs text-muted-foreground">

@@ -16,7 +16,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, resolveActingStoreId } from "@/lib/store-context";
 import {
   getLocationScope,
   locationWhere,
@@ -455,7 +455,15 @@ export async function createInvoice(
     if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
     else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
 
-    const storeId = await requireStoreScope();
+    // A caller may name the store explicitly — the QR scan-to-sell path does,
+    // because it resolves the shop from the scanned piece rather than from
+    // whichever store the phone happened to have active. `resolveActingStoreId`
+    // honours it only for a store the user is genuinely a member of, so this
+    // is no weaker than the store switcher; with nothing named it falls back
+    // to the active store exactly as before.
+    const storeId = await resolveActingStoreId(
+      String(formData.get("storeId") || "") || null,
+    );
 
     const customer = await prisma.customer.findFirst({
       where: { id: customerId, storeId },

@@ -4,41 +4,11 @@ import { revalidatePath } from "next/cache";
 import { StorePlanAction, UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { derivePlanStatus } from "@/lib/plan-status";
+import type { PlanStatus } from "@/lib/plan-status";
+
+export type { PlanStatus };
 import { requireRole } from "@/lib/auth/auth";
-
-/**
- * Where a store's subscription stands right now.
- *
- * Derived rather than stored: a store does not become "expired" by anyone
- * writing a status, it becomes expired because a date passed. Reading it from
- * the dates means it can never drift out of sync with them.
- */
-export type PlanStatus =
-  | "ARCHIVED"
-  | "NO_PLAN"
-  | "EXPIRED"
-  | "EXPIRING_SOON"
-  | "ACTIVE";
-
-/** Matches the reminder cron's window, so the badge agrees with the emails. */
-const EXPIRING_SOON_DAYS = 7;
-
-export function derivePlanStatus(store: {
-  isActive: boolean;
-  planId: string | null;
-  planExpiresAt: Date | null;
-}): PlanStatus {
-  // Archived wins over everything: nobody can sign in regardless of the plan.
-  if (!store.isActive) return "ARCHIVED";
-  if (!store.planId || !store.planExpiresAt) return "NO_PLAN";
-
-  const msLeft = store.planExpiresAt.getTime() - Date.now();
-
-  if (msLeft <= 0) return "EXPIRED";
-  if (msLeft <= EXPIRING_SOON_DAYS * 24 * 60 * 60 * 1000) return "EXPIRING_SOON";
-
-  return "ACTIVE";
-}
 
 export type StorePlanOverview = {
   storeId: string;

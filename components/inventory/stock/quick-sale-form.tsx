@@ -86,9 +86,12 @@ function ReviewRow({
 export function QuickSaleForm({
   target,
   customers,
+  token,
 }: {
   target: QuickSaleTarget
   customers: QuickSaleCustomer[]
+  /** Scan token: says which shop this sale is written to. */
+  token: string
 }) {
   const [state, formAction, pending] = useActionState(
     completeQuickSale,
@@ -221,6 +224,7 @@ export function QuickSaleForm({
           <form action={formAction} className="flex flex-col gap-5">
             {/* The values submitted are always these hidden fields, so what
                 was reviewed on the confirm step is exactly what is sent. */}
+            <input type="hidden" name="token" value={token} />
             <input type="hidden" name="stockId" value={target.stockId} />
             <input type="hidden" name="customerId" value={customerId} />
             <input type="hidden" name="quantity" value={String(quantityValue)} />

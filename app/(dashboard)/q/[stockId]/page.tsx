@@ -1,5 +1,8 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { ScanLine, ShieldAlert } from "lucide-react"
+
+import { verifyQuickSaleToken } from "@/lib/quick-sale-token"
 
 import {
   getQuickSaleCustomers,
@@ -27,6 +30,8 @@ import { QuickSaleForm } from "@/components/inventory/stock/quick-sale-form"
 
 type QuickSalePageProps = {
   params: Promise<{ stockId: string }>
+  /** `t` is the scan token from /s; `x` is set when /s could not issue one. */
+  searchParams: Promise<{ t?: string; x?: string }>
 }
 
 /** Full-width message card, used for every dead end on this page. */
@@ -63,22 +68,83 @@ function Notice({
   )
 }
 
-export default async function QuickSalePage({ params }: QuickSalePageProps) {
+export default async function QuickSalePage({
+  params,
+  searchParams,
+}: QuickSalePageProps) {
   const { stockId } = await params
+  const { t: token, x: entryProblem } = await searchParams
+
+  if (entryProblem === "denied") {
+    return (
+      <Notice
+        icon={<ShieldAlert className="size-10 text-muted-foreground" />}
+        title="Not your store"
+        body="This tag belongs to a store you don't have access to. If that's wrong, ask the store owner to add you."
+        action={{ href: "/dashboard", label: "Go to dashboard" }}
+      />
+    )
+  }
+
+  if (entryProblem === "missing") {
+    return (
+      <Notice
+        icon={<ScanLine className="size-10 text-muted-foreground" />}
+        title="Tag not recognised"
+        body="Nothing matches this tag. The stock entry may have been removed, or the code may not be one of ours."
+        action={{ href: "/inventory/stock", label: "Go to stock" }}
+      />
+    )
+  }
+
+  // Arrived without a token — opened by hand, or a stale link. Send it
+  // through the entry point, which is the one place that resolves store
+  // context, and come back with one.
+  if (!token) {
+    redirect(`/s/${stockId}`)
+  }
+
+  const verified = verifyQuickSaleToken(token)
+
+  if (!verified.valid) {
+    return (
+      <Notice
+        icon={<ScanLine className="size-10 text-muted-foreground" />}
+        title={
+          verified.reason === "expired" ? "This sale timed out" : "Link not valid"
+        }
+        body={
+          verified.reason === "expired"
+            ? "Sale links are short-lived for security. Scan the tag again to start a fresh one."
+            : "This link could not be verified. Scan the tag again."
+        }
+        // Straight back to the entry point, which mints a new token. A link
+        // rather than an automatic redirect, so an expired token cannot put
+        // the page into a refresh cycle.
+        action={{ href: `/s/${stockId}`, label: "Scan again" }}
+      />
+    )
+  }
+
+  // The token names the shop this sale belongs to. It is proof the scan was
+  // authorised, not authority in itself — every call below re-checks the
+  // session, the membership and the permission server-side.
+  const { storeId } = verified.payload
 
   let target: QuickSaleTarget | null = null
   let customers: QuickSaleCustomer[] = []
+  let notPermitted = false
 
   try {
-    target = await getQuickSaleTarget(stockId)
-    // Only loaded once the tag resolves, so a scan of an unknown code does no
-    // extra work — and only when a sale is actually possible.
-    if (target && !target.blockedReason) {
-      customers = await getQuickSaleCustomers()
-    }
+    target = await getQuickSaleTarget(stockId, storeId)
   } catch {
-    // requirePermission threw: signed in, but not allowed to sell. Scanning a
-    // tag must not become a side door into billing.
+    // requirePermission or the membership check threw: signed in, but not
+    // allowed to sell here. Scanning a tag must not be a side door into
+    // billing, nor into a store someone has been removed from.
+    notPermitted = true
+  }
+
+  if (notPermitted) {
     return (
       <Notice
         icon={<ShieldAlert className="size-10 text-muted-foreground" />}
@@ -89,18 +155,28 @@ export default async function QuickSalePage({ params }: QuickSalePageProps) {
     )
   }
 
-  // No match means the tag belongs to another store — most likely the person
-  // scanning has a different store active, not that the piece is missing. The
-  // message says so, because "not found" would send them hunting for the tag.
+  // Reached without the store having been resolved — someone opened this path
+  // directly, or followed an old link with a different store now active. Send
+  // it through the entry point, which is the one place that decides store
+  // context. `x` is absent by construction here, and /s always redirects back
+  // with `x` set, so this cannot loop.
+  // The token named a store and the piece is not in it — it was removed
+  // between the scan and now. No redirect: /s would only mint another token
+  // for the same missing row.
   if (!target) {
     return (
       <Notice
         icon={<ScanLine className="size-10 text-muted-foreground" />}
-        title="Tag not in this store"
-        body="This tag belongs to a different store, or the stock entry has been removed. Switch stores from the top bar and scan again."
+        title="Tag not recognised"
+        body="Nothing matches this tag any more. The stock entry may have been removed."
         action={{ href: "/inventory/stock", label: "Go to stock" }}
       />
     )
+  }
+
+  // Same permission as above, so this cannot fail on its own.
+  if (!target.blockedReason) {
+    customers = await getQuickSaleCustomers(storeId)
   }
 
   return (
@@ -113,7 +189,7 @@ export default async function QuickSalePage({ params }: QuickSalePageProps) {
         </p>
       </div>
 
-      <QuickSaleForm target={target} customers={customers} />
+      <QuickSaleForm target={target} customers={customers} token={token} />
     </main>
   )
 }

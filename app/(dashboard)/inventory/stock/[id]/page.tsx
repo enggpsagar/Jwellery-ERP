@@ -38,10 +38,11 @@ export default async function InventoryStockDetailsPage({
   }
 
   const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
-  // Points at the quick-sale flow, not at this page: a tag is scanned at the
-  // counter to sell the piece, so the scan should land on the sale rather
-  // than on a read-only record the seller then has to navigate away from.
-  const qrDataUrl = await QRCode.toDataURL(`${baseUrl}/q/${stock.id}`)
+  // Points at the scan entry point, not at this page and not straight at the
+  // sale screen: /s resolves who is scanning and which shop the piece belongs
+  // to, then hands over to the sale with that context already applied. Short
+  // payload too, which matters on a tag printed small.
+  const qrDataUrl = await QRCode.toDataURL(`${baseUrl}/s/${stock.id}`)
 
   return (
     <main className="space-y-6 p-6">
@@ -66,7 +67,7 @@ export default async function InventoryStockDetailsPage({
           <div className="flex items-center gap-2">
             {/* Tags printed before the QR pointed at the quick sale still land
                 here, so the sale has to be one tap away from this page too. */}
-            <Link href={`/q/${stock.id}`}>
+            <Link href={`/s/${stock.id}`}>
               <Button type="button" variant="outline" className="gap-2">
                 <ScanLine className="h-4 w-4" />
                 Sell this piece

@@ -69,9 +69,9 @@ export default async function StockPrintQrPage({
       netWeight: formatWeight(stock.netWeight),
       grossWeight: formatWeight(stock.grossWeight),
       manufactureDate: formatDate(stock.manufactureDate),
-      // Same target as the single-item QR: scanning a printed tag opens the
-      // quick-sale flow for that piece.
-      qrDataUrl: await QRCode.toDataURL(`${baseUrl}/q/${stock.id}`),
+      // Same target as the single-item QR: /s resolves the scanner's store
+      // and permissions, then hands over to the sale for this piece.
+      qrDataUrl: await QRCode.toDataURL(`${baseUrl}/s/${stock.id}`),
     }))
   )
 

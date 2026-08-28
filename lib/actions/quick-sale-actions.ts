@@ -3,9 +3,10 @@
 import { InventoryStockStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/auth/auth";
+import { requireAuth, requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
-import { requireStoreScope } from "@/lib/store-context";
+import { resolveActingStoreId } from "@/lib/store-context";
+import { verifyQuickSaleToken } from "@/lib/quick-sale-token";
 import { createInvoice } from "@/lib/actions/invoice-actions";
 
 /**
@@ -41,12 +42,14 @@ export type QuickSaleTarget = {
  */
 export async function getQuickSaleTarget(
   stockId: string,
+  /** Store named by the scan token; falls back to the active store. */
+  scopedStoreId?: string,
 ): Promise<QuickSaleTarget | null> {
   // Gated on the sell permission rather than plain sign-in: this returns the
   // piece's weights and rates, so a scanned tag must not become a way to read
   // stock for someone who cannot sell it.
   await requirePermission(PERMISSIONS.BILLING_CREATE);
-  const storeId = await requireStoreScope();
+  const storeId = await resolveActingStoreId(scopedStoreId);
 
   const stock = await prisma.inventoryStock.findFirst({
     where: { id: stockId, storeId },
@@ -126,9 +129,11 @@ export type QuickSaleCustomer = { id: string; name: string; phone: string | null
  * choice here exactly as it is on the full invoice form — the scan removes
  * the product entry, not the accounting.
  */
-export async function getQuickSaleCustomers(): Promise<QuickSaleCustomer[]> {
+export async function getQuickSaleCustomers(
+  scopedStoreId?: string,
+): Promise<QuickSaleCustomer[]> {
   await requirePermission(PERMISSIONS.BILLING_CREATE);
-  const storeId = await requireStoreScope();
+  const storeId = await resolveActingStoreId(scopedStoreId);
 
   return prisma.customer.findMany({
     where: { storeId, isActive: true, isArchived: false },
@@ -168,9 +173,40 @@ export async function completeQuickSale(
       };
     }
 
-    const storeId = await requireStoreScope();
+    // The scan token is what says which shop this sale belongs to. Verified
+    // before anything else is read, and re-bound to the session below, so a
+    // token cannot be lifted from one person's URL and used by another.
+    const token = String(formData.get("token") || "");
+    const verified = verifyQuickSaleToken(token);
+
+    if (!verified.valid) {
+      return {
+        success: false,
+        message:
+          verified.reason === "expired"
+            ? "This sale timed out. Scan the tag again."
+            : "This sale link is not valid. Scan the tag again.",
+      };
+    }
+
+    const actor = await requireAuth();
+
+    if (actor.id !== verified.payload.userId) {
+      return {
+        success: false,
+        message: "This sale link was issued to someone else. Scan the tag again.",
+      };
+    }
 
     const stockId = String(formData.get("stockId") || "").trim();
+
+    if (stockId && stockId !== verified.payload.stockId) {
+      return { success: false, message: "This sale link is for a different item." };
+    }
+
+    // Membership in the token's store is re-checked here, not assumed from
+    // the signature: access can be revoked between the scan and the confirm.
+    const storeId = await resolveActingStoreId(verified.payload.storeId);
     const sellingPrice = Number(formData.get("sellingPrice"));
     const quantity = Math.max(1, Math.trunc(Number(formData.get("quantity")) || 1));
     const paidNow = Number(formData.get("paidAmount"));
@@ -188,7 +224,7 @@ export async function completeQuickSale(
       return { success: false, message: "Enter a selling price." };
     }
 
-    const target = await getQuickSaleTarget(stockId);
+    const target = await getQuickSaleTarget(stockId, storeId);
 
     if (!target) {
       return { success: false, message: "That code does not match anything in this store." };
@@ -259,6 +295,7 @@ export async function completeQuickSale(
     };
 
     const invoiceForm = new FormData();
+    invoiceForm.set("storeId", storeId);
     invoiceForm.set("customerId", customerId);
     invoiceForm.set("itemsJson", JSON.stringify([lineItem]));
     invoiceForm.set("discount", "0");

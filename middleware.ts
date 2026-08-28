@@ -65,5 +65,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|login).*)"],
+  // `.+` rather than `.*` is what makes the landing page reachable: with
+  // `.*` the capture can be empty, so "/" itself matched and every visitor
+  // was redirected to /login before the page rendered. Requiring at least
+  // one character after the slash leaves "/" public and protects everything
+  // below it exactly as before.
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|login).+)"],
 };

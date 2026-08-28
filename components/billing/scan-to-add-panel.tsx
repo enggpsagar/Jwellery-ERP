@@ -9,7 +9,7 @@ import {
   stopScanSession,
 } from "@/lib/actions/scan-session-actions"
 import { Button } from "@/components/ui/button"
-import { WebcamQrScanner } from "@/components/billing/webcam-qr-scanner"
+import { WebcamQrScanner } from "@/components/shared/webcam-qr-scanner"
 
 /**
  * "Add item by scanning" for a billing screen, by either route.

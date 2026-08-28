@@ -86,6 +86,10 @@ function areaSegment(area: string | null | undefined): string {
 const GENERIC_NAME_WORDS = new Set([
   "JEWELLERS", "JEWELLER", "JWELLERS", "JWELLER", "JEWELERS", "JEWELER",
   "JEWELLERY", "JEWELRY", "JEWELS", "JEWEL",
+  // The J-without-E spellings are common locally and are what this app uses
+  // throughout its own data, so leaving them out meant "Alankar Jwellery"
+  // kept the trade word and coded as ALJ instead of ALA.
+  "JWELLERY", "JWELERY", "JWELLARY", "JWELLARS", "JEWELLARY",
   "GOLD", "SILVER", "DIAMOND", "DIAMONDS", "ORNAMENTS", "BULLION",
   "STORE", "STORES", "SHOP", "SHOPPE", "EMPORIUM", "HOUSE", "PALACE",
   "SONS", "BROS", "BROTHERS", "CO", "COMPANY", "AND", "THE",
@@ -100,7 +104,7 @@ const GENERIC_NAME_WORDS = new Set([
  * plus the first of the second ("Shree Ram" -> SHR), which reads better than
  * the bare initials "SR"; three or more give initials ("R K Sons" -> RKS).
  */
-function nameSegment(name: string): string {
+function nameSegment(name: string, keepGenericWords = false): string {
   const all = (name ?? "")
     .split(/\s+/)
     .map((word) => alnum(word))
@@ -110,7 +114,15 @@ function nameSegment(name: string): string {
 
   // Keep the generic words if that is all there is — "Gold Palace" should
   // still produce something rather than falling back to STR.
-  const meaningful = all.filter((word) => !GENERIC_NAME_WORDS.has(word));
+  //
+  // `keepGenericWords` is the collision escape hatch: three shops called
+  // "Demo - Gold/Silver/Diamond Business" reduce to the same DEB once the
+  // trade words are dropped, and the word that tells them apart is exactly
+  // the one that was dropped. Putting it back gives DGB/DSB/DDB, which beats
+  // numbering them.
+  const meaningful = keepGenericWords
+    ? all
+    : all.filter((word) => !GENERIC_NAME_WORDS.has(word));
   const words = meaningful.length > 0 ? meaningful : all;
 
   if (words.length === 1) return words[0].slice(0, 3).padEnd(3, "X");
@@ -130,11 +142,14 @@ export type StoreCodeParts = {
 };
 
 /** The code without any uniqueness handling — see `buildUniqueStoreCode`. */
-export function buildStoreCode(parts: StoreCodeParts): string {
+export function buildStoreCode(
+  parts: StoreCodeParts,
+  keepGenericWords = false,
+): string {
   return [
     stateSegment(parts.state),
     areaSegment(parts.area),
-    nameSegment(parts.name),
+    nameSegment(parts.name, keepGenericWords),
   ].join("-");
 }
 
@@ -153,6 +168,12 @@ export function buildUniqueStoreCode(
   const used = new Set([...taken].map((code) => code.toUpperCase()));
 
   if (!used.has(base)) return base;
+
+  // Before numbering, try the name with its trade words put back — for shops
+  // distinguished only by the word the stoplist removes, that is a real name
+  // rather than a counter.
+  const withGeneric = buildStoreCode(parts, true);
+  if (withGeneric !== base && !used.has(withGeneric)) return withGeneric;
 
   for (let suffix = 2; suffix < 1000; suffix += 1) {
     const candidate = `${base}-${suffix}`;

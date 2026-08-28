@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 type StockQrCardProps = {
   dataUrl: string
   stockCode: string
+  productCode: string | null
   productName: string
   tagNumber: string | null
   metalName: string | null
@@ -19,6 +20,7 @@ type StockQrCardProps = {
 export function StockQrCard({
   dataUrl,
   stockCode,
+  productCode,
   productName,
   tagNumber,
   metalName,
@@ -77,6 +79,14 @@ export function StockQrCard({
         <div>
           <p className="font-semibold">LR# {tagNumber ?? stockCode}</p>
           <p className="text-sm text-muted-foreground">{productName}</p>
+          {/* Printed in monospace at full contrast: the product code is read
+              off the physical tag by eye, so it has to survive a small label
+              and never be mistaken for the stock code above it. */}
+          {productCode && (
+            <p className="mt-1 font-mono text-sm font-semibold tracking-wide">
+              {productCode}
+            </p>
+          )}
         </div>
 
         <div className="w-full max-w-[220px] space-y-0.5 text-left text-xs text-muted-foreground">

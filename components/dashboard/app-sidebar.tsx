@@ -36,6 +36,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -186,8 +187,16 @@ function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string })
   const isSubItemActive =
     hasSubItems && item.items!.some((subItem) => pathname === subItem.href);
 
-  const [manuallyOpened, setManuallyOpened] = useState(false);
-  const open = isSubItemActive || manuallyOpened;
+  // null = "follow the route", true/false = the user has decided.
+  //
+  // Previously this was `isSubItemActive || manuallyOpened`, which could
+  // never close: being on one of the section's own pages forced it open, and
+  // the click handler only ever set the flag to true. Inventory and Billing
+  // showed it worst, because you are nearly always sitting on one of their
+  // sub-pages. An explicit override lets the route pick the initial state
+  // while still letting a click win.
+  const [openOverride, setOpenOverride] = useState<boolean | null>(null);
+  const open = openOverride ?? isSubItemActive;
 
   if (!hasSubItems) {
     return (
@@ -209,23 +218,36 @@ function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string })
 
   return (
     <SidebarMenuItem>
+      {/* Navigating to the section opens it; it never closes it, so landing
+          on a sub-page doesn't fight the chevron. */}
       <SidebarMenuButton
         asChild
         isActive={isActive}
         tooltip={item.title}
-        onClick={() => setManuallyOpened(true)}
+        onClick={() => setOpenOverride(true)}
         className={ACTIVE_NAV_CLASS}
       >
         <Link href={item.href}>
           <Icon className="h-4 w-4" />
           <span>{item.title}</span>
-          <ChevronRight
-            className={`ml-auto h-4 w-4 shrink-0 transition-transform ${
-              open ? "rotate-90" : ""
-            }`}
-          />
         </Link>
       </SidebarMenuButton>
+
+      {/* A real button beside the link rather than inside it: the chevron
+          expands and collapses, and must not navigate. Nesting it in the
+          <Link> would also be invalid HTML. */}
+      <SidebarMenuAction
+        onClick={() => setOpenOverride(!open)}
+        aria-expanded={open}
+        aria-label={`${open ? "Collapse" : "Expand"} ${item.title}`}
+        className="text-white/70 hover:bg-card/10 hover:text-white"
+      >
+        <ChevronRight
+          className={`h-4 w-4 shrink-0 transition-transform ${
+            open ? "rotate-90" : ""
+          }`}
+        />
+      </SidebarMenuAction>
 
       {open && (
         <SidebarMenuSub>

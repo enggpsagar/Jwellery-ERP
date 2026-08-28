@@ -61,6 +61,7 @@ export default async function StockPrintQrPage({
     stockItems.map(async (stock) => ({
       id: stock.id,
       stockCode: stock.stockCode,
+      productCode: stock.product?.productCode ?? null,
       productName: stock.product?.name ?? "-",
       tagNumber: stock.tagNumber || null,
       metalName: stock.metalType?.name ?? null,
@@ -68,9 +69,9 @@ export default async function StockPrintQrPage({
       netWeight: formatWeight(stock.netWeight),
       grossWeight: formatWeight(stock.grossWeight),
       manufactureDate: formatDate(stock.manufactureDate),
-      qrDataUrl: await QRCode.toDataURL(
-        `${baseUrl}/inventory/stock/${stock.id}`
-      ),
+      // Same target as the single-item QR: scanning a printed tag opens the
+      // quick-sale flow for that piece.
+      qrDataUrl: await QRCode.toDataURL(`${baseUrl}/q/${stock.id}`),
     }))
   )
 
@@ -145,6 +146,14 @@ export default async function StockPrintQrPage({
                 <p className="text-sm text-muted-foreground">
                   {item.productName}
                 </p>
+                {/* Read off the physical tag by eye — monospace at full
+                    contrast so it survives a small label and is never
+                    confused with the stock code above it. */}
+                {item.productCode && (
+                  <p className="mt-1 font-mono text-sm font-semibold tracking-wide">
+                    {item.productCode}
+                  </p>
+                )}
               </div>
 
               <div className="w-full max-w-[220px] space-y-0.5 text-left text-xs text-muted-foreground">

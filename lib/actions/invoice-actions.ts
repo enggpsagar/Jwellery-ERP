@@ -14,6 +14,8 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/auth/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope } from "@/lib/store-context";
 import {
   getLocationScope,
@@ -407,6 +409,14 @@ export async function createInvoice(
   formData: FormData,
 ): Promise<InvoiceFormState> {
   try {
+    // Authorization lives here, not only in middleware: a server action is a
+    // POST endpoint that can be invoked from any page the caller is allowed
+    // to load, so the route guard never sees it.
+    try {
+      await requirePermission(PERMISSIONS.BILLING_CREATE);
+    } catch {
+      return { success: false, message: "You do not have permission to create invoices." };
+    }
     const customerId = String(formData.get("customerId") || "");
     const itemsRaw = String(formData.get("itemsJson") || "[]");
 
@@ -616,6 +626,14 @@ export async function recordInvoicePayment(
   formData: FormData,
 ): Promise<InvoiceFormState> {
   try {
+    // Authorization lives here, not only in middleware: a server action is a
+    // POST endpoint that can be invoked from any page the caller is allowed
+    // to load, so the route guard never sees it.
+    try {
+      await requirePermission(PERMISSIONS.BILLING_UPDATE);
+    } catch {
+      return { success: false, message: "You do not have permission to record payments." };
+    }
     const paymentsRaw = String(formData.get("paymentsJson") || "[]");
     const notes = String(formData.get("notes") || "").trim() || null;
 
@@ -678,6 +696,14 @@ export async function recordInvoicePayment(
 /** Only DRAFT invoices with no recorded payments/ledger entries can be deleted. */
 export async function deleteInvoice(id: string): Promise<InvoiceFormState> {
   try {
+    // Authorization lives here, not only in middleware: a server action is a
+    // POST endpoint that can be invoked from any page the caller is allowed
+    // to load, so the route guard never sees it.
+    try {
+      await requirePermission(PERMISSIONS.BILLING_DELETE);
+    } catch {
+      return { success: false, message: "You do not have permission to delete invoices." };
+    }
     const storeId = await requireStoreScope();
 
     const invoice = await prisma.invoice.findFirst({
@@ -707,6 +733,14 @@ export async function deleteInvoice(id: string): Promise<InvoiceFormState> {
 /** Email a formatted copy of this invoice to the customer on file. */
 export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceFormState> {
   try {
+    // Authorization lives here, not only in middleware: a server action is a
+    // POST endpoint that can be invoked from any page the caller is allowed
+    // to load, so the route guard never sees it.
+    try {
+      await requirePermission(PERMISSIONS.BILLING_VIEW);
+    } catch {
+      return { success: false, message: "You do not have permission to email invoices." };
+    }
     const storeId = await requireStoreScope();
 
     const [invoice, storeName] = await Promise.all([

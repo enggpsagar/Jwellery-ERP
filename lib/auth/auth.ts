@@ -76,3 +76,21 @@ export async function hasPermission(permission: string) {
 
   return permissions.includes(permission);
 }
+/**
+ * Throwing companion to `hasPermission`, for guarding mutations.
+ *
+ * Server actions are POST endpoints in their own right: middleware gates them
+ * by the pathname they happen to be invoked from, which says nothing about
+ * which action is being run. A Staff user who is blocked from /billing can
+ * still reach a billing action from any page they are allowed to load, so the
+ * check has to live in the action rather than in front of the route.
+ */
+export async function requirePermission(permission: string) {
+  const user = await requireAuth();
+
+  if (!(await hasPermission(permission))) {
+    throw new Error("Forbidden");
+  }
+
+  return user;
+}

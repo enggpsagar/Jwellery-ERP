@@ -646,3 +646,111 @@ export function ledgerStatementEmail(params: {
     html: wrapEmail(params.storeName, "Account Statement", body),
   };
 }
+
+/**
+ * The previous day's trading, sent each morning.
+ *
+ * The body carries the four totals so the owner can read the day off their
+ * phone without opening anything; the attached workbook carries every line
+ * behind those totals for when they want to check one.
+ */
+export function dailyReportEmail(params: {
+  storeName: string;
+  appName: string;
+  dayLabel: string;
+  fileName: string;
+  sections: { title: string; count: number; total: number }[];
+  netPosition: number;
+}) {
+  const { storeName, appName, dayLabel, fileName, sections, netPosition } =
+    params;
+
+  const inr = (value: number) =>
+    new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 2,
+    }).format(value);
+
+  const summaryRows = sections
+    .map(
+      (section) => `
+        <tr>
+          <td style="padding: 10px 0; font-size: 13px; color: #374151; border-bottom: 1px solid #f3f4f6;">
+            ${section.title}
+            <span style="color: #9ca3af;">&nbsp;·&nbsp;${section.count} ${
+              section.count === 1 ? "entry" : "entries"
+            }</span>
+          </td>
+          <td style="padding: 10px 0; font-size: 13px; color: #111827; font-weight: bold; text-align: right; border-bottom: 1px solid #f3f4f6;">
+            ${inr(section.total)}
+          </td>
+        </tr>`,
+    )
+    .join("");
+
+  const nothingHappened = sections.every((section) => section.count === 0);
+
+  const body = `
+    <p style="margin-top: 0;">Here is the summary for <strong>${dayLabel}</strong> at <strong>${storeName}</strong>.</p>
+
+    ${
+      nothingHappened
+        ? `<div style="padding: 14px 16px; background: #f9fafb; border-left: 3px solid #9ca3af; border-radius: 0 6px 6px 0;">
+             <p style="margin: 0; font-size: 13px; color: #4b5563; line-height: 1.6;">
+               No transactions were recorded on this date.
+             </p>
+           </div>`
+        : ""
+    }
+
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+      <tbody>
+        ${summaryRows}
+        <tr>
+          <td style="padding: 12px 0; font-size: 13px; color: #374151; font-weight: bold;">
+            Sales less purchases
+          </td>
+          <td style="padding: 12px 0; font-size: 15px; font-weight: bold; text-align: right; color: ${
+            netPosition < 0 ? "#b91c1c" : "#047857"
+          };">
+            ${inr(netPosition)}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="font-size: 13px; color: #4b5563; line-height: 1.6;">
+      The attached spreadsheet <strong>${fileName}</strong> has a sheet for each
+      of Credit, Debit, Sale and Purchase, listing every transaction behind
+      these totals with the sum at the bottom of each sheet.
+    </p>
+
+    <p style="font-size: 12px; color: #6b7280; line-height: 1.6;">
+      Sent automatically each day by ${appName}. Figures cover ${dayLabel},
+      midnight to midnight IST.
+    </p>
+  `;
+
+  const text = [
+    `Daily summary for ${dayLabel} — ${storeName}`,
+    "",
+    ...sections.map(
+      (section) =>
+        `${section.title}: ${inr(section.total)} (${section.count} ${
+          section.count === 1 ? "entry" : "entries"
+        })`,
+    ),
+    `Sales less purchases: ${inr(netPosition)}`,
+    "",
+    `Attached: ${fileName} — one sheet each for Credit, Debit, Sale and Purchase.`,
+    "",
+    `Sent automatically by ${appName}. Figures cover ${dayLabel}, midnight to midnight IST.`,
+  ].join("\n");
+
+  return {
+    subject: `Daily summary — ${dayLabel} — ${storeName}`,
+    html: wrapEmail(storeName, `Daily summary · ${dayLabel}`, body),
+    text,
+  };
+}

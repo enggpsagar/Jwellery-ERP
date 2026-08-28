@@ -10,6 +10,8 @@ import { APP_NAME } from "@/lib/constants/app";
 import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 
+import { safeReturnTo } from "@/lib/safe-return-to";
+
 type Mode = "phone" | "email";
 
 type Notice = { tone: "error" | "info"; title: string; body: string };
@@ -79,11 +81,26 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
 
+  // Where to go once signed in. Middleware puts the blocked path in
+  // `callbackUrl`, and honouring it is what makes a scanned QR work on a
+  // phone: without it every scan that hits the login wall lands on the
+  // dashboard, and the tag the counter just scanned is lost.
+  //
+  // Sanitised before use — it comes from the query string, so an attacker
+  // could otherwise hand someone a login link that redirects off-site.
+  const [callbackUrl, setCallbackUrl] = useState("/dashboard");
+
   // Read straight off the URL rather than through useSearchParams, which
   // would force this page dynamic and require a Suspense boundary around it.
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get("error");
+    const params = new URLSearchParams(window.location.search);
+
+    const code = params.get("error");
     if (code) setNotice(noticeFor(code));
+
+    const target = safeReturnTo(params.get("callbackUrl"));
+    // The login page itself is a valid same-origin path but a redirect loop.
+    if (target && !target.startsWith("/login")) setCallbackUrl(target);
   }, []);
 
   function switchMode(next: Mode) {
@@ -150,7 +167,7 @@ export default function LoginPage() {
         return;
       }
 
-      window.location.href = "/dashboard";
+      window.location.href = callbackUrl;
     } catch {
       setNotice(noticeFor("AccessDenied"));
     } finally {
@@ -211,7 +228,7 @@ export default function LoginPage() {
         <button
           onClick={() =>
             signIn("google", {
-              callbackUrl: "/dashboard",
+              callbackUrl,
             })
           }
           className="mt-6 w-full rounded-md border px-4 py-2 font-medium transition-colors hover:bg-accent"

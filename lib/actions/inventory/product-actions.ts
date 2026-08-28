@@ -59,6 +59,9 @@ function serializeProduct(product: {
   defaultMakingChargeType: ChargeType;
   defaultStoneCharge: { toString(): string } | null;
   defaultStoneChargeType: ChargeType;
+  defaultGrossWeight: { toString(): string } | null;
+  defaultNetWeight: { toString(): string } | null;
+  defaultStoneWeight: { toString(): string } | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -82,6 +85,9 @@ function serializeProduct(product: {
     defaultMakingChargeType: product.defaultMakingChargeType,
     defaultStoneCharge: product.defaultStoneCharge?.toString() ?? null,
     defaultStoneChargeType: product.defaultStoneChargeType,
+    defaultGrossWeight: product.defaultGrossWeight?.toString() ?? null,
+    defaultNetWeight: product.defaultNetWeight?.toString() ?? null,
+    defaultStoneWeight: product.defaultStoneWeight?.toString() ?? null,
     designCode: product.designCode,
     hsnCode: product.hsnCode,
     description: product.description,
@@ -154,6 +160,9 @@ function mapProductRow(row: {
   defaultMakingChargeType: ChargeType;
   defaultStoneCharge: { toString(): string } | null;
   defaultStoneChargeType: ChargeType;
+  defaultGrossWeight: { toString(): string } | null;
+  defaultNetWeight: { toString(): string } | null;
+  defaultStoneWeight: { toString(): string } | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -176,6 +185,12 @@ function mapProductRow(row: {
     defaultStoneCharge:
       row.defaultStoneCharge != null ? Number(row.defaultStoneCharge) : null,
     defaultStoneChargeType: row.defaultStoneChargeType,
+    defaultGrossWeight:
+      row.defaultGrossWeight != null ? Number(row.defaultGrossWeight) : null,
+    defaultNetWeight:
+      row.defaultNetWeight != null ? Number(row.defaultNetWeight) : null,
+    defaultStoneWeight:
+      row.defaultStoneWeight != null ? Number(row.defaultStoneWeight) : null,
     designCode: row.designCode,
     hsnCode: row.hsnCode,
     description: row.description,
@@ -280,6 +295,9 @@ export async function exportProductsToExcel(
       "Making Charge Type": product.defaultMakingChargeType,
       "Default Stone Charge": product.defaultStoneCharge ?? "-",
       "Stone Charge Type": product.defaultStoneChargeType,
+      "Gross Weight (g)": product.defaultGrossWeight ?? "-",
+      "Net Weight (g)": product.defaultNetWeight ?? "-",
+      "Stone Weight (g)": product.defaultStoneWeight ?? "-",
       Description: product.description || "-",
       Notes: product.notes || "-",
       Status: product.isActive ? "Active" : "Inactive",
@@ -411,6 +429,19 @@ export async function createProduct(
         Object.values(ChargeType),
       ) ?? ChargeType.FIXED;
 
+    // Typical weights for the design. Optional: plenty of products (coins,
+    // bars, loose stones) are sold by count, and a blank must stay unknown
+    // rather than becoming zero.
+    const defaultGrossWeight = parseNullableDecimal(
+      formData.get("defaultGrossWeight"),
+    );
+    const defaultNetWeight = parseNullableDecimal(
+      formData.get("defaultNetWeight"),
+    );
+    const defaultStoneWeight = parseNullableDecimal(
+      formData.get("defaultStoneWeight"),
+    );
+
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
     const description = parseNullableString(formData.get("description"));
@@ -476,6 +507,9 @@ export async function createProduct(
         defaultMakingChargeType,
         defaultStoneCharge,
         defaultStoneChargeType,
+        defaultGrossWeight,
+        defaultNetWeight,
+        defaultStoneWeight,
         designCode,
         hsnCode,
         description,
@@ -536,6 +570,12 @@ export async function createProduct(
               makingCharge: defaultMakingCharge,
               makingChargeType: defaultMakingChargeType,
               stoneCharge: defaultStoneCharge,
+              // Seeded from the product so the piece is weighed once. The
+              // stock row stays the per-piece record and can be corrected
+              // against the scale without touching the design.
+              grossWeight: defaultGrossWeight,
+              netWeight: defaultNetWeight,
+              stoneWeight: defaultStoneWeight,
             },
           });
 
@@ -622,6 +662,19 @@ export async function updateProduct(
         Object.values(ChargeType),
       ) ?? ChargeType.FIXED;
 
+    // Typical weights for the design. Optional: plenty of products (coins,
+    // bars, loose stones) are sold by count, and a blank must stay unknown
+    // rather than becoming zero.
+    const defaultGrossWeight = parseNullableDecimal(
+      formData.get("defaultGrossWeight"),
+    );
+    const defaultNetWeight = parseNullableDecimal(
+      formData.get("defaultNetWeight"),
+    );
+    const defaultStoneWeight = parseNullableDecimal(
+      formData.get("defaultStoneWeight"),
+    );
+
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
     const description = parseNullableString(formData.get("description"));
@@ -690,6 +743,9 @@ export async function updateProduct(
     defaultMakingChargeType,
     defaultStoneCharge,
     defaultStoneChargeType,
+    defaultGrossWeight,
+    defaultNetWeight,
+    defaultStoneWeight,
     designCode,
     hsnCode,
     description,

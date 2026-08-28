@@ -15,6 +15,7 @@ type ProductRow = {
   ornamentType: string | null
   metalType: string
   defaultPurity: string | null
+  defaultNetWeight: number | null
   isActive: boolean
   createdAt: Date | string
 }
@@ -110,6 +111,7 @@ export function ProductsTable({
               <th className="px-4 py-3 text-left font-medium">Type</th>
               <th className="px-4 py-3 text-left font-medium">Metal</th>
               <th className="px-4 py-3 text-left font-medium">Purity</th>
+              <th className="px-4 py-3 text-right font-medium">Net Wt (g)</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <th className="px-4 py-3 text-left font-medium">Actions</th>
             </tr>
@@ -140,6 +142,11 @@ export function ProductsTable({
                   <td className="px-4 py-3">{product.ornamentType ?? "-"}</td>
                   <td className="px-4 py-3">{product.metalType}</td>
                   <td className="px-4 py-3">{product.defaultPurity ?? "-"}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {product.defaultNetWeight != null
+                      ? product.defaultNetWeight.toFixed(3)
+                      : "-"}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${

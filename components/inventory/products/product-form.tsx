@@ -49,6 +49,9 @@ type Product = {
   defaultMakingChargeType: "FIXED" | "PERCENTAGE" | null;
   defaultStoneCharge: string | null;
   defaultStoneChargeType: "FIXED" | "PERCENTAGE" | null;
+  defaultGrossWeight: string | null;
+  defaultNetWeight: string | null;
+  defaultStoneWeight: string | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -143,6 +146,42 @@ export function ProductForm({
   const [defaultStoneChargeType, setDefaultStoneChargeType] = useState(
     product?.defaultStoneChargeType ?? "FIXED",
   );
+
+  // Net = gross - stone is how a jeweller works it out, so the field fills
+  // itself in rather than making someone do the subtraction. It stops as
+  // soon as the field is edited directly: an existing product already has a
+  // net weight someone chose, and recomputing over it would quietly change
+  // a figure that prices the piece.
+  const [grossWeight, setGrossWeight] = useState(
+    product?.defaultGrossWeight ?? "",
+  );
+  const [stoneWeight, setStoneWeight] = useState(
+    product?.defaultStoneWeight ?? "",
+  );
+  const [netWeight, setNetWeight] = useState(product?.defaultNetWeight ?? "");
+  const [netTouched, setNetTouched] = useState(
+    Boolean(product?.defaultNetWeight),
+  );
+
+  const gross = Number(grossWeight);
+  const stone = stoneWeight.trim() === "" ? 0 : Number(stoneWeight);
+
+  const derivedNet =
+    grossWeight.trim() !== "" &&
+    Number.isFinite(gross) &&
+    Number.isFinite(stone) &&
+    gross - stone >= 0
+      ? // Trailing zeros trimmed so the box reads 5.5 rather than 5.500,
+        // while still respecting the column's three decimals.
+        String(Number((gross - stone).toFixed(3)))
+      : null;
+
+  // Kept in an effect rather than derived straight into the input, because
+  // the field has to stay editable once the user takes it over.
+  useEffect(() => {
+    if (netTouched) return;
+    setNetWeight(derivedNet ?? "");
+  }, [derivedNet, netTouched]);
 
   // Fetch the Types for whichever Category is currently selected, mirroring
   // the State -> City cascading pattern used on the Customer form.
@@ -403,6 +442,85 @@ export function ProductForm({
           </div>
         </div>
       </div>
+      {/* ============================
+          WEIGHTS
+      ============================= */}
+
+      <div className="rounded-xl border p-6">
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold">Weights</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Typical weights for this design. They prefill the stock entry, and
+            each piece can still be corrected against the scale afterwards.
+          </p>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div>
+            <Label htmlFor="defaultGrossWeight">Gross Weight (g)</Label>
+
+            <Input
+              id="defaultGrossWeight"
+              name="defaultGrossWeight"
+              type="number"
+              step="0.001"
+              min="0"
+              value={grossWeight}
+              onChange={(event) => setGrossWeight(event.target.value)}
+              placeholder="0.000"
+            />
+
+            <ErrorText error={state.errors.defaultGrossWeight} />
+          </div>
+
+          <div>
+            <Label htmlFor="defaultStoneWeight">Stone Weight (g)</Label>
+
+            <Input
+              id="defaultStoneWeight"
+              name="defaultStoneWeight"
+              type="number"
+              step="0.001"
+              min="0"
+              value={stoneWeight}
+              onChange={(event) => setStoneWeight(event.target.value)}
+              placeholder="0.000"
+            />
+
+            <ErrorText error={state.errors.defaultStoneWeight} />
+          </div>
+
+          <div>
+            <Label htmlFor="defaultNetWeight">Net Weight (g)</Label>
+
+            <Input
+              id="defaultNetWeight"
+              name="defaultNetWeight"
+              type="number"
+              step="0.001"
+              min="0"
+              value={netWeight}
+              onChange={(event) => {
+                // Typing here takes ownership of the field — from this point
+                // gross/stone stop driving it, so a deliberate figure is
+                // never silently overwritten.
+                setNetTouched(true);
+                setNetWeight(event.target.value);
+              }}
+              placeholder="0.000"
+            />
+
+            {!netTouched && derivedNet !== null ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Gross &minus; stone. Type to override.
+              </p>
+            ) : null}
+
+            <ErrorText error={state.errors.defaultNetWeight} />
+          </div>
+        </div>
+      </div>
+
       {/* ============================
           PRODUCT DETAILS
       ============================= */}

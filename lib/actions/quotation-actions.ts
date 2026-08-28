@@ -14,6 +14,8 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/auth/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope } from "@/lib/store-context";
 import {
   getLocationScope,
@@ -235,6 +237,15 @@ export async function exportQuotationsToExcel(
   params: DataTableExportParams = {},
 ): Promise<DataTableExportResult> {
   try {
+    // Authorization lives here, not only in middleware: a server action is a
+    // POST endpoint that can be invoked from any page the caller is allowed
+    // to load, so the route guard never sees it.
+    try {
+      await requirePermission(PERMISSIONS.QUOTATION_VIEW);
+    } catch {
+      return { success: false, message: "You do not have permission to export quotations." };
+    }
+
     const storeId = await requireStoreScope();
     const scope = await getLocationScope();
     const sortBy = toQuotationSortBy(params.sortBy);
@@ -353,6 +364,15 @@ export async function createQuotation(
   formData: FormData,
 ): Promise<QuotationFormState> {
   try {
+    // Authorization lives here, not only in middleware: a server action is a
+    // POST endpoint that can be invoked from any page the caller is allowed
+    // to load, so the route guard never sees it.
+    try {
+      await requirePermission(PERMISSIONS.QUOTATION_CREATE);
+    } catch {
+      return { success: false, message: "You do not have permission to create quotations." };
+    }
+
     const customerId = String(formData.get("customerId") || "");
     const locationId = String(formData.get("locationId") || "").trim() || null;
     const itemsRaw = String(formData.get("itemsJson") || "[]");
@@ -480,6 +500,15 @@ export async function createQuotation(
 /** Only "open" quotations (never converted) can be deleted. */
 export async function deleteQuotation(id: string): Promise<QuotationFormState> {
   try {
+    // Authorization lives here, not only in middleware: a server action is a
+    // POST endpoint that can be invoked from any page the caller is allowed
+    // to load, so the route guard never sees it.
+    try {
+      await requirePermission(PERMISSIONS.QUOTATION_DELETE);
+    } catch {
+      return { success: false, message: "You do not have permission to delete quotations." };
+    }
+
     const storeId = await requireStoreScope();
 
     const quotation = await prisma.quotation.findFirst({ where: { id, storeId } });
@@ -519,6 +548,18 @@ export async function convertQuotationToInvoice(
   formData: FormData,
 ): Promise<QuotationFormState> {
   try {
+    // Gated on billing rather than quotations: this is the point the sale
+    // actually happens — stock flips to SOLD and the ledger is posted — so
+    // being allowed to raise a quote must not be enough to invoice one.
+    try {
+      await requirePermission(PERMISSIONS.BILLING_CREATE);
+    } catch {
+      return {
+        success: false,
+        message: "You do not have permission to create invoices.",
+      };
+    }
+
     const storeId = await requireStoreScope();
 
     const quotation = await prisma.quotation.findFirst({

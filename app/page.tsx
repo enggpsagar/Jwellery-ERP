@@ -349,7 +349,7 @@ export default async function LandingPage() {
 
             <dl className="mt-10 grid max-w-md grid-cols-3 gap-6 border-t pt-6">
               {[
-                { k: "9", v: "modules" },
+                { k: String(MODULES.length), v: "modules" },
                 { k: "Kacha → Pakka", v: "billing flow" },
                 { k: "Fine-weight", v: "accounting" },
               ].map((stat) => (
@@ -375,8 +375,9 @@ export default async function LandingPage() {
               Everything the counter needs
             </h2>
             <p className="mt-3 text-muted-foreground">
-              Nine modules that share one set of records, so a purchase, a
-              repair job and a sale all describe the same piece of metal.
+              {MODULES.length} modules that share one set of records, so a
+              purchase, a repair job and a sale all describe the same piece of
+              metal.
             </p>
           </div>
 

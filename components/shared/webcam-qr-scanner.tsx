@@ -62,6 +62,9 @@ export function stockIdFromScan(raw: string): string | null {
   }
 }
 
+/** Remembered per browser, so the scanner is not re-chosen every sale. */
+const CAMERA_PREFERENCE_KEY = "stock-scanner-camera-id"
+
 /** Holding a tag in frame yields many reads a second; take one. */
 const REPEAT_SUPPRESSION_MS = 2500
 
@@ -84,6 +87,31 @@ export function WebcamQrScanner({
   )
   const [message, setMessage] = useState<string | null>(null)
   const [lastCode, setLastCode] = useState<string | null>(null)
+
+  // A counter often has two cameras — the laptop's own, facing the operator,
+  // and a scanner pointed at the desk. The browser picks one for you, and on
+  // a desktop `facingMode` gives it nothing to go on, so the choice has to be
+  // the operator's and has to stick.
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
+  const [deviceId, setDeviceId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null
+    try {
+      return window.localStorage.getItem(CAMERA_PREFERENCE_KEY)
+    } catch {
+      // Private browsing and blocked storage both throw; the picker still
+      // works, it just will not be remembered.
+      return null
+    }
+  })
+
+  const selectDevice = useCallback((next: string) => {
+    setDeviceId(next)
+    try {
+      window.localStorage.setItem(CAMERA_PREFERENCE_KEY, next)
+    } catch {
+      // Not worth surfacing — the camera still switches for this session.
+    }
+  }, [])
 
   const handleValue = useCallback((raw: string) => {
     const stockId = stockIdFromScan(raw)
@@ -117,10 +145,14 @@ export function WebcamQrScanner({
       }
 
       try {
+        // An exact deviceId when one has been chosen, so the choice is
+        // honoured rather than treated as a hint. Otherwise fall back to
+        // preferring a rear camera, which is what a tablet at the counter
+        // would use; a laptop simply has the one.
         const stream = await navigator.mediaDevices.getUserMedia({
-          // Prefers a rear camera where there is one, which is what a tablet
-          // at the counter would use; a laptop simply has the one.
-          video: { facingMode: "environment" },
+          video: deviceId
+            ? { deviceId: { exact: deviceId } }
+            : { facingMode: "environment" },
         })
 
         if (cancelled) {
@@ -144,10 +176,35 @@ export function WebcamQrScanner({
           }
         }
 
+        // Labels are blank until a camera has been granted, so the list is
+        // only worth reading after the stream is open — before that every
+        // entry would say "camera" and be impossible to choose between.
+        try {
+          const all = await navigator.mediaDevices.enumerateDevices()
+          if (!cancelled) {
+            setDevices(all.filter((device) => device.kind === "videoinput"))
+          }
+        } catch {
+          // Without the list there is no picker, but scanning still works.
+        }
+
         setStatus("scanning")
         scan()
       } catch (error) {
         if (cancelled) return
+        // A remembered camera that has since been unplugged fails with
+        // OverconstrainedError. Forget it and let the next attempt take
+        // whatever is actually attached, rather than stranding the panel.
+        if (error instanceof DOMException && error.name === "OverconstrainedError" && deviceId) {
+          try {
+            window.localStorage.removeItem(CAMERA_PREFERENCE_KEY)
+          } catch {
+            // Ignored; clearing state below is what matters.
+          }
+          setDeviceId(null)
+          return
+        }
+
         setStatus("error")
         setMessage(
           error instanceof DOMException && error.name === "NotAllowedError"
@@ -210,7 +267,9 @@ export function WebcamQrScanner({
       streamRef.current?.getTracks().forEach((track) => track.stop())
       streamRef.current = null
     }
-  }, [handleValue])
+    // Re-runs on a camera change: the cleanup below stops the old stream
+    // first, so the two never hold the device at once.
+  }, [handleValue, deviceId])
 
   return (
     <div className="rounded-lg border p-4">
@@ -261,6 +320,29 @@ export function WebcamQrScanner({
           </div>
         ) : null}
       </div>
+
+      {devices.length > 1 ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <label
+            htmlFor="scanner-camera"
+            className="text-xs text-muted-foreground"
+          >
+            Camera
+          </label>
+          <select
+            id="scanner-camera"
+            className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1.5 text-xs"
+            value={deviceId ?? devices[0]?.deviceId ?? ""}
+            onChange={(event) => selectDevice(event.target.value)}
+          >
+            {devices.map((device, index) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.label || `Camera ${index + 1}`}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
 
       {lastCode ? (
         <p className="mt-2 text-xs text-muted-foreground">

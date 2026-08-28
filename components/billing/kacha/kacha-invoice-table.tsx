@@ -133,9 +133,42 @@ export function KachaInvoiceTable({
                   />
                 </td>
                 <td className="px-4 py-3 font-medium">
-                  <Link href={`/billing/kacha/${kachaInvoice.id}`} className="hover:underline">
-                    {kachaInvoice.slipNumber}
-                  </Link>
+                  <RecordHoverCard
+                    label={kachaInvoice.slipNumber}
+                    href={`/billing/kacha/${kachaInvoice.id}`}
+                    title={kachaInvoice.slipNumber}
+                    subtitle={kachaInvoice.customer?.name ?? undefined}
+                    footerLabel="Open slip"
+                    sections={[
+                      {
+                        fields: [
+                          {
+                            label: "Date",
+                            value: new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN"),
+                          },
+                          { label: "Customer", value: kachaInvoice.customer?.name },
+                          { label: "Phone", value: kachaInvoice.customer?.phone },
+                          { label: "Status", value: kachaInvoice.status },
+                        ],
+                      },
+                      {
+                        fields: [
+                          { label: "Total", value: inr(kachaInvoice.totalAmount) },
+                          {
+                            label: "Balance",
+                            value:
+                              kachaInvoice.balanceAmount > 0
+                                ? inr(kachaInvoice.balanceAmount)
+                                : "Settled",
+                          },
+                          {
+                            label: "Converted to",
+                            value: kachaInvoice.convertedTo?.invoiceNumber,
+                          },
+                        ],
+                      },
+                    ]}
+                  />
                 </td>
                 <td className="px-4 py-3">
                   {new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN")}

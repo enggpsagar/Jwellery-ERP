@@ -64,9 +64,42 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
             {invoices.map((invoice) => (
               <tr key={invoice.id} className="border-b last:border-0">
                 <td className="px-4 py-3 font-medium">
-                  <Link href={`/billing/${invoice.id}`} className="hover:underline">
-                    {invoice.invoiceNumber}
-                  </Link>
+                  <RecordHoverCard
+                    label={invoice.invoiceNumber}
+                    href={`/billing/${invoice.id}`}
+                    title={invoice.invoiceNumber}
+                    subtitle={invoice.customer?.name ?? undefined}
+                    footerLabel="Open invoice"
+                    sections={[
+                      {
+                        fields: [
+                          {
+                            label: "Date",
+                            value: new Date(invoice.invoiceDate).toLocaleDateString("en-IN"),
+                          },
+                          { label: "Customer", value: invoice.customer?.name },
+                          { label: "Phone", value: invoice.customer?.phone },
+                          { label: "Status", value: invoice.status },
+                        ],
+                      },
+                      {
+                        fields: [
+                          { label: "Total", value: inr(invoice.totalAmount) },
+                          {
+                            label: "Balance",
+                            value:
+                              invoice.balanceAmount > 0
+                                ? inr(invoice.balanceAmount)
+                                : "Settled",
+                          },
+                          {
+                            label: "From slip",
+                            value: invoice.convertedFromKacha?.slipNumber,
+                          },
+                        ],
+                      },
+                    ]}
+                  />
                 </td>
                 <td className="px-4 py-3">
                   {new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}

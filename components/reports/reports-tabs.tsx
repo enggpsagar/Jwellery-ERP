@@ -2,6 +2,8 @@
 
 import Link from "next/link"
 
+import { RecordHoverCard } from "@/components/shared/record-hover-card"
+
 import { useState } from "react"
 
 import { ExportMenu } from "@/components/shared/export-menu"
@@ -92,6 +94,18 @@ type ReportsTabsProps = {
   metalWise: MetalWise
 }
 
+/** Money for the report cards; the columns print raw rupees themselves. */
+function reportInr(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) {
+    return null
+  }
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Number(value))
+}
+
 const TABS = [
   { key: "sales", label: "Sales" },
   { key: "inventory", label: "Inventory Valuation" },
@@ -179,12 +193,43 @@ export function ReportsTabs({
                   sales.invoices.map((invoice) => (
                     <tr key={invoice.id} className="border-b last:border-0">
                       <td className="px-4 py-3 font-medium">
-                        <Link
+                        <RecordHoverCard
+                          label={invoice.invoiceNumber}
                           href={`/billing/${invoice.id}?from=${encodeURIComponent("/reports")}`}
+                          title={invoice.invoiceNumber}
+                          subtitle={invoice.customerName}
+                          footerLabel="Open invoice"
                           className="text-primary underline-offset-4 hover:underline"
-                        >
-                          {invoice.invoiceNumber}
-                        </Link>
+                          sections={[
+                            {
+                              fields: [
+                                {
+                                  label: "Date",
+                                  value: new Date(invoice.invoiceDate).toLocaleDateString("en-IN"),
+                                },
+                                { label: "Customer", value: invoice.customerName },
+                              ],
+                            },
+                            {
+                              fields: [
+                                { label: "Total", value: reportInr(invoice.totalAmount) },
+                                {
+                                  label: "Balance",
+                                  value:
+                                    invoice.balanceAmount > 0
+                                      ? reportInr(invoice.balanceAmount)
+                                      : "Settled",
+                                },
+                                {
+                                  label: "Received",
+                                  value: reportInr(
+                                    invoice.totalAmount - invoice.balanceAmount,
+                                  ),
+                                },
+                              ],
+                            },
+                          ]}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         {new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}
@@ -224,7 +269,34 @@ export function ReportsTabs({
               <tbody>
                 {valuation.byStatus.map((row) => (
                   <tr key={row.status} className="border-b last:border-0">
-                    <td className="px-4 py-3">{row.status}</td>
+                    <td className="px-4 py-3">
+                      <RecordHoverCard
+                        label={row.status}
+                        title={row.status}
+                        subtitle="Stock valuation"
+                        sections={[
+                          {
+                            fields: [
+                              { label: "Items", value: row.count },
+                              { label: "Net weight", value: `${row.netWeight.toFixed(3)} g` },
+                              {
+                                label: "Estimated value",
+                                value: reportInr(row.estimatedValue),
+                              },
+                              {
+                                // The figure the row cannot show: what one
+                                // piece in this state is worth on average.
+                                label: "Average per item",
+                                value:
+                                  row.count > 0
+                                    ? reportInr(row.estimatedValue / row.count)
+                                    : null,
+                              },
+                            ],
+                          },
+                        ]}
+                      />
+                    </td>
                     <td className="px-4 py-3">{row.count}</td>
                     <td className="px-4 py-3">{row.netWeight.toFixed(3)}</td>
                     <td className="px-4 py-3">₹{row.estimatedValue.toFixed(2)}</td>
@@ -259,7 +331,31 @@ export function ReportsTabs({
                 ) : (
                   karigarOutstanding.byKarigar.map((row) => (
                     <tr key={row.name} className="border-b last:border-0">
-                      <td className="px-4 py-3 font-medium">{row.name}</td>
+                      <td className="px-4 py-3 font-medium">
+                        <RecordHoverCard
+                          label={row.name}
+                          title={row.name}
+                          subtitle="Outstanding with karigar"
+                          sections={[
+                            {
+                              fields: [
+                                { label: "Open jobs", value: row.jobs },
+                                {
+                                  label: "Weight out",
+                                  value: `${row.weightOut.toFixed(3)} g`,
+                                },
+                                {
+                                  label: "Average per job",
+                                  value:
+                                    row.jobs > 0
+                                      ? `${(row.weightOut / row.jobs).toFixed(3)} g`
+                                      : null,
+                                },
+                              ],
+                            },
+                          ]}
+                        />
+                      </td>
                       <td className="px-4 py-3">{row.jobs}</td>
                       <td className="px-4 py-3">{row.weightOut.toFixed(3)}</td>
                     </tr>
@@ -299,12 +395,34 @@ export function ReportsTabs({
                   customerDues.customers.map((customer) => (
                     <tr key={customer.id} className="border-b last:border-0">
                       <td className="px-4 py-3 font-medium">
-                        <Link
+                        <RecordHoverCard
+                          label={customer.name}
                           href={`/customers/${customer.id}?from=${encodeURIComponent("/reports")}`}
+                          title={customer.name}
+                          subtitle={customer.phone ?? undefined}
+                          footerLabel="View customer"
                           className="text-primary underline-offset-4 hover:underline"
-                        >
-                          {customer.name}
-                        </Link>
+                          sections={[
+                            {
+                              fields: [
+                                { label: "Phone", value: customer.phone },
+                                { label: "Unpaid invoices", value: customer.invoiceCount },
+                              ],
+                            },
+                            {
+                              fields: [
+                                { label: "Total due", value: reportInr(customer.totalDue) },
+                                {
+                                  label: "Average per invoice",
+                                  value:
+                                    customer.invoiceCount > 0
+                                      ? reportInr(customer.totalDue / customer.invoiceCount)
+                                      : null,
+                                },
+                              ],
+                            },
+                          ]}
+                        />
                       </td>
                       <td className="px-4 py-3">{customer.phone ?? "-"}</td>
                       <td className="px-4 py-3">{customer.invoiceCount}</td>
@@ -409,7 +527,40 @@ export function ReportsTabs({
                 ) : (
                   metalWise.metals.map((row) => (
                     <tr key={row.metalId} className="border-b last:border-0 align-top">
-                      <td className="px-4 py-3 font-medium">{row.metalName}</td>
+                      <td className="px-4 py-3 font-medium">
+                        {/* The row splits each metal across five columns;
+                            the card puts the whole position in one place. */}
+                        <RecordHoverCard
+                          label={row.metalName}
+                          title={row.metalName}
+                          subtitle="Metal position"
+                          sections={[
+                            {
+                              fields: [
+                                {
+                                  label: "Purchased",
+                                  value: `${row.purchasedWeight.toFixed(3)} g · ${row.purchasedCount}`,
+                                },
+                                {
+                                  label: "Sold",
+                                  value: `${row.soldWeight.toFixed(3)} g · ${row.soldCount}`,
+                                },
+                                {
+                                  label: "In stock",
+                                  value: `${row.inStockWeight.toFixed(3)} g · ${row.inStockCount}`,
+                                },
+                              ],
+                            },
+                            {
+                              fields: [
+                                { label: "Purchase value", value: reportInr(row.purchasedAmount) },
+                                { label: "Sale value", value: reportInr(row.soldAmount) },
+                                { label: "Stock value", value: reportInr(row.inStockValue) },
+                              ],
+                            },
+                          ]}
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <div>{row.purchasedWeight.toFixed(3)}g</div>
                         <div className="text-xs text-muted-foreground">

@@ -64,9 +64,40 @@ export function QuotationTable({ quotations }: QuotationTableProps) {
             {quotations.map((quotation) => (
               <tr key={quotation.id} className="border-b last:border-0">
                 <td className="px-4 py-3 font-medium">
-                  <Link href={`/quotations/${quotation.id}`} className="hover:underline">
-                    {quotation.quotationNumber}
-                  </Link>
+                  <RecordHoverCard
+                    label={quotation.quotationNumber}
+                    href={`/quotations/${quotation.id}`}
+                    title={quotation.quotationNumber}
+                    subtitle={quotation.customer?.name ?? undefined}
+                    footerLabel="Open quotation"
+                    sections={[
+                      {
+                        fields: [
+                          {
+                            label: "Date",
+                            value: new Date(quotation.quotationDate).toLocaleDateString("en-IN"),
+                          },
+                          {
+                            label: "Valid until",
+                            value: quotation.validUntil
+                              ? new Date(quotation.validUntil).toLocaleDateString("en-IN")
+                              : null,
+                          },
+                          { label: "Customer", value: quotation.customer?.name },
+                          { label: "Status", value: quotation.status },
+                        ],
+                      },
+                      {
+                        fields: [
+                          { label: "Total", value: inr(quotation.totalAmount) },
+                          {
+                            label: "Invoiced as",
+                            value: quotation.convertedTo?.invoiceNumber,
+                          },
+                        ],
+                      },
+                    ]}
+                  />
                 </td>
                 <td className="px-4 py-3">
                   {new Date(quotation.quotationDate).toLocaleDateString("en-IN")}

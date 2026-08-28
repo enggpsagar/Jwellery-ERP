@@ -62,9 +62,38 @@ export function PurchaseTable({ purchases }: PurchaseTableProps) {
             {purchases.map((purchase) => (
               <tr key={purchase.id} className="border-b last:border-0">
                 <td className="px-4 py-3 font-medium">
-                  <Link href={`/purchases/${purchase.id}`} className="hover:underline">
-                    {purchase.purchaseNumber}
-                  </Link>
+                  <RecordHoverCard
+                    label={purchase.purchaseNumber}
+                    href={`/purchases/${purchase.id}`}
+                    title={purchase.purchaseNumber}
+                    subtitle={purchase.vendor?.name ?? undefined}
+                    footerLabel="Open purchase"
+                    sections={[
+                      {
+                        fields: [
+                          {
+                            label: "Date",
+                            value: new Date(purchase.purchaseDate).toLocaleDateString("en-IN"),
+                          },
+                          { label: "Vendor", value: purchase.vendor?.name },
+                          { label: "Phone", value: purchase.vendor?.phone },
+                          { label: "Status", value: purchase.status },
+                        ],
+                      },
+                      {
+                        fields: [
+                          { label: "Total", value: inr(purchase.totalAmount) },
+                          {
+                            label: "Balance",
+                            value:
+                              purchase.balanceAmount > 0
+                                ? inr(purchase.balanceAmount)
+                                : "Settled",
+                          },
+                        ],
+                      },
+                    ]}
+                  />
                 </td>
                 <td className="px-4 py-3">
                   {new Date(purchase.purchaseDate).toLocaleDateString("en-IN")}

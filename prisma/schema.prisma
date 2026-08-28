@@ -50,6 +50,7 @@ model Store {
   users            User[]
   userMemberships  UserStoreMembership[]
   planHistory      StorePlanHistory[]
+  scanSessions     ScanSession[]
   customers        Customer[]
   karigars         Karigar[]
   products         Product[]
@@ -962,6 +963,7 @@ model User {
   invitedBy           User?         @relation("UserInvites", fields: [invitedById], references: [id])
   invitedUsers        User[]        @relation("UserInvites")
   locationAccess      UserLocationAccess[]
+  scanSessions        ScanSession[]
 
   @@index([storeId])
 }
@@ -1154,4 +1156,40 @@ enum OtpPurpose {
   PHONE_VERIFY
   PROFILE_PHONE_CHANGE
   PROFILE_EMAIL_CHANGE
+}
+
+/**
+ * A counter-side scanning session.
+ *
+ * Opened from the billing screen on a laptop so that tags scanned with a
+ * phone land on that invoice. It exists in the database rather than in
+ * memory because the two devices talk through separate serverless requests
+ * and share nothing else.
+ */
+model ScanSession {
+  id        String            @id @default(cuid())
+  storeId   String
+  userId    String
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  // Sessions are abandoned far more often than they are closed — a browser
+  // tab just goes away. An expiry means an old one cannot silently swallow
+  // a scan days later.
+  expiresAt DateTime
+  store     Store             @relation(fields: [storeId], references: [id])
+  user      User              @relation(fields: [userId], references: [id])
+  items     ScanSessionItem[]
+
+  @@index([userId, isActive])
+  @@index([storeId])
+}
+
+model ScanSessionItem {
+  id        String      @id @default(cuid())
+  sessionId String
+  stockId   String
+  createdAt DateTime    @default(now())
+  session   ScanSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
 }

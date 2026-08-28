@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { listMemberships } from "@/lib/store-membership";
 import { createQuickSaleToken } from "@/lib/quick-sale-token";
+import { addScanToOpenSession } from "@/lib/actions/scan-session-actions";
 
 /**
  * The scan entry point. Every printed tag points here.
@@ -84,6 +85,22 @@ export async function GET(
 
     if (!allowed) {
       return NextResponse.redirect(saleUrl(DENIED));
+    }
+
+    // A billing screen open on another device takes precedence: the person
+    // scanning has already said what these tags are for, so sending them to
+    // the single-piece sale instead would be ignoring that.
+    const intoSession = await addScanToOpenSession(
+      user.id,
+      stockId,
+      stock.storeId,
+    );
+
+    if (intoSession.added) {
+      const scanUrl = new URL("/scan", request.url);
+      scanUrl.searchParams.set("added", intoSession.stockCode);
+      scanUrl.searchParams.set("n", String(intoSession.total));
+      return NextResponse.redirect(scanUrl);
     }
 
     // Signed here, at the end of the authorisation decision, and carried in

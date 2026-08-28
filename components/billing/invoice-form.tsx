@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
 
 import { createInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
+import { ScanToAddPanel } from "@/components/billing/scan-to-add-panel"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -128,6 +129,52 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
     })
   }
 
+  /**
+   * A tag scanned on the phone becomes a line here.
+   *
+   * The first line starts blank, so the first scan fills it rather than
+   * leaving an empty row above the item that was just scanned. After that
+   * each scan appends, which is what makes scanning several pieces work.
+   */
+  const addScannedStock = useCallback(
+    (stockId: string) => {
+      const stock = stockItems.find((option) => option.id === stockId)
+
+      if (!stock) {
+        // Sold or moved since the page loaded — the stock list here is a
+        // snapshot. Say so rather than adding a line with nothing in it.
+        toast.error("That item is no longer available to sell.")
+        return
+      }
+
+      const scanned: LineItem = {
+        ...emptyLineItem(),
+        inventoryStockId: stock.id,
+        itemName: stock.productName,
+        metalTypeId: stock.metalType?.id ?? "",
+        purity: stock.purity ?? "",
+        netWeight: stock.netWeight ?? 0,
+        rate: stock.saleRate ?? 0,
+      }
+
+      setItems((prev) => {
+        const blank = prev.findIndex(
+          (item) => !item.inventoryStockId && !item.itemName,
+        )
+
+        if (blank === -1) return [...prev, scanned]
+
+        const next = [...prev]
+        next[blank] = scanned
+        return next
+      })
+
+      toast.success(`Added ${stock.productName}`)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stockItems],
+  )
+
   const removeItem = (key: string) => {
     setItems((prev) => (prev.length > 1 ? prev.filter((item) => item.key !== key) : prev))
   }
@@ -219,6 +266,9 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
             <Plus className="h-4 w-4 mr-1" /> Add Item
           </Button>
         </div>
+
+        {/* Above the lines, because it is how the lines get created. */}
+        <ScanToAddPanel onScanned={addScannedStock} />
 
         <div className="space-y-3">
           {items.map((item) => (

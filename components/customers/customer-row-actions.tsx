@@ -1,15 +1,15 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Archive, Loader2, Trash2 } from "lucide-react"
+import { Archive, Loader2, Pencil, Trash2 } from "lucide-react"
 
 import type { Customer } from "@/lib/actions/customer-actions"
 import {
   archiveCustomer,
   deleteCustomer,
 } from "@/lib/actions/customer-actions"
-import { EditCustomerDialog } from "@/components/customers/edit-customer-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -86,8 +86,16 @@ export function CustomerRowActions({
   return (
     <>
       <div className="flex items-center justify-end gap-2">
-        {/* This will now show only the pencil icon trigger */}
-        <EditCustomerDialog customer={customer} states={states} />
+        {/* A page, not a dialog — the edit form carries every field the
+            record holds and does not fit a modal on a phone. */}
+        <Link
+          href={`/customers/${customer.id}/edit?returnTo=${encodeURIComponent("/customers")}`}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-accent"
+          aria-label={`Edit ${customer.name}`}
+          title="Edit customer"
+        >
+          <Pencil className="h-4 w-4" />
+        </Link>
 
         <button
           type="button"

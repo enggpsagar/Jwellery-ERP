@@ -21,7 +21,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/users/status-badge";
-import { UserFormDialog } from "@/components/users/user-form-dialog";
 import { useToast } from "@/components/providers/toast-provider";
 
 import {

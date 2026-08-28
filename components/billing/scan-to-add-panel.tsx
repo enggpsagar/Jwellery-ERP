@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Loader2, ScanLine, Square, Wifi } from "lucide-react"
+import { Camera, Loader2, ScanLine, Square, Wifi } from "lucide-react"
 
 import {
   pollScanSession,
@@ -9,18 +9,20 @@ import {
   stopScanSession,
 } from "@/lib/actions/scan-session-actions"
 import { Button } from "@/components/ui/button"
+import { WebcamQrScanner } from "@/components/billing/webcam-qr-scanner"
 
 /**
- * "Add item by scanning" for a billing screen on a laptop.
+ * "Add item by scanning" for a billing screen, by either route.
  *
- * The laptop has no camera worth using at a counter, and the phone that does
- * cannot hold the invoice. So the phone scans and this listens: tags the
- * person scans on their phone arrive here and become line items.
+ * A camera on this device is the direct one: it decodes in the page and
+ * hands the id straight to the form. A phone is the other, for counters with
+ * no webcam or where the tags are easier to reach than the screen — it
+ * cannot hold the invoice, so it scans into a session and this listens.
  *
- * Polling rather than a socket. The scans are seconds apart and arrive in
- * ones, so a two-second poll is indistinguishable from a push at the counter
- * — and it keeps working on serverless hosting, where a long-lived
- * connection is the thing that does not.
+ * The phone route polls rather than holding a socket. Scans are seconds
+ * apart and arrive in ones, so a two-second poll is indistinguishable from a
+ * push at the counter — and it keeps working on serverless hosting, where a
+ * long-lived connection is the thing that does not.
  */
 
 const POLL_MS = 2000
@@ -32,6 +34,10 @@ export function ScanToAddPanel({
   onScanned: (stockId: string) => void
 }) {
   const [sessionId, setSessionId] = useState<string | null>(null)
+
+  // The two routes are independent: the camera on this device needs no
+  // session, because there is no second device to coordinate with.
+  const [webcamOpen, setWebcamOpen] = useState(false)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [count, setCount] = useState(0)
@@ -134,23 +140,43 @@ export function ScanToAddPanel({
           <div>
             <p className="text-sm font-medium">Add items by scanning</p>
             <p className="text-xs text-muted-foreground">
-              Scan tags with your phone camera and they appear here as line
-              items.
+              Use a camera on this computer, or scan with your phone — either
+              way the tags become line items here.
             </p>
           </div>
 
-          <Button type="button" variant="outline" onClick={start} disabled={starting}>
-            {starting ? (
-              <Loader2 className="mr-1.5 size-4 animate-spin" />
-            ) : (
-              <ScanLine className="mr-1.5 size-4" />
-            )}
-            {starting ? "Starting..." : "Start scanning"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setWebcamOpen(true)}
+            >
+              <Camera className="mr-1.5 size-4" />
+              Use this camera
+            </Button>
+
+            <Button type="button" variant="outline" onClick={start} disabled={starting}>
+              {starting ? (
+                <Loader2 className="mr-1.5 size-4 animate-spin" />
+              ) : (
+                <ScanLine className="mr-1.5 size-4" />
+              )}
+              {starting ? "Starting..." : "Scan with phone"}
+            </Button>
+          </div>
         </div>
 
         {error ? (
           <p className="mt-2 text-xs text-destructive">{error}</p>
+        ) : null}
+
+        {webcamOpen ? (
+          <div className="mt-3">
+            <WebcamQrScanner
+              onScanned={onScanned}
+              onClose={() => setWebcamOpen(false)}
+            />
+          </div>
         ) : null}
       </div>
     )

@@ -3,6 +3,9 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowLeft, Gem } from "lucide-react";
+
+import { APP_NAME } from "@/lib/constants/app";
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
@@ -80,10 +83,29 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
-      <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-sm">
+      <div className="w-full max-w-md">
+        {/* The way back out. Sitting above the card rather than inside it so
+            it reads as site chrome, not a form control — someone who landed
+            here by mistake needs an exit that isn't the browser button. */}
+        <Link
+          href="/"
+          className="mb-6 flex items-center justify-center gap-2.5 transition-opacity hover:opacity-80"
+        >
+          <span className="flex size-9 items-center justify-center rounded-lg bg-[color-mix(in_oklab,var(--chart-2)_88%,black)] text-white">
+            <Gem className="size-5" />
+          </span>
+          <span className="text-left leading-tight">
+            <span className="block font-semibold">{APP_NAME}</span>
+            <span className="block text-[11px] text-muted-foreground">
+              Jewellery ERP
+            </span>
+          </span>
+        </Link>
+
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
 
         <h1 className="text-2xl font-semibold">
-          Jewellery ERP
+          Sign in
         </h1>
 
         <p className="mt-2 text-sm text-muted-foreground">
@@ -96,7 +118,7 @@ export default function LoginPage() {
               callbackUrl: "/dashboard",
             })
           }
-          className="mt-6 w-full rounded-md bg-black px-4 py-2 text-white"
+          className="mt-6 w-full rounded-md border px-4 py-2 font-medium transition-colors hover:bg-accent"
         >
           Continue with Google
         </button>
@@ -110,7 +132,7 @@ export default function LoginPage() {
             type="button"
             onClick={() => switchMode("phone")}
             className={`flex-1 rounded-md px-3 py-1.5 ${
-              mode === "phone" ? "bg-black text-white" : "text-muted-foreground"
+              mode === "phone" ? "bg-[var(--chart-2)] text-white" : "text-muted-foreground"
             }`}
           >
             Mobile Number
@@ -119,7 +141,7 @@ export default function LoginPage() {
             type="button"
             onClick={() => switchMode("email")}
             className={`flex-1 rounded-md px-3 py-1.5 ${
-              mode === "email" ? "bg-black text-white" : "text-muted-foreground"
+              mode === "email" ? "bg-[var(--chart-2)] text-white" : "text-muted-foreground"
             }`}
           >
             Email
@@ -146,7 +168,7 @@ export default function LoginPage() {
             <button
               onClick={sendOTP}
               disabled={loading}
-              className="w-full rounded-md bg-blue-600 px-4 py-2 text-white"
+              className="w-full rounded-md bg-[var(--chart-2)] text-white transition-colors hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)] px-4 py-2 font-medium"
             >
               {loading ? "Sending..." : "Send OTP"}
             </button>
@@ -168,7 +190,7 @@ export default function LoginPage() {
 
               <button
                 onClick={loginWithOTP}
-                className="w-full rounded-md bg-green-600 px-4 py-2 text-white"
+                className="w-full rounded-md bg-[var(--chart-2)] text-white transition-colors hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)] px-4 py-2 font-medium"
               >
                 Login
               </button>
@@ -188,6 +210,17 @@ export default function LoginPage() {
             Register your store
           </Link>{" "}
           and start a free trial.
+        </p>
+        </div>
+
+        <p className="mt-6 text-center text-sm">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" />
+            Back to site
+          </Link>
         </p>
       </div>
     </main>

@@ -6,8 +6,6 @@ import { StorePlanAction, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { derivePlanStatus } from "@/lib/plan-status";
 import type { PlanStatus } from "@/lib/plan-status";
-
-export type { PlanStatus };
 import { requireRole } from "@/lib/auth/auth";
 
 export type StorePlanOverview = {

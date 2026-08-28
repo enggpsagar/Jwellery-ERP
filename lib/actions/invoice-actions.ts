@@ -14,7 +14,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/auth/auth";
+import { requirePermission, requirePermissionInStore } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope, resolveActingStoreId } from "@/lib/store-context";
 import {
@@ -409,14 +409,6 @@ export async function createInvoice(
   formData: FormData,
 ): Promise<InvoiceFormState> {
   try {
-    // Authorization lives here, not only in middleware: a server action is a
-    // POST endpoint that can be invoked from any page the caller is allowed
-    // to load, so the route guard never sees it.
-    try {
-      await requirePermission(PERMISSIONS.BILLING_CREATE);
-    } catch {
-      return { success: false, message: "You do not have permission to create invoices." };
-    }
     const customerId = String(formData.get("customerId") || "");
     const itemsRaw = String(formData.get("itemsJson") || "[]");
 
@@ -464,6 +456,21 @@ export async function createInvoice(
     const storeId = await resolveActingStoreId(
       String(formData.get("storeId") || "") || null,
     );
+
+    // Authorization lives here, not only in middleware: a server action is a
+    // POST endpoint that can be invoked from any page the caller is allowed
+    // to load, so the route guard never sees it. Checked against `storeId`
+    // rather than the active store, because a caller may name a different one
+    // above — being a member of that store is not the same as being allowed
+    // to bill in it.
+    try {
+      await requirePermissionInStore(PERMISSIONS.BILLING_CREATE, storeId);
+    } catch {
+      return {
+        success: false,
+        message: "You do not have permission to create invoices in this store.",
+      };
+    }
 
     const customer = await prisma.customer.findFirst({
       where: { id: customerId, storeId },

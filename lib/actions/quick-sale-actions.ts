@@ -3,7 +3,7 @@
 import { InventoryStockStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePermission } from "@/lib/auth/auth";
+import { requireAuth, requirePermissionInStore } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { resolveActingStoreId } from "@/lib/store-context";
 import { verifyQuickSaleToken } from "@/lib/quick-sale-token";
@@ -45,11 +45,15 @@ export async function getQuickSaleTarget(
   /** Store named by the scan token; falls back to the active store. */
   scopedStoreId?: string,
 ): Promise<QuickSaleTarget | null> {
-  // Gated on the sell permission rather than plain sign-in: this returns the
-  // piece's weights and rates, so a scanned tag must not become a way to read
-  // stock for someone who cannot sell it.
-  await requirePermission(PERMISSIONS.BILLING_CREATE);
+  // Store first, permission second, and the permission is checked against
+  // that store: a scan can point at a shop other than the one the browser has
+  // open, and billing rights in one shop say nothing about another.
+  //
+  // Gated on selling rather than plain sign-in because this returns the
+  // piece's weights and rates — a tag must not become a way to read stock for
+  // someone who cannot sell it.
   const storeId = await resolveActingStoreId(scopedStoreId);
+  await requirePermissionInStore(PERMISSIONS.BILLING_CREATE, storeId);
 
   const stock = await prisma.inventoryStock.findFirst({
     where: { id: stockId, storeId },
@@ -132,8 +136,8 @@ export type QuickSaleCustomer = { id: string; name: string; phone: string | null
 export async function getQuickSaleCustomers(
   scopedStoreId?: string,
 ): Promise<QuickSaleCustomer[]> {
-  await requirePermission(PERMISSIONS.BILLING_CREATE);
   const storeId = await resolveActingStoreId(scopedStoreId);
+  await requirePermissionInStore(PERMISSIONS.BILLING_CREATE, storeId);
 
   return prisma.customer.findMany({
     where: { storeId, isActive: true, isArchived: false },
@@ -162,17 +166,6 @@ export async function completeQuickSale(
   formData: FormData,
 ): Promise<QuickSaleState> {
   try {
-    // The same gate the full invoice form is behind. Checked here because a
-    // server action is reachable independently of the page it belongs to.
-    try {
-      await requirePermission(PERMISSIONS.BILLING_CREATE);
-    } catch {
-      return {
-        success: false,
-        message: "You do not have permission to create invoices.",
-      };
-    }
-
     // The scan token is what says which shop this sale belongs to. Verified
     // before anything else is read, and re-bound to the session below, so a
     // token cannot be lifted from one person's URL and used by another.
@@ -207,6 +200,18 @@ export async function completeQuickSale(
     // Membership in the token's store is re-checked here, not assumed from
     // the signature: access can be revoked between the scan and the confirm.
     const storeId = await resolveActingStoreId(verified.payload.storeId);
+
+    // The same gate the full invoice form is behind, evaluated against the
+    // store being sold from. Checked here because a server action is
+    // reachable independently of the page it belongs to.
+    try {
+      await requirePermissionInStore(PERMISSIONS.BILLING_CREATE, storeId);
+    } catch {
+      return {
+        success: false,
+        message: "You do not have permission to create invoices in this store.",
+      };
+    }
     const sellingPrice = Number(formData.get("sellingPrice"));
     const quantity = Math.max(1, Math.trunc(Number(formData.get("quantity")) || 1));
     const paidNow = Number(formData.get("paidAmount"));

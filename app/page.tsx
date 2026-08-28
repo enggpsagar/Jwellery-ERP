@@ -5,6 +5,7 @@ import {
   ArrowRight,
   BarChart3,
   Boxes,
+  CalendarClock,
   CircleDollarSign,
   FileText,
   Gem,
@@ -15,6 +16,7 @@ import {
   PackagePlus,
   ReceiptText,
   Scale,
+  ScanLine,
   ShieldCheck,
   Truck,
   Users,
@@ -46,7 +48,7 @@ const MODULES = [
   {
     icon: Boxes,
     title: "Products & Stock",
-    body: "Products define the design — metal, purity, default charges. Stock entries are the physical pieces, each with its own weight, tag and status, printable as QR labels.",
+    body: "Products define the design — metal, purity, default charges and typical weights. Stock entries are the physical pieces, each with its own weight, tag and status, printable as QR labels.",
     tint: "var(--chart-3)",
   },
   {
@@ -86,6 +88,12 @@ const MODULES = [
     tint: "var(--chart-4)",
   },
   {
+    icon: ScanLine,
+    title: "Scan to Sell",
+    body: "Scan a piece's QR label with a phone camera and its details are already filled in. Pick the customer, enter the price, confirm — the invoice is raised and the stock marked sold in one step at the counter.",
+    tint: "var(--chart-2)",
+  },
+  {
     icon: MapPin,
     title: "Multi-location Access",
     body: "Run several counters or branches under one shop, and grant each person access only to the locations they actually work at.",
@@ -116,6 +124,11 @@ const JEWELLERY_SPECIFICS = [
     icon: ShieldCheck,
     title: "Wastage that reconciles",
     body: "Each item's wastage percentage folds into the fine weight credited back from a karigar, so a job closes against what was issued instead of reading as unexplained missing metal.",
+  },
+  {
+    icon: CalendarClock,
+    title: "Yesterday's trading, every morning",
+    body: "A daily email summarises the day's credits, debits, sales and purchases with a total for each, and attaches a spreadsheet holding every transaction behind those figures. Quiet days are skipped, so it only arrives when there is something to read.",
   },
   {
     icon: Mail,

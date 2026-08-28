@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { UserPlus } from "lucide-react"
 
 import {
@@ -11,7 +12,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { QuickAddCustomerDialog } from "@/components/customers/quick-add-customer-dialog"
 
 /**
  * Sentinel for the "Create new customer" row. A real SelectItem rather than
@@ -37,9 +37,16 @@ type CustomerSelectProps = {
 }
 
 /**
- * Client-side searchable customer picker, mirrors ProductSelect
- * (components/inventory/shared/product-select.tsx). Renders a hidden
- * <input name="..."> so it drops straight into a server-action form.
+ * Client-side searchable customer picker, mirrors VendorSelect and
+ * ProductSelect. Renders a hidden <input name="..."> so it drops straight
+ * into a server-action form.
+ *
+ * "Create new customer" navigates to /customers/new rather than opening a
+ * dialog. A modal launched from inside a dropdown is fragile on touch — the
+ * dropdown's own overlay and the dialog's fight over focus and pointer
+ * events — and it was the reason adding a customer mid-sale did not work on
+ * a phone. The page returns here with `newCustomerId` set, which is picked
+ * up below, so the flow is unbroken.
  */
 export function CustomerSelect({
   customers,
@@ -50,31 +57,50 @@ export function CustomerSelect({
 }: CustomerSelectProps) {
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState(defaultValue ?? "")
-  const [localCustomers, setLocalCustomers] = useState(customers)
   const [selectOpen, setSelectOpen] = useState(false)
-  const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // Come back to exactly where we were — including the query, which on the
+  // quick-sale screen carries the scan token the page cannot work without.
+  const addNewHref = useMemo(() => {
+    const query = searchParams.toString()
+    const here = query ? `${pathname}?${query}` : pathname
+    return `/customers/new?returnTo=${encodeURIComponent(here)}`
+  }, [pathname, searchParams])
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return localCustomers
+    if (!query) return customers
 
-    return localCustomers.filter(
+    return customers.filter(
       (customer) =>
         customer.name.toLowerCase().includes(query) ||
         (customer.phone ?? "").toLowerCase().includes(query) ||
         (customer.customerCode ?? "").toLowerCase().includes(query),
     )
-  }, [localCustomers, search])
+  }, [customers, search])
 
   function selectCustomer(customer: CustomerOption) {
     setSelected(customer.id)
     onChange?.(customer.id, customer)
   }
 
-  function openQuickAdd() {
-    setSelectOpen(false)
-    setQuickAddOpen(true)
-  }
+  // Returning from /customers/new: pick up the customer that was just
+  // created. The list has already been refetched by then, so it is present.
+  const newCustomerId = searchParams.get("newCustomerId")
+
+  useEffect(() => {
+    if (!newCustomerId) return
+
+    const created = customers.find((customer) => customer.id === newCustomerId)
+    if (!created) return
+
+    setSelected(created.id)
+    onChange?.(created.id, created)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newCustomerId, customers])
 
   return (
     <div className="space-y-2">
@@ -86,14 +112,15 @@ export function CustomerSelect({
         onOpenChange={setSelectOpen}
         onValueChange={(value) => {
           if (value === ADD_NEW_VALUE) {
-            // Not a selection — leave `selected` alone so dismissing the
-            // dialog keeps whatever was already chosen.
-            openQuickAdd()
+            // Not a selection — leave `selected` alone so coming back without
+            // creating anything keeps whatever was already chosen.
+            setSelectOpen(false)
+            router.push(addNewHref)
             return
           }
 
           setSelected(value)
-          onChange?.(value, localCustomers.find((customer) => customer.id === value))
+          onChange?.(value, customers.find((customer) => customer.id === value))
         }}
       >
         <SelectTrigger>
@@ -144,14 +171,14 @@ export function CustomerSelect({
         anything. Keyed off the full list, not `filtered`, so it appears
         only for a genuinely empty store rather than every no-match search.
       */}
-      {localCustomers.length === 0 && (
+      {customers.length === 0 && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-dashed px-3 py-2">
           <span className="text-sm text-muted-foreground">
             No customers yet.
           </span>
           <button
             type="button"
-            onClick={() => setQuickAddOpen(true)}
+            onClick={() => router.push(addNewHref)}
             className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
           >
             <UserPlus className="h-3.5 w-3.5" />
@@ -160,16 +187,6 @@ export function CustomerSelect({
         </div>
       )}
 
-      <QuickAddCustomerDialog
-        open={quickAddOpen}
-        onOpenChange={setQuickAddOpen}
-        initialName={search}
-        onCreated={(customer) => {
-          setLocalCustomers((prev) => [customer, ...prev])
-          selectCustomer(customer)
-          setSearch("")
-        }}
-      />
     </div>
   )
 }

@@ -287,15 +287,18 @@ export function WebcamQrScanner({
         </Button>
       </div>
 
-      {/* Capped width and taller than it is wide-ish: a full-width strip
-          crops a 4:3 camera down to a letterbox, throwing away most of the
-          frame and leaving the tag a handful of pixels. A viewport shaped
-          closer to the sensor keeps the resolution the decoder needs. */}
-      <div className="relative mx-auto mt-3 w-full max-w-md overflow-hidden rounded-md bg-black">
+      {/* Sized to the sensor's own 4:3 rather than to a strip, and as large
+          as the column allows. A short full-width band cropped most of the
+          frame away; a small one threw away the resolution the decoder needs
+          to read a tag from arm's length. */}
+      <div className="relative mx-auto mt-3 aspect-[4/3] w-full max-w-3xl overflow-hidden rounded-md bg-black">
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+        {/* `contain`, not `cover`: nothing the camera sees is cropped out of
+            view, so what is on screen is exactly what the decoder is given.
+            A camera that is not 4:3 letterboxes rather than losing edges. */}
         <video
           ref={videoRef}
-          className="h-80 w-full object-cover"
+          className="h-full w-full object-contain"
           muted
           playsInline
         />
@@ -320,10 +323,11 @@ export function WebcamQrScanner({
           // A frame to aim at: without one people hold the tag too far off
           // centre for the decoder to read it.
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            {/* Large enough to hold a tag at a comfortable distance — a small
-                target makes people bring the label too close for a fixed
-                focus camera to resolve it. */}
-            <div className="size-64 rounded-lg border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+            {/* Sized as a share of the viewport rather than in pixels, so it
+                stays a sensible target on a large screen and a small one. A
+                cramped target makes people bring the label closer than a
+                fixed-focus camera can resolve. */}
+            <div className="aspect-square h-[70%] rounded-lg border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.3)]" />
           </div>
         ) : null}
       </div>

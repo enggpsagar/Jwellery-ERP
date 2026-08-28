@@ -194,11 +194,41 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   ];
 }
 
-export type MonthlySalesPoint = { month: string; sales: number };
+/**
+ * A month on the sales trend.
+ *
+ * `sales` is the month's invoiced total; the remaining keys are one per metal
+ * — Recharts needs each series as its own key on the row, so they sit
+ * alongside rather than nested.
+ */
+export type MonthlySalesPoint = {
+  month: string;
+  sales: number;
+  [metal: string]: number | string;
+};
+
+export type MonthlySalesTrend = {
+  points: MonthlySalesPoint[];
+  /** Metals that actually sold in the window, biggest first. */
+  metals: string[];
+};
+
+/** "gold" and "Gold" are the same metal to a reader; group them as one. */
+function metalKey(name: string) {
+  return name.trim().toLowerCase();
+}
+
+function metalLabel(name: string) {
+  const trimmed = name.trim();
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
+/** Sales where no metal was recorded still have to appear somewhere. */
+const UNSPECIFIED_METAL = "Unspecified";
 
 export async function getMonthlySalesTrend(
   monthsBack = 12
-): Promise<MonthlySalesPoint[]> {
+): Promise<MonthlySalesTrend> {
   const storeId = await requireStoreScope();
   const now = new Date();
   const rangeStart = new Date(
@@ -209,34 +239,108 @@ export async function getMonthlySalesTrend(
 
   const invoices = await prisma.invoice.findMany({
     where: { storeId, invoiceDate: { gte: rangeStart } },
-    select: { invoiceDate: true, totalAmount: true },
+    select: {
+      invoiceDate: true,
+      totalAmount: true,
+      items: {
+        select: {
+          lineTotal: true,
+          metalType: { select: { name: true } },
+        },
+      },
+    },
   });
 
-  const buckets = new Map<string, number>();
+  const monthKeys: string[] = [];
+  const totals = new Map<string, number>();
+  const perMetal = new Map<string, Map<string, number>>();
+  const labels = new Map<string, string>();
 
   for (let i = monthsBack - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const key = `${d.getFullYear()}-${d.getMonth()}`;
-    buckets.set(key, 0);
+    monthKeys.push(key);
+    totals.set(key, 0);
+    perMetal.set(key, new Map());
   }
 
-  for (const inv of invoices) {
-    const d = inv.invoiceDate;
+  for (const invoice of invoices) {
+    const d = invoice.invoiceDate;
     const key = `${d.getFullYear()}-${d.getMonth()}`;
-    if (buckets.has(key)) {
-      buckets.set(key, (buckets.get(key) ?? 0) + Number(inv.totalAmount));
+    if (!totals.has(key)) continue;
+
+    const invoiceTotal = Number(invoice.totalAmount);
+    totals.set(key, (totals.get(key) ?? 0) + invoiceTotal);
+
+    const bucket = perMetal.get(key)!;
+    const lineSum = invoice.items.reduce(
+      (sum, item) => sum + Number(item.lineTotal),
+      0
+    );
+
+    // Line totals exclude the invoice's discount and tax, so they do not add
+    // up to what was actually charged. Scaling each line by the invoice's
+    // total over its line sum spreads those proportionally across the metals,
+    // which keeps the bands adding up to the same figure the total line
+    // shows — a chart whose parts disagree with its whole is worse than no
+    // breakdown at all.
+    const factor = lineSum > 0 ? invoiceTotal / lineSum : 0;
+
+    if (lineSum <= 0) {
+      // Nothing to apportion against: book the whole invoice as unspecified
+      // rather than dropping it and quietly under-reporting the month.
+      bucket.set(
+        UNSPECIFIED_METAL,
+        (bucket.get(UNSPECIFIED_METAL) ?? 0) + invoiceTotal
+      );
+      labels.set(UNSPECIFIED_METAL, UNSPECIFIED_METAL);
+      continue;
+    }
+
+    for (const item of invoice.items) {
+      const raw = item.metalType?.name;
+      const id = raw ? metalKey(raw) : UNSPECIFIED_METAL;
+      if (!labels.has(id)) labels.set(id, raw ? metalLabel(raw) : UNSPECIFIED_METAL);
+
+      bucket.set(id, (bucket.get(id) ?? 0) + Number(item.lineTotal) * factor);
     }
   }
 
+  // Ordered by what each metal actually sold, so the biggest band sits at the
+  // bottom of the stack and the legend reads in the order that matters.
+  const metalTotals = new Map<string, number>();
+  for (const bucket of perMetal.values()) {
+    for (const [id, value] of bucket) {
+      metalTotals.set(id, (metalTotals.get(id) ?? 0) + value);
+    }
+  }
+
+  const metalIds = [...metalTotals.entries()]
+    .filter(([, value]) => value > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([id]) => id);
+
   const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
 
-  return Array.from(buckets.entries()).map(([key, sales]) => {
+  const points: MonthlySalesPoint[] = monthKeys.map((key) => {
     const [year, month] = key.split("-").map(Number);
-    return {
+    const bucket = perMetal.get(key)!;
+
+    const point: MonthlySalesPoint = {
       month: monthFormatter.format(new Date(year, month, 1)),
-      sales,
+      sales: totals.get(key) ?? 0,
     };
+
+    // Every series needs a value on every row, or Recharts breaks the band
+    // where a metal happened not to sell.
+    for (const id of metalIds) {
+      point[labels.get(id) ?? id] = Math.round((bucket.get(id) ?? 0) * 100) / 100;
+    }
+
+    return point;
   });
+
+  return { points, metals: metalIds.map((id) => labels.get(id) ?? id) };
 }
 
 export type CategoryRevenue = { category: string; value: number };

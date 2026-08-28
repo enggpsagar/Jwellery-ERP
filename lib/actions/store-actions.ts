@@ -3,13 +3,14 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { UserRole, UserStatus, InventoryStockStatus } from "@prisma/client";
+import { StorePlanAction, UserRole, UserStatus, InventoryStockStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth/auth";
 import { ACTIVE_STORE_COOKIE } from "@/lib/store-context";
 import { buildExcelExport } from "@/lib/excel-export";
 import { classifyMetalName } from "@/lib/business-units";
+import { buildUniqueStoreCode } from "@/lib/store-code";
 import { sendInviteEmailSafely } from "@/lib/invite-email";
 
 export type StoreFormState = {
@@ -179,7 +180,9 @@ export async function createStoreWithAdmin(
     await requireRole(UserRole.SUPER_ADMIN);
 
     const name = String(formData.get("name") || "").trim();
-    const code = String(formData.get("code") || "").trim().toUpperCase();
+    // Derived below, not accepted from the form: the code encodes state and
+    // area and is permanent, so a typed value could contradict the address
+    // submitted alongside it.
     const phone = toOptionalString(formData.get("phone"));
     const email = toOptionalString(formData.get("email"));
     const adminName = String(formData.get("adminName") || "").trim();
@@ -189,7 +192,7 @@ export async function createStoreWithAdmin(
 
     const errors: Record<string, string[]> = {};
     if (!name) errors.name = ["Store name is required"];
-    if (!code) errors.code = ["Store code is required"];
+
     if (!phone) errors.phone = ["Store phone number is required"];
     if (!email) errors.email = ["Store email is required"];
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -249,6 +252,17 @@ export async function createStoreWithAdmin(
         };
       }
     }
+
+    const code = buildUniqueStoreCode(
+      {
+        name,
+        state: toOptionalString(formData.get("state")),
+        area: toOptionalString(formData.get("city")),
+      },
+      (await prisma.store.findMany({ select: { code: true } })).map(
+        (existing) => existing.code,
+      ),
+    );
 
     const store = await prisma.$transaction(async (tx) => {
       const createdStore = await tx.store.create({
@@ -390,11 +404,17 @@ export async function restoreStore(storeId: string): Promise<StoreFormState> {
  */
 export async function assignPlanToStore(storeId: string, planId: string): Promise<StoreFormState> {
   try {
-    await requireRole(UserRole.SUPER_ADMIN);
+    const actor = await requireRole(UserRole.SUPER_ADMIN);
 
     const [store, plan] = await Promise.all([
-      prisma.store.findUnique({ where: { id: storeId }, select: { name: true } }),
-      prisma.plan.findFirst({ where: { id: planId, isActive: true }, select: { name: true, durationDays: true } }),
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, planId: true },
+      }),
+      prisma.plan.findFirst({
+        where: { id: planId, isActive: true },
+        select: { name: true, durationDays: true, price: true },
+      }),
     ]);
 
     if (!store) {
@@ -404,17 +424,51 @@ export async function assignPlanToStore(storeId: string, planId: string): Promis
       return { success: false, message: "Selected plan is not available" };
     }
 
-    await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        planId,
-        planStartedAt: new Date(),
-        planExpiresAt: new Date(Date.now() + plan.durationDays * 24 * 60 * 60 * 1000),
-        planReminderSentAt: null,
-      },
-    });
+    const startedAt = new Date();
+    const expiresAt = new Date(
+      startedAt.getTime() + plan.durationDays * 24 * 60 * 60 * 1000,
+    );
+
+    // Same plan again is a renewal; a different one is a change. Recorded
+    // distinctly because "when did they last renew" is a different question
+    // from "when did they last switch plan".
+    const action =
+      store.planId === planId
+        ? StorePlanAction.RENEWED
+        : StorePlanAction.ASSIGNED;
+
+    await prisma.$transaction([
+      prisma.store.update({
+        where: { id: storeId },
+        data: {
+          planId,
+          planStartedAt: startedAt,
+          planExpiresAt: expiresAt,
+          planReminderSentAt: null,
+        },
+      }),
+      // Written in the same transaction as the store update: a ledger that
+      // can disagree with the row it describes is worse than no ledger.
+      prisma.storePlanHistory.create({
+        data: {
+          storeId,
+          planId,
+          // Snapshots — the plan can be renamed or repriced later and the
+          // history has to keep saying what was actually sold.
+          planName: plan.name,
+          price: plan.price,
+          durationDays: plan.durationDays,
+          startedAt,
+          expiresAt,
+          action,
+          actorId: actor.id ?? null,
+          actorName: actor.name ?? null,
+        },
+      }),
+    ]);
 
     revalidatePath("/stores");
+    revalidatePath(`/stores/${storeId}`);
 
     return { success: true, message: `"${plan.name}" plan assigned to "${store.name}"` };
   } catch (error) {
@@ -509,6 +563,12 @@ export async function getStoreById(storeId: string): Promise<StoreDetail | null>
   });
 }
 
+/**
+ * Store code is deliberately NOT updatable here. It encodes the shop's state
+ * and area and is stamped on records that outlive any edit — an identifier
+ * that can change is one that stops identifying anything. The edit form
+ * renders it read-only, and this ignores it even if posted.
+ */
 export async function updateStore(
   storeId: string,
   prevState: StoreFormState,
@@ -518,13 +578,13 @@ export async function updateStore(
     await requireRole(UserRole.SUPER_ADMIN);
 
     const name = String(formData.get("name") || "").trim();
-    const code = String(formData.get("code") || "").trim().toUpperCase();
+
     const phone = toOptionalString(formData.get("phone"));
     const email = toOptionalString(formData.get("email"));
 
     const errors: Record<string, string[]> = {};
     if (!name) errors.name = ["Store name is required"];
-    if (!code) errors.code = ["Store code is required"];
+
     if (!phone) errors.phone = ["Store phone number is required"];
     if (!email) errors.email = ["Store email is required"];
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -539,7 +599,6 @@ export async function updateStore(
       where: { id: storeId },
       data: {
         name,
-        code,
         address: toOptionalString(formData.get("address")),
         city: toOptionalString(formData.get("city")),
         state: toOptionalString(formData.get("state")),

@@ -36,10 +36,13 @@ export default async function DashboardLayout({
   // row happened to name.
   const [allStores, memberships, activeStoreId] = await Promise.all([
     isSuperAdmin
-      ? prisma.store.findMany({
-          where: { isActive: true },
-          orderBy: { name: "asc" },
-          select: { id: true, name: true, code: true },
+      ? // Archived stores are included on purpose. A Super Admin has to be
+        // able to open a store to decide whether to restore it, and
+        // filtering on isActive made archived shops vanish from the switcher
+        // with no way back in. Their own users are still blocked at sign-in.
+        prisma.store.findMany({
+          orderBy: [{ isActive: "desc" }, { name: "asc" }],
+          select: { id: true, name: true, code: true, isActive: true },
         })
       : Promise.resolve([]),
     isSuperAdmin ? Promise.resolve([]) : getUserStoreMemberships(),
@@ -47,11 +50,19 @@ export default async function DashboardLayout({
   ]);
 
   const stores = isSuperAdmin
-    ? allStores
+    ? allStores.map((store) => ({
+        id: store.id,
+        name: store.name,
+        code: store.code,
+        // Labelled rather than hidden, so switching into a closed shop is a
+        // deliberate act rather than a surprise.
+        isArchived: !store.isActive,
+      }))
     : memberships.map((m) => ({
         id: m.storeId,
         name: m.storeName,
         code: m.storeCode,
+        isArchived: false,
       }));
 
   // Brand the sidebar with the store actually being worked in, not the one

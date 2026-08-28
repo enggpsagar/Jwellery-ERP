@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/providers/toast-provider"
 
 type StoreOption = {
+  isArchived?: boolean
   id: string
   name: string
   code: string
@@ -92,6 +93,11 @@ export function StoreSwitcher({ stores, activeStoreId }: StoreSwitcherProps) {
               <SelectItem key={store.id} value={store.id}>
                 <span className="block truncate">
                   {store.name} ({store.code})
+                  {store.isArchived ? (
+                    <span className="ml-1.5 rounded-full border px-1.5 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Archived
+                    </span>
+                  ) : null}
                 </span>
               </SelectItem>
             ))

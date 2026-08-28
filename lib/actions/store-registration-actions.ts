@@ -1,11 +1,12 @@
 "use server";
 
-import { UserRole, UserStatus } from "@prisma/client";
+import { StorePlanAction, UserRole, UserStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { sendMail } from "@/lib/mailer";
 import { APP_NAME } from "@/lib/constants/app";
 import { newStoreRegisteredEmail, storeWelcomeEmail } from "@/lib/email-templates";
+import { buildUniqueStoreCode } from "@/lib/store-code";
 
 export type RegisterStoreState = {
   success: boolean;
@@ -44,37 +45,22 @@ const STARTER_CATEGORIES: { name: string; types: string[] }[] = [
 ];
 
 /**
- * A store code derived from the name — "Alankar Jewellers" -> "ALAN".
+ * The store's code, built from state + area + name (see lib/store-code).
  *
- * `Store.code` is globally unique, so a collision is resolved with a numeric
- * suffix rather than failing the registration and asking a first-time user to
- * invent a code they have no opinion about.
+ * Every existing code is loaded rather than a prefix-filtered subset: the
+ * uniqueness check has to be against the whole set, and there are few enough
+ * stores that reading them all is cheaper than being subtly wrong.
  */
-async function generateStoreCode(name: string): Promise<string> {
-  const base =
-    name
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "")
-      .slice(0, 4) || "STORE";
+async function generateStoreCode(parts: {
+  name: string;
+  state: string | null;
+  area: string | null;
+}): Promise<string> {
+  const taken = (
+    await prisma.store.findMany({ select: { code: true } })
+  ).map((store) => store.code);
 
-  const taken = new Set(
-    (
-      await prisma.store.findMany({
-        where: { code: { startsWith: base } },
-        select: { code: true },
-      })
-    ).map((store) => store.code),
-  );
-
-  if (!taken.has(base)) return base;
-
-  for (let suffix = 2; suffix < 1000; suffix += 1) {
-    const candidate = `${base}${suffix}`;
-    if (!taken.has(candidate)) return candidate;
-  }
-
-  // Effectively unreachable; better than looping forever.
-  return `${base}${Date.now().toString().slice(-5)}`;
+  return buildUniqueStoreCode(parts, taken);
 }
 
 /**
@@ -86,7 +72,7 @@ async function resolveTrialPlan() {
   return prisma.plan.findFirst({
     where: { isActive: true },
     orderBy: [{ price: "asc" }, { sortOrder: "asc" }],
-    select: { id: true, name: true, durationDays: true },
+    select: { id: true, name: true, durationDays: true, price: true },
   });
 }
 
@@ -112,6 +98,7 @@ export async function registerStoreAction(
     const email = String(formData.get("email") || "").trim().toLowerCase();
     const phone = String(formData.get("phone") || "").trim();
     const city = String(formData.get("city") || "").trim();
+    const state = String(formData.get("state") || "").trim();
 
     const errors: Record<string, string[]> = {};
 
@@ -120,6 +107,11 @@ export async function registerStoreAction(
     if (!email) errors.email = ["Email is required"];
     else if (!EMAIL_RE.test(email)) errors.email = ["Enter a valid email address"];
     if (!phone) errors.phone = ["Mobile number is required"];
+    // State and city are required because the store code is derived from
+    // them and can never be changed afterwards — collecting them later would
+    // be too late to affect the code.
+    if (!state) errors.state = ["State is required"];
+    if (!city) errors.city = ["City or area is required"];
 
     if (Object.keys(errors).length > 0) {
       return { success: false, message: "Please fix the highlighted fields.", errors };
@@ -146,7 +138,7 @@ export async function registerStoreAction(
     }
 
     const [code, plan] = await Promise.all([
-      generateStoreCode(storeName),
+      generateStoreCode({ name: storeName, state, area: city }),
       resolveTrialPlan(),
     ]);
 
@@ -158,6 +150,7 @@ export async function registerStoreAction(
           email,
           phone,
           city: city || null,
+          state: state || null,
           ...(plan
             ? {
                 planId: plan.id,
@@ -169,6 +162,24 @@ export async function registerStoreAction(
             : {}),
         },
       });
+
+      // Opens the subscription ledger, so a self-registered store's history
+      // starts at its trial rather than at whatever a Super Admin does next.
+      if (plan) {
+        await tx.storePlanHistory.create({
+          data: {
+            storeId: createdStore.id,
+            planId: plan.id,
+            planName: plan.name,
+            price: plan.price,
+            durationDays: plan.durationDays,
+            startedAt: createdStore.planStartedAt ?? new Date(),
+            expiresAt: createdStore.planExpiresAt ?? new Date(),
+            action: StorePlanAction.REGISTERED,
+            note: "Free trial started at self-registration",
+          },
+        });
+      }
 
       const owner = await tx.user.create({
         data: {

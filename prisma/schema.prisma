@@ -36,8 +36,20 @@ model Store {
    */
   archiveNotifiedAt DateTime?
 
+  /**
+   * Which channels this store's owner accepts renewal reminders on.
+   *
+   * Email is wired up (app/api/cron/plan-reminders). WhatsApp is a stored
+   * preference only — there is no WhatsApp sender in this codebase yet, so
+   * the flag records intent and the UI says so rather than implying reminders
+   * are going out on a channel nothing delivers to.
+   */
+  reminderEmailEnabled    Boolean @default(true)
+  reminderWhatsappEnabled Boolean @default(false)
+
   users            User[]
   userMemberships  UserStoreMembership[]
+  planHistory      StorePlanHistory[]
   customers        Customer[]
   karigars         Karigar[]
   products         Product[]
@@ -70,7 +82,49 @@ model Plan {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  stores Store[]
+  stores  Store[]
+  history StorePlanHistory[]
+}
+
+/** How a plan period began. */
+enum StorePlanAction {
+  REGISTERED
+  ASSIGNED
+  RENEWED
+}
+
+/**
+ * One row per plan period a store has held — the subscription ledger.
+ *
+ * Needed because Store.planStartedAt/planExpiresAt are overwritten on every
+ * assignment: without this table a renewal destroys the record of the period
+ * it replaced, so "last renewal" and "history" cannot be answered at all.
+ *
+ * planName, price and durationDays are snapshots rather than reads through
+ * the relation. A plan can be renamed, repriced or deactivated, and history
+ * has to keep saying what was actually sold at the time.
+ */
+model StorePlanHistory {
+  id           String          @id @default(cuid())
+  storeId      String
+  planId       String?
+  planName     String
+  price        Decimal         @default(0) @db.Decimal(12, 2)
+  durationDays Int
+  startedAt    DateTime
+  expiresAt    DateTime
+  action       StorePlanAction @default(ASSIGNED)
+  /** Which Super Admin made the change; null for self-registration. */
+  actorId      String?
+  actorName    String?
+  note         String?
+  createdAt    DateTime        @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  plan  Plan? @relation(fields: [planId], references: [id])
+
+  @@index([storeId])
+  @@index([startedAt])
 }
 
 model StoreLocation {

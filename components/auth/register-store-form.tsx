@@ -129,10 +129,30 @@ export function RegisterStoreForm() {
             <FieldError errors={state.errors?.phone} />
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="city">City</Label>
-            <Input id="city" name="city" placeholder="Optional" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="state">State *</Label>
+              <Input id="state" name="state" placeholder="Maharashtra" required />
+              <FieldError errors={state.errors?.state} />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="city">City or area *</Label>
+              <Input id="city" name="city" placeholder="Nagpur" required />
+              <FieldError errors={state.errors?.city} />
+            </div>
           </div>
+
+          {/* Said up front because the code is permanent — this is the only
+              moment the answers can still affect it. */}
+          <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            Your store code is built from these — a shop called Himalaya in
+            Nagpur, Maharashtra becomes{" "}
+            <span className="font-mono font-medium text-foreground">
+              MH-NAG-HIM
+            </span>
+            . It cannot be changed later.
+          </p>
 
           {!state.success && state.message ? (
             <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">

@@ -105,7 +105,7 @@ export const authOptions: NextAuthOptions = {
           role: dbUser.role ?? UserRole.STAFF,
           storeId: dbUser.storeId,
         })
-        return false
+        return "/login?error=account_disabled"
       }
 
       if (dbUser.storeId) {
@@ -121,13 +121,13 @@ export const authOptions: NextAuthOptions = {
             storeId: dbUser.storeId,
             attemptedBy: dbUser.email ?? null,
           })
-          return false
+          return "/login?error=store_archived"
         }
 
         // planExpiresAt: null means no plan assigned yet (e.g. stores that
         // predate this feature) — treated as unrestricted, not a lockout.
         if (store?.planExpiresAt && store.planExpiresAt < new Date()) {
-          return false
+          return "/login?error=plan_expired"
         }
       }
 

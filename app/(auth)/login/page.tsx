@@ -3,14 +3,73 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Gem } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Gem } from "lucide-react";
 
 import { APP_NAME } from "@/lib/constants/app";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 
 type Mode = "phone" | "email";
+
+type Notice = { tone: "error" | "info"; title: string; body: string };
+
+/**
+ * Why a sign-in was refused, in words the person reading them can act on.
+ *
+ * Keyed by the codes the signIn callback redirects with. Without these every
+ * refusal arrives as a bare "AccessDenied" and the user is left guessing
+ * whether they typed something wrong, their account is off, or the shop
+ * itself is closed.
+ */
+const SIGN_IN_NOTICES: Record<string, Notice> = {
+  store_archived: {
+    tone: "error",
+    title: "This store is archived",
+    body:
+      "Nobody at the store can sign in while it stays archived. Your data has not been deleted — it all returns once the store is restored. We have emailed your store owner; please contact them or the application owner to have it reopened.",
+  },
+  account_disabled: {
+    tone: "error",
+    title: "Your account is disabled",
+    body:
+      "This account cannot sign in at the moment. Ask your store owner to re-enable it, then try again.",
+  },
+  plan_expired: {
+    tone: "error",
+    title: "This store's plan has expired",
+    body:
+      "Sign-in is paused until the plan is renewed. Contact the application owner to renew or upgrade, and everything returns exactly as it was.",
+  },
+  CredentialsSignin: {
+    tone: "error",
+    title: "That code did not work",
+    body: "Check the one-time code and try again, or request a new one.",
+  },
+  AccessDenied: {
+    tone: "error",
+    title: "You cannot sign in right now",
+    body:
+      "Your account or store may be inactive. Contact your store owner, or the application owner if the whole shop is affected.",
+  },
+};
+
+function noticeFor(code: string | null | undefined): Notice | null {
+  if (!code) return null;
+
+  return (
+    SIGN_IN_NOTICES[code] ?? {
+      tone: "error",
+      // A message thrown by the OTP path arrives here verbatim, so an
+      // unrecognised code is far more likely to be a real sentence than a
+      // symbol — show it rather than swallowing it.
+      title: "Could not sign you in",
+      body: /^[A-Za-z_]+$/.test(code)
+        ? "Please try again, or contact your store owner if this keeps happening."
+        : code,
+    }
+  );
+}
 
 export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("phone");
@@ -18,6 +77,14 @@ export default function LoginPage() {
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+
+  // Read straight off the URL rather than through useSearchParams, which
+  // would force this page dynamic and require a Suspense boundary around it.
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("error");
+    if (code) setNotice(noticeFor(code));
+  }, []);
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -66,16 +133,26 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+    setNotice(null);
 
     try {
-      await signIn("credentials", {
+      // `redirect: false` so the refusal comes back as a value. With
+      // `redirect: true` NextAuth navigates away and the reason — including
+      // the archived-store message thrown server-side — is lost.
+      const result = await signIn("credentials", {
         ...(mode === "phone" ? { phone: identifier } : { email: identifier }),
         otp,
-        callbackUrl: "/dashboard",
-        redirect: true,
+        redirect: false,
       });
+
+      if (result?.error) {
+        setNotice(noticeFor(result.error));
+        return;
+      }
+
+      window.location.href = "/dashboard";
     } catch {
-      alert("Login failed. Please try again.");
+      setNotice(noticeFor("AccessDenied"));
     } finally {
       setLoading(false);
     }
@@ -111,6 +188,25 @@ export default function LoginPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Login using Google, your registered mobile number, or email.
         </p>
+
+        {notice && (
+          <div
+            role="alert"
+            className="mt-5 rounded-lg border border-destructive/40 bg-destructive/5 p-4"
+          >
+            <div className="flex gap-2.5">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+              <div>
+                <p className="text-sm font-semibold text-destructive">
+                  {notice.title}
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-destructive/90">
+                  {notice.body}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <button
           onClick={() =>

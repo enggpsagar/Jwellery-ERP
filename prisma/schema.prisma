@@ -22,6 +22,12 @@ model Store {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  planId             String?
+  plan               Plan?     @relation(fields: [planId], references: [id])
+  planStartedAt      DateTime?
+  planExpiresAt      DateTime?
+  planReminderSentAt DateTime?
+
   users            User[]
   userMemberships  UserStoreMembership[]
   customers        Customer[]
@@ -44,6 +50,19 @@ model Store {
   storeLocations   StoreLocation[]
 
   @@index([code])
+}
+
+model Plan {
+  id           String   @id @default(cuid())
+  name         String
+  durationDays Int
+  price        Decimal  @default(0) @db.Decimal(12, 2)
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  stores Store[]
 }
 
 model StoreLocation {

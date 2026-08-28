@@ -45,11 +45,17 @@ async function assertCanSignIn(
   if (user.storeId) {
     const store = await prisma.store.findUnique({
       where: { id: user.storeId },
-      select: { isActive: true },
+      select: { isActive: true, planExpiresAt: true },
     })
 
     if (store && !store.isActive) {
       throw new Error("This store has been archived. Contact your administrator.")
+    }
+
+    // planExpiresAt: null means no plan assigned yet (e.g. stores that
+    // predate this feature) — treated as unrestricted, not a lockout.
+    if (store?.planExpiresAt && store.planExpiresAt < new Date()) {
+      throw new Error("This store's plan has expired. Contact your administrator to renew.")
     }
   }
 

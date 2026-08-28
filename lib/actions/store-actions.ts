@@ -45,6 +45,7 @@ type ExportStoresParams = {
 };
 
 const STORE_INCLUDE = {
+  plan: { select: { id: true, name: true, durationDays: true } },
   _count: {
     select: { users: true, customers: true, invoices: true },
   },
@@ -184,6 +185,7 @@ export async function createStoreWithAdmin(
     const adminName = String(formData.get("adminName") || "").trim();
     const adminEmail = toOptionalString(formData.get("adminEmail"));
     const adminPhone = toOptionalString(formData.get("adminPhone"));
+    const planId = toOptionalString(formData.get("planId"));
 
     const errors: Record<string, string[]> = {};
     if (!name) errors.name = ["Store name is required"];
@@ -200,6 +202,25 @@ export async function createStoreWithAdmin(
 
     if (Object.keys(errors).length > 0) {
       return { success: false, message: "Please fix the form errors", errors };
+    }
+
+    // Resolve the chosen plan up front so a bad/inactive planId fails the
+    // whole submission with a clear error, rather than silently creating a
+    // store with no plan (which would then never expire — the opposite of
+    // what picking a plan on this form is supposed to guarantee).
+    let plan: { id: string; durationDays: number } | null = null;
+    if (planId) {
+      plan = await prisma.plan.findFirst({
+        where: { id: planId, isActive: true },
+        select: { id: true, durationDays: true },
+      });
+      if (!plan) {
+        return {
+          success: false,
+          message: "Please fix the form errors",
+          errors: { planId: ["Selected plan is not available"] },
+        };
+      }
     }
 
     // Email/phone are globally-unique sign-in identifiers across every
@@ -241,6 +262,13 @@ export async function createStoreWithAdmin(
           phone,
           email,
           gstNumber: toOptionalString(formData.get("gstNumber")),
+          ...(plan
+            ? {
+                planId: plan.id,
+                planStartedAt: new Date(),
+                planExpiresAt: new Date(Date.now() + plan.durationDays * 24 * 60 * 60 * 1000),
+              }
+            : {}),
         },
       });
 
@@ -347,6 +375,48 @@ export async function restoreStore(storeId: string): Promise<StoreFormState> {
   } catch (error) {
     console.error("restoreStore error:", error);
     return { success: false, message: "Failed to restore store" };
+  }
+}
+
+/**
+ * Assigns or renews a store's plan — the single action used both to put a
+ * store on a plan for the first time and to renew/change it later; renewal
+ * isn't a separate code path, just calling this again. Resets
+ * planReminderSentAt so a renewed store re-enters the 7-day reminder cycle
+ * instead of being silently skipped by the cron's "already reminded" guard.
+ */
+export async function assignPlanToStore(storeId: string, planId: string): Promise<StoreFormState> {
+  try {
+    await requireRole(UserRole.SUPER_ADMIN);
+
+    const [store, plan] = await Promise.all([
+      prisma.store.findUnique({ where: { id: storeId }, select: { name: true } }),
+      prisma.plan.findFirst({ where: { id: planId, isActive: true }, select: { name: true, durationDays: true } }),
+    ]);
+
+    if (!store) {
+      return { success: false, message: "Store not found" };
+    }
+    if (!plan) {
+      return { success: false, message: "Selected plan is not available" };
+    }
+
+    await prisma.store.update({
+      where: { id: storeId },
+      data: {
+        planId,
+        planStartedAt: new Date(),
+        planExpiresAt: new Date(Date.now() + plan.durationDays * 24 * 60 * 60 * 1000),
+        planReminderSentAt: null,
+      },
+    });
+
+    revalidatePath("/stores");
+
+    return { success: true, message: `"${plan.name}" plan assigned to "${store.name}"` };
+  } catch (error) {
+    console.error("assignPlanToStore error:", error);
+    return { success: false, message: "Failed to assign plan" };
   }
 }
 

@@ -2,16 +2,17 @@
 
 import { useActionState, useEffect, useRef, useState, type FormEvent } from "react"
 import { useRouter } from "next/navigation"
-import { Store as StoreIcon, User, Mail, Phone, MapPin, Hash } from "lucide-react"
+import { Store as StoreIcon, User, Mail, Phone, MapPin, Hash, CreditCard } from "lucide-react"
 
 import { createStoreWithAdmin, type StoreFormState } from "@/lib/actions/store-actions"
+import type { PlanRow } from "@/lib/actions/plan-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
 
 const initialState: StoreFormState = { success: false, message: "", errors: {} }
 
-export function CreateStoreForm() {
+export function CreateStoreForm({ plans }: { plans: PlanRow[] }) {
   const router = useRouter()
   const toast = useToast()
   const formRef = useRef<HTMLFormElement>(null)
@@ -121,6 +122,30 @@ export function CreateStoreForm() {
           <div className="space-y-1">
             <label className="text-sm font-medium">GST Number</label>
             <input name="gstNumber" className="w-full rounded-md border px-3 py-2 text-sm" />
+          </div>
+
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              Plan
+            </label>
+            <select
+              name="planId"
+              defaultValue={plans[0]?.id ?? ""}
+              className="w-full rounded-md border px-3 py-2 text-sm"
+            >
+              {plans.map((plan) => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.name} {plan.price > 0 ? `— ₹${plan.price}` : ""}
+                </option>
+              ))}
+            </select>
+            {state.errors?.planId?.[0] && (
+              <p className="text-sm text-red-600">{state.errors.planId[0]}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              The store loses access once this plan expires — renew or change it anytime from Stores.
+            </p>
           </div>
 
           <div className="space-y-1">

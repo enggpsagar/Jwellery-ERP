@@ -21,6 +21,7 @@ import {
   Truck,
   PackagePlus,
   FileText,
+  CreditCard,
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
@@ -121,6 +122,11 @@ const mainNav: NavItem[] = [
     href: "/stores",
     icon: Store,
   },
+  {
+    title: "Plans",
+    href: "/plans",
+    icon: CreditCard,
+  },
 ];
 
 const karigarNav: NavItem[] = [
@@ -135,7 +141,7 @@ function getNavForRole(role?: string, permissions: string[] = []) {
   if (role === "KARIGAR") return karigarNav;
 
   return mainNav.filter((item) => {
-    if (item.href === "/stores") return role === "SUPER_ADMIN";
+    if (item.href === "/stores" || item.href === "/plans") return role === "SUPER_ADMIN";
     if (item.href === "/users") return role === "SUPER_ADMIN" || role === "ADMIN";
 
     // Empty permissions means "not customized" — falls back to full access,

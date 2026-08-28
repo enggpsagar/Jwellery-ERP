@@ -1,7 +1,10 @@
 import { CreateStoreForm } from "@/components/stores/create-store-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import { getPlans } from "@/lib/actions/plan-actions"
 
-export default function NewStorePage() {
+export default async function NewStorePage() {
+  const plans = await getPlans({ activeOnly: true })
+
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
@@ -11,7 +14,7 @@ export default function NewStorePage() {
         backLabel="Back to Stores"
       />
 
-      <CreateStoreForm />
+      <CreateStoreForm plans={plans} />
     </main>
   )
 }

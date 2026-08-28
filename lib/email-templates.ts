@@ -93,6 +93,30 @@ export function disabledAccountEmail(params: {
   };
 }
 
+export function planExpiringReminderEmail(params: {
+  name: string;
+  storeName: string;
+  planName: string;
+  expiresAt: Date;
+  daysRemaining: number;
+}) {
+  const { name, storeName, planName, expiresAt, daysRemaining } = params;
+
+  const urgency = daysRemaining <= 0 ? "today" : daysRemaining === 1 ? "tomorrow" : `in ${daysRemaining} days`;
+
+  const body = `
+    <p>Hi ${name},</p>
+    <p>Your <strong>${storeName}</strong> subscription on the <strong>${planName}</strong> plan expires ${urgency}, on <strong>${formatDate(expiresAt)}</strong>.</p>
+    <p>Renew before then to avoid any interruption — once the plan expires, users at this store will not be able to sign in until it's renewed.</p>
+    <p>Contact your Super Admin to renew or upgrade your plan.</p>
+  `;
+
+  return {
+    subject: `Your ${storeName} plan expires ${urgency}`,
+    html: wrapEmail(storeName, "Plan renewal reminder", body),
+  };
+}
+
 /**
  * One-time code email, used for both the sign-in code and the profile
  * email-change code — only the heading and intro line differ, so they

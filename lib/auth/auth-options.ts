@@ -108,10 +108,16 @@ export const authOptions: NextAuthOptions = {
       if (dbUser.storeId) {
         const store = await prisma.store.findUnique({
           where: { id: dbUser.storeId },
-          select: { isActive: true },
+          select: { isActive: true, planExpiresAt: true },
         })
 
         if (store && !store.isActive) {
+          return false
+        }
+
+        // planExpiresAt: null means no plan assigned yet (e.g. stores that
+        // predate this feature) — treated as unrestricted, not a lockout.
+        if (store?.planExpiresAt && store.planExpiresAt < new Date()) {
           return false
         }
       }

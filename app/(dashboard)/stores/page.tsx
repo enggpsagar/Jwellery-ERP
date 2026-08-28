@@ -4,6 +4,7 @@ import {
   type StoreSortBy,
   type SortOrder,
 } from "@/lib/actions/store-actions";
+import { getPlans } from "@/lib/actions/plan-actions";
 import { StoresClient } from "@/components/stores/stores-client";
 
 type StoresPageProps = {
@@ -27,9 +28,10 @@ export default async function StoresPage({ searchParams }: StoresPageProps) {
   const sortBy = params.sortBy || "createdAt";
   const sortOrder = params.sortOrder || "desc";
 
-  const [{ stores, pagination }, goldSummary] = await Promise.all([
+  const [{ stores, pagination }, goldSummary, plans] = await Promise.all([
     getStores({ page, pageSize, search, sortBy, sortOrder }),
     getPlatformGoldInventory(),
+    getPlans({ activeOnly: true }),
   ]);
 
   return (
@@ -37,6 +39,7 @@ export default async function StoresPage({ searchParams }: StoresPageProps) {
       stores={stores}
       pagination={pagination}
       goldSummary={goldSummary}
+      plans={plans}
     />
   );
 }

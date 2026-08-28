@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { StoreRowActions } from "@/components/stores/store-row-actions"
+import { ChangePlanDialog } from "@/components/stores/change-plan-dialog"
+import type { PlanRow } from "@/lib/actions/plan-actions"
 
 type StoreRow = {
   id: string
@@ -27,10 +29,40 @@ type StoreRow = {
   gstNumber: string | null
   isActive: boolean
   createdAt: Date
+  plan: { id: string; name: string; durationDays: number } | null
+  planExpiresAt: Date | null
   _count: { users: number; customers: number; invoices: number }
 }
 
-export function StoreTable({ stores }: { stores: StoreRow[] }) {
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function PlanStatusBadge({ planExpiresAt }: { planExpiresAt: Date | null }) {
+  if (!planExpiresAt) {
+    return <Badge variant="outline">No plan</Badge>
+  }
+
+  const daysRemaining = Math.ceil((planExpiresAt.getTime() - Date.now()) / DAY_MS)
+
+  if (daysRemaining < 0) {
+    return <Badge variant="destructive">Expired</Badge>
+  }
+
+  if (daysRemaining <= 7) {
+    return (
+      <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+        Expires in {daysRemaining}d
+      </Badge>
+    )
+  }
+
+  return (
+    <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
+      Active
+    </Badge>
+  )
+}
+
+export function StoreTable({ stores, plans }: { stores: StoreRow[]; plans: PlanRow[] }) {
   return (
     <div className="rounded-lg border">
       <Table>
@@ -43,6 +75,7 @@ export function StoreTable({ stores }: { stores: StoreRow[] }) {
             <TableHead>Customers</TableHead>
             <TableHead>Invoices</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Plan</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -50,7 +83,7 @@ export function StoreTable({ stores }: { stores: StoreRow[] }) {
         <TableBody>
           {stores.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+              <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
                 No stores yet. Create the first one to get started.
               </TableCell>
             </TableRow>
@@ -68,6 +101,12 @@ export function StoreTable({ stores }: { stores: StoreRow[] }) {
                     {store.isActive ? "Active" : "Inactive"}
                   </Badge>
                 </TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm">{store.plan?.name ?? "-"}</span>
+                    <PlanStatusBadge planExpiresAt={store.planExpiresAt} />
+                  </div>
+                </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
                     <Link
@@ -78,6 +117,12 @@ export function StoreTable({ stores }: { stores: StoreRow[] }) {
                     >
                       <Pencil className="h-4 w-4" />
                     </Link>
+                    <ChangePlanDialog
+                      storeId={store.id}
+                      storeName={store.name}
+                      currentPlanId={store.plan?.id ?? null}
+                      plans={plans}
+                    />
                     <StoreRowActions
                       storeId={store.id}
                       storeName={store.name}

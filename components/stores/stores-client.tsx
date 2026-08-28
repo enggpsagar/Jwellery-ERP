@@ -7,6 +7,7 @@ import { StoreTable } from "@/components/stores/store-table"
 import { DataTableToolbar } from "@/components/shared/data-table-toolbar"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { exportStoresToExcel } from "@/lib/actions/store-actions"
+import type { PlanRow } from "@/lib/actions/plan-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 
@@ -23,6 +24,8 @@ type StoreRow = {
   gstNumber: string | null
   isActive: boolean
   createdAt: Date
+  plan: { id: string; name: string; durationDays: number } | null
+  planExpiresAt: Date | null
   _count: { users: number; customers: number; invoices: number }
 }
 
@@ -44,13 +47,14 @@ type StoresClientProps = {
   stores: StoreRow[]
   pagination: Pagination
   goldSummary: GoldSummary
+  plans: PlanRow[]
 }
 
 function formatGrams(value: number) {
   return `${value.toLocaleString("en-IN", { maximumFractionDigits: 3 })} g`
 }
 
-export function StoresClient({ stores, pagination, goldSummary }: StoresClientProps) {
+export function StoresClient({ stores, pagination, goldSummary, plans }: StoresClientProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -118,7 +122,7 @@ export function StoresClient({ stores, pagination, goldSummary }: StoresClientPr
       />
 
       <div className="space-y-3">
-        <StoreTable stores={stores} />
+        <StoreTable stores={stores} plans={plans} />
 
         <div className="rounded-xl border">
           <DataTablePagination

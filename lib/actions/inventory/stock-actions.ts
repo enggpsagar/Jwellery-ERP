@@ -313,6 +313,9 @@ export async function getInventoryStockFormProducts() {
       defaultPurity: true,
       defaultMakingCharge: true,
       defaultStoneCharge: true,
+      defaultGrossWeight: true,
+      defaultNetWeight: true,
+      defaultStoneWeight: true,
       isActive: true,
     },
   })
@@ -325,6 +328,9 @@ export async function getInventoryStockFormProducts() {
     defaultPurity: product.defaultPurity ?? null,
     defaultMakingCharge: product.defaultMakingCharge?.toString() ?? null,
     defaultStoneCharge: product.defaultStoneCharge?.toString() ?? null,
+    defaultGrossWeight: product.defaultGrossWeight?.toString() ?? null,
+    defaultNetWeight: product.defaultNetWeight?.toString() ?? null,
+    defaultStoneWeight: product.defaultStoneWeight?.toString() ?? null,
   }))
 }
 

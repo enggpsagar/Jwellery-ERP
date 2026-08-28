@@ -52,6 +52,7 @@ export async function GET(request: Request) {
 
     let sent = 0;
     let skipped = 0;
+    let quiet = 0;
     const failures: string[] = [];
 
     for (const store of stores) {
@@ -82,9 +83,14 @@ export async function GET(request: Request) {
 
         const report = await buildDailyReport(store.id, store.name, day);
 
-        // A silent day still gets a mail. The report doubles as confirmation
-        // that the shop's books were watched, and a gap in the sequence
-        // would be indistinguishable from the cron having failed.
+        // Nothing traded, nothing to report. A shop that was shut that day
+        // should not get an email saying so — four empty totals every
+        // morning is how a useful report becomes one nobody opens.
+        if (report.isEmpty) {
+          quiet += 1;
+          continue;
+        }
+
         const workbook = buildDailyReportWorkbook(report);
 
         const sections = [
@@ -140,6 +146,7 @@ export async function GET(request: Request) {
       storesConsidered: stores.length,
       sent,
       skippedNoRecipient: skipped,
+      skippedNoActivity: quiet,
       failures,
     });
   } catch (error) {

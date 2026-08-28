@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   InventoryStockStatus,
@@ -41,6 +41,9 @@ type ProductOption = {
   defaultPurity: string | null;
   defaultMakingCharge: string | null;
   defaultStoneCharge: string | null;
+  defaultGrossWeight: string | null;
+  defaultNetWeight: string | null;
+  defaultStoneWeight: string | null;
   isActive: boolean;
 };
 
@@ -151,6 +154,24 @@ export function StockForm({
   // an uncontrolled `defaultValue` input, these two are the exception.
   const [purchaseRate, setPurchaseRate] = useState(stock?.purchaseRate ?? "");
   const [netWeight, setNetWeight] = useState(stock?.netWeight ?? "");
+  const [grossWeight, setGrossWeight] = useState(stock?.grossWeight ?? "");
+  const [stoneWeight, setStoneWeight] = useState(stock?.stoneWeight ?? "");
+
+  // Weights follow the selected product until someone weighs the piece.
+  //
+  // Locked as a group rather than field by field: gross, stone and net are
+  // one measurement (net = gross - stone), so filling two from a product and
+  // keeping the third from a different one would produce a set that does not
+  // add up. Editing an existing stock row starts locked — those numbers came
+  // off a scale and must not be overwritten by picking a product.
+  const [weightsTouched, setWeightsTouched] = useState(Boolean(stock?.id));
+
+  function editWeight(setter: (value: string) => void) {
+    return (value: string) => {
+      setWeightsTouched(true);
+      setter(value);
+    };
+  }
 
   // Metal, purity and the two charges are no longer entered here — the
   // server copies them from the product. This only tracks which product is
@@ -160,6 +181,17 @@ export function StockForm({
   );
 
   const selectedProduct = products.find((item) => item.id === selectedProductId);
+
+  // Seed the weights from the chosen product, and keep following it while the
+  // fields are untouched, so switching product corrects them rather than
+  // leaving the previous product's figures behind.
+  useEffect(() => {
+    if (weightsTouched || !selectedProduct) return;
+
+    setGrossWeight(selectedProduct.defaultGrossWeight ?? "");
+    setNetWeight(selectedProduct.defaultNetWeight ?? "");
+    setStoneWeight(selectedProduct.defaultStoneWeight ?? "");
+  }, [selectedProduct, weightsTouched]);
 
   // `ProductSelect` is a shared component whose `ProductOption` type
   // expects `category`/`ornamentType`/`metalType` as display strings, not
@@ -358,7 +390,8 @@ export function StockForm({
               name="grossWeight"
               type="number"
               step="0.001"
-              defaultValue={stock?.grossWeight ?? ""}
+              value={grossWeight}
+              onChange={(event) => editWeight(setGrossWeight)(event.target.value)}
             />
 
             <ErrorText error={state.errors.grossWeight} />
@@ -387,7 +420,7 @@ export function StockForm({
               type="number"
               step="0.001"
               value={netWeight}
-              onChange={(event) => setNetWeight(event.target.value)}
+              onChange={(event) => editWeight(setNetWeight)(event.target.value)}
             />
 
             <ErrorText error={state.errors.netWeight} />
@@ -401,7 +434,8 @@ export function StockForm({
               name="stoneWeight"
               type="number"
               step="0.001"
-              defaultValue={stock?.stoneWeight ?? ""}
+              value={stoneWeight}
+              onChange={(event) => editWeight(setStoneWeight)(event.target.value)}
             />
 
             <ErrorText error={state.errors.stoneWeight} />

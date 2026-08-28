@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import type { DashboardTransaction } from "@/lib/actions/dashboard-actions"
+import { RecordHoverCard } from "@/components/shared/record-hover-card"
 
 const statusStyles: Record<string, string> = {
   Paid: "bg-emerald-50 text-emerald-700",
@@ -73,7 +74,29 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
                   </Link>
                 </TableCell>
                 <TableCell className="max-w-[180px] truncate">
-                  {t.customer}
+                  <RecordHoverCard
+                    label={t.customer}
+                    href={`/billing/${t.invoiceId}`}
+                    title={t.customer}
+                    subtitle={t.id}
+                    footerLabel="View invoice"
+                    sections={[
+                      {
+                        fields: [
+                          { label: "Date", value: t.date },
+                          { label: "Type", value: t.type },
+                          { label: "Status", value: t.status },
+                        ],
+                      },
+                      {
+                        fields: [
+                          { label: "Metal", value: t.metal },
+                          { label: "Weight", value: t.weight },
+                          { label: "Amount", value: t.amount },
+                        ],
+                      },
+                    ]}
+                  />
                 </TableCell>
                 <TableCell className="text-muted-foreground">{t.type}</TableCell>
                 <TableCell className="text-muted-foreground">

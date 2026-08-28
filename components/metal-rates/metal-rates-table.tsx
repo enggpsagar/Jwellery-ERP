@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 
+import { RecordHoverCard } from "@/components/shared/record-hover-card";
+
 import {
   Card,
   CardContent,
@@ -23,6 +25,18 @@ import {
   Minus,
   Download,
 } from "lucide-react";
+
+/** A metal rate, formatted the way the column shows it. */
+function rupees(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) {
+    return null;
+  }
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Number(value));
+}
 
 type MetalRate = {
   id: string;
@@ -221,11 +235,49 @@ export function MetalRatesTable({ data }: Props) {
                 return (
                   <tr key={rate.id} className="border-t hover:bg-muted/40">
                     <td className="px-4 py-3">
-                      {new Date(rate.date).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      {/* The row shows each metal in its own column; the card
+                          puts the whole day's set together, with the previous
+                          day beside it so a move is readable without
+                          comparing two rows by eye. */}
+                      <RecordHoverCard
+                        label={new Date(rate.date).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                        title={new Date(rate.date).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                        subtitle={`Per ${rate.unit}`}
+                        sections={[
+                          {
+                            fields: [
+                              { label: "Gold 24K", value: rupees(rate.gold24k) },
+                              { label: "Gold 22K", value: rupees(rate.gold22k) },
+                              { label: "Gold 18K", value: rupees(rate.gold18k) },
+                              { label: "Silver", value: rupees(rate.silver) },
+                            ],
+                          },
+                          {
+                            fields: [
+                              {
+                                label: "Previous 24K",
+                                value: previous ? rupees(previous.gold24k) : null,
+                              },
+                              {
+                                label: "Previous 22K",
+                                value: previous ? rupees(previous.gold22k) : null,
+                              },
+                              {
+                                label: "Previous silver",
+                                value: previous ? rupees(previous.silver) : null,
+                              },
+                            ],
+                          },
+                        ]}
+                      />
                     </td>
 
                     <td className="px-4 py-3">

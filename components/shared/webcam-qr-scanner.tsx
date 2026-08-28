@@ -287,11 +287,15 @@ export function WebcamQrScanner({
         </Button>
       </div>
 
-      <div className="relative mt-3 overflow-hidden rounded-md bg-black">
+      {/* Capped width and taller than it is wide-ish: a full-width strip
+          crops a 4:3 camera down to a letterbox, throwing away most of the
+          frame and leaving the tag a handful of pixels. A viewport shaped
+          closer to the sensor keeps the resolution the decoder needs. */}
+      <div className="relative mx-auto mt-3 w-full max-w-md overflow-hidden rounded-md bg-black">
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video
           ref={videoRef}
-          className="h-56 w-full object-cover"
+          className="h-80 w-full object-cover"
           muted
           playsInline
         />
@@ -316,7 +320,10 @@ export function WebcamQrScanner({
           // A frame to aim at: without one people hold the tag too far off
           // centre for the decoder to read it.
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="size-36 rounded-lg border-2 border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+            {/* Large enough to hold a tag at a comfortable distance — a small
+                target makes people bring the label too close for a fixed
+                focus camera to resolve it. */}
+            <div className="size-64 rounded-lg border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
           </div>
         ) : null}
       </div>

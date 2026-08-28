@@ -1,10 +1,24 @@
 "use client"
 
 import Link from "next/link"
+
+import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import * as React from "react"
 import type { Customer } from "@/lib/actions/customer-actions"
 import { CustomerRowActions } from "@/components/customers/customer-row-actions"
 import { CustomersPagination } from "@/components/customers/customers-pagination"
+
+/** Money as it reads on a jewellery ledger. */
+function inr(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") return null
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return null
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
 
 type StateItem = {
   id: string
@@ -120,12 +134,37 @@ export function CustomersTable({
                   </td>
 
                   <td className="px-4 py-3 font-medium text-foreground">
-                    <Link
+                    <RecordHoverCard
+                      label={customer.name}
                       href={`/customers/${customer.id}`}
-                      className="hover:underline"
-                    >
-                      {customer.name}
-                    </Link>
+                      title={customer.name}
+                      subtitle={customer.customerType ?? undefined}
+                      footerLabel="View customer"
+                      sections={[
+                        {
+                          fields: [
+                            { label: "Phone", value: customer.phone },
+                            { label: "Alt. phone", value: customer.altPhone },
+                            { label: "Email", value: customer.email },
+                          ],
+                        },
+                        {
+                          fields: [
+                            { label: "City", value: customer.city },
+                            { label: "State", value: customer.state },
+                            { label: "GSTIN", value: customer.gstNumber },
+                          ],
+                        },
+                        {
+                          fields: [
+                            { label: "Opening balance", value: inr(customer.openingBalance) },
+                            { label: "Outstanding", value: inr(customer.pendingAmount) },
+                            { label: "Orders", value: customer.totalOrders },
+                            { label: "Last purchase", value: customer.lastPurchaseDate },
+                          ],
+                        },
+                      ]}
+                    />
                   </td>
 
                   <td className="px-4 py-3 text-foreground">

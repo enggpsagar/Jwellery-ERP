@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
+
+import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { Eye, Pencil } from "lucide-react"
 
 import { DeleteProductButton } from "@/components/inventory/products/delete-product-button"
@@ -16,6 +18,8 @@ type ProductRow = {
   metalType: string
   defaultPurity: string | null
   defaultNetWeight: number | null
+  defaultGrossWeight: number | null
+  defaultStoneWeight: number | null
   isActive: boolean
   createdAt: Date | string
 }
@@ -133,9 +137,48 @@ export function ProductsTable({
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <Link href={`/inventory/products/${product.id}`} className="hover:underline">
-                      {product.productCode}
-                    </Link>
+                    <RecordHoverCard
+                      label={product.productCode}
+                      href={`/inventory/products/${product.id}`}
+                      title={product.name}
+                      subtitle={product.productCode}
+                      footerLabel="View product"
+                      sections={[
+                        {
+                          fields: [
+                            { label: "Category", value: product.category },
+                            { label: "Type", value: product.ornamentType },
+                            { label: "Metal", value: product.metalType },
+                            { label: "Purity", value: product.defaultPurity },
+                          ],
+                        },
+                        {
+                          fields: [
+                            {
+                              label: "Gross weight",
+                              value:
+                                product.defaultGrossWeight != null
+                                  ? `${product.defaultGrossWeight.toFixed(3)} g`
+                                  : null,
+                            },
+                            {
+                              label: "Net weight",
+                              value:
+                                product.defaultNetWeight != null
+                                  ? `${product.defaultNetWeight.toFixed(3)} g`
+                                  : null,
+                            },
+                            {
+                              label: "Stone weight",
+                              value:
+                                product.defaultStoneWeight != null
+                                  ? `${product.defaultStoneWeight.toFixed(3)} g`
+                                  : null,
+                            },
+                          ],
+                        },
+                      ]}
+                    />
                   </td>
                   <td className="px-4 py-3 font-medium">{product.name}</td>
                   <td className="px-4 py-3">{product.category}</td>

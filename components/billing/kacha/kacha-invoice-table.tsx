@@ -2,9 +2,23 @@
 
 import * as React from "react"
 import Link from "next/link"
+
+import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { Eye, ArrowRightCircle } from "lucide-react"
 
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
+
+/** Money as it reads on a jewellery ledger. */
+function inr(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") return null
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return null
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
 
 type KachaInvoiceRow = {
   id: string
@@ -128,12 +142,42 @@ export function KachaInvoiceTable({
                 </td>
                 <td className="px-4 py-3">
                   {kachaInvoice.customer ? (
-                    <Link
+                    <RecordHoverCard
+                      label={kachaInvoice.customer.name}
                       href={`/customers/${kachaInvoice.customer.id}?from=${encodeURIComponent("/billing/kacha")}`}
+                      title={kachaInvoice.customer.name}
+                      subtitle={kachaInvoice.customer.phone ?? undefined}
+                      footerLabel="View customer"
                       className="text-primary underline-offset-4 hover:underline"
-                    >
-                      {kachaInvoice.customer.name}
-                    </Link>
+                      sections={[
+                        {
+                          fields: [
+                            { label: "Slip", value: kachaInvoice.slipNumber },
+                            {
+                              label: "Date",
+                              value: new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN"),
+                            },
+                            { label: "Status", value: kachaInvoice.status },
+                          ],
+                        },
+                        {
+                          fields: [
+                            { label: "Total", value: inr(kachaInvoice.totalAmount) },
+                            {
+                              label: "Balance",
+                              value:
+                                kachaInvoice.balanceAmount > 0
+                                  ? inr(kachaInvoice.balanceAmount)
+                                  : "Settled",
+                            },
+                            {
+                              label: "Converted to",
+                              value: kachaInvoice.convertedTo?.invoiceNumber,
+                            },
+                          ],
+                        },
+                      ]}
+                    />
                   ) : (
                     "-"
                   )}

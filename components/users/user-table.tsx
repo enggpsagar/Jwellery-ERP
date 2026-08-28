@@ -4,6 +4,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { RecordHoverCard } from "@/components/shared/record-hover-card";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -149,7 +151,41 @@ export function UserTable({
           ) : (
             users.map((user) => (
               <TableRow key={user.id}>
-                <TableCell>{user.name ?? "-"}</TableCell>
+                <TableCell>
+                  <RecordHoverCard
+                    label={user.name ?? "-"}
+                    href={`/users/${user.id}/edit`}
+                    title={user.name ?? "Unnamed user"}
+                    subtitle={ROLE_LABELS[user.role]}
+                    footerLabel="Edit user"
+                    sections={[
+                      {
+                        fields: [
+                          { label: "Email", value: user.email },
+                          { label: "Phone", value: user.phone },
+                        ],
+                      },
+                      {
+                        fields: [
+                          { label: "Status", value: user.status },
+                          { label: "Account", value: user.isActive ? "Active" : "Deactivated" },
+                          {
+                            label: "Added",
+                            value: new Date(user.createdAt).toLocaleDateString("en-IN"),
+                          },
+                          {
+                            // Empty means unrestricted, which is not the same
+                            // as none — say so rather than showing 0.
+                            label: "Locations",
+                            value: user.locationAccess?.length
+                              ? user.locationAccess.length
+                              : "All",
+                          },
+                        ],
+                      },
+                    ]}
+                  />
+                </TableCell>
 
                 <TableCell>{user.email ?? "-"}</TableCell>
 

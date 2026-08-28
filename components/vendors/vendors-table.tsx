@@ -1,10 +1,24 @@
 "use client"
 
 import Link from "next/link"
+
+import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import * as React from "react"
 import type { Vendor } from "@/lib/actions/vendor-actions"
 import { VendorRowActions } from "@/components/vendors/vendor-row-actions"
 import { VendorsPagination } from "@/components/vendors/vendors-pagination"
+
+/** Money as it reads on a jewellery ledger. */
+function inr(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") return null
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return null
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
 
 type StateItem = {
   id: string
@@ -120,12 +134,36 @@ export function VendorsTable({
                   </td>
 
                   <td className="px-4 py-3 font-medium text-foreground">
-                    <Link
+                    <RecordHoverCard
+                      label={vendor.name}
                       href={`/vendors/${vendor.id}`}
-                      className="hover:underline"
-                    >
-                      {vendor.name}
-                    </Link>
+                      title={vendor.name}
+                      subtitle={vendor.vendorType ?? undefined}
+                      footerLabel="View vendor"
+                      sections={[
+                        {
+                          fields: [
+                            { label: "Phone", value: vendor.phone },
+                            { label: "Alt. phone", value: vendor.altPhone },
+                            { label: "Email", value: vendor.email },
+                          ],
+                        },
+                        {
+                          fields: [
+                            { label: "City", value: vendor.city },
+                            { label: "State", value: vendor.state },
+                            { label: "GSTIN", value: vendor.gstNumber },
+                          ],
+                        },
+                        {
+                          fields: [
+                            { label: "Opening balance", value: inr(vendor.openingBalance) },
+                            { label: "Purchases", value: vendor.totalOrders },
+                            { label: "Purchase value", value: inr(vendor.totalPurchaseValue) },
+                          ],
+                        },
+                      ]}
+                    />
                   </td>
 
                   <td className="px-4 py-3 text-foreground">

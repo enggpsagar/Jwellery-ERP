@@ -4,6 +4,8 @@
 
 import Link from "next/link"
 
+import { RecordHoverCard } from "@/components/shared/record-hover-card"
+
 import { KarigarRowActions } from "@/components/karigars/karigar-row-actions"
 import { KarigarsPagination } from "@/components/karigars/karigars-pagination"
 import type { Karigar } from "@/lib/actions/karigar-actions"
@@ -104,7 +106,31 @@ export function KarigarTable({
                     {karigar.code || "-"}
                   </Link>
                 </td>
-                <td className="px-4 py-3 font-medium">{karigar.name}</td>
+                <td className="px-4 py-3 font-medium">
+                  <RecordHoverCard
+                    label={karigar.name}
+                    href={`/karigars/${karigar.id}`}
+                    title={karigar.name}
+                    subtitle={karigar.code || undefined}
+                    footerLabel="View karigar"
+                    sections={[
+                      {
+                        fields: [
+                          { label: "Mobile", value: karigar.mobile },
+                          { label: "City", value: karigar.city },
+                          { label: "Specialization", value: karigar.specialization },
+                        ],
+                      },
+                      {
+                        fields: [
+                          { label: "Opening gold", value: karigar.openingGold },
+                          { label: "Opening cash", value: karigar.openingCash },
+                          { label: "Status", value: karigar.isActive ? "Active" : "Inactive" },
+                        ],
+                      },
+                    ]}
+                  />
+                </td>
                 <td className="px-4 py-3">{karigar.mobile || "-"}</td>
                 <td className="px-4 py-3">{karigar.specialization || "-"}</td>
                 <td className="px-4 py-3">{karigar.city || "-"}</td>

@@ -90,6 +90,18 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             </div>
           )}
 
+          {/* Always shown, including when it is not known: an invoice with
+              no answer is different from one nobody has looked at, and the
+              blank would otherwise read as a missing field. */}
+          <div>
+            <p className="text-sm text-muted-foreground">Billed by</p>
+            <p className="font-medium">
+              {invoice.createdByName ?? (
+                <span className="text-muted-foreground">Not recorded</span>
+              )}
+            </p>
+          </div>
+
           <div>
             <p className="text-sm text-muted-foreground">Customer</p>
             {invoice.customer ? (

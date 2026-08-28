@@ -85,6 +85,24 @@ type MetalWise = {
   metals: MetalWiseRow[]
 }
 
+type SalesByUserRow = {
+  userId: string | null
+  name: string
+  invoiceCount: number
+  totalRevenue: number
+  totalCollected: number
+  totalOutstanding: number
+  firstSale: Date | null
+  lastSale: Date | null
+}
+
+type SalesByUser = {
+  rows: SalesByUserRow[]
+  totalRevenue: number
+  invoiceCount: number
+  unattributedCount: number
+}
+
 type ReportsTabsProps = {
   sales: SalesReport
   valuation: InventoryValuation
@@ -92,6 +110,7 @@ type ReportsTabsProps = {
   customerDues: CustomerDues
   goldFlow: GoldFlow
   metalWise: MetalWise
+  salesByUser: SalesByUser
 }
 
 /** Money for the report cards; the columns print raw rupees themselves. */
@@ -108,6 +127,7 @@ function reportInr(value: number | null | undefined) {
 
 const TABS = [
   { key: "sales", label: "Sales" },
+  { key: "byUser", label: "Sales by User" },
   { key: "inventory", label: "Inventory Valuation" },
   { key: "karigar", label: "Karigar Outstanding" },
   { key: "dues", label: "Customer Dues" },
@@ -133,6 +153,7 @@ export function ReportsTabs({
   customerDues,
   goldFlow,
   metalWise,
+  salesByUser,
 }: ReportsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("sales")
 
@@ -242,6 +263,137 @@ export function ReportsTabs({
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "byUser" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <StatCard title="Sellers" value={salesByUser.rows.length} />
+            <StatCard title="Invoices" value={salesByUser.invoiceCount} />
+            <StatCard
+              title="Total Revenue"
+              value={`₹${salesByUser.totalRevenue.toFixed(2)}`}
+            />
+          </div>
+
+          {/* Said plainly rather than left for someone to notice the numbers
+              not adding up: invoices raised before the seller was recorded
+              cannot be attributed to anyone. */}
+          {salesByUser.unattributedCount > 0 ? (
+            <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+              {salesByUser.unattributedCount}{" "}
+              {salesByUser.unattributedCount === 1 ? "invoice was" : "invoices were"}{" "}
+              raised before the seller was recorded, and appear under &ldquo;Not
+              recorded&rdquo;. Invoices from now on carry the seller.
+            </p>
+          ) : null}
+
+          <div className="overflow-hidden rounded-xl border bg-card">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-muted/40">
+                  <tr className="border-b">
+                    <th className="px-4 py-3 text-left font-medium">User</th>
+                    <th className="px-4 py-3 text-right font-medium">Invoices</th>
+                    <th className="px-4 py-3 text-right font-medium">Revenue</th>
+                    <th className="px-4 py-3 text-right font-medium">Collected</th>
+                    <th className="px-4 py-3 text-right font-medium">Outstanding</th>
+                    <th className="px-4 py-3 text-right font-medium">Avg / invoice</th>
+                    <th className="px-4 py-3 text-left font-medium">Last sale</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {salesByUser.rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
+                        No sales in this period.
+                      </td>
+                    </tr>
+                  ) : (
+                    salesByUser.rows.map((row) => (
+                      <tr
+                        key={row.userId ?? "unrecorded"}
+                        className="border-b last:border-0"
+                      >
+                        <td className="px-4 py-3 font-medium">
+                          <RecordHoverCard
+                            label={
+                              row.userId ? (
+                                row.name
+                              ) : (
+                                <span className="text-muted-foreground">{row.name}</span>
+                              )
+                            }
+                            title={row.name}
+                            subtitle="Sales by this user"
+                            sections={[
+                              {
+                                fields: [
+                                  { label: "Invoices", value: row.invoiceCount },
+                                  { label: "Revenue", value: reportInr(row.totalRevenue) },
+                                  { label: "Collected", value: reportInr(row.totalCollected) },
+                                  { label: "Outstanding", value: reportInr(row.totalOutstanding) },
+                                ],
+                              },
+                              {
+                                fields: [
+                                  {
+                                    label: "Average",
+                                    value:
+                                      row.invoiceCount > 0
+                                        ? reportInr(row.totalRevenue / row.invoiceCount)
+                                        : null,
+                                  },
+                                  {
+                                    label: "First sale",
+                                    value: row.firstSale
+                                      ? new Date(row.firstSale).toLocaleDateString("en-IN")
+                                      : null,
+                                  },
+                                  {
+                                    label: "Last sale",
+                                    value: row.lastSale
+                                      ? new Date(row.lastSale).toLocaleDateString("en-IN")
+                                      : null,
+                                  },
+                                ],
+                              },
+                            ]}
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          {row.invoiceCount}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          ₹{row.totalRevenue.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          ₹{row.totalCollected.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums text-red-600">
+                          {row.totalOutstanding > 0
+                            ? `₹${row.totalOutstanding.toFixed(2)}`
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          {row.invoiceCount > 0
+                            ? `₹${(row.totalRevenue / row.invoiceCount).toFixed(2)}`
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3">
+                          {row.lastSale
+                            ? new Date(row.lastSale).toLocaleDateString("en-IN")
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

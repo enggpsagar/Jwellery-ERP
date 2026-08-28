@@ -505,3 +505,108 @@ export async function getMetalWiseReport(range: DateRange = {}) {
     metals: Array.from(byMetal.values()).sort((a, b) => a.metalName.localeCompare(b.metalName)),
   };
 }
+
+export type SalesByUserRow = {
+  userId: string | null;
+  name: string;
+  invoiceCount: number;
+  totalRevenue: number;
+  totalCollected: number;
+  totalOutstanding: number;
+  firstSale: Date | null;
+  lastSale: Date | null;
+};
+
+export type SalesByUserReport = {
+  rows: SalesByUserRow[];
+  totalRevenue: number;
+  invoiceCount: number;
+  /** Invoices raised before the seller was recorded — see the null row. */
+  unattributedCount: number;
+};
+
+/**
+ * Who sold what.
+ *
+ * Grouped on the invoice's recorded seller rather than on a join, because
+ * the name is snapshotted at the sale: staff leave, and the report still has
+ * to attribute their sales rather than dropping or renaming them.
+ *
+ * Invoices raised before the seller was recorded collect under a single
+ * "Not recorded" row instead of being left out — a revenue report whose rows
+ * do not sum to the total is worse than one that admits the gap.
+ */
+export async function getSalesByUserReport(range: DateRange = {}) {
+  const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
+
+  const invoices = await prisma.invoice.findMany({
+    where: {
+      storeId,
+      ...locationWhere(scope),
+      ...toDateRangeWhere(range, "invoiceDate"),
+    },
+    select: {
+      invoiceDate: true,
+      totalAmount: true,
+      paidAmount: true,
+      balanceAmount: true,
+      createdById: true,
+      createdByName: true,
+      createdBy: { select: { name: true, email: true } },
+    },
+  });
+
+  const byUser = new Map<string, SalesByUserRow>();
+
+  for (const invoice of invoices) {
+    const key = invoice.createdById ?? "__unrecorded__";
+
+    // The snapshot first, the live user second: a renamed account should not
+    // silently rewrite who an old invoice says sold the piece.
+    const name =
+      invoice.createdByName ??
+      invoice.createdBy?.name ??
+      invoice.createdBy?.email ??
+      "Not recorded";
+
+    const row =
+      byUser.get(key) ??
+      ({
+        userId: invoice.createdById,
+        name,
+        invoiceCount: 0,
+        totalRevenue: 0,
+        totalCollected: 0,
+        totalOutstanding: 0,
+        firstSale: null,
+        lastSale: null,
+      } satisfies SalesByUserRow);
+
+    row.invoiceCount += 1;
+    row.totalRevenue += Number(invoice.totalAmount);
+    row.totalCollected += Number(invoice.paidAmount);
+    row.totalOutstanding += Number(invoice.balanceAmount);
+
+    if (!row.firstSale || invoice.invoiceDate < row.firstSale) {
+      row.firstSale = invoice.invoiceDate;
+    }
+    if (!row.lastSale || invoice.invoiceDate > row.lastSale) {
+      row.lastSale = invoice.invoiceDate;
+    }
+
+    byUser.set(key, row);
+  }
+
+  const rows = [...byUser.values()].sort(
+    (a, b) => b.totalRevenue - a.totalRevenue,
+  );
+
+  return {
+    rows,
+    totalRevenue: rows.reduce((sum, row) => sum + row.totalRevenue, 0),
+    invoiceCount: invoices.length,
+    unattributedCount:
+      byUser.get("__unrecorded__")?.invoiceCount ?? 0,
+  } satisfies SalesByUserReport;
+}

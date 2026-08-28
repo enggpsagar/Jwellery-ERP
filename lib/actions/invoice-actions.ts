@@ -149,6 +149,7 @@ function mapInvoice(invoice: any) {
     paidAmount: Number(invoice.paidAmount),
     balanceAmount: Number(invoice.balanceAmount),
     notes: invoice.notes,
+    createdByName: invoice.createdByName ?? invoice.createdBy?.name ?? null,
     customer: invoice.customer
       ? {
           id: invoice.customer.id,
@@ -349,6 +350,7 @@ export async function getInvoiceById(id: string) {
     where: { id, storeId },
     include: {
       customer: { select: { id: true, name: true, phone: true } },
+      createdBy: { select: { name: true, email: true } },
       items: true,
       ledgerEntries: { orderBy: { entryDate: "desc" } },
       convertedFromKacha: { select: { id: true, slipNumber: true } },
@@ -463,8 +465,9 @@ export async function createInvoice(
     // rather than the active store, because a caller may name a different one
     // above — being a member of that store is not the same as being allowed
     // to bill in it.
+    let actor;
     try {
-      await requirePermissionInStore(PERMISSIONS.BILLING_CREATE, storeId);
+      actor = await requirePermissionInStore(PERMISSIONS.BILLING_CREATE, storeId);
     } catch {
       return {
         success: false,
@@ -538,6 +541,10 @@ export async function createInvoice(
           paidAmount,
           balanceAmount,
           notes,
+          // Recorded at the moment of sale, name included, so the invoice
+          // still says who raised it after that person leaves the shop.
+          createdById: actor.id ?? null,
+          createdByName: actor.name ?? actor.email ?? null,
           items: {
             create: items.map((item) => ({
               itemName: item.itemName,

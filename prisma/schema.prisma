@@ -471,9 +471,16 @@ model Invoice {
   paidAmount             Decimal       @default(0) @db.Decimal(12, 2)
   balanceAmount          Decimal       @default(0) @db.Decimal(12, 2)
   notes                  String?
+  // Who raised it. The id is the link; the name is a snapshot, because staff
+  // leave and get renamed and an invoice has to keep saying who sold it.
+  // Nullable: invoices raised before this was recorded genuinely have no
+  // answer, and inventing one would be worse than showing none.
+  createdById            String?
+  createdByName          String?
   createdAt              DateTime      @default(now())
   updatedAt              DateTime      @updatedAt
   store                  Store         @relation(fields: [storeId], references: [id])
+  createdBy              User?         @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
   customer               Customer      @relation(fields: [customerId], references: [id])
   items                  InvoiceItem[]
   ledgerEntries          LedgerEntry[]
@@ -483,6 +490,7 @@ model Invoice {
   location               StoreLocation? @relation(fields: [locationId], references: [id])
 
   @@unique([storeId, invoiceNumber])
+  @@index([createdById])
   @@index([customerId])
   @@index([invoiceDate])
   @@index([status])
@@ -964,6 +972,7 @@ model User {
   invitedUsers        User[]        @relation("UserInvites")
   locationAccess      UserLocationAccess[]
   scanSessions        ScanSession[]
+  invoicesCreated     Invoice[]     @relation("InvoiceCreatedBy")
 
   @@index([storeId])
 }

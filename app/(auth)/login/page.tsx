@@ -2,6 +2,8 @@
 
 "use client";
 
+import Link from "next/link";
+
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 
@@ -174,6 +176,19 @@ export default function LoginPage() {
           )}
 
         </div>
+
+        {/* The way in for a shop that has no account yet. Without this the
+            registration page exists but nothing points at it. */}
+        <p className="mt-6 border-t pt-5 text-center text-sm text-muted-foreground">
+          New here?{" "}
+          <Link
+            href="/register"
+            className="font-medium text-[var(--chart-2)] underline-offset-4 hover:underline"
+          >
+            Register your store
+          </Link>{" "}
+          and start a free trial.
+        </p>
       </div>
     </main>
   );

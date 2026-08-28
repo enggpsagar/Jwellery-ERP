@@ -297,6 +297,129 @@ export function dataBackupEmail(params: {
   };
 }
 
+const detailRow = (label: string, value: string) => `
+      <tr>
+        <td style="padding: 8px 0; font-size: 13px; color: #6b7280; width: 140px; border-bottom: 1px solid #f3f4f6;">${label}</td>
+        <td style="padding: 8px 0; font-size: 13px; color: #111827; font-weight: bold; border-bottom: 1px solid #f3f4f6;">${value}</td>
+      </tr>`;
+
+/** Sent to the owner the moment their shop is registered. */
+export function storeWelcomeEmail(params: {
+  ownerName: string;
+  storeName: string;
+  storeCode: string;
+  appName: string;
+  planLabel: string;
+  email: string;
+  phone: string;
+}) {
+  const { ownerName, storeName, storeCode, appName, planLabel, email, phone } =
+    params;
+
+  const body = `
+    <p style="margin-top: 0;">Hi ${ownerName},</p>
+    <p><strong>${storeName}</strong> is set up and ready to use.</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+      <tbody>
+        ${detailRow("Store", storeName)}
+        ${detailRow("Store code", storeCode)}
+        ${detailRow("Plan", planLabel)}
+        ${detailRow("Sign in with", email)}
+        ${detailRow("or mobile", phone)}
+      </tbody>
+    </table>
+
+    <p>There is no password to remember. Sign in with your Google account, or
+    ask for a one-time code sent to your email or mobile.</p>
+
+    <p style="margin-bottom: 0;">Your shop already has starter metals,
+    categories and a Main Counter location so you can add a product and bill
+    it straight away. Rename any of it under Settings.</p>
+  `;
+
+  const text = [
+    `Hi ${ownerName},`,
+    "",
+    `${storeName} is set up and ready to use.`,
+    "",
+    `Store: ${storeName}`,
+    `Store code: ${storeCode}`,
+    `Plan: ${planLabel}`,
+    `Sign in with: ${email}`,
+    `or mobile: ${phone}`,
+    "",
+    "There is no password. Sign in with Google, or ask for a one-time code.",
+  ].join("\n");
+
+  return {
+    subject: `${storeName} is ready on ${appName}`,
+    html: wrapEmail(storeName, "Welcome aboard", body),
+    text,
+  };
+}
+
+/** Sent to the platform operator when a shop signs itself up. */
+export function newStoreRegisteredEmail(params: {
+  storeName: string;
+  storeCode: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  city: string | null;
+  planLabel: string;
+  appName: string;
+}) {
+  const {
+    storeName,
+    storeCode,
+    ownerName,
+    email,
+    phone,
+    city,
+    planLabel,
+    appName,
+  } = params;
+
+  const body = `
+    <p style="margin-top: 0;">A new store just registered itself on ${appName}.</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+      <tbody>
+        ${detailRow("Store", storeName)}
+        ${detailRow("Store code", storeCode)}
+        ${detailRow("Owner", ownerName)}
+        ${detailRow("Email", email)}
+        ${detailRow("Mobile", phone)}
+        ${city ? detailRow("City", city) : ""}
+        ${detailRow("Plan", planLabel)}
+      </tbody>
+    </table>
+
+    <p style="margin-bottom: 0; font-size: 13px; color: #6b7280;">
+      The store starts on the trial plan and expires on its own. Change or
+      extend it from Stores.
+    </p>
+  `;
+
+  const text = [
+    `A new store just registered itself on ${appName}.`,
+    "",
+    `Store: ${storeName} (${storeCode})`,
+    `Owner: ${ownerName}`,
+    `Email: ${email}`,
+    `Mobile: ${phone}`,
+    ...(city ? [`City: ${city}`] : []),
+    `Plan: ${planLabel}`,
+  ].join("\n");
+
+  return {
+    subject: `New store registered: ${storeName}`,
+    html: wrapEmail(appName, "New store registration", body),
+    text,
+  };
+}
+
 export function inviteUserEmail(params: {
   name: string;
   roleLabel: string;

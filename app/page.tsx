@@ -265,15 +265,21 @@ export default async function LandingPage() {
             </div>
           </div>
 
-          <Button
-            asChild
-            className="bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
-          >
-            <Link href="/login">
-              <LogIn className="mr-1.5 size-4" />
-              Login
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" className="hidden sm:inline-flex">
+              <Link href="/register">Register your store</Link>
+            </Button>
+
+            <Button
+              asChild
+              className="bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
+            >
+              <Link href="/login">
+                <LogIn className="mr-1.5 size-4" />
+                Login
+              </Link>
+            </Button>
+          </div>
         </nav>
       </header>
 
@@ -324,7 +330,7 @@ export default async function LandingPage() {
               </Button>
 
               <Button asChild size="lg" variant="outline">
-                <Link href="#features">See what it does</Link>
+                <Link href="/register">Register your store — free trial</Link>
               </Button>
             </div>
 
@@ -482,20 +488,26 @@ export default async function LandingPage() {
             Ready when you are
           </h2>
           <p className="mt-3 text-muted-foreground">
-            Sign in with your Google account or your registered mobile number.
-            Your Store Owner creates the account — there is no public sign-up.
+            Register your shop and start a free trial, or sign in with your
+            Google account or registered mobile number.
           </p>
 
-          <Button
-            asChild
-            size="lg"
-            className="mt-8 bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
-          >
-            <Link href="/login">
-              <LogIn className="mr-1.5 size-4" />
-              Login
-            </Link>
-          </Button>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Button
+              asChild
+              size="lg"
+              className="bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
+            >
+              <Link href="/register">Register your store</Link>
+            </Button>
+
+            <Button asChild size="lg" variant="outline">
+              <Link href="/login">
+                <LogIn className="mr-1.5 size-4" />
+                Login
+              </Link>
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -510,6 +522,9 @@ export default async function LandingPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            <Link href="/register" className="hover:text-foreground">
+              Register
+            </Link>
             <Link href="/login" className="hover:text-foreground">
               Login
             </Link>

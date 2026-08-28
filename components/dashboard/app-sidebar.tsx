@@ -353,6 +353,25 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+
+                {/* The owner's own subscription. Not shown to a Super Admin,
+                    who reaches every store's ledger through Stores and has no
+                    single "my plan" of their own. */}
+                {role === "ADMIN" && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isNavItemActive(pathname, "/my-plan")}
+                      tooltip="Plan & Billing"
+                      className={ACTIVE_NAV_CLASS}
+                    >
+                      <Link href="/my-plan">
+                        <CreditCard className="h-4 w-4" />
+                        <span>Plan &amp; Billing</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

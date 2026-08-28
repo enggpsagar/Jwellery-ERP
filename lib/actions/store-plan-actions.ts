@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { derivePlanStatus } from "@/lib/plan-status";
 import type { PlanStatus } from "@/lib/plan-status";
 import { requireRole } from "@/lib/auth/auth";
+import { requireStoreScope } from "@/lib/store-context";
 
 export type StorePlanOverview = {
   storeId: string;
@@ -39,17 +40,45 @@ function daysBetween(from: Date, to: Date) {
 }
 
 /**
+ * The store owner's own view of their plan and payments.
+ *
+ * Same figures the Super Admin sees for this shop, minus anything about other
+ * shops: a shop should be able to check what it is paying for and when it
+ * renews without asking the platform. Scoped through `requireStoreScope`, so
+ * it can only ever return the store the caller is actually working in.
+ */
+export async function getOwnStorePlan(): Promise<{
+  overview: StorePlanOverview;
+  history: PlanHistoryRow[];
+} | null> {
+  // The owner, not every member of staff — this is billing information.
+  await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+
+  const storeId = await requireStoreScope();
+
+  const [overview, history] = await Promise.all([
+    loadStorePlanOverview(storeId),
+    loadStorePlanHistory(storeId),
+  ]);
+
+  if (!overview) return null;
+
+  return { overview, history };
+}
+
+/**
  * The at-a-glance summary behind the hover card.
  *
  * Assembled in one pass over the history rather than with several queries per
  * store: the stores list renders this for every row, and a per-row round trip
  * would multiply with the page size.
+ *
+ * Carries no authorization of its own — it is not exported, and every caller
+ * above decides who may see which store first.
  */
-export async function getStorePlanOverview(
+async function loadStorePlanOverview(
   storeId: string,
 ): Promise<StorePlanOverview | null> {
-  await requireRole(UserRole.SUPER_ADMIN);
-
   const store = await prisma.store.findUnique({
     where: { id: storeId },
     select: {
@@ -108,6 +137,14 @@ export async function getStorePlanOverview(
       0,
     ),
   };
+}
+
+/** One store's summary, for the Super Admin. */
+export async function getStorePlanOverview(
+  storeId: string,
+): Promise<StorePlanOverview | null> {
+  await requireRole(UserRole.SUPER_ADMIN);
+  return loadStorePlanOverview(storeId);
 }
 
 /** Overviews for many stores at once, for the list's hover cards. */
@@ -190,12 +227,10 @@ export type PlanHistoryRow = {
   isCurrent: boolean;
 };
 
-/** The full subscription ledger for one store, newest first. */
-export async function getStorePlanHistory(
+/** The ledger rows themselves; callers above authorise access to the store. */
+async function loadStorePlanHistory(
   storeId: string,
 ): Promise<PlanHistoryRow[]> {
-  await requireRole(UserRole.SUPER_ADMIN);
-
   const [rows, store] = await Promise.all([
     prisma.storePlanHistory.findMany({
       where: { storeId },
@@ -224,6 +259,14 @@ export async function getStorePlanHistory(
       index === 0 &&
       store?.planStartedAt?.getTime() === row.startedAt.getTime(),
   }));
+}
+
+/** The full subscription ledger for one store, newest first. */
+export async function getStorePlanHistory(
+  storeId: string,
+): Promise<PlanHistoryRow[]> {
+  await requireRole(UserRole.SUPER_ADMIN);
+  return loadStorePlanHistory(storeId);
 }
 
 /** Which channels this store's owner accepts renewal reminders on. */

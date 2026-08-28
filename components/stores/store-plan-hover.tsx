@@ -4,8 +4,11 @@ import Link from "next/link"
 import { ArrowUpRight, Bell, BellOff, Mail, MessageCircle } from "lucide-react"
 
 import type { StorePlanOverview } from "@/lib/actions/store-plan-actions"
-import type { PlanStatus } from "@/lib/plan-status"
-import { Badge } from "@/components/ui/badge"
+import {
+  PlanStatusPill,
+  formatDay,
+  formatMoney,
+} from "@/components/stores/plan-presentation"
 import {
   HoverCard,
   HoverCardContent,
@@ -19,47 +22,6 @@ import {
  * every action live on the store's own page, which this links to. The hover
  * is for answering "where does this shop stand?" without losing the list.
  */
-
-const STATUS_LABEL: Record<PlanStatus, string> = {
-  ACTIVE: "Active",
-  EXPIRING_SOON: "Expiring soon",
-  EXPIRED: "Expired",
-  NO_PLAN: "No plan",
-  ARCHIVED: "Archived",
-}
-
-const STATUS_CLASS: Record<PlanStatus, string> = {
-  ACTIVE: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  EXPIRING_SOON: "border-amber-200 bg-amber-50 text-amber-700",
-  EXPIRED: "border-red-200 bg-red-50 text-red-700",
-  NO_PLAN: "border-muted bg-muted text-muted-foreground",
-  ARCHIVED: "border-muted bg-muted text-muted-foreground",
-}
-
-export function PlanStatusPill({ status }: { status: PlanStatus }) {
-  return (
-    <Badge variant="outline" className={STATUS_CLASS[status]}>
-      {STATUS_LABEL[status]}
-    </Badge>
-  )
-}
-
-export function formatDay(value: Date | string | null | undefined) {
-  if (!value) return "—"
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })
-}
-
-export function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(value)
-}
 
 function Row({
   label,

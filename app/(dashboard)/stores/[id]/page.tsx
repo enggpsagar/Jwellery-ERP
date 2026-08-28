@@ -18,10 +18,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
+  PLAN_ACTION_LABEL,
   PlanStatusPill,
   formatDay,
   formatMoney,
-} from "@/components/stores/store-plan-hover"
+} from "@/components/stores/plan-presentation"
 import { StoreReminderChannels } from "@/components/stores/store-reminder-channels"
 
 /**
@@ -35,15 +36,6 @@ import { StoreReminderChannels } from "@/components/stores/store-reminder-channe
 
 type StoreDetailPageProps = {
   params: Promise<{ id: string }>
-}
-
-const ACTION_LABEL: Record<string, string> = {
-  REGISTERED: "Registered",
-  ASSIGNED: "Plan assigned",
-  RENEWED: "Renewed",
-  CHANGED: "Plan changed",
-  EXPIRED: "Expired",
-  CANCELLED: "Cancelled",
 }
 
 /** One labelled figure in the summary grid. */
@@ -234,7 +226,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                         </div>
                       </TableCell>
                       <TableCell>
-                        {ACTION_LABEL[row.action] ?? row.action}
+                        {PLAN_ACTION_LABEL[row.action] ?? row.action}
                       </TableCell>
                       <TableCell>{formatDay(row.startedAt)}</TableCell>
                       <TableCell>{formatDay(row.expiresAt)}</TableCell>

@@ -28,6 +28,14 @@ model Store {
   planExpiresAt      DateTime?
   planReminderSentAt DateTime?
 
+  /**
+   * When the owner was last told this store is archived. Every blocked
+   * sign-in would otherwise send another email, so ten retries would mean
+   * ten identical messages. Cleared on restore, so a store archived again
+   * later notifies again.
+   */
+  archiveNotifiedAt DateTime?
+
   users            User[]
   userMemberships  UserStoreMembership[]
   customers        Customer[]

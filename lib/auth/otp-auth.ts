@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma"
 import { OtpPurpose, type User } from "@prisma/client"
 import { hashOTP } from "@/lib/auth/otp"
-import { sendDisabledAccountEmailSafely } from "@/lib/invite-email"
+import {
+  sendDisabledAccountEmailSafely,
+  sendStoreArchivedNoticeSafely,
+} from "@/lib/invite-email"
 
 async function verifyAndConsumeOtp(
   where: { phone: string } | { email: string },
@@ -49,7 +52,13 @@ async function assertCanSignIn(
     })
 
     if (store && !store.isActive) {
-      throw new Error("This store has been archived. Contact your administrator.")
+      await sendStoreArchivedNoticeSafely({
+        storeId: user.storeId,
+        attemptedBy: user.email ?? user.phone ?? null,
+      })
+      throw new Error(
+        "This store has been archived. Your store owner has been notified.",
+      )
     }
 
     // planExpiresAt: null means no plan assigned yet (e.g. stores that

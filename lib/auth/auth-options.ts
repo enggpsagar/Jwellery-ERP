@@ -5,7 +5,10 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { adapter } from "@/lib/auth/prisma-adapter"
 import { verifyOtpLogin, verifyEmailOtpLogin } from "@/lib/auth/otp-auth"
 import { prisma } from "@/lib/prisma"
-import { sendDisabledAccountEmailSafely } from "@/lib/invite-email"
+import {
+  sendDisabledAccountEmailSafely,
+  sendStoreArchivedNoticeSafely,
+} from "@/lib/invite-email"
 import { UserRole } from "@prisma/client"
 
 const SUPER_ADMIN_EMAILS = (process.env.SUPER_ADMIN_EMAILS ?? "")
@@ -112,6 +115,12 @@ export const authOptions: NextAuthOptions = {
         })
 
         if (store && !store.isActive) {
+          // The store owner is told why someone was turned away; the person
+          // attempting is not, since staff can do nothing about it.
+          await sendStoreArchivedNoticeSafely({
+            storeId: dbUser.storeId,
+            attemptedBy: dbUser.email ?? null,
+          })
           return false
         }
 

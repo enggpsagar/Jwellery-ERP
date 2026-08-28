@@ -420,6 +420,63 @@ export function newStoreRegisteredEmail(params: {
   };
 }
 
+/**
+ * Sent to a store's owner when someone is turned away because the store has
+ * been archived.
+ *
+ * Addressed to the owner rather than whoever attempted the sign-in: staff
+ * cannot do anything about an archived store, and telling them why would
+ * leak the store's account status to anyone who guesses an email.
+ */
+export function storeArchivedEmail(params: {
+  ownerName: string;
+  storeName: string;
+  appName: string;
+  attemptedBy?: string | null;
+}) {
+  const { ownerName, storeName, appName, attemptedBy } = params;
+
+  const body = `
+    <p style="margin-top: 0;">Hi ${ownerName},</p>
+
+    <p><strong>${storeName}</strong> is currently <strong>archived</strong>, so
+    nobody at the store can sign in.</p>
+
+    ${
+      attemptedBy
+        ? `<p style="font-size: 13px; color: #6b7280;">Someone tried to sign in just now (${attemptedBy}) and was turned away.</p>`
+        : ""
+    }
+
+    <div style="padding: 14px 16px; background: #fffbeb; border-left: 3px solid #d97706; border-radius: 0 6px 6px 0;">
+      <p style="margin: 0; font-size: 13px; color: #78350f; line-height: 1.6;">
+        <strong>Your data has not been deleted.</strong> Everything stays exactly
+        as it was and returns the moment the store is restored.
+      </p>
+    </div>
+
+    <p style="margin-bottom: 0;">To have ${storeName} restored, please contact
+    the ${appName} team. Reply to this address and they will pick it up.</p>
+  `;
+
+  const text = [
+    `Hi ${ownerName},`,
+    "",
+    `${storeName} is currently archived, so nobody at the store can sign in.`,
+    ...(attemptedBy ? ["", `Someone tried to sign in just now (${attemptedBy}) and was turned away.`] : []),
+    "",
+    "Your data has not been deleted. Everything stays as it was and returns the moment the store is restored.",
+    "",
+    `To have ${storeName} restored, please contact the ${appName} team.`,
+  ].join("\n");
+
+  return {
+    subject: `${storeName} is archived — action needed`,
+    html: wrapEmail(storeName, "Your store is archived", body),
+    text,
+  };
+}
+
 export function inviteUserEmail(params: {
   name: string;
   roleLabel: string;

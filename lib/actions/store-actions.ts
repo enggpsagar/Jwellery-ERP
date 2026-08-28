@@ -366,7 +366,10 @@ export async function restoreStore(storeId: string): Promise<StoreFormState> {
 
     await prisma.store.update({
       where: { id: storeId },
-      data: { isActive: true },
+      // Clear the archive-notice stamp too, so if this store is ever
+      // archived again its owner is told again rather than being silently
+      // suppressed by a cooldown from months earlier.
+      data: { isActive: true, archiveNotifiedAt: null },
     });
 
     revalidatePath("/stores");

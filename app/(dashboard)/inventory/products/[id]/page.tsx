@@ -69,6 +69,15 @@ function formatCharge(
     : `₹${number.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
 }
 
+/**
+ * Three decimals to match the column, and a unit, because a bare number on a
+ * jewellery record is ambiguous between grams and carats.
+ */
+function formatWeight(value: unknown) {
+  if (value === null || value === undefined || value === "") return null
+  return `${Number(value).toFixed(3)} g`
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-IN", {
     day: "2-digit",
@@ -176,6 +185,21 @@ export default async function ProductDetailsPage({ params, searchParams }: Props
               ? "Percentage"
               : "Fixed"
           }
+        />
+      </Section>
+
+      <Section title="Weights">
+        <Field
+          label="Gross Weight"
+          value={formatWeight(product.defaultGrossWeight)}
+        />
+        <Field
+          label="Stone Weight"
+          value={formatWeight(product.defaultStoneWeight)}
+        />
+        <Field
+          label="Net Weight"
+          value={formatWeight(product.defaultNetWeight)}
         />
       </Section>
 

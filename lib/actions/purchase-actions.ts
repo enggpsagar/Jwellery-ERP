@@ -16,6 +16,8 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/auth/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope } from "@/lib/store-context";
 import {
   getLocationScope,
@@ -280,6 +282,15 @@ export async function exportPurchasesToExcel(
   params: DataTableExportParams = {},
 ): Promise<DataTableExportResult> {
   try {
+    // Authorization lives here, not only in middleware: a server action is a
+    // POST endpoint that can be invoked from any page the caller is allowed
+    // to load, so the route guard never sees it.
+    try {
+      await requirePermission(PERMISSIONS.PURCHASE_VIEW);
+    } catch {
+      return { success: false, message: "You do not have permission to export purchases." };
+    }
+
     const storeId = await requireStoreScope();
     const scope = await getLocationScope();
     const sortBy = toPurchaseSortBy(params.sortBy);
@@ -409,6 +420,15 @@ export async function createPurchase(
   formData: FormData,
 ): Promise<PurchaseFormState> {
   try {
+    // Authorization lives here, not only in middleware: a server action is a
+    // POST endpoint that can be invoked from any page the caller is allowed
+    // to load, so the route guard never sees it.
+    try {
+      await requirePermission(PERMISSIONS.PURCHASE_CREATE);
+    } catch {
+      return { success: false, message: "You do not have permission to create purchases." };
+    }
+
     const vendorId = String(formData.get("vendorId") || "");
     const locationId = String(formData.get("locationId") || "").trim() || null;
     const itemsRaw = String(formData.get("itemsJson") || "[]");
@@ -635,6 +655,15 @@ export async function recordPurchasePayment(
   formData: FormData,
 ): Promise<PurchaseFormState> {
   try {
+    // Authorization lives here, not only in middleware: a server action is a
+    // POST endpoint that can be invoked from any page the caller is allowed
+    // to load, so the route guard never sees it.
+    try {
+      await requirePermission(PERMISSIONS.PURCHASE_UPDATE);
+    } catch {
+      return { success: false, message: "You do not have permission to record purchase payments." };
+    }
+
     const paymentsRaw = String(formData.get("paymentsJson") || "[]");
     const notes = String(formData.get("notes") || "").trim() || null;
 
@@ -701,6 +730,15 @@ export async function recordPurchasePayment(
  */
 export async function deletePurchase(id: string): Promise<PurchaseFormState> {
   try {
+    // Authorization lives here, not only in middleware: a server action is a
+    // POST endpoint that can be invoked from any page the caller is allowed
+    // to load, so the route guard never sees it.
+    try {
+      await requirePermission(PERMISSIONS.PURCHASE_DELETE);
+    } catch {
+      return { success: false, message: "You do not have permission to delete purchases." };
+    }
+
     const storeId = await requireStoreScope();
 
     const purchase = await prisma.purchase.findFirst({

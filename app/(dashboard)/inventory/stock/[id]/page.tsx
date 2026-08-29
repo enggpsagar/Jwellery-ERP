@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { Pencil } from "lucide-react"
+import { Pencil, ScanLine } from "lucide-react"
 import QRCode from "qrcode"
 
 import { getInventoryStockById } from "@/lib/actions/inventory/stock-actions"
@@ -38,9 +38,11 @@ export default async function InventoryStockDetailsPage({
   }
 
   const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
-  const qrDataUrl = await QRCode.toDataURL(
-    `${baseUrl}/inventory/stock/${stock.id}`
-  )
+  // Points at the scan entry point, not at this page and not straight at the
+  // sale screen: /s resolves who is scanning and which shop the piece belongs
+  // to, then hands over to the sale with that context already applied. Short
+  // payload too, which matters on a tag printed small.
+  const qrDataUrl = await QRCode.toDataURL(`${baseUrl}/s/${stock.id}`)
 
   return (
     <main className="space-y-6 p-6">
@@ -63,6 +65,15 @@ export default async function InventoryStockDetailsPage({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Tags printed before the QR pointed at the quick sale still land
+                here, so the sale has to be one tap away from this page too. */}
+            <Link href={`/s/${stock.id}`}>
+              <Button type="button" variant="outline" className="gap-2">
+                <ScanLine className="h-4 w-4" />
+                Sell this piece
+              </Button>
+            </Link>
+
             <Link href={`/inventory/stock/${stock.id}/edit`}>
               <Button type="button" className="gap-2">
                 <Pencil className="h-4 w-4" />
@@ -134,6 +145,7 @@ export default async function InventoryStockDetailsPage({
         <StockQrCard
           dataUrl={qrDataUrl}
           stockCode={stock.stockCode}
+          productCode={stock.product?.productCode ?? null}
           productName={stock.product?.name ?? "-"}
           tagNumber={stock.tagNumber || null}
           metalName={stock.metalType?.name ?? null}

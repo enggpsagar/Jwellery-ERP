@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 const initialState: StockActionState = { success: false, message: "" }
 
@@ -468,7 +469,7 @@ export function ReceiveItemsForm({
                     </div>
 
                     <div className="space-y-1">
-                      <Label className="text-xs">Net Weight (g) *</Label>
+                      <Label className="text-xs">Net Weight (g) <RequiredMark /></Label>
                       <Input
                         type="number"
                         step="0.001"

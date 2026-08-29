@@ -5,6 +5,7 @@ import {
   type SortOrder,
 } from "@/lib/actions/store-actions";
 import { getPlans } from "@/lib/actions/plan-actions";
+import { getStorePlanOverviews } from "@/lib/actions/store-plan-actions";
 import { StoresClient } from "@/components/stores/stores-client";
 
 type StoresPageProps = {
@@ -34,12 +35,18 @@ export default async function StoresPage({ searchParams }: StoresPageProps) {
     getPlans({ activeOnly: true }),
   ]);
 
+  // Fetched for this page of rows only, in one query rather than per row —
+  // the hover card needs it ready before the pointer arrives, so it cannot
+  // be loaded on demand without a visible stall.
+  const planOverviews = await getStorePlanOverviews(stores.map((s) => s.id));
+
   return (
     <StoresClient
       stores={stores}
       pagination={pagination}
       goldSummary={goldSummary}
       plans={plans}
+      planOverviews={planOverviews}
     />
   );
 }

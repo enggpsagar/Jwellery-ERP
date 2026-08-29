@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -36,6 +36,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -179,15 +180,40 @@ const ACTIVE_NAV_CLASS = [
   "text-white/70 hover:text-white hover:bg-card/5",
 ].join(" ");
 
-function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string }) {
+/**
+ * Which section is expanded.
+ *
+ * `undefined` means no one has chosen yet, so the route decides; a title
+ * means that section is open; `null` means the user collapsed everything.
+ */
+type OpenMenu = string | null | undefined;
+
+function SidebarNavItem({
+  item,
+  pathname,
+  openMenu,
+  setOpenMenu,
+}: {
+  item: NavItem;
+  pathname: string;
+  openMenu: OpenMenu;
+  setOpenMenu: (next: OpenMenu) => void;
+}) {
   const Icon = item.icon;
   const isActive = isNavItemActive(pathname, item.href);
   const hasSubItems = "items" in item && item.items;
   const isSubItemActive =
     hasSubItems && item.items!.some((subItem) => pathname === subItem.href);
 
-  const [manuallyOpened, setManuallyOpened] = useState(false);
-  const open = isSubItemActive || manuallyOpened;
+  // What the route alone would open. `isActive` as well as `isSubItemActive`,
+  // because landing on a section's own page (/inventory) matches no sub-item
+  // and would otherwise leave the section you just opened shut.
+  const routeOpen = Boolean(isActive || isSubItemActive);
+
+  // The open section is held by the sidebar, not by each item, which is what
+  // makes this an accordion: only one title can match at a time, so opening
+  // one closes whichever was open.
+  const open = openMenu === undefined ? routeOpen : openMenu === item.title;
 
   if (!hasSubItems) {
     return (
@@ -209,23 +235,38 @@ function SidebarNavItem({ item, pathname }: { item: NavItem; pathname: string })
 
   return (
     <SidebarMenuItem>
+      {/* Navigating to the section opens it; it never closes it, so landing
+          on a sub-page doesn't fight the chevron. */}
       <SidebarMenuButton
         asChild
         isActive={isActive}
         tooltip={item.title}
-        onClick={() => setManuallyOpened(true)}
+        onClick={() => setOpenMenu(item.title)}
         className={ACTIVE_NAV_CLASS}
       >
         <Link href={item.href}>
           <Icon className="h-4 w-4" />
           <span>{item.title}</span>
-          <ChevronRight
-            className={`ml-auto h-4 w-4 shrink-0 transition-transform ${
-              open ? "rotate-90" : ""
-            }`}
-          />
         </Link>
       </SidebarMenuButton>
+
+      {/* A real button beside the link rather than inside it: the chevron
+          expands and collapses, and must not navigate. Nesting it in the
+          <Link> would also be invalid HTML. */}
+      <SidebarMenuAction
+        // Closing sets null rather than undefined: undefined would fall back
+        // to the route and immediately re-open the section you are inside.
+        onClick={() => setOpenMenu(open ? null : item.title)}
+        aria-expanded={open}
+        aria-label={`${open ? "Collapse" : "Expand"} ${item.title}`}
+        className="text-white/70 hover:bg-card/10 hover:text-white"
+      >
+        <ChevronRight
+          className={`h-4 w-4 shrink-0 transition-transform ${
+            open ? "rotate-90" : ""
+          }`}
+        />
+      </SidebarMenuAction>
 
       {open && (
         <SidebarMenuSub>
@@ -258,6 +299,15 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
   const { data: session } = useSession();
   const role = session?.user?.role;
   const navItems = getNavForRole(role, session?.user?.permissions);
+
+  const [openMenu, setOpenMenu] = useState<OpenMenu>(undefined);
+
+  // Hand control back to the route on every navigation, so the section you
+  // land in opens and the rest close. Without this, a section expanded by
+  // hand would stay expanded while you worked somewhere else entirely.
+  useEffect(() => {
+    setOpenMenu(undefined);
+  }, [pathname]);
   const showSettings = role !== "STAFF" && role !== "KARIGAR" && role !== "MANAGER";
   const userName = session?.user?.name ?? "User";
   const userInitials = initialsOf(userName);
@@ -304,7 +354,13 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => (
-                <SidebarNavItem key={item.title} item={item} pathname={pathname} />
+                <SidebarNavItem
+                  key={item.title}
+                  item={item}
+                  pathname={pathname}
+                  openMenu={openMenu}
+                  setOpenMenu={setOpenMenu}
+                />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -331,6 +387,25 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+
+                {/* The owner's own subscription. Not shown to a Super Admin,
+                    who reaches every store's ledger through Stores and has no
+                    single "my plan" of their own. */}
+                {role === "ADMIN" && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isNavItemActive(pathname, "/my-plan")}
+                      tooltip="Plan & Billing"
+                      className={ACTIVE_NAV_CLASS}
+                    >
+                      <Link href="/my-plan">
+                        <CreditCard className="h-4 w-4" />
+                        <span>Plan &amp; Billing</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

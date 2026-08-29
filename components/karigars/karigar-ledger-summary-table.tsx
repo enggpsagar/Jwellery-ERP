@@ -2,6 +2,7 @@
 import Link from "next/link"
 
 import type { KarigarLedgerSummaryRow } from "@/lib/actions/ledger-actions"
+import { RecordHoverCard } from "@/components/shared/record-hover-card"
 
 import {
   Table,
@@ -12,6 +13,18 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+/** Money as it reads on a jewellery ledger. */
+function inr(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") return null
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return null
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
 
 type KarigarLedgerSummaryTableProps = {
   rows: KarigarLedgerSummaryRow[]
@@ -94,9 +107,34 @@ export function KarigarLedgerSummaryTable({ rows, totals }: KarigarLedgerSummary
               rows.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell>
-                    <Link href={`/karigars/${row.id}`} className="font-medium hover:underline">
-                      {row.name}
-                    </Link>
+                    <RecordHoverCard
+                      label={row.name}
+                      href={`/karigars/${row.id}`}
+                      title={row.name}
+                      subtitle={row.code ?? undefined}
+                      footerLabel="View karigar"
+                      sections={[
+                        {
+                          fields: [
+                            { label: "Opening gold", value: `${row.openingGold.toFixed(3)} g` },
+                            { label: "Gold issued", value: `${row.goldIssued.toFixed(3)} g` },
+                            { label: "Gold used", value: `${row.goldUsed.toFixed(3)} g` },
+                            {
+                              label: "Gold outstanding",
+                              value: `${row.outstandingGold.toFixed(3)} g`,
+                            },
+                          ],
+                        },
+                        {
+                          fields: [
+                            { label: "Items delivered", value: row.itemsDelivered },
+                            { label: "Earned", value: inr(row.totalEarned) },
+                            { label: "Paid", value: inr(row.totalPaid) },
+                            { label: "Cash outstanding", value: inr(row.outstandingCash) },
+                          ],
+                        },
+                      ]}
+                    />
                     {row.code ? (
                       <span className="ml-1 text-xs text-muted-foreground">({row.code})</span>
                     ) : null}

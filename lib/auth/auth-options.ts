@@ -5,7 +5,10 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { adapter } from "@/lib/auth/prisma-adapter"
 import { verifyOtpLogin, verifyEmailOtpLogin } from "@/lib/auth/otp-auth"
 import { prisma } from "@/lib/prisma"
-import { sendDisabledAccountEmailSafely } from "@/lib/invite-email"
+import {
+  sendDisabledAccountEmailSafely,
+  sendStoreArchivedNoticeSafely,
+} from "@/lib/invite-email"
 import { UserRole } from "@prisma/client"
 
 const SUPER_ADMIN_EMAILS = (process.env.SUPER_ADMIN_EMAILS ?? "")
@@ -102,7 +105,7 @@ export const authOptions: NextAuthOptions = {
           role: dbUser.role ?? UserRole.STAFF,
           storeId: dbUser.storeId,
         })
-        return false
+        return "/login?error=account_disabled"
       }
 
       if (dbUser.storeId) {
@@ -112,13 +115,19 @@ export const authOptions: NextAuthOptions = {
         })
 
         if (store && !store.isActive) {
-          return false
+          // The store owner is told why someone was turned away; the person
+          // attempting is not, since staff can do nothing about it.
+          await sendStoreArchivedNoticeSafely({
+            storeId: dbUser.storeId,
+            attemptedBy: dbUser.email ?? null,
+          })
+          return "/login?error=store_archived"
         }
 
         // planExpiresAt: null means no plan assigned yet (e.g. stores that
         // predate this feature) — treated as unrestricted, not a lockout.
         if (store?.planExpiresAt && store.planExpiresAt < new Date()) {
-          return false
+          return "/login?error=plan_expired"
         }
       }
 

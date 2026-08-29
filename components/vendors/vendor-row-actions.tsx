@@ -1,15 +1,15 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Archive, Loader2, Trash2 } from "lucide-react"
+import { Archive, Loader2, Pencil, Trash2 } from "lucide-react"
 
 import type { Vendor } from "@/lib/actions/vendor-actions"
 import {
   archiveVendor,
   deleteVendor,
 } from "@/lib/actions/vendor-actions"
-import { EditVendorDialog } from "@/components/vendors/edit-vendor-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -87,7 +87,15 @@ export function VendorRowActions({
     <>
       <div className="flex items-center justify-end gap-2">
         {/* This will now show only the pencil icon trigger */}
-        <EditVendorDialog vendor={vendor} states={states} />
+        {/* A page, not a dialog — same reasoning as customers. */}
+        <Link
+          href={`/vendors/${vendor.id}/edit?returnTo=${encodeURIComponent("/vendors")}`}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-accent"
+          aria-label={`Edit ${vendor.name}`}
+          title="Edit vendor"
+        >
+          <Pencil className="h-4 w-4" />
+        </Link>
 
         <button
           type="button"

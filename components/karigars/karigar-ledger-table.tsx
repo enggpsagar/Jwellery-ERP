@@ -1,4 +1,5 @@
 import type { KarigarLedgerRow } from "@/lib/actions/ledger-actions"
+import { RecordHoverCard } from "@/components/shared/record-hover-card"
 
 import {
   Table,
@@ -10,6 +11,18 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+/** Money as it reads on a jewellery ledger. */
+function inr(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") return null
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return null
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
 
 type KarigarLedgerTableProps = {
   rows: KarigarLedgerRow[]
@@ -79,7 +92,42 @@ export function KarigarLedgerTable({
                 const isDebit = row.type === "DEBIT"
                 return (
                   <TableRow key={row.id}>
-                    <TableCell>{row.date}</TableCell>
+                    <TableCell>
+                      <RecordHoverCard
+                        label={row.date}
+                        title={row.sourceLabel}
+                        subtitle={row.date}
+                        sections={[
+                          {
+                            fields: [
+                              { label: "Type", value: row.type },
+                              { label: "Description", value: row.description },
+                            ],
+                          },
+                          {
+                            fields: [
+                              {
+                                label: "Fine gold",
+                                value:
+                                  row.metalWeightFine !== null
+                                    ? `${row.metalWeightFine.toFixed(3)} g`
+                                    : null,
+                              },
+                              { label: "Amount", value: inr(row.amount) },
+                            ],
+                          },
+                          {
+                            fields: [
+                              {
+                                label: "Gold balance",
+                                value: `${row.runningFineGoldBalance.toFixed(3)} g`,
+                              },
+                              { label: "Cash balance", value: inr(row.runningCashBalance) },
+                            ],
+                          },
+                        ]}
+                      />
+                    </TableCell>
                     <TableCell>
                       <Badge variant={isDebit ? "destructive" : "secondary"}>
                         {row.type}

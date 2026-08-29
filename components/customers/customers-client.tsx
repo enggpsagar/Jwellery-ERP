@@ -1,7 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { AddCustomerDialog } from "@/components/customers/add-customer-dialog"
+import Link from "next/link"
+
+import { Button } from "@/components/ui/button"
 import { CustomersTable } from "@/components/customers/customers-table"
 import { CustomersToolbar } from "@/components/customers/customers-toolbar"
 import type { Customer } from "@/lib/actions/customer-actions"
@@ -45,7 +47,11 @@ export function CustomersClient({
           </p>
         </div>
 
-        <AddCustomerDialog states={states} />
+        {/* A page, not a dialog — same as Vendors. The form is long enough
+            that a modal fights the on-screen keyboard on a phone. */}
+        <Link href="/customers/new">
+          <Button>Add Customer</Button>
+        </Link>
       </div>
 
       <CustomersToolbar selectedCustomerIds={selectedCustomerIds} />

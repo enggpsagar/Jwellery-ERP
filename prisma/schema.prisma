@@ -28,8 +28,29 @@ model Store {
   planExpiresAt      DateTime?
   planReminderSentAt DateTime?
 
+  /**
+   * When the owner was last told this store is archived. Every blocked
+   * sign-in would otherwise send another email, so ten retries would mean
+   * ten identical messages. Cleared on restore, so a store archived again
+   * later notifies again.
+   */
+  archiveNotifiedAt DateTime?
+
+  /**
+   * Which channels this store's owner accepts renewal reminders on.
+   *
+   * Email is wired up (app/api/cron/plan-reminders). WhatsApp is a stored
+   * preference only — there is no WhatsApp sender in this codebase yet, so
+   * the flag records intent and the UI says so rather than implying reminders
+   * are going out on a channel nothing delivers to.
+   */
+  reminderEmailEnabled    Boolean @default(true)
+  reminderWhatsappEnabled Boolean @default(false)
+
   users            User[]
   userMemberships  UserStoreMembership[]
+  planHistory      StorePlanHistory[]
+  scanSessions     ScanSession[]
   customers        Customer[]
   karigars         Karigar[]
   products         Product[]
@@ -62,7 +83,49 @@ model Plan {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  stores Store[]
+  stores  Store[]
+  history StorePlanHistory[]
+}
+
+/** How a plan period began. */
+enum StorePlanAction {
+  REGISTERED
+  ASSIGNED
+  RENEWED
+}
+
+/**
+ * One row per plan period a store has held — the subscription ledger.
+ *
+ * Needed because Store.planStartedAt/planExpiresAt are overwritten on every
+ * assignment: without this table a renewal destroys the record of the period
+ * it replaced, so "last renewal" and "history" cannot be answered at all.
+ *
+ * planName, price and durationDays are snapshots rather than reads through
+ * the relation. A plan can be renamed, repriced or deactivated, and history
+ * has to keep saying what was actually sold at the time.
+ */
+model StorePlanHistory {
+  id           String          @id @default(cuid())
+  storeId      String
+  planId       String?
+  planName     String
+  price        Decimal         @default(0) @db.Decimal(12, 2)
+  durationDays Int
+  startedAt    DateTime
+  expiresAt    DateTime
+  action       StorePlanAction @default(ASSIGNED)
+  /** Which Super Admin made the change; null for self-registration. */
+  actorId      String?
+  actorName    String?
+  note         String?
+  createdAt    DateTime        @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  plan  Plan? @relation(fields: [planId], references: [id])
+
+  @@index([storeId])
+  @@index([startedAt])
 }
 
 model StoreLocation {
@@ -278,6 +341,13 @@ model Product {
   defaultMakingChargeType ChargeType       @default(FIXED)
   defaultStoneCharge  Decimal?             @db.Decimal(12, 2)
   defaultStoneChargeType  ChargeType       @default(FIXED)
+  // Typical weights for this design, used to prefill a stock entry rather
+  // than to describe any one piece — two rings off the same design are never
+  // identical to the milligram, so the per-piece truth stays on
+  // InventoryStock. Same Decimal(10, 3) as the columns they seed.
+  defaultGrossWeight  Decimal?             @db.Decimal(10, 3)
+  defaultNetWeight    Decimal?             @db.Decimal(10, 3)
+  defaultStoneWeight  Decimal?             @db.Decimal(10, 3)
   designCode          String?
   hsnCode             String?
   description         String?
@@ -401,9 +471,16 @@ model Invoice {
   paidAmount             Decimal       @default(0) @db.Decimal(12, 2)
   balanceAmount          Decimal       @default(0) @db.Decimal(12, 2)
   notes                  String?
+  // Who raised it. The id is the link; the name is a snapshot, because staff
+  // leave and get renamed and an invoice has to keep saying who sold it.
+  // Nullable: invoices raised before this was recorded genuinely have no
+  // answer, and inventing one would be worse than showing none.
+  createdById            String?
+  createdByName          String?
   createdAt              DateTime      @default(now())
   updatedAt              DateTime      @updatedAt
   store                  Store         @relation(fields: [storeId], references: [id])
+  createdBy              User?         @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
   customer               Customer      @relation(fields: [customerId], references: [id])
   items                  InvoiceItem[]
   ledgerEntries          LedgerEntry[]
@@ -413,6 +490,7 @@ model Invoice {
   location               StoreLocation? @relation(fields: [locationId], references: [id])
 
   @@unique([storeId, invoiceNumber])
+  @@index([createdById])
   @@index([customerId])
   @@index([invoiceDate])
   @@index([status])
@@ -893,6 +971,8 @@ model User {
   invitedBy           User?         @relation("UserInvites", fields: [invitedById], references: [id])
   invitedUsers        User[]        @relation("UserInvites")
   locationAccess      UserLocationAccess[]
+  scanSessions        ScanSession[]
+  invoicesCreated     Invoice[]     @relation("InvoiceCreatedBy")
 
   @@index([storeId])
 }
@@ -1085,4 +1165,40 @@ enum OtpPurpose {
   PHONE_VERIFY
   PROFILE_PHONE_CHANGE
   PROFILE_EMAIL_CHANGE
+}
+
+/**
+ * A counter-side scanning session.
+ *
+ * Opened from the billing screen on a laptop so that tags scanned with a
+ * phone land on that invoice. It exists in the database rather than in
+ * memory because the two devices talk through separate serverless requests
+ * and share nothing else.
+ */
+model ScanSession {
+  id        String            @id @default(cuid())
+  storeId   String
+  userId    String
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  // Sessions are abandoned far more often than they are closed — a browser
+  // tab just goes away. An expiry means an old one cannot silently swallow
+  // a scan days later.
+  expiresAt DateTime
+  store     Store             @relation(fields: [storeId], references: [id])
+  user      User              @relation(fields: [userId], references: [id])
+  items     ScanSessionItem[]
+
+  @@index([userId, isActive])
+  @@index([storeId])
+}
+
+model ScanSessionItem {
+  id        String      @id @default(cuid())
+  sessionId String
+  stockId   String
+  createdAt DateTime    @default(now())
+  session   ScanSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
 }

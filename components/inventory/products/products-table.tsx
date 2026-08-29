@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
+
+import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { Eye, Pencil } from "lucide-react"
 
 import { DeleteProductButton } from "@/components/inventory/products/delete-product-button"
@@ -15,6 +17,9 @@ type ProductRow = {
   ornamentType: string | null
   metalType: string
   defaultPurity: string | null
+  defaultNetWeight: number | null
+  defaultGrossWeight: number | null
+  defaultStoneWeight: number | null
   isActive: boolean
   createdAt: Date | string
 }
@@ -110,6 +115,7 @@ export function ProductsTable({
               <th className="px-4 py-3 text-left font-medium">Type</th>
               <th className="px-4 py-3 text-left font-medium">Metal</th>
               <th className="px-4 py-3 text-left font-medium">Purity</th>
+              <th className="px-4 py-3 text-right font-medium">Net Wt (g)</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <th className="px-4 py-3 text-left font-medium">Actions</th>
             </tr>
@@ -131,15 +137,59 @@ export function ProductsTable({
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <Link href={`/inventory/products/${product.id}`} className="hover:underline">
-                      {product.productCode}
-                    </Link>
+                    <RecordHoverCard
+                      label={product.productCode}
+                      href={`/inventory/products/${product.id}`}
+                      title={product.name}
+                      subtitle={product.productCode}
+                      footerLabel="View product"
+                      sections={[
+                        {
+                          fields: [
+                            { label: "Category", value: product.category },
+                            { label: "Type", value: product.ornamentType },
+                            { label: "Metal", value: product.metalType },
+                            { label: "Purity", value: product.defaultPurity },
+                          ],
+                        },
+                        {
+                          fields: [
+                            {
+                              label: "Gross weight",
+                              value:
+                                product.defaultGrossWeight != null
+                                  ? `${product.defaultGrossWeight.toFixed(3)} g`
+                                  : null,
+                            },
+                            {
+                              label: "Net weight",
+                              value:
+                                product.defaultNetWeight != null
+                                  ? `${product.defaultNetWeight.toFixed(3)} g`
+                                  : null,
+                            },
+                            {
+                              label: "Stone weight",
+                              value:
+                                product.defaultStoneWeight != null
+                                  ? `${product.defaultStoneWeight.toFixed(3)} g`
+                                  : null,
+                            },
+                          ],
+                        },
+                      ]}
+                    />
                   </td>
                   <td className="px-4 py-3 font-medium">{product.name}</td>
                   <td className="px-4 py-3">{product.category}</td>
                   <td className="px-4 py-3">{product.ornamentType ?? "-"}</td>
                   <td className="px-4 py-3">{product.metalType}</td>
                   <td className="px-4 py-3">{product.defaultPurity ?? "-"}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {product.defaultNetWeight != null
+                      ? product.defaultNetWeight.toFixed(3)
+                      : "-"}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${

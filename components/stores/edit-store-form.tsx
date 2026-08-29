@@ -8,6 +8,7 @@ import { updateStore, type StoreFormState, type StoreDetail } from "@/lib/action
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 const initialState: StoreFormState = { success: false, message: "", errors: {} }
 
@@ -46,7 +47,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <StoreIcon className="h-4 w-4 text-muted-foreground" />
-              Store Name <span className="text-red-500">*</span>
+              Store Name <RequiredMark />
             </label>
             <input
               name="name"
@@ -62,7 +63,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
-              Store Code <span className="text-red-500">*</span>
+              Store Code <RequiredMark />
             </label>
             <input
               name="code"
@@ -126,7 +127,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
-              Phone <span className="text-red-500">*</span>
+              Phone <RequiredMark />
             </label>
             <input
               name="phone"
@@ -143,7 +144,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Mail className="h-4 w-4 text-muted-foreground" />
-              Email <span className="text-red-500">*</span>
+              Email <RequiredMark />
             </label>
             <input
               name="email"

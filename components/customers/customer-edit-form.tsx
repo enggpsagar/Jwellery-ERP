@@ -1,82 +1,82 @@
 "use client"
 
-import * as React from "react"
-import { useActionState, useEffect, useMemo, useRef, useState } from "react"
+import { useActionState, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { addCustomer, type CustomerFormState } from "@/lib/actions/customer-actions"
+import { User, Phone, Mail, MapPin, Hash, IndianRupee } from "lucide-react"
+
+import {
+  updateCustomer,
+  type Customer,
+  type CustomerFormState,
+} from "@/lib/actions/customer-actions"
 import { getCitiesByStateId } from "@/lib/actions/location-actions"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
-import { User, Phone, Mail, MapPin, Hash, IndianRupee, Plus } from "lucide-react"
+import { RequiredMark } from "@/components/shared/required-mark"
 
-type StateItem = {
-  id: string
-  name: string
+type StateItem = { id: string; name: string }
+type CityItem = { id: string; name: string }
+
+const initialState: CustomerFormState = { success: false, message: "", errors: {} }
+
+const FIELD = "w-full rounded-md border bg-background px-3 py-2 text-sm"
+
+function FieldError({ errors }: { errors?: string[] }) {
+  if (!errors?.length) return null
+  return <p className="text-sm text-destructive">{errors[0]}</p>
 }
 
-type CityItem = {
-  id: string
-  name: string
-}
-
-const initialState: CustomerFormState = {
-  success: false,
-  message: "",
-  errors: {},
-}
-
-type AddCustomerDialogProps = {
+/**
+ * Full-page customer edit form, replacing the dialog this used to be.
+ *
+ * Every field the record holds is present. That matters more here than on a
+ * create form: `updateCustomer` writes what the form submits, so a field
+ * left out of the markup is a field silently blanked on save.
+ */
+export function CustomerEditForm({
+  customer,
+  states,
+  returnTo,
+}: {
+  customer: Customer
   states: StateItem[]
-}
-
-export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
+  returnTo?: string
+}) {
   const router = useRouter()
   const toast = useToast()
 
-  const formRef = useRef<HTMLFormElement>(null)
+  const stateNameMap = useMemo(
+    () => new Map(states.map((item) => [item.id, item.name])),
+    [states],
+  )
 
-  const [open, setOpen] = useState(false)
-  const [selectedStateId, setSelectedStateId] = useState("")
+  // The record stores the state's name; the picker works in ids.
+  const initialStateId = useMemo(() => {
+    const match = states.find(
+      (item) => item.name.toLowerCase() === (customer.state ?? "").toLowerCase(),
+    )
+    return match?.id ?? ""
+  }, [states, customer.state])
+
+  const [selectedStateId, setSelectedStateId] = useState(initialStateId)
   const [cities, setCities] = useState<CityItem[]>([])
   const [loadingCities, setLoadingCities] = useState(false)
 
-  const [state, formAction, pending] = useActionState(addCustomer, initialState)
-
-  const stateNameMap = useMemo(() => {
-    return new Map(states.map((item) => [item.id, item.name]))
-  }, [states])
-
-  const resetDialogState = React.useCallback(() => {
-    formRef.current?.reset()
-    setSelectedStateId("")
-    setCities([])
-  }, [])
-
-  useEffect(() => {
-    if (!open) {
-      resetDialogState()
-    }
-  }, [open, resetDialogState])
+  const action = updateCustomer.bind(null, customer.id)
+  const [state, formAction, pending] = useActionState(action, initialState)
 
   useEffect(() => {
     if (state.success) {
-      toast.success(state.message || "Customer added successfully")
-      setOpen(false)
-      resetDialogState()
+      toast.success(state.message || "Customer updated")
+      router.push(returnTo ?? `/customers/${customer.id}`)
       router.refresh()
       return
     }
 
-    if (!state.success && state.message) {
-      toast.error(state.message)
-    }
-  }, [state, router, toast, resetDialogState])
+    if (!state.success && state.message) toast.error(state.message)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state])
 
   useEffect(() => {
     let cancelled = false
@@ -87,80 +87,52 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
         return
       }
 
+      setLoadingCities(true)
       try {
-        setLoadingCities(true)
-        const data = await getCitiesByStateId(selectedStateId)
-
-        if (!cancelled) {
-          setCities(data || [])
-        }
-      } catch (err) {
-        console.error("Failed to load cities:", err)
-        if (!cancelled) {
-          setCities([])
-        }
+        const result = await getCitiesByStateId(selectedStateId)
+        if (!cancelled) setCities(result)
       } finally {
-        if (!cancelled) {
-          setLoadingCities(false)
-        }
+        if (!cancelled) setLoadingCities(false)
       }
     }
 
     loadCities()
-
     return () => {
       cancelled = true
     }
   }, [selectedStateId])
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Button type="button" className="gap-2" onClick={() => setOpen(true)}>
-        <Plus className="h-4 w-4" />
-        Add Customer
-      </Button>
-
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Add Customer</DialogTitle>
-        </DialogHeader>
-
-        <form
-          ref={formRef}
-          action={formAction}
-          className="grid grid-cols-1 gap-4 md:grid-cols-2"
-        >
+    <Card>
+      <CardContent className="p-6">
+        <form action={formAction} className="grid gap-5 md:grid-cols-2">
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4 text-muted-foreground" />
-              Customer Name <span className="text-red-500">*</span>
+              Name <RequiredMark />
             </label>
             <input
               name="name"
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              placeholder="Enter customer name"
+              className={FIELD}
+              defaultValue={customer.name}
               required
+              autoFocus
             />
-            {state.errors?.name?.[0] && (
-              <p className="text-sm text-red-600">{state.errors.name[0]}</p>
-            )}
+            <FieldError errors={state.errors?.name} />
           </div>
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
-              Phone <span className="text-red-500">*</span>
+              Phone
             </label>
             <input
               name="phone"
               type="tel"
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              placeholder="Enter phone number"
-              required
+              className={FIELD}
+              defaultValue={customer.phone ?? ""}
             />
-            {state.errors?.phone?.[0] && (
-              <p className="text-sm text-red-600">{state.errors.phone[0]}</p>
-            )}
+            <FieldError errors={state.errors?.phone} />
           </div>
 
           <div className="space-y-1">
@@ -171,8 +143,8 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
             <input
               name="altPhone"
               type="tel"
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              placeholder="Enter alternate phone"
+              className={FIELD}
+              defaultValue={customer.altPhone ?? ""}
             />
           </div>
 
@@ -184,8 +156,8 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
             <input
               name="email"
               type="email"
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              placeholder="Enter email address"
+              className={FIELD}
+              defaultValue={customer.email ?? ""}
             />
           </div>
 
@@ -196,9 +168,9 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
             </label>
             <textarea
               name="address"
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              placeholder="Enter full address"
+              className={FIELD}
               rows={3}
+              defaultValue={customer.address ?? ""}
             />
           </div>
 
@@ -208,9 +180,9 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
               State
             </label>
             <select
-              className="w-full rounded-md border px-3 py-2 text-sm"
+              className={FIELD}
               value={selectedStateId}
-              onChange={(e) => setSelectedStateId(e.target.value)}
+              onChange={(event) => setSelectedStateId(event.target.value)}
             >
               <option value="">Select state</option>
               {states.map((item) => (
@@ -220,10 +192,16 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
               ))}
             </select>
 
+            {/* Falls back to whatever is already on the record, so a state
+                that is not in the list is kept rather than wiped on save. */}
             <input
               type="hidden"
               name="state"
-              value={selectedStateId ? stateNameMap.get(selectedStateId) ?? "" : ""}
+              value={
+                selectedStateId
+                  ? (stateNameMap.get(selectedStateId) ?? "")
+                  : (customer.state ?? "")
+              }
             />
           </div>
 
@@ -234,13 +212,23 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
             </label>
             <select
               name="city"
-              className="w-full rounded-md border px-3 py-2 text-sm"
+              className={FIELD}
               disabled={!selectedStateId || loadingCities}
-              defaultValue=""
+              defaultValue={customer.city ?? ""}
+              key={cities.length}
             >
               <option value="">
                 {loadingCities ? "Loading cities..." : "Select city"}
               </option>
+
+              {/* The saved city stays selectable even before the list for its
+                  state has loaded, so opening the form and saving without
+                  touching this does not clear it. */}
+              {customer.city &&
+              !cities.some((city) => city.name === customer.city) ? (
+                <option value={customer.city}>{customer.city}</option>
+              ) : null}
+
               {cities.map((city) => (
                 <option key={city.id} value={city.name}>
                   {city.name}
@@ -256,8 +244,8 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
             </label>
             <input
               name="pincode"
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              placeholder="Enter pincode"
+              className={FIELD}
+              defaultValue={customer.pincode ?? ""}
             />
           </div>
 
@@ -268,8 +256,8 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
             </label>
             <input
               name="gstNumber"
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              placeholder="Enter GST number"
+              className={FIELD}
+              defaultValue={customer.gstNumber ?? ""}
             />
           </div>
 
@@ -282,8 +270,8 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
               name="openingBalance"
               type="number"
               step="0.01"
-              defaultValue="0"
-              className="w-full rounded-md border px-3 py-2 text-sm"
+              className={FIELD}
+              defaultValue={customer.openingBalance ?? 0}
             />
           </div>
 
@@ -291,28 +279,19 @@ export function AddCustomerDialog({ states }: AddCustomerDialogProps) {
             <label className="text-sm font-medium">Notes</label>
             <textarea
               name="notes"
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              placeholder="Enter notes"
-              rows={3}
+              className={FIELD}
+              rows={2}
+              defaultValue={customer.notes ?? ""}
             />
           </div>
 
-          <div className="md:col-span-2 flex justify-end gap-3 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={pending}
-            >
-              Cancel
-            </Button>
-
-            <Button type="submit" disabled={pending}>
-              {pending ? "Saving..." : "Save Customer"}
+          <div className="flex gap-3 md:col-span-2">
+            <Button type="submit" disabled={pending} size="lg">
+              {pending ? "Saving..." : "Save changes"}
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CardContent>
+    </Card>
   )
 }

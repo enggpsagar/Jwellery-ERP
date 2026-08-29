@@ -29,6 +29,9 @@ type EditProductFormProps = {
     defaultMakingChargeType: "FIXED" | "PERCENTAGE" | null;
     defaultStoneCharge: string | null;
     defaultStoneChargeType: "FIXED" | "PERCENTAGE" | null;
+    defaultGrossWeight: string | null;
+    defaultNetWeight: string | null;
+    defaultStoneWeight: string | null;
     designCode: string | null;
     hsnCode: string | null;
     description: string | null;

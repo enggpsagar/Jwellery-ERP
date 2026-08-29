@@ -13,6 +13,7 @@ import {
 } from "@/lib/inventory/stock-types"
 
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 type ProductOption = {
   id: string
@@ -117,7 +118,7 @@ useEffect(() => {
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-2">
           <label htmlFor="stockCode" className="text-sm font-medium">
-            Stock Code <span className="text-red-500">*</span>
+            Stock Code <RequiredMark />
           </label>
           <input
             id="stockCode"
@@ -144,7 +145,7 @@ useEffect(() => {
 
         <div className="space-y-2">
           <label htmlFor="productId" className="text-sm font-medium">
-            Product <span className="text-red-500">*</span>
+            Product <RequiredMark />
           </label>
           <select
             id="productId"
@@ -166,7 +167,7 @@ useEffect(() => {
 
         <div className="space-y-2">
           <label htmlFor="quantity" className="text-sm font-medium">
-            Quantity <span className="text-red-500">*</span>
+            Quantity <RequiredMark />
           </label>
           <input
             id="quantity"
@@ -180,7 +181,7 @@ useEffect(() => {
 
         <div className="space-y-2">
           <label htmlFor="metalType" className="text-sm font-medium">
-            Metal Type <span className="text-red-500">*</span>
+            Metal Type <RequiredMark />
           </label>
           <select
             id="metalType"
@@ -217,7 +218,7 @@ useEffect(() => {
 
         <div className="space-y-2">
           <label htmlFor="status" className="text-sm font-medium">
-            Status <span className="text-red-500">*</span>
+            Status <RequiredMark />
           </label>
           <select
             id="status"

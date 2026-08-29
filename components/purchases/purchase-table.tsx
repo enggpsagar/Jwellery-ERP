@@ -1,9 +1,23 @@
 "use client"
 
 import Link from "next/link"
+
+import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { Eye } from "lucide-react"
 
 import { PurchaseStatusBadge } from "@/components/purchases/purchase-status-badge"
+
+/** Money as it reads on a jewellery ledger. */
+function inr(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") return null
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return null
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
 
 type PurchaseRow = {
   id: string
@@ -48,14 +62,79 @@ export function PurchaseTable({ purchases }: PurchaseTableProps) {
             {purchases.map((purchase) => (
               <tr key={purchase.id} className="border-b last:border-0">
                 <td className="px-4 py-3 font-medium">
-                  <Link href={`/purchases/${purchase.id}`} className="hover:underline">
-                    {purchase.purchaseNumber}
-                  </Link>
+                  <RecordHoverCard
+                    label={purchase.purchaseNumber}
+                    href={`/purchases/${purchase.id}`}
+                    title={purchase.purchaseNumber}
+                    subtitle={purchase.vendor?.name ?? undefined}
+                    footerLabel="Open purchase"
+                    sections={[
+                      {
+                        fields: [
+                          {
+                            label: "Date",
+                            value: new Date(purchase.purchaseDate).toLocaleDateString("en-IN"),
+                          },
+                          { label: "Vendor", value: purchase.vendor?.name },
+                          { label: "Phone", value: purchase.vendor?.phone },
+                          { label: "Status", value: purchase.status },
+                        ],
+                      },
+                      {
+                        fields: [
+                          { label: "Total", value: inr(purchase.totalAmount) },
+                          {
+                            label: "Balance",
+                            value:
+                              purchase.balanceAmount > 0
+                                ? inr(purchase.balanceAmount)
+                                : "Settled",
+                          },
+                        ],
+                      },
+                    ]}
+                  />
                 </td>
                 <td className="px-4 py-3">
                   {new Date(purchase.purchaseDate).toLocaleDateString("en-IN")}
                 </td>
-                <td className="px-4 py-3">{purchase.vendor?.name ?? "-"}</td>
+                <td className="px-4 py-3">
+                  {purchase.vendor ? (
+                    <RecordHoverCard
+                      label={purchase.vendor.name}
+                      href={`/vendors/${purchase.vendor.id}`}
+                      title={purchase.vendor.name}
+                      subtitle={purchase.vendor.phone ?? undefined}
+                      footerLabel="View vendor"
+                      sections={[
+                        {
+                          fields: [
+                            { label: "Purchase", value: purchase.purchaseNumber },
+                            {
+                              label: "Date",
+                              value: new Date(purchase.purchaseDate).toLocaleDateString("en-IN"),
+                            },
+                            { label: "Status", value: purchase.status },
+                          ],
+                        },
+                        {
+                          fields: [
+                            { label: "Total", value: inr(purchase.totalAmount) },
+                            {
+                              label: "Balance",
+                              value:
+                                purchase.balanceAmount > 0
+                                  ? inr(purchase.balanceAmount)
+                                  : "Settled",
+                            },
+                          ],
+                        },
+                      ]}
+                    />
+                  ) : (
+                    "-"
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <PurchaseStatusBadge status={purchase.status as any} />
                 </td>

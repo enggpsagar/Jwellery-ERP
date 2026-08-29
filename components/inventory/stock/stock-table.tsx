@@ -1,6 +1,8 @@
 "use client"
 
 import Link from "next/link"
+
+import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import * as React from "react"
 
 import type { InventoryStockStatus, InventoryFinish } from "@prisma/client"
@@ -153,9 +155,34 @@ export function StockTable({
                   </td>
 
                   <td className="px-4 py-3 font-medium">
-                    <Link href={`/inventory/stock/${item.id}`} className="hover:underline">
-                      {item.stockCode}
-                    </Link>
+                    <RecordHoverCard
+                      label={item.stockCode}
+                      href={`/inventory/stock/${item.id}`}
+                      title={item.product?.name ?? item.stockCode}
+                      subtitle={item.stockCode}
+                      footerLabel="View stock item"
+                      sections={[
+                        {
+                          fields: [
+                            { label: "Tag", value: item.tagNumber },
+                            { label: "Metal", value: item.metalType?.name },
+                            { label: "Purity", value: item.purity },
+                          ],
+                        },
+                        {
+                          fields: [
+                            { label: "Gross", value: formatNumber(item.grossWeight) },
+                            { label: "Net", value: formatNumber(item.netWeight) },
+                          ],
+                        },
+                        {
+                          fields: [
+                            { label: "Quantity", value: item.quantity },
+                            { label: "Location", value: item.location?.name },
+                          ],
+                        },
+                      ]}
+                    />
                   </td>
 
                   <td className="px-4 py-3">

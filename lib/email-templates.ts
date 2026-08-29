@@ -297,6 +297,186 @@ export function dataBackupEmail(params: {
   };
 }
 
+const detailRow = (label: string, value: string) => `
+      <tr>
+        <td style="padding: 8px 0; font-size: 13px; color: #6b7280; width: 140px; border-bottom: 1px solid #f3f4f6;">${label}</td>
+        <td style="padding: 8px 0; font-size: 13px; color: #111827; font-weight: bold; border-bottom: 1px solid #f3f4f6;">${value}</td>
+      </tr>`;
+
+/** Sent to the owner the moment their shop is registered. */
+export function storeWelcomeEmail(params: {
+  ownerName: string;
+  storeName: string;
+  storeCode: string;
+  appName: string;
+  planLabel: string;
+  email: string;
+  phone: string;
+}) {
+  const { ownerName, storeName, storeCode, appName, planLabel, email, phone } =
+    params;
+
+  const body = `
+    <p style="margin-top: 0;">Hi ${ownerName},</p>
+    <p><strong>${storeName}</strong> is set up and ready to use.</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+      <tbody>
+        ${detailRow("Store", storeName)}
+        ${detailRow("Store code", storeCode)}
+        ${detailRow("Plan", planLabel)}
+        ${detailRow("Sign in with", email)}
+        ${detailRow("or mobile", phone)}
+      </tbody>
+    </table>
+
+    <p>There is no password to remember. Sign in with your Google account, or
+    ask for a one-time code sent to your email or mobile.</p>
+
+    <p style="margin-bottom: 0;">Your shop already has starter metals,
+    categories and a Main Counter location so you can add a product and bill
+    it straight away. Rename any of it under Settings.</p>
+  `;
+
+  const text = [
+    `Hi ${ownerName},`,
+    "",
+    `${storeName} is set up and ready to use.`,
+    "",
+    `Store: ${storeName}`,
+    `Store code: ${storeCode}`,
+    `Plan: ${planLabel}`,
+    `Sign in with: ${email}`,
+    `or mobile: ${phone}`,
+    "",
+    "There is no password. Sign in with Google, or ask for a one-time code.",
+  ].join("\n");
+
+  return {
+    subject: `${storeName} is ready on ${appName}`,
+    html: wrapEmail(storeName, "Welcome aboard", body),
+    text,
+  };
+}
+
+/** Sent to the platform operator when a shop signs itself up. */
+export function newStoreRegisteredEmail(params: {
+  storeName: string;
+  storeCode: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  city: string | null;
+  planLabel: string;
+  appName: string;
+}) {
+  const {
+    storeName,
+    storeCode,
+    ownerName,
+    email,
+    phone,
+    city,
+    planLabel,
+    appName,
+  } = params;
+
+  const body = `
+    <p style="margin-top: 0;">A new store just registered itself on ${appName}.</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+      <tbody>
+        ${detailRow("Store", storeName)}
+        ${detailRow("Store code", storeCode)}
+        ${detailRow("Owner", ownerName)}
+        ${detailRow("Email", email)}
+        ${detailRow("Mobile", phone)}
+        ${city ? detailRow("City", city) : ""}
+        ${detailRow("Plan", planLabel)}
+      </tbody>
+    </table>
+
+    <p style="margin-bottom: 0; font-size: 13px; color: #6b7280;">
+      The store starts on the trial plan and expires on its own. Change or
+      extend it from Stores.
+    </p>
+  `;
+
+  const text = [
+    `A new store just registered itself on ${appName}.`,
+    "",
+    `Store: ${storeName} (${storeCode})`,
+    `Owner: ${ownerName}`,
+    `Email: ${email}`,
+    `Mobile: ${phone}`,
+    ...(city ? [`City: ${city}`] : []),
+    `Plan: ${planLabel}`,
+  ].join("\n");
+
+  return {
+    subject: `New store registered: ${storeName}`,
+    html: wrapEmail(appName, "New store registration", body),
+    text,
+  };
+}
+
+/**
+ * Sent to a store's owner when someone is turned away because the store has
+ * been archived.
+ *
+ * Addressed to the owner rather than whoever attempted the sign-in: staff
+ * cannot do anything about an archived store, and telling them why would
+ * leak the store's account status to anyone who guesses an email.
+ */
+export function storeArchivedEmail(params: {
+  ownerName: string;
+  storeName: string;
+  appName: string;
+  attemptedBy?: string | null;
+}) {
+  const { ownerName, storeName, appName, attemptedBy } = params;
+
+  const body = `
+    <p style="margin-top: 0;">Hi ${ownerName},</p>
+
+    <p><strong>${storeName}</strong> is currently <strong>archived</strong>, so
+    nobody at the store can sign in.</p>
+
+    ${
+      attemptedBy
+        ? `<p style="font-size: 13px; color: #6b7280;">Someone tried to sign in just now (${attemptedBy}) and was turned away.</p>`
+        : ""
+    }
+
+    <div style="padding: 14px 16px; background: #fffbeb; border-left: 3px solid #d97706; border-radius: 0 6px 6px 0;">
+      <p style="margin: 0; font-size: 13px; color: #78350f; line-height: 1.6;">
+        <strong>Your data has not been deleted.</strong> Everything stays exactly
+        as it was and returns the moment the store is restored.
+      </p>
+    </div>
+
+    <p style="margin-bottom: 0;">To have ${storeName} restored, please contact
+    the ${appName} team. Reply to this address and they will pick it up.</p>
+  `;
+
+  const text = [
+    `Hi ${ownerName},`,
+    "",
+    `${storeName} is currently archived, so nobody at the store can sign in.`,
+    ...(attemptedBy ? ["", `Someone tried to sign in just now (${attemptedBy}) and was turned away.`] : []),
+    "",
+    "Your data has not been deleted. Everything stays as it was and returns the moment the store is restored.",
+    "",
+    `To have ${storeName} restored, please contact the ${appName} team.`,
+  ].join("\n");
+
+  return {
+    subject: `${storeName} is archived — action needed`,
+    html: wrapEmail(storeName, "Your store is archived", body),
+    text,
+  };
+}
+
 export function inviteUserEmail(params: {
   name: string;
   roleLabel: string;
@@ -464,5 +644,113 @@ export function ledgerStatementEmail(params: {
   return {
     subject: `Your account statement — ${params.storeName}`,
     html: wrapEmail(params.storeName, "Account Statement", body),
+  };
+}
+
+/**
+ * The previous day's trading, sent each morning.
+ *
+ * The body carries the four totals so the owner can read the day off their
+ * phone without opening anything; the attached workbook carries every line
+ * behind those totals for when they want to check one.
+ */
+export function dailyReportEmail(params: {
+  storeName: string;
+  appName: string;
+  dayLabel: string;
+  fileName: string;
+  sections: { title: string; count: number; total: number }[];
+  netPosition: number;
+}) {
+  const { storeName, appName, dayLabel, fileName, sections, netPosition } =
+    params;
+
+  const inr = (value: number) =>
+    new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 2,
+    }).format(value);
+
+  const summaryRows = sections
+    .map(
+      (section) => `
+        <tr>
+          <td style="padding: 10px 0; font-size: 13px; color: #374151; border-bottom: 1px solid #f3f4f6;">
+            ${section.title}
+            <span style="color: #9ca3af;">&nbsp;·&nbsp;${section.count} ${
+              section.count === 1 ? "entry" : "entries"
+            }</span>
+          </td>
+          <td style="padding: 10px 0; font-size: 13px; color: #111827; font-weight: bold; text-align: right; border-bottom: 1px solid #f3f4f6;">
+            ${inr(section.total)}
+          </td>
+        </tr>`,
+    )
+    .join("");
+
+  const nothingHappened = sections.every((section) => section.count === 0);
+
+  const body = `
+    <p style="margin-top: 0;">Here is the summary for <strong>${dayLabel}</strong> at <strong>${storeName}</strong>.</p>
+
+    ${
+      nothingHappened
+        ? `<div style="padding: 14px 16px; background: #f9fafb; border-left: 3px solid #9ca3af; border-radius: 0 6px 6px 0;">
+             <p style="margin: 0; font-size: 13px; color: #4b5563; line-height: 1.6;">
+               No transactions were recorded on this date.
+             </p>
+           </div>`
+        : ""
+    }
+
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+      <tbody>
+        ${summaryRows}
+        <tr>
+          <td style="padding: 12px 0; font-size: 13px; color: #374151; font-weight: bold;">
+            Sales less purchases
+          </td>
+          <td style="padding: 12px 0; font-size: 15px; font-weight: bold; text-align: right; color: ${
+            netPosition < 0 ? "#b91c1c" : "#047857"
+          };">
+            ${inr(netPosition)}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="font-size: 13px; color: #4b5563; line-height: 1.6;">
+      The attached spreadsheet <strong>${fileName}</strong> has a sheet for each
+      of Credit, Debit, Sale and Purchase, listing every transaction behind
+      these totals with the sum at the bottom of each sheet.
+    </p>
+
+    <p style="font-size: 12px; color: #6b7280; line-height: 1.6;">
+      Sent automatically each day by ${appName}. Figures cover ${dayLabel},
+      midnight to midnight IST.
+    </p>
+  `;
+
+  const text = [
+    `Daily summary for ${dayLabel} — ${storeName}`,
+    "",
+    ...sections.map(
+      (section) =>
+        `${section.title}: ${inr(section.total)} (${section.count} ${
+          section.count === 1 ? "entry" : "entries"
+        })`,
+    ),
+    `Sales less purchases: ${inr(netPosition)}`,
+    "",
+    `Attached: ${fileName} — one sheet each for Credit, Debit, Sale and Purchase.`,
+    "",
+    `Sent automatically by ${appName}. Figures cover ${dayLabel}, midnight to midnight IST.`,
+  ].join("\n");
+
+  return {
+    subject: `Daily summary — ${dayLabel} — ${storeName}`,
+    html: wrapEmail(storeName, `Daily summary · ${dayLabel}`, body),
+    text,
   };
 }

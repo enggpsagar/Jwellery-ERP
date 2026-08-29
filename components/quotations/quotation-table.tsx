@@ -1,9 +1,23 @@
 "use client"
 
 import Link from "next/link"
+
+import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { Eye, ArrowRightCircle } from "lucide-react"
 
 import { QuotationStatusBadge } from "@/components/quotations/quotation-status-badge"
+
+/** Money as it reads on a jewellery ledger. */
+function inr(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") return null
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return null
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
 
 type QuotationRow = {
   id: string
@@ -50,9 +64,40 @@ export function QuotationTable({ quotations }: QuotationTableProps) {
             {quotations.map((quotation) => (
               <tr key={quotation.id} className="border-b last:border-0">
                 <td className="px-4 py-3 font-medium">
-                  <Link href={`/quotations/${quotation.id}`} className="hover:underline">
-                    {quotation.quotationNumber}
-                  </Link>
+                  <RecordHoverCard
+                    label={quotation.quotationNumber}
+                    href={`/quotations/${quotation.id}`}
+                    title={quotation.quotationNumber}
+                    subtitle={quotation.customer?.name ?? undefined}
+                    footerLabel="Open quotation"
+                    sections={[
+                      {
+                        fields: [
+                          {
+                            label: "Date",
+                            value: new Date(quotation.quotationDate).toLocaleDateString("en-IN"),
+                          },
+                          {
+                            label: "Valid until",
+                            value: quotation.validUntil
+                              ? new Date(quotation.validUntil).toLocaleDateString("en-IN")
+                              : null,
+                          },
+                          { label: "Customer", value: quotation.customer?.name },
+                          { label: "Status", value: quotation.status },
+                        ],
+                      },
+                      {
+                        fields: [
+                          { label: "Total", value: inr(quotation.totalAmount) },
+                          {
+                            label: "Invoiced as",
+                            value: quotation.convertedTo?.invoiceNumber,
+                          },
+                        ],
+                      },
+                    ]}
+                  />
                 </td>
                 <td className="px-4 py-3">
                   {new Date(quotation.quotationDate).toLocaleDateString("en-IN")}
@@ -62,7 +107,46 @@ export function QuotationTable({ quotations }: QuotationTableProps) {
                     ? new Date(quotation.validUntil).toLocaleDateString("en-IN")
                     : "-"}
                 </td>
-                <td className="px-4 py-3">{quotation.customer?.name ?? "-"}</td>
+                <td className="px-4 py-3">
+                  {quotation.customer ? (
+                    <RecordHoverCard
+                      label={quotation.customer.name}
+                      href={`/customers/${quotation.customer.id}`}
+                      title={quotation.customer.name}
+                      subtitle={quotation.customer.phone ?? undefined}
+                      footerLabel="View customer"
+                      sections={[
+                        {
+                          fields: [
+                            { label: "Quotation", value: quotation.quotationNumber },
+                            {
+                              label: "Date",
+                              value: new Date(quotation.quotationDate).toLocaleDateString("en-IN"),
+                            },
+                            {
+                              label: "Valid until",
+                              value: quotation.validUntil
+                                ? new Date(quotation.validUntil).toLocaleDateString("en-IN")
+                                : null,
+                            },
+                            { label: "Status", value: quotation.status },
+                          ],
+                        },
+                        {
+                          fields: [
+                            { label: "Total", value: inr(quotation.totalAmount) },
+                            {
+                              label: "Invoiced as",
+                              value: quotation.convertedTo?.invoiceNumber,
+                            },
+                          ],
+                        },
+                      ]}
+                    />
+                  ) : (
+                    "-"
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <QuotationStatusBadge status={quotation.status} />
                 </td>

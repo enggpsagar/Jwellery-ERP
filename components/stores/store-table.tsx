@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui/badge"
 import { StoreRowActions } from "@/components/stores/store-row-actions"
 import { ChangePlanDialog } from "@/components/stores/change-plan-dialog"
 import type { PlanRow } from "@/lib/actions/plan-actions"
+import type { StorePlanOverview } from "@/lib/actions/store-plan-actions"
+import { StorePlanHover } from "@/components/stores/store-plan-hover"
 
 type StoreRow = {
   id: string
@@ -62,7 +64,15 @@ function PlanStatusBadge({ planExpiresAt }: { planExpiresAt: Date | null }) {
   )
 }
 
-export function StoreTable({ stores, plans }: { stores: StoreRow[]; plans: PlanRow[] }) {
+export function StoreTable({
+  stores,
+  plans,
+  planOverviews,
+}: {
+  stores: StoreRow[]
+  plans: PlanRow[]
+  planOverviews: Record<string, StorePlanOverview>
+}) {
   return (
     <div className="rounded-lg border">
       <Table>
@@ -90,7 +100,12 @@ export function StoreTable({ stores, plans }: { stores: StoreRow[]; plans: PlanR
           ) : (
             stores.map((store) => (
               <TableRow key={store.id}>
-                <TableCell className="font-medium">{store.name}</TableCell>
+                <TableCell>
+                  <StorePlanHover
+                    storeName={store.name}
+                    overview={planOverviews[store.id]}
+                  />
+                </TableCell>
                 <TableCell>{store.code}</TableCell>
                 <TableCell>{store.city ?? "-"}</TableCell>
                 <TableCell>{store._count.users}</TableCell>

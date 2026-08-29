@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
 
 import { createInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
+import { ScanToAddPanel } from "@/components/billing/scan-to-add-panel"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 type CustomerOption = {
   id: string
@@ -150,6 +152,67 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
     })
   }
 
+  /**
+   * A tag scanned on the phone becomes a line here.
+   *
+   * The first line starts blank, so the first scan fills it rather than
+   * leaving an empty row above the item that was just scanned. After that
+   * each scan appends, which is what makes scanning several pieces work.
+   */
+  const addScannedStock = useCallback(
+    (stockId: string) => {
+      const stock = stockItems.find((option) => option.id === stockId)
+
+      if (!stock) {
+        // Sold or moved since the page loaded — the stock list here is a
+        // snapshot. Say so rather than adding a line with nothing in it.
+        toast.error("That item is no longer available to sell.")
+        return
+      }
+
+      const scanned: LineItem = {
+        ...emptyLineItem(),
+        inventoryStockId: stock.id,
+        itemName: stock.productName,
+        metalTypeId: stock.metalType?.id ?? "",
+        purity: stock.purity ?? "",
+        netWeight: stock.netWeight ?? 0,
+        rate: stock.saleRate ?? 0,
+      }
+
+      setItems((prev) => {
+        const blank = prev.findIndex(
+          (item) => !item.inventoryStockId && !item.itemName,
+        )
+
+        if (blank === -1) return [...prev, scanned]
+
+        const next = [...prev]
+        next[blank] = scanned
+        return next
+      })
+
+      setConfirmingClear(false)
+      toast.success(`Added ${stock.productName}`)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stockItems],
+  )
+
+  // Rows that actually hold something. The form always keeps one blank line
+  // to type into, and offering to "remove all" when that is all there is
+  // would be offering to do nothing.
+  const filledCount = items.filter(
+    (item) => item.inventoryStockId || item.itemName.trim(),
+  ).length
+
+  const [confirmingClear, setConfirmingClear] = useState(false)
+
+  const clearAllItems = () => {
+    setItems([emptyLineItem()])
+    setConfirmingClear(false)
+  }
+
   const removeItem = (key: string) => {
     setItems((prev) => (prev.length > 1 ? prev.filter((item) => item.key !== key) : prev))
   }
@@ -205,7 +268,7 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2">
-          <Label>Customer *</Label>
+          <Label>Customer <RequiredMark /></Label>
           <CustomerSelect
             customers={customers}
             defaultValue={customerId}
@@ -230,17 +293,68 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
       </div>
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Label>Line Items</Label>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setItems((prev) => [...prev, emptyLineItem()])}
-          >
-            <Plus className="h-4 w-4 mr-1" /> Add Item
-          </Button>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Label>
+            Line Items
+            {filledCount > 0 ? (
+              <span className="ml-1.5 font-normal text-muted-foreground">
+                ({filledCount})
+              </span>
+            ) : null}
+          </Label>
+
+          <div className="flex items-center gap-2">
+            {/* Only offered when there is something to clear, and it asks
+                first — scanning twenty tags and losing them to a stray click
+                is a long walk back. Confirmed in place rather than in a
+                dialog, which is the pattern the rest of the app is moving
+                to. */}
+            {filledCount > 0 ? (
+              confirmingClear ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={clearAllItems}
+                  >
+                    Remove all {filledCount}?
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirmingClear(false)}
+                  >
+                    Keep
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setConfirmingClear(true)}
+                >
+                  <Trash2 className="mr-1 h-4 w-4" />
+                  Remove all
+                </Button>
+              )
+            ) : null}
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setItems((prev) => [...prev, emptyLineItem()])}
+            >
+              <Plus className="h-4 w-4 mr-1" /> Add Item
+            </Button>
+          </div>
         </div>
+
+        {/* Above the lines, because it is how the lines get created. */}
+        <ScanToAddPanel onScanned={addScannedStock} />
 
         <div className="space-y-3">
           {items.map((item) => (

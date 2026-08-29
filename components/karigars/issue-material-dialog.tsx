@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 const initialState: StockActionState = { success: false, message: "" }
 
@@ -173,7 +174,7 @@ export function IssueMaterialDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Issue Weight (g) *</Label>
+            <Label>Issue Weight (g) <RequiredMark /></Label>
             <Input name="issueWeight" type="number" step="0.001" min="0" required />
           </div>
 
@@ -193,7 +194,13 @@ export function IssueMaterialDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>{isPreciousMetal ? "Notes" : "Material Description *"}</Label>
+            <Label>{isPreciousMetal ? (
+              "Notes"
+            ) : (
+              <>
+                Material Description <RequiredMark />
+              </>
+            )}</Label>
             <Textarea
               name="notes"
               rows={2}

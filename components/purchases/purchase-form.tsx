@@ -24,6 +24,7 @@ import { ProductSelect } from "@/components/inventory/shared/product-select"
 import { LocationSelect } from "@/components/shared/location-select"
 
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 type VendorOption = {
   id: string
@@ -398,7 +399,7 @@ export function PurchaseForm({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2">
-          <Label>Vendor *</Label>
+          <Label>Vendor <RequiredMark /></Label>
           <VendorSelect
             key={vendorSelectKey}
             vendors={vendors}
@@ -448,7 +449,7 @@ export function PurchaseForm({
             <div key={item.key} className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="md:col-span-2 space-y-1">
-                  <Label className="text-xs">Product *</Label>
+                  <Label className="text-xs">Product <RequiredMark /></Label>
                   <ProductSelect
                     key={productSelectKeys[item.key] ?? 0}
                     products={productSelectOptions}

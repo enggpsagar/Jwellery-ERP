@@ -76,3 +76,59 @@ export async function hasPermission(permission: string) {
 
   return permissions.includes(permission);
 }
+/**
+ * Throwing companion to `hasPermission`, for guarding mutations.
+ *
+ * Server actions are POST endpoints in their own right: middleware gates them
+ * by the pathname they happen to be invoked from, which says nothing about
+ * which action is being run. A Staff user who is blocked from /billing can
+ * still reach a billing action from any page they are allowed to load, so the
+ * check has to live in the action rather than in front of the route.
+ */
+export async function requirePermission(permission: string) {
+  const user = await requireAuth();
+
+  if (!(await hasPermission(permission))) {
+    throw new Error("Forbidden");
+  }
+
+  return user;
+}
+
+/**
+ * Permission check against a named store, rather than whichever store the
+ * cookie says is active.
+ *
+ * The two differ in exactly the case this exists for: the QR scan-to-sell
+ * path writes to the shop the scanned piece belongs to, which need not be the
+ * shop the browser had open. Checking the active store there would let
+ * someone who may sell in one shop invoice in another — the membership check
+ * alone does not cover it, because being a member of a store is not the same
+ * as being allowed to bill in it.
+ */
+export async function requirePermissionInStore(
+  permission: string,
+  storeId: string,
+) {
+  const user = await requireAuth();
+
+  // Super Admin reaches every store and is a member of none, so membership
+  // cannot be the test for them.
+  if (user.role === UserRole.SUPER_ADMIN) return user;
+
+  const memberships = user.id ? await listMemberships(user.id) : [];
+  const membership = memberships.find((entry) => entry.storeId === storeId);
+
+  if (!membership) throw new Error("Forbidden");
+
+  // Role and permissions are read from the membership in *this* store — the
+  // same person can be Admin in one shop and restricted Staff in another.
+  const permissions = getEffectivePermissions({
+    role: membership.role,
+    permissions: membership.permissions,
+  });
+
+  if (!permissions.includes(permission)) throw new Error("Forbidden");
+
+  return user;
+}

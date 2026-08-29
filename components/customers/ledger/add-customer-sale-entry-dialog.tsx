@@ -24,6 +24,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/providers/toast-provider"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 type AddCustomerSaleEntryDialogProps = {
   customerId: string
@@ -107,7 +108,7 @@ export function AddCustomerSaleEntryDialog({
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <Scale className="h-4 w-4 text-muted-foreground" />
-                {BUSINESS_UNIT_LABELS[unit]} Type <span className="text-red-500">*</span>
+                {BUSINESS_UNIT_LABELS[unit]} Type <RequiredMark />
               </label>
               <select
                 name="metalTypeId"
@@ -131,7 +132,7 @@ export function AddCustomerSaleEntryDialog({
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <Scale className="h-4 w-4 text-muted-foreground" />
-                Weight (grams) <span className="text-red-500">*</span>
+                Weight (grams) <RequiredMark />
               </label>
               <input
                 name="weight"
@@ -150,7 +151,7 @@ export function AddCustomerSaleEntryDialog({
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <IndianRupee className="h-4 w-4 text-muted-foreground" />
-                Sale Amount <span className="text-red-500">*</span>
+                Sale Amount <RequiredMark />
               </label>
               <input
                 name="amount"

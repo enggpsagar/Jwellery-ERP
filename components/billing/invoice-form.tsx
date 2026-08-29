@@ -158,6 +158,13 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
    * The first line starts blank, so the first scan fills it rather than
    * leaving an empty row above the item that was just scanned. After that
    * each scan appends, which is what makes scanning several pieces work.
+   *
+   * Scanning the same stock item again bumps that line's quantity instead
+   * of adding a second, identical line — one scan = one physical piece, so
+   * this is what actually enforces the available-quantity ceiling: capped
+   * at `availableForStock`, checked against the DB quantity minus whatever
+   * other lines in this cart already claim, the same guard the manual
+   * dropdown/quantity field uses.
    */
   const addScannedStock = useCallback(
     (stockId: string) => {
@@ -170,27 +177,67 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
         return
       }
 
-      const scanned: LineItem = {
-        ...emptyLineItem(),
-        inventoryStockId: stock.id,
-        itemName: stock.productName,
-        metalTypeId: stock.metalType?.id ?? "",
-        purity: stock.purity ?? "",
-        netWeight: stock.netWeight ?? 0,
-        rate: stock.saleRate ?? 0,
-      }
+      // Set inside the updater (where `prev` is always the latest state,
+      // not a stale closure) but only acted on — toasts, etc. — after
+      // setItems returns, since an updater function isn't a safe place for
+      // side effects (React may invoke it more than once).
+      let rejected = false
 
       setItems((prev) => {
-        const blank = prev.findIndex(
-          (item) => !item.inventoryStockId && !item.itemName,
-        )
+        const existingIndex = prev.findIndex((item) => item.inventoryStockId === stock.id)
 
+        if (existingIndex !== -1) {
+          const existing = prev[existingIndex]
+          const claimedByOtherLines = prev.reduce(
+            (sum, item, index) =>
+              index === existingIndex || item.inventoryStockId !== stock.id
+                ? sum
+                : sum + (item.quantity || 0),
+            0,
+          )
+          const available = Math.max(0, stock.quantity - claimedByOtherLines)
+
+          if (existing.quantity >= available) {
+            rejected = true
+            return prev
+          }
+
+          const next = [...prev]
+          next[existingIndex] = { ...existing, quantity: existing.quantity + 1 }
+          return next
+        }
+
+        const claimedByOtherLines = prev.reduce(
+          (sum, item) => (item.inventoryStockId === stock.id ? sum + (item.quantity || 0) : sum),
+          0,
+        )
+        if (claimedByOtherLines >= stock.quantity) {
+          rejected = true
+          return prev
+        }
+
+        const scanned: LineItem = {
+          ...emptyLineItem(),
+          inventoryStockId: stock.id,
+          itemName: stock.productName,
+          metalTypeId: stock.metalType?.id ?? "",
+          purity: stock.purity ?? "",
+          netWeight: stock.netWeight ?? 0,
+          rate: stock.saleRate ?? 0,
+        }
+
+        const blank = prev.findIndex((item) => !item.inventoryStockId && !item.itemName)
         if (blank === -1) return [...prev, scanned]
 
         const next = [...prev]
         next[blank] = scanned
         return next
       })
+
+      if (rejected) {
+        toast.error(`Only ${stock.quantity} of ${stock.productName} in stock — all of it is already on this bill.`)
+        return
+      }
 
       setConfirmingClear(false)
       toast.success(`Added ${stock.productName}`)

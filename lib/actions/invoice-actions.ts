@@ -25,9 +25,7 @@ import { sendMail } from "@/lib/mailer";
 import { invoiceEmail } from "@/lib/email-templates";
 import { resolveStoreName } from "@/lib/invite-email";
 import { buildExcelExport } from "@/lib/excel-export";
-
-/** Thrown inside a $transaction when a guarded stock decrement finds nothing left — distinguished from an unexpected server error so its specific message reaches the merchant instead of a generic failure. */
-class OversellError extends Error {}
+import { OversellError } from "@/lib/inventory/oversell-error";
 
 export type InvoiceLineItemInput = {
   itemName: string;

@@ -25,6 +25,7 @@ import {
   getInvoiceFormCustomers,
   getInvoiceFormStockItems,
 } from "@/lib/actions/invoice-actions";
+import { OversellError } from "@/lib/inventory/oversell-error";
 import {
   buildExcelExport,
   buildMultiSheetExcelExport,
@@ -470,24 +471,41 @@ export async function createKachaInvoice(
         // 100 pieces that sells 2 still has 98 on hand. Marking it SOLD
         // outright made the remainder vanish from stock.
         const soldQty = Math.max(1, item.quantity || 1);
-        const currentStock = await tx.inventoryStock.findFirst({
-          where: { id: item.inventoryStockId, storeId },
-          select: { quantity: true },
-        });
-        if (!currentStock) continue;
 
-        const remaining = currentStock.quantity - soldQty;
-
+        // The `quantity: { gte: soldQty }` guard is what actually prevents
+        // overselling under concurrency — see invoice-actions.ts's
+        // createInvoice for the full reasoning (identical here). A stale
+        // JS-side `quantity` read beforehand can never provide that
+        // guarantee, since two concurrent slips can both read the same
+        // starting value before either decrements.
         const { count } = await tx.inventoryStock.updateMany({
-          where: { id: item.inventoryStockId, storeId },
+          where: { id: item.inventoryStockId, storeId, quantity: { gte: soldQty } },
           data: {
             quantity: { decrement: soldQty },
-            // Only the last piece leaving turns the row SOLD.
-            ...(remaining <= 0 ? { status: InventoryStockStatus.SOLD } : {}),
             saleAmount: lineTotal(item),
           },
         });
-        if (count === 0) continue;
+
+        if (count === 0) {
+          throw new OversellError(
+            `Not enough stock left for ${item.itemName || "an item"} — it may have just been sold in another sale. Refresh and try again.`,
+          );
+        }
+
+        // Only the last piece leaving turns the row SOLD — read the
+        // post-decrement quantity back rather than computing it from the
+        // pre-decrement value, which the guard above proved cannot be
+        // trusted under concurrency.
+        const updatedStock = await tx.inventoryStock.findUniqueOrThrow({
+          where: { id: item.inventoryStockId },
+          select: { quantity: true, status: true },
+        });
+        if (updatedStock.quantity <= 0 && updatedStock.status !== InventoryStockStatus.SOLD) {
+          await tx.inventoryStock.update({
+            where: { id: item.inventoryStockId },
+            data: { status: InventoryStockStatus.SOLD },
+          });
+        }
 
         await tx.inventoryTransaction.create({
           data: {
@@ -524,6 +542,9 @@ export async function createKachaInvoice(
       kachaInvoiceId: kachaInvoice.id,
     };
   } catch (error) {
+    if (error instanceof OversellError) {
+      return { success: false, message: error.message };
+    }
     console.error("createKachaInvoice error:", error);
     return { success: false, message: "Failed to create Kacha slip" };
   }

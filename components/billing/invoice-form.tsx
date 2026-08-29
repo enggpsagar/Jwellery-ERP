@@ -37,6 +37,7 @@ type StockOption = {
   purity: string | null
   netWeight: number | null
   saleRate: number | null
+  quantity: number
 }
 
 type LineItem = {
@@ -111,12 +112,28 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
     )
   }
 
+  // How many units of a stock row are still free to add, given what other
+  // lines in THIS cart already claim — the same DB quantity can't be
+  // billed twice across two lines just because each line's own dropdown
+  // looks unclaimed. Excludes `excludeKey` so an item can see its own
+  // current line's claim as available to itself while editing.
+  const availableForStock = (stockId: string, excludeKey: string) => {
+    const stock = stockItems.find((s) => s.id === stockId)
+    if (!stock) return 0
+    const claimedByOtherLines = items
+      .filter((item) => item.key !== excludeKey && item.inventoryStockId === stockId)
+      .reduce((sum, item) => sum + (item.quantity || 0), 0)
+    return Math.max(0, stock.quantity - claimedByOtherLines)
+  }
+
   const applyStockToItem = (key: string, stockId: string) => {
     const stock = stockItems.find((s) => s.id === stockId)
     if (!stock) {
       updateItem(key, { inventoryStockId: "" })
       return
     }
+
+    const available = availableForStock(stockId, key)
 
     updateItem(key, {
       inventoryStockId: stockId,
@@ -125,6 +142,11 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
       purity: stock.purity ?? "",
       netWeight: stock.netWeight ?? 0,
       rate: stock.saleRate ?? 0,
+      // Re-linking to a different stock item resets quantity to a sane
+      // default for it (1, or 0 if it's already fully claimed by other
+      // lines) rather than carrying over a quantity that made sense for
+      // the previous stock item.
+      quantity: available > 0 ? 1 : 0,
     })
   }
 
@@ -234,11 +256,14 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
                       <SelectValue placeholder="Not linked to stock" />
                     </SelectTrigger>
                     <SelectContent>
-                      {stockItems.map((stock) => (
-                        <SelectItem key={stock.id} value={stock.id}>
-                          {stock.stockCode} — {stock.productName}
-                        </SelectItem>
-                      ))}
+                      {stockItems.map((stock) => {
+                        const available = availableForStock(stock.id, item.key)
+                        return (
+                          <SelectItem key={stock.id} value={stock.id} disabled={available <= 0}>
+                            {stock.stockCode} — {stock.productName} ({available} available)
+                          </SelectItem>
+                        )
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
@@ -256,11 +281,21 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
                   <Input
                     type="number"
                     min={1}
+                    max={item.inventoryStockId ? availableForStock(item.inventoryStockId, item.key) : undefined}
                     value={item.quantity}
-                    onChange={(e) =>
-                      updateItem(item.key, { quantity: Number(e.target.value) || 1 })
-                    }
+                    onChange={(e) => {
+                      const requested = Number(e.target.value) || 1
+                      const quantity = item.inventoryStockId
+                        ? Math.min(requested, Math.max(availableForStock(item.inventoryStockId, item.key), 1))
+                        : requested
+                      updateItem(item.key, { quantity })
+                    }}
                   />
+                  {item.inventoryStockId && (
+                    <p className="text-xs text-muted-foreground">
+                      {availableForStock(item.inventoryStockId, item.key)} in stock
+                    </p>
+                  )}
                 </div>
               </div>
 

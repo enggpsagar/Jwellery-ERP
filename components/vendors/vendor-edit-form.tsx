@@ -13,6 +13,7 @@ import { getCitiesByStateId } from "@/lib/actions/location-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 type StateItem = { id: string; name: string }
 type CityItem = { id: string; name: string }
@@ -108,7 +109,7 @@ export function VendorEditForm({
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4 text-muted-foreground" />
-              Name *
+              Name <RequiredMark />
             </label>
             <input
               name="name"

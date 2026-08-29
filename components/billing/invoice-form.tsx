@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 type CustomerOption = {
   id: string
@@ -245,7 +246,7 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2">
-          <Label>Customer *</Label>
+          <Label>Customer <RequiredMark /></Label>
           <CustomerSelect
             customers={customers}
             defaultValue={customerId}

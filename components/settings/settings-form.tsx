@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StoreLogoUpload } from "@/components/settings/store-logo-upload";
 import { cn } from "@/lib/utils";
+import { RequiredMark } from "@/components/shared/required-mark"
 
 type SettingsFormProps = {
   settings: BusinessSettings;
@@ -98,7 +99,7 @@ export function SettingsForm({ settings, canEdit }: SettingsFormProps) {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5 md:col-span-2">
-            <Label htmlFor="businessName">Business Name *</Label>
+            <Label htmlFor="businessName">Business Name <RequiredMark /></Label>
             <Input
               id="businessName"
               name="businessName"

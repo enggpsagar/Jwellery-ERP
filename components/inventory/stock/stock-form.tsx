@@ -25,6 +25,7 @@ import {
 
 import { ProductSelect } from "@/components/inventory/shared/product-select";
 import { LocationSelect } from "@/components/shared/location-select";
+import { RequiredMark } from "@/components/shared/required-mark"
 
 type LocationOption = {
   id: string;
@@ -220,7 +221,7 @@ export function StockForm({
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div>
-            <Label>Product *</Label>
+            <Label>Product <RequiredMark /></Label>
 
             <ProductSelect
               products={productSelectOptions}
@@ -234,7 +235,7 @@ export function StockForm({
           </div>
 
           <div>
-            <Label htmlFor="stockCode">Stock Code *</Label>
+            <Label htmlFor="stockCode">Stock Code <RequiredMark /></Label>
 
             <Input
               id="stockCode"

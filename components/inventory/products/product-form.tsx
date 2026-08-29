@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RequiredMark } from "@/components/shared/required-mark"
 
 export type StoreMetalOption = {
   id: string;
@@ -237,7 +238,7 @@ export function ProductForm({
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div>
-            <Label htmlFor="productCode">Product Code *</Label>
+            <Label htmlFor="productCode">Product Code <RequiredMark /></Label>
 
             <Input
               id="productCode"
@@ -250,7 +251,7 @@ export function ProductForm({
           </div>
 
           <div>
-            <Label htmlFor="name">Product Name *</Label>
+            <Label htmlFor="name">Product Name <RequiredMark /></Label>
 
             <Input
               id="name"
@@ -263,7 +264,7 @@ export function ProductForm({
           </div>
 
           <div>
-            <Label>Category *</Label>
+            <Label>Category <RequiredMark /></Label>
 
             <Select value={categoryId} onValueChange={setCategoryId}>
               <SelectTrigger className="h-11 w-full">
@@ -336,7 +337,7 @@ export function ProductForm({
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div>
-            <Label>Metal Type *</Label>
+            <Label>Metal Type <RequiredMark /></Label>
 
             <Select value={metalTypeId} onValueChange={setMetalTypeId}>
               <SelectTrigger className="h-11 w-full">

@@ -15,6 +15,7 @@ import {
 import type { Karigar } from "@/lib/actions/karigar-actions"
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
 import { LocationSelect } from "@/components/shared/location-select"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 type Props = {
   pending?: boolean
@@ -46,7 +47,7 @@ export function KarigarForm({
         </div>
 
         <div className="space-y-2">
-          <Label>Name *</Label>
+          <Label>Name <RequiredMark /></Label>
           <Input
             name="name"
             placeholder="Karigar name"

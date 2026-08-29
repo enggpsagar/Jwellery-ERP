@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 const initialState: RegisterStoreState = { success: false, message: "" }
 
@@ -80,7 +81,7 @@ export function RegisterStoreForm() {
       <CardContent className="p-6 sm:p-8">
         <form action={formAction} className="flex flex-col gap-5">
           <div className="space-y-1.5">
-            <Label htmlFor="storeName">Store name *</Label>
+            <Label htmlFor="storeName">Store name <RequiredMark /></Label>
             <Input
               id="storeName"
               name="storeName"
@@ -92,7 +93,7 @@ export function RegisterStoreForm() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="ownerName">Your name *</Label>
+            <Label htmlFor="ownerName">Your name <RequiredMark /></Label>
             <Input
               id="ownerName"
               name="ownerName"
@@ -103,7 +104,7 @@ export function RegisterStoreForm() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="email">Email *</Label>
+            <Label htmlFor="email">Email <RequiredMark /></Label>
             <Input
               id="email"
               name="email"
@@ -118,7 +119,7 @@ export function RegisterStoreForm() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="phone">Mobile number *</Label>
+            <Label htmlFor="phone">Mobile number <RequiredMark /></Label>
             <Input
               id="phone"
               name="phone"
@@ -131,13 +132,13 @@ export function RegisterStoreForm() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="state">State *</Label>
+              <Label htmlFor="state">State <RequiredMark /></Label>
               <Input id="state" name="state" placeholder="Maharashtra" required />
               <FieldError errors={state.errors?.state} />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="city">City or area *</Label>
+              <Label htmlFor="city">City or area <RequiredMark /></Label>
               <Input id="city" name="city" placeholder="Nagpur" required />
               <FieldError errors={state.errors?.city} />
             </div>

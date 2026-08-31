@@ -69,6 +69,7 @@ model Store {
   storeMetals      StoreMetal[]
   storeCategories  StoreCategory[]
   storeLocations   StoreLocation[]
+  apiKeys          ApiKey[]
 
   @@index([code])
 }
@@ -282,6 +283,13 @@ model Customer {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   isArchived     Boolean        @default(false)
+  // Who created this record — the id is the link, the name a snapshot, same
+  // convention as Invoice.createdById/createdByName. Nullable: customers
+  // created before this was tracked genuinely have no answer, and an
+  // API/MCP-created customer has no human User behind it at all.
+  createdById    String?
+  createdByName  String?
+  createdBy      User?          @relation("CustomerCreatedBy", fields: [createdById], references: [id])
   store          Store          @relation(fields: [storeId], references: [id])
   invoices       Invoice[]
   kachaInvoices  KachaInvoice[]
@@ -294,6 +302,7 @@ model Customer {
   @@index([phone])
   @@index([customerCode])
   @@index([storeId])
+  @@index([createdById])
 }
 
 model Karigar {
@@ -999,6 +1008,8 @@ model User {
   locationAccess      UserLocationAccess[]
   scanSessions        ScanSession[]
   invoicesCreated     Invoice[]     @relation("InvoiceCreatedBy")
+  apiKeysCreated      ApiKey[]      @relation("ApiKeyCreatedBy")
+  customersCreated    Customer[]    @relation("CustomerCreatedBy")
 
   @@index([storeId])
 }
@@ -1061,6 +1072,36 @@ model InviteToken {
   @@index([phone])
   @@index([invitedById])
   @@index([storeId])
+}
+
+// A credential for programmatic access (a future mobile app, an AI
+// assistant via MCP) — store-scoped like everything else in this app, never
+// stores the raw secret (only its sha256, same convention as
+// InviteToken.tokenHash), and carries its own permission list rather than
+// inheriting whatever the creating Admin can do, so a leaked key has a
+// bounded blast radius.
+model ApiKey {
+  id          String    @id @default(cuid())
+  storeId     String
+  name        String
+  // First chars of the raw key, stored in plaintext purely so the Settings
+  // list can show "sk_live_a1b2..." for identification — never enough to
+  // reconstruct the real secret.
+  prefix      String
+  keyHash     String    @unique
+  permissions String[]  @default([])
+  isRevoked   Boolean   @default(false)
+  revokedAt   DateTime?
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdBy   User      @relation("ApiKeyCreatedBy", fields: [createdById], references: [id])
+
+  @@index([storeId])
+  @@index([createdById])
 }
 
 model OtpCode {

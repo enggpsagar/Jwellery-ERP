@@ -4,73 +4,37 @@
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
+import { getCurrentUser } from "@/lib/auth/auth"
 import * as XLSX from "xlsx"
+import {
+  getCustomersCore,
+  getCustomerByIdCore,
+  createCustomerCore,
+  updateCustomerCore,
+  getCustomerWhere,
+  getCustomerOrderBy,
+  mapCustomer,
+  CUSTOMER_LIST_INCLUDE,
+  type CustomerRecord,
+  type CustomerFormState as CoreCustomerFormState,
+  type CustomerSortBy as CoreCustomerSortBy,
+  type SortOrder as CoreSortOrder,
+  type GetCustomersParams as CoreGetCustomersParams,
+  type CustomersListResponse as CoreCustomersListResponse,
+  type CustomerInput,
+} from "@/lib/core/customer"
 
-export type Customer = {
-  id: string
-  name: string
-  phone?: string
-  altPhone?: string
-  email?: string
-  address?: string
-  city?: string
-  state?: string
-  pincode?: string
-  customerType?: string
-  openingBalance: number
-  currentBalance?: number
-  balanceType?: string
-  goldBalance?: number
-  silverBalance?: number
-  creditLimit?: string
-  paymentTerms?: string
-  gstNumber?: string
-  panNumber?: string
-  registrationId?: string
-  totalOrders?: number
-  totalPurchaseValue?: string
-  pendingAmount?: string
-  lastPurchaseDate?: string
-  lastPaymentDate?: string
-  notes?: string
-  createdAt?: string
-}
-
-export type CustomerFormState = {
-  success: boolean
-  message: string
-  errors?: Record<string, string[]>
-  /** Set on a successful addCustomer — lets callers (e.g. an inline "create customer" picker) select the new row without a full reload. */
-  customer?: {
-    id: string
-    name: string
-    phone: string | null
-    customerCode: string | null
-  }
-}
-
-export type CustomerSortBy = "name" | "createdAt" | "openingBalance"
-export type SortOrder = "asc" | "desc"
-
-export type GetCustomersParams = {
-  page?: number
-  pageSize?: number
-  search?: string
-  sortBy?: CustomerSortBy
-  sortOrder?: SortOrder
-}
-
-export type CustomersListResponse = {
-  customers: Customer[]
-  pagination: {
-    page: number
-    pageSize: number
-    totalCount: number
-    totalPages: number
-    hasNextPage: boolean
-    hasPrevPage: boolean
-  }
-}
+// Re-declared (not re-exported via `export type {...} from`, which Next's
+// "use server" export transform can't handle) so every existing
+// `import { type Customer } from "@/lib/actions/customer-actions"` across
+// the app keeps working unchanged — the canonical definitions now live in
+// lib/core/customer.ts.
+export type Customer = CustomerRecord
+export type CustomerFormState = CoreCustomerFormState
+export type CustomerSortBy = CoreCustomerSortBy
+export type SortOrder = CoreSortOrder
+export type GetCustomersParams = CoreGetCustomersParams
+export type CustomersListResponse = CoreCustomersListResponse
 
 type ExportCustomersParams = {
   selectedIds?: string[]
@@ -85,196 +49,34 @@ function toNumber(value: FormDataEntryValue | null, fallback = 0) {
   return Number.isNaN(num) ? fallback : num
 }
 
-function formatCurrency(value: number) {
-  return `₹ ${value.toLocaleString("en-IN")}`
-}
-
-function formatDate(date?: Date | null) {
-  if (!date) return "-"
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date)
-}
-
-function getCustomerWhere(storeId: string, search?: string) {
-  const query = String(search || "").trim()
-
+function formDataToCustomerInput(formData: FormData): CustomerInput {
   return {
-    storeId,
-    isArchived: false,
-    ...(query
-      ? {
-          OR: [
-            { name: { contains: query, mode: "insensitive" as const } },
-            { phone: { contains: query, mode: "insensitive" as const } },
-            { email: { contains: query, mode: "insensitive" as const } },
-            { city: { contains: query, mode: "insensitive" as const } },
-            { state: { contains: query, mode: "insensitive" as const } },
-          ],
-        }
-      : {}),
-  }
-}
-
-function getCustomerOrderBy(
-  sortBy: CustomerSortBy = "createdAt",
-  sortOrder: SortOrder = "desc"
-) {
-  if (sortBy === "name") return { name: sortOrder }
-  if (sortBy === "openingBalance") return { openingBalance: sortOrder }
-  return { createdAt: sortOrder }
-}
-
-function mapCustomer(customer: any): Customer {
-  const totalOrders = customer.invoices.length
-
-  const totalPurchaseValueNumber = customer.invoices.reduce(
-    (sum: number, invoice: any) => sum + Number(invoice.totalAmount || 0),
-    0
-  )
-
-  const pendingAmountNumber = customer.invoices.reduce(
-    (sum: number, invoice: any) => sum + Number(invoice.balanceAmount || 0),
-    0
-  )
-
-  const lastPurchaseDate =
-    customer.invoices.length > 0
-      ? formatDate(customer.invoices[0].invoiceDate)
-      : "-"
-
-  const lastPaymentDate =
-    customer.ledgerEntries.length > 0
-      ? formatDate(customer.ledgerEntries[0].entryDate)
-      : "-"
-
-  return {
-    id: customer.id,
-    name: customer.name,
-    phone: customer.phone ?? "",
-    altPhone: customer.alternatePhone ?? "",
-    email: customer.email ?? "",
-    address: customer.addressLine1 ?? "",
-    city: customer.city ?? "",
-    state: customer.state ?? "",
-    pincode: customer.pincode ?? "",
-    customerType: "",
-    openingBalance: Number(customer.openingBalance ?? 0),
-    currentBalance: Number(customer.openingBalance ?? 0),
-    balanceType: "Receivable",
-    goldBalance: 0,
-    silverBalance: 0,
-    creditLimit: "",
-    paymentTerms: "",
-    gstNumber: customer.gstin ?? "",
-    panNumber: customer.panNumber ?? "",
-    registrationId: customer.registrationId ?? "",
-    totalOrders,
-    totalPurchaseValue: formatCurrency(totalPurchaseValueNumber),
-    pendingAmount: formatCurrency(pendingAmountNumber),
-    lastPurchaseDate,
-    lastPaymentDate,
-    notes: customer.notes ?? "",
-    createdAt: customer.createdAt.toISOString(),
+    name: String(formData.get("name") || "").trim(),
+    phone: String(formData.get("phone") || "").trim(),
+    altPhone: String(formData.get("altPhone") || "").trim(),
+    email: String(formData.get("email") || "").trim(),
+    address: String(formData.get("address") || "").trim(),
+    city: String(formData.get("city") || "").trim(),
+    state: String(formData.get("state") || "").trim(),
+    pincode: String(formData.get("pincode") || "").trim(),
+    gstNumber: String(formData.get("gstNumber") || "").trim(),
+    panNumber: String(formData.get("panNumber") || "").trim(),
+    registrationId: String(formData.get("registrationId") || "").trim(),
+    notes: String(formData.get("notes") || "").trim(),
+    openingBalance: toNumber(formData.get("openingBalance"), 0),
   }
 }
 
 export async function getCustomers(
   params: GetCustomersParams = {}
 ): Promise<CustomersListResponse> {
-  const page = Math.max(1, Number(params.page || 1))
-  const pageSize = Math.max(1, Number(params.pageSize || 10))
-  const search = String(params.search || "").trim()
-  const sortBy: CustomerSortBy = params.sortBy || "createdAt"
-  const sortOrder: SortOrder = params.sortOrder || "desc"
-
   const storeId = await requireStoreScope()
-  const where = getCustomerWhere(storeId, search)
-  const orderBy = getCustomerOrderBy(sortBy, sortOrder)
-
-  const [totalCount, customers] = await Promise.all([
-    prisma.customer.count({ where }),
-    prisma.customer.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      include: {
-        invoices: {
-          select: {
-            id: true,
-            totalAmount: true,
-            balanceAmount: true,
-            invoiceDate: true,
-          },
-          orderBy: {
-            invoiceDate: "desc",
-          },
-        },
-        ledgerEntries: {
-          select: {
-            id: true,
-            amount: true,
-            entryDate: true,
-          },
-          orderBy: {
-            entryDate: "desc",
-          },
-        },
-      },
-    }),
-  ])
-
-  const mappedCustomers: Customer[] = customers.map(mapCustomer)
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
-
-  return {
-    customers: mappedCustomers,
-    pagination: {
-      page,
-      pageSize,
-      totalCount,
-      totalPages,
-      hasNextPage: page < totalPages,
-      hasPrevPage: page > 1,
-    },
-  }
+  return getCustomersCore(params, storeId)
 }
 
 export async function getCustomerById(id: string): Promise<Customer | null> {
   const storeId = await requireStoreScope()
-
-  const customer = await prisma.customer.findFirst({
-    where: { id, storeId },
-    include: {
-      invoices: {
-        select: {
-          id: true,
-          totalAmount: true,
-          balanceAmount: true,
-          invoiceDate: true,
-        },
-        orderBy: {
-          invoiceDate: "desc",
-        },
-      },
-      ledgerEntries: {
-        select: {
-          id: true,
-          amount: true,
-          entryDate: true,
-        },
-        orderBy: {
-          entryDate: "desc",
-        },
-      },
-    },
-  })
-
-  if (!customer) return null
-  return mapCustomer(customer)
+  return getCustomerByIdCore(id, storeId)
 }
 
 async function getAllCustomersForExport(
@@ -297,29 +99,7 @@ async function getAllCustomersForExport(
   const customers = await prisma.customer.findMany({
     where,
     orderBy: getCustomerOrderBy(sortBy, sortOrder),
-    include: {
-      invoices: {
-        select: {
-          id: true,
-          totalAmount: true,
-          balanceAmount: true,
-          invoiceDate: true,
-        },
-        orderBy: {
-          invoiceDate: "desc",
-        },
-      },
-      ledgerEntries: {
-        select: {
-          id: true,
-          amount: true,
-          entryDate: true,
-        },
-        orderBy: {
-          entryDate: "desc",
-        },
-      },
-    },
+    include: CUSTOMER_LIST_INCLUDE,
   })
 
   return customers.map(mapCustomer)
@@ -405,92 +185,17 @@ export async function addCustomer(
   prevState: CustomerFormState,
   formData: FormData
 ): Promise<CustomerFormState> {
-  try {
-    const name = String(formData.get("name") || "").trim()
-    const phone = String(formData.get("phone") || "").trim()
-    const altPhone = String(formData.get("altPhone") || "").trim()
-    const email = String(formData.get("email") || "").trim()
-    const address = String(formData.get("address") || "").trim()
-    const city = String(formData.get("city") || "").trim()
-    const state = String(formData.get("state") || "").trim()
-    const pincode = String(formData.get("pincode") || "").trim()
-    const gstNumber = String(formData.get("gstNumber") || "").trim()
-    const panNumber = String(formData.get("panNumber") || "").trim()
-    const registrationId = String(formData.get("registrationId") || "").trim()
-    const notes = String(formData.get("notes") || "").trim()
-    const openingBalance = toNumber(formData.get("openingBalance"), 0)
+  const storeId = await requireStoreScope()
+  const actor = await getCurrentUser()
 
-    const errors: Record<string, string[]> = {}
+  const result = await createCustomerCore(formDataToCustomerInput(formData), {
+    storeId,
+    actorId: actor?.id ?? null,
+    actorName: actor?.name ?? actor?.email ?? null,
+  })
 
-    if (!name) errors.name = ["Customer name is required"]
-    if (!phone) errors.phone = ["Phone number is required"]
-
-    if (Object.keys(errors).length > 0) {
-      return {
-        success: false,
-        message: "Please fix the form errors",
-        errors,
-      }
-    }
-
-    const storeId = await requireStoreScope()
-
-    if (phone) {
-      const existing = await prisma.customer.findFirst({
-        where: { phone, storeId },
-        select: { id: true },
-      })
-
-      if (existing) {
-        return {
-          success: false,
-          message: "Phone number already exists",
-          errors: { phone: ["A customer with this phone number already exists"] },
-        }
-      }
-    }
-
-    const customer = await prisma.customer.create({
-      data: {
-        storeId,
-        name,
-        phone: phone || null,
-        alternatePhone: altPhone || null,
-        email: email || null,
-        addressLine1: address || null,
-        city: city || null,
-        state: state || null,
-        pincode: pincode || null,
-        gstin: gstNumber || null,
-        panNumber: panNumber || null,
-        registrationId: registrationId || null,
-        notes: notes || null,
-        openingBalance,
-      },
-      select: { id: true, name: true, phone: true, customerCode: true },
-    })
-
-    revalidatePath("/customers")
-
-    return {
-      success: true,
-      message: "Customer added successfully",
-      customer,
-    }
-  } catch (error: any) {
-    if (error?.code === "P2002") {
-      return {
-        success: false,
-        message: "Phone number already exists",
-        errors: { phone: ["A customer with this phone number already exists"] },
-      }
-    }
-    console.error("addCustomer error:", error)
-    return {
-      success: false,
-      message: "Failed to add customer",
-    }
-  }
+  if (result.success) revalidatePath("/customers")
+  return result
 }
 
 export async function updateCustomer(
@@ -498,98 +203,14 @@ export async function updateCustomer(
   prevState: CustomerFormState,
   formData: FormData
 ): Promise<CustomerFormState> {
-  try {
-    const name = String(formData.get("name") || "").trim()
-    const phone = String(formData.get("phone") || "").trim()
-    const altPhone = String(formData.get("altPhone") || "").trim()
-    const email = String(formData.get("email") || "").trim()
-    const address = String(formData.get("address") || "").trim()
-    const city = String(formData.get("city") || "").trim()
-    const state = String(formData.get("state") || "").trim()
-    const pincode = String(formData.get("pincode") || "").trim()
-    const gstNumber = String(formData.get("gstNumber") || "").trim()
-    const panNumber = String(formData.get("panNumber") || "").trim()
-    const registrationId = String(formData.get("registrationId") || "").trim()
-    const notes = String(formData.get("notes") || "").trim()
-    const openingBalance = toNumber(formData.get("openingBalance"), 0)
+  const storeId = await requireStoreScope()
+  const result = await updateCustomerCore(id, formDataToCustomerInput(formData), storeId)
 
-    const errors: Record<string, string[]> = {}
-
-    if (!name) errors.name = ["Customer name is required"]
-    if (!phone) errors.phone = ["Phone number is required"]
-
-    if (Object.keys(errors).length > 0) {
-      return {
-        success: false,
-        message: "Please fix the form errors",
-        errors,
-      }
-    }
-
-    const storeId = await requireStoreScope()
-
-    if (phone) {
-      const existing = await prisma.customer.findFirst({
-        where: { phone, storeId, NOT: { id } },
-        select: { id: true },
-      })
-
-      if (existing) {
-        return {
-          success: false,
-          message: "Phone number already exists",
-          errors: { phone: ["A customer with this phone number already exists"] },
-        }
-      }
-    }
-
-    const { count } = await prisma.customer.updateMany({
-      where: { id, storeId },
-      data: {
-        name,
-        phone: phone || null,
-        alternatePhone: altPhone || null,
-        email: email || null,
-        addressLine1: address || null,
-        city: city || null,
-        state: state || null,
-        pincode: pincode || null,
-        gstin: gstNumber || null,
-        panNumber: panNumber || null,
-        registrationId: registrationId || null,
-        notes: notes || null,
-        openingBalance,
-      },
-    })
-
-    if (count === 0) {
-      return {
-        success: false,
-        message: "Customer not found",
-      }
-    }
-
+  if (result.success) {
     revalidatePath("/customers")
     revalidatePath(`/customers/${id}`)
-
-    return {
-      success: true,
-      message: "Customer updated successfully",
-    }
-  } catch (error: any) {
-    if (error?.code === "P2002") {
-      return {
-        success: false,
-        message: "Phone number already exists",
-        errors: { phone: ["A customer with this phone number already exists"] },
-      }
-    }
-    console.error("updateCustomer error:", error)
-    return {
-      success: false,
-      message: "Failed to update customer",
-    }
   }
+  return result
 }
 
 export async function archiveCustomer(id: string): Promise<CustomerFormState> {

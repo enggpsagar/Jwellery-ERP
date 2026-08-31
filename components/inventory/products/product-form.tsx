@@ -6,6 +6,18 @@ import { PurityType } from "@prisma/client";
 
 import type { ProductFormState } from "@/lib/inventory/product-types";
 import { getStoreCategoryTypes } from "@/lib/actions/taxonomy-actions";
+import { classifyMetalName } from "@/lib/business-units";
+
+// PurityType only encodes gold/silver purities plus a catch-all — a metal
+// classifies into one of these groups by its name (see classifyMetalName),
+// same heuristic already used for Business Units, so a purity that doesn't
+// belong to the selected metal is never offered.
+const PURITY_OPTIONS_BY_METAL: Record<"GOLD" | "SILVER" | "OTHER" | "DIAMOND", PurityType[]> = {
+  GOLD: [PurityType.GOLD_24K, PurityType.GOLD_22K, PurityType.GOLD_20K, PurityType.GOLD_18K],
+  SILVER: [PurityType.SILVER_999, PurityType.SILVER_925],
+  DIAMOND: [PurityType.OTHER],
+  OTHER: [PurityType.OTHER],
+};
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,6 +111,25 @@ export function ProductForm({
   const [defaultPurity, setDefaultPurity] = useState(
     product?.defaultPurity ?? "__none__",
   );
+
+  const selectedMetal = metals.find((item) => item.id === metalTypeId);
+  const metalFamily = selectedMetal
+    ? classifyMetalName(selectedMetal.name)
+    : null;
+  const availablePurities = metalFamily
+    ? PURITY_OPTIONS_BY_METAL[metalFamily]
+    : Object.values(PurityType);
+
+  // Switching metal (or its purity family no longer including what was
+  // picked) clears a now-invalid Default Purity rather than silently
+  // submitting a Gold purity against a Silver product.
+  useEffect(() => {
+    if (defaultPurity === "__none__") return;
+    if (!availablePurities.includes(defaultPurity as PurityType)) {
+      setDefaultPurity("__none__");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metalTypeId]);
 
   const [isActive, setIsActive] = useState(
     product?.isActive === false ? "false" : "true",
@@ -321,21 +352,39 @@ export function ProductForm({
           <div>
             <Label>Default Purity</Label>
 
-            <Select value={defaultPurity} onValueChange={setDefaultPurity}>
+            <Select
+              value={defaultPurity}
+              onValueChange={setDefaultPurity}
+              disabled={selectedMetal ? !selectedMetal.hasPurity : false}
+            >
               <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="Select Purity" />
+                <SelectValue
+                  placeholder={
+                    selectedMetal && !selectedMetal.hasPurity
+                      ? "Not applicable for this metal"
+                      : "Select Purity"
+                  }
+                />
               </SelectTrigger>
 
               <SelectContent>
                 <SelectItem value="__none__">None</SelectItem>
 
-                {Object.values(PurityType).map((item) => (
+                {availablePurities.map((item) => (
                   <SelectItem key={item} value={item}>
                     {item.replaceAll("_", " ")}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+
+            {selectedMetal && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {selectedMetal.hasPurity
+                  ? `Showing ${metalFamily?.toLowerCase() ?? "matching"} purities for ${selectedMetal.name}.`
+                  : `${selectedMetal.name} doesn't track purity.`}
+              </p>
+            )}
 
             <input
               type="hidden"

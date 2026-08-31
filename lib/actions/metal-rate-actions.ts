@@ -90,7 +90,7 @@ export async function getLast10DaysRates(): Promise<ChartData[]> {
 /**
  * Calculate percentage change
  */
-export function calculatePercentageChange(
+function calculatePercentageChange(
   current: number,
   previous: number
 ): number {

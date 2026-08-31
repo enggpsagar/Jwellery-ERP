@@ -158,7 +158,6 @@ export function CustomersToolbar({
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name, phone, email, city..."
           className="pl-9"
-          disabled={isPending}
         />
       </div>
 

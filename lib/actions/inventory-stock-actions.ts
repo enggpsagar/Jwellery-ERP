@@ -599,6 +599,7 @@ export async function receiveItemsFromKarigar(
           data: {
             inventoryStockId: stock.id,
             transactionType: InventoryTransactionType.KARIGAR_RECEIPT,
+            quantity: item.quantity || 1,
             netWeight: item.netWeight ?? undefined,
             referenceType: "KarigarJob",
             referenceId: jobId,

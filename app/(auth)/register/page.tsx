@@ -6,6 +6,7 @@ import { Gem } from "lucide-react"
 import { authOptions } from "@/lib/auth/auth-options"
 import { APP_NAME } from "@/lib/constants/app"
 import { prisma } from "@/lib/prisma"
+import { getStates } from "@/lib/actions/location-actions"
 import { RegisterStoreForm } from "@/components/auth/register-store-form"
 
 export const dynamic = "force-dynamic"
@@ -26,6 +27,8 @@ export default async function RegisterStorePage() {
     orderBy: [{ price: "asc" }, { sortOrder: "asc" }],
     select: { name: true, durationDays: true },
   })
+
+  const states = await getStates()
 
   return (
     <main className="flex min-h-svh flex-col bg-background">
@@ -99,7 +102,7 @@ export default async function RegisterStorePage() {
           </ul>
         </div>
 
-        <RegisterStoreForm />
+        <RegisterStoreForm states={states} />
       </div>
     </main>
   )

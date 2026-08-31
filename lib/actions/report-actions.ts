@@ -1,7 +1,7 @@
 // lib/actions/report-actions.ts
 "use server";
 
-import { InventoryStockStatus } from "@prisma/client";
+import { InventoryStockStatus, InventoryTransactionType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -112,8 +112,22 @@ export async function getInventoryValuationReport() {
 
   const inStockValue = byStatus.get(InventoryStockStatus.IN_STOCK)?.estimatedValue ?? 0;
 
+  // On-hand only (IN_STOCK + RESERVED) — matches ON_HAND_STOCK_STATUSES in
+  // dashboard-actions.ts. `stockItems.length` below the fold counts every
+  // status ever recorded (including SOLD/DAMAGED/ARCHIVED), which is right
+  // for the full byStatus breakdown but wrong for a "how much do I have"
+  // headline figure.
+  const onHandStatuses: InventoryStockStatus[] = [
+    InventoryStockStatus.IN_STOCK,
+    InventoryStockStatus.RESERVED,
+  ];
+  const onHandItems = stockItems.filter((stock) =>
+    onHandStatuses.includes(stock.status),
+  ).length;
+
   return {
-    totalItems: stockItems.length,
+    totalItems: onHandItems,
+    totalItemsAllTime: stockItems.length,
     inStockValue,
     byStatus: Array.from(byStatus.entries()).map(([status, data]) => ({
       status,
@@ -609,4 +623,206 @@ export async function getSalesByUserReport(range: DateRange = {}) {
     unattributedCount:
       byUser.get("__unrecorded__")?.invoiceCount ?? 0,
   } satisfies SalesByUserReport;
+}
+
+export type ItemLedgerEvent = { date: string; label: string };
+
+export type ItemLedgerRow = {
+  stockId: string;
+  stockCode: string;
+  productName: string;
+  status: string;
+  quantityRemaining: number;
+  netWeight: number;
+  purchaseDate: string | null;
+  purchaseQuantity: number | null;
+  vendorName: string | null;
+  // No staff-attribution column exists on Purchase today — always "Not
+  // recorded" until that's added, kept visible rather than dropped so the
+  // gap is honest instead of silently missing.
+  purchasedBy: string;
+  totalSoldQuantity: number;
+  lastSaleDate: string | null;
+  soldTo: string;
+  soldBy: string;
+  history: ItemLedgerEvent[];
+};
+
+export type ItemLedgerReport = {
+  rows: ItemLedgerRow[];
+  itemCount: number;
+};
+
+// Lifecycle events with no other record on the item's timeline (a sale or a
+// karigar receipt is already captured from its own table, with better
+// detail than this generic log carries).
+const NOTABLE_TRANSACTION_TYPES: InventoryTransactionType[] = [
+  InventoryTransactionType.DAMAGE,
+  InventoryTransactionType.RESERVE,
+  InventoryTransactionType.UNRESERVE,
+];
+
+function transactionTypeLabel(type: InventoryTransactionType) {
+  return type
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+/**
+ * Full purchase-to-sale history per inventory item: when it was bought and
+ * from whom, when (and to whom, by whom) it sold, and every step in between.
+ *
+ * "Purchased by" (which staff member logged the purchase) cannot be
+ * populated — Purchase has no createdBy field yet, unlike Invoice — so that
+ * column always reads "Not recorded" rather than being silently omitted.
+ */
+export async function getItemLedgerReport(): Promise<ItemLedgerReport> {
+  const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
+
+  const stockItems = await prisma.inventoryStock.findMany({
+    where: { storeId, ...locationWhere(scope) },
+    orderBy: { createdAt: "desc" },
+    include: {
+      product: { select: { name: true } },
+      purchaseItems: { select: { quantity: true } },
+      invoiceItems: {
+        select: {
+          quantity: true,
+          invoice: {
+            select: {
+              invoiceNumber: true,
+              invoiceDate: true,
+              createdByName: true,
+              customer: { select: { name: true } },
+            },
+          },
+        },
+      },
+      kachaInvoiceItems: {
+        select: {
+          quantity: true,
+          kachaInvoice: {
+            select: {
+              slipNumber: true,
+              invoiceDate: true,
+              customer: { select: { name: true } },
+            },
+          },
+        },
+      },
+      karigarJobs: {
+        select: {
+          issueDate: true,
+          receivedDate: true,
+          karigar: { select: { name: true } },
+        },
+      },
+      transactions: {
+        select: { transactionType: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+
+  const rows: ItemLedgerRow[] = stockItems.map((stock) => {
+    const events: { date: Date; label: string }[] = [];
+
+    const purchaseQuantity =
+      stock.purchaseItems.reduce((sum, item) => sum + item.quantity, 0) || null;
+
+    if (stock.purchaseDate) {
+      events.push({
+        date: stock.purchaseDate,
+        label: `Purchased${purchaseQuantity ? ` (Qty ${purchaseQuantity})` : ""} from ${
+          stock.vendorName ?? "Unknown vendor"
+        }`,
+      });
+    }
+
+    for (const job of stock.karigarJobs) {
+      events.push({
+        date: job.issueDate,
+        label: `Issued to Karigar ${job.karigar.name}`,
+      });
+      if (job.receivedDate) {
+        events.push({
+          date: job.receivedDate,
+          label: `Received from Karigar ${job.karigar.name}`,
+        });
+      }
+    }
+
+    const soldToNames = new Set<string>();
+    const soldByNames = new Set<string>();
+    let totalSoldQuantity = 0;
+    let lastSaleDate: Date | null = null;
+
+    for (const item of stock.invoiceItems) {
+      totalSoldQuantity += item.quantity;
+      soldToNames.add(item.invoice.customer.name);
+      if (item.invoice.createdByName) soldByNames.add(item.invoice.createdByName);
+      if (!lastSaleDate || item.invoice.invoiceDate > lastSaleDate) {
+        lastSaleDate = item.invoice.invoiceDate;
+      }
+      events.push({
+        date: item.invoice.invoiceDate,
+        label: `Sold (Qty ${item.quantity}) to ${item.invoice.customer.name} — Invoice ${
+          item.invoice.invoiceNumber
+        }${item.invoice.createdByName ? ` by ${item.invoice.createdByName}` : ""}`,
+      });
+    }
+
+    for (const item of stock.kachaInvoiceItems) {
+      totalSoldQuantity += item.quantity;
+      soldToNames.add(item.kachaInvoice.customer.name);
+      if (!lastSaleDate || item.kachaInvoice.invoiceDate > lastSaleDate) {
+        lastSaleDate = item.kachaInvoice.invoiceDate;
+      }
+      events.push({
+        date: item.kachaInvoice.invoiceDate,
+        label: `Sold (Qty ${item.quantity}) to ${item.kachaInvoice.customer.name} — Kacha Slip ${item.kachaInvoice.slipNumber}`,
+      });
+    }
+
+    for (const txn of stock.transactions) {
+      if (NOTABLE_TRANSACTION_TYPES.includes(txn.transactionType)) {
+        events.push({
+          date: txn.createdAt,
+          label: transactionTypeLabel(txn.transactionType),
+        });
+      }
+    }
+
+    events.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    return {
+      stockId: stock.id,
+      stockCode: stock.stockCode,
+      productName: stock.product.name,
+      status: stock.status,
+      quantityRemaining: stock.quantity,
+      netWeight: stock.netWeight ? Number(stock.netWeight) : 0,
+      purchaseDate: stock.purchaseDate ? stock.purchaseDate.toISOString() : null,
+      purchaseQuantity,
+      vendorName: stock.vendorName,
+      purchasedBy: "Not recorded",
+      totalSoldQuantity,
+      lastSaleDate: lastSaleDate ? (lastSaleDate as Date).toISOString() : null,
+      soldTo: soldToNames.size ? Array.from(soldToNames).join(", ") : "-",
+      soldBy: soldByNames.size
+        ? Array.from(soldByNames).join(", ")
+        : totalSoldQuantity > 0
+          ? "Not recorded"
+          : "-",
+      history: events.map((event) => ({
+        date: event.date.toISOString(),
+        label: event.label,
+      })),
+    };
+  });
+
+  return { rows, itemCount: rows.length };
 }

@@ -103,6 +103,31 @@ type SalesByUser = {
   unattributedCount: number
 }
 
+type ItemLedgerEvent = { date: string; label: string }
+
+type ItemLedgerRow = {
+  stockId: string
+  stockCode: string
+  productName: string
+  status: string
+  quantityRemaining: number
+  netWeight: number
+  purchaseDate: string | null
+  purchaseQuantity: number | null
+  vendorName: string | null
+  purchasedBy: string
+  totalSoldQuantity: number
+  lastSaleDate: string | null
+  soldTo: string
+  soldBy: string
+  history: ItemLedgerEvent[]
+}
+
+type ItemLedger = {
+  rows: ItemLedgerRow[]
+  itemCount: number
+}
+
 type ReportsTabsProps = {
   sales: SalesReport
   valuation: InventoryValuation
@@ -111,6 +136,11 @@ type ReportsTabsProps = {
   goldFlow: GoldFlow
   metalWise: MetalWise
   salesByUser: SalesByUser
+  itemLedger: ItemLedger
+}
+
+function reportDate(value: string | null) {
+  return value ? new Date(value).toLocaleDateString("en-IN") : "-"
 }
 
 /** Money for the report cards; the columns print raw rupees themselves. */
@@ -133,6 +163,7 @@ const TABS = [
   { key: "dues", label: "Customer Dues" },
   { key: "goldFlow", label: "Gold Flow" },
   { key: "metalWise", label: "By Metal" },
+  { key: "itemLedger", label: "Item Ledger" },
 ] as const
 
 type TabKey = (typeof TABS)[number]["key"]
@@ -154,6 +185,7 @@ export function ReportsTabs({
   goldFlow,
   metalWise,
   salesByUser,
+  itemLedger,
 }: ReportsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("sales")
 
@@ -744,6 +776,117 @@ export function ReportsTabs({
                             ? `Gap: ${row.reconciliationGap.toFixed(3)}g`
                             : "Reconciled"}
                         </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "itemLedger" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <StatCard title="Items" value={itemLedger.itemCount} />
+            <StatCard
+              title="Sold Items"
+              value={itemLedger.rows.filter((row) => row.totalSoldQuantity > 0).length}
+            />
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border bg-card">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/40">
+                <tr className="border-b">
+                  <th className="px-4 py-3 text-left font-medium">Item</th>
+                  <th className="px-4 py-3 text-left font-medium">Status</th>
+                  <th className="px-4 py-3 text-left font-medium">Purchased</th>
+                  <th className="px-4 py-3 text-left font-medium">Sold</th>
+                  <th className="px-4 py-3 text-left font-medium">History</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itemLedger.rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+                      No inventory items recorded yet.
+                    </td>
+                  </tr>
+                ) : (
+                  itemLedger.rows.map((row) => (
+                    <tr key={row.stockId} className="border-b last:border-0 align-top">
+                      <td className="px-4 py-3">
+                        <RecordHoverCard
+                          label={row.stockCode}
+                          href={`/inventory/stock/${row.stockId}`}
+                          title={row.productName}
+                          subtitle={row.stockCode}
+                          sections={[
+                            {
+                              fields: [
+                                { label: "Status", value: row.status },
+                                { label: "Qty on hand", value: row.quantityRemaining },
+                                { label: "Net weight", value: `${row.netWeight.toFixed(3)} g` },
+                              ],
+                            },
+                          ]}
+                        />
+                        <div className="text-xs text-muted-foreground">{row.productName}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
+                          {row.status}
+                        </span>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Qty on hand: {row.quantityRemaining}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>{reportDate(row.purchaseDate)}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.purchaseQuantity ? `Qty ${row.purchaseQuantity} · ` : ""}
+                          {row.vendorName ?? "Unknown vendor"}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Purchased by: {row.purchasedBy}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {row.totalSoldQuantity > 0 ? (
+                          <>
+                            <div>{reportDate(row.lastSaleDate)}</div>
+                            <div className="text-xs text-muted-foreground">
+                              Qty {row.totalSoldQuantity} · {row.soldTo}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Sold by: {row.soldBy}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Not sold yet</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {row.history.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">No activity</span>
+                        ) : (
+                          <RecordHoverCard
+                            label={`${row.history.length} event(s)`}
+                            title={`${row.productName} — Timeline`}
+                            subtitle={row.stockCode}
+                            className="text-xs font-medium underline-offset-4 hover:underline"
+                            sections={[
+                              {
+                                fields: row.history.map((event) => ({
+                                  label: reportDate(event.date),
+                                  value: event.label,
+                                })),
+                              },
+                            ]}
+                          />
+                        )}
                       </td>
                     </tr>
                   ))

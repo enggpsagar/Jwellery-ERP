@@ -551,8 +551,9 @@ export async function convertQuotationToInvoice(
     // Gated on billing rather than quotations: this is the point the sale
     // actually happens — stock flips to SOLD and the ledger is posted — so
     // being allowed to raise a quote must not be enough to invoice one.
+    let actor;
     try {
-      await requirePermission(PERMISSIONS.BILLING_CREATE);
+      actor = await requirePermission(PERMISSIONS.BILLING_CREATE);
     } catch {
       return {
         success: false,
@@ -613,6 +614,11 @@ export async function convertQuotationToInvoice(
           balanceAmount,
           notes,
           locationId: quotation.locationId ?? undefined,
+          // Recorded the same way a direct invoice does, so a quotation-born
+          // sale attributes to whoever converted it instead of falling into
+          // the Sales-by-User report's "Not recorded" bucket.
+          createdById: actor.id ?? null,
+          createdByName: actor.name ?? actor.email ?? null,
           items: {
             create: quotation.items.map((item) => ({
               itemName: item.itemName,
@@ -666,6 +672,7 @@ export async function convertQuotationToInvoice(
           data: {
             inventoryStockId: item.inventoryStockId,
             transactionType: InventoryTransactionType.SALE,
+            quantity: takeQty,
             netWeight: item.netWeight ?? undefined,
             referenceType: "Invoice",
             referenceId: created.id,

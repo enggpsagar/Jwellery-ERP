@@ -474,9 +474,10 @@ export function PurchaseForm({
                   <Input
                     type="number"
                     min={1}
-                    value={item.quantity}
+                    value={item.quantity === 0 ? "" : item.quantity}
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) =>
-                      updateItem(item.key, { quantity: Number(e.target.value) || 1 })
+                      updateItem(item.key, { quantity: Number(e.target.value) || 0 })
                     }
                   />
                 </div>

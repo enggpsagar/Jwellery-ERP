@@ -6,6 +6,7 @@ import {
   getGoldFlowReport,
   getMetalWiseReport,
   getSalesByUserReport,
+  getItemLedgerReport,
 } from "@/lib/actions/report-actions"
 
 import { ReportsTabs } from "@/components/reports/reports-tabs"
@@ -20,6 +21,7 @@ export default async function ReportsPage() {
     goldFlow,
     metalWise,
     salesByUser,
+    itemLedger,
   ] = await Promise.all([
       getSalesReport(),
       getInventoryValuationReport(),
@@ -28,6 +30,7 @@ export default async function ReportsPage() {
       getGoldFlowReport(),
       getMetalWiseReport(),
       getSalesByUserReport(),
+      getItemLedgerReport(),
     ])
 
   return (
@@ -47,6 +50,7 @@ export default async function ReportsPage() {
         goldFlow={goldFlow}
         metalWise={metalWise}
         salesByUser={salesByUser}
+        itemLedger={itemLedger}
       />
     </main>
   )

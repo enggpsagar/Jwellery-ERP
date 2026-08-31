@@ -493,6 +493,7 @@ export async function createKachaInvoice(
           data: {
             inventoryStockId: item.inventoryStockId,
             transactionType: InventoryTransactionType.SALE,
+            quantity: soldQty,
             netWeight: item.netWeight ?? undefined,
             referenceType: "KachaInvoice",
             referenceId: created.id,

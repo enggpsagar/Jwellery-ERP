@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState } from "react"
+import { useActionState, useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react"
 
@@ -8,10 +8,22 @@ import {
   registerStoreAction,
   type RegisterStoreState,
 } from "@/lib/actions/store-registration-actions"
+import {
+  getCitiesByStateId,
+  type CityOption,
+  type StateOption,
+} from "@/lib/actions/location-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { RequiredMark } from "@/components/shared/required-mark"
 
 const initialState: RegisterStoreState = { success: false, message: "" }
@@ -21,11 +33,52 @@ function FieldError({ errors }: { errors?: string[] }) {
   return <p className="text-sm text-destructive">{errors[0]}</p>
 }
 
-export function RegisterStoreForm() {
+type RegisterStoreFormProps = {
+  states: StateOption[]
+}
+
+export function RegisterStoreForm({ states }: RegisterStoreFormProps) {
   const [state, formAction, pending] = useActionState(
     registerStoreAction,
     initialState,
   )
+
+  const [selectedStateId, setSelectedStateId] = useState("")
+  const [selectedCity, setSelectedCity] = useState("")
+  const [cities, setCities] = useState<CityOption[]>([])
+  const [loadingCities, setLoadingCities] = useState(false)
+
+  const selectedStateName =
+    states.find((item) => item.id === selectedStateId)?.name ?? ""
+
+  // Cities depend on the chosen state, so they're fetched fresh whenever it
+  // changes — mirrors the same State→City cascade used on the Add Vendor form.
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadCities() {
+      if (!selectedStateId) {
+        setCities([])
+        return
+      }
+
+      try {
+        setLoadingCities(true)
+        const data = await getCitiesByStateId(selectedStateId)
+        if (!cancelled) setCities(data || [])
+      } catch (error) {
+        console.error("Failed to load cities:", error)
+        if (!cancelled) setCities([])
+      } finally {
+        if (!cancelled) setLoadingCities(false)
+      }
+    }
+
+    loadCities()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedStateId])
 
   // Success is a different screen, not a toast: the next step is "go and sign
   // in", and a message that disappears after three seconds would take the
@@ -133,13 +186,58 @@ export function RegisterStoreForm() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="state">State <RequiredMark /></Label>
-              <Input id="state" name="state" placeholder="Maharashtra" required />
+              {/* Selected/keyed by id (to drive the city fetch below), but the
+                  form field itself must submit the state's name — Store.state
+                  is a plain text column, same convention as City. */}
+              <input type="hidden" name="state" value={selectedStateName} />
+              <Select
+                value={selectedStateId}
+                onValueChange={(value) => {
+                  setSelectedStateId(value)
+                  setSelectedCity("")
+                }}
+              >
+                <SelectTrigger id="state" className="w-full">
+                  <SelectValue placeholder="Select state" />
+                </SelectTrigger>
+                <SelectContent>
+                  {states.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FieldError errors={state.errors?.state} />
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="city">City or area <RequiredMark /></Label>
-              <Input id="city" name="city" placeholder="Nagpur" required />
+              <input type="hidden" name="city" value={selectedCity} />
+              <Select
+                value={selectedCity}
+                onValueChange={setSelectedCity}
+                disabled={!selectedStateId || loadingCities}
+              >
+                <SelectTrigger id="city" className="w-full">
+                  <SelectValue
+                    placeholder={
+                      loadingCities
+                        ? "Loading cities..."
+                        : selectedStateId
+                          ? "Select city"
+                          : "Select a state first"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {cities.map((city) => (
+                    <SelectItem key={city.id} value={city.name}>
+                      {city.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FieldError errors={state.errors?.city} />
             </div>
           </div>

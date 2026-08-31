@@ -308,7 +308,7 @@ model Karigar {
   aadhaarNumber  String?
   specialization String?
   notes          String?
-  openingGold    Decimal       @default(0) @db.Decimal(10, 3)
+  openingGold    Decimal       @default(0) @db.Decimal(12, 5)
   openingCash    Decimal       @default(0) @db.Decimal(12, 2)
   isActive       Boolean       @default(true)
   createdAt      DateTime      @default(now())
@@ -344,10 +344,10 @@ model Product {
   // Typical weights for this design, used to prefill a stock entry rather
   // than to describe any one piece — two rings off the same design are never
   // identical to the milligram, so the per-piece truth stays on
-  // InventoryStock. Same Decimal(10, 3) as the columns they seed.
-  defaultGrossWeight  Decimal?             @db.Decimal(10, 3)
-  defaultNetWeight    Decimal?             @db.Decimal(10, 3)
-  defaultStoneWeight  Decimal?             @db.Decimal(10, 3)
+  // InventoryStock. Same Decimal(12, 5) as the columns they seed.
+  defaultGrossWeight  Decimal?             @db.Decimal(12, 5)
+  defaultNetWeight    Decimal?             @db.Decimal(12, 5)
+  defaultStoneWeight  Decimal?             @db.Decimal(12, 5)
   designCode          String?
   hsnCode             String?
   description         String?
@@ -385,11 +385,11 @@ model InventoryStock {
   status              InventoryStockStatus   @default(IN_STOCK)
   finish              InventoryFinish        @default(KACHA)
   isActive            Boolean                @default(true)
-  grossWeight         Decimal?               @db.Decimal(10, 3)
-  lessWeight          Decimal?               @db.Decimal(10, 3)
-  netWeight           Decimal?               @db.Decimal(10, 3)
-  stoneWeight         Decimal?               @db.Decimal(10, 3)
-  dmoWeight           Decimal?               @db.Decimal(10, 3)
+  grossWeight         Decimal?               @db.Decimal(12, 5)
+  lessWeight          Decimal?               @db.Decimal(12, 5)
+  netWeight           Decimal?               @db.Decimal(12, 5)
+  stoneWeight         Decimal?               @db.Decimal(12, 5)
+  dmoWeight           Decimal?               @db.Decimal(12, 5)
   wastagePercent      Decimal?               @db.Decimal(5, 2)
   purchaseRate        Decimal?               @db.Decimal(12, 2)
   saleRate            Decimal?               @db.Decimal(12, 2)
@@ -440,8 +440,8 @@ model InventoryTransaction {
   inventoryStockId String
   transactionType  InventoryTransactionType
   quantity         Int                      @default(1)
-  grossWeight      Decimal?                 @db.Decimal(10, 3)
-  netWeight        Decimal?                 @db.Decimal(10, 3)
+  grossWeight      Decimal?                 @db.Decimal(12, 5)
+  netWeight        Decimal?                 @db.Decimal(12, 5)
   referenceType    String?
   referenceId      String?
   notes            String?
@@ -540,9 +540,9 @@ model KachaInvoiceItem {
   metalTypeId      String?
   purity           PurityType?
   quantity         Int             @default(1)
-  grossWeight      Decimal?        @db.Decimal(10, 3)
-  netWeight        Decimal?        @db.Decimal(10, 3)
-  dmoWeight        Decimal?        @db.Decimal(10, 3)
+  grossWeight      Decimal?        @db.Decimal(12, 5)
+  netWeight        Decimal?        @db.Decimal(12, 5)
+  dmoWeight        Decimal?        @db.Decimal(12, 5)
   rate             Decimal?        @db.Decimal(12, 2)
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
   makingChargeType ChargeType      @default(FIXED)
@@ -565,9 +565,9 @@ model InvoiceItem {
   itemName         String
   metalTypeId      String?
   quantity         Int             @default(1)
-  grossWeight      Decimal?        @db.Decimal(10, 3)
-  netWeight        Decimal?        @db.Decimal(10, 3)
-  dmoWeight        Decimal?        @db.Decimal(10, 3)
+  grossWeight      Decimal?        @db.Decimal(12, 5)
+  netWeight        Decimal?        @db.Decimal(12, 5)
+  dmoWeight        Decimal?        @db.Decimal(12, 5)
   rate             Decimal?        @db.Decimal(12, 2)
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
   makingChargeType ChargeType      @default(FIXED)
@@ -597,8 +597,8 @@ model LedgerEntry {
   purchaseId       String?
   vendorId         String?
   metalTypeId      String?
-  metalWeight      Decimal?         @db.Decimal(10, 3)
-  metalWeightFine  Decimal?         @db.Decimal(10, 3)
+  metalWeight      Decimal?         @db.Decimal(12, 5)
+  metalWeightFine  Decimal?         @db.Decimal(12, 5)
   amount           Decimal          @default(0) @db.Decimal(12, 2)
   paymentMethod    PaymentMethod?
   paymentReference String?
@@ -638,11 +638,11 @@ model KarigarJob {
   expectedDate      DateTime?
   receivedDate      DateTime?
   metalTypeId       String?
-  issueWeight       Decimal?             @db.Decimal(10, 3)
+  issueWeight       Decimal?             @db.Decimal(12, 5)
   issuePurity       PurityType?
-  issueFineWeight   Decimal?             @db.Decimal(10, 3)
-  receiveWeight     Decimal?             @db.Decimal(10, 3)
-  receiveFineWeight Decimal?             @db.Decimal(10, 3)
+  issueFineWeight   Decimal?             @db.Decimal(12, 5)
+  receiveWeight     Decimal?             @db.Decimal(12, 5)
+  receiveFineWeight Decimal?             @db.Decimal(12, 5)
   labourCharge      Decimal              @default(0) @db.Decimal(12, 2)
   status            String               @default("issued")
   notes             String?
@@ -738,9 +738,9 @@ model PurchaseItem {
   metalTypeId      String?
   purity           PurityType?
   quantity         Int             @default(1)
-  grossWeight      Decimal?        @db.Decimal(10, 3)
-  netWeight        Decimal?        @db.Decimal(10, 3)
-  dmoWeight        Decimal?        @db.Decimal(10, 3)
+  grossWeight      Decimal?        @db.Decimal(12, 5)
+  netWeight        Decimal?        @db.Decimal(12, 5)
+  dmoWeight        Decimal?        @db.Decimal(12, 5)
   rate             Decimal?        @db.Decimal(12, 2)
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
   makingChargeType ChargeType      @default(FIXED)
@@ -778,12 +778,12 @@ model KarigarReceiptItem {
   metalTypeId      String?
   purity           PurityType
   quantity         Int             @default(1)
-  grossWeight      Decimal?        @db.Decimal(10, 3)
-  netWeight        Decimal?        @db.Decimal(10, 3)
-  stoneWeight      Decimal?        @db.Decimal(10, 3)
-  dmoWeight        Decimal?        @db.Decimal(10, 3)
+  grossWeight      Decimal?        @db.Decimal(12, 5)
+  netWeight        Decimal?        @db.Decimal(12, 5)
+  stoneWeight      Decimal?        @db.Decimal(12, 5)
+  dmoWeight        Decimal?        @db.Decimal(12, 5)
   wastagePercent   Decimal?        @db.Decimal(5, 2)
-  fineWeight       Decimal         @db.Decimal(10, 3)
+  fineWeight       Decimal         @db.Decimal(12, 5)
   inventoryStockId String?
   createdAt        DateTime        @default(now())
   karigarJob       KarigarJob      @relation(fields: [karigarJobId], references: [id], onDelete: Cascade)
@@ -835,8 +835,8 @@ model QuotationItem {
   metalTypeId      String?
   purity           PurityType?
   quantity         Int             @default(1)
-  grossWeight      Decimal?        @db.Decimal(10, 3)
-  netWeight        Decimal?        @db.Decimal(10, 3)
+  grossWeight      Decimal?        @db.Decimal(12, 5)
+  netWeight        Decimal?        @db.Decimal(12, 5)
   rate             Decimal?        @db.Decimal(12, 2)
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
   makingChargeType ChargeType      @default(FIXED)

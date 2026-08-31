@@ -4,24 +4,36 @@ import { NextRequest, NextResponse } from "next/server"
 
 import {
   getSalesReport,
+  getSalesByUserReport,
   getInventoryValuationReport,
   getKarigarOutstandingReport,
   getCustomerDuesReport,
   getGoldFlowReport,
   getMetalWiseReport,
+  getItemLedgerReport,
 } from "@/lib/actions/report-actions"
 import { buildCsvExport, buildExcelExport } from "@/lib/excel-export"
 
-type ReportType = "sales" | "inventory" | "karigar" | "dues" | "goldFlow" | "metalWise"
+type ReportType =
+  | "sales"
+  | "byUser"
+  | "inventory"
+  | "karigar"
+  | "dues"
+  | "goldFlow"
+  | "metalWise"
+  | "itemLedger"
 type Format = "csv" | "excel"
 
 const REPORT_LABELS: Record<ReportType, string> = {
   sales: "Sales",
+  byUser: "Sales by User",
   inventory: "Inventory Valuation",
   karigar: "Karigar Outstanding",
   dues: "Customer Dues",
   goldFlow: "Gold Flow",
   metalWise: "By Metal",
+  itemLedger: "Item Ledger",
 }
 
 async function buildRows(type: ReportType) {
@@ -35,6 +47,22 @@ async function buildRows(type: ReportType) {
         Status: invoice.status,
         "Total (₹)": invoice.totalAmount,
         "Balance (₹)": invoice.balanceAmount,
+      }))
+    }
+    case "byUser": {
+      const report = await getSalesByUserReport()
+      return report.rows.map((row) => ({
+        User: row.name,
+        Invoices: row.invoiceCount,
+        "Revenue (₹)": row.totalRevenue,
+        "Collected (₹)": row.totalCollected,
+        "Outstanding (₹)": row.totalOutstanding,
+        "First Sale": row.firstSale
+          ? new Date(row.firstSale).toLocaleDateString("en-IN")
+          : "",
+        "Last Sale": row.lastSale
+          ? new Date(row.lastSale).toLocaleDateString("en-IN")
+          : "",
       }))
     }
     case "inventory": {
@@ -98,6 +126,34 @@ async function buildRows(type: ReportType) {
         "In Stock Value (₹)": row.inStockValue,
         "With Karigar Weight (g)": row.withKarigarWeight,
         "Reconciliation Gap (g)": row.reconciliationGap,
+      }))
+    }
+    case "itemLedger": {
+      const report = await getItemLedgerReport()
+      return report.rows.map((row) => ({
+        "Stock Code": row.stockCode,
+        Item: row.productName,
+        Status: row.status,
+        "Qty On Hand": row.quantityRemaining,
+        "Net Weight (g)": row.netWeight,
+        "Purchase Date": row.purchaseDate
+          ? new Date(row.purchaseDate).toLocaleDateString("en-IN")
+          : "",
+        "Purchase Qty": row.purchaseQuantity ?? "",
+        Vendor: row.vendorName ?? "",
+        "Purchased By": row.purchasedBy,
+        "Last Sale Date": row.lastSaleDate
+          ? new Date(row.lastSaleDate).toLocaleDateString("en-IN")
+          : "",
+        "Sold Qty": row.totalSoldQuantity,
+        "Sold To": row.soldTo,
+        "Sold By": row.soldBy,
+        "Transaction History": row.history
+          .map(
+            (event) =>
+              `${new Date(event.date).toLocaleDateString("en-IN")}: ${event.label}`,
+          )
+          .join(" | "),
       }))
     }
   }

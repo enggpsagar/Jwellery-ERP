@@ -73,6 +73,20 @@ type ReceiptItem = {
   manufactureDate: string
   locationId: string
   remarks: string
+  /** Once Net Weight is edited directly, the gross/less/stone/dmo auto-calc
+   * stops overwriting it — same override rule as the Add Stock form. */
+  netTouched: boolean
+}
+
+function deriveNetWeight(
+  grossWeight: number,
+  lessWeight: number,
+  stoneWeight: number,
+  dmoWeight: number,
+) {
+  if (!grossWeight) return null
+  const net = grossWeight - lessWeight - stoneWeight - dmoWeight
+  return net >= 0 ? Number(net.toFixed(3)) : null
 }
 
 // Every returned item becomes brand-new sellable InventoryStock (see
@@ -112,6 +126,7 @@ function emptyReceiptItem(defaultMetal?: StoreMetalRow): ReceiptItem {
     manufactureDate: "",
     locationId: "",
     remarks: "",
+    netTouched: false,
   }
 }
 
@@ -448,11 +463,23 @@ export function ReceiveItemsForm({
                       <Label className="text-xs">Gross Weight (g)</Label>
                       <Input
                         type="number"
-                        step="0.001"
+                        step="0.00001"
                         value={item.grossWeight === 0 ? "" : item.grossWeight}
-                        onChange={(e) =>
-                          updateItem(item.key, { grossWeight: Number(e.target.value) || 0 })
-                        }
+                        onChange={(e) => {
+                          const grossWeight = Number(e.target.value) || 0
+                          const derived = item.netTouched
+                            ? null
+                            : deriveNetWeight(
+                                grossWeight,
+                                item.lessWeight,
+                                item.stoneWeight,
+                                item.dmoWeight,
+                              )
+                          updateItem(item.key, {
+                            grossWeight,
+                            ...(derived !== null ? { netWeight: derived } : {}),
+                          })
+                        }}
                       />
                     </div>
 
@@ -460,11 +487,23 @@ export function ReceiveItemsForm({
                       <Label className="text-xs">Less Weight (g)</Label>
                       <Input
                         type="number"
-                        step="0.001"
+                        step="0.00001"
                         value={item.lessWeight === 0 ? "" : item.lessWeight}
-                        onChange={(e) =>
-                          updateItem(item.key, { lessWeight: Number(e.target.value) || 0 })
-                        }
+                        onChange={(e) => {
+                          const lessWeight = Number(e.target.value) || 0
+                          const derived = item.netTouched
+                            ? null
+                            : deriveNetWeight(
+                                item.grossWeight,
+                                lessWeight,
+                                item.stoneWeight,
+                                item.dmoWeight,
+                              )
+                          updateItem(item.key, {
+                            lessWeight,
+                            ...(derived !== null ? { netWeight: derived } : {}),
+                          })
+                        }}
                       />
                     </div>
 
@@ -472,23 +511,43 @@ export function ReceiveItemsForm({
                       <Label className="text-xs">Net Weight (g) <RequiredMark /></Label>
                       <Input
                         type="number"
-                        step="0.001"
+                        step="0.00001"
                         value={item.netWeight === 0 ? "" : item.netWeight}
                         onChange={(e) =>
-                          updateItem(item.key, { netWeight: Number(e.target.value) || 0 })
+                          updateItem(item.key, {
+                            netWeight: Number(e.target.value) || 0,
+                            netTouched: true,
+                          })
                         }
                       />
+                      {!item.netTouched && (
+                        <p className="text-xs text-muted-foreground">
+                          Gross − less − stone − dust/other
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-1">
                       <Label className="text-xs">Stone Weight (g)</Label>
                       <Input
                         type="number"
-                        step="0.001"
+                        step="0.00001"
                         value={item.stoneWeight === 0 ? "" : item.stoneWeight}
-                        onChange={(e) =>
-                          updateItem(item.key, { stoneWeight: Number(e.target.value) || 0 })
-                        }
+                        onChange={(e) => {
+                          const stoneWeight = Number(e.target.value) || 0
+                          const derived = item.netTouched
+                            ? null
+                            : deriveNetWeight(
+                                item.grossWeight,
+                                item.lessWeight,
+                                stoneWeight,
+                                item.dmoWeight,
+                              )
+                          updateItem(item.key, {
+                            stoneWeight,
+                            ...(derived !== null ? { netWeight: derived } : {}),
+                          })
+                        }}
                       />
                     </div>
 
@@ -496,11 +555,23 @@ export function ReceiveItemsForm({
                       <Label className="text-xs">Dust/Making/Other Wt (g)</Label>
                       <Input
                         type="number"
-                        step="0.001"
+                        step="0.00001"
                         value={item.dmoWeight === 0 ? "" : item.dmoWeight}
-                        onChange={(e) =>
-                          updateItem(item.key, { dmoWeight: Number(e.target.value) || 0 })
-                        }
+                        onChange={(e) => {
+                          const dmoWeight = Number(e.target.value) || 0
+                          const derived = item.netTouched
+                            ? null
+                            : deriveNetWeight(
+                                item.grossWeight,
+                                item.lessWeight,
+                                item.stoneWeight,
+                                dmoWeight,
+                              )
+                          updateItem(item.key, {
+                            dmoWeight,
+                            ...(derived !== null ? { netWeight: derived } : {}),
+                          })
+                        }}
                       />
                     </div>
 

@@ -55,7 +55,7 @@ export type DashboardStat = {
   change: string;
   trend: "up" | "down";
   sub: string;
-  icon: "rupee" | "trending" | "wallet" | "metal" | "hammer";
+  icon: "rupee" | "trending" | "wallet" | "metal" | "hammer" | "truck";
 };
 
 export type MetalStockStat = {
@@ -80,12 +80,17 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     where: { storeId, isActive: true },
   });
 
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
   const [
     todaySalesAgg,
     yesterdaySalesAgg,
     monthSalesAgg,
     lastMonthSalesAgg,
     outstandingAgg,
+    todayPurchasesAgg,
+    totalPurchasesAgg,
     metalStockAggs,
     pendingJobs,
     overdueJobs,
@@ -109,6 +114,17 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     prisma.invoice.aggregate({
       where: { storeId, balanceAmount: { gt: 0 } },
       _sum: { balanceAmount: true },
+      _count: true,
+    }),
+    // Bounded above unlike the sales queries this mirrors — a future-dated
+    // purchase must not inflate "today" indefinitely.
+    prisma.purchase.aggregate({
+      where: { storeId, purchaseDate: { gte: todayStart, lt: tomorrowStart } },
+      _sum: { totalAmount: true },
+    }),
+    prisma.purchase.aggregate({
+      where: { storeId },
+      _sum: { totalAmount: true },
       _count: true,
     }),
     Promise.all(
@@ -146,6 +162,9 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   const lastMonthSales = Number(lastMonthSalesAgg._sum.totalAmount ?? 0);
   const outstanding = Number(outstandingAgg._sum.balanceAmount ?? 0);
   const outstandingAccounts = outstandingAgg._count;
+  const todayPurchases = Number(todayPurchasesAgg._sum.totalAmount ?? 0);
+  const totalPurchases = Number(totalPurchasesAgg._sum.totalAmount ?? 0);
+  const totalPurchaseCount = totalPurchasesAgg._count;
 
   const metalStats: MetalStockStat[] = activeMetals.map((metal, index) => ({
     metalId: metal.id,
@@ -183,6 +202,14 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
       trend: outstanding > 0 ? "down" : "up",
       sub: `across ${outstandingAccounts} account${outstandingAccounts === 1 ? "" : "s"}`,
       icon: "wallet",
+    },
+    {
+      label: "Total Vendor Purchases",
+      value: `₹${totalPurchases.toLocaleString("en-IN")}`,
+      change: "",
+      trend: "up",
+      sub: `₹${todayPurchases.toLocaleString("en-IN")} today · ${totalPurchaseCount} purchase${totalPurchaseCount === 1 ? "" : "s"}`,
+      icon: "truck",
     },
     ...metalStats.map((metal) => ({
       label: `${metal.metalName} Stock`,

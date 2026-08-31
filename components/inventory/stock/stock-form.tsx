@@ -157,6 +157,63 @@ export function StockForm({
   const [netWeight, setNetWeight] = useState(stock?.netWeight ?? "");
   const [grossWeight, setGrossWeight] = useState(stock?.grossWeight ?? "");
   const [stoneWeight, setStoneWeight] = useState(stock?.stoneWeight ?? "");
+  const [lessWeight, setLessWeight] = useState(stock?.lessWeight ?? "");
+  const [dmoWeight, setDmoWeight] = useState(stock?.dmoWeight ?? "");
+
+  // Net = gross - less - stone - dust/making/other, the same subtraction a
+  // jeweller does by hand — mirrors the auto-fill on the Product form.
+  // Stops the moment Net Weight itself is edited directly, so a figure that
+  // came off a scale is never silently overwritten by the deduction fields.
+  const [netTouched, setNetTouched] = useState(Boolean(stock?.netWeight));
+
+  function toNum(value: string) {
+    const trimmed = value.trim();
+    return trimmed === "" ? 0 : Number(trimmed);
+  }
+
+  function deriveNet(gross: string, less: string, stone: string, dmo: string) {
+    if (gross.trim() === "" || !Number.isFinite(Number(gross))) return null;
+    const net = toNum(gross) - toNum(less) - toNum(stone) - toNum(dmo);
+    return net >= 0 ? String(Number(net.toFixed(3))) : null;
+  }
+
+  function editGrossWeight(value: string) {
+    setWeightsTouched(true);
+    setGrossWeight(value);
+    if (netTouched) return;
+    const derived = deriveNet(value, lessWeight, stoneWeight, dmoWeight);
+    if (derived !== null) setNetWeight(derived);
+  }
+
+  function editLessWeight(value: string) {
+    setWeightsTouched(true);
+    setLessWeight(value);
+    if (netTouched) return;
+    const derived = deriveNet(grossWeight, value, stoneWeight, dmoWeight);
+    if (derived !== null) setNetWeight(derived);
+  }
+
+  function editStoneWeight(value: string) {
+    setWeightsTouched(true);
+    setStoneWeight(value);
+    if (netTouched) return;
+    const derived = deriveNet(grossWeight, lessWeight, value, dmoWeight);
+    if (derived !== null) setNetWeight(derived);
+  }
+
+  function editDmoWeight(value: string) {
+    setWeightsTouched(true);
+    setDmoWeight(value);
+    if (netTouched) return;
+    const derived = deriveNet(grossWeight, lessWeight, stoneWeight, value);
+    if (derived !== null) setNetWeight(derived);
+  }
+
+  function editNetWeight(value: string) {
+    setWeightsTouched(true);
+    setNetTouched(true);
+    setNetWeight(value);
+  }
 
   // Weights follow the selected product until someone weighs the piece.
   //
@@ -166,13 +223,6 @@ export function StockForm({
   // add up. Editing an existing stock row starts locked — those numbers came
   // off a scale and must not be overwritten by picking a product.
   const [weightsTouched, setWeightsTouched] = useState(Boolean(stock?.id));
-
-  function editWeight(setter: (value: string) => void) {
-    return (value: string) => {
-      setWeightsTouched(true);
-      setter(value);
-    };
-  }
 
   // Metal, purity and the two charges are no longer entered here — the
   // server copies them from the product. This only tracks which product is
@@ -390,9 +440,9 @@ export function StockForm({
               id="grossWeight"
               name="grossWeight"
               type="number"
-              step="0.001"
+              step="0.00001"
               value={grossWeight}
-              onChange={(event) => editWeight(setGrossWeight)(event.target.value)}
+              onChange={(event) => editGrossWeight(event.target.value)}
             />
 
             <ErrorText error={state.errors.grossWeight} />
@@ -405,8 +455,9 @@ export function StockForm({
               id="lessWeight"
               name="lessWeight"
               type="number"
-              step="0.001"
-              defaultValue={stock?.lessWeight ?? ""}
+              step="0.00001"
+              value={lessWeight}
+              onChange={(event) => editLessWeight(event.target.value)}
             />
 
             <ErrorText error={state.errors.lessWeight} />
@@ -419,10 +470,15 @@ export function StockForm({
               id="netWeight"
               name="netWeight"
               type="number"
-              step="0.001"
+              step="0.00001"
               value={netWeight}
-              onChange={(event) => editWeight(setNetWeight)(event.target.value)}
+              onChange={(event) => editNetWeight(event.target.value)}
             />
+            {!netTouched && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Gross − less − stone − dust/other. Type to override.
+              </p>
+            )}
 
             <ErrorText error={state.errors.netWeight} />
           </div>
@@ -434,9 +490,9 @@ export function StockForm({
               id="stoneWeight"
               name="stoneWeight"
               type="number"
-              step="0.001"
+              step="0.00001"
               value={stoneWeight}
-              onChange={(event) => editWeight(setStoneWeight)(event.target.value)}
+              onChange={(event) => editStoneWeight(event.target.value)}
             />
 
             <ErrorText error={state.errors.stoneWeight} />
@@ -449,8 +505,9 @@ export function StockForm({
               id="dmoWeight"
               name="dmoWeight"
               type="number"
-              step="0.001"
-              defaultValue={stock?.dmoWeight ?? ""}
+              step="0.00001"
+              value={dmoWeight}
+              onChange={(event) => editDmoWeight(event.target.value)}
             />
 
             <ErrorText error={state.errors.dmoWeight} />

@@ -75,38 +75,6 @@ function ErrorText({ error }: { error?: string[] }) {
   return <p className="mt-1 text-sm text-red-600">{error[0]}</p>;
 }
 
-function ChargeTypeToggle({
-  value,
-  onChange,
-}: {
-  value: "FIXED" | "PERCENTAGE";
-  onChange: (value: "FIXED" | "PERCENTAGE") => void;
-}) {
-  return (
-    <div className="flex rounded-md border p-0.5 text-xs">
-      <Button
-        type="button"
-        size="sm"
-        variant={value === "FIXED" ? "default" : "ghost"}
-        className="h-6 px-2"
-        onClick={() => onChange("FIXED")}
-      >
-        ₹
-      </Button>
-
-      <Button
-        type="button"
-        size="sm"
-        variant={value === "PERCENTAGE" ? "default" : "ghost"}
-        className="h-6 px-2"
-        onClick={() => onChange("PERCENTAGE")}
-      >
-        %
-      </Button>
-    </div>
-  );
-}
-
 export function ProductForm({
   mode,
   product,
@@ -140,14 +108,6 @@ export function ProductForm({
   // product doesn't need a second trip to Inventory to become stockable.
   const [createStock, setCreateStock] = useState(false);
 
-  const [defaultMakingChargeType, setDefaultMakingChargeType] = useState(
-    product?.defaultMakingChargeType ?? "FIXED",
-  );
-
-  const [defaultStoneChargeType, setDefaultStoneChargeType] = useState(
-    product?.defaultStoneChargeType ?? "FIXED",
-  );
-
   // Net = gross - stone is how a jeweller works it out, so the field fills
   // itself in rather than making someone do the subtraction. It stops as
   // soon as the field is edited directly: an existing product already has a
@@ -174,7 +134,7 @@ export function ProductForm({
     gross - stone >= 0
       ? // Trailing zeros trimmed so the box reads 5.5 rather than 5.500,
         // while still respecting the column's three decimals.
-        String(Number((gross - stone).toFixed(3)))
+        String(Number((gross - stone).toFixed(5)))
       : null;
 
   // Kept in an effect rather than derived straight into the input, because
@@ -386,61 +346,6 @@ export function ProductForm({
             <ErrorText error={state.errors.defaultPurity} />
           </div>
 
-          <div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="defaultMakingCharge">Default Making Charge</Label>
-
-              <ChargeTypeToggle
-                value={defaultMakingChargeType}
-                onChange={setDefaultMakingChargeType}
-              />
-            </div>
-
-            <Input
-              id="defaultMakingCharge"
-              name="defaultMakingCharge"
-              type="number"
-              step="0.01"
-              defaultValue={product?.defaultMakingCharge ?? ""}
-              placeholder={defaultMakingChargeType === "PERCENTAGE" ? "0.00 %" : "0.00"}
-            />
-
-            <input
-              type="hidden"
-              name="defaultMakingChargeType"
-              value={defaultMakingChargeType}
-            />
-
-            <ErrorText error={state.errors.defaultMakingCharge} />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="defaultStoneCharge">Default Stone Charge</Label>
-
-              <ChargeTypeToggle
-                value={defaultStoneChargeType}
-                onChange={setDefaultStoneChargeType}
-              />
-            </div>
-
-            <Input
-              id="defaultStoneCharge"
-              name="defaultStoneCharge"
-              type="number"
-              step="0.01"
-              defaultValue={product?.defaultStoneCharge ?? ""}
-              placeholder={defaultStoneChargeType === "PERCENTAGE" ? "0.00 %" : "0.00"}
-            />
-
-            <input
-              type="hidden"
-              name="defaultStoneChargeType"
-              value={defaultStoneChargeType}
-            />
-
-            <ErrorText error={state.errors.defaultStoneCharge} />
-          </div>
         </div>
       </div>
       {/* ============================
@@ -464,7 +369,7 @@ export function ProductForm({
               id="defaultGrossWeight"
               name="defaultGrossWeight"
               type="number"
-              step="0.001"
+              step="0.00001"
               min="0"
               value={grossWeight}
               onChange={(event) => setGrossWeight(event.target.value)}
@@ -481,7 +386,7 @@ export function ProductForm({
               id="defaultStoneWeight"
               name="defaultStoneWeight"
               type="number"
-              step="0.001"
+              step="0.00001"
               min="0"
               value={stoneWeight}
               onChange={(event) => setStoneWeight(event.target.value)}
@@ -498,7 +403,7 @@ export function ProductForm({
               id="defaultNetWeight"
               name="defaultNetWeight"
               type="number"
-              step="0.001"
+              step="0.00001"
               min="0"
               value={netWeight}
               onChange={(event) => {

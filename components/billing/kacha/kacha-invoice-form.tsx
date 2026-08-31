@@ -58,6 +58,9 @@ type LineItem = {
   stoneCharge: number
   dmoWeight: number
   inventoryStockId: string
+  /** Once Net Weight is edited directly, the gross/dmo auto-calc stops
+   * overwriting it. */
+  netTouched: boolean
 }
 
 function emptyLineItem(): LineItem {
@@ -75,7 +78,14 @@ function emptyLineItem(): LineItem {
     stoneCharge: 0,
     dmoWeight: 0,
     inventoryStockId: "",
+    netTouched: false,
   }
+}
+
+function deriveNetWeight(grossWeight: number, dmoWeight: number) {
+  if (!grossWeight) return null
+  const net = grossWeight - dmoWeight
+  return net >= 0 ? Number(net.toFixed(3)) : null
 }
 
 const initialState: KachaInvoiceFormState = { success: false, message: "" }
@@ -143,6 +153,9 @@ export function KachaInvoiceForm({ customers, stockItems }: KachaInvoiceFormProp
       netWeight: stock.netWeight ?? 0,
       rate: stock.saleRate ?? 0,
       quantity: available > 0 ? 1 : 0,
+      // The linked stock row's own net weight is authoritative — the
+      // gross/dmo calc below must not silently recompute over it.
+      netTouched: true,
     })
   }
 
@@ -284,26 +297,58 @@ export function KachaInvoiceForm({ customers, stockItems }: KachaInvoiceFormProp
 
               <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                 <div className="space-y-1">
+                  <Label className="text-xs">Gross Weight (g)</Label>
+                  <Input
+                    type="number"
+                    step="0.00001"
+                    value={item.grossWeight === 0 ? "" : item.grossWeight}
+                    onChange={(e) => {
+                      const grossWeight = Number(e.target.value) || 0
+                      const derived = item.netTouched
+                        ? null
+                        : deriveNetWeight(grossWeight, item.dmoWeight)
+                      updateItem(item.key, {
+                        grossWeight,
+                        ...(derived !== null ? { netWeight: derived } : {}),
+                      })
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1">
                   <Label className="text-xs">Net Weight (g)</Label>
                   <Input
                     type="number"
-                    step="0.001"
+                    step="0.00001"
                     value={item.netWeight === 0 ? "" : item.netWeight}
                     onChange={(e) =>
-                      updateItem(item.key, { netWeight: Number(e.target.value) || 0 })
+                      updateItem(item.key, {
+                        netWeight: Number(e.target.value) || 0,
+                        netTouched: true,
+                      })
                     }
                   />
+                  {!item.netTouched && (
+                    <p className="text-xs text-muted-foreground">Gross − dust/other</p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
                   <Label className="text-xs">Dust/Making/Other Wt (g)</Label>
                   <Input
                     type="number"
-                    step="0.001"
+                    step="0.00001"
                     value={item.dmoWeight === 0 ? "" : item.dmoWeight}
-                    onChange={(e) =>
-                      updateItem(item.key, { dmoWeight: Number(e.target.value) || 0 })
-                    }
+                    onChange={(e) => {
+                      const dmoWeight = Number(e.target.value) || 0
+                      const derived = item.netTouched
+                        ? null
+                        : deriveNetWeight(item.grossWeight, dmoWeight)
+                      updateItem(item.key, {
+                        dmoWeight,
+                        ...(derived !== null ? { netWeight: derived } : {}),
+                      })
+                    }}
                   />
                 </div>
 

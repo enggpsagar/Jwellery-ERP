@@ -62,6 +62,15 @@ type LineItem = {
   schemeDiscount: number
   hsnCode: string
   inventoryStockId: string
+  /** Once Net Weight is edited directly, the gross/stone/dmo auto-calc
+   * stops overwriting it. */
+  netTouched: boolean
+}
+
+function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: number) {
+  if (!grossWeight) return null
+  const net = grossWeight - stoneWeight - dmoWeight
+  return net >= 0 ? Number(net.toFixed(3)) : null
 }
 
 function emptyLineItem(): LineItem {
@@ -83,6 +92,7 @@ function emptyLineItem(): LineItem {
     schemeDiscount: 0,
     hsnCode: "",
     inventoryStockId: "",
+    netTouched: false,
   }
 }
 
@@ -160,6 +170,9 @@ export function InvoiceForm({ customers, stockItems, defaultGstRate = 0 }: Invoi
       stoneWeight: stock.stoneWeight ?? 0,
       rate: stock.saleRate ?? 0,
       hsnCode: stock.hsnCode ?? "",
+      // The linked stock row's own net weight is authoritative — the
+      // gross/stone/dmo calc below must not silently recompute over it.
+      netTouched: true,
       // Re-linking to a different stock item resets quantity to a sane
       // default for it (1, or 0 if it's already fully claimed by other
       // lines) rather than carrying over a quantity that made sense for
@@ -242,6 +255,7 @@ export function InvoiceForm({ customers, stockItems, defaultGstRate = 0 }: Invoi
           stoneWeight: stock.stoneWeight ?? 0,
           rate: stock.saleRate ?? 0,
           hsnCode: stock.hsnCode ?? "",
+          netTouched: true,
         }
 
         const blank = prev.findIndex((item) => !item.inventoryStockId && !item.itemName)
@@ -525,26 +539,58 @@ export function InvoiceForm({ customers, stockItems, defaultGstRate = 0 }: Invoi
 
               <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                 <div className="space-y-1">
+                  <Label className="text-xs">Gross Weight (g)</Label>
+                  <Input
+                    type="number"
+                    step="0.00001"
+                    value={item.grossWeight === 0 ? "" : item.grossWeight}
+                    onChange={(e) => {
+                      const grossWeight = Number(e.target.value) || 0
+                      const derived = item.netTouched
+                        ? null
+                        : deriveNetWeight(grossWeight, item.stoneWeight, item.dmoWeight)
+                      updateItem(item.key, {
+                        grossWeight,
+                        ...(derived !== null ? { netWeight: derived } : {}),
+                      })
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1">
                   <Label className="text-xs">Net Weight (g)</Label>
                   <Input
                     type="number"
-                    step="0.001"
+                    step="0.00001"
                     value={item.netWeight === 0 ? "" : item.netWeight}
                     onChange={(e) =>
-                      updateItem(item.key, { netWeight: Number(e.target.value) || 0 })
+                      updateItem(item.key, {
+                        netWeight: Number(e.target.value) || 0,
+                        netTouched: true,
+                      })
                     }
                   />
+                  {!item.netTouched && (
+                    <p className="text-xs text-muted-foreground">Gross − stone − dust/other</p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
                   <Label className="text-xs">Dust/Making/Other Wt (g)</Label>
                   <Input
                     type="number"
-                    step="0.001"
+                    step="0.00001"
                     value={item.dmoWeight === 0 ? "" : item.dmoWeight}
-                    onChange={(e) =>
-                      updateItem(item.key, { dmoWeight: Number(e.target.value) || 0 })
-                    }
+                    onChange={(e) => {
+                      const dmoWeight = Number(e.target.value) || 0
+                      const derived = item.netTouched
+                        ? null
+                        : deriveNetWeight(item.grossWeight, item.stoneWeight, dmoWeight)
+                      updateItem(item.key, {
+                        dmoWeight,
+                        ...(derived !== null ? { netWeight: derived } : {}),
+                      })
+                    }}
                   />
                 </div>
 
@@ -606,9 +652,16 @@ export function InvoiceForm({ customers, stockItems, defaultGstRate = 0 }: Invoi
                     type="number"
                     step="0.00001"
                     value={item.stoneWeight === 0 ? "" : item.stoneWeight}
-                    onChange={(e) =>
-                      updateItem(item.key, { stoneWeight: Number(e.target.value) || 0 })
-                    }
+                    onChange={(e) => {
+                      const stoneWeight = Number(e.target.value) || 0
+                      const derived = item.netTouched
+                        ? null
+                        : deriveNetWeight(item.grossWeight, stoneWeight, item.dmoWeight)
+                      updateItem(item.key, {
+                        stoneWeight,
+                        ...(derived !== null ? { netWeight: derived } : {}),
+                      })
+                    }}
                   />
                 </div>
 

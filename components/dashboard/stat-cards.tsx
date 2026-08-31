@@ -4,6 +4,7 @@ import {
   Wallet,
   Coins,
   Hammer,
+  Truck,
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react"
@@ -18,6 +19,7 @@ const iconMap = {
   wallet: Wallet,
   metal: Coins,
   hammer: Hammer,
+  truck: Truck,
 }
 
 /**
@@ -35,6 +37,7 @@ const iconTint: Record<string, string> = {
   wallet: "var(--chart-5)",
   metal: "var(--chart-2)",
   hammer: "var(--chart-4)",
+  truck: "var(--chart-1)",
 }
 
 type StatCardsProps = {

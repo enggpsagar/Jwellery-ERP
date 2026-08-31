@@ -25,6 +25,8 @@ export type Customer = {
   creditLimit?: string
   paymentTerms?: string
   gstNumber?: string
+  panNumber?: string
+  registrationId?: string
   totalOrders?: number
   totalPurchaseValue?: string
   pendingAmount?: string
@@ -167,6 +169,8 @@ function mapCustomer(customer: any): Customer {
     creditLimit: "",
     paymentTerms: "",
     gstNumber: customer.gstin ?? "",
+    panNumber: customer.panNumber ?? "",
+    registrationId: customer.registrationId ?? "",
     totalOrders,
     totalPurchaseValue: formatCurrency(totalPurchaseValueNumber),
     pendingAmount: formatCurrency(pendingAmountNumber),
@@ -411,6 +415,8 @@ export async function addCustomer(
     const state = String(formData.get("state") || "").trim()
     const pincode = String(formData.get("pincode") || "").trim()
     const gstNumber = String(formData.get("gstNumber") || "").trim()
+    const panNumber = String(formData.get("panNumber") || "").trim()
+    const registrationId = String(formData.get("registrationId") || "").trim()
     const notes = String(formData.get("notes") || "").trim()
     const openingBalance = toNumber(formData.get("openingBalance"), 0)
 
@@ -456,6 +462,8 @@ export async function addCustomer(
         state: state || null,
         pincode: pincode || null,
         gstin: gstNumber || null,
+        panNumber: panNumber || null,
+        registrationId: registrationId || null,
         notes: notes || null,
         openingBalance,
       },
@@ -500,6 +508,8 @@ export async function updateCustomer(
     const state = String(formData.get("state") || "").trim()
     const pincode = String(formData.get("pincode") || "").trim()
     const gstNumber = String(formData.get("gstNumber") || "").trim()
+    const panNumber = String(formData.get("panNumber") || "").trim()
+    const registrationId = String(formData.get("registrationId") || "").trim()
     const notes = String(formData.get("notes") || "").trim()
     const openingBalance = toNumber(formData.get("openingBalance"), 0)
 
@@ -545,6 +555,8 @@ export async function updateCustomer(
         state: state || null,
         pincode: pincode || null,
         gstin: gstNumber || null,
+        panNumber: panNumber || null,
+        registrationId: registrationId || null,
         notes: notes || null,
         openingBalance,
       },

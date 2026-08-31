@@ -16,6 +16,7 @@ export type BusinessSettings = {
   logoUrl: string;
   gstNumber: string;
   panNumber: string;
+  cin: string;
   stateCode: string;
   address: string;
   city: string;
@@ -59,6 +60,7 @@ function mapSettings(settings: any): BusinessSettings {
     logoUrl: settings.logoUrl ?? "",
     gstNumber: settings.gstNumber ?? "",
     panNumber: settings.panNumber ?? "",
+    cin: settings.cin ?? "",
     stateCode: settings.stateCode ?? "",
     address: settings.address ?? "",
     city: settings.city ?? "",
@@ -178,6 +180,7 @@ export async function updateBusinessSettings(
         legalName: toOptionalString(formData.get("legalName")),
         gstNumber,
         panNumber: toOptionalString(formData.get("panNumber")),
+        cin: toOptionalString(formData.get("cin")),
         stateCode: toOptionalString(formData.get("stateCode")),
         address: toOptionalString(formData.get("address")),
         city: toOptionalString(formData.get("city")),
@@ -204,6 +207,7 @@ export async function updateBusinessSettings(
         legalName: toOptionalString(formData.get("legalName")),
         gstNumber,
         panNumber: toOptionalString(formData.get("panNumber")),
+        cin: toOptionalString(formData.get("cin")),
         stateCode: toOptionalString(formData.get("stateCode")),
         address: toOptionalString(formData.get("address")),
         city: toOptionalString(formData.get("city")),

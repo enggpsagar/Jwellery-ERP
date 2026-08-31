@@ -263,6 +263,30 @@ export function CustomerEditForm({
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
+              <Hash className="h-4 w-4 text-muted-foreground" />
+              PAN Number
+            </label>
+            <input
+              name="panNumber"
+              className={FIELD}
+              defaultValue={customer.panNumber ?? ""}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <Hash className="h-4 w-4 text-muted-foreground" />
+              Registration / Encircle Id
+            </label>
+            <input
+              name="registrationId"
+              className={FIELD}
+              defaultValue={customer.registrationId ?? ""}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 text-sm font-medium">
               <IndianRupee className="h-4 w-4 text-muted-foreground" />
               Opening Balance
             </label>

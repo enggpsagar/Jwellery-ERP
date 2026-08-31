@@ -191,6 +191,17 @@ export function SettingsForm({ settings, canEdit }: SettingsFormProps) {
           </div>
 
           <div className="space-y-1.5">
+            <Label htmlFor="cin">CIN</Label>
+            <Input
+              id="cin"
+              name="cin"
+              placeholder="Optional — registered companies only"
+              defaultValue={settings.cin}
+              className="uppercase"
+            />
+          </div>
+
+          <div className="space-y-1.5">
             <Label htmlFor="stateCode">GST State Code</Label>
             <Input
               id="stateCode"

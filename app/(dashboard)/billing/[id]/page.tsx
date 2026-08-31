@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeftCircle } from "lucide-react"
+import { ArrowLeftCircle, Printer } from "lucide-react"
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
@@ -43,6 +43,13 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         backLabel={backTo.label}
         action={
           <div className="flex items-center gap-2">
+            <Link
+              href={`/billing/${invoice.id}/print`}
+              className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
+            >
+              <Printer className="h-4 w-4" />
+              Print
+            </Link>
             <ShareWhatsAppButton
               phone={invoice.customer?.phone}
               message={whatsappMessage}

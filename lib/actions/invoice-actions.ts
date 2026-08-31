@@ -41,6 +41,12 @@ export type InvoiceLineItemInput = {
   makingChargeType?: ChargeType | string | null;
   stoneCharge: number;
   dmoWeight?: number | null;
+  stoneWeight?: number | null;
+  hmCharge?: number;
+  schemeDiscount?: number;
+  sgstAmount?: number;
+  cgstAmount?: number;
+  hsnCode?: string | null;
   inventoryStockId?: string | null;
 };
 
@@ -97,7 +103,15 @@ function toChargeType(value: unknown): ChargeType {
 
 function lineTotal(item: InvoiceLineItemInput) {
   const metalValue = toNumber(item.rate) * toNumber(item.netWeight);
-  return metalValue + toNumber(item.makingCharge) + toNumber(item.stoneCharge);
+  return (
+    metalValue +
+    toNumber(item.makingCharge) +
+    toNumber(item.hmCharge) +
+    toNumber(item.stoneCharge) -
+    toNumber(item.schemeDiscount) +
+    toNumber(item.sgstAmount) +
+    toNumber(item.cgstAmount)
+  );
 }
 
 async function generateInvoiceNumber(storeId: string) {
@@ -130,6 +144,12 @@ export type InvoiceItemView = {
   makingChargeType: ChargeType;
   stoneCharge: number;
   dmoWeight: number | null;
+  stoneWeight: number | null;
+  hmCharge: number;
+  schemeDiscount: number;
+  sgstAmount: number;
+  cgstAmount: number;
+  hsnCode: string | null;
   lineTotal: number;
   inventoryStockId: string | null;
 };
@@ -156,6 +176,14 @@ function mapInvoice(invoice: any) {
           id: invoice.customer.id,
           name: invoice.customer.name,
           phone: invoice.customer.phone,
+          gstin: invoice.customer.gstin ?? null,
+          panNumber: invoice.customer.panNumber ?? null,
+          registrationId: invoice.customer.registrationId ?? null,
+          addressLine1: invoice.customer.addressLine1 ?? null,
+          addressLine2: invoice.customer.addressLine2 ?? null,
+          city: invoice.customer.city ?? null,
+          state: invoice.customer.state ?? null,
+          pincode: invoice.customer.pincode ?? null,
         }
       : null,
     // Cast the array, not just the callback: `.map()` on an `any` returns
@@ -174,6 +202,12 @@ function mapInvoice(invoice: any) {
       makingChargeType: item.makingChargeType as ChargeType,
       stoneCharge: Number(item.stoneCharge),
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
+      stoneWeight: item.stoneWeight ? Number(item.stoneWeight) : null,
+      hmCharge: Number(item.hmCharge ?? 0),
+      schemeDiscount: Number(item.schemeDiscount ?? 0),
+      sgstAmount: Number(item.sgstAmount ?? 0),
+      cgstAmount: Number(item.cgstAmount ?? 0),
+      hsnCode: item.hsnCode ?? null,
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
     })),
@@ -183,6 +217,17 @@ function mapInvoice(invoice: any) {
           slipNumber: invoice.convertedFromKacha.slipNumber,
         }
       : null,
+    // Fetched via `include` but unused until the print view — the "Payment
+    // Details" block reads a payment's method/reference/bank the same way
+    // recordInvoicePayment's dual-method split writes them.
+    ledgerEntries: ((invoice.ledgerEntries ?? []) as any[]).map((entry) => ({
+      id: entry.id,
+      entryDate: entry.entryDate.toISOString(),
+      amount: Number(entry.amount),
+      paymentMethod: entry.paymentMethod as PaymentMethod | null,
+      paymentReference: entry.paymentReference as string | null,
+      bankName: entry.bankName as string | null,
+    })),
   };
 }
 
@@ -350,7 +395,21 @@ export async function getInvoiceById(id: string) {
   const invoice = await prisma.invoice.findFirst({
     where: { id, storeId },
     include: {
-      customer: { select: { id: true, name: true, phone: true } },
+      customer: {
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          gstin: true,
+          panNumber: true,
+          registrationId: true,
+          addressLine1: true,
+          addressLine2: true,
+          city: true,
+          state: true,
+          pincode: true,
+        },
+      },
       createdBy: { select: { name: true, email: true } },
       items: true,
       ledgerEntries: { orderBy: { entryDate: "desc" } },
@@ -383,7 +442,7 @@ export async function getInvoiceFormStockItems() {
     where: { storeId, status: InventoryStockStatus.IN_STOCK, isActive: true },
     orderBy: { stockCode: "asc" },
     include: {
-      product: { select: { name: true } },
+      product: { select: { name: true, hsnCode: true } },
       metalType: { select: { id: true, name: true } },
     },
   });
@@ -392,11 +451,13 @@ export async function getInvoiceFormStockItems() {
     id: stock.id,
     stockCode: stock.stockCode,
     productName: stock.product.name,
+    hsnCode: stock.product.hsnCode,
     metalType: stock.metalType
       ? { id: stock.metalType.id, name: stock.metalType.name }
       : null,
     purity: stock.purity,
     netWeight: stock.netWeight ? Number(stock.netWeight) : null,
+    stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
     saleRate: stock.saleRate ? Number(stock.saleRate) : null,
     quantity: stock.quantity,
   }));
@@ -431,8 +492,7 @@ export async function createInvoice(
       return { success: false, message: "Add at least one line item" };
     }
 
-    const discount = toNumber(formData.get("discount"));
-    const taxAmount = toNumber(formData.get("taxAmount"));
+    const manualDiscount = toNumber(formData.get("discount"));
     const paidAmount = toNumber(formData.get("paidAmount"));
     const invoiceDateRaw = String(formData.get("invoiceDate") || "");
     const dueDateRaw = String(formData.get("dueDate") || "");
@@ -442,8 +502,28 @@ export async function createInvoice(
       (sum, item) => sum + toNumber(item.rate) * toNumber(item.netWeight),
       0,
     );
-    const makingCharges = items.reduce((sum, item) => sum + toNumber(item.makingCharge), 0);
+    // Hallmarking charge folds into the invoice's Making Charges total — the
+    // printed format shows it as a sub-line under Making Charges, not a
+    // separate money bucket.
+    const makingCharges = items.reduce(
+      (sum, item) => sum + toNumber(item.makingCharge) + toNumber(item.hmCharge),
+      0,
+    );
     const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
+    // Per-line scheme/discount folds into the invoice's single `discount`
+    // total alongside whatever was typed at invoice level, so every existing
+    // reader of Invoice.discount (reports, the detail page, the
+    // subtotal+making+stone-discount+tax invariant) still adds up without
+    // needing to know per-line discounts exist.
+    const discount =
+      manualDiscount + items.reduce((sum, item) => sum + toNumber(item.schemeDiscount), 0);
+    // Recomputed from each line's own sgst/cgst rather than trusted from a
+    // single form field — the per-line breakdown is the source of truth the
+    // printed invoice shows, so the saved total must match it exactly.
+    const taxAmount = items.reduce(
+      (sum, item) => sum + toNumber(item.sgstAmount) + toNumber(item.cgstAmount),
+      0,
+    );
     const totalAmount = subtotal + makingCharges + stoneCharges - discount + taxAmount;
     const balanceAmount = Math.max(0, totalAmount - paidAmount);
 
@@ -560,6 +640,12 @@ export async function createInvoice(
               makingChargeType: toChargeType(item.makingChargeType),
               stoneCharge: item.stoneCharge,
               dmoWeight: item.dmoWeight ?? undefined,
+              stoneWeight: item.stoneWeight ?? undefined,
+              hmCharge: item.hmCharge ?? 0,
+              schemeDiscount: item.schemeDiscount ?? 0,
+              sgstAmount: item.sgstAmount ?? 0,
+              cgstAmount: item.cgstAmount ?? 0,
+              hsnCode: item.hsnCode ?? undefined,
               lineTotal: lineTotal(item),
               inventoryStockId:
                 item.inventoryStockId && validStockIds.has(item.inventoryStockId)

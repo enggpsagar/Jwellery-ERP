@@ -2,14 +2,16 @@ import {
   getInvoiceFormCustomers,
   getInvoiceFormStockItems,
 } from "@/lib/actions/invoice-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 
 import { InvoiceForm } from "@/components/billing/invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 export default async function NewInvoicePage() {
-  const [customers, stockItems] = await Promise.all([
+  const [customers, stockItems, businessSettings] = await Promise.all([
     getInvoiceFormCustomers(),
     getInvoiceFormStockItems(),
+    getBusinessSettings(),
   ])
 
   return (
@@ -21,7 +23,11 @@ export default async function NewInvoicePage() {
         backLabel="Back to Billing"
       />
 
-      <InvoiceForm customers={customers} stockItems={stockItems} />
+      <InvoiceForm
+        customers={customers}
+        stockItems={stockItems}
+        defaultGstRate={businessSettings.defaultGstRate}
+      />
     </main>
   )
 }

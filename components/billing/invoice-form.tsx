@@ -35,9 +35,11 @@ type StockOption = {
   id: string
   stockCode: string
   productName: string
+  hsnCode: string | null
   metalType: { id: string; name: string } | null
   purity: string | null
   netWeight: number | null
+  stoneWeight: number | null
   saleRate: number | null
   quantity: number
 }
@@ -55,6 +57,10 @@ type LineItem = {
   makingChargeType: "FIXED" | "PERCENTAGE"
   stoneCharge: number
   dmoWeight: number
+  stoneWeight: number
+  hmCharge: number
+  schemeDiscount: number
+  hsnCode: string
   inventoryStockId: string
 }
 
@@ -72,6 +78,10 @@ function emptyLineItem(): LineItem {
     makingChargeType: "FIXED",
     stoneCharge: 0,
     dmoWeight: 0,
+    stoneWeight: 0,
+    hmCharge: 0,
+    schemeDiscount: 0,
+    hsnCode: "",
     inventoryStockId: "",
   }
 }
@@ -81,16 +91,20 @@ const initialState: InvoiceFormState = { success: false, message: "" }
 type InvoiceFormProps = {
   customers: CustomerOption[]
   stockItems: StockOption[]
+  /** Store's default GST%, split evenly into SGST+CGST per line. Editable
+   * here per invoice — a store on an exempt sale, or one that changes its
+   * rate mid-year, isn't stuck with whatever Settings says today. */
+  defaultGstRate?: number
 }
 
-export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
+export function InvoiceForm({ customers, stockItems, defaultGstRate = 0 }: InvoiceFormProps) {
   const router = useRouter()
   const toast = useToast()
 
   const [customerId, setCustomerId] = useState("")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
-  const [taxAmount, setTaxAmount] = useState(0)
+  const [gstRate, setGstRate] = useState(defaultGstRate)
   const [paidAmount, setPaidAmount] = useState(0)
 
   const [state, formAction, pending] = useActionState(
@@ -143,7 +157,9 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
       metalTypeId: stock.metalType?.id ?? "",
       purity: stock.purity ?? "",
       netWeight: stock.netWeight ?? 0,
+      stoneWeight: stock.stoneWeight ?? 0,
       rate: stock.saleRate ?? 0,
+      hsnCode: stock.hsnCode ?? "",
       // Re-linking to a different stock item resets quantity to a sane
       // default for it (1, or 0 if it's already fully claimed by other
       // lines) rather than carrying over a quantity that made sense for
@@ -223,7 +239,9 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
           metalTypeId: stock.metalType?.id ?? "",
           purity: stock.purity ?? "",
           netWeight: stock.netWeight ?? 0,
+          stoneWeight: stock.stoneWeight ?? 0,
           rate: stock.saleRate ?? 0,
+          hsnCode: stock.hsnCode ?? "",
         }
 
         const blank = prev.findIndex((item) => !item.inventoryStockId && !item.itemName)
@@ -264,40 +282,85 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
     setItems((prev) => (prev.length > 1 ? prev.filter((item) => item.key !== key) : prev))
   }
 
-  const lineTotal = (item: LineItem) =>
-    item.rate * item.netWeight + item.makingCharge + item.stoneCharge
+  // Taxable value per line: metal + making + HM + stone, less any per-line
+  // scheme discount — the same base the reference format's SGST/CGST
+  // columns are computed against, split evenly since intra-state GST always
+  // is.
+  const taxableValue = (item: LineItem) =>
+    item.rate * item.netWeight +
+    item.makingCharge +
+    item.hmCharge +
+    item.stoneCharge -
+    item.schemeDiscount
+
+  const lineGst = (item: LineItem) => {
+    const half = Math.round(((taxableValue(item) * gstRate) / 2 / 100) * 100) / 100
+    return { sgst: half, cgst: half }
+  }
+
+  const lineTotal = (item: LineItem) => {
+    const { sgst, cgst } = lineGst(item)
+    return taxableValue(item) + sgst + cgst
+  }
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.rate * item.netWeight, 0),
     [items],
   )
   const makingChargesTotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.makingCharge, 0),
+    () => items.reduce((sum, item) => sum + item.makingCharge + item.hmCharge, 0),
     [items],
   )
   const stoneChargesTotal = useMemo(
     () => items.reduce((sum, item) => sum + item.stoneCharge, 0),
     [items],
   )
+  const schemeDiscountTotal = useMemo(
+    () => items.reduce((sum, item) => sum + item.schemeDiscount, 0),
+    [items],
+  )
+  const taxAmount = useMemo(
+    () =>
+      items.reduce((sum, item) => {
+        const { sgst, cgst } = lineGst(item)
+        return sum + sgst + cgst
+      }, 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, gstRate],
+  )
   const totalAmount =
-    subtotal + makingChargesTotal + stoneChargesTotal - discount + taxAmount
+    subtotal +
+    makingChargesTotal +
+    stoneChargesTotal -
+    discount -
+    schemeDiscountTotal +
+    taxAmount
   const balanceAmount = Math.max(0, totalAmount - paidAmount)
 
   const itemsJson = JSON.stringify(
-    items.map((item) => ({
-      itemName: item.itemName || "Item",
-      metalTypeId: item.metalTypeId || null,
-      purity: item.purity || null,
-      quantity: item.quantity || 1,
-      grossWeight: item.grossWeight || null,
-      netWeight: item.netWeight || null,
-      rate: item.rate || null,
-      makingCharge: item.makingCharge,
-      makingChargeType: item.makingChargeType,
-      stoneCharge: item.stoneCharge,
-      dmoWeight: item.dmoWeight || null,
-      inventoryStockId: item.inventoryStockId || null,
-    })),
+    items.map((item) => {
+      const { sgst, cgst } = lineGst(item)
+      return {
+        itemName: item.itemName || "Item",
+        metalTypeId: item.metalTypeId || null,
+        purity: item.purity || null,
+        quantity: item.quantity || 1,
+        grossWeight: item.grossWeight || null,
+        netWeight: item.netWeight || null,
+        rate: item.rate || null,
+        makingCharge: item.makingCharge,
+        makingChargeType: item.makingChargeType,
+        stoneCharge: item.stoneCharge,
+        dmoWeight: item.dmoWeight || null,
+        stoneWeight: item.stoneWeight || null,
+        hmCharge: item.hmCharge,
+        schemeDiscount: item.schemeDiscount,
+        sgstAmount: sgst,
+        cgstAmount: cgst,
+        hsnCode: item.hsnCode || null,
+        inventoryStockId: item.inventoryStockId || null,
+      }
+    }),
   )
 
   return (
@@ -528,6 +591,66 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">HSN Code</Label>
+                  <Input
+                    value={item.hsnCode}
+                    onChange={(e) => updateItem(item.key, { hsnCode: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Net Stone Weight (ct/g)</Label>
+                  <Input
+                    type="number"
+                    step="0.00001"
+                    value={item.stoneWeight === 0 ? "" : item.stoneWeight}
+                    onChange={(e) =>
+                      updateItem(item.key, { stoneWeight: Number(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">HM Charge</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={item.hmCharge === 0 ? "" : item.hmCharge}
+                    onChange={(e) =>
+                      updateItem(item.key, { hmCharge: Number(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Scheme / Discount</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={item.schemeDiscount === 0 ? "" : item.schemeDiscount}
+                    onChange={(e) =>
+                      updateItem(item.key, { schemeDiscount: Number(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">SGST ({(gstRate / 2).toFixed(2)}%)</Label>
+                  <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                    ₹{lineGst(item).sgst.toFixed(2)}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">CGST ({(gstRate / 2).toFixed(2)}%)</Label>
+                  <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                    ₹{lineGst(item).cgst.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+
               {items.length > 1 && (
                 <button
                   type="button"
@@ -554,13 +677,16 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
         </div>
 
         <div className="space-y-2">
-          <Label>Tax Amount</Label>
+          <Label>GST Rate %</Label>
           <Input
             type="number"
             step="0.01"
-            value={taxAmount === 0 ? "" : taxAmount}
-            onChange={(e) => setTaxAmount(Number(e.target.value) || 0)}
+            value={gstRate}
+            onChange={(e) => setGstRate(Number(e.target.value) || 0)}
           />
+          <p className="text-xs text-muted-foreground">
+            Split evenly into SGST + CGST per line — total tax ₹{taxAmount.toFixed(2)}
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -585,7 +711,7 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
           <span>₹{subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Making Charges</span>
+          <span>Making Charges (incl. HM)</span>
           <span>₹{makingChargesTotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
@@ -597,7 +723,11 @@ export function InvoiceForm({ customers, stockItems }: InvoiceFormProps) {
           <span>-₹{discount.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Tax</span>
+          <span>Scheme / Discount (line items)</span>
+          <span>-₹{schemeDiscountTotal.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>SGST + CGST</span>
           <span>₹{taxAmount.toFixed(2)}</span>
         </div>
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">

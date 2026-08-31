@@ -65,6 +65,7 @@ export async function GET(request: Request) {
     const gold24kPerGram = Number(data.price) / 31.1035;
     const gold22kPerGram = gold24kPerGram * (22 / 24);
     const gold18kPerGram = gold24kPerGram * (18 / 24);
+    const gold14kPerGram = gold24kPerGram * (14 / 24);
 
     // Temporary silver value
     const silverPerGram = 120;
@@ -73,6 +74,7 @@ export async function GET(request: Request) {
       gold24k: Number(gold24kPerGram.toFixed(2)),
       gold22k: Number(gold22kPerGram.toFixed(2)),
       gold18k: Number(gold18kPerGram.toFixed(2)),
+      gold14k: Number(gold14kPerGram.toFixed(2)),
       silver: Number(silverPerGram.toFixed(2)),
       unit: "GRAM",
     };

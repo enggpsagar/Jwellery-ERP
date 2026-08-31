@@ -27,6 +27,7 @@ import { sendMail } from "@/lib/mailer";
 import { invoiceEmail } from "@/lib/email-templates";
 import { resolveStoreName } from "@/lib/invite-email";
 import { buildExcelExport } from "@/lib/excel-export";
+import { OversellError } from "@/lib/inventory/oversell-error";
 
 export type InvoiceLineItemInput = {
   itemName: string;
@@ -397,6 +398,7 @@ export async function getInvoiceFormStockItems() {
     purity: stock.purity,
     netWeight: stock.netWeight ? Number(stock.netWeight) : null,
     saleRate: stock.saleRate ? Number(stock.saleRate) : null,
+    quantity: stock.quantity,
   }));
 }
 
@@ -574,27 +576,49 @@ export async function createInvoice(
         // Decrement rather than flipping the whole row to SOLD: a row of
         // 100 pieces that sells 2 still has 98 on hand. Marking it SOLD
         // outright made the remainder disappear from stock entirely.
-        // `decrement` is applied by the database, so concurrent sales of the
-        // same row cannot both read the same starting quantity.
         const soldQty = Math.max(1, item.quantity || 1);
-        const currentStock = await tx.inventoryStock.findFirst({
-          where: { id: item.inventoryStockId, storeId },
-          select: { quantity: true },
-        });
-        if (!currentStock) continue;
 
-        const remaining = currentStock.quantity - soldQty;
-
+        // The `quantity: { gte: soldQty }` guard — not the earlier
+        // requestedQtyByStock pre-check above — is what actually prevents
+        // overselling: two concurrent invoices for the same row can both
+        // pass that pre-check (it reads quantity before either has
+        // decremented anything) and then both land here. The database
+        // evaluates this WHERE clause against the row's real, current
+        // quantity, so only one of two racing decrements past the last
+        // unit can ever match; the other gets count: 0. A stale JS-side
+        // `quantity` read beforehand (the previous version of this code)
+        // can never provide that guarantee.
         const { count } = await tx.inventoryStock.updateMany({
-          where: { id: item.inventoryStockId, storeId },
+          where: { id: item.inventoryStockId, storeId, quantity: { gte: soldQty } },
           data: {
             quantity: { decrement: soldQty },
-            // Only the last piece leaving turns the row SOLD.
-            ...(remaining <= 0 ? { status: InventoryStockStatus.SOLD } : {}),
             saleAmount: lineTotal(item),
           },
         });
-        if (count === 0) continue;
+
+        if (count === 0) {
+          // Thrown, not returned — this must roll back the whole
+          // transaction (including every other line item's decrement
+          // already applied above), not create a partial invoice.
+          throw new OversellError(
+            `Not enough stock left for ${item.itemName || "an item"} — it may have just been sold in another sale. Refresh and try again.`,
+          );
+        }
+
+        // Only the last piece leaving turns the row SOLD — read the
+        // post-decrement quantity back rather than computing it from the
+        // pre-decrement value, since that value is exactly what the guard
+        // above proved cannot be trusted under concurrency.
+        const updatedStock = await tx.inventoryStock.findUniqueOrThrow({
+          where: { id: item.inventoryStockId },
+          select: { quantity: true, status: true },
+        });
+        if (updatedStock.quantity <= 0 && updatedStock.status !== InventoryStockStatus.SOLD) {
+          await tx.inventoryStock.update({
+            where: { id: item.inventoryStockId },
+            data: { status: InventoryStockStatus.SOLD },
+          });
+        }
 
         await tx.inventoryTransaction.create({
           data: {
@@ -633,6 +657,9 @@ export async function createInvoice(
       invoiceId: invoice.id,
     };
   } catch (error) {
+    if (error instanceof OversellError) {
+      return { success: false, message: error.message };
+    }
     console.error("createInvoice error:", error);
     return { success: false, message: "Failed to create invoice" };
   }

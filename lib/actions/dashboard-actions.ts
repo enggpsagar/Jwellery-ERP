@@ -113,14 +113,20 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     }),
     Promise.all(
       activeMetals.map((metal) =>
-        prisma.inventoryStock.aggregate({
+        // netWeight is captured per piece (see the stock form's "Weight
+        // Details" section) — a row of 4 rings at 6g each holds
+        // netWeight: 6, quantity: 4, so the row's actual contribution to
+        // on-hand stock is netWeight * quantity, not netWeight alone.
+        // aggregate()'s _sum can't express that (it sums one raw column),
+        // so this fetches the two columns and reduces client-side instead.
+        prisma.inventoryStock.findMany({
           where: {
             storeId,
             metalTypeId: metal.id,
             isActive: true,
             status: { in: ON_HAND_STOCK_STATUSES },
           },
-          _sum: { netWeight: true },
+          select: { netWeight: true, quantity: true },
         })
       )
     ),
@@ -144,7 +150,10 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   const metalStats: MetalStockStat[] = activeMetals.map((metal, index) => ({
     metalId: metal.id,
     metalName: metal.name,
-    grams: Number(metalStockAggs[index]._sum.netWeight ?? 0),
+    grams: metalStockAggs[index].reduce(
+      (sum, row) => sum + Number(row.netWeight ?? 0) * row.quantity,
+      0
+    ),
   }));
 
   const todayChange = percentChange(todaySales, yesterdaySales);

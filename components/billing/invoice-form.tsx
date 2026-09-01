@@ -25,6 +25,7 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
+import { PURITY_SELECT_OPTIONS } from "@/lib/purity"
 
 type CustomerOption = {
   id: string
@@ -302,12 +303,18 @@ export function InvoiceForm({ customers, stockItems, locations, defaultGstRate =
     setItems((prev) => (prev.length > 1 ? prev.filter((item) => item.key !== key) : prev))
   }
 
+  // Diamond items price per carat, not per gram — mirrors lineQuantity in
+  // invoice-actions.ts so the live-preview total here never disagrees with
+  // what the server actually saves.
+  const lineQuantity = (item: LineItem) =>
+    item.purity === "DIAMOND" ? item.caratWeight : item.netWeight
+
   // Taxable value per line: metal + making + HM + stone, less any per-line
   // scheme discount — the same base the reference format's SGST/CGST
   // columns are computed against, split evenly since intra-state GST always
   // is.
   const taxableValue = (item: LineItem) =>
-    item.rate * item.netWeight +
+    item.rate * lineQuantity(item) +
     item.makingCharge +
     item.hmCharge +
     item.stoneCharge -
@@ -324,7 +331,8 @@ export function InvoiceForm({ customers, stockItems, locations, defaultGstRate =
   }
 
   const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.rate * item.netWeight, 0),
+    () => items.reduce((sum, item) => sum + item.rate * lineQuantity(item), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
   const makingChargesTotal = useMemo(
@@ -367,6 +375,7 @@ export function InvoiceForm({ customers, stockItems, locations, defaultGstRate =
         quantity: item.quantity || 1,
         grossWeight: item.grossWeight || null,
         netWeight: item.netWeight || null,
+        caratWeight: item.caratWeight || null,
         rate: item.rate || null,
         makingCharge: item.makingCharge,
         makingChargeType: item.makingChargeType,
@@ -563,6 +572,25 @@ export function InvoiceForm({ customers, stockItems, locations, defaultGstRate =
 
               <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                 <div className="space-y-1">
+                  <Label className="text-xs">Purity</Label>
+                  <Select
+                    value={item.purity}
+                    onValueChange={(value) => updateItem(item.key, { purity: value })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select purity" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PURITY_SELECT_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
                   <Label className="text-xs">Gross Weight (g)</Label>
                   <Input
                     type="number"
@@ -598,6 +626,21 @@ export function InvoiceForm({ customers, stockItems, locations, defaultGstRate =
                     <p className="text-xs text-muted-foreground">Gross − stone − dust/other</p>
                   )}
                 </div>
+
+                {item.purity === "DIAMOND" && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Carat Weight (ct)</Label>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      value={item.caratWeight === 0 ? "" : item.caratWeight}
+                      onChange={(e) =>
+                        updateItem(item.key, { caratWeight: Number(e.target.value) || 0 })
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">Priced per carat, not per gram</p>
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <Label className="text-xs">Dust/Making/Other Wt (g)</Label>

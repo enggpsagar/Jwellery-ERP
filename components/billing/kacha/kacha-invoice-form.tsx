@@ -26,6 +26,7 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
+import { PURITY_SELECT_OPTIONS } from "@/lib/purity"
 
 type CustomerOption = {
   id: string
@@ -53,6 +54,7 @@ type LineItem = {
   quantity: number
   grossWeight: number
   netWeight: number
+  caratWeight: number
   rate: number
   makingCharge: number
   makingChargeType: "FIXED" | "PERCENTAGE"
@@ -73,6 +75,7 @@ function emptyLineItem(): LineItem {
     quantity: 1,
     grossWeight: 0,
     netWeight: 0,
+    caratWeight: 0,
     rate: 0,
     makingCharge: 0,
     makingChargeType: "FIXED",
@@ -166,11 +169,18 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
     setItems((prev) => (prev.length > 1 ? prev.filter((item) => item.key !== key) : prev))
   }
 
+  // Diamond items price per carat, not per gram — mirrors lineQuantity in
+  // kacha-invoice-actions.ts so the live-preview total here never disagrees
+  // with what the server actually saves.
+  const lineQuantity = (item: LineItem) =>
+    item.purity === "DIAMOND" ? item.caratWeight : item.netWeight
+
   const lineTotal = (item: LineItem) =>
-    item.rate * item.netWeight + item.makingCharge + item.stoneCharge
+    item.rate * lineQuantity(item) + item.makingCharge + item.stoneCharge
 
   const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.rate * item.netWeight, 0),
+    () => items.reduce((sum, item) => sum + item.rate * lineQuantity(item), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
   const makingChargesTotal = useMemo(
@@ -192,6 +202,7 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
       quantity: item.quantity || 1,
       grossWeight: item.grossWeight || null,
       netWeight: item.netWeight || null,
+      caratWeight: item.caratWeight || null,
       rate: item.rate || null,
       makingCharge: item.makingCharge,
       makingChargeType: item.makingChargeType,
@@ -324,6 +335,25 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
 
               <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                 <div className="space-y-1">
+                  <Label className="text-xs">Purity</Label>
+                  <Select
+                    value={item.purity}
+                    onValueChange={(value) => updateItem(item.key, { purity: value })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select purity" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PURITY_SELECT_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
                   <Label className="text-xs">Gross Weight (g)</Label>
                   <Input
                     type="number"
@@ -359,6 +389,21 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
                     <p className="text-xs text-muted-foreground">Gross − dust/other</p>
                   )}
                 </div>
+
+                {item.purity === "DIAMOND" && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Carat Weight (ct)</Label>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      value={item.caratWeight === 0 ? "" : item.caratWeight}
+                      onChange={(e) =>
+                        updateItem(item.key, { caratWeight: Number(e.target.value) || 0 })
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">Priced per carat, not per gram</p>
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <Label className="text-xs">Dust/Making/Other Wt (g)</Label>

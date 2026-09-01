@@ -69,7 +69,7 @@ export default async function PurchaseDetailPage({ params }: Props) {
               <th className="px-4 py-3 text-left font-medium">Item</th>
               <th className="px-4 py-3 text-left font-medium">Qty</th>
               <th className="px-4 py-3 text-left font-medium">Purity</th>
-              <th className="px-4 py-3 text-left font-medium">Net Wt (g)</th>
+              <th className="px-4 py-3 text-left font-medium">Weight</th>
               <th className="px-4 py-3 text-left font-medium">Rate</th>
               <th className="px-4 py-3 text-left font-medium">Making</th>
               <th className="px-4 py-3 text-left font-medium">Stone</th>
@@ -82,7 +82,11 @@ export default async function PurchaseDetailPage({ params }: Props) {
                 <td className="px-4 py-3">{item.itemName}</td>
                 <td className="px-4 py-3">{item.quantity}</td>
                 <td className="px-4 py-3">{item.purity ?? "-"}</td>
-                <td className="px-4 py-3">{item.netWeight?.toFixed(3) ?? "-"}</td>
+                <td className="px-4 py-3">
+                  {item.purity === "DIAMOND"
+                    ? item.caratWeight != null ? `${item.caratWeight.toFixed(3)} ct` : "-"
+                    : item.netWeight != null ? `${item.netWeight.toFixed(3)} g` : "-"}
+                </td>
                 <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
                 <td className="px-4 py-3">₹{item.makingCharge.toFixed(2)}</td>
                 <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>

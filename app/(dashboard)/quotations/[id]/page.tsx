@@ -14,7 +14,9 @@ type QuotationItemRow = {
   id: string
   itemName: string
   quantity: number
+  purity?: string | null
   netWeight: number | null
+  caratWeight?: number | null
   rate: number | null
   makingCharge: number
   makingChargeType?: string
@@ -125,7 +127,7 @@ export default async function QuotationDetailPage({ params }: Props) {
             <tr className="border-b">
               <th className="px-4 py-3 text-left font-medium">Item</th>
               <th className="px-4 py-3 text-left font-medium">Qty</th>
-              <th className="px-4 py-3 text-left font-medium">Net Wt (g)</th>
+              <th className="px-4 py-3 text-left font-medium">Weight</th>
               <th className="px-4 py-3 text-left font-medium">Rate</th>
               <th className="px-4 py-3 text-left font-medium">Making</th>
               <th className="px-4 py-3 text-left font-medium">Stone</th>
@@ -137,15 +139,22 @@ export default async function QuotationDetailPage({ params }: Props) {
               <tr key={item.id} className="border-b last:border-0">
                 <td className="px-4 py-3">{item.itemName}</td>
                 <td className="px-4 py-3">{item.quantity}</td>
-                <td className="px-4 py-3">{item.netWeight?.toFixed(3) ?? "-"}</td>
+                <td className="px-4 py-3">
+                  {item.purity === "DIAMOND"
+                    ? item.caratWeight != null ? `${item.caratWeight.toFixed(3)} ct` : "-"
+                    : item.netWeight != null ? `${item.netWeight.toFixed(3)} g` : "-"}
+                </td>
                 <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
                 <td className="px-4 py-3">
                   ₹{item.makingCharge.toFixed(2)}
-                  {item.makingChargeType === "PERCENTAGE" && item.rate && item.netWeight ? (
-                    <span className="block text-xs text-muted-foreground">
-                      ({((item.makingCharge / (item.rate * item.netWeight)) * 100).toFixed(2)}% of metal value)
-                    </span>
-                  ) : null}
+                  {(() => {
+                    const quantity = item.purity === "DIAMOND" ? item.caratWeight : item.netWeight
+                    return item.makingChargeType === "PERCENTAGE" && item.rate && quantity ? (
+                      <span className="block text-xs text-muted-foreground">
+                        ({((item.makingCharge / (item.rate * quantity)) * 100).toFixed(2)}% of metal value)
+                      </span>
+                    ) : null
+                  })()}
                 </td>
                 <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
                 <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>

@@ -135,7 +135,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             <tr className="border-b">
               <th className="px-4 py-3 text-left font-medium">Item</th>
               <th className="px-4 py-3 text-left font-medium">Qty</th>
-              <th className="px-4 py-3 text-left font-medium">Net Wt (g)</th>
+              <th className="px-4 py-3 text-left font-medium">Weight</th>
               <th className="px-4 py-3 text-left font-medium">Rate</th>
               <th className="px-4 py-3 text-left font-medium">Making</th>
               <th className="px-4 py-3 text-left font-medium">Stone</th>
@@ -143,24 +143,32 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             </tr>
           </thead>
           <tbody>
-            {invoice.items.map((item) => (
+            {invoice.items.map((item) => {
+              // Diamonds price and display by carat, not gram weight — same
+              // unit toLineQuantity used to save this line's own total.
+              const isDiamond = item.purity === "DIAMOND"
+              const quantity = isDiamond ? item.caratWeight : item.netWeight
+              return (
               <tr key={item.id} className="border-b last:border-0">
                 <td className="px-4 py-3">{item.itemName}</td>
                 <td className="px-4 py-3">{item.quantity}</td>
-                <td className="px-4 py-3">{item.netWeight?.toFixed(3) ?? "-"}</td>
+                <td className="px-4 py-3">
+                  {quantity != null ? `${quantity.toFixed(3)} ${isDiamond ? "ct" : "g"}` : "-"}
+                </td>
                 <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
                 <td className="px-4 py-3">
                   ₹{item.makingCharge.toFixed(2)}
-                  {item.makingChargeType === "PERCENTAGE" && item.rate && item.netWeight ? (
+                  {item.makingChargeType === "PERCENTAGE" && item.rate && quantity ? (
                     <span className="block text-xs text-muted-foreground">
-                      ({((item.makingCharge / (item.rate * item.netWeight)) * 100).toFixed(2)}% of metal value)
+                      ({((item.makingCharge / (item.rate * quantity)) * 100).toFixed(2)}% of metal value)
                     </span>
                   ) : null}
                 </td>
                 <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
                 <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>

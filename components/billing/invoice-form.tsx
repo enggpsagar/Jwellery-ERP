@@ -54,6 +54,7 @@ type LineItem = {
   quantity: number
   grossWeight: number
   netWeight: number
+  caratWeight: number
   rate: number
   makingCharge: number
   makingChargeType: "FIXED" | "PERCENTAGE"
@@ -84,6 +85,7 @@ function emptyLineItem(): LineItem {
     quantity: 1,
     grossWeight: 0,
     netWeight: 0,
+    caratWeight: 0,
     rate: 0,
     makingCharge: 0,
     makingChargeType: "FIXED",

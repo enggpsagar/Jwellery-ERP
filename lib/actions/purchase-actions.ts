@@ -112,8 +112,17 @@ function toDecimal(value: number | null | undefined): Prisma.Decimal | undefined
   return new Prisma.Decimal(value);
 }
 
+/**
+ * Diamond items price per carat, not per gram — every other purity still
+ * prices off netWeight. Duplicated per action file (same convention as the
+ * generateXNumber helpers in this codebase) rather than a shared import.
+ */
+function lineQuantity(item: { purity?: PurityType | null; netWeight?: number | null; caratWeight?: number | null }) {
+  return item.purity === PurityType.DIAMOND ? toNumber(item.caratWeight) : toNumber(item.netWeight);
+}
+
 function lineTotal(item: PurchaseLineItemInput) {
-  const metalValue = toNumber(item.rate) * toNumber(item.netWeight);
+  const metalValue = toNumber(item.rate) * lineQuantity(item);
   return metalValue + toNumber(item.makingCharge) + toNumber(item.stoneCharge);
 }
 
@@ -179,6 +188,7 @@ function mapPurchase(purchase: any) {
       quantity: item.quantity,
       grossWeight: item.grossWeight ? Number(item.grossWeight) : null,
       netWeight: item.netWeight ? Number(item.netWeight) : null,
+      caratWeight: item.caratWeight ? Number(item.caratWeight) : null,
       rate: item.rate ? Number(item.rate) : null,
       makingCharge: Number(item.makingCharge),
       makingChargeType: item.makingChargeType as ChargeType,
@@ -467,7 +477,7 @@ export async function createPurchase(
     const notes = String(formData.get("notes") || "").trim() || null;
 
     const subtotal = items.reduce(
-      (sum, item) => sum + toNumber(item.rate) * toNumber(item.netWeight),
+      (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
       0,
     );
     const makingCharges = items.reduce((sum, item) => sum + toNumber(item.makingCharge), 0);
@@ -585,6 +595,7 @@ export async function createPurchase(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
+              caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,
               makingChargeType: toChargeType(item.makingChargeType),

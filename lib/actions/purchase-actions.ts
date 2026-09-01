@@ -47,6 +47,7 @@ export type PurchaseLineItemInput = {
   quantity: number;
   grossWeight?: number | null;
   netWeight?: number | null;
+  caratWeight?: number | null;
   rate?: number | null;
   makingCharge: number;
   makingChargeType?: ChargeType | string | null;

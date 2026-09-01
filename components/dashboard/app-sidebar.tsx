@@ -339,7 +339,7 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
           </div>
 
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <h2 className="truncate font-semibold">{storeName || "Swarna Suite"}</h2>
+            <h2 className="truncate font-heading font-semibold">{storeName || "Swarna Suite"}</h2>
             <p className="text-xs text-muted-foreground">Jewellery ERP</p>
           </div>
         </div>

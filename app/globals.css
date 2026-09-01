@@ -108,24 +108,27 @@
 
 .dark {
   color-scheme: dark;
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  /* Same warm-hue-angle approach as :root — gold reads as the "premium"
+     accent on a dark surface, so primary shifts from burgundy (light mode)
+     to gold here rather than a dimmed maroon, which would read muddy. */
+  --background: oklch(0.16 0.015 40);
+  --foreground: oklch(0.96 0.01 75);
+  --card: oklch(0.21 0.02 40);
+  --card-foreground: oklch(0.96 0.01 75);
+  --popover: oklch(0.21 0.02 40);
+  --popover-foreground: oklch(0.96 0.01 75);
+  --primary: oklch(0.78 0.13 80);
+  --primary-foreground: oklch(0.18 0.02 40);
+  --secondary: oklch(0.28 0.02 40);
+  --secondary-foreground: oklch(0.96 0.01 75);
+  --muted: oklch(0.26 0.02 40);
+  --muted-foreground: oklch(0.68 0.02 60);
+  --accent: oklch(0.28 0.03 60);
+  --accent-foreground: oklch(0.96 0.01 75);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: oklch(0.9 0.02 70 / 12%);
+  --input: oklch(0.9 0.02 70 / 16%);
+  --ring: oklch(0.7 0.12 80);
   /* The same five hues re-stepped for the dark surface, not an automatic
      flip: validated separately - CVD adjacent dE 9.6, normal-vision 16.9,
      all inside L 0.48-0.67 and all >=3:1 against the dark surface. */
@@ -135,40 +138,40 @@
   --chart-4: #a57fd4;
   --chart-5: #d9584a;
 
-  --sidebar: oklch(0.18 0 0);
-  --sidebar-foreground: oklch(0.98 0 0);
+  --sidebar: oklch(0.16 0.015 40);
+  --sidebar-foreground: oklch(0.97 0.01 75);
 
   --sidebar-primary: oklch(0.83 0.17 87);
-  --sidebar-primary-foreground: oklch(0.15 0 0);
+  --sidebar-primary-foreground: oklch(0.15 0.015 40);
 
-  --sidebar-accent: oklch(0.27 0 0);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.24 0.02 40);
+  --sidebar-accent-foreground: oklch(0.97 0.01 75);
 
-  --sidebar-border: oklch(0.28 0 0);
+  --sidebar-border: oklch(0.26 0.02 40);
   --sidebar-ring: oklch(0.83 0.17 87);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
     color-scheme: dark;
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
+    --background: oklch(0.16 0.015 40);
+    --foreground: oklch(0.96 0.01 75);
+    --card: oklch(0.21 0.02 40);
+    --card-foreground: oklch(0.96 0.01 75);
+    --popover: oklch(0.21 0.02 40);
+    --popover-foreground: oklch(0.96 0.01 75);
+    --primary: oklch(0.78 0.13 80);
+    --primary-foreground: oklch(0.18 0.02 40);
+    --secondary: oklch(0.28 0.02 40);
+    --secondary-foreground: oklch(0.96 0.01 75);
+    --muted: oklch(0.26 0.02 40);
+    --muted-foreground: oklch(0.68 0.02 60);
+    --accent: oklch(0.28 0.03 60);
+    --accent-foreground: oklch(0.96 0.01 75);
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --border: oklch(0.9 0.02 70 / 12%);
+    --input: oklch(0.9 0.02 70 / 16%);
+    --ring: oklch(0.7 0.12 80);
     /* The same five hues re-stepped for the dark surface, not an automatic
        flip: validated separately - CVD adjacent dE 9.6, normal-vision 16.9,
        all inside L 0.48-0.67 and all >=3:1 against the dark surface. */
@@ -178,16 +181,16 @@
     --chart-4: #a57fd4;
     --chart-5: #d9584a;
 
-    --sidebar: oklch(0.18 0 0);
-    --sidebar-foreground: oklch(0.98 0 0);
+    --sidebar: oklch(0.16 0.015 40);
+    --sidebar-foreground: oklch(0.97 0.01 75);
 
     --sidebar-primary: oklch(0.83 0.17 87);
-    --sidebar-primary-foreground: oklch(0.15 0 0);
+    --sidebar-primary-foreground: oklch(0.15 0.015 40);
 
-    --sidebar-accent: oklch(0.27 0 0);
-    --sidebar-accent-foreground: oklch(0.98 0 0);
+    --sidebar-accent: oklch(0.24 0.02 40);
+    --sidebar-accent-foreground: oklch(0.97 0.01 75);
 
-    --sidebar-border: oklch(0.28 0 0);
+    --sidebar-border: oklch(0.26 0.02 40);
     --sidebar-ring: oklch(0.83 0.17 87);
   }
 }

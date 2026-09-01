@@ -362,6 +362,7 @@ model Product {
   defaultGrossWeight  Decimal?             @db.Decimal(12, 5)
   defaultNetWeight    Decimal?             @db.Decimal(12, 5)
   defaultStoneWeight  Decimal?             @db.Decimal(12, 5)
+  defaultCaratWeight  Decimal?             @db.Decimal(10, 3)
   designCode          String?
   hsnCode             String?
   description         String?
@@ -404,6 +405,10 @@ model InventoryStock {
   netWeight           Decimal?               @db.Decimal(12, 5)
   stoneWeight         Decimal?               @db.Decimal(12, 5)
   dmoWeight           Decimal?               @db.Decimal(12, 5)
+  // Diamond weight in carats — a distinct unit from every gram-based weight
+  // above, only meaningful when purity is DIAMOND. Rate then prices per
+  // carat, not per gram (see toLineQuantity in the *-actions.ts files).
+  caratWeight         Decimal?               @db.Decimal(10, 3)
   wastagePercent      Decimal?               @db.Decimal(5, 2)
   purchaseRate        Decimal?               @db.Decimal(12, 2)
   saleRate            Decimal?               @db.Decimal(12, 2)
@@ -557,6 +562,7 @@ model KachaInvoiceItem {
   grossWeight      Decimal?        @db.Decimal(12, 5)
   netWeight        Decimal?        @db.Decimal(12, 5)
   dmoWeight        Decimal?        @db.Decimal(12, 5)
+  caratWeight      Decimal?        @db.Decimal(10, 3)
   rate             Decimal?        @db.Decimal(12, 2)
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
   makingChargeType ChargeType      @default(FIXED)
@@ -586,6 +592,10 @@ model InvoiceItem {
   // convention as every other weight field), separate from dmoWeight (which
   // is Dust/Making/Other, not stone).
   stoneWeight      Decimal?        @db.Decimal(12, 5)
+  // Diamond weight in carats, only meaningful when purity is DIAMOND — a
+  // dedicated, unambiguous unit (unlike stoneWeight above), since rate then
+  // prices per carat rather than per gram.
+  caratWeight      Decimal?        @db.Decimal(10, 3)
   rate             Decimal?        @db.Decimal(12, 2)
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
   makingChargeType ChargeType      @default(FIXED)
@@ -771,6 +781,7 @@ model PurchaseItem {
   grossWeight      Decimal?        @db.Decimal(12, 5)
   netWeight        Decimal?        @db.Decimal(12, 5)
   dmoWeight        Decimal?        @db.Decimal(12, 5)
+  caratWeight      Decimal?        @db.Decimal(10, 3)
   rate             Decimal?        @db.Decimal(12, 2)
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
   makingChargeType ChargeType      @default(FIXED)
@@ -867,6 +878,7 @@ model QuotationItem {
   quantity         Int             @default(1)
   grossWeight      Decimal?        @db.Decimal(12, 5)
   netWeight        Decimal?        @db.Decimal(12, 5)
+  caratWeight      Decimal?        @db.Decimal(10, 3)
   rate             Decimal?        @db.Decimal(12, 2)
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
   makingChargeType ChargeType      @default(FIXED)

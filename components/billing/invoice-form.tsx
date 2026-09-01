@@ -8,6 +8,7 @@ import { Plus, Trash2 } from "lucide-react"
 import { createInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
 import { ScanToAddPanel } from "@/components/billing/scan-to-add-panel"
+import { todayForDateInput } from "@/lib/date-input"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -420,7 +421,7 @@ export function InvoiceForm({ customers, stockItems, defaultGstRate = 0 }: Invoi
 
         <div className="space-y-2">
           <Label>Due Date</Label>
-          <Input type="date" name="dueDate" />
+          <Input type="date" name="dueDate" min={todayForDateInput()} />
         </div>
       </div>
 

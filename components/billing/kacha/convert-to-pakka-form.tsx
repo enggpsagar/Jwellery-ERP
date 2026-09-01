@@ -9,6 +9,7 @@ import {
   type KachaInvoiceFormState,
 } from "@/lib/actions/kacha-invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
+import { todayForDateInput } from "@/lib/date-input"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -156,7 +157,7 @@ export function ConvertToPakkaForm({
 
           <div className="space-y-2">
             <Label>Due Date</Label>
-            <Input type="date" name="dueDate" />
+            <Input type="date" name="dueDate" min={todayForDateInput()} />
           </div>
         </div>
 

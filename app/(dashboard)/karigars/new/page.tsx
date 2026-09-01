@@ -1,12 +1,16 @@
 // FILE PATH: app/(dashboard)/karigars/new/page.tsx
 
 import { getStoreLocations } from "@/lib/actions/store-location-actions";
+import { getStates } from "@/lib/actions/location-actions";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { KarigarCreateForm } from "@/components/karigars/karigar-create-form";
 
 export default async function NewKarigarPage() {
-  const locations = await getStoreLocations();
+  const [locations, states] = await Promise.all([
+    getStoreLocations(),
+    getStates(),
+  ]);
 
   return (
     <main className="space-y-6 p-6">
@@ -17,7 +21,7 @@ export default async function NewKarigarPage() {
         backLabel="Back to Karigars"
       />
 
-      <KarigarCreateForm locations={locations} />
+      <KarigarCreateForm locations={locations} states={states} />
     </main>
   );
 }

@@ -8,16 +8,26 @@ import type { ProductFormState } from "@/lib/inventory/product-types";
 import { getStoreCategoryTypes } from "@/lib/actions/taxonomy-actions";
 import { classifyMetalName } from "@/lib/business-units";
 
-// PurityType only encodes gold/silver purities plus a catch-all — a metal
-// classifies into one of these groups by its name (see classifyMetalName),
-// same heuristic already used for Business Units, so a purity that doesn't
-// belong to the selected metal is never offered.
-const PURITY_OPTIONS_BY_METAL: Record<"GOLD" | "SILVER" | "OTHER" | "DIAMOND", PurityType[]> = {
+// A metal classifies into one of these groups by its name — GOLD/SILVER/
+// DIAMOND/OTHER via classifyMetalName (the same heuristic Business Units
+// uses), plus a local PLATINUM check on top of it (classifyMetalName's own
+// return type is tied to the BusinessUnit enum, which has no Platinum unit,
+// so extending it there would ripple into the Ledger/Dashboard's per-unit
+// totals — out of scope here, this only decides which purities to offer).
+type PurityFamily = "GOLD" | "SILVER" | "PLATINUM" | "DIAMOND" | "OTHER";
+
+const PURITY_OPTIONS_BY_METAL: Record<PurityFamily, PurityType[]> = {
   GOLD: [PurityType.GOLD_24K, PurityType.GOLD_22K, PurityType.GOLD_20K, PurityType.GOLD_18K],
   SILVER: [PurityType.SILVER_999, PurityType.SILVER_925],
-  DIAMOND: [PurityType.OTHER],
+  PLATINUM: [PurityType.PLATINUM_950, PurityType.PLATINUM_900],
+  DIAMOND: [PurityType.DIAMOND],
   OTHER: [PurityType.OTHER],
 };
+
+function classifyPurityFamily(metalName: string): PurityFamily {
+  if (metalName.toLowerCase().includes("platinum")) return "PLATINUM";
+  return classifyMetalName(metalName) as PurityFamily;
+}
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -114,7 +124,7 @@ export function ProductForm({
 
   const selectedMetal = metals.find((item) => item.id === metalTypeId);
   const metalFamily = selectedMetal
-    ? classifyMetalName(selectedMetal.name)
+    ? classifyPurityFamily(selectedMetal.name)
     : null;
   const availablePurities = metalFamily
     ? PURITY_OPTIONS_BY_METAL[metalFamily]

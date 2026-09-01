@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   updateBusinessSettings,
@@ -14,6 +14,7 @@ import {
   BUSINESS_UNIT_DESCRIPTIONS,
   type BusinessUnit,
 } from "@/lib/business-units";
+import { getCitiesByStateId, type StateOption } from "@/lib/actions/location-actions";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,14 +25,17 @@ import { StoreLogoUpload } from "@/components/settings/store-logo-upload";
 import { cn } from "@/lib/utils";
 import { RequiredMark } from "@/components/shared/required-mark"
 
+type CityItem = { id: string; name: string }
+
 type SettingsFormProps = {
   settings: BusinessSettings;
   canEdit: boolean;
+  states?: StateOption[];
 };
 
 const initialState: SettingsFormState = { success: false, message: "" };
 
-export function SettingsForm({ settings, canEdit }: SettingsFormProps) {
+export function SettingsForm({ settings, canEdit, states = [] }: SettingsFormProps) {
   const [state, formAction, isPending] = useActionState(
     updateBusinessSettings,
     initialState,
@@ -48,6 +52,51 @@ export function SettingsForm({ settings, canEdit }: SettingsFormProps) {
         : [...current, unit],
     );
   }
+
+  // Selected/keyed by id (to drive the city fetch below), but the form
+  // field itself submits the state's name — BusinessSettings.state is a
+  // plain text column, same convention as Vendor/Karigar's own state field.
+  const initialStateId = useMemo(() => {
+    const match = states.find(
+      (item) => item.name.toLowerCase() === (settings.state ?? "").toLowerCase(),
+    )
+    return match?.id ?? ""
+  }, [states, settings.state])
+
+  const [selectedStateId, setSelectedStateId] = useState(initialStateId)
+  const [cities, setCities] = useState<CityItem[]>([])
+  const [loadingCities, setLoadingCities] = useState(false)
+  const stateNameMap = useMemo(
+    () => new Map(states.map((item) => [item.id, item.name])),
+    [states],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadCities() {
+      if (!selectedStateId) {
+        setCities([])
+        return
+      }
+
+      try {
+        setLoadingCities(true)
+        const data = await getCitiesByStateId(selectedStateId)
+        if (!cancelled) setCities(data || [])
+      } catch (error) {
+        console.error("Failed to load cities:", error)
+        if (!cancelled) setCities([])
+      } finally {
+        if (!cancelled) setLoadingCities(false)
+      }
+    }
+
+    loadCities()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedStateId])
 
   useEffect(() => {
     if (state.message && state.success) {
@@ -249,13 +298,61 @@ export function SettingsForm({ settings, canEdit }: SettingsFormProps) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="city">City</Label>
-            <Input id="city" name="city" defaultValue={settings.city} />
+            <Label htmlFor="state">State</Label>
+            <select
+              id="state"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs"
+              value={selectedStateId}
+              onChange={(event) => setSelectedStateId(event.target.value)}
+            >
+              <option value="">Select state</option>
+              {states.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Falls back to whatever is already on the record, so a state
+                that is not in the list is kept rather than wiped on save. */}
+            <input
+              type="hidden"
+              name="state"
+              value={
+                selectedStateId
+                  ? (stateNameMap.get(selectedStateId) ?? "")
+                  : (settings.state ?? "")
+              }
+            />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="state">State</Label>
-            <Input id="state" name="state" defaultValue={settings.state} />
+            <Label htmlFor="city">City</Label>
+            <select
+              id="city"
+              name="city"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!selectedStateId || loadingCities}
+              defaultValue={settings.city ?? ""}
+              key={cities.length}
+            >
+              <option value="">
+                {loadingCities ? "Loading cities..." : "Select city"}
+              </option>
+
+              {/* The saved city stays selectable even before the list for
+                  its state has loaded, so opening the form and saving
+                  without touching this does not clear it. */}
+              {settings.city && !cities.some((city) => city.name === settings.city) ? (
+                <option value={settings.city}>{settings.city}</option>
+              ) : null}
+
+              {cities.map((city) => (
+                <option key={city.id} value={city.name}>
+                  {city.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-1.5">

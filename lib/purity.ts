@@ -9,6 +9,13 @@ export const DEFAULT_FINENESS: Record<PurityType, number> = {
   GOLD_18K: 75.0,
   SILVER_999: 99.9,
   SILVER_925: 92.5,
+  PLATINUM_950: 95.0,
+  PLATINUM_900: 90.0,
+  // Diamonds aren't valued by a fine-metal percentage the way Gold/Silver/
+  // Platinum are — kept at 100% (same convention as OTHER) purely so this
+  // stays a total Record<PurityType, number> without a special case in
+  // toFineWeight; nothing meaningfully divides a diamond's weight down.
+  DIAMOND: 100.0,
   OTHER: 100.0,
 };
 
@@ -53,12 +60,20 @@ export const PURITY_LABELS: Record<PurityType, string> = {
   GOLD_18K: "Gold 18K",
   SILVER_999: "Silver 999",
   SILVER_925: "Silver 925",
+  PLATINUM_950: "Platinum 950",
+  PLATINUM_900: "Platinum 900",
+  DIAMOND: "Diamond",
   OTHER: "Other",
 };
 
 export function getPurityLabel(purity: PurityType) {
   return PURITY_LABELS[purity];
 }
+
+/** Every purity as a ready-to-render {value, label} option — the single source for purity dropdowns app-wide, so a new PurityType only needs to be added here once. */
+export const PURITY_SELECT_OPTIONS: { value: PurityType; label: string }[] = (
+  Object.keys(PURITY_LABELS) as PurityType[]
+).map((value) => ({ value, label: PURITY_LABELS[value] }));
 
 export function toFineWeight(
   weight: number | null | undefined,

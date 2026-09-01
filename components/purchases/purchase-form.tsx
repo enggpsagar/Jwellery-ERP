@@ -6,6 +6,7 @@ import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
 
 import { createPurchase, type PurchaseFormState } from "@/lib/actions/purchase-actions"
+import { PURITY_SELECT_OPTIONS } from "@/lib/purity"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { Input } from "@/components/ui/input"
@@ -66,15 +67,7 @@ type LineItem = {
   netTouched: boolean
 }
 
-const PURITY_OPTIONS = [
-  { value: "GOLD_24K", label: "24K Gold" },
-  { value: "GOLD_22K", label: "22K Gold" },
-  { value: "GOLD_20K", label: "20K Gold" },
-  { value: "GOLD_18K", label: "18K Gold" },
-  { value: "SILVER_999", label: "Silver 999" },
-  { value: "SILVER_925", label: "Silver 925" },
-  { value: "OTHER", label: "Other" },
-]
+const PURITY_OPTIONS = PURITY_SELECT_OPTIONS
 
 function emptyLineItem(): LineItem {
   return {

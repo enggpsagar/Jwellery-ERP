@@ -9,6 +9,7 @@ import {
   type KarigarFormState
 } from "@/lib/actions/karigar-actions"
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
+import type { StateOption } from "@/lib/actions/location-actions"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { KarigarForm } from "./karigar-form"
@@ -25,9 +26,10 @@ const initialState: KarigarFormState = {
 
 type Props = {
   locations?: StoreLocationRow[]
+  states?: StateOption[]
 }
 
-export function KarigarCreateForm({ locations = [] }: Props){
+export function KarigarCreateForm({ locations = [], states = [] }: Props){
 
   const router = useRouter()
   const toast = useToast()
@@ -94,6 +96,7 @@ export function KarigarCreateForm({ locations = [] }: Props){
         pending={pending}
         errors={state.errors}
         locations={locations}
+        states={states}
       />
 
 

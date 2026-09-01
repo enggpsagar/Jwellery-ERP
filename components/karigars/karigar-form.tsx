@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -40,16 +40,21 @@ export function KarigarForm({
 
   // Selected/keyed by id (to drive the city fetch below), but the form
   // field itself submits the state's name — Karigar.state is a plain text
-  // column, same convention as Vendor/Customer's own state field. A karigar
-  // being edited only has the state's name on file, not its id, so the
-  // initial selection is resolved by matching that name against the
-  // options list once (falling back to "" if the name isn't in it, e.g. a
-  // typo predating this dropdown).
-  const [selectedStateId, setSelectedStateId] = useState(
-    () => states.find((item) => item.name === karigar?.state)?.id ?? "",
-  )
+  // column, same convention as Vendor/Customer's own state field.
+  const initialStateId = useMemo(() => {
+    const match = states.find(
+      (item) => item.name.toLowerCase() === (karigar?.state ?? "").toLowerCase(),
+    )
+    return match?.id ?? ""
+  }, [states, karigar?.state])
+
+  const [selectedStateId, setSelectedStateId] = useState(initialStateId)
   const [cities, setCities] = useState<CityItem[]>([])
   const [loadingCities, setLoadingCities] = useState(false)
+  const stateNameMap = useMemo(
+    () => new Map(states.map((item) => [item.id, item.name])),
+    [states],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -152,10 +157,17 @@ export function KarigarForm({
               </option>
             ))}
           </select>
+
+          {/* Falls back to whatever is already on the record, so a state
+              that is not in the list is kept rather than wiped on save. */}
           <input
             type="hidden"
             name="state"
-            value={states.find((item) => item.id === selectedStateId)?.name ?? ""}
+            value={
+              selectedStateId
+                ? (stateNameMap.get(selectedStateId) ?? "")
+                : (karigar?.state ?? "")
+            }
           />
         </div>
 
@@ -166,14 +178,19 @@ export function KarigarForm({
             className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             disabled={!selectedStateId || loadingCities}
             defaultValue={karigar?.city ?? ""}
+            key={cities.length}
           >
             <option value="">
-              {loadingCities
-                ? "Loading cities..."
-                : selectedStateId
-                  ? "Select city"
-                  : "Select a state first"}
+              {loadingCities ? "Loading cities..." : "Select city"}
             </option>
+
+            {/* The saved city stays selectable even before the list for its
+                state has loaded, so opening the form and saving without
+                touching this does not clear it. */}
+            {karigar?.city && !cities.some((city) => city.name === karigar.city) ? (
+              <option value={karigar.city}>{karigar.city}</option>
+            ) : null}
+
             {cities.map((city) => (
               <option key={city.id} value={city.name}>
                 {city.name}

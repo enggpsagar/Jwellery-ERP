@@ -1,10 +1,8 @@
-import Link from "next/link"
-import { CreditCard, Mail } from "lucide-react"
+import { CreditCard } from "lucide-react"
 
 import { getOwnStorePlan } from "@/lib/actions/store-plan-actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -19,6 +17,7 @@ import {
   formatDay,
   formatMoney,
 } from "@/components/stores/plan-presentation"
+import { RenewalContactDialog } from "@/components/stores/renewal-contact-dialog"
 
 /**
  * A store owner's own plan and payment history.
@@ -94,12 +93,7 @@ export default async function MyPlanPage() {
 
         {/* Renewals are handled by the platform, so the useful action here is
             getting in touch rather than a button that cannot do anything. */}
-        <Button asChild variant="outline" className="gap-2">
-          <Link href="mailto:parmanand@aristasystems.in?subject=Plan%20renewal">
-            <Mail className="size-4" />
-            Contact us about renewal
-          </Link>
-        </Button>
+        <RenewalContactDialog />
       </div>
 
       {overview.status === "EXPIRED" ? (

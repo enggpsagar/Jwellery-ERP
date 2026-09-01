@@ -7,6 +7,7 @@ import { sendMail } from "@/lib/mailer";
 import { APP_NAME } from "@/lib/constants/app";
 import { newStoreRegisteredEmail, storeWelcomeEmail } from "@/lib/email-templates";
 import { buildUniqueStoreCode } from "@/lib/store-code";
+import { getSuperAdminEmails } from "@/lib/super-admin";
 
 export type RegisterStoreState = {
   success: boolean;
@@ -288,13 +289,7 @@ export async function registerStoreAction(
   }
 }
 
-/**
- * Tell whoever runs the platform that a shop signed itself up.
- *
- * Recipients come from SUPER_ADMIN_EMAILS — the same env var that decides who
- * is a Super Admin at sign-in — rather than from a role lookup, so the
- * notification still goes out before any Super Admin row exists.
- */
+/** Tell whoever runs the platform that a shop signed itself up. */
 async function notifySuperAdmins(details: {
   storeName: string;
   storeCode: string;
@@ -304,10 +299,7 @@ async function notifySuperAdmins(details: {
   city: string | null;
   planLabel: string;
 }) {
-  const recipients = (process.env.SUPER_ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((address) => address.trim())
-    .filter(Boolean);
+  const recipients = getSuperAdminEmails();
 
   if (recipients.length === 0) {
     console.warn(

@@ -421,6 +421,56 @@ export function newStoreRegisteredEmail(params: {
 }
 
 /**
+ * Sent to the Super Admin(s) when a store owner uses the "Contact us about
+ * renewal" popup on their My Plan page. Deliberately carries the sender's
+ * own name/email/store so a Super Admin can reply or look the store up
+ * without having to ask who sent it.
+ */
+export function renewalContactRequestEmail(params: {
+  storeName: string;
+  storeCode: string;
+  senderName: string;
+  senderEmail: string | null;
+  message: string;
+  appName: string;
+}) {
+  const { storeName, storeCode, senderName, senderEmail, message, appName } = params;
+
+  const body = `
+    <p style="margin-top: 0;"><strong>${senderName}</strong> from <strong>${storeName}</strong> sent a renewal request on ${appName}.</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+      <tbody>
+        ${detailRow("Store", storeName)}
+        ${detailRow("Store code", storeCode)}
+        ${detailRow("From", senderName)}
+        ${senderEmail ? detailRow("Email", senderEmail) : ""}
+      </tbody>
+    </table>
+
+    <p style="margin-bottom: 4px; font-size: 13px; color: #6b7280;">Message</p>
+    <p style="margin-top: 0; white-space: pre-wrap;">${message}</p>
+  `;
+
+  const text = [
+    `${senderName} from ${storeName} sent a renewal request on ${appName}.`,
+    "",
+    `Store: ${storeName} (${storeCode})`,
+    `From: ${senderName}`,
+    ...(senderEmail ? [`Email: ${senderEmail}`] : []),
+    "",
+    "Message:",
+    message,
+  ].join("\n");
+
+  return {
+    subject: `Renewal request from ${storeName}`,
+    html: wrapEmail(appName, "Plan renewal request", body),
+    text,
+  };
+}
+
+/**
  * Sent to a store's owner when someone is turned away because the store has
  * been archived.
  *

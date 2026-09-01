@@ -2,8 +2,10 @@
 
 "use client";
 
+import Link from "next/link";
+
 import { UserTable } from "@/components/users/user-table";
-import { UserFormDialog } from "@/components/users/user-form-dialog";
+import { Button } from "@/components/ui/button";
 import { DataTableToolbar } from "@/components/shared/data-table-toolbar";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { exportUsersToExcel } from "@/app/(dashboard)/users/actions";
@@ -71,12 +73,9 @@ export function UsersClient({
           </p>
         </div>
 
-        <UserFormDialog
-          mode="create"
-          karigars={karigars}
-          locations={locations}
-          allowSuperAdmin={allowSuperAdmin}
-        />
+        <Button asChild>
+          <Link href="/users/new">Add User</Link>
+        </Button>
       </div>
 
       <DataTableToolbar

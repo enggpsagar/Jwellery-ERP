@@ -103,6 +103,27 @@ type SalesByUser = {
   unattributedCount: number
 }
 
+type VendorPurchaseRow = {
+  vendorId: string
+  vendorName: string
+  purchaseCount: number
+  totalQuantity: number
+  totalWeight: number
+  totalAmount: number
+  paidAmount: number
+  balanceAmount: number
+  firstPurchase: Date | null
+  lastPurchase: Date | null
+}
+
+type VendorPurchase = {
+  rows: VendorPurchaseRow[]
+  vendorCount: number
+  purchaseCount: number
+  totalAmount: number
+  balanceAmount: number
+}
+
 type ItemLedgerEvent = { date: string; label: string }
 
 type ItemLedgerRow = {
@@ -136,6 +157,7 @@ type ReportsTabsProps = {
   goldFlow: GoldFlow
   metalWise: MetalWise
   salesByUser: SalesByUser
+  vendorPurchase: VendorPurchase
   itemLedger: ItemLedger
 }
 
@@ -158,6 +180,7 @@ function reportInr(value: number | null | undefined) {
 const TABS = [
   { key: "sales", label: "Sales" },
   { key: "byUser", label: "Sales by User" },
+  { key: "vendorPurchase", label: "Vendor Purchase" },
   { key: "inventory", label: "Inventory Valuation" },
   { key: "karigar", label: "Karigar Outstanding" },
   { key: "dues", label: "Customer Dues" },
@@ -185,6 +208,7 @@ export function ReportsTabs({
   goldFlow,
   metalWise,
   salesByUser,
+  vendorPurchase,
   itemLedger,
 }: ReportsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("sales")
@@ -418,6 +442,111 @@ export function ReportsTabs({
                         <td className="px-4 py-3">
                           {row.lastSale
                             ? new Date(row.lastSale).toLocaleDateString("en-IN")
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "vendorPurchase" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <StatCard title="Vendors" value={vendorPurchase.vendorCount} />
+            <StatCard title="Purchases" value={vendorPurchase.purchaseCount} />
+            <StatCard
+              title="Total Purchased"
+              value={`₹${vendorPurchase.totalAmount.toFixed(2)}`}
+            />
+          </div>
+
+          <div className="overflow-hidden rounded-xl border bg-card">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-muted/40">
+                  <tr className="border-b">
+                    <th className="px-4 py-3 text-left font-medium">Vendor</th>
+                    <th className="px-4 py-3 text-right font-medium">Purchases</th>
+                    <th className="px-4 py-3 text-right font-medium">Qty</th>
+                    <th className="px-4 py-3 text-right font-medium">Weight</th>
+                    <th className="px-4 py-3 text-right font-medium">Amount</th>
+                    <th className="px-4 py-3 text-right font-medium">Paid</th>
+                    <th className="px-4 py-3 text-right font-medium">Balance</th>
+                    <th className="px-4 py-3 text-left font-medium">Last purchase</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {vendorPurchase.rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-6 text-center text-muted-foreground">
+                        No purchases in this period.
+                      </td>
+                    </tr>
+                  ) : (
+                    vendorPurchase.rows.map((row) => (
+                      <tr key={row.vendorId} className="border-b last:border-0">
+                        <td className="px-4 py-3 font-medium">
+                          <RecordHoverCard
+                            label={row.vendorName}
+                            title={row.vendorName}
+                            subtitle="Purchases from this vendor"
+                            sections={[
+                              {
+                                fields: [
+                                  { label: "Purchases", value: row.purchaseCount },
+                                  { label: "Amount", value: reportInr(row.totalAmount) },
+                                  { label: "Paid", value: reportInr(row.paidAmount) },
+                                  { label: "Balance", value: reportInr(row.balanceAmount) },
+                                ],
+                              },
+                              {
+                                fields: [
+                                  {
+                                    label: "First purchase",
+                                    value: row.firstPurchase
+                                      ? new Date(row.firstPurchase).toLocaleDateString("en-IN")
+                                      : null,
+                                  },
+                                  {
+                                    label: "Last purchase",
+                                    value: row.lastPurchase
+                                      ? new Date(row.lastPurchase).toLocaleDateString("en-IN")
+                                      : null,
+                                  },
+                                ],
+                              },
+                            ]}
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          {row.purchaseCount}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          {row.totalQuantity}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          {row.totalWeight.toFixed(3)} g
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          ₹{row.totalAmount.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          ₹{row.paidAmount.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums text-red-600">
+                          {row.balanceAmount > 0
+                            ? `₹${row.balanceAmount.toFixed(2)}`
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3">
+                          {row.lastPurchase
+                            ? new Date(row.lastPurchase).toLocaleDateString("en-IN")
                             : "—"}
                         </td>
                       </tr>

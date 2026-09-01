@@ -625,6 +625,105 @@ export async function getSalesByUserReport(range: DateRange = {}) {
   } satisfies SalesByUserReport;
 }
 
+export type VendorPurchaseRow = {
+  vendorId: string;
+  vendorName: string;
+  purchaseCount: number;
+  totalQuantity: number;
+  totalWeight: number;
+  totalAmount: number;
+  paidAmount: number;
+  balanceAmount: number;
+  firstPurchase: Date | null;
+  lastPurchase: Date | null;
+};
+
+export type VendorPurchaseReport = {
+  rows: VendorPurchaseRow[];
+  vendorCount: number;
+  purchaseCount: number;
+  totalAmount: number;
+  balanceAmount: number;
+};
+
+/**
+ * What was bought from each vendor, for a date range — the purchase-side
+ * counterpart to getSalesByUserReport. Grouped on `vendorId` via Purchase's
+ * real relation (unlike InventoryStock.vendorName, a plain snapshot string),
+ * so a renamed vendor still rolls every purchase up under one row.
+ */
+export async function getVendorPurchaseReport(range: DateRange = {}) {
+  const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
+
+  const purchases = await prisma.purchase.findMany({
+    where: {
+      storeId,
+      ...locationWhere(scope),
+      ...toDateRangeWhere(range, "purchaseDate"),
+    },
+    select: {
+      vendorId: true,
+      vendor: { select: { name: true } },
+      purchaseDate: true,
+      totalAmount: true,
+      paidAmount: true,
+      balanceAmount: true,
+      items: { select: { quantity: true, netWeight: true } },
+    },
+  });
+
+  const byVendor = new Map<string, VendorPurchaseRow>();
+
+  for (const purchase of purchases) {
+    const row =
+      byVendor.get(purchase.vendorId) ??
+      ({
+        vendorId: purchase.vendorId,
+        vendorName: purchase.vendor.name,
+        purchaseCount: 0,
+        totalQuantity: 0,
+        totalWeight: 0,
+        totalAmount: 0,
+        paidAmount: 0,
+        balanceAmount: 0,
+        firstPurchase: null,
+        lastPurchase: null,
+      } satisfies VendorPurchaseRow);
+
+    row.purchaseCount += 1;
+    row.totalAmount += Number(purchase.totalAmount);
+    row.paidAmount += Number(purchase.paidAmount);
+    row.balanceAmount += Number(purchase.balanceAmount);
+
+    for (const item of purchase.items) {
+      row.totalQuantity += item.quantity;
+      row.totalWeight += item.netWeight ? Number(item.netWeight) : 0;
+    }
+
+    if (!row.firstPurchase || purchase.purchaseDate < row.firstPurchase) {
+      row.firstPurchase = purchase.purchaseDate;
+    }
+    if (!row.lastPurchase || purchase.purchaseDate > row.lastPurchase) {
+      row.lastPurchase = purchase.purchaseDate;
+    }
+
+    byVendor.set(purchase.vendorId, row);
+  }
+
+  const rows = [...byVendor.values()].sort(
+    (a, b) => b.totalAmount - a.totalAmount,
+  );
+
+  return {
+    rows,
+    vendorCount: rows.length,
+    purchaseCount: purchases.length,
+    totalAmount: rows.reduce((sum, row) => sum + row.totalAmount, 0),
+    balanceAmount: rows.reduce((sum, row) => sum + row.balanceAmount, 0),
+  } satisfies VendorPurchaseReport;
+}
+
 export type ItemLedgerEvent = { date: string; label: string };
 
 export type ItemLedgerRow = {

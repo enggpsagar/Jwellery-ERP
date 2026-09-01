@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server"
 import {
   getSalesReport,
   getSalesByUserReport,
+  getVendorPurchaseReport,
   getInventoryValuationReport,
   getKarigarOutstandingReport,
   getCustomerDuesReport,
@@ -17,6 +18,7 @@ import { buildCsvExport, buildExcelExport } from "@/lib/excel-export"
 type ReportType =
   | "sales"
   | "byUser"
+  | "vendorPurchase"
   | "inventory"
   | "karigar"
   | "dues"
@@ -28,6 +30,7 @@ type Format = "csv" | "excel"
 const REPORT_LABELS: Record<ReportType, string> = {
   sales: "Sales",
   byUser: "Sales by User",
+  vendorPurchase: "Vendor Purchase",
   inventory: "Inventory Valuation",
   karigar: "Karigar Outstanding",
   dues: "Customer Dues",
@@ -62,6 +65,24 @@ async function buildRows(type: ReportType) {
           : "",
         "Last Sale": row.lastSale
           ? new Date(row.lastSale).toLocaleDateString("en-IN")
+          : "",
+      }))
+    }
+    case "vendorPurchase": {
+      const report = await getVendorPurchaseReport()
+      return report.rows.map((row) => ({
+        Vendor: row.vendorName,
+        Purchases: row.purchaseCount,
+        Qty: row.totalQuantity,
+        "Weight (g)": row.totalWeight,
+        "Amount (₹)": row.totalAmount,
+        "Paid (₹)": row.paidAmount,
+        "Balance (₹)": row.balanceAmount,
+        "First Purchase": row.firstPurchase
+          ? new Date(row.firstPurchase).toLocaleDateString("en-IN")
+          : "",
+        "Last Purchase": row.lastPurchase
+          ? new Date(row.lastPurchase).toLocaleDateString("en-IN")
           : "",
       }))
     }

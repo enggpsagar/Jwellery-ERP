@@ -8,6 +8,11 @@ import { derivePlanStatus } from "@/lib/plan-status";
 import type { PlanStatus } from "@/lib/plan-status";
 import { requireRole } from "@/lib/auth/auth";
 import { requireStoreScope } from "@/lib/store-context";
+import { resolveStoreName } from "@/lib/invite-email";
+import { sendMail } from "@/lib/mailer";
+import { renewalContactRequestEmail } from "@/lib/email-templates";
+import { getSuperAdminEmails } from "@/lib/super-admin";
+import { APP_NAME } from "@/lib/constants/app";
 
 export type StorePlanOverview = {
   storeId: string;
@@ -267,6 +272,74 @@ export async function getStorePlanHistory(
 ): Promise<PlanHistoryRow[]> {
   await requireRole(UserRole.SUPER_ADMIN);
   return loadStorePlanHistory(storeId);
+}
+
+/**
+ * Sends the "Contact us about renewal" popup's message to the Super
+ * Admin(s), same SUPER_ADMIN_EMAILS recipient list as a new store
+ * registration notice.
+ *
+ * Same store-owner gate as `getOwnStorePlan` — this is the action behind
+ * that page's own contact button, not a general-purpose contact form.
+ */
+export async function sendRenewalContactRequestAction(
+  message: string,
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const user = await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+    const storeId = await requireStoreScope();
+
+    const trimmed = message.trim();
+    if (!trimmed) {
+      return { success: false, message: "Please enter a message before sending." };
+    }
+
+    const recipients = getSuperAdminEmails();
+    if (recipients.length === 0) {
+      console.warn(
+        "Renewal contact request submitted but SUPER_ADMIN_EMAILS is empty — no notification sent.",
+      );
+      return {
+        success: false,
+        message: "Renewal contact isn't set up yet. Please try another way to reach us.",
+      };
+    }
+
+    const [storeName, store] = await Promise.all([
+      resolveStoreName(storeId),
+      prisma.store.findUnique({ where: { id: storeId }, select: { code: true } }),
+    ]);
+
+    const mail = renewalContactRequestEmail({
+      storeName,
+      storeCode: store?.code ?? "",
+      senderName: user.name || "Store owner",
+      senderEmail: user.email ?? null,
+      message: trimmed,
+      appName: APP_NAME,
+    });
+
+    const results = await Promise.all(
+      recipients.map((to) =>
+        sendMail({ to, subject: mail.subject, html: mail.html, text: mail.text }),
+      ),
+    );
+
+    if (!results.some((result) => result.sent)) {
+      return {
+        success: false,
+        message: "Could not send your message right now. Please try again shortly.",
+      };
+    }
+
+    return {
+      success: true,
+      message: "Your message has been sent. We'll get back to you shortly.",
+    };
+  } catch (error) {
+    console.error("sendRenewalContactRequestAction error:", error);
+    return { success: false, message: "Failed to send your message. Please try again." };
+  }
 }
 
 /** Which channels this store's owner accepts renewal reminders on. */

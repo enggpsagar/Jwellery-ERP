@@ -15,7 +15,12 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
-import { getLocationScope, locationWhere, type LocationScope } from "@/lib/location-scope";
+import {
+  getLocationScope,
+  locationWhere,
+  isLocationAllowed,
+  type LocationScope,
+} from "@/lib/location-scope";
 import { requireAuth, requireRole } from "@/lib/auth/auth";
 import { sendMail } from "@/lib/mailer";
 import { kachaSlipEmail, dataBackupEmail } from "@/lib/email-templates";
@@ -362,6 +367,7 @@ export async function createKachaInvoice(
     const paidAmount = toNumber(formData.get("paidAmount"));
     const invoiceDateRaw = String(formData.get("invoiceDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
+    const locationId = String(formData.get("locationId") || "").trim() || null;
 
     const subtotal = items.reduce(
       (sum, item) => sum + toNumber(item.rate) * toNumber(item.netWeight),
@@ -384,6 +390,26 @@ export async function createKachaInvoice(
     });
     if (!customer) {
       return { success: false, message: "Please select a customer" };
+    }
+
+    // Without this, every slip saved with locationId: null — a
+    // location-restricted Staff user's own list filters by
+    // `locationId: { in: scope.locationIds }`, so they could create a slip
+    // and then never see it again, including the one they just made. Same
+    // validation as invoice-actions.ts/purchase-actions.ts.
+    if (locationId) {
+      const location = await prisma.storeLocation.findFirst({
+        where: { id: locationId, storeId },
+        select: { id: true },
+      });
+      if (!location) {
+        return { success: false, message: "Selected location is invalid" };
+      }
+
+      const scope = await getLocationScope();
+      if (!isLocationAllowed(scope, locationId)) {
+        return { success: false, message: "You don't have access to bill against this location" };
+      }
     }
 
     // Every referenced stock item must belong to this store — otherwise a
@@ -441,6 +467,7 @@ export async function createKachaInvoice(
           paidAmount,
           balanceAmount,
           notes,
+          locationId: locationId ?? undefined,
           items: {
             create: items.map((item) => ({
               itemName: item.itemName,
@@ -677,6 +704,11 @@ export async function convertKachaToPakka(
           paidAmount,
           balanceAmount,
           notes,
+          // Carries the slip's own location forward — otherwise the
+          // converted invoice reverts to locationId: null even though the
+          // slip it came from had one, the same visibility gap this
+          // session fixed on plain invoice/slip creation.
+          locationId: kachaInvoice.locationId ?? undefined,
           items: {
             create: kachaInvoice.items.map((item) => ({
               itemName: item.itemName,

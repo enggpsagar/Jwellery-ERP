@@ -497,6 +497,7 @@ export async function createInvoice(
     const invoiceDateRaw = String(formData.get("invoiceDate") || "");
     const dueDateRaw = String(formData.get("dueDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
+    const locationId = String(formData.get("locationId") || "").trim() || null;
 
     const subtotal = items.reduce(
       (sum, item) => sum + toNumber(item.rate) * toNumber(item.netWeight),
@@ -565,6 +566,26 @@ export async function createInvoice(
       return { success: false, message: "Please select a customer" };
     }
 
+    // Without this, every invoice saved with locationId: null — a
+    // location-restricted Staff user's own `getInvoices` list filters by
+    // `locationId: { in: scope.locationIds }`, so they could create an
+    // invoice and then never see it again, including the one they just
+    // made. Same validation as purchase-actions.ts/quotation-actions.ts.
+    if (locationId) {
+      const location = await prisma.storeLocation.findFirst({
+        where: { id: locationId, storeId },
+        select: { id: true },
+      });
+      if (!location) {
+        return { success: false, message: "Selected location is invalid" };
+      }
+
+      const scope = await getLocationScope();
+      if (!isLocationAllowed(scope, locationId)) {
+        return { success: false, message: "You don't have access to bill against this location" };
+      }
+    }
+
     // Every referenced stock item must belong to this store — otherwise a
     // crafted itemsJson could link a line item to another store's stock,
     // leaking its details (and, via the SOLD-status update below, its
@@ -623,6 +644,7 @@ export async function createInvoice(
           paidAmount,
           balanceAmount,
           notes,
+          locationId: locationId ?? undefined,
           // Recorded at the moment of sale, name included, so the invoice
           // still says who raised it after that person leaves the shop.
           createdById: actor.id ?? null,

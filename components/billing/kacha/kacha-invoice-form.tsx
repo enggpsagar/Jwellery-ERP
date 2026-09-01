@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
+import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
 
 type CustomerOption = {
   id: string
@@ -93,13 +94,15 @@ const initialState: KachaInvoiceFormState = { success: false, message: "" }
 type KachaInvoiceFormProps = {
   customers: CustomerOption[]
   stockItems: StockOption[]
+  locations: LocationOption[]
 }
 
-export function KachaInvoiceForm({ customers, stockItems }: KachaInvoiceFormProps) {
+export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvoiceFormProps) {
   const router = useRouter()
   const toast = useToast()
 
   const [customerId, setCustomerId] = useState("")
+  const [locationId, setLocationId] = useState("")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
   const [paidAmount, setPaidAmount] = useState(0)
@@ -235,6 +238,16 @@ export function KachaInvoiceForm({ customers, stockItems }: KachaInvoiceFormProp
             type="date"
             name="invoiceDate"
             defaultValue={new Date().toISOString().slice(0, 10)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Location</Label>
+          <LocationSelect
+            locations={locations}
+            name="locationId"
+            defaultValue={locationId}
+            onChange={setLocationId}
           />
         </div>
       </div>

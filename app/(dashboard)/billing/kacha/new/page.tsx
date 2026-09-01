@@ -2,14 +2,16 @@ import {
   getKachaInvoiceFormCustomers,
   getKachaInvoiceFormStockItems,
 } from "@/lib/actions/kacha-invoice-actions"
+import { getStoreLocations } from "@/lib/actions/store-location-actions"
 
 import { KachaInvoiceForm } from "@/components/billing/kacha/kacha-invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 export default async function NewKachaInvoicePage() {
-  const [customers, stockItems] = await Promise.all([
+  const [customers, stockItems, locations] = await Promise.all([
     getKachaInvoiceFormCustomers(),
     getKachaInvoiceFormStockItems(),
+    getStoreLocations(),
   ])
 
   return (
@@ -21,7 +23,7 @@ export default async function NewKachaInvoicePage() {
         backLabel="Back to Kacha Slips"
       />
 
-      <KachaInvoiceForm customers={customers} stockItems={stockItems} />
+      <KachaInvoiceForm customers={customers} stockItems={stockItems} locations={locations} />
     </main>
   )
 }

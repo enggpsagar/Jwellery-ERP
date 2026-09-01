@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
+import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
 
 type CustomerOption = {
   id: string
@@ -102,17 +103,19 @@ const initialState: InvoiceFormState = { success: false, message: "" }
 type InvoiceFormProps = {
   customers: CustomerOption[]
   stockItems: StockOption[]
+  locations: LocationOption[]
   /** Store's default GST%, split evenly into SGST+CGST per line. Editable
    * here per invoice — a store on an exempt sale, or one that changes its
    * rate mid-year, isn't stuck with whatever Settings says today. */
   defaultGstRate?: number
 }
 
-export function InvoiceForm({ customers, stockItems, defaultGstRate = 0 }: InvoiceFormProps) {
+export function InvoiceForm({ customers, stockItems, locations, defaultGstRate = 0 }: InvoiceFormProps) {
   const router = useRouter()
   const toast = useToast()
 
   const [customerId, setCustomerId] = useState("")
+  const [locationId, setLocationId] = useState("")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
   const [gstRate, setGstRate] = useState(defaultGstRate)
@@ -422,6 +425,16 @@ export function InvoiceForm({ customers, stockItems, defaultGstRate = 0 }: Invoi
         <div className="space-y-2">
           <Label>Due Date</Label>
           <Input type="date" name="dueDate" min={todayForDateInput()} />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Location</Label>
+          <LocationSelect
+            locations={locations}
+            name="locationId"
+            defaultValue={locationId}
+            onChange={setLocationId}
+          />
         </div>
       </div>
 

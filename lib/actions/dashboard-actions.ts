@@ -399,39 +399,51 @@ export async function getMonthlySalesTrend(
 
 export type CategoryRevenue = { category: string; value: number };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  Ornament: "Ornaments",
-  Coin: "Coins & Bars",
-  Bar: "Coins & Bars",
-  "Raw Metal": "Raw Metal",
-  Stone: "Stones",
-  Other: "Other",
+export type RevenueByMetal = {
+  /** This month's total across every metal — the figure the bars below add up to. */
+  total: number;
+  rows: CategoryRevenue[];
 };
 
-export async function getRevenueByCategory(): Promise<CategoryRevenue[]> {
+/**
+ * This month's revenue split by metal (Gold/Silver/Diamond/Platinum/...),
+ * not by product taxonomy — a merchant thinks of "what did we sell" in
+ * terms of metal first, and this list is never a fixed set: whatever
+ * StoreMetal rows a store has configured (see Taxonomy settings) show up
+ * here automatically, "Unspecified" collects line items with no metal
+ * recorded at all, rather than silently dropping their revenue.
+ */
+export async function getRevenueByCategory(): Promise<RevenueByMetal> {
   const storeId = await requireStoreScope();
   const scope = await getLocationScope();
+  const now = new Date();
+  const monthStart = startOfMonth(now);
+
   const items = await prisma.invoiceItem.findMany({
-    where: { invoice: { storeId, ...locationWhere(scope) } },
+    where: {
+      invoice: { storeId, invoiceDate: { gte: monthStart }, ...locationWhere(scope) },
+    },
     select: {
       lineTotal: true,
-      inventoryStock: {
-        select: { product: { select: { category: { select: { name: true } } } } },
-      },
+      metalType: { select: { name: true } },
     },
   });
 
-  const byCategory = new Map<string, number>();
+  const byMetal = new Map<string, number>();
 
   for (const item of items) {
-    const category = item.inventoryStock?.product?.category?.name ?? "Other";
-    const label = CATEGORY_LABELS[category] ?? "Other";
-    byCategory.set(label, (byCategory.get(label) ?? 0) + Number(item.lineTotal));
+    const label = item.metalType?.name ?? "Unspecified";
+    byMetal.set(label, (byMetal.get(label) ?? 0) + Number(item.lineTotal));
   }
 
-  return Array.from(byCategory.entries())
+  const rows = Array.from(byMetal.entries())
     .map(([category, value]) => ({ category, value }))
     .sort((a, b) => b.value - a.value);
+
+  return {
+    total: rows.reduce((sum, row) => sum + row.value, 0),
+    rows,
+  };
 }
 
 export type DashboardTransaction = {

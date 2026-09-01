@@ -1,15 +1,24 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Inter, Playfair_Display } from "next/font/google";
 
 import { cn } from "@/lib/utils";
 import { ToastProvider } from "@/components/providers/toast-provider";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-const geist = Geist({
+// Inter (body) + Playfair Display (headings) — the premium-jewellery pairing
+// behind the app-wide theme in globals.css: a warm, high-contrast serif for
+// titles reads as considered/high-end without touching dense UI text (forms,
+// tables), which stays in the plain, highly-legible sans throughout.
+const bodyFont = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
+});
+
+const headingFont = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-heading-serif",
 });
 
 export const metadata: Metadata = {
@@ -23,7 +32,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
+    <html
+      lang="en"
+      className={cn("font-sans", bodyFont.variable, headingFont.variable)}
+    >
       <body>
         <SessionProvider>
           <TooltipProvider>

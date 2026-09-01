@@ -15,7 +15,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import type { CategoryRevenue } from "@/lib/actions/dashboard-actions"
+import type { RevenueByMetal } from "@/lib/actions/dashboard-actions"
 
 const chartConfig = {
   value: { label: "Revenue" },
@@ -44,7 +44,7 @@ const compact = (v: number) =>
       : `₹${v}`
 
 type CategoryChartProps = {
-  data: CategoryRevenue[]
+  data: RevenueByMetal
 }
 
 /**
@@ -62,7 +62,7 @@ type CategoryChartProps = {
  * falls below 3:1 against the light surface.
  */
 export function CategoryChart({ data }: CategoryChartProps) {
-  const sorted = [...data].sort((a, b) => b.value - a.value)
+  const sorted = [...data.rows].sort((a, b) => b.value - a.value)
 
   // Anything past the fixed slots is summed into one bar rather than given a
   // colour outside the validated set.
@@ -89,8 +89,18 @@ export function CategoryChart({ data }: CategoryChartProps) {
   return (
     <Card className="gap-0">
       <CardHeader className="border-b [.border-b]:pb-5">
-        <CardTitle>Revenue by Category</CardTitle>
-        <CardDescription>This month&apos;s revenue split</CardDescription>
+        <div className="flex items-baseline justify-between gap-3">
+          <div>
+            <CardTitle>Revenue by Metal</CardTitle>
+            <CardDescription>This month&apos;s revenue split</CardDescription>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-lg font-semibold tabular-nums">
+              ₹{data.total.toLocaleString("en-IN")}
+            </p>
+          </div>
+        </div>
       </CardHeader>
 
       <CardContent className="pt-6">

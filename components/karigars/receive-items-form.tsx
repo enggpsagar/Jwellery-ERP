@@ -45,6 +45,8 @@ const PURITY_OPTIONS: { value: string; label: string }[] = [
   { value: "GOLD_18K", label: "Gold 18K" },
   { value: "SILVER_999", label: "Silver 999" },
   { value: "SILVER_925", label: "Silver 925" },
+  { value: "PLATINUM_950", label: "Platinum 950" },
+  { value: "PLATINUM_900", label: "Platinum 900" },
 ]
 
 type ReceiptItem = {
@@ -103,9 +105,11 @@ function emptyReceiptItem(defaultMetal?: StoreMetalRow): ReceiptItem {
     purity:
       defaultMetal && !defaultMetal.hasPurity
         ? "OTHER"
-        : classifyMetalName(defaultMetal?.name) === "SILVER"
-          ? "SILVER_999"
-          : "GOLD_22K",
+        : defaultMetal?.name.toLowerCase().includes("platinum")
+          ? "PLATINUM_950"
+          : classifyMetalName(defaultMetal?.name) === "SILVER"
+            ? "SILVER_999"
+            : "GOLD_22K",
     quantity: 1,
     grossWeight: 0,
     lessWeight: 0,
@@ -198,6 +202,9 @@ export function ReceiveItemsForm({
   // metal, not just keep whatever was set for the old one (e.g. Gold ->
   // Silver must not leave "GOLD_22K" silently selected).
   const purityOptionsForMetal = (metal: StoreMetalRow | undefined) => {
+    if (metal?.name.toLowerCase().includes("platinum")) {
+      return PURITY_OPTIONS.filter((o) => o.value.startsWith("PLATINUM_"))
+    }
     const family = classifyMetalName(metal?.name)
     if (family === "SILVER") return PURITY_OPTIONS.filter((o) => o.value.startsWith("SILVER_"))
     if (family === "GOLD") return PURITY_OPTIONS.filter((o) => o.value.startsWith("GOLD_"))

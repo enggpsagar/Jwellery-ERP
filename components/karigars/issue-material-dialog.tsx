@@ -43,6 +43,8 @@ const PURITY_OPTIONS: { value: string; label: string }[] = [
   { value: "GOLD_18K", label: "Gold 18K" },
   { value: "SILVER_999", label: "Silver 999" },
   { value: "SILVER_925", label: "Silver 925" },
+  { value: "PLATINUM_950", label: "Platinum 950" },
+  { value: "PLATINUM_900", label: "Platinum 900" },
 ]
 
 type LocationOption = {
@@ -84,13 +86,17 @@ export function IssueMaterialDialog({
   const isPreciousMetal = selectedMetal?.hasPurity ?? false
 
   // Purity options depend on which metal is selected — Silver should never
-  // offer Gold purities and vice versa. A custom precious metal this codebase
-  // doesn't recognize as Gold/Silver (e.g. Platinum) falls back to the full
-  // list, since PurityType has no values for it either way.
-  const metalFamily = classifyMetalName(selectedMetal?.name)
+  // offer Gold purities and vice versa. classifyMetalName's own return type
+  // is tied to the BusinessUnit enum, which has no Platinum unit, so
+  // Platinum is matched separately by name here rather than widening that
+  // shared classifier (see the same reasoning in product-form.tsx).
+  const metalFamily = selectedMetal?.name.toLowerCase().includes("platinum")
+    ? "PLATINUM"
+    : classifyMetalName(selectedMetal?.name)
   const purityOptions = useMemo(() => {
     if (metalFamily === "GOLD") return PURITY_OPTIONS.filter((o) => o.value.startsWith("GOLD_"))
     if (metalFamily === "SILVER") return PURITY_OPTIONS.filter((o) => o.value.startsWith("SILVER_"))
+    if (metalFamily === "PLATINUM") return PURITY_OPTIONS.filter((o) => o.value.startsWith("PLATINUM_"))
     return PURITY_OPTIONS
   }, [metalFamily])
 

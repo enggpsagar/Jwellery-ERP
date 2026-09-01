@@ -36,6 +36,9 @@ const PURITY_LABELS: Record<string, string> = {
   GOLD_24K: "24K",
   SILVER_925: "925",
   SILVER_999: "999",
+  PLATINUM_900: "Pt900",
+  PLATINUM_950: "Pt950",
+  DIAMOND: "Diamond",
   OTHER: "",
 }
 

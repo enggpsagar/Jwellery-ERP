@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-heading-serif);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono), "Geist Mono Fallback";
   --color-sidebar-ring: var(--sidebar-ring);
@@ -50,22 +50,28 @@
 
 :root {
   color-scheme: light;
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /* Tanishq-inspired premium jewellery theme: warm ivory surfaces, a deep
+     burgundy primary (the signature colour of Indian fine-jewellery
+     branding), and a gold-tinted focus ring that ties into the existing
+     --chart-2 gold below. Every hue here carries a small warm hue angle
+     (~40-80) instead of the neutral 0 the shadcn default uses, which is
+     what reads as "warm/premium" rather than "generic SaaS grey." */
+  --card: oklch(0.995 0.004 80);
+  --card-foreground: oklch(0.18 0.015 40);
+  --popover: oklch(0.995 0.004 80);
+  --popover-foreground: oklch(0.18 0.015 40);
+  --primary: oklch(0.32 0.13 20);
+  --primary-foreground: oklch(0.98 0.01 75);
+  --secondary: oklch(0.94 0.02 75);
+  --secondary-foreground: oklch(0.28 0.02 40);
+  --muted: oklch(0.96 0.012 75);
+  --muted-foreground: oklch(0.5 0.02 50);
+  --accent: oklch(0.93 0.03 80);
+  --accent-foreground: oklch(0.28 0.02 40);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.88 0.015 70);
+  --input: oklch(0.9 0.014 70);
+  --ring: oklch(0.75 0.12 80);
   /* Jewellery categorical palette — sapphire, gold, emerald, amethyst, ruby.
      Validated with the data-viz six checks on the light surface: CVD adjacent
      dE 8.4 (>=8 target), normal-vision 19.4 (>=15 floor), all inside the
@@ -80,22 +86,24 @@
   --chart-3: #0f9463;
   --chart-4: #8b5fbf;
   --chart-5: #c0392b;
-  --radius: 0.625rem;
+  --radius: 0.5rem;
 
-  --sidebar: oklch(0.18 0 0);
-  --sidebar-foreground: oklch(0.98 0 0);
+  /* Already a dark case lined in gold before this pass — kept, just warmed
+     off pure achromatic black to match the rest of the palette. */
+  --sidebar: oklch(0.16 0.015 40);
+  --sidebar-foreground: oklch(0.97 0.01 75);
 
   --sidebar-primary: oklch(0.83 0.17 87);
-  --sidebar-primary-foreground: oklch(0.15 0 0);
+  --sidebar-primary-foreground: oklch(0.15 0.015 40);
 
-  --sidebar-accent: oklch(0.27 0 0);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.24 0.02 40);
+  --sidebar-accent-foreground: oklch(0.97 0.01 75);
 
-  --sidebar-border: oklch(0.28 0 0);
+  --sidebar-border: oklch(0.26 0.02 40);
   --sidebar-ring: oklch(0.83 0.17 87);
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(0.985 0.006 75);
+  --foreground: oklch(0.18 0.015 40);
 }
 
 .dark {

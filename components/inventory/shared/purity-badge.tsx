@@ -9,6 +9,9 @@ const PURITY_LABELS: Record<PurityType, string> = {
   GOLD_24K: "24K Gold",
   SILVER_925: "925 Silver",
   SILVER_999: "999 Silver",
+  PLATINUM_900: "900 Platinum",
+  PLATINUM_950: "950 Platinum",
+  DIAMOND: "Diamond",
   OTHER: "Other",
 };
 
@@ -19,6 +22,9 @@ const PURITY_STYLES: Record<PurityType, string> = {
   GOLD_24K: "bg-amber-200 text-amber-900 border-amber-400",
   SILVER_925: "bg-slate-100 text-slate-700 border-slate-300",
   SILVER_999: "bg-slate-200 text-slate-800 border-slate-400",
+  PLATINUM_900: "bg-sky-50 text-sky-700 border-sky-200",
+  PLATINUM_950: "bg-sky-100 text-sky-800 border-sky-300",
+  DIAMOND: "bg-cyan-50 text-cyan-700 border-cyan-200",
   OTHER: "bg-muted text-foreground border-input",
 };
 

@@ -704,7 +704,7 @@ export async function recordKarigarPayment(
 
     const karigar = await prisma.karigar.findFirst({
       where: { id: karigarId, storeId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, locationId: true },
     });
 
     if (!karigar) return { success: false, message: "Karigar not found" };
@@ -722,6 +722,7 @@ export async function recordKarigarPayment(
             paymentReference: payment.reference ?? undefined,
             bankName: payment.bankName ?? undefined,
             attachmentUrl: payment.attachmentUrl ?? undefined,
+            locationId: karigar.locationId ?? undefined,
             description: notes ?? (index === 0 ? `Payment made to ${karigar.name}` : undefined),
           },
         }),

@@ -654,6 +654,7 @@ export async function createInventoryStock(
                 metalWeightFine,
                 amount: 0,
                 description: `Stock added — ${stockCode}${tagNumber ? ` (Tag ${tagNumber})` : ""}`,
+                locationId: locationId ?? undefined,
               },
             }),
           ]

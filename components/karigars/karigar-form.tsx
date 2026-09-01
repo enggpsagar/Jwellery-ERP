@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,14 +14,19 @@ import {
 } from "@/components/ui/select"
 import type { Karigar } from "@/lib/actions/karigar-actions"
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
+import { getCitiesByStateId } from "@/lib/actions/location-actions"
 import { LocationSelect } from "@/components/shared/location-select"
 import { RequiredMark } from "@/components/shared/required-mark"
+
+type StateItem = { id: string; name: string }
+type CityItem = { id: string; name: string }
 
 type Props = {
   pending?: boolean
   karigar?: Karigar | null
   errors?: Record<string, string[]>
   locations?: StoreLocationRow[]
+  states?: StateItem[]
 }
 
 export function KarigarForm({
@@ -29,8 +34,49 @@ export function KarigarForm({
   karigar = null,
   errors,
   locations = [],
+  states = [],
 }: Props) {
   const [locationId, setLocationId] = useState(karigar?.locationId ?? "")
+
+  // Selected/keyed by id (to drive the city fetch below), but the form
+  // field itself submits the state's name — Karigar.state is a plain text
+  // column, same convention as Vendor/Customer's own state field. A karigar
+  // being edited only has the state's name on file, not its id, so the
+  // initial selection is resolved by matching that name against the
+  // options list once (falling back to "" if the name isn't in it, e.g. a
+  // typo predating this dropdown).
+  const [selectedStateId, setSelectedStateId] = useState(
+    () => states.find((item) => item.name === karigar?.state)?.id ?? "",
+  )
+  const [cities, setCities] = useState<CityItem[]>([])
+  const [loadingCities, setLoadingCities] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadCities() {
+      if (!selectedStateId) {
+        setCities([])
+        return
+      }
+
+      try {
+        setLoadingCities(true)
+        const data = await getCitiesByStateId(selectedStateId)
+        if (!cancelled) setCities(data || [])
+      } catch (error) {
+        console.error("Failed to load cities:", error)
+        if (!cancelled) setCities([])
+      } finally {
+        if (!cancelled) setLoadingCities(false)
+      }
+    }
+
+    loadCities()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedStateId])
 
   return (
     <div className="space-y-6">
@@ -93,11 +139,47 @@ export function KarigarForm({
         </div>
 
         <div className="space-y-2">
-          <Label>City</Label>
-          <Input
-            name="city"
-            defaultValue={karigar?.city}
+          <Label>State</Label>
+          <select
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            value={selectedStateId}
+            onChange={(event) => setSelectedStateId(event.target.value)}
+          >
+            <option value="">Select state</option>
+            {states.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="hidden"
+            name="state"
+            value={states.find((item) => item.id === selectedStateId)?.name ?? ""}
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label>City</Label>
+          <select
+            name="city"
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            disabled={!selectedStateId || loadingCities}
+            defaultValue={karigar?.city ?? ""}
+          >
+            <option value="">
+              {loadingCities
+                ? "Loading cities..."
+                : selectedStateId
+                  ? "Select city"
+                  : "Select a state first"}
+            </option>
+            {cities.map((city) => (
+              <option key={city.id} value={city.name}>
+                {city.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="space-y-2">

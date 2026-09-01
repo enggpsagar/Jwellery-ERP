@@ -1,13 +1,15 @@
 "use client"
 
 
-import { useActionState } from "react"
+import { useActionState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 
 import {
   createKarigar,
   type KarigarFormState
 } from "@/lib/actions/karigar-actions"
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
+import { useToast } from "@/components/providers/toast-provider"
 
 import { KarigarForm } from "./karigar-form"
 
@@ -27,6 +29,8 @@ type Props = {
 
 export function KarigarCreateForm({ locations = [] }: Props){
 
+  const router = useRouter()
+  const toast = useToast()
 
   const [
     state,
@@ -38,7 +42,14 @@ export function KarigarCreateForm({ locations = [] }: Props){
     initialState
   )
 
-
+  useEffect(() => {
+    if (state.success) {
+      toast.success(state.message || "Karigar added successfully")
+      router.push("/karigars")
+      router.refresh()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state])
 
   return (
 

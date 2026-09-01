@@ -750,6 +750,7 @@ export async function createInvoice(
             invoiceId: created.id,
             amount: balanceAmount,
             description: `Invoice ${invoiceNumber} balance due`,
+            locationId: locationId ?? undefined,
           },
         });
       }
@@ -833,6 +834,7 @@ export async function recordInvoicePayment(
             paymentReference: payment.reference ?? undefined,
             bankName: payment.bankName ?? undefined,
             attachmentUrl: payment.attachmentUrl ?? undefined,
+            locationId: invoice.locationId ?? undefined,
             description:
               notes ??
               (index === 0 ? `Payment received for ${invoice.invoiceNumber}` : undefined),

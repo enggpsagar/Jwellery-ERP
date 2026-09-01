@@ -708,6 +708,7 @@ export async function recordPurchasePayment(
             paymentReference: payment.reference ?? undefined,
             bankName: payment.bankName ?? undefined,
             attachmentUrl: payment.attachmentUrl ?? undefined,
+            locationId: purchase.locationId ?? undefined,
             description:
               notes ??
               (index === 0 ? `Payment made for ${purchase.purchaseNumber}` : undefined),

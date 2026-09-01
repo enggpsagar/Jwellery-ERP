@@ -5,6 +5,7 @@ import { InventoryStockStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { getLocationScope, locationWhere } from "@/lib/location-scope";
 
 /**
  * What counts as metal still on hand.
@@ -66,6 +67,7 @@ export type MetalStockStat = {
 
 export async function getDashboardStats(): Promise<DashboardStat[]> {
   const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
   const now = new Date();
   const todayStart = startOfDay(now);
   const yesterdayStart = new Date(todayStart);
@@ -89,6 +91,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     monthSalesAgg,
     lastMonthSalesAgg,
     outstandingAgg,
+    outstandingKachaAgg,
     todayPurchasesAgg,
     totalPurchasesAgg,
     metalStockAggs,
@@ -96,34 +99,44 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     overdueJobs,
   ] = await Promise.all([
     prisma.invoice.aggregate({
-      where: { storeId, invoiceDate: { gte: todayStart } },
+      where: { storeId, invoiceDate: { gte: todayStart }, ...locationWhere(scope) },
       _sum: { totalAmount: true },
     }),
     prisma.invoice.aggregate({
-      where: { storeId, invoiceDate: { gte: yesterdayStart, lt: todayStart } },
+      where: { storeId, invoiceDate: { gte: yesterdayStart, lt: todayStart }, ...locationWhere(scope) },
       _sum: { totalAmount: true },
     }),
     prisma.invoice.aggregate({
-      where: { storeId, invoiceDate: { gte: monthStart } },
+      where: { storeId, invoiceDate: { gte: monthStart }, ...locationWhere(scope) },
       _sum: { totalAmount: true },
     }),
     prisma.invoice.aggregate({
-      where: { storeId, invoiceDate: { gte: lastMonthStart, lt: monthStart } },
+      where: { storeId, invoiceDate: { gte: lastMonthStart, lt: monthStart }, ...locationWhere(scope) },
       _sum: { totalAmount: true },
     }),
     prisma.invoice.aggregate({
-      where: { storeId, balanceAmount: { gt: 0 } },
+      where: { storeId, balanceAmount: { gt: 0 }, ...locationWhere(scope) },
+      _sum: { balanceAmount: true },
+      _count: true,
+    }),
+    // A customer's Kacha slip balance is owed exactly the same as an
+    // invoice's — it just hasn't been converted to a Pakka invoice yet.
+    // Without this, "Outstanding Receivables" under-reports real dues and
+    // disagrees with the Ledger, which already counts both (each creates
+    // its own balance-due LedgerEntry).
+    prisma.kachaInvoice.aggregate({
+      where: { storeId, balanceAmount: { gt: 0 }, ...locationWhere(scope) },
       _sum: { balanceAmount: true },
       _count: true,
     }),
     // Bounded above unlike the sales queries this mirrors — a future-dated
     // purchase must not inflate "today" indefinitely.
     prisma.purchase.aggregate({
-      where: { storeId, purchaseDate: { gte: todayStart, lt: tomorrowStart } },
+      where: { storeId, purchaseDate: { gte: todayStart, lt: tomorrowStart }, ...locationWhere(scope) },
       _sum: { totalAmount: true },
     }),
     prisma.purchase.aggregate({
-      where: { storeId },
+      where: { storeId, ...locationWhere(scope) },
       _sum: { totalAmount: true },
       _count: true,
     }),
@@ -141,17 +154,19 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
             metalTypeId: metal.id,
             isActive: true,
             status: { in: ON_HAND_STOCK_STATUSES },
+            ...locationWhere(scope),
           },
           select: { netWeight: true, quantity: true },
         })
       )
     ),
-    prisma.karigarJob.count({ where: { storeId, receivedDate: null } }),
+    prisma.karigarJob.count({ where: { storeId, receivedDate: null, ...locationWhere(scope) } }),
     prisma.karigarJob.count({
       where: {
         storeId,
         receivedDate: null,
         expectedDate: { lt: now },
+        ...locationWhere(scope),
       },
     }),
   ]);
@@ -160,8 +175,10 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   const yesterdaySales = Number(yesterdaySalesAgg._sum.totalAmount ?? 0);
   const monthSales = Number(monthSalesAgg._sum.totalAmount ?? 0);
   const lastMonthSales = Number(lastMonthSalesAgg._sum.totalAmount ?? 0);
-  const outstanding = Number(outstandingAgg._sum.balanceAmount ?? 0);
-  const outstandingAccounts = outstandingAgg._count;
+  const outstanding =
+    Number(outstandingAgg._sum.balanceAmount ?? 0) +
+    Number(outstandingKachaAgg._sum.balanceAmount ?? 0);
+  const outstandingAccounts = outstandingAgg._count + outstandingKachaAgg._count;
   const todayPurchases = Number(todayPurchasesAgg._sum.totalAmount ?? 0);
   const totalPurchases = Number(totalPurchasesAgg._sum.totalAmount ?? 0);
   const totalPurchaseCount = totalPurchasesAgg._count;
@@ -266,6 +283,7 @@ export async function getMonthlySalesTrend(
   monthsBack = 12
 ): Promise<MonthlySalesTrend> {
   const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
   const now = new Date();
   const rangeStart = new Date(
     now.getFullYear(),
@@ -274,7 +292,7 @@ export async function getMonthlySalesTrend(
   );
 
   const invoices = await prisma.invoice.findMany({
-    where: { storeId, invoiceDate: { gte: rangeStart } },
+    where: { storeId, invoiceDate: { gte: rangeStart }, ...locationWhere(scope) },
     select: {
       invoiceDate: true,
       totalAmount: true,
@@ -392,8 +410,9 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export async function getRevenueByCategory(): Promise<CategoryRevenue[]> {
   const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
   const items = await prisma.invoiceItem.findMany({
-    where: { invoice: { storeId } },
+    where: { invoice: { storeId, ...locationWhere(scope) } },
     select: {
       lineTotal: true,
       inventoryStock: {
@@ -438,8 +457,9 @@ export async function getRecentTransactions(
   limit = 6
 ): Promise<DashboardTransaction[]> {
   const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
   const invoices = await prisma.invoice.findMany({
-    where: { storeId },
+    where: { storeId, ...locationWhere(scope) },
     orderBy: { invoiceDate: "desc" },
     take: limit,
     include: {
@@ -524,8 +544,9 @@ export async function getRecentActivity(
   limit = 5
 ): Promise<DashboardActivity[]> {
   const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
   const entries = await prisma.ledgerEntry.findMany({
-    where: { storeId },
+    where: { storeId, ...locationWhere(scope) },
     orderBy: { entryDate: "desc" },
     take: limit,
     include: {

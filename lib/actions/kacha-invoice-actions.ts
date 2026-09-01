@@ -555,6 +555,7 @@ export async function createKachaInvoice(
             customerId,
             amount: balanceAmount,
             description: `Kacha slip ${slipNumber} balance due`,
+            locationId: locationId ?? undefined,
           },
         });
       }
@@ -620,6 +621,7 @@ export async function recordKachaInvoicePayment(
           customerId: kachaInvoice.customerId,
           amount,
           description: notes ?? `Payment received for ${kachaInvoice.slipNumber}`,
+          locationId: kachaInvoice.locationId ?? undefined,
         },
       }),
     ]);

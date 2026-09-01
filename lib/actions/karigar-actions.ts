@@ -19,6 +19,7 @@ export type Karigar = {
   email: string;
   address: string;
   city: string;
+  state: string;
   pincode: string;
   gstNumber: string;
   panNumber: string;
@@ -96,6 +97,7 @@ function mapKarigar(karigar: any): Karigar {
     email: karigar.email ?? "",
     address: karigar.address ?? "",
     city: karigar.city ?? "",
+    state: karigar.state ?? "",
     pincode: karigar.pincode ?? "",
     gstNumber: karigar.gstNumber ?? "",
     panNumber: karigar.panNumber ?? "",
@@ -195,6 +197,7 @@ function buildKarigarData(formData: FormData) {
     email: toOptionalString(formData.get("email")),
     address: toOptionalString(formData.get("address")),
     city: toOptionalString(formData.get("city")),
+    state: toOptionalString(formData.get("state")),
     pincode: toOptionalString(formData.get("pincode")),
     gstNumber: toOptionalString(formData.get("gstNumber")),
     panNumber: toOptionalString(formData.get("panNumber")),

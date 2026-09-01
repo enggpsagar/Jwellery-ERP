@@ -315,6 +315,7 @@ model Karigar {
   email          String?
   address        String?
   city           String?
+  state          String?
   pincode        String?
   gstNumber      String?
   panNumber      String?

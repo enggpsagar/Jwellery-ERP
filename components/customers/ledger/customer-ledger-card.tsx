@@ -31,6 +31,15 @@ function formatWeight(value: number) {
   })} g`
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: "Cash",
+  UPI: "UPI",
+  NET_BANKING: "Net Banking",
+  CHEQUE: "Cheque",
+  CARD: "Card",
+  OTHER: "Other",
+}
+
 function formatEntryAmount(entry: { metalType: string | null; metalWeight: number | null; amount: number }) {
   const family = classifyMetalName(entry.metalType)
 
@@ -199,7 +208,14 @@ export async function CustomerLedgerCard({
                     <td className="px-4 py-3 text-foreground">
                       {entry.metalType ?? "Money"}
                     </td>
-                    <td className="px-4 py-3 text-foreground">{entry.sourceType}</td>
+                    <td className="px-4 py-3 text-foreground">
+                      {entry.sourceType}
+                      {entry.paymentMethod ? (
+                        <span className="block text-xs text-muted-foreground">
+                          {PAYMENT_METHOD_LABELS[entry.paymentMethod] ?? entry.paymentMethod}
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-3 text-foreground">
                       {entry.description || "-"}
                     </td>

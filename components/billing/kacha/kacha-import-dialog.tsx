@@ -1,7 +1,8 @@
 "use client"
 
 import { useRef, useState, useTransition } from "react"
-import { Upload, Download, Loader2 } from "lucide-react"
+import { Upload, Download } from "lucide-react"
+import { Loader } from "@/components/ui/loader"
 
 import {
   getKachaImportTemplate,
@@ -100,7 +101,7 @@ export function KachaImportDialog() {
             disabled={downloading}
           >
             {downloading ? (
-              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              <Loader className="mr-1 h-4 w-4" />
             ) : (
               <Download className="mr-1 h-4 w-4" />
             )}
@@ -137,7 +138,7 @@ export function KachaImportDialog() {
 
           <DialogFooter>
             <Button type="submit" disabled={pending || !fileName}>
-              {pending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              {pending && <Loader className="mr-1 h-4 w-4" />}
               Import
             </Button>
           </DialogFooter>

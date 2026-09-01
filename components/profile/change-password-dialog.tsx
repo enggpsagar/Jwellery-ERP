@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, Smartphone, Mail, Loader2 } from "lucide-react";
+import { Shield, Smartphone, Mail } from "lucide-react";
+import { Loader } from "@/components/ui/loader";
 
 import {
   Dialog,
@@ -111,7 +112,7 @@ function ChangeContactFlow({ kind, currentValue, onUpdated }: ChangeContactFlowP
         >
           {pending ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader className="mr-2 h-4 w-4" />
               Sending OTP...
             </>
           ) : (
@@ -138,7 +139,7 @@ function ChangeContactFlow({ kind, currentValue, onUpdated }: ChangeContactFlowP
         <Button size="sm" onClick={handleVerify} disabled={pending || otp.length !== 6}>
           {pending ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader className="mr-2 h-4 w-4" />
               Verifying...
             </>
           ) : (

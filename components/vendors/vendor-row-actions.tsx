@@ -3,7 +3,8 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Archive, Loader2, Pencil, Trash2 } from "lucide-react"
+import { Archive, Pencil, Trash2 } from "lucide-react"
+import { Loader } from "@/components/ui/loader"
 
 import type { Vendor } from "@/lib/actions/vendor-actions"
 import {
@@ -159,7 +160,7 @@ export function VendorRowActions({
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader className="mr-2 h-4 w-4" />
                       Archiving...
                     </>
                   ) : (
@@ -210,7 +211,7 @@ export function VendorRowActions({
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader className="mr-2 h-4 w-4" />
                       Deleting...
                     </>
                   ) : (

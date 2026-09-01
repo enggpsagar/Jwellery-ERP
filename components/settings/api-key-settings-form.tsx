@@ -1,7 +1,8 @@
 "use client"
 
 import { useActionState, useEffect, useMemo, useState } from "react"
-import { Ban, Loader2, Plus } from "lucide-react"
+import { Ban, Plus } from "lucide-react"
+import { Loader } from "@/components/ui/loader"
 
 import {
   createApiKey,
@@ -176,7 +177,7 @@ export function ApiKeySettingsForm({
 
               <Button type="submit" disabled={pending}>
                 {pending ? (
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  <Loader className="mr-1.5 h-4 w-4" />
                 ) : (
                   <Plus className="mr-1.5 h-4 w-4" />
                 )}
@@ -256,7 +257,7 @@ export function ApiKeySettingsForm({
                             onClick={() => handleRevoke(key.id)}
                           >
                             {revokingId === key.id ? (
-                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                              <Loader className="mr-1 h-3.5 w-3.5" />
                             ) : (
                               <Ban className="mr-1 h-3.5 w-3.5" />
                             )}

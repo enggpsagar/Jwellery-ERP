@@ -4,7 +4,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { RotateCcw } from "lucide-react"
 
-import { unarchiveCustomer } from "@/lib/actions/customer-actions"
+import { unarchiveVendor } from "@/lib/actions/vendor-actions"
 import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/loader"
 import {
@@ -17,12 +17,12 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/providers/toast-provider"
 
-export function ArchivedCustomerRestoreButton({
-  customerId,
-  customerName,
+export function ArchivedVendorRestoreButton({
+  vendorId,
+  vendorName,
 }: {
-  customerId: string
-  customerName: string
+  vendorId: string
+  vendorName: string
 }) {
   const router = useRouter()
   const toast = useToast()
@@ -33,21 +33,18 @@ export function ArchivedCustomerRestoreButton({
   async function handleRestore() {
     try {
       setLoading(true)
-      const result = await unarchiveCustomer(customerId)
+      const result = await unarchiveVendor(vendorId)
 
       if (result.success) {
         toast.success(result.message)
         setOpen(false)
-        // The restored row leaves this (archived-only) list — refresh
-        // re-fetches it from the server rather than filtering client-side,
-        // so pagination/counts stay correct too.
         router.refresh()
       } else {
         toast.error(result.message)
       }
     } catch (error) {
       console.error(error)
-      toast.error("Failed to restore customer")
+      toast.error("Failed to restore vendor")
     } finally {
       setLoading(false)
     }
@@ -74,10 +71,10 @@ export function ArchivedCustomerRestoreButton({
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Restore Customer</DialogTitle>
+            <DialogTitle>Restore Vendor</DialogTitle>
             <DialogDescription>
-              Restore <span className="font-medium text-foreground">{customerName}</span>{" "}
-              to the active customer list?
+              Restore <span className="font-medium text-foreground">{vendorName}</span>{" "}
+              to the active vendor list?
             </DialogDescription>
           </DialogHeader>
 
@@ -98,7 +95,7 @@ export function ArchivedCustomerRestoreButton({
                   Restoring...
                 </>
               ) : (
-                "Restore Customer"
+                "Restore Vendor"
               )}
             </Button>
           </DialogFooter>

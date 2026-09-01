@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Loader2 } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
+import { Loader } from "@/components/ui/loader";
 
 import {
   upsertStoreLocation,
@@ -287,7 +288,7 @@ function LocationFormRow({
 
       <div className="flex gap-2 pb-0.5">
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+          {pending ? <Loader className="h-4 w-4" /> : "Save"}
         </Button>
         <Button type="button" size="sm" variant="outline" onClick={onDone}>
           Cancel

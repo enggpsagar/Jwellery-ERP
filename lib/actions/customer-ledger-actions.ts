@@ -31,6 +31,7 @@ export type CustomerLedgerEntryItem = {
   amount: number
   metalType: string | null
   metalWeight: number | null
+  paymentMethod: string | null
   entryDate: string
   invoiceId: string | null
   invoiceNumber: string | null
@@ -91,6 +92,7 @@ export async function getCustomerLedgerEntries(
     amount: Number(entry.amount ?? 0),
     metalType: entry.metalType?.name ?? null,
     metalWeight: entry.metalWeight ? Number(entry.metalWeight) : null,
+    paymentMethod: entry.paymentMethod ?? null,
     entryDate: formatDate(entry.entryDate),
     invoiceId: entry.invoice?.id ?? null,
     invoiceNumber: entry.invoice?.invoiceNumber ?? null,

@@ -21,6 +21,15 @@ function formatCurrency(value: number) {
   return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: "Cash",
+  UPI: "UPI",
+  NET_BANKING: "Net Banking",
+  CHEQUE: "Cheque",
+  CARD: "Card",
+  OTHER: "Other",
+}
+
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 py-2.5">
@@ -121,6 +130,15 @@ export function LedgerDetailDrawer({
                     Information
                   </h3>
                   <DetailRow label="Type" value={entry.sourceLabel} />
+                  {entry.paymentMethod ? (
+                    <>
+                      <Separator />
+                      <DetailRow
+                        label="Payment Method"
+                        value={PAYMENT_METHOD_LABELS[entry.paymentMethod] ?? entry.paymentMethod}
+                      />
+                    </>
+                  ) : null}
                   <Separator />
                   <DetailRow
                     label="Invoice"

@@ -195,6 +195,18 @@
   }
 }
 
+/* components/ui/loader.tsx's infinity-track loading indicator — the comet
+   segment (28% of the normalised path) travels one full lap per cycle. */
+@keyframes loader-infinity {
+  to {
+    stroke-dashoffset: -1;
+  }
+}
+
+.animate-loader-infinity {
+  animation: loader-infinity 1.4s linear infinite;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

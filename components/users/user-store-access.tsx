@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Loader2, Store as StoreIcon, Trash2 } from "lucide-react"
+import { Store as StoreIcon, Trash2 } from "lucide-react"
 import { UserRole } from "@prisma/client"
 
 import {
@@ -13,6 +13,7 @@ import { MODULE_DEFINITIONS, ROLE_LABELS, type ModuleKey } from "@/lib/roles"
 import { useToast } from "@/components/providers/toast-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Loader } from "@/components/ui/loader"
 import {
   Select,
   SelectContent,
@@ -147,7 +148,7 @@ export function UserStoreAccess({ userId, rows }: UserStoreAccessProps) {
                   </Select>
 
                   <Button size="sm" disabled={busy} onClick={() => save(row)}>
-                    {busy && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+                    {busy && <Loader className="mr-1 h-3.5 w-3.5" />}
                     Save
                   </Button>
 

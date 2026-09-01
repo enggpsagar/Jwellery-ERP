@@ -1,8 +1,9 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { Loader2, Paperclip, X } from "lucide-react"
+import { Paperclip, X } from "lucide-react"
 
+import { Loader } from "@/components/ui/loader"
 import { useToast } from "@/components/providers/toast-provider"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -199,7 +200,7 @@ export function PaymentMethodFields({ value, onChange, maxAmount }: PaymentMetho
 
         {uploading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader className="h-4 w-4" />
             Uploading...
           </div>
         )}

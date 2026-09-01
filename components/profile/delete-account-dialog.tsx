@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Loader2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 
@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Loader } from "@/components/ui/loader";
 
 export function DeleteAccountDialog() {
   const [open, setOpen] = useState(false);
@@ -71,7 +72,7 @@ export function DeleteAccountDialog() {
           <Button variant="destructive" onClick={handleDelete} disabled={loading}>
             {loading ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader className="mr-2 h-4 w-4" />
                 Deleting...
               </>
             ) : (

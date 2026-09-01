@@ -8,7 +8,6 @@ import {
   ArrowRight,
   CheckCircle2,
   IndianRupee,
-  Loader2,
   ScanLine,
 } from "lucide-react"
 
@@ -19,6 +18,7 @@ import {
   type QuickSaleTarget,
 } from "@/lib/actions/quick-sale-actions"
 import { Button } from "@/components/ui/button"
+import { Loader } from "@/components/ui/loader"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -299,7 +299,7 @@ export function QuickSaleForm({
                     disabled={pending}
                     className="h-14 bg-[var(--chart-2)] text-base text-white hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
                   >
-                    {pending && <Loader2 className="mr-2 size-5 animate-spin" />}
+                    {pending && <Loader className="mr-2 size-5" />}
                     {pending ? "Creating invoice..." : "Confirm & create invoice"}
                   </Button>
 

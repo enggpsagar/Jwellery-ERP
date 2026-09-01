@@ -54,6 +54,15 @@ function formatCurrency(value: number, withSign = false) {
   return formatted
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: "Cash",
+  UPI: "UPI",
+  NET_BANKING: "Net Banking",
+  CHEQUE: "Cheque",
+  CARD: "Card",
+  OTHER: "Other",
+}
+
 /** Gold/silver entries are settled by weight, not rupees — show the weight instead of ₹ for those rows. */
 function formatEntryValue(entry: LedgerEntryRow) {
   const family = classifyMetalName(entry.metalType)
@@ -413,17 +422,24 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "font-normal",
-                          entry.type === "CREDIT"
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-destructive/30 bg-destructive/10 text-destructive",
-                        )}
-                      >
-                        {entry.type === "CREDIT" ? "Credit" : "Debit"}
-                      </Badge>
+                      <div className="flex flex-col gap-0.5">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "w-fit font-normal",
+                            entry.type === "CREDIT"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-destructive/30 bg-destructive/10 text-destructive",
+                          )}
+                        >
+                          {entry.type === "CREDIT" ? "Credit" : "Debit"}
+                        </Badge>
+                        {entry.paymentMethod ? (
+                          <span className="text-xs text-muted-foreground">
+                            {PAYMENT_METHOD_LABELS[entry.paymentMethod] ?? entry.paymentMethod}
+                          </span>
+                        ) : null}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {entry.type === "DEBIT" ? (

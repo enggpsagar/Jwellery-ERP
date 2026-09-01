@@ -1,9 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { CameraOff, Loader2, X } from "lucide-react"
+import { CameraOff, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Loader } from "@/components/ui/loader"
 
 /**
  * Reads stock QR labels from a camera attached to this device.
@@ -326,7 +327,7 @@ export function WebcamQrScanner({
 
         {status === "starting" ? (
           <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 text-sm text-white">
-            <Loader2 className="size-4 animate-spin" />
+            <Loader className="size-4" />
             Opening camera...
           </div>
         ) : null}

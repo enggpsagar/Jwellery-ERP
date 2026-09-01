@@ -2,10 +2,11 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Archive, ArchiveRestore, Loader2 } from "lucide-react"
+import { Archive, ArchiveRestore } from "lucide-react"
 
 import { archiveStore, restoreStore } from "@/lib/actions/store-actions"
 import { Button } from "@/components/ui/button"
+import { Loader } from "@/components/ui/loader"
 import {
   Dialog,
   DialogContent,
@@ -119,7 +120,7 @@ export function StoreRowActions({
             <Button type="button" onClick={handleConfirm} disabled={loading}>
               {loading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader className="mr-2 h-4 w-4" />
                   {isActive ? "Archiving..." : "Restoring..."}
                 </>
               ) : isActive ? (

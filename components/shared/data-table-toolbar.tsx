@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Download, Loader2, Search } from "lucide-react"
+import { Download, Search } from "lucide-react"
+import { Loader } from "@/components/ui/loader"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/providers/toast-provider"
@@ -219,7 +220,7 @@ export function DataTableToolbar({
         >
           {isExporting ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader className="h-4 w-4" />
               Exporting...
             </>
           ) : (

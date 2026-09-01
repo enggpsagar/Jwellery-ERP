@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Trash2, Loader2, ShieldAlert } from "lucide-react"
+import { Trash2, ShieldAlert } from "lucide-react"
+import { Loader } from "@/components/ui/loader"
 
 import {
   deleteAllKachaInvoices,
@@ -100,7 +101,7 @@ export function DeleteAllKachaDialog({
 
           {loading || summary === null ? (
             <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader className="h-4 w-4" />
               Checking what would be deleted...
             </div>
           ) : (
@@ -191,7 +192,7 @@ export function DeleteAllKachaDialog({
               onClick={handleDelete}
               disabled={!canDelete || pending}
             >
-              {pending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              {pending && <Loader className="mr-1 h-4 w-4" />}
               {pending ? "Backing up..." : "Back up and delete"}
             </Button>
           </DialogFooter>

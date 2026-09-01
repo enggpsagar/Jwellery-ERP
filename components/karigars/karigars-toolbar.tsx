@@ -3,7 +3,8 @@
 
 import * as React from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Download, Loader2, Search } from "lucide-react"
+import { Download, Search } from "lucide-react"
+import { Loader } from "@/components/ui/loader"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { exportKarigarsToExcel } from "@/lib/actions/karigar-actions"
@@ -179,7 +180,7 @@ export function KarigarsToolbar({ selectedKarigarIds }: KarigarsToolbarProps) {
         >
           {isExporting ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader className="h-4 w-4" />
               Exporting...
             </>
           ) : (

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Camera, Loader2, ScanLine, Square, Wifi } from "lucide-react"
+import { Camera, ScanLine, Square, Wifi } from "lucide-react"
 
 import {
   pollScanSession,
@@ -9,6 +9,7 @@ import {
   stopScanSession,
 } from "@/lib/actions/scan-session-actions"
 import { Button } from "@/components/ui/button"
+import { Loader } from "@/components/ui/loader"
 import { WebcamQrScanner } from "@/components/shared/webcam-qr-scanner"
 
 /**
@@ -157,7 +158,7 @@ export function ScanToAddPanel({
 
             <Button type="button" variant="outline" onClick={start} disabled={starting}>
               {starting ? (
-                <Loader2 className="mr-1.5 size-4 animate-spin" />
+                <Loader className="mr-1.5 size-4" />
               ) : (
                 <ScanLine className="mr-1.5 size-4" />
               )}

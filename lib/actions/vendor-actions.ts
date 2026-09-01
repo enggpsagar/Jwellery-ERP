@@ -59,6 +59,8 @@ export type GetVendorsParams = {
   search?: string
   sortBy?: VendorSortBy
   sortOrder?: SortOrder
+  /** Defaults to the active list — set true to list archived vendors instead. */
+  archived?: boolean
 }
 
 export type VendorsListResponse = {
@@ -108,12 +110,12 @@ function formatDate(date?: Date | null) {
   }).format(date)
 }
 
-function getVendorWhere(storeId: string, search?: string) {
+function getVendorWhere(storeId: string, search?: string, archived = false) {
   const query = String(search || "").trim()
 
   return {
     storeId,
-    isArchived: false,
+    isArchived: archived,
     ...(query
       ? {
           OR: [
@@ -199,7 +201,7 @@ export async function getVendors(
   const sortOrder: SortOrder = params.sortOrder || "desc"
 
   const storeId = await requireStoreScope()
-  const where = getVendorWhere(storeId, search)
+  const where = getVendorWhere(storeId, search, params.archived)
   const orderBy = getVendorOrderBy(sortBy, sortOrder)
 
   const [totalCount, vendors] = await Promise.all([
@@ -587,6 +589,7 @@ export async function archiveVendor(id: string): Promise<VendorFormState> {
     }
 
     revalidatePath("/vendors")
+    revalidatePath("/vendors/archived")
     revalidatePath(`/vendors/${id}`)
 
     return {
@@ -598,6 +601,41 @@ export async function archiveVendor(id: string): Promise<VendorFormState> {
     return {
       success: false,
       message: "Failed to archive vendor",
+    }
+  }
+}
+
+export async function unarchiveVendor(id: string): Promise<VendorFormState> {
+  try {
+    const storeId = await requireStoreScope()
+
+    const { count } = await prisma.vendor.updateMany({
+      where: { id, storeId },
+      data: {
+        isArchived: false,
+      },
+    })
+
+    if (count === 0) {
+      return {
+        success: false,
+        message: "Vendor not found",
+      }
+    }
+
+    revalidatePath("/vendors")
+    revalidatePath("/vendors/archived")
+    revalidatePath(`/vendors/${id}`)
+
+    return {
+      success: true,
+      message: "Vendor restored successfully",
+    }
+  } catch (error) {
+    console.error("unarchiveVendor error:", error)
+    return {
+      success: false,
+      message: "Failed to restore vendor",
     }
   }
 }

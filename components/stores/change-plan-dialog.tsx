@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { CreditCard, Loader2 } from "lucide-react"
+import { CreditCard } from "lucide-react"
+import { Loader } from "@/components/ui/loader"
 
 import { assignPlanToStore } from "@/lib/actions/store-actions"
 import type { PlanRow } from "@/lib/actions/plan-actions"
@@ -121,7 +122,7 @@ export function ChangePlanDialog({
             <Button type="button" onClick={handleConfirm} disabled={loading || !planId}>
               {loading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader className="mr-2 h-4 w-4" />
                   Assigning...
                 </>
               ) : (

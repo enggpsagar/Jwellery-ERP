@@ -46,9 +46,15 @@ export function VendorsClient({
           </p>
         </div>
 
-        <Link href="/vendors/new">
-          <Button>Add Vendor</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/vendors/archived">
+            <Button variant="outline">Archived Vendors</Button>
+          </Link>
+
+          <Link href="/vendors/new">
+            <Button>Add Vendor</Button>
+          </Link>
+        </div>
       </div>
 
       <VendorsToolbar selectedVendorIds={selectedVendorIds} />

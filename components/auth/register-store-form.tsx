@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react"
+import { ArrowRight, CheckCircle2 } from "lucide-react"
+import { Loader } from "@/components/ui/loader"
 
 import {
   registerStoreAction,
@@ -279,7 +280,7 @@ export function RegisterStoreForm({ states }: RegisterStoreFormProps) {
             disabled={pending}
             className="bg-[var(--chart-2)] text-white hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
           >
-            {pending && <Loader2 className="mr-1.5 size-4 animate-spin" />}
+            {pending && <Loader className="mr-1.5 size-4" />}
             {pending ? "Setting up your shop..." : "Create my store"}
           </Button>
 

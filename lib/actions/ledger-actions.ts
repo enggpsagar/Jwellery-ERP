@@ -27,6 +27,7 @@ export type LedgerEntryRow = {
   amount: number
   metalType: string | null
   metalWeight: number | null
+  paymentMethod: string | null
   description: string
   invoiceId: string | null
   invoiceNumber: string | null
@@ -88,6 +89,7 @@ export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
       amount: Number(entry.amount ?? 0),
       metalType: entry.metalType?.name ?? null,
       metalWeight: entry.metalWeight ? Number(entry.metalWeight) : null,
+      paymentMethod: entry.paymentMethod ?? null,
       description: entry.description ?? "",
       invoiceId: entry.invoiceId,
       invoiceNumber: entry.invoice?.invoiceNumber ?? null,
@@ -102,6 +104,7 @@ export type KarigarLedgerRow = {
   sourceLabel: string
   description: string
   metalWeightFine: number | null
+  paymentMethod: string | null
   amount: number
   runningFineGoldBalance: number
   runningCashBalance: number
@@ -144,6 +147,7 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
       sourceLabel: formatLedgerSource(entry.sourceType),
       description: entry.description ?? "",
       metalWeightFine,
+      paymentMethod: entry.paymentMethod ?? null,
       amount,
       runningFineGoldBalance: fineGoldBalance,
       runningCashBalance: cashBalance,

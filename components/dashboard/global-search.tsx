@@ -3,9 +3,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Loader2, Users, Gem, Receipt, Hammer } from "lucide-react";
+import { Search, Users, Gem, Receipt, Hammer } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
+import { Loader } from "@/components/ui/loader";
 import { cn } from "@/lib/utils";
 import {
   globalSearch,
@@ -142,7 +143,7 @@ export function GlobalSearch() {
         >
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader className="h-4 w-4" />
               Searching...
             </div>
           ) : results.length === 0 ? (

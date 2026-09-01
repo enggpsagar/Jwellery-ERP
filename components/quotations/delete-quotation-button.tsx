@@ -2,11 +2,12 @@
 
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Trash2, Loader2 } from "lucide-react"
+import { Trash2 } from "lucide-react"
 
 import { deleteQuotation } from "@/lib/actions/quotation-actions"
 import { useToast } from "@/components/providers/toast-provider"
 import { Button } from "@/components/ui/button"
+import { Loader } from "@/components/ui/loader"
 
 export function DeleteQuotationButton({
   quotationId,
@@ -38,7 +39,7 @@ export function DeleteQuotationButton({
   return (
     <Button variant="outline" onClick={handleClick} disabled={pending}>
       {pending ? (
-        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+        <Loader className="h-4 w-4 mr-1" />
       ) : (
         <Trash2 className="h-4 w-4 mr-1" />
       )}

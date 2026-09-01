@@ -2,10 +2,11 @@
 
 import { useRef, useState, type ChangeEvent } from "react"
 import { useRouter } from "next/navigation"
-import { ImageIcon, Loader2, Trash2, Upload } from "lucide-react"
+import { ImageIcon, Trash2, Upload } from "lucide-react"
 
 import { removeStoreLogo } from "@/lib/actions/settings-actions"
 import { Button } from "@/components/ui/button"
+import { Loader } from "@/components/ui/loader"
 import { useToast } from "@/components/providers/toast-provider"
 
 type StoreLogoUploadProps = {
@@ -102,7 +103,7 @@ export function StoreLogoUpload({ logoUrl, storeName, canEdit }: StoreLogoUpload
             onClick={() => inputRef.current?.click()}
           >
             {uploading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader className="mr-2 h-4 w-4" />
             ) : (
               <Upload className="mr-2 h-4 w-4" />
             )}

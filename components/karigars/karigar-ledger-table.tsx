@@ -12,6 +12,15 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: "Cash",
+  UPI: "UPI",
+  NET_BANKING: "Net Banking",
+  CHEQUE: "Cheque",
+  CARD: "Card",
+  OTHER: "Other",
+}
+
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
   if (value === null || value === undefined || value === "") return null
@@ -101,6 +110,7 @@ export function KarigarLedgerTable({
                           {
                             fields: [
                               { label: "Type", value: row.type },
+                              { label: "Payment Method", value: PAYMENT_METHOD_LABELS[row.paymentMethod ?? ""] ?? row.paymentMethod },
                               { label: "Description", value: row.description },
                             ],
                           },
@@ -133,7 +143,14 @@ export function KarigarLedgerTable({
                         {row.type}
                       </Badge>
                     </TableCell>
-                    <TableCell>{row.sourceLabel}</TableCell>
+                    <TableCell>
+                      {row.sourceLabel}
+                      {row.paymentMethod ? (
+                        <span className="block text-xs text-muted-foreground">
+                          {PAYMENT_METHOD_LABELS[row.paymentMethod] ?? row.paymentMethod}
+                        </span>
+                      ) : null}
+                    </TableCell>
                     <TableCell className="max-w-xs truncate" title={row.description}>
                       {row.description}
                     </TableCell>

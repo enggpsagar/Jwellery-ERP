@@ -1,11 +1,12 @@
 "use client"
 
 import { useTransition } from "react"
-import { Mail, Loader2 } from "lucide-react"
+import { Mail } from "lucide-react"
 
 import { emailKachaInvoiceAction } from "@/lib/actions/kacha-invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
 import { Button } from "@/components/ui/button"
+import { Loader } from "@/components/ui/loader"
 
 export function EmailKachaInvoiceButton({ kachaInvoiceId }: { kachaInvoiceId: string }) {
   const [pending, startTransition] = useTransition()
@@ -25,7 +26,7 @@ export function EmailKachaInvoiceButton({ kachaInvoiceId }: { kachaInvoiceId: st
   return (
     <Button variant="outline" onClick={handleClick} disabled={pending}>
       {pending ? (
-        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+        <Loader className="h-4 w-4 mr-1" />
       ) : (
         <Mail className="h-4 w-4 mr-1" />
       )}

@@ -162,9 +162,10 @@ export function StockForm({
 
   // Net = gross - less - stone - dust/making/other, the same subtraction a
   // jeweller does by hand — mirrors the auto-fill on the Product form.
-  // Stops the moment Net Weight itself is edited directly, so a figure that
-  // came off a scale is never silently overwritten by the deduction fields.
-  const [netTouched, setNetTouched] = useState(Boolean(stock?.netWeight));
+  // Active on both create and edit (a change to any deduction field
+  // recomputes Net Weight even over an existing saved value); stops only
+  // once Net Weight itself is edited directly in this session.
+  const [netTouched, setNetTouched] = useState(false);
 
   function toNum(value: string) {
     const trimmed = value.trim();

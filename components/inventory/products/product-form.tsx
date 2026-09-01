@@ -140,10 +140,10 @@ export function ProductForm({
   const [createStock, setCreateStock] = useState(false);
 
   // Net = gross - stone is how a jeweller works it out, so the field fills
-  // itself in rather than making someone do the subtraction. It stops as
-  // soon as the field is edited directly: an existing product already has a
-  // net weight someone chose, and recomputing over it would quietly change
-  // a figure that prices the piece.
+  // itself in rather than making someone do the subtraction. Active on both
+  // create and edit — a change to Gross or Stone recomputes Net even over
+  // an existing saved value — and stops only once Net Weight itself is
+  // edited directly in this session.
   const [grossWeight, setGrossWeight] = useState(
     product?.defaultGrossWeight ?? "",
   );
@@ -151,9 +151,7 @@ export function ProductForm({
     product?.defaultStoneWeight ?? "",
   );
   const [netWeight, setNetWeight] = useState(product?.defaultNetWeight ?? "");
-  const [netTouched, setNetTouched] = useState(
-    Boolean(product?.defaultNetWeight),
-  );
+  const [netTouched, setNetTouched] = useState(false);
 
   const gross = Number(grossWeight);
   const stone = stoneWeight.trim() === "" ? 0 : Number(stoneWeight);
@@ -169,8 +167,17 @@ export function ProductForm({
       : null;
 
   // Kept in an effect rather than derived straight into the input, because
-  // the field has to stay editable once the user takes it over.
+  // the field has to stay editable once the user takes it over. Skips its
+  // very first run: on an edit page, gross/stone are already populated from
+  // the saved product, so without this guard the effect would recompute (and
+  // silently overwrite) Net Weight the instant the page loads, before the
+  // user has touched anything.
+  const skippedFirstNetCalc = useRef(false);
   useEffect(() => {
+    if (!skippedFirstNetCalc.current) {
+      skippedFirstNetCalc.current = true;
+      return;
+    }
     if (netTouched) return;
     setNetWeight(derivedNet ?? "");
   }, [derivedNet, netTouched]);

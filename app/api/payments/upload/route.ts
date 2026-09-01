@@ -27,8 +27,9 @@ export async function POST(request: Request) {
     return Response.json({ url: blob.url });
   } catch (error) {
     console.error("payment receipt upload error:", error);
+    const message = error instanceof Error ? error.message : String(error);
     return Response.json(
-      { error: "Upload failed — check that BLOB_READ_WRITE_TOKEN is configured" },
+      { error: `Upload failed: ${message}` },
       { status: 500 },
     );
   }

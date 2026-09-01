@@ -81,7 +81,21 @@ export function AddCustomerSaleEntryDialog({
           <DialogTitle>Add Sale Entry</DialogTitle>
         </DialogHeader>
 
-        <form action={formAction} className="space-y-4">
+        <form
+          onSubmit={(event) => {
+            // Deliberately not `action={formAction}` directly on the form:
+            // React resets a form's uncontrolled fields once an action-bound
+            // submission settles, regardless of whether the action's own
+            // returned state says success or failure — so a plain validation
+            // error wiped every other field the user had already typed.
+            // Calling the same dispatcher by hand from a prevented submit
+            // sidesteps that auto-reset while keeping identical pending/error-
+            // state behavior.
+            event.preventDefault()
+            formAction(new FormData(event.currentTarget))
+          }}
+          className="space-y-4"
+        >
           {activeUnits.length > 1 && (
             <div className="space-y-1">
               <label className="text-sm font-medium">Unit</label>

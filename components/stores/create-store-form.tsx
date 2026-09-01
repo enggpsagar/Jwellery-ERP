@@ -26,13 +26,23 @@ export function CreateStoreForm({ plans }: { plans: PlanRow[] }) {
     const email = (formEl.elements.namedItem("adminEmail") as HTMLInputElement)?.value.trim()
     const phone = (formEl.elements.namedItem("adminPhone") as HTMLInputElement)?.value.trim()
 
+    // Deliberately not `action={formAction}` directly on the form:
+    // React resets a form's uncontrolled fields once an action-bound
+    // submission settles, regardless of whether the action's own
+    // returned state says success or failure — so a plain validation
+    // error wiped every other field the user had already typed.
+    // Calling the same `formAction` dispatcher by hand from a prevented
+    // submit sidesteps that auto-reset while keeping identical
+    // pending/error-state behavior.
+    event.preventDefault()
+
     if (!email && !phone) {
-      event.preventDefault()
       setContactError("Provide an admin email or phone number — it's required to sign in to the Store Dashboard")
       return
     }
 
     setContactError("")
+    formAction(new FormData(formEl))
   }
 
   useEffect(() => {
@@ -57,7 +67,6 @@ export function CreateStoreForm({ plans }: { plans: PlanRow[] }) {
       <CardContent>
         <form
           ref={formRef}
-          action={formAction}
           onSubmit={handleSubmit}
           className="grid grid-cols-1 gap-4 md:grid-cols-2"
         >

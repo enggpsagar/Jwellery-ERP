@@ -102,7 +102,21 @@ useEffect(() => {
 }, [state.success, state.message, router, stock.id])
 
   return (
-    <form action={formAction} className="space-y-6 rounded-xl border bg-card p-6">
+    <form
+      onSubmit={(event) => {
+        // Deliberately not `action={formAction}` directly on the form:
+        // React resets a form's uncontrolled fields once an action-bound
+        // submission settles, regardless of whether the action's own
+        // returned state says success or failure — so a plain validation
+        // error wiped every other field the user had already typed.
+        // Calling the same dispatcher by hand from a prevented submit
+        // sidesteps that auto-reset while keeping identical pending/error-
+        // state behavior.
+        event.preventDefault()
+        formAction(new FormData(event.currentTarget))
+      }}
+      className="space-y-6 rounded-xl border bg-card p-6"
+    >
       {state.message ? (
         <div
           className={`rounded-md px-3 py-2 text-sm ${

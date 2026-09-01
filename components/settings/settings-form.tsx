@@ -57,7 +57,21 @@ export function SettingsForm({ settings, canEdit }: SettingsFormProps) {
   }, [state]);
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form
+      onSubmit={(event) => {
+        // Deliberately not `action={formAction}` directly on the form:
+        // React resets a form's uncontrolled fields once an action-bound
+        // submission settles, regardless of whether the action's own
+        // returned state says success or failure — so a plain validation
+        // error wiped every other field the user had already typed.
+        // Calling the same dispatcher by hand from a prevented submit
+        // sidesteps that auto-reset while keeping identical pending/error-
+        // state behavior.
+        event.preventDefault()
+        formAction(new FormData(event.currentTarget))
+      }}
+      className="space-y-6"
+    >
       {!canEdit ? (
         <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
           Only the Store Owner can edit these settings. You have view-only access.

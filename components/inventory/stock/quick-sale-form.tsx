@@ -221,7 +221,21 @@ export function QuickSaleForm({
 
       <Card>
         <CardContent className="p-5 sm:p-6">
-          <form action={formAction} className="flex flex-col gap-5">
+          <form
+            onSubmit={(event) => {
+              // Deliberately not `action={formAction}` directly on the form:
+              // React resets a form's uncontrolled fields once an action-bound
+              // submission settles, regardless of whether the action's own
+              // returned state says success or failure — so a plain validation
+              // error wiped every other field the user had already typed.
+              // Calling the same dispatcher by hand from a prevented submit
+              // sidesteps that auto-reset while keeping identical pending/error-
+              // state behavior.
+              event.preventDefault()
+              formAction(new FormData(event.currentTarget))
+            }}
+            className="flex flex-col gap-5"
+          >
             {/* The values submitted are always these hidden fields, so what
                 was reviewed on the confirm step is exactly what is sent. */}
             <input type="hidden" name="token" value={token} />

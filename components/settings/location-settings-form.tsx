@@ -205,7 +205,18 @@ function LocationFormRow({
 
   return (
     <form
-      action={formAction}
+      onSubmit={(event) => {
+        // Deliberately not `action={formAction}` directly on the form:
+        // React resets a form's uncontrolled fields once an action-bound
+        // submission settles, regardless of whether the action's own
+        // returned state says success or failure — so a plain validation
+        // error wiped every other field the user had already typed.
+        // Calling the same dispatcher by hand from a prevented submit
+        // sidesteps that auto-reset while keeping identical pending/error-
+        // state behavior.
+        event.preventDefault()
+        formAction(new FormData(event.currentTarget))
+      }}
       className="flex flex-wrap items-end gap-3 rounded-md border border-dashed p-3"
     >
       <input type="hidden" name="id" value={location?.id ?? ""} />

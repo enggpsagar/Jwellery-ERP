@@ -132,7 +132,21 @@ export function RegisterStoreForm({ states }: RegisterStoreFormProps) {
   return (
     <Card>
       <CardContent className="p-6 sm:p-8">
-        <form action={formAction} className="flex flex-col gap-5">
+        <form
+          onSubmit={(event) => {
+            // Deliberately not `action={formAction}` directly on the form:
+            // React resets a form's uncontrolled fields once an action-bound
+            // submission settles, regardless of whether the action's own
+            // returned state says success or failure — so a plain validation
+            // error wiped every other field the user had already typed.
+            // Calling the same dispatcher by hand from a prevented submit
+            // sidesteps that auto-reset while keeping identical pending/error-
+            // state behavior.
+            event.preventDefault()
+            formAction(new FormData(event.currentTarget))
+          }}
+          className="flex flex-col gap-5"
+        >
           <div className="space-y-1.5">
             <Label htmlFor="storeName">Store name <RequiredMark /></Label>
             <Input

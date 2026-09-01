@@ -65,6 +65,8 @@ export type GetCustomersParams = {
   search?: string;
   sortBy?: CustomerSortBy;
   sortOrder?: SortOrder;
+  /** Defaults to the active list — set true to list archived customers instead. */
+  archived?: boolean;
 };
 
 export type CustomersListResponse = {
@@ -121,12 +123,12 @@ function formatDate(date?: Date | null) {
   }).format(date);
 }
 
-export function getCustomerWhere(storeId: string, search?: string) {
+export function getCustomerWhere(storeId: string, search?: string, archived = false) {
   const query = String(search || "").trim();
 
   return {
     storeId,
-    isArchived: false,
+    isArchived: archived,
     ...(query
       ? {
           OR: [
@@ -230,7 +232,7 @@ export async function getCustomersCore(
   const sortBy: CustomerSortBy = params.sortBy || "createdAt";
   const sortOrder: SortOrder = params.sortOrder || "desc";
 
-  const where = getCustomerWhere(storeId, params.search);
+  const where = getCustomerWhere(storeId, params.search, params.archived);
   const orderBy = getCustomerOrderBy(sortBy, sortOrder);
 
   const [totalCount, customers] = await Promise.all([

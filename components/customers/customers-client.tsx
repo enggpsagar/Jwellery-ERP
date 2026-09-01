@@ -47,11 +47,17 @@ export function CustomersClient({
           </p>
         </div>
 
-        {/* A page, not a dialog — same as Vendors. The form is long enough
-            that a modal fights the on-screen keyboard on a phone. */}
-        <Link href="/customers/new">
-          <Button>Add Customer</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/customers/archived">
+            <Button variant="outline">Archived Customers</Button>
+          </Link>
+
+          {/* A page, not a dialog — same as Vendors. The form is long enough
+              that a modal fights the on-screen keyboard on a phone. */}
+          <Link href="/customers/new">
+            <Button>Add Customer</Button>
+          </Link>
+        </div>
       </div>
 
       <CustomersToolbar selectedCustomerIds={selectedCustomerIds} />

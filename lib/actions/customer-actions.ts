@@ -232,6 +232,7 @@ export async function archiveCustomer(id: string): Promise<CustomerFormState> {
     }
 
     revalidatePath("/customers")
+    revalidatePath("/customers/archived")
     revalidatePath(`/customers/${id}`)
 
     return {
@@ -243,6 +244,41 @@ export async function archiveCustomer(id: string): Promise<CustomerFormState> {
     return {
       success: false,
       message: "Failed to archive customer",
+    }
+  }
+}
+
+export async function unarchiveCustomer(id: string): Promise<CustomerFormState> {
+  try {
+    const storeId = await requireStoreScope()
+
+    const { count } = await prisma.customer.updateMany({
+      where: { id, storeId },
+      data: {
+        isArchived: false,
+      },
+    })
+
+    if (count === 0) {
+      return {
+        success: false,
+        message: "Customer not found",
+      }
+    }
+
+    revalidatePath("/customers")
+    revalidatePath("/customers/archived")
+    revalidatePath(`/customers/${id}`)
+
+    return {
+      success: true,
+      message: "Customer restored successfully",
+    }
+  } catch (error) {
+    console.error("unarchiveCustomer error:", error)
+    return {
+      success: false,
+      message: "Failed to restore customer",
     }
   }
 }

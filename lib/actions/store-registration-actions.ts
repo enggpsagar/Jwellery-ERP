@@ -31,6 +31,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STARTER_METALS = [
   { name: "Gold", hasPurity: true },
   { name: "Silver", hasPurity: true },
+  { name: "Platinum", hasPurity: true },
   { name: "Diamond", hasPurity: false },
   { name: "Other", hasPurity: false },
 ];
@@ -43,6 +44,7 @@ const STARTER_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Coin", types: ["Gold Coin", "Silver Coin"] },
   { name: "Bar", types: ["Bar"] },
   { name: "Loose Stone", types: ["Loose Stone"] },
+  { name: "Diamond", types: ["Loose Diamond", "Diamond Jewellery"] },
 ];
 
 /**

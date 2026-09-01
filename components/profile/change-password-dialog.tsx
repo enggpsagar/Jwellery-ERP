@@ -92,7 +92,7 @@ function ChangeContactFlow({ kind, currentValue, onUpdated }: ChangeContactFlowP
   if (step === "idle") {
     return (
       <div className="mt-4 space-y-2">
-        <Label htmlFor={`new-${kind}`}>
+        <Label htmlFor={`new-${kind}`} required>
           New {isPhone ? "mobile number" : "email address"}
         </Label>
         <Input
@@ -124,7 +124,7 @@ function ChangeContactFlow({ kind, currentValue, onUpdated }: ChangeContactFlowP
 
   return (
     <div className="mt-4 space-y-2">
-      <Label htmlFor={`otp-${kind}`}>
+      <Label htmlFor={`otp-${kind}`} required>
         Enter the OTP sent to {value}
       </Label>
       <Input

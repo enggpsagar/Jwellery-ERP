@@ -31,7 +31,7 @@ type DataTableToolbarProps = {
   defaultSortBy: string
   defaultSortOrder?: "asc" | "desc"
   statusOptions?: Option[]
-  /** Omit entirely to hide the bulk "Export Selected" button (no row-select in this table). */
+  /** Omit when this table has no row-select — the single Export button then always exports the filtered set. */
   selectedIds?: string[]
   entityLabel: string
   exportAction: (params: DataTableExportParams) => Promise<DataTableExportResult>
@@ -68,8 +68,7 @@ export function DataTableToolbar({
 
   const [search, setSearch] = React.useState(currentSearch)
   const [isPending, startTransition] = React.useTransition()
-  const [isExportingSelected, setIsExportingSelected] = React.useState(false)
-  const [isExportingFiltered, setIsExportingFiltered] = React.useState(false)
+  const [isExporting, setIsExporting] = React.useState(false)
 
   React.useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -108,14 +107,29 @@ export function DataTableToolbar({
     })
   }
 
-  const runExport = async (
-    params: DataTableExportParams,
-    setLoading: (value: boolean) => void,
-  ) => {
-    try {
-      setLoading(true)
+  const hasSelection = !!selectedIds && selectedIds.length > 0
 
-      const result = await exportAction(params)
+  /**
+   * One button instead of two separate "Export Selected"/"Export Filtered
+   * Results" actions — it exports the current selection when there is one,
+   * otherwise everything matching the current search/sort/status. Selecting
+   * rows is already how a user narrows an export, so a second button for
+   * the unfiltered case was a distinction without a difference.
+   */
+  const handleExport = async () => {
+    try {
+      setIsExporting(true)
+
+      const result = await exportAction(
+        hasSelection
+          ? { selectedIds, sortBy: currentSortBy, sortOrder: currentSortOrder }
+          : {
+              search: currentSearch,
+              sortBy: currentSortBy,
+              sortOrder: currentSortOrder,
+              status: currentStatus !== "ALL" ? currentStatus : undefined,
+            },
+      )
 
       if (!result.success || !result.fileBase64 || !result.fileName) {
         toast.error(result.message || `Failed to export ${entityLabel}.`)
@@ -128,26 +142,9 @@ export function DataTableToolbar({
       console.error(error)
       toast.error(`Failed to export ${entityLabel}.`)
     } finally {
-      setLoading(false)
+      setIsExporting(false)
     }
   }
-
-  const handleExportSelected = () =>
-    runExport(
-      { selectedIds, sortBy: currentSortBy, sortOrder: currentSortOrder },
-      setIsExportingSelected,
-    )
-
-  const handleExportFiltered = () =>
-    runExport(
-      {
-        search: currentSearch,
-        sortBy: currentSortBy,
-        sortOrder: currentSortOrder,
-        status: currentStatus !== "ALL" ? currentStatus : undefined,
-      },
-      setIsExportingFiltered,
-    )
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm xl:flex-row xl:items-center xl:justify-between">
@@ -213,36 +210,14 @@ export function DataTableToolbar({
           <option value="50">50 / page</option>
         </select>
 
-        {selectedIds ? (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleExportSelected}
-            disabled={isExportingSelected || isExportingFiltered}
-            className="gap-2"
-          >
-            {isExportingSelected ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Exporting Selected...
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4" />
-                Export Selected ({selectedIds.length})
-              </>
-            )}
-          </Button>
-        ) : null}
-
         <Button
           type="button"
           variant="outline"
-          onClick={handleExportFiltered}
-          disabled={isExportingSelected || isExportingFiltered}
+          onClick={handleExport}
+          disabled={isExporting}
           className="gap-2"
         >
-          {isExportingFiltered ? (
+          {isExporting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               Exporting...
@@ -250,7 +225,7 @@ export function DataTableToolbar({
           ) : (
             <>
               <Download className="h-4 w-4" />
-              Export Filtered Results
+              {hasSelection ? `Export Selected (${selectedIds!.length})` : "Export"}
             </>
           )}
         </Button>

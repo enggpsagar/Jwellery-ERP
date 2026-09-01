@@ -203,7 +203,7 @@ function MetalFormRow({
       <input type="hidden" name="id" value={metal?.id ?? ""} />
 
       <div className="space-y-1.5">
-        <Label htmlFor="metal-name">Name</Label>
+        <Label htmlFor="metal-name" required>Name</Label>
         <Input
           id="metal-name"
           name="name"
@@ -383,7 +383,7 @@ function CategoryFormRow({
       <input type="hidden" name="id" value={category?.id ?? ""} />
 
       <div className="space-y-1.5">
-        <Label htmlFor="category-name">Name</Label>
+        <Label htmlFor="category-name" required>Name</Label>
         <Input
           id="category-name"
           name="name"
@@ -636,7 +636,7 @@ function TypeFormRow({
       <input type="hidden" name="categoryId" value={categoryId} />
 
       <div className="space-y-1.5">
-        <Label htmlFor="type-name">Name</Label>
+        <Label htmlFor="type-name" required>Name</Label>
         <Input
           id="type-name"
           name="name"

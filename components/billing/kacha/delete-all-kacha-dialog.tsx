@@ -162,7 +162,7 @@ export function DeleteAllKachaDialog({
                   )}
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="confirm-delete-all">
+                    <Label htmlFor="confirm-delete-all" required>
                       Type {CONFIRM_WORD} to confirm
                     </Label>
                     <Input

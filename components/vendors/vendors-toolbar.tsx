@@ -55,8 +55,7 @@ export function VendorsToolbar({
 
   const [search, setSearch] = React.useState(currentSearch)
   const [isPending, startTransition] = React.useTransition()
-  const [isExportingSelected, setIsExportingSelected] = React.useState(false)
-  const [isExportingFiltered, setIsExportingFiltered] = React.useState(false)
+  const [isExporting, setIsExporting] = React.useState(false)
 
   React.useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -94,20 +93,22 @@ export function VendorsToolbar({
     })
   }
 
-  const handleExportSelected = async () => {
-    if (!selectedVendorIds.length) {
-      toast.error("Please select at least one vendor to export.")
-      return
-    }
+  const hasSelection = selectedVendorIds.length > 0
 
+  /**
+   * One button instead of two: exports the current selection when there is
+   * one, otherwise everything matching the current search/sort. Selecting
+   * rows is already how a user narrows an export.
+   */
+  const handleExport = async () => {
     try {
-      setIsExportingSelected(true)
+      setIsExporting(true)
 
-      const result = await exportVendorsToExcel({
-        selectedIds: selectedVendorIds,
-        sortBy: currentSortBy,
-        sortOrder: currentSortOrder,
-      })
+      const result = await exportVendorsToExcel(
+        hasSelection
+          ? { selectedIds: selectedVendorIds, sortBy: currentSortBy, sortOrder: currentSortOrder }
+          : { search: currentSearch, sortBy: currentSortBy, sortOrder: currentSortOrder },
+      )
 
       if (!result.success || !result.fileBase64 || !result.fileName) {
         toast.error(result.message || "Failed to export vendors.")
@@ -118,34 +119,9 @@ export function VendorsToolbar({
       toast.success(result.message || "Vendors exported successfully.")
     } catch (error) {
       console.error(error)
-      toast.error("Failed to export selected vendors.")
+      toast.error("Failed to export vendors.")
     } finally {
-      setIsExportingSelected(false)
-    }
-  }
-
-  const handleExportFiltered = async () => {
-    try {
-      setIsExportingFiltered(true)
-
-      const result = await exportVendorsToExcel({
-        search: currentSearch,
-        sortBy: currentSortBy,
-        sortOrder: currentSortOrder,
-      })
-
-      if (!result.success || !result.fileBase64 || !result.fileName) {
-        toast.error(result.message || "Failed to export vendors.")
-        return
-      }
-
-      downloadBase64File(result.fileBase64, result.fileName)
-      toast.success(result.message || "Vendors exported successfully.")
-    } catch (error) {
-      console.error(error)
-      toast.error("Failed to export filtered vendors.")
-    } finally {
-      setIsExportingFiltered(false)
+      setIsExporting(false)
     }
   }
 
@@ -198,39 +174,19 @@ export function VendorsToolbar({
         <Button
           type="button"
           variant="outline"
-          onClick={handleExportSelected}
-          disabled={isExportingSelected || isExportingFiltered}
+          onClick={handleExport}
+          disabled={isExporting}
           className="gap-2"
         >
-          {isExportingSelected ? (
+          {isExporting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Exporting Selected...
+              Exporting...
             </>
           ) : (
             <>
               <Download className="h-4 w-4" />
-              Export Selected ({selectedVendorIds.length})
-            </>
-          )}
-        </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleExportFiltered}
-          disabled={isExportingSelected || isExportingFiltered}
-          className="gap-2"
-        >
-          {isExportingFiltered ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Exporting Filtered...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4" />
-              Export Filtered Results
+              {hasSelection ? `Export Selected (${selectedVendorIds.length})` : "Export"}
             </>
           )}
         </Button>

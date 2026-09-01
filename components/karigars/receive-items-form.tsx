@@ -391,7 +391,7 @@ export function ReceiveItemsForm({
                   </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs">Metal Type</Label>
+                    <Label className="text-xs">Metal Type <RequiredMark /></Label>
                     <Select
                       value={item.metalTypeId}
                       onValueChange={(value) => updateItemMetal(item.key, value)}

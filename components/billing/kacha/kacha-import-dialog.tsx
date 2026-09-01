@@ -108,7 +108,7 @@ export function KachaImportDialog() {
           </Button>
 
           <div className="space-y-1.5">
-            <Label htmlFor="kacha-import-file">Spreadsheet</Label>
+            <Label htmlFor="kacha-import-file" required>Spreadsheet</Label>
             <Input
               id="kacha-import-file"
               name="file"

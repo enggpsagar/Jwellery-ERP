@@ -147,7 +147,7 @@ function PlanFormRow({ plan, onDone }: { plan?: PlanRow; onDone: () => void }) {
       <input type="hidden" name="id" value={plan?.id ?? ""} />
 
       <div className="space-y-1.5">
-        <Label htmlFor="plan-name">Name</Label>
+        <Label htmlFor="plan-name" required>Name</Label>
         <Input
           id="plan-name"
           name="name"
@@ -161,7 +161,7 @@ function PlanFormRow({ plan, onDone }: { plan?: PlanRow; onDone: () => void }) {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="plan-durationDays">Duration (days)</Label>
+        <Label htmlFor="plan-durationDays" required>Duration (days)</Label>
         <Input
           id="plan-durationDays"
           name="durationDays"
@@ -178,7 +178,7 @@ function PlanFormRow({ plan, onDone }: { plan?: PlanRow; onDone: () => void }) {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="plan-price">Price (₹)</Label>
+        <Label htmlFor="plan-price" required>Price (₹)</Label>
         <Input
           id="plan-price"
           name="price"

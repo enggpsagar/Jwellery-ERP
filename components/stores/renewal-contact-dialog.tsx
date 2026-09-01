@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 /**
  * Replaces the old `mailto:` link on My Plan — that only worked if the
@@ -75,7 +76,9 @@ export function RenewalContactDialog() {
           </p>
         ) : (
           <div className="space-y-2">
-            <Label htmlFor="renewal-email-content">Email Content</Label>
+            <Label htmlFor="renewal-email-content">
+              Email Content <RequiredMark />
+            </Label>
             <Textarea
               id="renewal-email-content"
               rows={6}

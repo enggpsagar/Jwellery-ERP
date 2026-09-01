@@ -208,7 +208,7 @@ export function UserFormDialog({
   const formBody = (
     <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>Name</Label>
+            <Label required>Name</Label>
             <Input name="name" defaultValue={user?.name ?? ""} required />
           </div>
 
@@ -223,7 +223,7 @@ export function UserFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Phone</Label>
+            <Label required>Phone</Label>
             <Input
               name="phone"
               value={phone}
@@ -232,7 +232,7 @@ export function UserFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Role</Label>
+            <Label required>Role</Label>
             <input type="hidden" name="role" value={role} />
             <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
               <SelectTrigger>

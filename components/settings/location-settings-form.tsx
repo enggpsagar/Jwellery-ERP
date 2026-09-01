@@ -216,7 +216,7 @@ function LocationFormRow({
       />
 
       <div className="space-y-1.5">
-        <Label htmlFor="location-name">Name</Label>
+        <Label htmlFor="location-name" required>Name</Label>
         <Input
           id="location-name"
           name="name"

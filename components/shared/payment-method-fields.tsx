@@ -95,7 +95,7 @@ export function PaymentMethodFields({ value, onChange, maxAmount }: PaymentMetho
     <div className="space-y-3">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label>Payment Method</Label>
+          <Label required>Payment Method</Label>
           <Select
             value={value.method}
             onValueChange={(method) => onChange({ method, reference: "", bankName: "" })}
@@ -114,7 +114,7 @@ export function PaymentMethodFields({ value, onChange, maxAmount }: PaymentMetho
         </div>
 
         <div className="space-y-2">
-          <Label>Amount{maxAmount !== undefined ? ` (max ₹${maxAmount.toFixed(2)})` : ""}</Label>
+          <Label required>Amount{maxAmount !== undefined ? ` (max ₹${maxAmount.toFixed(2)})` : ""}</Label>
           <Input
             type="number"
             step="0.01"

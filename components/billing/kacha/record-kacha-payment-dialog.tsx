@@ -72,7 +72,7 @@ export function RecordKachaPaymentDialog({
           )}
 
           <div className="space-y-2">
-            <Label>Amount (Balance: ₹{balanceAmount.toFixed(2)})</Label>
+            <Label required>Amount (Balance: ₹{balanceAmount.toFixed(2)})</Label>
             <Input
               name="amount"
               type="number"

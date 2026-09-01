@@ -9,6 +9,7 @@ import { getCitiesByStateId } from "@/lib/actions/location-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 type StateItem = { id: string; name: string }
 type CityItem = { id: string; name: string }
@@ -101,7 +102,7 @@ export function VendorCreateForm({ states, returnTo }: VendorCreateFormProps) {
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4 text-muted-foreground" />
-              Vendor Name <span className="text-destructive">*</span>
+              Vendor Name <RequiredMark />
             </label>
             <input
               name="name"
@@ -118,7 +119,7 @@ export function VendorCreateForm({ states, returnTo }: VendorCreateFormProps) {
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
-              Phone <span className="text-destructive">*</span>
+              Phone <RequiredMark />
             </label>
             <input
               name="phone"

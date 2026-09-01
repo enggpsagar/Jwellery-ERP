@@ -300,7 +300,7 @@ export function QuickSaleForm({
             ) : (
               <>
                 <div className="space-y-1.5">
-                  <Label htmlFor="customer">Customer</Label>
+                  <Label htmlFor="customer" required>Customer</Label>
                   {/* The same picker the full invoice form uses — searchable,
                       and able to create a customer inline, so a first-time
                       buyer at the counter doesn't end the sale.
@@ -321,7 +321,7 @@ export function QuickSaleForm({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="sellingPriceInput" className="text-base">
+                  <Label htmlFor="sellingPriceInput" className="text-base" required>
                     Selling price
                   </Label>
 

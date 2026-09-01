@@ -104,7 +104,21 @@ export function CustomerCreateForm({ states, returnTo }: CustomerCreateFormProps
   return (
     <Card>
       <CardContent className="p-6">
-        <form action={formAction} className="grid gap-5 md:grid-cols-2">
+        <form
+          onSubmit={(event) => {
+            // Deliberately not `action={formAction}` directly on the form:
+            // React resets a form's uncontrolled fields once an action-bound
+            // submission settles, regardless of whether the action's own
+            // returned state says success or failure — so a plain validation
+            // error (name missing, etc) wiped every other field the user had
+            // already typed. Calling the same `formAction` dispatcher by hand
+            // from a prevented submit sidesteps that auto-reset while keeping
+            // identical pending/error-state behavior.
+            event.preventDefault()
+            formAction(new FormData(event.currentTarget))
+          }}
+          className="grid gap-5 md:grid-cols-2"
+        >
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4 text-muted-foreground" />
@@ -117,9 +131,9 @@ export function CustomerCreateForm({ states, returnTo }: CustomerCreateFormProps
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
-              Phone
+              Phone <RequiredMark />
             </label>
-            <input name="phone" type="tel" className={FIELD} placeholder="9876543210" />
+            <input name="phone" type="tel" className={FIELD} placeholder="9876543210" required />
             <FieldError errors={state.errors?.phone} />
           </div>
 

@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RevealOnceSecretDialog } from "@/components/shared/reveal-once-secret-dialog"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 const initialState: ApiKeyFormState = { success: false, message: "" }
 
@@ -107,7 +108,7 @@ export function ApiKeySettingsForm({
 
             <form action={formAction} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">Name <RequiredMark /></Label>
                 <Input
                   id="name"
                   name="name"
@@ -121,7 +122,7 @@ export function ApiKeySettingsForm({
 
               <div className="space-y-1.5">
                 <Label>
-                  Permissions{" "}
+                  Permissions <RequiredMark />{" "}
                   <span className="font-normal text-muted-foreground">
                     — nothing is selected by default; grant only what this key
                     actually needs

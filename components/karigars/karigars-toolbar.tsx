@@ -54,8 +54,7 @@ export function KarigarsToolbar({ selectedKarigarIds }: KarigarsToolbarProps) {
 
   const [search, setSearch] = React.useState(currentSearch)
   const [isPending, startTransition] = React.useTransition()
-  const [isExportingSelected, setIsExportingSelected] = React.useState(false)
-  const [isExportingFiltered, setIsExportingFiltered] = React.useState(false)
+  const [isExporting, setIsExporting] = React.useState(false)
 
   React.useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -93,20 +92,22 @@ export function KarigarsToolbar({ selectedKarigarIds }: KarigarsToolbarProps) {
     })
   }
 
-  const handleExportSelected = async () => {
-    if (!selectedKarigarIds.length) {
-      toast.error("Please select at least one karigar to export.")
-      return
-    }
+  const hasSelection = selectedKarigarIds.length > 0
 
+  /**
+   * One button instead of two: exports the current selection when there is
+   * one, otherwise everything matching the current search/sort. Selecting
+   * rows is already how a user narrows an export.
+   */
+  const handleExport = async () => {
     try {
-      setIsExportingSelected(true)
+      setIsExporting(true)
 
-      const result = await exportKarigarsToExcel({
-        selectedIds: selectedKarigarIds,
-        sortBy: currentSortBy,
-        sortOrder: currentSortOrder,
-      })
+      const result = await exportKarigarsToExcel(
+        hasSelection
+          ? { selectedIds: selectedKarigarIds, sortBy: currentSortBy, sortOrder: currentSortOrder }
+          : { search: currentSearch, sortBy: currentSortBy, sortOrder: currentSortOrder },
+      )
 
       if (!result.success || !result.fileBase64 || !result.fileName) {
         toast.error(result.message || "Failed to export karigars.")
@@ -117,34 +118,9 @@ export function KarigarsToolbar({ selectedKarigarIds }: KarigarsToolbarProps) {
       toast.success(result.message || "Karigars exported successfully.")
     } catch (error) {
       console.error(error)
-      toast.error("Failed to export selected karigars.")
+      toast.error("Failed to export karigars.")
     } finally {
-      setIsExportingSelected(false)
-    }
-  }
-
-  const handleExportFiltered = async () => {
-    try {
-      setIsExportingFiltered(true)
-
-      const result = await exportKarigarsToExcel({
-        search: currentSearch,
-        sortBy: currentSortBy,
-        sortOrder: currentSortOrder,
-      })
-
-      if (!result.success || !result.fileBase64 || !result.fileName) {
-        toast.error(result.message || "Failed to export karigars.")
-        return
-      }
-
-      downloadBase64File(result.fileBase64, result.fileName)
-      toast.success(result.message || "Karigars exported successfully.")
-    } catch (error) {
-      console.error(error)
-      toast.error("Failed to export filtered karigars.")
-    } finally {
-      setIsExportingFiltered(false)
+      setIsExporting(false)
     }
   }
 
@@ -197,39 +173,19 @@ export function KarigarsToolbar({ selectedKarigarIds }: KarigarsToolbarProps) {
         <Button
           type="button"
           variant="outline"
-          onClick={handleExportSelected}
-          disabled={isExportingSelected || isExportingFiltered}
+          onClick={handleExport}
+          disabled={isExporting}
           className="gap-2"
         >
-          {isExportingSelected ? (
+          {isExporting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Exporting Selected...
+              Exporting...
             </>
           ) : (
             <>
               <Download className="h-4 w-4" />
-              Export Selected ({selectedKarigarIds.length})
-            </>
-          )}
-        </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleExportFiltered}
-          disabled={isExportingSelected || isExportingFiltered}
-          className="gap-2"
-        >
-          {isExportingFiltered ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Exporting Filtered...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4" />
-              Export Filtered Results
+              {hasSelection ? `Export Selected (${selectedKarigarIds.length})` : "Export"}
             </>
           )}
         </Button>

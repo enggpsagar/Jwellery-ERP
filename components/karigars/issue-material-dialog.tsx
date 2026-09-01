@@ -139,7 +139,7 @@ export function IssueMaterialDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Metal Type</Label>
+              <Label>Metal Type <RequiredMark /></Label>
               <Select value={metalTypeId} onValueChange={setMetalTypeId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select metal" />

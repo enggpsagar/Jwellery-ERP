@@ -4,11 +4,17 @@ import * as React from "react"
 import { Label as LabelPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { RequiredMark } from "@/components/shared/required-mark"
 
 function Label({
   className,
+  required,
+  children,
   ...props
-}: React.ComponentProps<typeof LabelPrimitive.Root>) {
+}: React.ComponentProps<typeof LabelPrimitive.Root> & {
+  /** Appends the app-wide RequiredMark — the convention for marking a required field. */
+  required?: boolean
+}) {
   return (
     <LabelPrimitive.Root
       data-slot="label"
@@ -17,7 +23,10 @@ function Label({
         className
       )}
       {...props}
-    />
+    >
+      {children}
+      {required ? <RequiredMark /> : null}
+    </LabelPrimitive.Root>
   )
 }
 

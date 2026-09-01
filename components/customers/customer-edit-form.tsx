@@ -124,13 +124,14 @@ export function CustomerEditForm({
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
-              Phone
+              Phone <RequiredMark />
             </label>
             <input
               name="phone"
               type="tel"
               className={FIELD}
               defaultValue={customer.phone ?? ""}
+              required
             />
             <FieldError errors={state.errors?.phone} />
           </div>

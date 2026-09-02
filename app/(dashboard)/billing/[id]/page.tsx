@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeftCircle, ArrowRightCircle, Plus, Printer } from "lucide-react"
+import { ArrowLeftCircle, ArrowRightCircle, Pencil, Plus, Printer } from "lucide-react"
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
@@ -40,7 +40,12 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   const whatsappMessage = `Hi! Here is your invoice ${invoice.invoiceNumber} from ${settings.businessName}. Total: ₹${invoice.totalAmount.toFixed(2)}. Balance due: ₹${invoice.balanceAmount.toFixed(2)}.`
 
   const isCancelled = invoice.status === "CANCELLED"
+  // Same statuses on purpose: a fully paid invoice's total can't silently
+  // change without a real refund decision, so PAID only ever gets the
+  // basic date/location/notes dialog — not line-item editing, not cancel.
   const isCancellable = invoice.status === "DRAFT" || invoice.status === "PARTIAL"
+  const canFullyEdit = isCancellable
+  const isPaid = invoice.status === "PAID"
 
   return (
     <main className="space-y-6 p-6">
@@ -63,7 +68,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               message={whatsappMessage}
             />
             <EmailInvoiceButton invoiceId={invoice.id} />
-            {!isCancelled && (
+            {isPaid && (
               <EditInvoiceDialog
                 invoiceId={invoice.id}
                 invoiceDate={invoice.invoiceDate}
@@ -72,6 +77,14 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                 locationId={invoice.locationId ?? null}
                 locations={locations}
               />
+            )}
+            {canFullyEdit && (
+              <Button asChild variant="outline" className="gap-2">
+                <Link href={`/billing/${invoice.id}/edit`}>
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </Link>
+              </Button>
             )}
             {isCancellable && (
               <CancelInvoiceDialog

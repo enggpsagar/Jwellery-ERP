@@ -463,7 +463,16 @@ export async function getInvoiceFormCustomers() {
 }
 
 /** In-stock items available to attach to an invoice line item. */
-export async function getInvoiceFormStockItems() {
+/**
+ * `includeInvoiceId` is for the edit page: a line already linked to a
+ * stock row that this same invoice sold out to zero (flipped SOLD) would
+ * otherwise be invisible here — IN_STOCK-only — even though editing will
+ * restore it first. Included rows get their quantity boosted by exactly
+ * what this invoice's own items already claim of them, so the picker
+ * shows "available to re-select" as if that restoration had already
+ * happened, matching what updateInvoice's full-edit path actually does.
+ */
+export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
   const storeId = await requireStoreScope();
 
   const stockItems = await prisma.inventoryStock.findMany({
@@ -475,7 +484,7 @@ export async function getInvoiceFormStockItems() {
     },
   });
 
-  return stockItems.map((stock) => ({
+  const mapped = stockItems.map((stock) => ({
     id: stock.id,
     stockCode: stock.stockCode,
     productName: stock.product.name,
@@ -489,6 +498,54 @@ export async function getInvoiceFormStockItems() {
     saleRate: stock.saleRate ? Number(stock.saleRate) : null,
     quantity: stock.quantity,
   }));
+
+  if (!includeInvoiceId) return mapped;
+
+  const currentItems = await prisma.invoiceItem.findMany({
+    where: { invoiceId: includeInvoiceId, inventoryStockId: { not: null } },
+    select: { inventoryStockId: true, quantity: true },
+  });
+  const claimedByThisInvoice = new Map<string, number>();
+  for (const item of currentItems) {
+    if (!item.inventoryStockId) continue;
+    claimedByThisInvoice.set(
+      item.inventoryStockId,
+      (claimedByThisInvoice.get(item.inventoryStockId) ?? 0) + Math.max(1, item.quantity || 1),
+    );
+  }
+  if (claimedByThisInvoice.size === 0) return mapped;
+
+  const byId = new Map(mapped.map((stock) => [stock.id, stock]));
+  for (const [stockId, claimed] of claimedByThisInvoice) {
+    const existing = byId.get(stockId);
+    if (existing) {
+      existing.quantity += claimed;
+      continue;
+    }
+    // Not in the IN_STOCK list at all (fully SOLD) — fetch it directly.
+    const stock = await prisma.inventoryStock.findFirst({
+      where: { id: stockId, storeId },
+      include: {
+        product: { select: { name: true, hsnCode: true } },
+        metalType: { select: { id: true, name: true } },
+      },
+    });
+    if (!stock) continue;
+    mapped.push({
+      id: stock.id,
+      stockCode: stock.stockCode,
+      productName: stock.product.name,
+      hsnCode: stock.product.hsnCode,
+      metalType: stock.metalType ? { id: stock.metalType.id, name: stock.metalType.name } : null,
+      purity: stock.purity,
+      netWeight: stock.netWeight ? Number(stock.netWeight) : null,
+      stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
+      saleRate: stock.saleRate ? Number(stock.saleRate) : null,
+      quantity: stock.quantity + claimed,
+    });
+  }
+
+  return mapped;
 }
 
 /**
@@ -909,6 +966,23 @@ export async function recordInvoicePayment(
  * already does, not a quiet in-place edit. A real correction goes through
  * cancelInvoice + a replacement invoice instead.
  */
+/**
+ * Two edit paths in one action, branched on whether `itemsJson` is present
+ * in `formData`:
+ *
+ * - Absent → basic fields only (invoice date, due date, location, notes).
+ *   Used by EditInvoiceDialog, available on any non-CANCELLED invoice
+ *   (this is the only edit a PAID invoice ever gets).
+ * - Present → full line-item edit (price/quantity/rate/making/stone/
+ *   everything), used by the /billing/[id]/edit page. Only available on
+ *   DRAFT/PARTIAL — same restriction cancelInvoice already has, same
+ *   reason: a PAID invoice means money was actually collected, and
+ *   silently changing its total needs a real refund decision. Reverses
+ *   every old line's stock effect and reapplies the new lines' the same
+ *   guarded way createInvoice/cancelInvoice already do, then reconciles
+ *   the ledger with one offsetting entry sized to the actual balance
+ *   delta — existing payment entries are never touched or rewritten.
+ */
 export async function updateInvoice(
   id: string,
   prevState: InvoiceFormState = initialState,
@@ -922,7 +996,10 @@ export async function updateInvoice(
     }
 
     const storeId = await requireStoreScope();
-    const invoice = await prisma.invoice.findFirst({ where: { id, storeId } });
+    const invoice = await prisma.invoice.findFirst({
+      where: { id, storeId },
+      include: { items: true },
+    });
     if (!invoice) return { success: false, message: "Invoice not found" };
 
     if (invoice.status === InvoiceStatus.CANCELLED) {
@@ -952,21 +1029,253 @@ export async function updateInvoice(
       }
     }
 
-    await prisma.invoice.update({
-      where: { id },
-      data: {
-        invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : invoice.invoiceDate,
-        dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
-        notes,
-        locationId: locationId ?? null,
-      },
+    const hasItems = formData.has("itemsJson");
+
+    if (!hasItems) {
+      await prisma.invoice.update({
+        where: { id },
+        data: {
+          invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : invoice.invoiceDate,
+          dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+          notes,
+          locationId: locationId ?? null,
+        },
+      });
+
+      revalidatePath("/billing");
+      revalidatePath(`/billing/${id}`);
+
+      return { success: true, message: "Invoice updated" };
+    }
+
+    // --- Full line-item edit ---
+
+    if (invoice.status !== InvoiceStatus.DRAFT && invoice.status !== InvoiceStatus.PARTIAL) {
+      return {
+        success: false,
+        message: "Only draft or partially-paid invoices can have their line items edited.",
+      };
+    }
+
+    let items: InvoiceLineItemInput[] = [];
+    try {
+      items = JSON.parse(String(formData.get("itemsJson") || "[]"));
+    } catch {
+      return { success: false, message: "Invalid line items" };
+    }
+    if (!items.length) {
+      return { success: false, message: "Add at least one line item" };
+    }
+
+    const manualDiscount = toNumber(formData.get("discount"));
+
+    const subtotal = items.reduce(
+      (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
+      0,
+    );
+    const makingCharges = items.reduce(
+      (sum, item) => sum + toNumber(item.makingCharge) + toNumber(item.hmCharge),
+      0,
+    );
+    const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
+    const discount =
+      manualDiscount + items.reduce((sum, item) => sum + toNumber(item.schemeDiscount), 0);
+    const taxAmount = items.reduce(
+      (sum, item) => sum + toNumber(item.sgstAmount) + toNumber(item.cgstAmount),
+      0,
+    );
+    const totalAmount = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+
+    const paidAmount = Number(invoice.paidAmount);
+    if (totalAmount < paidAmount) {
+      return {
+        success: false,
+        message: `New total (₹${totalAmount.toFixed(2)}) can't be less than the ₹${paidAmount.toFixed(2)} already paid — record a refund or adjust payments first.`,
+      };
+    }
+    const newBalanceAmount = Math.max(0, totalAmount - paidAmount);
+
+    let newStatus: InvoiceStatus = InvoiceStatus.PAID;
+    if (newBalanceAmount > 0 && paidAmount > 0) newStatus = InvoiceStatus.PARTIAL;
+    else if (newBalanceAmount > 0 && paidAmount === 0) newStatus = InvoiceStatus.DRAFT;
+
+    // Same store-ownership/oversell validation createInvoice already does,
+    // against the new items — old items' own stock hasn't been restored
+    // yet at this point, so a row a new line also targets is checked
+    // against its current (pre-restore) quantity plus whatever this same
+    // invoice already holds there; the transaction below restores old
+    // quantities before applying new ones, so the real guard is the
+    // `gte`-guarded decrement inside it, same as createInvoice.
+    const requestedStockIds = [
+      ...new Set(items.map((item) => item.inventoryStockId).filter((sid): sid is string => !!sid)),
+    ];
+    const validStock = requestedStockIds.length
+      ? await prisma.inventoryStock.findMany({
+          where: { id: { in: requestedStockIds }, storeId },
+          select: { id: true, stockCode: true, quantity: true },
+        })
+      : [];
+    const validStockIds = new Set(validStock.map((s) => s.id));
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Restore every old line's stock first — same as cancelInvoice.
+      for (const item of invoice.items) {
+        if (!item.inventoryStockId) continue;
+
+        const restoreQty = Math.max(1, item.quantity || 1);
+
+        await tx.inventoryStock.updateMany({
+          where: { id: item.inventoryStockId, storeId },
+          data: { quantity: { increment: restoreQty } },
+        });
+
+        const restoredStock = await tx.inventoryStock.findUnique({
+          where: { id: item.inventoryStockId },
+          select: { quantity: true, status: true },
+        });
+        if (
+          restoredStock &&
+          restoredStock.quantity > 0 &&
+          restoredStock.status === InventoryStockStatus.SOLD
+        ) {
+          await tx.inventoryStock.update({
+            where: { id: item.inventoryStockId },
+            data: { status: InventoryStockStatus.IN_STOCK },
+          });
+        }
+
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryStockId: item.inventoryStockId,
+            transactionType: InventoryTransactionType.SALE_RETURN,
+            quantity: restoreQty,
+            netWeight: item.netWeight ?? undefined,
+            referenceType: "Invoice",
+            referenceId: invoice.id,
+            notes: "Stock restored — invoice edited",
+          },
+        });
+      }
+
+      // 2. Replace the item rows with the new set.
+      await tx.invoice.update({
+        where: { id },
+        data: {
+          subtotal,
+          makingCharges,
+          stoneCharges,
+          discount,
+          taxAmount,
+          totalAmount,
+          balanceAmount: newBalanceAmount,
+          status: newStatus,
+          invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : invoice.invoiceDate,
+          dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+          notes,
+          locationId: locationId ?? null,
+          items: {
+            deleteMany: {},
+            create: items.map((item) => ({
+              itemName: item.itemName,
+              metalTypeId: item.metalTypeId ?? undefined,
+              purity: item.purity ?? undefined,
+              quantity: item.quantity || 1,
+              grossWeight: item.grossWeight ?? undefined,
+              netWeight: item.netWeight ?? undefined,
+              caratWeight: item.caratWeight ?? undefined,
+              rate: item.rate ?? undefined,
+              makingCharge: item.makingCharge,
+              makingChargeType: toChargeType(item.makingChargeType),
+              stoneCharge: item.stoneCharge,
+              dmoWeight: item.dmoWeight ?? undefined,
+              stoneWeight: item.stoneWeight ?? undefined,
+              hmCharge: item.hmCharge ?? 0,
+              schemeDiscount: item.schemeDiscount ?? 0,
+              sgstAmount: item.sgstAmount ?? 0,
+              cgstAmount: item.cgstAmount ?? 0,
+              hsnCode: item.hsnCode ?? undefined,
+              lineTotal: lineTotal(item),
+              inventoryStockId:
+                item.inventoryStockId && validStockIds.has(item.inventoryStockId)
+                  ? item.inventoryStockId
+                  : undefined,
+            })),
+          },
+        },
+      });
+
+      // 3. Apply the new lines' stock — thrown OversellError here rolls
+      // back the restoration above too, leaving the invoice untouched.
+      for (const item of items) {
+        if (!item.inventoryStockId || !validStockIds.has(item.inventoryStockId)) continue;
+
+        const soldQty = Math.max(1, item.quantity || 1);
+
+        const { count } = await tx.inventoryStock.updateMany({
+          where: { id: item.inventoryStockId, storeId, quantity: { gte: soldQty } },
+          data: {
+            quantity: { decrement: soldQty },
+            saleAmount: lineTotal(item),
+          },
+        });
+
+        if (count === 0) {
+          throw new OversellError(
+            `Not enough stock left for ${item.itemName || "an item"} — it may have just been sold in another sale. Refresh and try again.`,
+          );
+        }
+
+        const updatedStock = await tx.inventoryStock.findUniqueOrThrow({
+          where: { id: item.inventoryStockId },
+          select: { quantity: true, status: true },
+        });
+        if (updatedStock.quantity <= 0 && updatedStock.status !== InventoryStockStatus.SOLD) {
+          await tx.inventoryStock.update({
+            where: { id: item.inventoryStockId },
+            data: { status: InventoryStockStatus.SOLD },
+          });
+        }
+
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryStockId: item.inventoryStockId,
+            transactionType: InventoryTransactionType.SALE,
+            quantity: soldQty,
+            netWeight: item.netWeight ?? undefined,
+            referenceType: "Invoice",
+            referenceId: invoice.id,
+          },
+        });
+      }
+
+      // 4. One offsetting ledger entry sized to the actual change — never
+      // a rewrite of what's already posted. Payments already recorded
+      // keep their own CREDIT entries exactly as they are.
+      const delta = newBalanceAmount - Number(invoice.balanceAmount);
+      if (delta !== 0) {
+        await tx.ledgerEntry.create({
+          data: {
+            storeId,
+            type: delta > 0 ? LedgerEntryType.DEBIT : LedgerEntryType.CREDIT,
+            sourceType: LedgerSourceType.SALE,
+            customerId: invoice.customerId,
+            invoiceId: invoice.id,
+            amount: Math.abs(delta),
+            description: `Invoice ${invoice.invoiceNumber} revised — balance ${delta > 0 ? "increased" : "decreased"}`,
+            locationId: locationId ?? undefined,
+          },
+        });
+      }
     });
 
     revalidatePath("/billing");
     revalidatePath(`/billing/${id}`);
 
-    return { success: true, message: "Invoice updated" };
+    return { success: true, message: "Invoice updated", invoiceId: id };
   } catch (error) {
+    if (error instanceof OversellError) {
+      return { success: false, message: error.message };
+    }
     console.error("updateInvoice error:", error);
     return { success: false, message: "Failed to update invoice" };
   }

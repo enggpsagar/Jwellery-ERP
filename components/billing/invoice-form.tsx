@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
 
-import { createInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
+import { createInvoice, updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
 import { ScanToAddPanel } from "@/components/billing/scan-to-add-panel"
 import { todayForDateInput } from "@/lib/date-input"
@@ -121,6 +121,13 @@ type InvoiceFormProps = {
   initialItems?: LineItem[]
   replacesId?: string
   replacesInvoiceNumber?: string
+  /** Full line-item edit of an existing DRAFT/PARTIAL invoice — see
+   * app/(dashboard)/billing/[id]/edit/page.tsx. When set, the form binds
+   * to updateInvoice instead of createInvoice; everything else about the
+   * form (all fields, stock picker, weight/purity inputs) is identical,
+   * which is the whole point — full editing needs no extra fields of its
+   * own, just a different action to submit to. */
+  editInvoiceId?: string
 }
 
 export function InvoiceForm({
@@ -133,6 +140,7 @@ export function InvoiceForm({
   initialItems,
   replacesId,
   replacesInvoiceNumber,
+  editInvoiceId,
 }: InvoiceFormProps) {
   const router = useRouter()
   const toast = useToast()
@@ -147,13 +155,13 @@ export function InvoiceForm({
   const [paidAmount, setPaidAmount] = useState(0)
 
   const [state, formAction, pending] = useActionState(
-    createInvoice,
+    editInvoiceId ? updateInvoice.bind(null, editInvoiceId) : createInvoice,
     initialState,
   )
 
   useEffect(() => {
     if (state.success && state.invoiceId) {
-      toast.success(state.message || "Invoice created")
+      toast.success(state.message || (editInvoiceId ? "Invoice updated" : "Invoice created"))
       router.push(`/billing/${state.invoiceId}`)
     } else if (!state.success && state.message) {
       toast.error(state.message)
@@ -447,13 +455,27 @@ export function InvoiceForm({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2">
-          <Label>Customer <RequiredMark /></Label>
-          <CustomerSelect
-            customers={customers}
-            defaultValue={customerId}
-            onChange={(id) => setCustomerId(id)}
-            name="customerId"
-          />
+          <Label>Customer {!editInvoiceId && <RequiredMark />}</Label>
+          {editInvoiceId ? (
+            // The customer isn't editable here — this changes line items
+            // and amounts, not who's billed. Moving an invoice's ledger
+            // history to a different customer is a distinct operation
+            // nobody asked for. Still posted as a hidden field since
+            // customerId is part of the form's shape either way.
+            <>
+              <input type="hidden" name="customerId" value={customerId} />
+              <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm">
+                {customers.find((c) => c.id === customerId)?.name ?? "—"}
+              </div>
+            </>
+          ) : (
+            <CustomerSelect
+              customers={customers}
+              defaultValue={customerId}
+              onChange={(id) => setCustomerId(id)}
+              name="customerId"
+            />
+          )}
         </div>
 
         <div className="space-y-2">
@@ -921,7 +943,13 @@ export function InvoiceForm({
       </div>
 
       <Button type="submit" disabled={pending || !customerId}>
-        {pending ? "Creating..." : "Create Invoice"}
+        {editInvoiceId
+          ? pending
+            ? "Saving..."
+            : "Save Changes"
+          : pending
+            ? "Creating..."
+            : "Create Invoice"}
       </Button>
     </form>
   )

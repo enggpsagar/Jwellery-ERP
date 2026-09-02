@@ -96,3 +96,19 @@ export const GRAMS_PER_CARAT = 0.2;
 export function stoneWeightToGrams(value: number, unit: "GRAM" | "CARAT"): number {
   return unit === "CARAT" ? value * GRAMS_PER_CARAT : value;
 }
+
+/**
+ * True for a metal weighed and priced by carat rather than by gram —
+ * Diamond, and a loose Stone product line (a stand-alone gemstone
+ * `StoreMetal`, not the stone embedded in a metal piece — that's the
+ * separate `stoneWeight`/`defaultStoneWeight` fields, always in grams).
+ * Matched the same way `classifyMetalName` / product-form's
+ * `classifyPurityFamily` do: a case-insensitive substring on the metal's
+ * free-text name. Kept separate from `classifyMetalName`'s `MetalFamily`
+ * (tied to the `BusinessUnit` enum, which has no Stone unit) so this stays a
+ * pure, local carat/weight concern shared by every line-item form.
+ */
+export function isCaratWeighedMetal(metalName: string | null | undefined): boolean {
+  const lower = (metalName ?? "").toLowerCase();
+  return lower.includes("diamond") || lower.includes("stone");
+}

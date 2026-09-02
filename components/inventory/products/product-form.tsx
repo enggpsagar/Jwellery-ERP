@@ -10,22 +10,31 @@ import { classifyMetalName } from "@/lib/business-units";
 
 // A metal classifies into one of these groups by its name — GOLD/SILVER/
 // DIAMOND/OTHER via classifyMetalName (the same heuristic Business Units
-// uses), plus a local PLATINUM check on top of it (classifyMetalName's own
-// return type is tied to the BusinessUnit enum, which has no Platinum unit,
-// so extending it there would ripple into the Ledger/Dashboard's per-unit
-// totals — out of scope here, this only decides which purities to offer).
-type PurityFamily = "GOLD" | "SILVER" | "PLATINUM" | "DIAMOND" | "OTHER";
+// uses), plus local PLATINUM and STONE checks on top of it (classifyMetalName's
+// own return type is tied to the BusinessUnit enum, which has neither a
+// Platinum nor a Stone unit, so extending it there would ripple into the
+// Ledger/Dashboard's per-unit totals — out of scope here, this only decides
+// which purities to offer and whether to show the Carat Weight field).
+// STONE is a stand-alone loose-gemstone product line (a StoreMetal literally
+// named e.g. "Stone"), not the stone embedded in a metal piece — that's the
+// separate defaultStoneWeight field below, untouched by this.
+type PurityFamily = "GOLD" | "SILVER" | "PLATINUM" | "DIAMOND" | "STONE" | "OTHER";
 
 const PURITY_OPTIONS_BY_METAL: Record<PurityFamily, PurityType[]> = {
   GOLD: [PurityType.GOLD_24K, PurityType.GOLD_22K, PurityType.GOLD_20K, PurityType.GOLD_18K],
   SILVER: [PurityType.SILVER_999, PurityType.SILVER_925],
   PLATINUM: [PurityType.PLATINUM_950, PurityType.PLATINUM_900],
   DIAMOND: [PurityType.DIAMOND],
+  // No PurityType exists for loose gemstone grades — OTHER is the closest
+  // fit, same catch-all a non-purity-tracked metal already uses.
+  STONE: [PurityType.OTHER],
   OTHER: [PurityType.OTHER],
 };
 
 function classifyPurityFamily(metalName: string): PurityFamily {
-  if (metalName.toLowerCase().includes("platinum")) return "PLATINUM";
+  const lower = metalName.toLowerCase();
+  if (lower.includes("platinum")) return "PLATINUM";
+  if (lower.includes("stone")) return "STONE";
   return classifyMetalName(metalName) as PurityFamily;
 }
 
@@ -174,15 +183,16 @@ export function ProductForm({
   const [netWeight, setNetWeight] = useState(product?.defaultNetWeight ?? "");
   const [netTouched, setNetTouched] = useState(false);
 
-  // Diamonds are weighed by carat, not gram, but this form only has one
-  // Weight field (Net Weight, shared with every other metal) — so a Diamond
-  // product's Carat Weight converts into it directly rather than getting a
-  // parallel weight of its own. 1 carat = 0.2 g, the standard used
-  // industry-wide.
+  // Diamonds and loose Stones are weighed by carat, not gram, but this form
+  // only has one Weight field (Net Weight, shared with every other metal) —
+  // so a Diamond/Stone product's Carat Weight converts into it directly
+  // rather than getting a parallel weight of its own. 1 carat = 0.2 g, the
+  // standard used industry-wide.
   const [caratWeight, setCaratWeight] = useState(
     product?.defaultCaratWeight ?? "",
   );
   const CARAT_TO_GRAM = 0.2;
+  const isCaratFamily = metalFamily === "DIAMOND" || metalFamily === "STONE";
 
   function handleCaratWeightChange(value: string) {
     setCaratWeight(value);
@@ -198,7 +208,7 @@ export function ProductForm({
     setNetTouched(true);
     setNetWeight(value);
 
-    if (metalFamily !== "DIAMOND") return;
+    if (!isCaratFamily) return;
 
     const netNum = Number(value);
     if (value.trim() !== "" && Number.isFinite(netNum)) {
@@ -531,7 +541,7 @@ export function ProductForm({
             <ErrorText error={state.errors.defaultNetWeight} />
           </div>
 
-          {metalFamily === "DIAMOND" && (
+          {isCaratFamily && (
             <div>
               <Label htmlFor="defaultCaratWeight">Carat Weight (ct)</Label>
 

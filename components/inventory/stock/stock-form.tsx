@@ -9,6 +9,7 @@ import {
 } from "@prisma/client";
 
 import type { StockFormState } from "@/lib/inventory/stock-types";
+import { isCaratWeighedMetal, GRAMS_PER_CARAT } from "@/lib/purity";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,7 @@ type ProductOption = {
   defaultGrossWeight: string | null;
   defaultNetWeight: string | null;
   defaultStoneWeight: string | null;
+  defaultCaratWeight: string | null;
   isActive: boolean;
 };
 
@@ -74,6 +76,8 @@ type Stock = {
   netWeight: string | null;
 
   stoneWeight: string | null;
+
+  caratWeight: string | null;
 
   dmoWeight: string | null;
 
@@ -160,6 +164,11 @@ export function StockForm({
   const [lessWeight, setLessWeight] = useState(stock?.lessWeight ?? "");
   const [dmoWeight, setDmoWeight] = useState(stock?.dmoWeight ?? "");
 
+  // Diamond/Stone stock is weighed by carat, not gram — converts into Net
+  // Weight directly (same 1 ct = 0.2 g convention as the Product form and
+  // every purchase/sale line-item form).
+  const [caratWeight, setCaratWeight] = useState(stock?.caratWeight ?? "");
+
   // Net = gross - less - stone - dust/making/other, the same subtraction a
   // jeweller does by hand — mirrors the auto-fill on the Product form.
   // Active on both create and edit (a change to any deduction field
@@ -214,6 +223,26 @@ export function StockForm({
     setWeightsTouched(true);
     setNetTouched(true);
     setNetWeight(value);
+
+    if (!isCaratFamily) return;
+
+    const netNum = Number(value);
+    if (value.trim() !== "" && Number.isFinite(netNum)) {
+      setCaratWeight(String(Number((netNum / GRAMS_PER_CARAT).toFixed(3))));
+    } else {
+      setCaratWeight("");
+    }
+  }
+
+  function editCaratWeight(value: string) {
+    setWeightsTouched(true);
+    setCaratWeight(value);
+
+    const caratNum = Number(value);
+    if (value.trim() !== "" && Number.isFinite(caratNum)) {
+      setNetTouched(true);
+      setNetWeight(String(Number((caratNum * GRAMS_PER_CARAT).toFixed(5))));
+    }
   }
 
   // Weights follow the selected product until someone weighs the piece.
@@ -234,6 +263,10 @@ export function StockForm({
 
   const selectedProduct = products.find((item) => item.id === selectedProductId);
 
+  // Same Diamond/Stone signal as product-form.tsx's classifyPurityFamily —
+  // gates the Carat Weight field and its conversion against Net Weight.
+  const isCaratFamily = isCaratWeighedMetal(selectedProduct?.metalType?.name);
+
   // Seed the weights from the chosen product, and keep following it while the
   // fields are untouched, so switching product corrects them rather than
   // leaving the previous product's figures behind.
@@ -243,6 +276,7 @@ export function StockForm({
     setGrossWeight(selectedProduct.defaultGrossWeight ?? "");
     setNetWeight(selectedProduct.defaultNetWeight ?? "");
     setStoneWeight(selectedProduct.defaultStoneWeight ?? "");
+    setCaratWeight(selectedProduct.defaultCaratWeight ?? "");
   }, [selectedProduct, weightsTouched]);
 
   // `ProductSelect` is a shared component whose `ProductOption` type
@@ -498,6 +532,28 @@ export function StockForm({
 
             <ErrorText error={state.errors.stoneWeight} />
           </div>
+
+          {isCaratFamily && (
+            <div>
+              <Label htmlFor="caratWeight">Carat Weight (ct)</Label>
+
+              <Input
+                id="caratWeight"
+                name="caratWeight"
+                type="number"
+                step="0.001"
+                min="0"
+                value={caratWeight}
+                onChange={(event) => editCaratWeight(event.target.value)}
+              />
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                1 ct = 0.2 g. Converts with Net Weight automatically.
+              </p>
+
+              <ErrorText error={state.errors.caratWeight} />
+            </div>
+          )}
 
           <div>
             <Label htmlFor="dmoWeight">Dust/Making/Other Wt (g)</Label>

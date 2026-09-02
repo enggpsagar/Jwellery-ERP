@@ -15,7 +15,7 @@ import {
 } from "lucide-react"
 
 import type { LedgerEntryRow, LedgerTotals } from "@/lib/actions/ledger-actions"
-import { classifyMetalName } from "@/lib/business-units"
+import { classifyMetalName, formatUnitValue } from "@/lib/business-units"
 import { cn } from "@/lib/utils"
 import {
   Card,
@@ -63,12 +63,17 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   OTHER: "Other",
 }
 
-/** Gold/silver entries are settled by weight, not rupees — show the weight instead of ₹ for those rows. */
+/** Gold/silver entries are settled by weight and Diamond by carats, not
+ * rupees — show the weight/carat quantity instead of ₹ for those rows. */
 function formatEntryValue(entry: LedgerEntryRow) {
   const family = classifyMetalName(entry.metalType)
 
   if ((family === "GOLD" || family === "SILVER") && entry.metalWeight != null) {
     return `${Math.abs(entry.metalWeight).toLocaleString("en-IN", { maximumFractionDigits: 3 })} g`
+  }
+
+  if (family === "DIAMOND" && entry.caratWeight != null) {
+    return `${Math.abs(entry.caratWeight).toLocaleString("en-IN", { maximumFractionDigits: 3 })} ct`
   }
 
   return formatCurrency(entry.amount)
@@ -173,10 +178,11 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
     setDrawerOpen(true)
   }
 
+  // Delegates to the shared formatUnitValue (grams for Gold/Silver, carats
+  // for Diamond — business-units.ts's CARAT_BASED_UNITS) rather than
+  // reimplementing the Diamond special-case locally.
   const formatUnitTotal = (unit: LedgerTotals["unitTotals"][number], value: number) =>
-    unit.unit === "DIAMOND"
-      ? formatCurrency(value)
-      : `${Math.abs(value).toLocaleString("en-IN", { maximumFractionDigits: 3 })} g`
+    formatUnitValue(unit.unit, value)
 
   const summaryCards = [
     ...(totals.moneyActive

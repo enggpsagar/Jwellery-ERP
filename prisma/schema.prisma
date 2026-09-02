@@ -661,6 +661,12 @@ model LedgerEntry {
   metalTypeId      String?
   metalWeight      Decimal?         @db.Decimal(12, 5)
   metalWeightFine  Decimal?         @db.Decimal(12, 5)
+  // Diamond entries are carat-based, not weight-based — metalWeight/
+  // metalWeightFine stay null for them (same 12,5 columns other metals use
+  // in grams would be the wrong unit). Matches the caratWeight precision
+  // already used on PurchaseItem/InvoiceItem/KachaInvoiceItem/QuotationItem/
+  // Product/InventoryStock (see the 20260901193000 migration).
+  caratWeight      Decimal?         @db.Decimal(10, 3)
   amount           Decimal          @default(0) @db.Decimal(12, 2)
   paymentMethod    PaymentMethod?
   paymentReference String?

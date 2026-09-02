@@ -145,6 +145,7 @@ function mapStockRow(row: any) {
     lessWeight: row.lessWeight?.toString() ?? null,
     netWeight: row.netWeight?.toString() ?? null,
     stoneWeight: row.stoneWeight?.toString() ?? null,
+    caratWeight: row.caratWeight?.toString() ?? null,
     dmoWeight: row.dmoWeight?.toString() ?? null,
     wastagePercent: row.wastagePercent?.toString() ?? null,
     purchaseRate: row.purchaseRate?.toString() ?? null,
@@ -254,6 +255,7 @@ export async function exportInventoryStockToExcel(
       "Gross Weight (g)": item.grossWeight || "-",
       "Net Weight (g)": item.netWeight || "-",
       "Stone Weight (g)": item.stoneWeight || "-",
+      "Carat Weight (ct)": item.caratWeight || "-",
       "Purchase Rate": item.purchaseRate || "-",
       "Sale Rate": item.saleRate || "-",
       "Making Charge": item.makingCharge || "-",
@@ -316,6 +318,7 @@ export async function getInventoryStockFormProducts() {
       defaultGrossWeight: true,
       defaultNetWeight: true,
       defaultStoneWeight: true,
+      defaultCaratWeight: true,
       isActive: true,
     },
   })
@@ -331,6 +334,7 @@ export async function getInventoryStockFormProducts() {
     defaultGrossWeight: product.defaultGrossWeight?.toString() ?? null,
     defaultNetWeight: product.defaultNetWeight?.toString() ?? null,
     defaultStoneWeight: product.defaultStoneWeight?.toString() ?? null,
+    defaultCaratWeight: product.defaultCaratWeight?.toString() ?? null,
   }))
 }
 
@@ -406,6 +410,7 @@ export async function getInventoryStockById(id: string) {
     lessWeight: row.lessWeight?.toString() ?? null,
     netWeight: row.netWeight?.toString() ?? null,
     stoneWeight: row.stoneWeight?.toString() ?? null,
+    caratWeight: row.caratWeight?.toString() ?? null,
     dmoWeight: row.dmoWeight?.toString() ?? null,
     wastagePercent: row.wastagePercent?.toString() ?? null,
     purchaseRate: row.purchaseRate?.toString() ?? null,
@@ -460,6 +465,7 @@ export async function createInventoryStock(
     const lessWeight = parseOptionalNumber(formData.get("lessWeight"))
     const netWeight = parseOptionalNumber(formData.get("netWeight"))
     const stoneWeight = parseOptionalNumber(formData.get("stoneWeight"))
+    const caratWeight = parseOptionalNumber(formData.get("caratWeight"))
     const dmoWeight = parseOptionalNumber(formData.get("dmoWeight"))
     const wastagePercent = parseOptionalNumber(formData.get("wastagePercent"))
 
@@ -625,6 +631,7 @@ export async function createInventoryStock(
           lessWeight: toDecimal(lessWeight),
           netWeight: toDecimal(netWeight),
           stoneWeight: toDecimal(stoneWeight),
+          caratWeight: toDecimal(caratWeight),
           dmoWeight: toDecimal(dmoWeight),
           wastagePercent: toDecimal(wastagePercent),
           purchaseRate: toDecimal(purchaseRate),
@@ -759,6 +766,7 @@ export async function updateInventoryStock(
     const lessWeight = parseOptionalNumber(formData.get("lessWeight"))
     const netWeight = parseOptionalNumber(formData.get("netWeight"))
     const stoneWeight = parseOptionalNumber(formData.get("stoneWeight"))
+    const caratWeight = parseOptionalNumber(formData.get("caratWeight"))
     const dmoWeight = parseOptionalNumber(formData.get("dmoWeight"))
     const wastagePercent = parseOptionalNumber(formData.get("wastagePercent"))
 
@@ -938,6 +946,7 @@ export async function updateInventoryStock(
         lessWeight: toDecimal(lessWeight),
         netWeight: toDecimal(netWeight),
         stoneWeight: toDecimal(stoneWeight),
+        caratWeight: toDecimal(caratWeight),
         dmoWeight: toDecimal(dmoWeight),
         wastagePercent: toDecimal(wastagePercent),
         purchaseRate: toDecimal(purchaseRate),

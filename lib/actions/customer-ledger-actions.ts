@@ -31,6 +31,9 @@ export type CustomerLedgerEntryItem = {
   amount: number
   metalType: string | null
   metalWeight: number | null
+  /** Carat quantity for a Diamond entry — Diamond is carat-based, not
+   * weight-based (see business-units.ts's CARAT_BASED_UNITS). */
+  caratWeight: number | null
   paymentMethod: string | null
   entryDate: string
   invoiceId: string | null
@@ -92,6 +95,7 @@ export async function getCustomerLedgerEntries(
     amount: Number(entry.amount ?? 0),
     metalType: entry.metalType?.name ?? null,
     metalWeight: entry.metalWeight ? Number(entry.metalWeight) : null,
+    caratWeight: entry.caratWeight ? Number(entry.caratWeight) : null,
     paymentMethod: entry.paymentMethod ?? null,
     entryDate: formatDate(entry.entryDate),
     invoiceId: entry.invoice?.id ?? null,
@@ -119,6 +123,7 @@ export async function getCustomerLedgerSummary(
         amount: true,
         metalWeight: true,
         metalWeightFine: true,
+        caratWeight: true,
         metalType: { select: { name: true } },
       },
     }),
@@ -149,9 +154,12 @@ export async function getCustomerLedgerSummary(
     const family = classifyMetalName(entry.metalType?.name)
     if (family === "OTHER") continue
 
+    // Diamond is carat-based, not weight-based (see business-units.ts's
+    // CARAT_BASED_UNITS) — reads its own caratWeight column, never the
+    // Gold/Silver metalWeight/metalWeightFine columns or the rupee amount.
     const value =
       family === "DIAMOND"
-        ? amount
+        ? Number(entry.caratWeight ?? 0)
         : Number(entry.metalWeightFine ?? entry.metalWeight ?? 0)
 
     weightTotals[family][isDebit ? "debit" : "credit"] += value
@@ -187,14 +195,17 @@ type ManualEntryFields = {
   metalTypeId: string | null
   metalWeight: number | null
   metalWeightFine: number | null
+  caratWeight: number | null
 }
 
 /**
  * A manual ledger entry can be denominated in money (a ₹ amount) or, for a
- * business that also deals in Gold/Silver, in a metal weight instead — the
- * unit picked in the dialog decides which fields formData actually carries.
- * Diamond is value-based (see lib/business-units.ts), so it's parsed the
- * same way Money is, just tagged with a Diamond metalTypeId.
+ * business that also deals in Gold/Silver/Diamond, in a quantity of that unit
+ * instead — the unit picked in the dialog decides which fields formData
+ * actually carries. Diamond is carat-based (see lib/business-units.ts's
+ * CARAT_BASED_UNITS), so it's parsed the same way Gold/Silver's weight is —
+ * a required metal type plus a required positive quantity — just written
+ * into caratWeight instead of metalWeight/metalWeightFine.
  */
 function parseManualEntryFields(
   formData: FormData,
@@ -202,7 +213,7 @@ function parseManualEntryFields(
   const unit = String(formData.get("unit") || "MONEY") as BusinessUnit
   const errors: Record<string, string[]> = {}
 
-  if (unit === "GOLD" || unit === "SILVER") {
+  if (unit === "GOLD" || unit === "SILVER" || unit === "DIAMOND") {
     const metalTypeId = String(formData.get("metalTypeId") || "").trim()
     const weight = toNumber(formData.get("weight"), 0)
 
@@ -216,9 +227,16 @@ function parseManualEntryFields(
 
     if (Object.keys(errors).length > 0) return { ok: false, errors }
 
+    if (unit === "DIAMOND") {
+      return {
+        ok: true,
+        fields: { amount: 0, metalTypeId, metalWeight: null, metalWeightFine: null, caratWeight: weight },
+      }
+    }
+
     return {
       ok: true,
-      fields: { amount: 0, metalTypeId, metalWeight: weight, metalWeightFine: weight },
+      fields: { amount: 0, metalTypeId, metalWeight: weight, metalWeightFine: weight, caratWeight: null },
     }
   }
 
@@ -229,17 +247,10 @@ function parseManualEntryFields(
     return { ok: false, errors }
   }
 
-  const metalTypeId =
-    unit === "DIAMOND" ? String(formData.get("metalTypeId") || "").trim() || null : null
-
-  if (unit === "DIAMOND" && !metalTypeId) {
-    return {
-      ok: false,
-      errors: { metalTypeId: ["Select which diamond type this entry is for"] },
-    }
+  return {
+    ok: true,
+    fields: { amount, metalTypeId: null, metalWeight: null, metalWeightFine: null, caratWeight: null },
   }
-
-  return { ok: true, fields: { amount, metalTypeId, metalWeight: null, metalWeightFine: null } }
 }
 
 export async function addCustomerSaleEntry(

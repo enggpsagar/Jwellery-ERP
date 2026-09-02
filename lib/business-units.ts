@@ -26,11 +26,20 @@ export const BUSINESS_UNIT_DESCRIPTIONS: Record<BusinessUnit, string> = {
   MONEY: "Track customer/karigar dues and payments in rupees.",
   GOLD: "Track dues and payments in grams of fine gold.",
   SILVER: "Track dues and payments in grams of silver.",
-  DIAMOND: "Track dues and payments as a rupee-equivalent diamond value.",
+  DIAMOND: "Track dues and payments in carats of diamond weight.",
 }
 
 /** Non-money units that are settled by weight rather than by a rupee amount. */
 export const WEIGHT_BASED_UNITS: BusinessUnit[] = ["GOLD", "SILVER"]
+
+/**
+ * Non-money units settled by carat weight rather than a rupee amount.
+ * Diamond used to be tracked as a rupee-equivalent value (see git history),
+ * but a real Diamond Ledger needs an actual carat quantity — kept as its own
+ * list rather than folded into WEIGHT_BASED_UNITS since the unit (carats,
+ * not grams) and precision differ from Gold/Silver.
+ */
+export const CARAT_BASED_UNITS: BusinessUnit[] = ["DIAMOND"]
 
 type MetalFamily = "GOLD" | "SILVER" | "DIAMOND" | "OTHER"
 
@@ -61,6 +70,10 @@ export function formatUnitValue(unit: BusinessUnit, value: number) {
 
   if (WEIGHT_BASED_UNITS.includes(unit)) {
     return `${abs.toLocaleString("en-IN", { maximumFractionDigits: 3 })} g`
+  }
+
+  if (CARAT_BASED_UNITS.includes(unit)) {
+    return `${abs.toLocaleString("en-IN", { maximumFractionDigits: 3 })} ct`
   }
 
   return `₹${abs.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`

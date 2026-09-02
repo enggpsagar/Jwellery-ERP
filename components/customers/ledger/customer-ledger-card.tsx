@@ -31,6 +31,13 @@ function formatWeight(value: number) {
   })} g`
 }
 
+function formatCarat(value: number) {
+  return `${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  })} ct`
+}
+
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CASH: "Cash",
   UPI: "UPI",
@@ -40,11 +47,20 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   OTHER: "Other",
 }
 
-function formatEntryAmount(entry: { metalType: string | null; metalWeight: number | null; amount: number }) {
+function formatEntryAmount(entry: {
+  metalType: string | null
+  metalWeight: number | null
+  caratWeight: number | null
+  amount: number
+}) {
   const family = classifyMetalName(entry.metalType)
 
   if ((family === "GOLD" || family === "SILVER") && entry.metalWeight != null) {
     return formatWeight(entry.metalWeight)
+  }
+
+  if (family === "DIAMOND" && entry.caratWeight != null) {
+    return formatCarat(entry.caratWeight)
   }
 
   return formatAmount(entry.amount)
@@ -130,7 +146,7 @@ export async function CustomerLedgerCard({
           )}
 
           {summary.unitSummaries.map((unit) => {
-            const format = unit.unit === "DIAMOND" ? formatAmount : formatWeight
+            const format = unit.unit === "DIAMOND" ? formatCarat : formatWeight
 
             return (
               <div key={unit.unit} className="grid grid-cols-1 gap-4 md:grid-cols-3">

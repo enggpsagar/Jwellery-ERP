@@ -27,6 +27,10 @@ export type LedgerEntryRow = {
   amount: number
   metalType: string | null
   metalWeight: number | null
+  /** Carat quantity for a Diamond entry — Diamond is carat-based, not
+   * weight-based (see business-units.ts's CARAT_BASED_UNITS), so it never
+   * shares metalWeight with Gold/Silver. */
+  caratWeight: number | null
   paymentMethod: string | null
   description: string
   invoiceId: string | null
@@ -89,6 +93,7 @@ export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
       amount: Number(entry.amount ?? 0),
       metalType: entry.metalType?.name ?? null,
       metalWeight: entry.metalWeight ? Number(entry.metalWeight) : null,
+      caratWeight: entry.caratWeight ? Number(entry.caratWeight) : null,
       paymentMethod: entry.paymentMethod ?? null,
       description: entry.description ?? "",
       invoiceId: entry.invoiceId,
@@ -312,6 +317,7 @@ export async function getLedgerTotals(): Promise<LedgerTotals> {
             amount: true,
             metalWeight: true,
             metalWeightFine: true,
+            caratWeight: true,
             metalType: { select: { name: true } },
           },
         })
@@ -329,9 +335,12 @@ export async function getLedgerTotals(): Promise<LedgerTotals> {
     if (family === "OTHER") continue
 
     const isDebit = entry.type === LedgerEntryType.DEBIT
+    // Diamond is carat-based, not weight-based — see business-units.ts's
+    // CARAT_BASED_UNITS — so it reads its own caratWeight column, never the
+    // Gold/Silver metalWeight/metalWeightFine columns.
     const value =
       family === "DIAMOND"
-        ? Number(entry.amount ?? 0)
+        ? Number(entry.caratWeight ?? 0)
         : Number(entry.metalWeightFine ?? entry.metalWeight ?? 0)
 
     weightTotals[family][isDebit ? "debit" : "credit"] += value
@@ -356,7 +365,7 @@ export async function getLedgerTotals(): Promise<LedgerTotals> {
 export type MetalDailyUnitEntry = {
   unit: BusinessUnit
   label: string
-  /** Grams for GOLD/SILVER, rupee value for DIAMOND — same convention as getLedgerTotals's weightTotals. */
+  /** Grams for GOLD/SILVER, carats for DIAMOND — same convention as getLedgerTotals's weightTotals. */
   purchasedValue: number
   purchasedAmount: number
   soldValue: number
@@ -403,6 +412,7 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
       where: { purchase: { storeId, ...locationWhere(scope) } },
       select: {
         netWeight: true,
+        caratWeight: true,
         lineTotal: true,
         metalType: { select: { name: true } },
         purchase: { select: { purchaseDate: true } },
@@ -414,6 +424,7 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
       },
       select: {
         netWeight: true,
+        caratWeight: true,
         lineTotal: true,
         metalType: { select: { name: true } },
         invoice: { select: { invoiceDate: true } },
@@ -423,6 +434,7 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
       where: { kachaInvoice: { storeId, ...locationWhere(scope) } },
       select: {
         netWeight: true,
+        caratWeight: true,
         lineTotal: true,
         metalType: { select: { name: true } },
         kachaInvoice: { select: { invoiceDate: true } },
@@ -451,8 +463,11 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
     return entry
   }
 
-  function valueFor(family: BusinessUnit, netWeight: unknown, amount: number) {
-    return family === "DIAMOND" ? amount : Number(netWeight ?? 0)
+  // Diamond is carat-based, not weight-based (see business-units.ts's
+  // CARAT_BASED_UNITS) — its "quantity" is caratWeight, never the line's
+  // rupee amount.
+  function valueFor(family: BusinessUnit, netWeight: unknown, caratWeight: unknown) {
+    return family === "DIAMOND" ? Number(caratWeight ?? 0) : Number(netWeight ?? 0)
   }
 
   for (const item of purchaseItems) {
@@ -462,7 +477,7 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
     const dateISO = item.purchase.purchaseDate.toISOString().slice(0, 10)
     const amount = Number(item.lineTotal ?? 0)
     const entry = unitTotals(dayTotals(dateISO), family)
-    entry.purchasedValue += valueFor(family, item.netWeight, amount)
+    entry.purchasedValue += valueFor(family, item.netWeight, item.caratWeight)
     entry.purchasedAmount += amount
   }
 
@@ -474,7 +489,7 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
     const dateISO = invoiceDate.toISOString().slice(0, 10)
     const amount = Number(item.lineTotal ?? 0)
     const entry = unitTotals(dayTotals(dateISO), family)
-    entry.soldValue += valueFor(family, item.netWeight, amount)
+    entry.soldValue += valueFor(family, item.netWeight, item.caratWeight)
     entry.soldAmount += amount
   }
 

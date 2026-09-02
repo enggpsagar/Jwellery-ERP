@@ -63,6 +63,11 @@ export function AddCustomerRefundEntryDialog({
   }, [state, toast])
 
   const isWeightBased = WEIGHT_BASED_UNITS.includes(unit)
+  // Diamond is carat-based, not a rupee value — same quantity-entry pattern
+  // as Gold/Silver's weight, just labelled in carats (see business-units.ts's
+  // CARAT_BASED_UNITS).
+  const isCaratBased = unit === "DIAMOND"
+  const isQuantityBased = isWeightBased || isCaratBased
 
   const matchingMetals = useMemo(
     () => metals.filter((metal) => classifyMetalName(metal.name) === unit),
@@ -118,7 +123,7 @@ export function AddCustomerRefundEntryDialog({
             <input type="hidden" name="unit" value={unit} />
           )}
 
-          {(unit === "DIAMOND" || isWeightBased) && (
+          {isQuantityBased && (
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <Scale className="h-4 w-4 text-muted-foreground" />
@@ -142,11 +147,11 @@ export function AddCustomerRefundEntryDialog({
             </div>
           )}
 
-          {isWeightBased ? (
+          {isQuantityBased ? (
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <Scale className="h-4 w-4 text-muted-foreground" />
-                Weight (grams) <RequiredMark />
+                {isCaratBased ? "Carat Weight (ct)" : "Weight (grams)"} <RequiredMark />
               </label>
               <input
                 name="weight"
@@ -154,7 +159,7 @@ export function AddCustomerRefundEntryDialog({
                 step="0.001"
                 min="0"
                 className="w-full rounded-md border px-3 py-2 text-sm"
-                placeholder="Enter weight in grams"
+                placeholder={isCaratBased ? "Enter weight in carats" : "Enter weight in grams"}
                 required
               />
               {state.errors?.weight?.[0] && (

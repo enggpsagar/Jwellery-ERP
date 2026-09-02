@@ -125,6 +125,16 @@ export function LedgerDetailDrawer({
                   </div>
                 ) : null}
 
+                {entry.caratWeight ? (
+                  <div className="flex items-center justify-between rounded-lg border bg-card p-4">
+                    <span className="text-sm text-muted-foreground">Carat Weight</span>
+                    <span className="text-sm font-medium tabular-nums">
+                      {entry.caratWeight.toLocaleString("en-IN", { maximumFractionDigits: 3 })} ct
+                      {entry.metalType ? ` (${entry.metalType})` : ""}
+                    </span>
+                  </div>
+                ) : null}
+
                 <div>
                   <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Information

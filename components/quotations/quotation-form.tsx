@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { LocationSelect } from "@/components/shared/location-select"
-import { PURITY_SELECT_OPTIONS, stoneWeightToGrams } from "@/lib/purity"
+import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, GRAMS_PER_CARAT } from "@/lib/purity"
 import { RequiredMark } from "@/components/shared/required-mark"
 
 type CustomerOption = {
@@ -168,9 +168,58 @@ export function QuotationForm({
     setItems((prev) => (prev.length > 1 ? prev.filter((item) => item.key !== key) : prev))
   }
 
+  // metalTypeId on a line only ever comes from the linked stock item, so this
+  // is the same metal-name signal product-form.tsx's classifyPurityFamily
+  // uses, just resolved from the `stockItems` list this form already has.
+  const metalNameByTypeId = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const stock of stockItems) {
+      if (stock.metalType) map[stock.metalType.id] = stock.metalType.name
+    }
+    return map
+  }, [stockItems])
+
+  // Whether this line's Carat Weight field should show/convert: an explicit
+  // Diamond purity (today's existing signal), or a metal name that reads as
+  // Diamond/Stone (the only way to catch a Stone line — there's no PurityType
+  // for loose gemstones).
+  const isCaratLine = (item: LineItem) =>
+    item.purity === "DIAMOND" || isCaratWeighedMetal(metalNameByTypeId[item.metalTypeId])
+
+  const handleCaratWeightChange = (item: LineItem, value: string) => {
+    const caratWeight = Number(value) || 0
+    const patch: Partial<LineItem> = { caratWeight }
+
+    if (isCaratLine(item)) {
+      const caratNum = Number(value)
+      if (value.trim() !== "" && Number.isFinite(caratNum)) {
+        patch.netWeight = Number((caratNum * GRAMS_PER_CARAT).toFixed(5))
+      }
+    }
+
+    updateItem(item.key, patch)
+  }
+
+  const handleNetWeightChange = (item: LineItem, value: string) => {
+    const netWeight = Number(value) || 0
+    const patch: Partial<LineItem> = { netWeight }
+
+    if (isCaratLine(item)) {
+      const netNum = Number(value)
+      patch.caratWeight =
+        value.trim() !== "" && Number.isFinite(netNum)
+          ? Number((netNum / GRAMS_PER_CARAT).toFixed(3))
+          : 0
+    }
+
+    updateItem(item.key, patch)
+  }
+
   // Diamond items price per carat, not per gram — mirrors lineQuantity in
   // quotation-actions.ts so the live-preview total here never disagrees
-  // with what the server actually saves.
+  // with what the server actually saves. Stone lines keep pricing off Net
+  // Weight (unchanged) — only the Carat Weight field's conversion
+  // convenience extends to Stone, not the pricing quantity itself.
   const lineQuantity = (item: LineItem) =>
     item.purity === "DIAMOND" ? item.caratWeight : item.netWeight
 
@@ -371,9 +420,7 @@ export function QuotationForm({
                     type="number"
                     step="0.001"
                     value={item.netWeight === 0 ? "" : item.netWeight}
-                    onChange={(e) =>
-                      updateItem(item.key, { netWeight: Number(e.target.value) || 0 })
-                    }
+                    onChange={(e) => handleNetWeightChange(item, e.target.value)}
                   />
                 </div>
 
@@ -406,18 +453,20 @@ export function QuotationForm({
                   </div>
                 </div>
 
-                {item.purity === "DIAMOND" && (
+                {isCaratLine(item) && (
                   <div className="space-y-1">
                     <Label className="text-xs">Carat Weight (ct)</Label>
                     <Input
                       type="number"
                       step="0.001"
                       value={item.caratWeight === 0 ? "" : item.caratWeight}
-                      onChange={(e) =>
-                        updateItem(item.key, { caratWeight: Number(e.target.value) || 0 })
-                      }
+                      onChange={(e) => handleCaratWeightChange(item, e.target.value)}
                     />
-                    <p className="text-xs text-muted-foreground">Priced per carat, not per gram</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.purity === "DIAMOND"
+                        ? "Priced per carat, not per gram"
+                        : "1 ct = 0.2 g — converts with Net Weight"}
+                    </p>
                   </div>
                 )}
 

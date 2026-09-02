@@ -38,7 +38,6 @@ model Store {
 
   /**
    * Which channels this store's owner accepts renewal reminders on.
-   *
    * Email is wired up (app/api/cron/plan-reminders). WhatsApp is a stored
    * preference only — there is no WhatsApp sender in this codebase yet, so
    * the flag records intent and the UI says so rather than implying reminders
@@ -88,7 +87,9 @@ model Plan {
   history StorePlanHistory[]
 }
 
-/** How a plan period began. */
+/**
+ * How a plan period began.
+ */
 enum StorePlanAction {
   REGISTERED
   ASSIGNED
@@ -97,11 +98,9 @@ enum StorePlanAction {
 
 /**
  * One row per plan period a store has held — the subscription ledger.
- *
  * Needed because Store.planStartedAt/planExpiresAt are overwritten on every
  * assignment: without this table a renewal destroys the record of the period
  * it replaced, so "last renewal" and "history" cannot be answered at all.
- *
  * planName, price and durationDays are snapshots rather than reads through
  * the relation. A plan can be renamed, repriced or deactivated, and history
  * has to keep saying what was actually sold at the time.
@@ -116,7 +115,9 @@ model StorePlanHistory {
   startedAt    DateTime
   expiresAt    DateTime
   action       StorePlanAction @default(ASSIGNED)
-  /** Which Super Admin made the change; null for self-registration. */
+  /**
+   * Which Super Admin made the change; null for self-registration.
+   */
   actorId      String?
   actorName    String?
   note         String?
@@ -167,13 +168,11 @@ model StoreLocation {
 /**
  * A person's access to one store. Someone who works across several stores
  * has one row per store, each carrying its own role and module permissions.
- *
  * `User` stays globally unique on email and phone and is NOT duplicated per
  * store: the NextAuth Prisma adapter resolves Google sign-in through
  * `findUnique({ where: { email } })`, and OTP login does the same on phone,
  * so a second row for the same person would break authentication outright.
  * One login, many memberships.
- *
  * `User.storeId` / `User.role` / `User.permissions` remain as the default
  * membership for accounts that predate this table, and are what a single-
  * store user still resolves to. Membership rows win when present.
@@ -306,7 +305,7 @@ model Customer {
 }
 
 model Karigar {
-  id             String        @id @default(cuid())
+  id             String         @id @default(cuid())
   storeId        String
   code           String?
   name           String
@@ -322,12 +321,12 @@ model Karigar {
   aadhaarNumber  String?
   specialization String?
   notes          String?
-  openingGold    Decimal       @default(0) @db.Decimal(12, 5)
-  openingCash    Decimal       @default(0) @db.Decimal(12, 2)
-  isActive       Boolean       @default(true)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  store          Store         @relation(fields: [storeId], references: [id])
+  openingGold    Decimal        @default(0) @db.Decimal(12, 5)
+  openingCash    Decimal        @default(0) @db.Decimal(12, 2)
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  store          Store          @relation(fields: [storeId], references: [id])
   karigarJobs    KarigarJob[]
   ledgerEntries  LedgerEntry[]
   loginUser      User?
@@ -343,40 +342,40 @@ model Karigar {
 }
 
 model Product {
-  id                  String               @id @default(cuid())
-  storeId             String
-  productCode         String
-  name                String
-  categoryId          String?
-  categoryTypeId      String?
-  metalTypeId         String?
-  defaultPurity       PurityType?
-  defaultMakingCharge Decimal?             @db.Decimal(12, 2)
-  defaultMakingChargeType ChargeType       @default(FIXED)
-  defaultStoneCharge  Decimal?             @db.Decimal(12, 2)
-  defaultStoneChargeType  ChargeType       @default(FIXED)
+  id                      String               @id @default(cuid())
+  storeId                 String
+  productCode             String
+  name                    String
+  categoryId              String?
+  categoryTypeId          String?
+  metalTypeId             String?
+  defaultPurity           PurityType?
+  defaultMakingCharge     Decimal?             @db.Decimal(12, 2)
+  defaultMakingChargeType ChargeType           @default(FIXED)
+  defaultStoneCharge      Decimal?             @db.Decimal(12, 2)
+  defaultStoneChargeType  ChargeType           @default(FIXED)
   // Typical weights for this design, used to prefill a stock entry rather
   // than to describe any one piece — two rings off the same design are never
   // identical to the milligram, so the per-piece truth stays on
   // InventoryStock. Same Decimal(12, 5) as the columns they seed.
-  defaultGrossWeight  Decimal?             @db.Decimal(12, 5)
-  defaultNetWeight    Decimal?             @db.Decimal(12, 5)
-  defaultStoneWeight  Decimal?             @db.Decimal(12, 5)
-  defaultCaratWeight  Decimal?             @db.Decimal(10, 3)
-  designCode          String?
-  hsnCode             String?
-  description         String?
-  notes               String?
-  isActive            Boolean              @default(true)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  store               Store                @relation(fields: [storeId], references: [id])
-  stockItems          InventoryStock[]
-  purchaseItems       PurchaseItem[]
-  karigarReceiptItems KarigarReceiptItem[]
-  category            StoreCategory?       @relation(fields: [categoryId], references: [id])
-  categoryType        StoreCategoryType?   @relation(fields: [categoryTypeId], references: [id])
-  metalType           StoreMetal?          @relation(fields: [metalTypeId], references: [id])
+  defaultGrossWeight      Decimal?             @db.Decimal(12, 5)
+  defaultNetWeight        Decimal?             @db.Decimal(12, 5)
+  defaultStoneWeight      Decimal?             @db.Decimal(12, 5)
+  defaultCaratWeight      Decimal?             @db.Decimal(10, 3)
+  designCode              String?
+  hsnCode                 String?
+  description             String?
+  notes                   String?
+  isActive                Boolean              @default(true)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  store                   Store                @relation(fields: [storeId], references: [id])
+  stockItems              InventoryStock[]
+  purchaseItems           PurchaseItem[]
+  karigarReceiptItems     KarigarReceiptItem[]
+  category                StoreCategory?       @relation(fields: [categoryId], references: [id])
+  categoryType            StoreCategoryType?   @relation(fields: [categoryTypeId], references: [id])
+  metalType               StoreMetal?          @relation(fields: [metalTypeId], references: [id])
 
   @@unique([storeId, productCode])
   @@index([categoryId])
@@ -474,21 +473,21 @@ model InventoryTransaction {
 }
 
 model Invoice {
-  id                     String        @id @default(cuid())
+  id                     String         @id @default(cuid())
   storeId                String
   invoiceNumber          String
   customerId             String
-  invoiceDate            DateTime      @default(now())
+  invoiceDate            DateTime       @default(now())
   dueDate                DateTime?
-  status                 InvoiceStatus @default(PAID)
-  subtotal               Decimal       @default(0) @db.Decimal(12, 2)
-  makingCharges          Decimal       @default(0) @db.Decimal(12, 2)
-  stoneCharges           Decimal       @default(0) @db.Decimal(12, 2)
-  discount               Decimal       @default(0) @db.Decimal(12, 2)
-  taxAmount              Decimal       @default(0) @db.Decimal(12, 2)
-  totalAmount            Decimal       @default(0) @db.Decimal(12, 2)
-  paidAmount             Decimal       @default(0) @db.Decimal(12, 2)
-  balanceAmount          Decimal       @default(0) @db.Decimal(12, 2)
+  status                 InvoiceStatus  @default(PAID)
+  subtotal               Decimal        @default(0) @db.Decimal(12, 2)
+  makingCharges          Decimal        @default(0) @db.Decimal(12, 2)
+  stoneCharges           Decimal        @default(0) @db.Decimal(12, 2)
+  discount               Decimal        @default(0) @db.Decimal(12, 2)
+  taxAmount              Decimal        @default(0) @db.Decimal(12, 2)
+  totalAmount            Decimal        @default(0) @db.Decimal(12, 2)
+  paidAmount             Decimal        @default(0) @db.Decimal(12, 2)
+  balanceAmount          Decimal        @default(0) @db.Decimal(12, 2)
   notes                  String?
   // Who raised it. The id is the link; the name is a snapshot, because staff
   // leave and get renamed and an invoice has to keep saying who sold it.
@@ -503,16 +502,16 @@ model Invoice {
   cancelledById          String?
   cancelledByName        String?
   cancellationReason     String?
-  createdAt              DateTime      @default(now())
-  updatedAt              DateTime      @updatedAt
-  store                  Store         @relation(fields: [storeId], references: [id])
-  createdBy              User?         @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
-  cancelledBy            User?         @relation("InvoiceCancelledBy", fields: [cancelledById], references: [id])
-  customer               Customer      @relation(fields: [customerId], references: [id])
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  store                  Store          @relation(fields: [storeId], references: [id])
+  createdBy              User?          @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  cancelledBy            User?          @relation("InvoiceCancelledBy", fields: [cancelledById], references: [id])
+  customer               Customer       @relation(fields: [customerId], references: [id])
   items                  InvoiceItem[]
   ledgerEntries          LedgerEntry[]
-  convertedFromKacha     KachaInvoice? @relation("KachaConvertedToPakka")
-  convertedFromQuotation Quotation?    @relation("QuotationConvertedToInvoice")
+  convertedFromKacha     KachaInvoice?  @relation("KachaConvertedToPakka")
+  convertedFromQuotation Quotation?     @relation("QuotationConvertedToInvoice")
   locationId             String?
   location               StoreLocation? @relation(fields: [locationId], references: [id])
   // Self-relation for "this invoice was raised to replace a cancelled
@@ -627,6 +626,11 @@ model InvoiceItem {
   schemeDiscount   Decimal         @default(0) @db.Decimal(12, 2)
   sgstAmount       Decimal         @default(0) @db.Decimal(12, 2)
   cgstAmount       Decimal         @default(0) @db.Decimal(12, 2)
+  // Charged instead of sgstAmount+cgstAmount when the sale is inter-state
+  // (customer's state differs from the store's own) - never both at once,
+  // see computeGst() in lib/gst.ts. Always 0 for a Composition-scheme store,
+  // same as sgst/cgst - a composition dealer never itemizes GST at all.
+  igstAmount       Decimal         @default(0) @db.Decimal(12, 2)
   // HSN snapshot at sale time — Product.hsnCode can change later, and a
   // manually-entered line (no linked stock/product) has no HSN otherwise.
   hsnCode          String?
@@ -756,33 +760,43 @@ model Vendor {
 }
 
 model Purchase {
-  id             String         @id @default(cuid())
-  storeId        String
-  purchaseNumber String
+  id                  String         @id @default(cuid())
+  storeId             String
+  purchaseNumber      String
   /// The vendor's own invoice/bill number for this purchase — a free-typed
   /// reference (not generated, not unique), so it can be matched back
   /// against the physical bill the vendor issued.
   vendorInvoiceNumber String?
-  vendorId       String
-  purchaseDate   DateTime       @default(now())
-  status         InvoiceStatus  @default(PAID)
-  subtotal       Decimal        @default(0) @db.Decimal(12, 2)
-  makingCharges  Decimal        @default(0) @db.Decimal(12, 2)
-  stoneCharges   Decimal        @default(0) @db.Decimal(12, 2)
-  discount       Decimal        @default(0) @db.Decimal(12, 2)
-  taxAmount      Decimal        @default(0) @db.Decimal(12, 2)
-  totalAmount    Decimal        @default(0) @db.Decimal(12, 2)
-  paidAmount     Decimal        @default(0) @db.Decimal(12, 2)
-  balanceAmount  Decimal        @default(0) @db.Decimal(12, 2)
-  notes          String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  store          Store          @relation(fields: [storeId], references: [id])
-  vendor         Vendor         @relation(fields: [vendorId], references: [id])
-  items          PurchaseItem[]
-  ledgerEntries  LedgerEntry[]
-  locationId     String?
-  location       StoreLocation? @relation(fields: [locationId], references: [id])
+  vendorId            String
+  purchaseDate        DateTime       @default(now())
+  status              InvoiceStatus  @default(PAID)
+  subtotal            Decimal        @default(0) @db.Decimal(12, 2)
+  makingCharges       Decimal        @default(0) @db.Decimal(12, 2)
+  stoneCharges        Decimal        @default(0) @db.Decimal(12, 2)
+  discount            Decimal        @default(0) @db.Decimal(12, 2)
+  // Whatever GST the vendor actually charged on their bill - this is about
+  // the VENDOR's invoice, not the store's own gstScheme, so it's recorded
+  // the same way regardless of which of the three schemes the store itself
+  // operates under. What DOES depend on the store's scheme is whether this
+  // is eligible for input tax credit: a Composition-scheme store can never
+  // claim ITC on anything, no matter what a vendor charged - see the
+  // "ITC not eligible" note rendered wherever this purchase is shown.
+  taxAmount           Decimal        @default(0) @db.Decimal(12, 2)
+  sgstAmount          Decimal        @default(0) @db.Decimal(12, 2)
+  cgstAmount          Decimal        @default(0) @db.Decimal(12, 2)
+  igstAmount          Decimal        @default(0) @db.Decimal(12, 2)
+  totalAmount         Decimal        @default(0) @db.Decimal(12, 2)
+  paidAmount          Decimal        @default(0) @db.Decimal(12, 2)
+  balanceAmount       Decimal        @default(0) @db.Decimal(12, 2)
+  notes               String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  store               Store          @relation(fields: [storeId], references: [id])
+  vendor              Vendor         @relation(fields: [vendorId], references: [id])
+  items               PurchaseItem[]
+  ledgerEntries       LedgerEntry[]
+  locationId          String?
+  location            StoreLocation? @relation(fields: [locationId], references: [id])
 
   @@unique([storeId, purchaseNumber])
   @@index([vendorId])
@@ -809,6 +823,10 @@ model PurchaseItem {
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
   makingChargeType ChargeType      @default(FIXED)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
+  // HSN snapshot at purchase time - same reasoning as InvoiceItem.hsnCode:
+  // Product.hsnCode can change later, and this line might not even have a
+  // linked product yet at the time of entry.
+  hsnCode          String?
   lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId String?
   createdAt        DateTime        @default(now())
@@ -872,7 +890,16 @@ model Quotation {
   makingCharges   Decimal         @default(0) @db.Decimal(12, 2)
   stoneCharges    Decimal         @default(0) @db.Decimal(12, 2)
   discount        Decimal         @default(0) @db.Decimal(12, 2)
+  // taxAmount stays as the persisted sgst+cgst+igst total - every existing
+  // read of it (totals, exports, the print template) keeps working
+  // unchanged. The three below are new: Quotation never broke tax into
+  // components before, matching how it never did per-line tax at all
+  // (unlike Invoice/InvoiceItem) - this stays at the document level for the
+  // same reason, not per QuotationItem.
   taxAmount       Decimal         @default(0) @db.Decimal(12, 2)
+  sgstAmount      Decimal         @default(0) @db.Decimal(12, 2)
+  cgstAmount      Decimal         @default(0) @db.Decimal(12, 2)
+  igstAmount      Decimal         @default(0) @db.Decimal(12, 2)
   totalAmount     Decimal         @default(0) @db.Decimal(12, 2)
   notes           String?
   convertedToId   String?         @unique
@@ -974,6 +1001,14 @@ model BusinessSettings {
   cin       String? // Corporate Identification Number, for registered companies
   stateCode String? // GST state code, e.g. "27" for Maharashtra
 
+  // Which of the three GST registration types this store operates under.
+  // Drives what's shown/required across Billing, Quotations, and Purchases -
+  // see GstScheme's own doc comment. Defaults to REGULAR_B2C so every
+  // existing store (created before this field existed) keeps behaving
+  // exactly as it already did: full SGST/CGST charged, customer GSTIN
+  // optional - a Composition or B2B store has to explicitly opt in here.
+  gstScheme GstScheme @default(REGULAR_B2C)
+
   // Contact & address
   address String?
   city    String?
@@ -1009,45 +1044,45 @@ model BusinessSettings {
 }
 
 model User {
-  id                  String        @id @default(cuid())
+  id                  String                @id @default(cuid())
   name                String?
-  email               String?       @unique
-  phone               String?       @unique
+  email               String?               @unique
+  phone               String?               @unique
   image               String?
-  role                UserRole      @default(STAFF)
-  status              UserStatus    @default(INVITED)
-  isActive            Boolean       @default(true)
+  role                UserRole              @default(STAFF)
+  status              UserStatus            @default(INVITED)
+  isActive            Boolean               @default(true)
   emailVerified       DateTime?
   phoneVerified       DateTime?
   invitedById         String?
   storeId             String?
-  karigarId           String?       @unique
-  permissions         String[]      @default([])
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  karigarId           String?               @unique
+  permissions         String[]              @default([])
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
   addressLine1        String?
   addressLine2        String?
   city                String?
-  country             String?       @default("India")
+  country             String?               @default("India")
   pincode             String?
   state               String?
   accounts            Account[]
   employee            Employee?
-  store               Store?        @relation(fields: [storeId], references: [id])
+  store               Store?                @relation(fields: [storeId], references: [id])
   storeMemberships    UserStoreMembership[]
-  karigar             Karigar?      @relation(fields: [karigarId], references: [id])
-  createdInviteTokens InviteToken[] @relation("UserCreatedInvites")
-  inviteTokens        InviteToken[] @relation("InviteTokenUser")
+  karigar             Karigar?              @relation(fields: [karigarId], references: [id])
+  createdInviteTokens InviteToken[]         @relation("UserCreatedInvites")
+  inviteTokens        InviteToken[]         @relation("InviteTokenUser")
   otpCodes            OtpCode[]
   sessions            Session[]
-  invitedBy           User?         @relation("UserInvites", fields: [invitedById], references: [id])
-  invitedUsers        User[]        @relation("UserInvites")
+  invitedBy           User?                 @relation("UserInvites", fields: [invitedById], references: [id])
+  invitedUsers        User[]                @relation("UserInvites")
   locationAccess      UserLocationAccess[]
   scanSessions        ScanSession[]
-  invoicesCreated     Invoice[]     @relation("InvoiceCreatedBy")
-  invoicesCancelled   Invoice[]     @relation("InvoiceCancelledBy")
-  apiKeysCreated      ApiKey[]      @relation("ApiKeyCreatedBy")
-  customersCreated    Customer[]    @relation("CustomerCreatedBy")
+  invoicesCreated     Invoice[]             @relation("InvoiceCreatedBy")
+  invoicesCancelled   Invoice[]             @relation("InvoiceCancelledBy")
+  apiKeysCreated      ApiKey[]              @relation("ApiKeyCreatedBy")
+  customersCreated    Customer[]            @relation("CustomerCreatedBy")
 
   @@index([storeId])
 }
@@ -1214,6 +1249,28 @@ enum BusinessUnit {
   DIAMOND
 }
 
+// The three GST registration types a jewellery business can operate under
+// in India - see BusinessSettings.gstScheme. Each has real legal
+// consequences for what an invoice/quotation/purchase bill must show:
+//   REGULAR_B2C  - Retailer. Full SGST+CGST (or IGST if inter-state) shown
+//                  and collected from the customer. Customer GSTIN optional.
+//   REGULAR_B2B  - Wholesaler & Manufacturer. Same tax collection as B2C,
+//                  but selling to other GST-registered businesses, so the
+//                  buyer's GSTIN is required for a valid B2B tax invoice.
+//   COMPOSITION  - Small local jeweler under the Composition Scheme. Legally
+//                  PROHIBITED from showing/collecting GST as a line item on
+//                  any document - no SGST/CGST/IGST columns at all. Must
+//                  print "Bill of Supply" (never "Tax Invoice") with the
+//                  mandatory disclaimer. The dealer still pays a small flat
+//                  tax to the government, but out of their own margin, never
+//                  itemized to the customer, and can never claim input tax
+//                  credit on purchases either.
+enum GstScheme {
+  REGULAR_B2C
+  REGULAR_B2B
+  COMPOSITION
+}
+
 enum PurityType {
   GOLD_18K
   GOLD_20K
@@ -1277,7 +1334,6 @@ enum OtpPurpose {
 
 /**
  * A counter-side scanning session.
- *
  * Opened from the billing screen on a laptop so that tags scanned with a
  * phone land on that invoice. It exists in the database rather than in
  * memory because the two devices talk through separate serverless requests

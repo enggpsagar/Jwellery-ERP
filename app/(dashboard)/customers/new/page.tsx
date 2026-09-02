@@ -1,5 +1,6 @@
 import { getStates } from "@/lib/actions/location-actions"
 import { safeReturnTo } from "@/lib/safe-return-to"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 
 import { CustomerCreateForm } from "@/components/customers/customer-create-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
@@ -14,7 +15,7 @@ export default async function NewCustomerPage({
   const params = (await searchParams) ?? {}
   const returnTo = safeReturnTo(params.returnTo)
 
-  const states = await getStates()
+  const [states, settings] = await Promise.all([getStates(), getBusinessSettings()])
 
   return (
     <main className="space-y-6 p-6">
@@ -25,7 +26,7 @@ export default async function NewCustomerPage({
         backLabel={returnTo ? "Back without saving" : "Back to Customers"}
       />
 
-      <CustomerCreateForm states={states} returnTo={returnTo} />
+      <CustomerCreateForm states={states} returnTo={returnTo} gstScheme={settings.gstScheme} />
     </main>
   )
 }

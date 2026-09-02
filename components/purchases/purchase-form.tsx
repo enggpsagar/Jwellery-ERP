@@ -45,6 +45,7 @@ type ProductOption = {
   defaultMakingCharge: number | null
   defaultMakingChargeType: "FIXED" | "PERCENTAGE"
   defaultStoneCharge: number | null
+  hsnCode: string | null
   isActive: boolean
 }
 
@@ -65,6 +66,7 @@ type LineItem = {
   dmoWeight: number
   stoneWeightInput: number
   stoneWeightUnit: "GRAM" | "CARAT"
+  hsnCode: string
   /** Once Net Weight is edited directly, the gross/dmo auto-calc stops
    * overwriting it — same override rule as the Product form. */
   netTouched: boolean
@@ -90,6 +92,7 @@ function emptyLineItem(): LineItem {
     dmoWeight: 0,
     stoneWeightInput: 0,
     stoneWeightUnit: "GRAM",
+    hsnCode: "",
     netTouched: false,
   }
 }
@@ -273,6 +276,7 @@ export function PurchaseForm({
                   makingCharge: product.defaultMakingCharge ?? 0,
                   makingChargeType: product.defaultMakingChargeType ?? "FIXED",
                   stoneCharge: product.defaultStoneCharge ?? 0,
+                  hsnCode: product.hsnCode ?? "",
                 }
               : item,
           )
@@ -356,6 +360,7 @@ export function PurchaseForm({
       makingCharge: product.defaultMakingCharge ?? 0,
       makingChargeType: product.defaultMakingChargeType ?? "FIXED",
       stoneCharge: product.defaultStoneCharge ?? 0,
+      hsnCode: product.hsnCode ?? "",
     })
   }
 
@@ -405,6 +410,7 @@ export function PurchaseForm({
       stoneCharge: item.stoneCharge,
       dmoWeight: item.dmoWeight || null,
       stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit) || null,
+      hsnCode: item.hsnCode || null,
     })),
   )
 
@@ -706,6 +712,15 @@ export function PurchaseForm({
                         stoneCharge: Number(e.target.value) || 0,
                       })
                     }
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">HSN Code</Label>
+                  <Input
+                    value={item.hsnCode}
+                    onChange={(e) => updateItem(item.key, { hsnCode: e.target.value })}
+                    placeholder="e.g. 7113"
                   />
                 </div>
 

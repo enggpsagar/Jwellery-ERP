@@ -47,6 +47,7 @@ export type StoreMetalOption = {
   id: string;
   name: string;
   hasPurity: boolean;
+  isActive: boolean;
 };
 
 export type StoreCategoryOption = {
@@ -120,6 +121,15 @@ export function ProductForm({
 
   const [defaultPurity, setDefaultPurity] = useState(
     product?.defaultPurity ?? "__none__",
+  );
+
+  // A disabled metal (e.g. "Stone" turned off in Settings) is hidden from
+  // the picker so it can't be chosen for a NEW product — but if this
+  // product already uses one (disabled after it was picked), that entry
+  // stays visible here so editing doesn't silently drop/replace their
+  // existing selection.
+  const selectableMetals = metals.filter(
+    (item) => item.isActive || item.id === product?.metalTypeId,
   );
 
   const selectedMetal = metals.find((item) => item.id === metalTypeId);
@@ -353,9 +363,10 @@ export function ProductForm({
               </SelectTrigger>
 
               <SelectContent>
-                {metals.map((item) => (
+                {selectableMetals.map((item) => (
                   <SelectItem key={item.id} value={item.id}>
                     {item.name}
+                    {!item.isActive ? " (Disabled)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -556,17 +567,17 @@ export function ProductForm({
       <div className="rounded-xl border p-6">
         <h3 className="mb-6 text-lg font-semibold">Additional Information</h3>
 
-        <div className="space-y-5">
+        <div className="grid gap-5 md:grid-cols-2">
           <div>
             <Label htmlFor="description">Description</Label>
 
             <Textarea
               id="description"
               name="description"
-              rows={4}
+              rows={2}
               defaultValue={product?.description ?? ""}
               placeholder="Product description..."
-              className="min-h-[120px]"
+              className="min-h-[60px]"
             />
 
             <ErrorText error={state.errors.description} />
@@ -578,10 +589,10 @@ export function ProductForm({
             <Textarea
               id="notes"
               name="notes"
-              rows={4}
+              rows={2}
               defaultValue={product?.notes ?? ""}
               placeholder="Internal notes..."
-              className="min-h-[120px]"
+              className="min-h-[60px]"
             />
 
             <ErrorText error={state.errors.notes} />

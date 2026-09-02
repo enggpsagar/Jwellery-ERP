@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
 import { RequiredMark } from "@/components/shared/required-mark"
+import { customerGstinRequired } from "@/lib/gst"
+import type { GstScheme } from "@prisma/client"
 
 type StateItem = { id: string; name: string }
 type CityItem = { id: string; name: string }
@@ -26,6 +28,10 @@ type CustomerCreateFormProps = {
    * screen can select it on arrival.
    */
   returnTo?: string
+  /** Drives whether GSTIN is required below - only a B2B (Wholesaler/
+   *  Manufacturer) store needs the buyer's GSTIN for a valid tax invoice.
+   *  See customerGstinRequired's own doc comment. */
+  gstScheme: GstScheme
 }
 
 function FieldError({ errors }: { errors?: string[] }) {
@@ -41,7 +47,9 @@ function FieldError({ errors }: { errors?: string[] }) {
  * modal opened from inside one is fragile on touch. A page also survives the
  * keyboard opening, which a small dialog does not.
  */
-export function CustomerCreateForm({ states, returnTo }: CustomerCreateFormProps) {
+export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCreateFormProps) {
+  const gstinRequired = customerGstinRequired(gstScheme)
+
   const router = useRouter()
   const toast = useToast()
 
@@ -220,9 +228,19 @@ export function CustomerCreateForm({ states, returnTo }: CustomerCreateFormProps
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
-              GST Number
+              GST Number {gstinRequired ? <RequiredMark /> : null}
             </label>
-            <input name="gstNumber" className={FIELD} placeholder="Optional" />
+            <input
+              name="gstNumber"
+              className={FIELD}
+              placeholder={gstinRequired ? "Required for a B2B tax invoice" : "Optional"}
+              required={gstinRequired}
+            />
+            {gstinRequired ? (
+              <p className="text-xs text-muted-foreground">
+                Wholesaler/Manufacturer (B2B) invoices need the buyer's GSTIN to be valid.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1">

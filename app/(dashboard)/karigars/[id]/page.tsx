@@ -13,11 +13,11 @@ import { requireStoreScope } from "@/lib/store-context";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IssueMaterialDialog } from "@/components/karigars/issue-material-dialog";
 import { RecordKarigarPaymentDialog } from "@/components/karigars/record-karigar-payment-dialog";
 import { KarigarLedgerTable } from "@/components/karigars/karigar-ledger-table";
+import { KarigarStatusCard } from "@/components/karigars/karigar-status-card";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -99,16 +99,7 @@ export default async function KarigarDetailPage({ params }: Props) {
           </CardContent>
         </Card>
 
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Badge variant={karigar.isActive ? "secondary" : "outline"}>
-              {karigar.isActive ? "Active" : "Inactive"}
-            </Badge>
-          </CardContent>
-        </Card>
+        <KarigarStatusCard karigarId={id} karigarName={karigar.name} isActive={karigar.isActive} />
       </div>
 
       <Card>

@@ -40,6 +40,9 @@ export function KarigarsClient({ karigars, pagination }: KarigarsClientProps) {
         backLabel="Back to Dashboard"
         action={
           <div className="flex flex-wrap gap-2">
+            <Link href="/karigars/disabled">
+              <Button variant="outline">Disabled Karigars</Button>
+            </Link>
             <Link href="/karigars/ledger">
               <Button variant="outline">Karigar Ledger</Button>
             </Link>

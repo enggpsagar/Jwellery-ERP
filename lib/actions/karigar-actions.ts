@@ -48,6 +48,10 @@ export type GetKarigarsParams = {
   search?: string;
   sortBy?: KarigarSortBy;
   sortOrder?: SortOrder;
+  /** Defaults to true (only active karigars) — matches the main Karigars
+   *  list. Pass false to list disabled ones instead (see /karigars/disabled),
+   *  mirroring how getVendors()'s `archived` param works. */
+  active?: boolean;
 };
 
 export type KarigarListResponse = {
@@ -112,11 +116,12 @@ function mapKarigar(karigar: any): Karigar {
   };
 }
 
-function getWhere(storeId: string, search: string | undefined, scope: LocationScope) {
+function getWhere(storeId: string, search: string | undefined, scope: LocationScope, active = true) {
   const query = String(search || "").trim();
 
   return {
     storeId,
+    isActive: active,
     ...locationWhere(scope),
     ...(query
       ? {
@@ -151,7 +156,7 @@ export async function getKarigars(
   const sortOrder = params.sortOrder || "desc";
   const storeId = await requireStoreScope();
   const scope = await getLocationScope();
-  const where = getWhere(storeId, search, scope);
+  const where = getWhere(storeId, search, scope, params.active ?? true);
 
   const [totalCount, karigars] = await Promise.all([
     prisma.karigar.count({ where }),
@@ -453,6 +458,63 @@ export async function updateKarigar(
     }
     console.error("updateKarigar error:", error);
     return { success: false, message: "Failed to update karigar" };
+  }
+}
+
+/**
+ * Disable/enable a karigar — the reversible alternative to deleteKarigar,
+ * which is blocked outright once a karigar has any job or ledger history
+ * (see its own error message below). Unlike delete, this has no such
+ * restriction: a karigar with a full job/ledger history is exactly the
+ * normal case for disabling one (they've simply stopped working with you),
+ * and their records must stay intact and queryable either way. Mirrors
+ * archiveVendor/unarchiveVendor's shape (lib/actions/vendor-actions.ts).
+ */
+export async function disableKarigar(id: string): Promise<KarigarFormState> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const { count } = await prisma.karigar.updateMany({
+      where: { id, storeId },
+      data: { isActive: false },
+    });
+
+    if (count === 0) {
+      return { success: false, message: "Karigar not found" };
+    }
+
+    revalidatePath("/karigars");
+    revalidatePath("/karigars/disabled");
+    revalidatePath(`/karigars/${id}`);
+
+    return { success: true, message: "Karigar disabled" };
+  } catch (error) {
+    console.error("disableKarigar error:", error);
+    return { success: false, message: "Failed to disable karigar" };
+  }
+}
+
+export async function enableKarigar(id: string): Promise<KarigarFormState> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const { count } = await prisma.karigar.updateMany({
+      where: { id, storeId },
+      data: { isActive: true },
+    });
+
+    if (count === 0) {
+      return { success: false, message: "Karigar not found" };
+    }
+
+    revalidatePath("/karigars");
+    revalidatePath("/karigars/disabled");
+    revalidatePath(`/karigars/${id}`);
+
+    return { success: true, message: "Karigar re-enabled" };
+  } catch (error) {
+    console.error("enableKarigar error:", error);
+    return { success: false, message: "Failed to re-enable karigar" };
   }
 }
 

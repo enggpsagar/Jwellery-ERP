@@ -642,7 +642,14 @@ export async function receiveItemsFromKarigar(
       const cumulativeReceiveFineWeight =
         (job.receiveFineWeight ? Number(job.receiveFineWeight) : 0) + receiveFineWeight;
       issueWeightNum = job.issueWeight ? Number(job.issueWeight) : 0;
-      isFullyReceived = issueWeightNum > 0 ? cumulativeReceiveWeight >= issueWeightNum : true;
+      // A strict >= against summed floating-point weights can miss an exact
+      // match by a fraction of a milligram (e.g. two 50g receipts landing on
+      // 99.99999999999999 instead of 100) and leave a fully-received job
+      // stuck open forever. 0.001g is well below any real gold-weighing
+      // precision this app cares about, so it only absorbs float noise -
+      // it can't mask a genuine, meaningful under-receipt.
+      const WEIGHT_TOLERANCE = 0.001;
+      isFullyReceived = issueWeightNum > 0 ? cumulativeReceiveWeight >= issueWeightNum - WEIGHT_TOLERANCE : true;
 
       await tx.karigarJob.update({
         where: { id: jobId },

@@ -743,20 +743,20 @@ model Vendor {
 }
 
 model Purchase {
-  id             String         @id @default(cuid())
-  storeId        String
-  purchaseNumber String
+  id                  String         @id @default(cuid())
+  storeId             String
+  purchaseNumber      String
   /// The vendor's own invoice/bill number for this purchase — a free-typed
   /// reference (not generated, not unique), so it can be matched back
   /// against the physical bill the vendor issued.
   vendorInvoiceNumber String?
-  vendorId       String
-  purchaseDate   DateTime       @default(now())
-  status         InvoiceStatus  @default(PAID)
-  subtotal       Decimal        @default(0) @db.Decimal(12, 2)
-  makingCharges  Decimal        @default(0) @db.Decimal(12, 2)
-  stoneCharges   Decimal        @default(0) @db.Decimal(12, 2)
-  discount       Decimal        @default(0) @db.Decimal(12, 2)
+  vendorId            String
+  purchaseDate        DateTime       @default(now())
+  status              InvoiceStatus  @default(PAID)
+  subtotal            Decimal        @default(0) @db.Decimal(12, 2)
+  makingCharges       Decimal        @default(0) @db.Decimal(12, 2)
+  stoneCharges        Decimal        @default(0) @db.Decimal(12, 2)
+  discount            Decimal        @default(0) @db.Decimal(12, 2)
   // Whatever GST the vendor actually charged on their bill - this is about
   // the VENDOR's invoice, not the store's own gstScheme, so it's recorded
   // the same way regardless of which of the three schemes the store itself
@@ -764,22 +764,22 @@ model Purchase {
   // is eligible for input tax credit: a Composition-scheme store can never
   // claim ITC on anything, no matter what a vendor charged - see the
   // "ITC not eligible" note rendered wherever this purchase is shown.
-  taxAmount      Decimal        @default(0) @db.Decimal(12, 2)
-  sgstAmount     Decimal        @default(0) @db.Decimal(12, 2)
-  cgstAmount     Decimal        @default(0) @db.Decimal(12, 2)
-  igstAmount     Decimal        @default(0) @db.Decimal(12, 2)
-  totalAmount    Decimal        @default(0) @db.Decimal(12, 2)
-  paidAmount     Decimal        @default(0) @db.Decimal(12, 2)
-  balanceAmount  Decimal        @default(0) @db.Decimal(12, 2)
-  notes          String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  store          Store          @relation(fields: [storeId], references: [id])
-  vendor         Vendor         @relation(fields: [vendorId], references: [id])
-  items          PurchaseItem[]
-  ledgerEntries  LedgerEntry[]
-  locationId     String?
-  location       StoreLocation? @relation(fields: [locationId], references: [id])
+  taxAmount           Decimal        @default(0) @db.Decimal(12, 2)
+  sgstAmount          Decimal        @default(0) @db.Decimal(12, 2)
+  cgstAmount          Decimal        @default(0) @db.Decimal(12, 2)
+  igstAmount          Decimal        @default(0) @db.Decimal(12, 2)
+  totalAmount         Decimal        @default(0) @db.Decimal(12, 2)
+  paidAmount          Decimal        @default(0) @db.Decimal(12, 2)
+  balanceAmount       Decimal        @default(0) @db.Decimal(12, 2)
+  notes               String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  store               Store          @relation(fields: [storeId], references: [id])
+  vendor              Vendor         @relation(fields: [vendorId], references: [id])
+  items               PurchaseItem[]
+  ledgerEntries       LedgerEntry[]
+  locationId          String?
+  location            StoreLocation? @relation(fields: [locationId], references: [id])
 
   @@unique([storeId, purchaseNumber])
   @@index([vendorId])
@@ -806,6 +806,10 @@ model PurchaseItem {
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
   makingChargeType ChargeType      @default(FIXED)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
+  // HSN snapshot at purchase time - same reasoning as InvoiceItem.hsnCode:
+  // Product.hsnCode can change later, and this line might not even have a
+  // linked product yet at the time of entry.
+  hsnCode          String?
   lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId String?
   createdAt        DateTime        @default(now())

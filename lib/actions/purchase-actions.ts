@@ -54,6 +54,7 @@ export type PurchaseLineItemInput = {
   makingChargeType?: ChargeType | string | null;
   stoneCharge: number;
   dmoWeight?: number | null;
+  hsnCode?: string | null;
 };
 
 /** Never trust client input for the making-charge mode — anything other
@@ -197,6 +198,7 @@ function mapPurchase(purchase: any) {
       makingChargeType: item.makingChargeType as ChargeType,
       stoneCharge: Number(item.stoneCharge),
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
+      hsnCode: item.hsnCode ?? null,
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
     })),
@@ -405,6 +407,7 @@ export async function getPurchaseFormProducts() {
       defaultMakingCharge: true,
       defaultMakingChargeType: true,
       defaultStoneCharge: true,
+      hsnCode: true,
       isActive: true,
     },
   });
@@ -608,6 +611,7 @@ export async function createPurchase(
               makingChargeType: toChargeType(item.makingChargeType),
               stoneCharge: item.stoneCharge,
               dmoWeight: item.dmoWeight ?? undefined,
+              hsnCode: item.hsnCode ?? undefined,
               lineTotal: lineTotal(item),
               inventoryStockId: stockIds[i],
             })),

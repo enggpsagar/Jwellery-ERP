@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { customerGstinRequired } from "@/lib/gst"
+import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 
 type StateItem = { id: string; name: string }
 type CityItem = { id: string; name: string }
@@ -248,6 +249,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
               <Hash className="h-4 w-4 text-muted-foreground" />
               GSTIN {gstinRequired ? <RequiredMark /> : null}
             </label>
+            <GstSchemeBadge scheme={gstScheme} />
             <input
               name="gstNumber"
               className={FIELD}

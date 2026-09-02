@@ -9,6 +9,7 @@ import type { GstScheme } from "@prisma/client"
 import { createQuotation, type QuotationFormState } from "@/lib/actions/quotation-actions"
 import { useToast } from "@/components/providers/toast-provider"
 import { computeGst } from "@/lib/gst"
+import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -600,6 +601,7 @@ export function QuotationForm({
 
         <div className="space-y-2">
           <Label>GST Rate %</Label>
+          <GstSchemeBadge scheme={gstScheme} />
           <Input
             type="number"
             step="0.01"

@@ -4,6 +4,8 @@ import { useActionState, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { User, Phone, Mail, MapPin, Hash, IndianRupee } from "lucide-react"
 
+import type { GstScheme } from "@prisma/client"
+
 import {
   updateCustomer,
   type Customer,
@@ -14,6 +16,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
 import { RequiredMark } from "@/components/shared/required-mark"
+import { customerGstinRequired } from "@/lib/gst"
+import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 
 type StateItem = { id: string; name: string }
 type CityItem = { id: string; name: string }
@@ -38,11 +42,17 @@ export function CustomerEditForm({
   customer,
   states,
   returnTo,
+  gstScheme,
 }: {
   customer: Customer
   states: StateItem[]
   returnTo?: string
+  /** Drives whether GSTIN is required below — see customerGstinRequired's
+   *  own doc comment. */
+  gstScheme: GstScheme
 }) {
+  const gstinRequired = customerGstinRequired(gstScheme)
+
   const router = useRouter()
   const toast = useToast()
 
@@ -267,13 +277,21 @@ export function CustomerEditForm({
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
-              GST Number
+              GST Number {gstinRequired ? <RequiredMark /> : null}
             </label>
+            <GstSchemeBadge scheme={gstScheme} />
             <input
               name="gstNumber"
               className={FIELD}
               defaultValue={customer.gstNumber ?? ""}
+              placeholder={gstinRequired ? "Required for a B2B tax invoice" : undefined}
+              required={gstinRequired}
             />
+            {gstinRequired ? (
+              <p className="text-xs text-muted-foreground">
+                Wholesaler/Manufacturer (B2B) invoices need the buyer's GSTIN to be valid.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1">

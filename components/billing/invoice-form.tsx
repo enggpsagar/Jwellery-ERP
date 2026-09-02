@@ -28,6 +28,7 @@ import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
 import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, GRAMS_PER_CARAT } from "@/lib/purity"
+import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 
 type CustomerOption = {
   id: string
@@ -1063,6 +1064,7 @@ export function InvoiceForm({
 
         <div className="space-y-2">
           <Label>GST Rate %</Label>
+          <GstSchemeBadge scheme={gstScheme} />
           <Input
             type="number"
             step="0.01"

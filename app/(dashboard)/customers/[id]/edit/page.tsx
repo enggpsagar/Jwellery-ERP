@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 
 import { getCustomerById } from "@/lib/actions/customer-actions"
 import { getStates } from "@/lib/actions/location-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { safeReturnTo } from "@/lib/safe-return-to"
 
 import { CustomerEditForm } from "@/components/customers/customer-edit-form"
@@ -20,9 +21,10 @@ export default async function EditCustomerPage({
   const query = (await searchParams) ?? {}
   const returnTo = safeReturnTo(query.returnTo)
 
-  const [customer, states] = await Promise.all([
+  const [customer, states, businessSettings] = await Promise.all([
     getCustomerById(id),
     getStates(),
+    getBusinessSettings(),
   ])
 
   if (!customer) notFound()
@@ -36,7 +38,12 @@ export default async function EditCustomerPage({
         backLabel={returnTo ? "Back without saving" : "Back to Customers"}
       />
 
-      <CustomerEditForm customer={customer} states={states} returnTo={returnTo} />
+      <CustomerEditForm
+        customer={customer}
+        states={states}
+        returnTo={returnTo}
+        gstScheme={businessSettings.gstScheme}
+      />
     </main>
   )
 }

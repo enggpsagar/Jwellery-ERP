@@ -70,7 +70,7 @@ export function DeleteKarigarButton({
             <br />
             <br />
             This action cannot be undone. The karigar can only be deleted if
-            they have no jobs or ledger entries linked to them.
+            they have no jobs linked to them.
           </p>
 
           <DialogFooter>

@@ -540,11 +540,18 @@ export async function deleteKarigar(id: string): Promise<KarigarFormState> {
       return { success: false, message: "Karigar not found" };
     }
 
-    if (karigar.karigarJobs.length > 0 || karigar.ledgerEntries.length > 0) {
+    // Jobs are the real blocker: deleting a karigar with job history would
+    // orphan KarigarReceiptItem/InventoryStock rows that trace back to them,
+    // which is real inventory data, not just a record. Ledger entries are
+    // NOT a blocker: LedgerEntry.karigarId is ON DELETE SET NULL (see the
+    // migration), so any standalone payment entries recorded against a
+    // karigar who was never issued a job survive the delete - they just
+    // lose the karigar attribution, which is fine since there's no job to
+    // reconcile them against anyway.
+    if (karigar.karigarJobs.length > 0) {
       return {
         success: false,
-        message:
-          "This karigar has jobs or ledger entries linked to them and cannot be deleted. Mark them inactive instead.",
+        message: "This karigar has jobs linked to them and cannot be deleted. Mark them inactive instead.",
       };
     }
 
@@ -560,7 +567,12 @@ export async function deleteKarigar(id: string): Promise<KarigarFormState> {
     revalidatePath("/karigars");
     revalidatePath("/users");
 
-    return { success: true, message: "Karigar deleted successfully" };
+    const message =
+      karigar.ledgerEntries.length > 0
+        ? "Karigar deleted successfully. Their recorded payments are kept but no longer linked to a karigar."
+        : "Karigar deleted successfully";
+
+    return { success: true, message };
   } catch (error) {
     console.error("deleteKarigar error:", error);
     return { success: false, message: "Failed to delete karigar" };

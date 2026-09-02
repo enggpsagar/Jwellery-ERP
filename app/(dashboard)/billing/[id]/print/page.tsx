@@ -5,6 +5,7 @@ import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getLatestMetalRates } from "@/lib/actions/metal-rate-actions"
 import { amountInWords } from "@/lib/number-to-words"
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button"
+import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -58,6 +59,12 @@ export default async function InvoicePrintPage({ params }: Props) {
   const totalSchemeDiscount = invoice.items.reduce((sum, item) => sum + item.schemeDiscount, 0)
   const totalSgst = invoice.items.reduce((sum, item) => sum + item.sgstAmount, 0)
   const totalCgst = invoice.items.reduce((sum, item) => sum + item.cgstAmount, 0)
+  const totalIgst = invoice.items.reduce((sum, item) => sum + item.igstAmount, 0)
+  // An invoice is either wholly intra-state or wholly inter-state — one
+  // customer, one shipping state — so the presence of any IGST at all is
+  // enough to pick the column layout for the whole document.
+  const isInterState = totalIgst > 0
+  const heading = documentHeading(settings.gstScheme)
 
   const payments = invoice.ledgerEntries.filter((entry) => entry.amount > 0)
   const totalPaid = payments.reduce((sum, entry) => sum + entry.amount, 0)
@@ -69,6 +76,16 @@ export default async function InvoicePrintPage({ params }: Props) {
       </div>
 
       <div className="border border-black">
+        {/* A Composition dealer legally cannot print "Tax Invoice" — it
+            must say "Bill of Supply", with the disclaimer below it. See
+            documentHeading()/COMPOSITION_DISCLAIMER in lib/gst.ts. */}
+        <div className="border-b border-black p-2 text-center">
+          <p className="text-sm font-bold uppercase tracking-wide">{heading}</p>
+          {settings.gstScheme === "COMPOSITION" && (
+            <p className="text-[10px] italic">{COMPOSITION_DISCLAIMER}</p>
+          )}
+        </div>
+
         {/* Header: business (left) / customer (right) */}
         <div className="grid grid-cols-2 border-b border-black">
           <div className="border-r border-black p-2 space-y-0.5">
@@ -119,8 +136,17 @@ export default async function InvoicePrintPage({ params }: Props) {
               <th>Gross Product Price (Rs.)</th>
               <th>Making Charges (Rs.)</th>
               <th>Scheme*/Discount (Rs.)</th>
-              <th>SGST</th>
-              <th>CGST</th>
+              {/* One customer, one shipping state — an invoice is either
+                  wholly intra-state or wholly inter-state, never a mix, so
+                  the column choice is made once for the whole table. */}
+              {isInterState ? (
+                <th>IGST</th>
+              ) : (
+                <>
+                  <th>SGST</th>
+                  <th>CGST</th>
+                </>
+              )}
               <th>Product Value (Rs.)</th>
             </tr>
           </thead>
@@ -142,8 +168,14 @@ export default async function InvoicePrintPage({ params }: Props) {
                   {item.hmCharge > 0 ? <span className="block">HM {fmt(item.hmCharge)}</span> : null}
                 </td>
                 <td className="text-right">{fmt(item.schemeDiscount)}</td>
-                <td className="text-right">{fmt(item.sgstAmount)}</td>
-                <td className="text-right">{fmt(item.cgstAmount)}</td>
+                {isInterState ? (
+                  <td className="text-right">{fmt(item.igstAmount)}</td>
+                ) : (
+                  <>
+                    <td className="text-right">{fmt(item.sgstAmount)}</td>
+                    <td className="text-right">{fmt(item.cgstAmount)}</td>
+                  </>
+                )}
                 <td className="text-right font-medium">{fmt(item.lineTotal)}</td>
               </tr>
             ))}
@@ -159,8 +191,14 @@ export default async function InvoicePrintPage({ params }: Props) {
                 {totalHm > 0 ? <span className="block">HM {fmt(totalHm)}</span> : null}
               </td>
               <td className="text-right">{fmt(totalSchemeDiscount)}</td>
-              <td className="text-right">{fmt(totalSgst)}</td>
-              <td className="text-right">{fmt(totalCgst)}</td>
+              {isInterState ? (
+                <td className="text-right">{fmt(totalIgst)}</td>
+              ) : (
+                <>
+                  <td className="text-right">{fmt(totalSgst)}</td>
+                  <td className="text-right">{fmt(totalCgst)}</td>
+                </>
+              )}
               <td className="text-right">{fmt(invoice.totalAmount)}</td>
             </tr>
           </tbody>

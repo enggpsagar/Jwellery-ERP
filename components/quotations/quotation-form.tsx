@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
+import type { GstScheme } from "@prisma/client"
 
 import { createQuotation, type QuotationFormState } from "@/lib/actions/quotation-actions"
 import { useToast } from "@/components/providers/toast-provider"
+import { computeGst } from "@/lib/gst"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,6 +32,7 @@ type CustomerOption = {
   name: string
   phone: string | null
   customerCode: string | null
+  state: string | null
 }
 
 type StockOption = {
@@ -91,9 +94,25 @@ type QuotationFormProps = {
   customers: CustomerOption[]
   stockItems: StockOption[]
   locations?: LocationOption[]
+  /** Store's default GST%, split into SGST+CGST (intra-state) or IGST
+   * (inter-state) via computeGst() — see lib/gst.ts. */
+  defaultGstRate?: number
+  /** Drives whether GST can be charged at all (never, for Composition) and
+   * how it's split — see computeGst()'s own doc comment in lib/gst.ts. */
+  gstScheme: GstScheme
+  /** The store's own state, compared against the selected customer's state
+   * to tell an inter-state quote (IGST) from an intra-state one (SGST+CGST). */
+  storeState?: string | null
 }
 
-export function QuotationForm({ customers, stockItems, locations = [] }: QuotationFormProps) {
+export function QuotationForm({
+  customers,
+  stockItems,
+  locations = [],
+  defaultGstRate = 0,
+  gstScheme,
+  storeState,
+}: QuotationFormProps) {
   const router = useRouter()
   const toast = useToast()
 
@@ -101,7 +120,11 @@ export function QuotationForm({ customers, stockItems, locations = [] }: Quotati
   const [locationId, setLocationId] = useState("")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
-  const [taxAmount, setTaxAmount] = useState(0)
+  // A Composition-scheme store can never charge GST — its rate starts (and
+  // stays) at 0 regardless of whatever Settings has saved as the default.
+  const [gstRate, setGstRate] = useState(gstScheme === "COMPOSITION" ? 0 : defaultGstRate)
+
+  const selectedCustomer = customers.find((customer) => customer.id === customerId)
 
   const [state, formAction, pending] = useActionState(
     createQuotation,
@@ -167,6 +190,24 @@ export function QuotationForm({ customers, stockItems, locations = [] }: Quotati
     () => items.reduce((sum, item) => sum + item.stoneCharge, 0),
     [items],
   )
+
+  // Quotation records tax at the document level, not per line (see
+  // Quotation's own schema comment) — one computeGst() call against the
+  // whole taxable base, scheme- and inter-state-aware just like Invoice.
+  const taxableValue = subtotal + makingChargesTotal + stoneChargesTotal - discount
+  const gstBreakdown = useMemo(() => {
+    const breakdown = computeGst(taxableValue, gstRate, gstScheme, storeState, selectedCustomer?.state)
+    const round = (value: number) => Math.round(value * 100) / 100
+    return {
+      sgst: round(breakdown.sgst),
+      cgst: round(breakdown.cgst),
+      igst: round(breakdown.igst),
+      isInterState: breakdown.isInterState,
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taxableValue, gstRate, gstScheme, storeState, selectedCustomer?.state])
+  const taxAmount = gstBreakdown.sgst + gstBreakdown.cgst + gstBreakdown.igst
+
   const totalAmount =
     subtotal + makingChargesTotal + stoneChargesTotal - discount + taxAmount
 
@@ -207,6 +248,9 @@ export function QuotationForm({ customers, stockItems, locations = [] }: Quotati
       <input type="hidden" name="itemsJson" value={itemsJson} />
       <input type="hidden" name="discount" value={discount} />
       <input type="hidden" name="taxAmount" value={taxAmount} />
+      <input type="hidden" name="sgstAmount" value={gstBreakdown.sgst} />
+      <input type="hidden" name="cgstAmount" value={gstBreakdown.cgst} />
+      <input type="hidden" name="igstAmount" value={gstBreakdown.igst} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2">
@@ -446,15 +490,51 @@ export function QuotationForm({ customers, stockItems, locations = [] }: Quotati
         </div>
 
         <div className="space-y-2">
-          <Label>Tax Amount</Label>
+          <Label>GST Rate %</Label>
           <Input
             type="number"
             step="0.01"
-            value={taxAmount === 0 ? "" : taxAmount}
-            onChange={(e) => setTaxAmount(Number(e.target.value) || 0)}
+            value={gstRate}
+            disabled={gstScheme === "COMPOSITION"}
+            onChange={(e) => setGstRate(Number(e.target.value) || 0)}
           />
+          <p className="text-xs text-muted-foreground">
+            {gstScheme === "COMPOSITION"
+              ? "Not used — Composition Scheme never charges GST."
+              : gstBreakdown.isInterState
+                ? `IGST (inter-state) — total tax ₹${taxAmount.toFixed(2)}`
+                : `SGST + CGST (intra-state) — total tax ₹${taxAmount.toFixed(2)}`}
+          </p>
         </div>
       </div>
+
+      {gstScheme !== "COMPOSITION" && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {gstBreakdown.isInterState ? (
+            <div className="space-y-2">
+              <Label className="text-xs">IGST ({gstRate.toFixed(2)}%)</Label>
+              <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                ₹{gstBreakdown.igst.toFixed(2)}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label className="text-xs">SGST ({(gstRate / 2).toFixed(2)}%)</Label>
+                <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                  ₹{gstBreakdown.sgst.toFixed(2)}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">CGST ({(gstRate / 2).toFixed(2)}%)</Label>
+                <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                  ₹{gstBreakdown.cgst.toFixed(2)}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label>Notes</Label>

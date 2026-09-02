@@ -47,6 +47,11 @@ export type InvoiceLineItemInput = {
   schemeDiscount?: number;
   sgstAmount?: number;
   cgstAmount?: number;
+  // Charged instead of sgst+cgst on an inter-state sale — see computeGst()
+  // in lib/gst.ts, the single source of truth for this split. Optional
+  // (not required) purely so older-shaped payloads don't fail to parse;
+  // treated as 0 when absent.
+  igstAmount?: number;
   hsnCode?: string | null;
   inventoryStockId?: string | null;
 };
@@ -120,7 +125,8 @@ function lineTotal(item: InvoiceLineItemInput) {
     toNumber(item.stoneCharge) -
     toNumber(item.schemeDiscount) +
     toNumber(item.sgstAmount) +
-    toNumber(item.cgstAmount)
+    toNumber(item.cgstAmount) +
+    toNumber(item.igstAmount)
   );
 }
 
@@ -163,6 +169,7 @@ export type InvoiceItemView = {
   schemeDiscount: number;
   sgstAmount: number;
   cgstAmount: number;
+  igstAmount: number;
   hsnCode: string | null;
   lineTotal: number;
   inventoryStockId: string | null;
@@ -232,6 +239,7 @@ function mapInvoice(invoice: any) {
       schemeDiscount: Number(item.schemeDiscount ?? 0),
       sgstAmount: Number(item.sgstAmount ?? 0),
       cgstAmount: Number(item.cgstAmount ?? 0),
+      igstAmount: Number(item.igstAmount ?? 0),
       hsnCode: item.hsnCode ?? null,
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
@@ -456,7 +464,9 @@ export async function getInvoiceFormCustomers() {
   const customers = await prisma.customer.findMany({
     where: { storeId, isActive: true, isArchived: false },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, phone: true, customerCode: true },
+    // `state` rides along so the form can tell an inter-state sale from an
+    // intra-state one (computeGst's isInterState) without a second round trip.
+    select: { id: true, name: true, phone: true, customerCode: true, state: true },
   });
 
   return customers;
@@ -577,6 +587,19 @@ export async function createInvoice(
       return { success: false, message: "Add at least one line item" };
     }
 
+    // Selling price is what an invoice actually charges for — a line with
+    // no rate at all is not a valid sale, and the client-side check on the
+    // form is only a convenience; this is the real guarantee. Checked
+    // before any other parsing so a $0 line never reaches stock/ledger
+    // writes below.
+    const invalidRateItem = items.find((item) => !(toNumber(item.rate) > 0));
+    if (invalidRateItem) {
+      return {
+        success: false,
+        message: `Enter a selling price for "${invalidRateItem.itemName || "an item"}" before creating the invoice.`,
+      };
+    }
+
     const manualDiscount = toNumber(formData.get("discount"));
     const paidAmount = toNumber(formData.get("paidAmount"));
     const invoiceDateRaw = String(formData.get("invoiceDate") || "");
@@ -604,11 +627,15 @@ export async function createInvoice(
     // needing to know per-line discounts exist.
     const discount =
       manualDiscount + items.reduce((sum, item) => sum + toNumber(item.schemeDiscount), 0);
-    // Recomputed from each line's own sgst/cgst rather than trusted from a
-    // single form field — the per-line breakdown is the source of truth the
-    // printed invoice shows, so the saved total must match it exactly.
+    // Recomputed from each line's own sgst/cgst/igst rather than trusted
+    // from a single form field — the per-line breakdown is the source of
+    // truth the printed invoice shows, so the saved total must match it
+    // exactly. sgst+cgst (intra-state) and igst (inter-state) are never
+    // both nonzero on the same line — see computeGst() in lib/gst.ts — so
+    // summing all three here is safe either way.
     const taxAmount = items.reduce(
-      (sum, item) => sum + toNumber(item.sgstAmount) + toNumber(item.cgstAmount),
+      (sum, item) =>
+        sum + toNumber(item.sgstAmount) + toNumber(item.cgstAmount) + toNumber(item.igstAmount),
       0,
     );
     const totalAmount = subtotal + makingCharges + stoneCharges - discount + taxAmount;
@@ -650,6 +677,30 @@ export async function createInvoice(
     });
     if (!customer) {
       return { success: false, message: "Please select a customer" };
+    }
+
+    // A Composition-scheme store is legally barred from charging any GST at
+    // all — see GstScheme's doc comment and computeGst() in lib/gst.ts,
+    // which the form is expected to have already zeroed these against.
+    // Enforced again here because a server action is reachable independent
+    // of whatever the form's own UI disabled.
+    const businessSettings = await prisma.businessSettings.findUnique({
+      where: { storeId },
+      select: { gstScheme: true },
+    });
+    if (
+      businessSettings?.gstScheme === "COMPOSITION" &&
+      items.some(
+        (item) =>
+          toNumber(item.sgstAmount) !== 0 ||
+          toNumber(item.cgstAmount) !== 0 ||
+          toNumber(item.igstAmount) !== 0,
+      )
+    ) {
+      return {
+        success: false,
+        message: "This store is on the Composition Scheme and cannot charge GST on an invoice.",
+      };
     }
 
     // Without this, every invoice saved with locationId: null — a
@@ -772,6 +823,7 @@ export async function createInvoice(
               schemeDiscount: item.schemeDiscount ?? 0,
               sgstAmount: item.sgstAmount ?? 0,
               cgstAmount: item.cgstAmount ?? 0,
+              igstAmount: item.igstAmount ?? 0,
               hsnCode: item.hsnCode ?? undefined,
               lineTotal: lineTotal(item),
               inventoryStockId:
@@ -1067,6 +1119,37 @@ export async function updateInvoice(
       return { success: false, message: "Add at least one line item" };
     }
 
+    // Same guarantee as createInvoice — a line with no rate at all is not a
+    // valid sale, whether the invoice is being created or edited.
+    const invalidRateItem = items.find((item) => !(toNumber(item.rate) > 0));
+    if (invalidRateItem) {
+      return {
+        success: false,
+        message: `Enter a selling price for "${invalidRateItem.itemName || "an item"}" before saving.`,
+      };
+    }
+
+    // Same Composition-scheme guard as createInvoice — a store that can't
+    // charge GST at creation can't gain it back by editing line items either.
+    const businessSettings = await prisma.businessSettings.findUnique({
+      where: { storeId },
+      select: { gstScheme: true },
+    });
+    if (
+      businessSettings?.gstScheme === "COMPOSITION" &&
+      items.some(
+        (item) =>
+          toNumber(item.sgstAmount) !== 0 ||
+          toNumber(item.cgstAmount) !== 0 ||
+          toNumber(item.igstAmount) !== 0,
+      )
+    ) {
+      return {
+        success: false,
+        message: "This store is on the Composition Scheme and cannot charge GST on an invoice.",
+      };
+    }
+
     const manualDiscount = toNumber(formData.get("discount"));
 
     const subtotal = items.reduce(
@@ -1080,8 +1163,11 @@ export async function updateInvoice(
     const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
     const discount =
       manualDiscount + items.reduce((sum, item) => sum + toNumber(item.schemeDiscount), 0);
+    // sgst+cgst (intra-state) and igst (inter-state) — see createInvoice's
+    // identical computation for why summing all three is always safe.
     const taxAmount = items.reduce(
-      (sum, item) => sum + toNumber(item.sgstAmount) + toNumber(item.cgstAmount),
+      (sum, item) =>
+        sum + toNumber(item.sgstAmount) + toNumber(item.cgstAmount) + toNumber(item.igstAmount),
       0,
     );
     const totalAmount = subtotal + makingCharges + stoneCharges - discount + taxAmount;
@@ -1193,6 +1279,7 @@ export async function updateInvoice(
               schemeDiscount: item.schemeDiscount ?? 0,
               sgstAmount: item.sgstAmount ?? 0,
               cgstAmount: item.cgstAmount ?? 0,
+              igstAmount: item.igstAmount ?? 0,
               hsnCode: item.hsnCode ?? undefined,
               lineTotal: lineTotal(item),
               inventoryStockId:

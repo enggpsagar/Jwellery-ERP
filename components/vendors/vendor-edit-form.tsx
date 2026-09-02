@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { User, Phone, Mail, MapPin, Hash, IndianRupee } from "lucide-react"
+import type { GstScheme } from "@prisma/client"
 
 import {
   updateVendor,
@@ -14,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
 import { RequiredMark } from "@/components/shared/required-mark"
+import { customerGstinRequired } from "@/lib/gst"
 
 type StateItem = { id: string; name: string }
 type CityItem = { id: string; name: string }
@@ -38,11 +40,19 @@ export function VendorEditForm({
   vendor,
   states,
   returnTo,
+  gstScheme,
 }: {
   vendor: Vendor
   states: StateItem[]
   returnTo?: string
+  /** Drives whether GSTIN is required below. `customerGstinRequired`'s name
+   * is customer-specific, but its rule is not — a B2B (Wholesaler/
+   * Manufacturer) store needs a proper tax invoice from its vendors just as
+   * much as it needs one from its buyers, so the same gate applies here. */
+  gstScheme: GstScheme
 }) {
+  const gstinRequired = customerGstinRequired(gstScheme)
+
   const router = useRouter()
   const toast = useToast()
 
@@ -267,13 +277,20 @@ export function VendorEditForm({
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
-              GST Number
+              GST Number {gstinRequired ? <RequiredMark /> : null}
             </label>
             <input
               name="gstNumber"
               className={FIELD}
               defaultValue={vendor.gstNumber ?? ""}
+              placeholder={gstinRequired ? "Required for a B2B tax invoice" : undefined}
+              required={gstinRequired}
             />
+            {gstinRequired ? (
+              <p className="text-xs text-muted-foreground">
+                Wholesaler/Manufacturer (B2B) purchases need the vendor's GSTIN to be valid.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1">

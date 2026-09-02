@@ -4,11 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
+import type { GstScheme } from "@prisma/client"
 
 import { createInvoice, updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
 import { ScanToAddPanel } from "@/components/billing/scan-to-add-panel"
 import { todayForDateInput } from "@/lib/date-input"
+import { computeGst } from "@/lib/gst"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,6 +34,7 @@ type CustomerOption = {
   name: string
   phone: string | null
   customerCode: string | null
+  state: string | null
 }
 
 type StockOption = {
@@ -109,10 +112,17 @@ type InvoiceFormProps = {
   customers: CustomerOption[]
   stockItems: StockOption[]
   locations: LocationOption[]
-  /** Store's default GST%, split evenly into SGST+CGST per line. Editable
-   * here per invoice — a store on an exempt sale, or one that changes its
-   * rate mid-year, isn't stuck with whatever Settings says today. */
+  /** Store's default GST%, split into SGST+CGST (intra-state) or IGST
+   * (inter-state) per line via computeGst() — see lib/gst.ts. Editable here
+   * per invoice — a store on an exempt sale, or one that changes its rate
+   * mid-year, isn't stuck with whatever Settings says today. */
   defaultGstRate?: number
+  /** Drives whether GST can be charged at all (never, for Composition) and
+   * how it's split — see computeGst()'s own doc comment in lib/gst.ts. */
+  gstScheme: GstScheme
+  /** The store's own state, compared against the selected customer's state
+   * to tell an inter-state sale (IGST) from an intra-state one (SGST+CGST). */
+  storeState?: string | null
   /** Prefill from a cancelled invoice being replaced — see
    * app/(dashboard)/billing/[id]/replace/page.tsx. All optional; a fresh
    * "New Invoice" passes none of these. */
@@ -135,6 +145,8 @@ export function InvoiceForm({
   stockItems,
   locations,
   defaultGstRate = 0,
+  gstScheme,
+  storeState,
   initialCustomerId,
   initialLocationId,
   initialItems,
@@ -151,8 +163,13 @@ export function InvoiceForm({
     initialItems && initialItems.length ? initialItems : [emptyLineItem()],
   )
   const [discount, setDiscount] = useState(0)
-  const [gstRate, setGstRate] = useState(defaultGstRate)
+  // A Composition-scheme store can never charge GST — see GstScheme's doc
+  // comment in schema.prisma — so its rate starts (and stays) at 0
+  // regardless of whatever Settings has saved as the store's default.
+  const [gstRate, setGstRate] = useState(gstScheme === "COMPOSITION" ? 0 : defaultGstRate)
   const [paidAmount, setPaidAmount] = useState(0)
+
+  const selectedCustomer = customers.find((customer) => customer.id === customerId)
 
   const [state, formAction, pending] = useActionState(
     editInvoiceId ? updateInvoice.bind(null, editInvoiceId) : createInvoice,
@@ -342,9 +359,8 @@ export function InvoiceForm({
     item.purity === "DIAMOND" ? item.caratWeight : item.netWeight
 
   // Taxable value per line: metal + making + HM + stone, less any per-line
-  // scheme discount — the same base the reference format's SGST/CGST
-  // columns are computed against, split evenly since intra-state GST always
-  // is.
+  // scheme discount — the same base the reference format's SGST/CGST/IGST
+  // columns are computed against.
   const taxableValue = (item: LineItem) =>
     item.rate * lineQuantity(item) +
     item.makingCharge +
@@ -352,14 +368,23 @@ export function InvoiceForm({
     item.stoneCharge -
     item.schemeDiscount
 
+  // Scheme- and inter-state-aware: zero on a Composition store regardless
+  // of rate, IGST-only on an inter-state sale, SGST+CGST split otherwise —
+  // see computeGst()'s own doc comment in lib/gst.ts.
   const lineGst = (item: LineItem) => {
-    const half = Math.round(((taxableValue(item) * gstRate) / 2 / 100) * 100) / 100
-    return { sgst: half, cgst: half }
+    const breakdown = computeGst(taxableValue(item), gstRate, gstScheme, storeState, selectedCustomer?.state)
+    const round = (value: number) => Math.round(value * 100) / 100
+    return {
+      sgst: round(breakdown.sgst),
+      cgst: round(breakdown.cgst),
+      igst: round(breakdown.igst),
+      isInterState: breakdown.isInterState,
+    }
   }
 
   const lineTotal = (item: LineItem) => {
-    const { sgst, cgst } = lineGst(item)
-    return taxableValue(item) + sgst + cgst
+    const { sgst, cgst, igst } = lineGst(item)
+    return taxableValue(item) + sgst + cgst + igst
   }
 
   const subtotal = useMemo(
@@ -382,11 +407,11 @@ export function InvoiceForm({
   const taxAmount = useMemo(
     () =>
       items.reduce((sum, item) => {
-        const { sgst, cgst } = lineGst(item)
-        return sum + sgst + cgst
+        const { sgst, cgst, igst } = lineGst(item)
+        return sum + sgst + cgst + igst
       }, 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, gstRate],
+    [items, gstRate, gstScheme, storeState, selectedCustomer?.state],
   )
   const totalAmount =
     subtotal +
@@ -399,7 +424,7 @@ export function InvoiceForm({
 
   const itemsJson = JSON.stringify(
     items.map((item) => {
-      const { sgst, cgst } = lineGst(item)
+      const { sgst, cgst, igst } = lineGst(item)
       return {
         itemName: item.itemName || "Item",
         metalTypeId: item.metalTypeId || null,
@@ -418,11 +443,17 @@ export function InvoiceForm({
         schemeDiscount: item.schemeDiscount,
         sgstAmount: sgst,
         cgstAmount: cgst,
+        igstAmount: igst,
         hsnCode: item.hsnCode || null,
         inventoryStockId: item.inventoryStockId || null,
       }
     }),
   )
+
+  // Selling price is mandatory on every line — an invoice with a $0 rate is
+  // not a real sale. Checked against every item (not just "filled" ones),
+  // matching the server's own guard in createInvoice.
+  const hasInvalidRate = items.some((item) => !(item.rate > 0))
 
   return (
     <form
@@ -436,6 +467,10 @@ export function InvoiceForm({
         // sidesteps that auto-reset while keeping identical pending/error-
         // state behavior.
         event.preventDefault()
+        if (hasInvalidRate) {
+          toast.error("Enter a selling price (Rate / g) for every line item before creating the invoice.")
+          return
+        }
         formAction(new FormData(event.currentTarget))
       }}
       className="space-y-6"
@@ -718,7 +753,9 @@ export function InvoiceForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs">Rate / g</Label>
+                  <Label className="text-xs">
+                    Rate / g (Selling Price) <RequiredMark />
+                  </Label>
                   <Input
                     type="number"
                     step="0.01"
@@ -727,6 +764,9 @@ export function InvoiceForm({
                       updateItem(item.key, { rate: Number(e.target.value) || 0 })
                     }
                   />
+                  {!(item.rate > 0) && (
+                    <p className="text-xs text-destructive">Selling price is required</p>
+                  )}
                 </div>
 
                 <MakingChargeInput
@@ -838,19 +878,34 @@ export function InvoiceForm({
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs">SGST ({(gstRate / 2).toFixed(2)}%)</Label>
-                  <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                    ₹{lineGst(item).sgst.toFixed(2)}
+                {/* SGST+CGST for an intra-state sale, a single IGST column
+                    for inter-state instead — never both, see computeGst()
+                    in lib/gst.ts. Composition always lands here at ₹0.00,
+                    since computeGst zeroes every component for it. */}
+                {lineGst(item).isInterState ? (
+                  <div className="space-y-1">
+                    <Label className="text-xs">IGST ({gstRate.toFixed(2)}%)</Label>
+                    <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                      ₹{lineGst(item).igst.toFixed(2)}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="space-y-1">
+                      <Label className="text-xs">SGST ({(gstRate / 2).toFixed(2)}%)</Label>
+                      <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                        ₹{lineGst(item).sgst.toFixed(2)}
+                      </div>
+                    </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs">CGST ({(gstRate / 2).toFixed(2)}%)</Label>
-                  <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                    ₹{lineGst(item).cgst.toFixed(2)}
-                  </div>
-                </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">CGST ({(gstRate / 2).toFixed(2)}%)</Label>
+                      <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                        ₹{lineGst(item).cgst.toFixed(2)}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {items.length > 1 && (
@@ -884,10 +939,13 @@ export function InvoiceForm({
             type="number"
             step="0.01"
             value={gstRate}
+            disabled={gstScheme === "COMPOSITION"}
             onChange={(e) => setGstRate(Number(e.target.value) || 0)}
           />
           <p className="text-xs text-muted-foreground">
-            Split evenly into SGST + CGST per line — total tax ₹{taxAmount.toFixed(2)}
+            {gstScheme === "COMPOSITION"
+              ? "Not used — Composition Scheme never charges GST."
+              : `Split into SGST+CGST (or IGST for an inter-state customer) per line — total tax ₹${taxAmount.toFixed(2)}`}
           </p>
         </div>
 
@@ -929,7 +987,7 @@ export function InvoiceForm({
           <span>-₹{schemeDiscountTotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>SGST + CGST</span>
+          <span>GST (SGST+CGST or IGST)</span>
           <span>₹{taxAmount.toFixed(2)}</span>
         </div>
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
@@ -942,7 +1000,7 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <Button type="submit" disabled={pending || !customerId}>
+      <Button type="submit" disabled={pending || !customerId || hasInvalidRate}>
         {editInvoiceId
           ? pending
             ? "Saving..."

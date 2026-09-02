@@ -4,16 +4,18 @@ import {
   getPurchaseFormVendors,
   getPurchaseFormProducts,
 } from "@/lib/actions/purchase-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
 
 import { PurchaseForm } from "@/components/purchases/purchase-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 export default async function NewPurchasePage() {
-  const [vendors, products, locations] = await Promise.all([
+  const [vendors, products, locations, businessSettings] = await Promise.all([
     getPurchaseFormVendors(),
     getPurchaseFormProducts(),
     getStoreLocations(),
+    getBusinessSettings(),
   ])
 
   return (
@@ -29,7 +31,14 @@ export default async function NewPurchasePage() {
           which needs a Suspense boundary to avoid opting the whole route out
           of static optimisation. */}
       <Suspense fallback={null}>
-        <PurchaseForm vendors={vendors} products={products} locations={locations} />
+        <PurchaseForm
+          vendors={vendors}
+          products={products}
+          locations={locations}
+          defaultGstRate={businessSettings.defaultGstRate}
+          gstScheme={businessSettings.gstScheme}
+          storeState={businessSettings.state}
+        />
       </Suspense>
     </main>
   )

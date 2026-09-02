@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { User, Phone, Mail, MapPin, Hash, IndianRupee } from "lucide-react"
+import type { GstScheme } from "@prisma/client"
 
 import { addVendor, type VendorFormState } from "@/lib/actions/vendor-actions"
 import { getCitiesByStateId } from "@/lib/actions/location-actions"
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
 import { RequiredMark } from "@/components/shared/required-mark"
+import { customerGstinRequired } from "@/lib/gst"
 
 type StateItem = { id: string; name: string }
 type CityItem = { id: string; name: string }
@@ -26,6 +28,11 @@ type VendorCreateFormProps = {
    * that screen can select it on arrival.
    */
   returnTo?: string
+  /** Drives whether GSTIN is required below. `customerGstinRequired`'s name
+   * is customer-specific, but its rule is not — a B2B (Wholesaler/
+   * Manufacturer) store needs a proper tax invoice from its vendors just as
+   * much as it needs one from its buyers, so the same gate applies here. */
+  gstScheme: GstScheme
 }
 
 /**
@@ -34,7 +41,9 @@ type VendorCreateFormProps = {
  * dialog is gone, this page is linked to directly instead). Also reused
  * mid-flow by other forms' "Add New Vendor" option via a `returnTo`.
  */
-export function VendorCreateForm({ states, returnTo }: VendorCreateFormProps) {
+export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFormProps) {
+  const gstinRequired = customerGstinRequired(gstScheme)
+
   const router = useRouter()
   const toast = useToast()
 
@@ -237,9 +246,19 @@ export function VendorCreateForm({ states, returnTo }: VendorCreateFormProps) {
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
-              GSTIN
+              GSTIN {gstinRequired ? <RequiredMark /> : null}
             </label>
-            <input name="gstNumber" className={FIELD} placeholder="Enter GSTIN" />
+            <input
+              name="gstNumber"
+              className={FIELD}
+              placeholder={gstinRequired ? "Required for a B2B tax invoice" : "Enter GSTIN"}
+              required={gstinRequired}
+            />
+            {gstinRequired ? (
+              <p className="text-xs text-muted-foreground">
+                Wholesaler/Manufacturer (B2B) purchases need the vendor's GSTIN to be valid.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1">

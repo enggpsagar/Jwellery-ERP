@@ -340,7 +340,9 @@ export async function getQuotationFormCustomers() {
   const customers = await prisma.customer.findMany({
     where: { storeId, isActive: true, isArchived: false },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, phone: true, customerCode: true },
+    // `state` rides along so the form can tell an inter-state sale from an
+    // intra-state one (computeGst's isInterState) without a second round trip.
+    select: { id: true, name: true, phone: true, customerCode: true, state: true },
   });
 
   return customers;
@@ -410,6 +412,13 @@ export async function createQuotation(
 
     const discount = toNumber(formData.get("discount"));
     const taxAmount = toNumber(formData.get("taxAmount"));
+    // Computed client-side by computeGst() (lib/gst.ts) — sgst+cgst on an
+    // intra-state quote, igst alone on an inter-state one, never both. Kept
+    // as three separate columns (mirroring Invoice/Purchase) even though
+    // Quotation only ever needed a document-level total before.
+    const sgstAmount = toNumber(formData.get("sgstAmount"));
+    const cgstAmount = toNumber(formData.get("cgstAmount"));
+    const igstAmount = toNumber(formData.get("igstAmount"));
     const quotationDateRaw = String(formData.get("quotationDate") || "");
     const validUntilRaw = String(formData.get("validUntil") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
@@ -430,6 +439,25 @@ export async function createQuotation(
     });
     if (!customer) {
       return { success: false, message: "Please select a customer" };
+    }
+
+    // A Composition-scheme store is legally barred from charging any GST at
+    // all — see GstScheme's doc comment and computeGst() in lib/gst.ts,
+    // which the form is expected to have already zeroed these against.
+    // Enforced again here because a server action is reachable independent
+    // of whatever the form's own UI disabled.
+    const businessSettings = await prisma.businessSettings.findUnique({
+      where: { storeId },
+      select: { gstScheme: true },
+    });
+    if (
+      businessSettings?.gstScheme === "COMPOSITION" &&
+      (sgstAmount !== 0 || cgstAmount !== 0 || igstAmount !== 0 || taxAmount !== 0)
+    ) {
+      return {
+        success: false,
+        message: "This store is on the Composition Scheme and cannot charge GST on a quotation.",
+      };
     }
 
     // Every referenced stock item must belong to this store — otherwise a
@@ -475,6 +503,9 @@ export async function createQuotation(
         stoneCharges,
         discount,
         taxAmount,
+        sgstAmount,
+        cgstAmount,
+        igstAmount,
         totalAmount,
         notes,
         locationId: locationId ?? undefined,
@@ -598,6 +629,21 @@ export async function convertQuotationToInvoice(
     const paidAmount = toNumber(formData.get("paidAmount"));
     const dueDateRaw = String(formData.get("dueDate") || "");
     const notes = String(formData.get("notes") || "").trim() || quotation.notes;
+
+    // A Composition-scheme store is legally barred from charging any GST at
+    // all — this form re-asks for a fresh tax amount rather than reusing
+    // the quotation's own (see this function's doc comment), so it needs
+    // its own guard rather than inheriting createQuotation's.
+    const businessSettings = await prisma.businessSettings.findUnique({
+      where: { storeId },
+      select: { gstScheme: true },
+    });
+    if (businessSettings?.gstScheme === "COMPOSITION" && taxAmount !== 0) {
+      return {
+        success: false,
+        message: "This store is on the Composition Scheme and cannot charge GST on an invoice.",
+      };
+    }
 
     const subtotal = Number(quotation.subtotal);
     const makingCharges = Number(quotation.makingCharges);

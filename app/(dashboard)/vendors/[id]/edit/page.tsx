@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 
 import { getVendorById } from "@/lib/actions/vendor-actions"
 import { getStates } from "@/lib/actions/location-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { safeReturnTo } from "@/lib/safe-return-to"
 
 import { VendorEditForm } from "@/components/vendors/vendor-edit-form"
@@ -20,7 +21,11 @@ export default async function EditVendorPage({
   const query = (await searchParams) ?? {}
   const returnTo = safeReturnTo(query.returnTo)
 
-  const [vendor, states] = await Promise.all([getVendorById(id), getStates()])
+  const [vendor, states, businessSettings] = await Promise.all([
+    getVendorById(id),
+    getStates(),
+    getBusinessSettings(),
+  ])
 
   if (!vendor) notFound()
 
@@ -33,7 +38,12 @@ export default async function EditVendorPage({
         backLabel={returnTo ? "Back without saving" : "Back to Vendors"}
       />
 
-      <VendorEditForm vendor={vendor} states={states} returnTo={returnTo} />
+      <VendorEditForm
+        vendor={vendor}
+        states={states}
+        returnTo={returnTo}
+        gstScheme={businessSettings.gstScheme}
+      />
     </main>
   )
 }

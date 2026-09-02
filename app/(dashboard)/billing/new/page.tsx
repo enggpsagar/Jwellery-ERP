@@ -30,6 +30,8 @@ export default async function NewInvoicePage() {
         stockItems={stockItems}
         locations={locations}
         defaultGstRate={businessSettings.defaultGstRate}
+        gstScheme={businessSettings.gstScheme}
+        storeState={businessSettings.state}
       />
     </main>
   )

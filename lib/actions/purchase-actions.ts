@@ -383,7 +383,9 @@ export async function getPurchaseFormVendors() {
   const vendors = await prisma.vendor.findMany({
     where: { storeId, isActive: true, isArchived: false },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, phone: true, vendorCode: true },
+    // `state` rides along so the form can tell an inter-state purchase from
+    // an intra-state one (computeGst's isInterState) without a second round trip.
+    select: { id: true, name: true, phone: true, vendorCode: true, state: true },
   });
 
   return vendors;
@@ -478,6 +480,11 @@ export async function createPurchase(
 
     const discount = toNumber(formData.get("discount"));
     const taxAmount = toNumber(formData.get("taxAmount"));
+    // Computed client-side by computeGst() (lib/gst.ts) — sgst+cgst on an
+    // intra-state purchase, igst alone on an inter-state one, never both.
+    const sgstAmount = toNumber(formData.get("sgstAmount"));
+    const cgstAmount = toNumber(formData.get("cgstAmount"));
+    const igstAmount = toNumber(formData.get("igstAmount"));
     const paidAmount = toNumber(formData.get("paidAmount"));
     const purchaseDateRaw = String(formData.get("purchaseDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
@@ -504,6 +511,26 @@ export async function createPurchase(
     });
     if (!vendor) {
       return { success: false, message: "Please select a vendor" };
+    }
+
+    // A Composition-scheme store is legally barred from charging (or, per
+    // the Settings screen's own explanation of this scheme, recording) any
+    // GST — see GstScheme's doc comment and computeGst() in lib/gst.ts,
+    // which the form is expected to have already zeroed these against.
+    // Enforced again here because a server action is reachable independent
+    // of whatever the form's own UI disabled.
+    const businessSettings = await prisma.businessSettings.findUnique({
+      where: { storeId },
+      select: { gstScheme: true },
+    });
+    if (
+      businessSettings?.gstScheme === "COMPOSITION" &&
+      (sgstAmount !== 0 || cgstAmount !== 0 || igstAmount !== 0 || taxAmount !== 0)
+    ) {
+      return {
+        success: false,
+        message: "This store is on the Composition Scheme and cannot record GST on a purchase.",
+      };
     }
 
     const productIds = [...new Set(items.map((item) => item.productId))];
@@ -589,6 +616,9 @@ export async function createPurchase(
           stoneCharges,
           discount,
           taxAmount,
+          sgstAmount,
+          cgstAmount,
+          igstAmount,
           totalAmount,
           paidAmount,
           balanceAmount,

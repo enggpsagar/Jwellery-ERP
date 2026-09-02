@@ -78,6 +78,8 @@ export default async function ReplaceInvoicePage({ params }: Props) {
         stockItems={stockItems}
         locations={locations}
         defaultGstRate={businessSettings.defaultGstRate}
+        gstScheme={businessSettings.gstScheme}
+        storeState={businessSettings.state}
         initialCustomerId={cancelledInvoice.customer?.id}
         initialLocationId={cancelledInvoice.locationId ?? undefined}
         initialItems={initialItems}

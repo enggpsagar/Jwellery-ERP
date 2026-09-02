@@ -84,3 +84,15 @@ export function toFineWeight(
   const percent = fineness[purity ?? PurityType.OTHER] ?? 100;
   return (weight * percent) / 100;
 }
+
+export const GRAMS_PER_CARAT = 0.2;
+
+/** Stone weight is always stored/calculated in grams (same convention as
+ * grossWeight/netWeight/dmoWeight) — this converts a value a user typed in
+ * a chosen unit into grams before it's used in any weight math or sent to
+ * a server action. Shared across every line-item form's Stone Weight
+ * field, unlike the per-file business-logic helpers elsewhere in this
+ * codebase, since a unit conversion factor must never drift between them. */
+export function stoneWeightToGrams(value: number, unit: "GRAM" | "CARAT"): number {
+  return unit === "CARAT" ? value * GRAMS_PER_CARAT : value;
+}

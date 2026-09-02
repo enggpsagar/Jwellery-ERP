@@ -114,7 +114,7 @@ export default async function InvoicePrintPage({ params }: Props) {
               <th>Purity/HSN</th>
               <th>Net Qty</th>
               <th>Gross Product Weight (grams)</th>
-              <th>Net Stone Weight (Carats/grams)</th>
+              <th>Net Stone Weight (g)</th>
               <th>Net Metal Weight (grams)</th>
               <th>Gross Product Price (Rs.)</th>
               <th>Making Charges (Rs.)</th>

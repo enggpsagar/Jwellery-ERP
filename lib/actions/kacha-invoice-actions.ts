@@ -44,6 +44,7 @@ export type KachaInvoiceLineItemInput = {
   quantity: number;
   grossWeight?: number | null;
   netWeight?: number | null;
+  stoneWeight?: number | null;
   caratWeight?: number | null;
   rate?: number | null;
   makingCharge: number;
@@ -136,6 +137,7 @@ function mapKachaInvoice(kachaInvoice: any) {
       quantity: item.quantity,
       grossWeight: item.grossWeight ? Number(item.grossWeight) : null,
       netWeight: item.netWeight ? Number(item.netWeight) : null,
+      stoneWeight: item.stoneWeight ? Number(item.stoneWeight) : null,
       caratWeight: item.caratWeight ? Number(item.caratWeight) : null,
       rate: item.rate ? Number(item.rate) : null,
       makingCharge: Number(item.makingCharge),
@@ -487,6 +489,7 @@ export async function createKachaInvoice(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
+              stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,
@@ -694,11 +697,14 @@ export async function convertKachaToPakka(
     if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
     else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
 
+    const invoiceSettings = await prisma.businessSettings.findUnique({ where: { storeId } });
+    const invoicePrefix = invoiceSettings?.invoicePrefix?.trim() || "INV";
+    const invoiceStartingNo = invoiceSettings?.invoiceStartingNo ?? 1;
     const year = new Date().getFullYear();
     const count = await prisma.invoice.count({
-      where: { storeId, invoiceNumber: { startsWith: `INV-${year}-` } },
+      where: { storeId, invoiceNumber: { startsWith: `${invoicePrefix}-${year}-` } },
     });
-    const invoiceNumber = `INV-${year}-${String(count + 1).padStart(4, "0")}`;
+    const invoiceNumber = `${invoicePrefix}-${year}-${String(count + invoiceStartingNo).padStart(4, "0")}`;
 
     const invoice = await prisma.$transaction(async (tx) => {
       const created = await tx.invoice.create({
@@ -731,6 +737,7 @@ export async function convertKachaToPakka(
               quantity: item.quantity,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
+              stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,

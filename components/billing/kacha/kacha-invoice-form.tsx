@@ -26,7 +26,7 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
-import { PURITY_SELECT_OPTIONS } from "@/lib/purity"
+import { PURITY_SELECT_OPTIONS, stoneWeightToGrams } from "@/lib/purity"
 
 type CustomerOption = {
   id: string
@@ -60,6 +60,8 @@ type LineItem = {
   makingChargeType: "FIXED" | "PERCENTAGE"
   stoneCharge: number
   dmoWeight: number
+  stoneWeightInput: number
+  stoneWeightUnit: "GRAM" | "CARAT"
   inventoryStockId: string
   /** Once Net Weight is edited directly, the gross/dmo auto-calc stops
    * overwriting it. */
@@ -81,14 +83,16 @@ function emptyLineItem(): LineItem {
     makingChargeType: "FIXED",
     stoneCharge: 0,
     dmoWeight: 0,
+    stoneWeightInput: 0,
+    stoneWeightUnit: "GRAM",
     inventoryStockId: "",
     netTouched: false,
   }
 }
 
-function deriveNetWeight(grossWeight: number, dmoWeight: number) {
+function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: number) {
   if (!grossWeight) return null
-  const net = grossWeight - dmoWeight
+  const net = grossWeight - stoneWeight - dmoWeight
   return net >= 0 ? Number(net.toFixed(3)) : null
 }
 
@@ -208,6 +212,7 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
       makingChargeType: item.makingChargeType,
       stoneCharge: item.stoneCharge,
       dmoWeight: item.dmoWeight || null,
+      stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit) || null,
       inventoryStockId: item.inventoryStockId || null,
     })),
   )
@@ -361,9 +366,10 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
                     value={item.grossWeight === 0 ? "" : item.grossWeight}
                     onChange={(e) => {
                       const grossWeight = Number(e.target.value) || 0
+                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit)
                       const derived = item.netTouched
                         ? null
-                        : deriveNetWeight(grossWeight, item.dmoWeight)
+                        : deriveNetWeight(grossWeight, stoneWeightGrams, item.dmoWeight)
                       updateItem(item.key, {
                         grossWeight,
                         ...(derived !== null ? { netWeight: derived } : {}),
@@ -386,8 +392,53 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
                     }
                   />
                   {!item.netTouched && (
-                    <p className="text-xs text-muted-foreground">Gross − dust/other</p>
+                    <p className="text-xs text-muted-foreground">Gross − stone − dust/other</p>
                   )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Net Stone Weight</Label>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      step="0.00001"
+                      className="flex-1"
+                      value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
+                      onChange={(e) => {
+                        const stoneWeightInput = Number(e.target.value) || 0
+                        const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit)
+                        const derived = item.netTouched
+                          ? null
+                          : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+                        updateItem(item.key, {
+                          stoneWeightInput,
+                          ...(derived !== null ? { netWeight: derived } : {}),
+                        })
+                      }}
+                    />
+                    <Select
+                      value={item.stoneWeightUnit}
+                      onValueChange={(unit) => {
+                        const stoneWeightUnit = unit as "GRAM" | "CARAT"
+                        const grams = stoneWeightToGrams(item.stoneWeightInput, stoneWeightUnit)
+                        const derived = item.netTouched
+                          ? null
+                          : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+                        updateItem(item.key, {
+                          stoneWeightUnit,
+                          ...(derived !== null ? { netWeight: derived } : {}),
+                        })
+                      }}
+                    >
+                      <SelectTrigger className="w-16">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GRAM">g</SelectItem>
+                        <SelectItem value="CARAT">ct</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {item.purity === "DIAMOND" && (
@@ -413,9 +464,10 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
                     value={item.dmoWeight === 0 ? "" : item.dmoWeight}
                     onChange={(e) => {
                       const dmoWeight = Number(e.target.value) || 0
+                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit)
                       const derived = item.netTouched
                         ? null
-                        : deriveNetWeight(item.grossWeight, dmoWeight)
+                        : deriveNetWeight(item.grossWeight, stoneWeightGrams, dmoWeight)
                       updateItem(item.key, {
                         dmoWeight,
                         ...(derived !== null ? { netWeight: derived } : {}),

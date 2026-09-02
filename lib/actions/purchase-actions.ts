@@ -47,6 +47,7 @@ export type PurchaseLineItemInput = {
   quantity: number;
   grossWeight?: number | null;
   netWeight?: number | null;
+  stoneWeight?: number | null;
   caratWeight?: number | null;
   rate?: number | null;
   makingCharge: number;
@@ -188,6 +189,7 @@ function mapPurchase(purchase: any) {
       quantity: item.quantity,
       grossWeight: item.grossWeight ? Number(item.grossWeight) : null,
       netWeight: item.netWeight ? Number(item.netWeight) : null,
+      stoneWeight: item.stoneWeight ? Number(item.stoneWeight) : null,
       caratWeight: item.caratWeight ? Number(item.caratWeight) : null,
       rate: item.rate ? Number(item.rate) : null,
       makingCharge: Number(item.makingCharge),
@@ -552,6 +554,7 @@ export async function createPurchase(
             grossWeight: toDecimal(item.grossWeight),
             netWeight: toDecimal(item.netWeight),
             dmoWeight: toDecimal(item.dmoWeight),
+            stoneWeight: toDecimal(item.stoneWeight),
             purchaseRate: toDecimal(item.rate),
             purchaseAmount: toDecimal(lineTotal(item)),
             makingCharge: toDecimal(item.makingCharge),
@@ -595,6 +598,7 @@ export async function createPurchase(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
+              stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,

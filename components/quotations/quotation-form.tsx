@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { LocationSelect } from "@/components/shared/location-select"
-import { PURITY_SELECT_OPTIONS } from "@/lib/purity"
+import { PURITY_SELECT_OPTIONS, stoneWeightToGrams } from "@/lib/purity"
 import { RequiredMark } from "@/components/shared/required-mark"
 
 type CustomerOption = {
@@ -55,6 +55,8 @@ type LineItem = {
   makingCharge: number
   makingChargeType: "FIXED" | "PERCENTAGE"
   stoneCharge: number
+  stoneWeightInput: number
+  stoneWeightUnit: "GRAM" | "CARAT"
   inventoryStockId: string
 }
 
@@ -72,6 +74,8 @@ function emptyLineItem(): LineItem {
     makingCharge: 0,
     makingChargeType: "FIXED",
     stoneCharge: 0,
+    stoneWeightInput: 0,
+    stoneWeightUnit: "GRAM",
     inventoryStockId: "",
   }
 }
@@ -179,6 +183,7 @@ export function QuotationForm({ customers, stockItems, locations = [] }: Quotati
       makingCharge: item.makingCharge,
       makingChargeType: item.makingChargeType,
       stoneCharge: item.stoneCharge,
+      stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit) || null,
       inventoryStockId: item.inventoryStockId || null,
     })),
   )
@@ -326,6 +331,35 @@ export function QuotationForm({ customers, stockItems, locations = [] }: Quotati
                       updateItem(item.key, { netWeight: Number(e.target.value) || 0 })
                     }
                   />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Net Stone Weight</Label>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      step="0.00001"
+                      className="flex-1"
+                      value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
+                      onChange={(e) =>
+                        updateItem(item.key, { stoneWeightInput: Number(e.target.value) || 0 })
+                      }
+                    />
+                    <Select
+                      value={item.stoneWeightUnit}
+                      onValueChange={(unit) =>
+                        updateItem(item.key, { stoneWeightUnit: unit as "GRAM" | "CARAT" })
+                      }
+                    >
+                      <SelectTrigger className="w-16">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GRAM">g</SelectItem>
+                        <SelectItem value="CARAT">ct</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {item.purity === "DIAMOND" && (

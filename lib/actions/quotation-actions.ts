@@ -36,6 +36,7 @@ export type QuotationLineItemInput = {
   quantity: number;
   grossWeight?: number | null;
   netWeight?: number | null;
+  stoneWeight?: number | null;
   caratWeight?: number | null;
   rate?: number | null;
   makingCharge: number;
@@ -93,15 +94,18 @@ async function generateQuotationNumber(storeId: string) {
 /** Duplicated from invoice-actions.ts's generateInvoiceNumber — numbering
  * helpers are per-file in this codebase, not shared. */
 async function generateInvoiceNumber(storeId: string) {
+  const settings = await prisma.businessSettings.findUnique({ where: { storeId } });
+  const prefix = settings?.invoicePrefix?.trim() || "INV";
+  const startingNo = settings?.invoiceStartingNo ?? 1;
   const year = new Date().getFullYear();
   const count = await prisma.invoice.count({
     where: {
       storeId,
-      invoiceNumber: { startsWith: `INV-${year}-` },
+      invoiceNumber: { startsWith: `${prefix}-${year}-` },
     },
   });
 
-  return `INV-${year}-${String(count + 1).padStart(4, "0")}`;
+  return `${prefix}-${year}-${String(count + startingNo).padStart(4, "0")}`;
 }
 
 function mapQuotation(quotation: any) {
@@ -140,6 +144,7 @@ function mapQuotation(quotation: any) {
       quantity: item.quantity,
       grossWeight: item.grossWeight ? Number(item.grossWeight) : null,
       netWeight: item.netWeight ? Number(item.netWeight) : null,
+      stoneWeight: item.stoneWeight ? Number(item.stoneWeight) : null,
       caratWeight: item.caratWeight ? Number(item.caratWeight) : null,
       rate: item.rate ? Number(item.rate) : null,
       makingCharge: Number(item.makingCharge),
@@ -481,6 +486,7 @@ export async function createQuotation(
             quantity: item.quantity || 1,
             grossWeight: item.grossWeight ?? undefined,
             netWeight: item.netWeight ?? undefined,
+            stoneWeight: item.stoneWeight ?? undefined,
             caratWeight: item.caratWeight ?? undefined,
             rate: item.rate ?? undefined,
             makingCharge: item.makingCharge,
@@ -639,6 +645,7 @@ export async function convertQuotationToInvoice(
               quantity: item.quantity,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
+              stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,

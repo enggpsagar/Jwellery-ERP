@@ -6,7 +6,7 @@ import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
 
 import { createPurchase, type PurchaseFormState } from "@/lib/actions/purchase-actions"
-import { PURITY_SELECT_OPTIONS } from "@/lib/purity"
+import { PURITY_SELECT_OPTIONS, stoneWeightToGrams } from "@/lib/purity"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { Input } from "@/components/ui/input"
@@ -63,6 +63,8 @@ type LineItem = {
   makingChargeType: "FIXED" | "PERCENTAGE"
   stoneCharge: number
   dmoWeight: number
+  stoneWeightInput: number
+  stoneWeightUnit: "GRAM" | "CARAT"
   /** Once Net Weight is edited directly, the gross/dmo auto-calc stops
    * overwriting it — same override rule as the Product form. */
   netTouched: boolean
@@ -86,13 +88,15 @@ function emptyLineItem(): LineItem {
     makingChargeType: "FIXED",
     stoneCharge: 0,
     dmoWeight: 0,
+    stoneWeightInput: 0,
+    stoneWeightUnit: "GRAM",
     netTouched: false,
   }
 }
 
-function deriveNetWeight(grossWeight: number, dmoWeight: number) {
+function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: number) {
   if (!grossWeight) return null
-  const net = grossWeight - dmoWeight
+  const net = grossWeight - stoneWeight - dmoWeight
   return net >= 0 ? Number(net.toFixed(3)) : null
 }
 
@@ -391,6 +395,7 @@ export function PurchaseForm({
       makingChargeType: item.makingChargeType,
       stoneCharge: item.stoneCharge,
       dmoWeight: item.dmoWeight || null,
+      stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit) || null,
     })),
   )
 
@@ -532,9 +537,10 @@ export function PurchaseForm({
                     value={item.grossWeight === 0 ? "" : item.grossWeight}
                     onChange={(e) => {
                       const grossWeight = Number(e.target.value) || 0
+                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit)
                       const derived = item.netTouched
                         ? undefined
-                        : deriveNetWeight(grossWeight, item.dmoWeight)
+                        : deriveNetWeight(grossWeight, stoneWeightGrams, item.dmoWeight)
                       updateItem(item.key, {
                         grossWeight,
                         ...(derived !== null && derived !== undefined
@@ -559,8 +565,57 @@ export function PurchaseForm({
                     }
                   />
                   {!item.netTouched && (
-                    <p className="text-xs text-muted-foreground">Gross − dust/other</p>
+                    <p className="text-xs text-muted-foreground">Gross − stone − dust/other</p>
                   )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Net Stone Weight</Label>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      step="0.00001"
+                      className="flex-1"
+                      value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
+                      onChange={(e) => {
+                        const stoneWeightInput = Number(e.target.value) || 0
+                        const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit)
+                        const derived = item.netTouched
+                          ? undefined
+                          : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+                        updateItem(item.key, {
+                          stoneWeightInput,
+                          ...(derived !== null && derived !== undefined
+                            ? { netWeight: derived }
+                            : {}),
+                        })
+                      }}
+                    />
+                    <Select
+                      value={item.stoneWeightUnit}
+                      onValueChange={(unit) => {
+                        const stoneWeightUnit = unit as "GRAM" | "CARAT"
+                        const grams = stoneWeightToGrams(item.stoneWeightInput, stoneWeightUnit)
+                        const derived = item.netTouched
+                          ? undefined
+                          : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+                        updateItem(item.key, {
+                          stoneWeightUnit,
+                          ...(derived !== null && derived !== undefined
+                            ? { netWeight: derived }
+                            : {}),
+                        })
+                      }}
+                    >
+                      <SelectTrigger className="w-16">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GRAM">g</SelectItem>
+                        <SelectItem value="CARAT">ct</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {item.purity === "DIAMOND" && (
@@ -586,9 +641,10 @@ export function PurchaseForm({
                     value={item.dmoWeight === 0 ? "" : item.dmoWeight}
                     onChange={(e) => {
                       const dmoWeight = Number(e.target.value) || 0
+                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit)
                       const derived = item.netTouched
                         ? undefined
-                        : deriveNetWeight(item.grossWeight, dmoWeight)
+                        : deriveNetWeight(item.grossWeight, stoneWeightGrams, dmoWeight)
                       updateItem(item.key, {
                         dmoWeight,
                         ...(derived !== null && derived !== undefined

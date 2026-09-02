@@ -25,7 +25,7 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
-import { PURITY_SELECT_OPTIONS } from "@/lib/purity"
+import { PURITY_SELECT_OPTIONS, stoneWeightToGrams } from "@/lib/purity"
 
 type CustomerOption = {
   id: string
@@ -61,7 +61,8 @@ type LineItem = {
   makingChargeType: "FIXED" | "PERCENTAGE"
   stoneCharge: number
   dmoWeight: number
-  stoneWeight: number
+  stoneWeightInput: number
+  stoneWeightUnit: "GRAM" | "CARAT"
   hmCharge: number
   schemeDiscount: number
   hsnCode: string
@@ -92,7 +93,8 @@ function emptyLineItem(): LineItem {
     makingChargeType: "FIXED",
     stoneCharge: 0,
     dmoWeight: 0,
-    stoneWeight: 0,
+    stoneWeightInput: 0,
+    stoneWeightUnit: "GRAM",
     hmCharge: 0,
     schemeDiscount: 0,
     hsnCode: "",
@@ -174,7 +176,8 @@ export function InvoiceForm({ customers, stockItems, locations, defaultGstRate =
       metalTypeId: stock.metalType?.id ?? "",
       purity: stock.purity ?? "",
       netWeight: stock.netWeight ?? 0,
-      stoneWeight: stock.stoneWeight ?? 0,
+      stoneWeightInput: stock.stoneWeight ?? 0,
+      stoneWeightUnit: "GRAM",
       rate: stock.saleRate ?? 0,
       hsnCode: stock.hsnCode ?? "",
       // The linked stock row's own net weight is authoritative — the
@@ -259,7 +262,8 @@ export function InvoiceForm({ customers, stockItems, locations, defaultGstRate =
           metalTypeId: stock.metalType?.id ?? "",
           purity: stock.purity ?? "",
           netWeight: stock.netWeight ?? 0,
-          stoneWeight: stock.stoneWeight ?? 0,
+          stoneWeightInput: stock.stoneWeight ?? 0,
+          stoneWeightUnit: "GRAM",
           rate: stock.saleRate ?? 0,
           hsnCode: stock.hsnCode ?? "",
           netTouched: true,
@@ -381,7 +385,7 @@ export function InvoiceForm({ customers, stockItems, locations, defaultGstRate =
         makingChargeType: item.makingChargeType,
         stoneCharge: item.stoneCharge,
         dmoWeight: item.dmoWeight || null,
-        stoneWeight: item.stoneWeight || null,
+        stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit) || null,
         hmCharge: item.hmCharge,
         schemeDiscount: item.schemeDiscount,
         sgstAmount: sgst,
@@ -598,9 +602,10 @@ export function InvoiceForm({ customers, stockItems, locations, defaultGstRate =
                     value={item.grossWeight === 0 ? "" : item.grossWeight}
                     onChange={(e) => {
                       const grossWeight = Number(e.target.value) || 0
+                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit)
                       const derived = item.netTouched
                         ? null
-                        : deriveNetWeight(grossWeight, item.stoneWeight, item.dmoWeight)
+                        : deriveNetWeight(grossWeight, stoneWeightGrams, item.dmoWeight)
                       updateItem(item.key, {
                         grossWeight,
                         ...(derived !== null ? { netWeight: derived } : {}),
@@ -650,9 +655,10 @@ export function InvoiceForm({ customers, stockItems, locations, defaultGstRate =
                     value={item.dmoWeight === 0 ? "" : item.dmoWeight}
                     onChange={(e) => {
                       const dmoWeight = Number(e.target.value) || 0
+                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit)
                       const derived = item.netTouched
                         ? null
-                        : deriveNetWeight(item.grossWeight, item.stoneWeight, dmoWeight)
+                        : deriveNetWeight(item.grossWeight, stoneWeightGrams, dmoWeight)
                       updateItem(item.key, {
                         dmoWeight,
                         ...(derived !== null ? { netWeight: derived } : {}),
@@ -714,22 +720,48 @@ export function InvoiceForm({ customers, stockItems, locations, defaultGstRate =
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs">Net Stone Weight (ct/g)</Label>
-                  <Input
-                    type="number"
-                    step="0.00001"
-                    value={item.stoneWeight === 0 ? "" : item.stoneWeight}
-                    onChange={(e) => {
-                      const stoneWeight = Number(e.target.value) || 0
-                      const derived = item.netTouched
-                        ? null
-                        : deriveNetWeight(item.grossWeight, stoneWeight, item.dmoWeight)
-                      updateItem(item.key, {
-                        stoneWeight,
-                        ...(derived !== null ? { netWeight: derived } : {}),
-                      })
-                    }}
-                  />
+                  <Label className="text-xs">Net Stone Weight</Label>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      step="0.00001"
+                      className="flex-1"
+                      value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
+                      onChange={(e) => {
+                        const stoneWeightInput = Number(e.target.value) || 0
+                        const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit)
+                        const derived = item.netTouched
+                          ? null
+                          : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+                        updateItem(item.key, {
+                          stoneWeightInput,
+                          ...(derived !== null ? { netWeight: derived } : {}),
+                        })
+                      }}
+                    />
+                    <Select
+                      value={item.stoneWeightUnit}
+                      onValueChange={(unit) => {
+                        const stoneWeightUnit = unit as "GRAM" | "CARAT"
+                        const grams = stoneWeightToGrams(item.stoneWeightInput, stoneWeightUnit)
+                        const derived = item.netTouched
+                          ? null
+                          : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+                        updateItem(item.key, {
+                          stoneWeightUnit,
+                          ...(derived !== null ? { netWeight: derived } : {}),
+                        })
+                      }}
+                    >
+                      <SelectTrigger className="w-16">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GRAM">g</SelectItem>
+                        <SelectItem value="CARAT">ct</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="space-y-1">

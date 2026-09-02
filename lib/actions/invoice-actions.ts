@@ -125,15 +125,18 @@ function lineTotal(item: InvoiceLineItemInput) {
 }
 
 async function generateInvoiceNumber(storeId: string) {
+  const settings = await prisma.businessSettings.findUnique({ where: { storeId } });
+  const prefix = settings?.invoicePrefix?.trim() || "INV";
+  const startingNo = settings?.invoiceStartingNo ?? 1;
   const year = new Date().getFullYear();
   const count = await prisma.invoice.count({
     where: {
       storeId,
-      invoiceNumber: { startsWith: `INV-${year}-` },
+      invoiceNumber: { startsWith: `${prefix}-${year}-` },
     },
   });
 
-  return `INV-${year}-${String(count + 1).padStart(4, "0")}`;
+  return `${prefix}-${year}-${String(count + startingNo).padStart(4, "0")}`;
 }
 
 /**

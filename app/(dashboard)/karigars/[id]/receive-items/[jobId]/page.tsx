@@ -77,7 +77,14 @@ export default async function ReceiveItemsPage({ params }: Props) {
           job.issueWeight ? Number(job.issueWeight) : 0
         }g ${job.issuePurity ?? ""} (${
           job.issueFineWeight ? Number(job.issueFineWeight).toFixed(3) : "0.000"
-        }g fine)`}
+        }g fine)${
+          job.issueWeight && Number(job.receiveWeight ?? 0) > 0
+            ? ` · ${Number(job.receiveWeight).toFixed(3)}g already received, ${Math.max(
+                0,
+                Number(job.issueWeight) - Number(job.receiveWeight),
+              ).toFixed(3)}g remaining`
+            : ""
+        }`}
         backHref={`/karigars/${id}`}
         backLabel="Back to Karigar"
       />

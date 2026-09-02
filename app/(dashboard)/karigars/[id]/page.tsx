@@ -133,6 +133,12 @@ export default async function KarigarDetailPage({ params }: Props) {
                     {job.issuePurity ?? ""} ({job.issueFineWeight ? Number(job.issueFineWeight).toFixed(3) : "0.000"}g fine)
                     {job.expectedDate ? ` · Expected ${formatDate(job.expectedDate)}` : ""}
                   </div>
+                  {job.issueWeight && Number(job.receiveWeight ?? 0) > 0 && (
+                    <div className="text-sm font-medium text-amber-700">
+                      {Number(job.receiveWeight).toFixed(3)}g received so far ·{" "}
+                      {Math.max(0, Number(job.issueWeight) - Number(job.receiveWeight)).toFixed(3)}g remaining
+                    </div>
+                  )}
                 </div>
                 <Link href={`/karigars/${id}/receive-items/${job.id}`}>
                   <Button type="button" size="sm">

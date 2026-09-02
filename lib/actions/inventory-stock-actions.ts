@@ -518,6 +518,9 @@ export async function receiveItemsFromKarigar(
     let receiveFineWeight = 0;
     let plainFineWeightTotal = 0;
     let autoCreatedProducts = 0;
+    let isFullyReceived = false;
+    let cumulativeReceiveWeight = 0;
+    let issueWeightNum = 0;
 
     await prisma.$transaction(async (tx) => {
       for (let i = 0; i < items.length; i++) {
@@ -625,14 +628,30 @@ export async function receiveItemsFromKarigar(
         });
       }
 
+      // Partial receiving: a karigar can return an issued job's material across
+      // several visits (e.g. 500g issued, 200g back today, the rest next week).
+      // receiveWeight/receiveFineWeight/labourCharge on the job are running
+      // totals across every receipt against it, not just this one — so they
+      // accumulate onto whatever was already there instead of overwriting it.
+      // The job only closes (status -> "received") once the cumulative
+      // received weight has caught up to what was issued; until then it stays
+      // "issued" so it keeps showing under Open Jobs and this same action can
+      // be called again against it. A job with no declared issueWeight has
+      // nothing to reconcile against, so any receipt closes it immediately.
+      cumulativeReceiveWeight = (job.receiveWeight ? Number(job.receiveWeight) : 0) + receiveWeight;
+      const cumulativeReceiveFineWeight =
+        (job.receiveFineWeight ? Number(job.receiveFineWeight) : 0) + receiveFineWeight;
+      issueWeightNum = job.issueWeight ? Number(job.issueWeight) : 0;
+      isFullyReceived = issueWeightNum > 0 ? cumulativeReceiveWeight >= issueWeightNum : true;
+
       await tx.karigarJob.update({
         where: { id: jobId },
         data: {
-          receiveWeight,
-          receiveFineWeight,
-          receivedDate: new Date(),
-          status: "received",
-          labourCharge,
+          receiveWeight: cumulativeReceiveWeight,
+          receiveFineWeight: cumulativeReceiveFineWeight,
+          receivedDate: isFullyReceived ? new Date() : job.receivedDate,
+          status: isFullyReceived ? "received" : "issued",
+          labourCharge: Number(job.labourCharge) + labourCharge,
         },
       });
 
@@ -674,7 +693,12 @@ export async function receiveItemsFromKarigar(
     revalidatePath(`/karigars/${job.karigarId}`);
     revalidatePath("/inventory/stock");
 
-    return { success: true, message: "Items received from karigar" };
+    const remaining = Math.max(0, issueWeightNum - cumulativeReceiveWeight);
+    const message = isFullyReceived
+      ? "Items received — job fully closed"
+      : `Items received — ${cumulativeReceiveWeight.toFixed(3)}g of ${issueWeightNum.toFixed(3)}g received so far, ${remaining.toFixed(3)}g remaining. Job stays open for further receipts.`;
+
+    return { success: true, message };
   } catch (error) {
     console.error("receiveItemsFromKarigar error:", error);
     return { success: false, message: "Failed to receive items from karigar" };

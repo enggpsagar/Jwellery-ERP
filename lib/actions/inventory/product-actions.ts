@@ -63,6 +63,8 @@ function serializeProduct(product: {
   defaultNetWeight: { toString(): string } | null;
   defaultStoneWeight: { toString(): string } | null;
   defaultCaratWeight: { toString(): string } | null;
+  hasStoneComponent: boolean;
+  defaultStoneRate: { toString(): string } | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -90,6 +92,8 @@ function serializeProduct(product: {
     defaultNetWeight: product.defaultNetWeight?.toString() ?? null,
     defaultStoneWeight: product.defaultStoneWeight?.toString() ?? null,
     defaultCaratWeight: product.defaultCaratWeight?.toString() ?? null,
+    hasStoneComponent: product.hasStoneComponent,
+    defaultStoneRate: product.defaultStoneRate?.toString() ?? null,
     designCode: product.designCode,
     hsnCode: product.hsnCode,
     description: product.description,
@@ -166,6 +170,8 @@ function mapProductRow(row: {
   defaultNetWeight: { toString(): string } | null;
   defaultStoneWeight: { toString(): string } | null;
   defaultCaratWeight: { toString(): string } | null;
+  hasStoneComponent: boolean;
+  defaultStoneRate: { toString(): string } | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -196,6 +202,9 @@ function mapProductRow(row: {
       row.defaultStoneWeight != null ? Number(row.defaultStoneWeight) : null,
     defaultCaratWeight:
       row.defaultCaratWeight != null ? Number(row.defaultCaratWeight) : null,
+    hasStoneComponent: row.hasStoneComponent,
+    defaultStoneRate:
+      row.defaultStoneRate != null ? Number(row.defaultStoneRate) : null,
     designCode: row.designCode,
     hsnCode: row.hsnCode,
     description: row.description,
@@ -304,6 +313,8 @@ export async function exportProductsToExcel(
       "Net Weight (g)": product.defaultNetWeight ?? "-",
       "Stone Weight (g)": product.defaultStoneWeight ?? "-",
       "Carat Weight (ct)": product.defaultCaratWeight ?? "-",
+      "Has Stone Component": product.hasStoneComponent ? "Yes" : "No",
+      "Stone Rate (₹/ct)": product.defaultStoneRate ?? "-",
       Description: product.description || "-",
       Notes: product.notes || "-",
       Status: product.isActive ? "Active" : "Inactive",
@@ -450,6 +461,10 @@ export async function createProduct(
     const defaultCaratWeight = parseNullableDecimal(
       formData.get("defaultCaratWeight"),
     );
+    const hasStoneComponent = parseBoolean(formData.get("hasStoneComponent"));
+    const defaultStoneRate = parseNullableDecimal(
+      formData.get("defaultStoneRate"),
+    );
 
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
@@ -520,6 +535,8 @@ export async function createProduct(
         defaultNetWeight,
         defaultStoneWeight,
         defaultCaratWeight,
+        hasStoneComponent,
+        defaultStoneRate,
         designCode,
         hsnCode,
         description,
@@ -587,6 +604,7 @@ export async function createProduct(
               netWeight: defaultNetWeight,
               stoneWeight: defaultStoneWeight,
               caratWeight: defaultCaratWeight,
+              stoneRate: defaultStoneRate,
             },
           });
 
@@ -688,6 +706,10 @@ export async function updateProduct(
     const defaultCaratWeight = parseNullableDecimal(
       formData.get("defaultCaratWeight"),
     );
+    const hasStoneComponent = parseBoolean(formData.get("hasStoneComponent"));
+    const defaultStoneRate = parseNullableDecimal(
+      formData.get("defaultStoneRate"),
+    );
 
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
@@ -761,6 +783,8 @@ export async function updateProduct(
     defaultNetWeight,
     defaultStoneWeight,
     defaultCaratWeight,
+    hasStoneComponent,
+    defaultStoneRate,
     designCode,
     hsnCode,
     description,

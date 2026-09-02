@@ -41,6 +41,7 @@ export type InvoiceLineItemInput = {
   makingCharge: number;
   makingChargeType?: ChargeType | string | null;
   stoneCharge: number;
+  stoneRate?: number | null;
   dmoWeight?: number | null;
   stoneWeight?: number | null;
   hmCharge?: number;
@@ -163,6 +164,7 @@ export type InvoiceItemView = {
   makingCharge: number;
   makingChargeType: ChargeType;
   stoneCharge: number;
+  stoneRate: number | null;
   dmoWeight: number | null;
   stoneWeight: number | null;
   hmCharge: number;
@@ -233,6 +235,7 @@ function mapInvoice(invoice: any) {
       makingCharge: Number(item.makingCharge),
       makingChargeType: item.makingChargeType as ChargeType,
       stoneCharge: Number(item.stoneCharge),
+      stoneRate: item.stoneRate ? Number(item.stoneRate) : null,
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
       stoneWeight: item.stoneWeight ? Number(item.stoneWeight) : null,
       hmCharge: Number(item.hmCharge ?? 0),
@@ -505,6 +508,8 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
     purity: stock.purity,
     netWeight: stock.netWeight ? Number(stock.netWeight) : null,
     stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
+    caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
+    stoneRate: stock.stoneRate ? Number(stock.stoneRate) : null,
     saleRate: stock.saleRate ? Number(stock.saleRate) : null,
     quantity: stock.quantity,
   }));
@@ -550,6 +555,8 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       purity: stock.purity,
       netWeight: stock.netWeight ? Number(stock.netWeight) : null,
       stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
+      caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
+      stoneRate: stock.stoneRate ? Number(stock.stoneRate) : null,
       saleRate: stock.saleRate ? Number(stock.saleRate) : null,
       quantity: stock.quantity + claimed,
     });
@@ -817,6 +824,7 @@ export async function createInvoice(
               makingCharge: item.makingCharge,
               makingChargeType: toChargeType(item.makingChargeType),
               stoneCharge: item.stoneCharge,
+              stoneRate: item.stoneRate ?? undefined,
               dmoWeight: item.dmoWeight ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               hmCharge: item.hmCharge ?? 0,
@@ -1273,6 +1281,7 @@ export async function updateInvoice(
               makingCharge: item.makingCharge,
               makingChargeType: toChargeType(item.makingChargeType),
               stoneCharge: item.stoneCharge,
+              stoneRate: item.stoneRate ?? undefined,
               dmoWeight: item.dmoWeight ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               hmCharge: item.hmCharge ?? 0,

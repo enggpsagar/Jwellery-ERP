@@ -362,6 +362,14 @@ model Product {
   defaultNetWeight        Decimal?             @db.Decimal(12, 5)
   defaultStoneWeight      Decimal?             @db.Decimal(12, 5)
   defaultCaratWeight      Decimal?             @db.Decimal(10, 3)
+  // A composite piece — one metal (priced by weight, unchanged) plus one
+  // embedded stone/diamond component (priced by defaultStoneRate × the
+  // existing defaultCaratWeight above, auto-summed into Stone Charge)
+  // rather than a flat manually-typed Stone Charge. Distinct from a line
+  // whose own metal IS Diamond/Stone (isCaratWeighedMetal) — that's a
+  // single carat-priced item, not a metal+stone combination.
+  hasStoneComponent       Boolean              @default(false)
+  defaultStoneRate        Decimal?             @db.Decimal(12, 2)
   designCode              String?
   hsnCode                 String?
   description             String?
@@ -414,6 +422,12 @@ model InventoryStock {
   makingCharge        Decimal?               @db.Decimal(12, 2)
   makingChargeType    ChargeType             @default(FIXED)
   stoneCharge         Decimal?               @db.Decimal(12, 2)
+  // Rate per carat for this piece's embedded stone/diamond (composite
+  // items — metal priced by weight as usual, stone priced by
+  // stoneRate × caratWeight, summed into stoneCharge). No boolean flag
+  // needed at the stock level — a non-null caratWeight/stoneRate here is
+  // signal enough.
+  stoneRate           Decimal?               @db.Decimal(12, 2)
   otherCharge         Decimal?               @db.Decimal(12, 2)
   purchaseAmount      Decimal?               @db.Decimal(12, 2)
   saleAmount          Decimal?               @db.Decimal(12, 2)
@@ -584,6 +598,7 @@ model KachaInvoiceItem {
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
   makingChargeType ChargeType      @default(FIXED)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
+  stoneRate        Decimal?        @db.Decimal(12, 2)
   lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId String?
   createdAt        DateTime        @default(now())
@@ -620,6 +635,7 @@ model InvoiceItem {
   // printed invoice — distinct from makingCharge itself.
   hmCharge         Decimal         @default(0) @db.Decimal(12, 2)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
+  stoneRate        Decimal?        @db.Decimal(12, 2)
   // Per-line scheme/discount amount, separate from Invoice.discount (which
   // is an invoice-level total) — the printed format wants one column per
   // line, not a single amount split across items after the fact.
@@ -829,6 +845,7 @@ model PurchaseItem {
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
   makingChargeType ChargeType      @default(FIXED)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
+  stoneRate        Decimal?        @db.Decimal(12, 2)
   // HSN snapshot at purchase time - same reasoning as InvoiceItem.hsnCode:
   // Product.hsnCode can change later, and this line might not even have a
   // linked product yet at the time of entry.
@@ -940,6 +957,7 @@ model QuotationItem {
   makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
   makingChargeType ChargeType      @default(FIXED)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
+  stoneRate        Decimal?        @db.Decimal(12, 2)
   lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId String?
   quotation        Quotation       @relation(fields: [quotationId], references: [id], onDelete: Cascade)

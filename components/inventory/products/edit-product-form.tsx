@@ -33,6 +33,8 @@ type EditProductFormProps = {
     defaultNetWeight: string | null;
     defaultStoneWeight: string | null;
     defaultCaratWeight: string | null;
+    hasStoneComponent: boolean;
+    defaultStoneRate: string | null;
     designCode: string | null;
     hsnCode: string | null;
     description: string | null;

@@ -86,6 +86,8 @@ type Product = {
   defaultNetWeight: string | null;
   defaultStoneWeight: string | null;
   defaultCaratWeight: string | null;
+  hasStoneComponent: boolean;
+  defaultStoneRate: string | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -194,8 +196,26 @@ export function ProductForm({
   const CARAT_TO_GRAM = 0.2;
   const isCaratFamily = metalFamily === "DIAMOND" || metalFamily === "STONE";
 
+  // A composite piece — e.g. a Gold ring with an embedded diamond — keeps
+  // its metal as the primary purity/weight (unchanged), and separately
+  // records the stone's own carat weight + rate, auto-summed into Stone
+  // Charge. Distinct from isCaratFamily above: that's for a product whose
+  // ENTIRE weight is carat-based (a loose Diamond/Stone with no separate
+  // metal component at all).
+  const [hasStoneComponent, setHasStoneComponent] = useState(
+    product?.hasStoneComponent ?? false,
+  );
+  const [stoneRate, setStoneRate] = useState(product?.defaultStoneRate ?? "");
+  const showCaratWeight = isCaratFamily || hasStoneComponent;
+
   function handleCaratWeightChange(value: string) {
     setCaratWeight(value);
+
+    // Only a genuinely carat-weighed item (Diamond/Stone as the product's
+    // own metal) converts Carat Weight into Net Weight — for a composite
+    // piece, Carat Weight is the embedded stone's own weight, independent
+    // of the metal's Net Weight, so no conversion applies.
+    if (!isCaratFamily) return;
 
     const caratNum = Number(value);
     if (value.trim() !== "" && Number.isFinite(caratNum)) {
@@ -468,6 +488,22 @@ export function ProductForm({
             <ErrorText error={state.errors.defaultPurity} />
           </div>
 
+          <div className="flex items-end pb-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={hasStoneComponent}
+                onChange={(event) => setHasStoneComponent(event.target.checked)}
+              />
+              Includes a stone/diamond
+            </label>
+            <input
+              type="hidden"
+              name="hasStoneComponent"
+              value={hasStoneComponent ? "true" : "false"}
+            />
+          </div>
+
         </div>
       </div>
       {/* ============================
@@ -541,9 +577,11 @@ export function ProductForm({
             <ErrorText error={state.errors.defaultNetWeight} />
           </div>
 
-          {isCaratFamily && (
+          {showCaratWeight && (
             <div>
-              <Label htmlFor="defaultCaratWeight">Carat Weight (ct)</Label>
+              <Label htmlFor="defaultCaratWeight">
+                {isCaratFamily ? "Carat Weight (ct)" : "Stone Carat Weight (ct)"}
+              </Label>
 
               <Input
                 id="defaultCaratWeight"
@@ -559,10 +597,35 @@ export function ProductForm({
               />
 
               <p className="mt-1 text-xs text-muted-foreground">
-                1 ct = 0.2 g. Converts with Net Weight automatically.
+                {isCaratFamily
+                  ? "1 ct = 0.2 g. Converts with Net Weight automatically."
+                  : "The embedded stone's weight — separate from the metal's Net Weight above."}
               </p>
 
               <ErrorText error={state.errors.defaultCaratWeight} />
+            </div>
+          )}
+
+          {hasStoneComponent && !isCaratFamily && (
+            <div>
+              <Label htmlFor="defaultStoneRate">Stone Rate (₹/ct)</Label>
+
+              <Input
+                id="defaultStoneRate"
+                name="defaultStoneRate"
+                type="number"
+                step="0.01"
+                min="0"
+                value={stoneRate}
+                onChange={(event) => setStoneRate(event.target.value)}
+                placeholder="0.00"
+              />
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                Prefills Stone Charge as Stone Rate × Stone Carat Weight on stock/documents.
+              </p>
+
+              <ErrorText error={state.errors.defaultStoneRate} />
             </div>
           )}
         </div>

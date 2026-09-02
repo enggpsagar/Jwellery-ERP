@@ -42,6 +42,8 @@ type StockOption = {
   metalType: { id: string; name: string } | null
   purity: string | null
   netWeight: number | null
+  caratWeight: number | null
+  stoneRate: number | null
   saleRate: number | null
   quantity: number
 }
@@ -59,6 +61,9 @@ type LineItem = {
   makingCharge: number
   makingChargeType: "FIXED" | "PERCENTAGE"
   stoneCharge: number
+  stoneRate: number
+  hasStoneComponent: boolean
+  stoneChargeTouched: boolean
   dmoWeight: number
   stoneWeightInput: number
   stoneWeightUnit: "GRAM" | "CARAT"
@@ -82,6 +87,9 @@ function emptyLineItem(): LineItem {
     makingCharge: 0,
     makingChargeType: "FIXED",
     stoneCharge: 0,
+    stoneRate: 0,
+    hasStoneComponent: false,
+    stoneChargeTouched: false,
     dmoWeight: 0,
     stoneWeightInput: 0,
     stoneWeightUnit: "GRAM",
@@ -163,6 +171,13 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
       netWeight: stock.netWeight ?? 0,
       rate: stock.saleRate ?? 0,
       quantity: available > 0 ? 1 : 0,
+      caratWeight: stock.caratWeight ?? 0,
+      stoneRate: stock.stoneRate ?? 0,
+      hasStoneComponent: stock.stoneRate != null,
+      stoneCharge: stock.stoneRate != null && stock.caratWeight != null
+        ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
+        : 0,
+      stoneChargeTouched: false,
       // The linked stock row's own net weight is authoritative — the
       // gross/dmo calc below must not silently recompute over it.
       netTouched: true,
@@ -201,9 +216,26 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
         patch.netWeight = Number((caratNum * GRAMS_PER_CARAT).toFixed(5))
         patch.netTouched = true
       }
+    } else if (item.hasStoneComponent && !item.stoneChargeTouched) {
+      patch.stoneCharge = Number((item.stoneRate * caratWeight).toFixed(2))
     }
 
     updateItem(item.key, patch)
+  }
+
+  const handleStoneRateChange = (item: LineItem, value: string) => {
+    const stoneRate = Number(value) || 0
+    const patch: Partial<LineItem> = { stoneRate }
+
+    if (!item.stoneChargeTouched) {
+      patch.stoneCharge = Number((stoneRate * item.caratWeight).toFixed(2))
+    }
+
+    updateItem(item.key, patch)
+  }
+
+  const handleStoneChargeChange = (item: LineItem, value: string) => {
+    updateItem(item.key, { stoneCharge: Number(value) || 0, stoneChargeTouched: true })
   }
 
   const handleNetWeightChange = (item: LineItem, value: string) => {
@@ -261,6 +293,7 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
       makingCharge: item.makingCharge,
       makingChargeType: item.makingChargeType,
       stoneCharge: item.stoneCharge,
+      stoneRate: item.hasStoneComponent ? item.stoneRate || null : null,
       dmoWeight: item.dmoWeight || null,
       stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit) || null,
       inventoryStockId: item.inventoryStockId || null,
@@ -486,9 +519,26 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
                   </div>
                 </div>
 
-                {isCaratLine(item) && (
+                {!isCaratLine(item) && (
+                  <div className="flex items-end pb-2">
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={item.hasStoneComponent}
+                        onChange={(e) =>
+                          updateItem(item.key, { hasStoneComponent: e.target.checked })
+                        }
+                      />
+                      Includes stone/diamond
+                    </label>
+                  </div>
+                )}
+
+                {(isCaratLine(item) || item.hasStoneComponent) && (
                   <div className="space-y-1">
-                    <Label className="text-xs">Carat Weight (ct)</Label>
+                    <Label className="text-xs">
+                      {isCaratLine(item) ? "Carat Weight (ct)" : "Stone Carat Weight (ct)"}
+                    </Label>
                     <Input
                       type="number"
                       step="0.001"
@@ -498,8 +548,22 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
                     <p className="text-xs text-muted-foreground">
                       {item.purity === "DIAMOND"
                         ? "Priced per carat, not per gram"
-                        : "1 ct = 0.2 g — converts with Net Weight"}
+                        : isCaratLine(item)
+                          ? "1 ct = 0.2 g — converts with Net Weight"
+                          : "Stone's own weight — independent of Net Weight"}
                     </p>
+                  </div>
+                )}
+
+                {!isCaratLine(item) && item.hasStoneComponent && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Stone Rate (₹/ct)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={item.stoneRate === 0 ? "" : item.stoneRate}
+                      onChange={(e) => handleStoneRateChange(item, e.target.value)}
+                    />
                   </div>
                 )}
 
@@ -550,11 +614,7 @@ export function KachaInvoiceForm({ customers, stockItems, locations }: KachaInvo
                     type="number"
                     step="0.01"
                     value={item.stoneCharge === 0 ? "" : item.stoneCharge}
-                    onChange={(e) =>
-                      updateItem(item.key, {
-                        stoneCharge: Number(e.target.value) || 0,
-                      })
-                    }
+                    onChange={(e) => handleStoneChargeChange(item, e.target.value)}
                   />
                 </div>
 

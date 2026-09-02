@@ -152,6 +152,7 @@ function mapStockRow(row: any) {
     saleRate: row.saleRate?.toString() ?? null,
     makingCharge: row.makingCharge?.toString() ?? null,
     stoneCharge: row.stoneCharge?.toString() ?? null,
+    stoneRate: row.stoneRate?.toString() ?? null,
     otherCharge: row.otherCharge?.toString() ?? null,
     purchaseAmount: row.purchaseAmount?.toString() ?? null,
     saleAmount: row.saleAmount?.toString() ?? null,
@@ -417,6 +418,7 @@ export async function getInventoryStockById(id: string) {
     saleRate: row.saleRate?.toString() ?? null,
     makingCharge: row.makingCharge?.toString() ?? null,
     stoneCharge: row.stoneCharge?.toString() ?? null,
+    stoneRate: row.stoneRate?.toString() ?? null,
     otherCharge: row.otherCharge?.toString() ?? null,
     purchaseAmount: row.purchaseAmount?.toString() ?? null,
     saleAmount: row.saleAmount?.toString() ?? null,
@@ -522,6 +524,8 @@ export async function createInventoryStock(
         defaultMakingCharge: true,
         defaultMakingChargeType: true,
         defaultStoneCharge: true,
+        hasStoneComponent: true,
+        defaultStoneRate: true,
       },
     })
 
@@ -583,7 +587,16 @@ export async function createInventoryStock(
     const purity = product.defaultPurity
     const makingCharge = product.defaultMakingCharge
     const makingChargeType = product.defaultMakingChargeType
-    const stoneCharge = product.defaultStoneCharge
+    // A composite product's stone value is auto-computed from this piece's
+    // own carat weight × the product's Stone Rate, rather than the flat
+    // defaultStoneCharge every other product just copies as-is — the
+    // physical stone in a specific piece rarely matches the design's
+    // typical weight exactly.
+    const stoneRate = product.hasStoneComponent ? product.defaultStoneRate : null
+    const stoneCharge =
+      product.hasStoneComponent && product.defaultStoneRate != null && caratWeight
+        ? new Prisma.Decimal(product.defaultStoneRate).mul(caratWeight)
+        : product.defaultStoneCharge
 
     const existing = await prisma.inventoryStock.findFirst({
       where: { stockCode, storeId },
@@ -639,6 +652,7 @@ export async function createInventoryStock(
           makingCharge,
           makingChargeType,
           stoneCharge,
+          stoneRate: stoneRate ?? undefined,
           otherCharge: toDecimal(otherCharge),
           purchaseAmount: toDecimal(purchaseAmount),
           saleAmount: toDecimal(saleAmount),
@@ -707,6 +721,7 @@ export async function updateInventoryStock(
         makingCharge: true,
         makingChargeType: true,
         stoneCharge: true,
+        stoneRate: true,
         invoiceItems: {
           select: { id: true },
           take: 1,
@@ -859,6 +874,11 @@ export async function updateInventoryStock(
       }
     }
 
+    // Preserved as-is when locked (product unchanged) — same convention as
+    // stoneCharge/makingCharge above, so editing other fields on this stock
+    // row never silently wipes what a prior product selection already set.
+    let stoneRate: Prisma.Decimal | null = existingStock.stoneRate
+
     if (!isLockedForCoreChanges) {
       const product = await prisma.product.findFirst({
         where: { id: productId, storeId },
@@ -869,6 +889,8 @@ export async function updateInventoryStock(
           defaultMakingCharge: true,
           defaultMakingChargeType: true,
           defaultStoneCharge: true,
+          hasStoneComponent: true,
+          defaultStoneRate: true,
         },
       })
 
@@ -897,7 +919,11 @@ export async function updateInventoryStock(
       purity = product.defaultPurity
       makingCharge = product.defaultMakingCharge
       makingChargeType = product.defaultMakingChargeType
-      stoneCharge = product.defaultStoneCharge
+      stoneRate = product.hasStoneComponent ? product.defaultStoneRate : null
+      stoneCharge =
+        product.hasStoneComponent && product.defaultStoneRate != null && caratWeight
+          ? new Prisma.Decimal(product.defaultStoneRate).mul(caratWeight)
+          : product.defaultStoneCharge
     }
 
     /**
@@ -954,6 +980,7 @@ export async function updateInventoryStock(
         makingCharge,
         makingChargeType,
         stoneCharge,
+        stoneRate,
         otherCharge: toDecimal(otherCharge),
         purchaseAmount: toDecimal(purchaseAmount),
         saleAmount: toDecimal(saleAmount),

@@ -48,6 +48,9 @@ type ProductOption = {
   defaultMakingCharge: number | null
   defaultMakingChargeType: "FIXED" | "PERCENTAGE"
   defaultStoneCharge: number | null
+  hasStoneComponent: boolean
+  defaultStoneRate: number | null
+  defaultCaratWeight: number | null
   hsnCode: string | null
   isActive: boolean
 }
@@ -66,6 +69,9 @@ type LineItem = {
   makingCharge: number
   makingChargeType: "FIXED" | "PERCENTAGE"
   stoneCharge: number
+  stoneRate: number
+  hasStoneComponent: boolean
+  stoneChargeTouched: boolean
   dmoWeight: number
   stoneWeightInput: number
   stoneWeightUnit: "GRAM" | "CARAT"
@@ -92,6 +98,9 @@ function emptyLineItem(): LineItem {
     makingCharge: 0,
     makingChargeType: "FIXED",
     stoneCharge: 0,
+    stoneRate: 0,
+    hasStoneComponent: false,
+    stoneChargeTouched: false,
     dmoWeight: 0,
     stoneWeightInput: 0,
     stoneWeightUnit: "GRAM",
@@ -378,7 +387,13 @@ export function PurchaseForm({
       purity: product.defaultPurity ?? "",
       makingCharge: product.defaultMakingCharge ?? 0,
       makingChargeType: product.defaultMakingChargeType ?? "FIXED",
-      stoneCharge: product.defaultStoneCharge ?? 0,
+      stoneCharge: product.hasStoneComponent && product.defaultStoneRate != null && product.defaultCaratWeight != null
+        ? Number((product.defaultStoneRate * product.defaultCaratWeight).toFixed(2))
+        : product.defaultStoneCharge ?? 0,
+      stoneRate: product.hasStoneComponent ? product.defaultStoneRate ?? 0 : 0,
+      hasStoneComponent: product.hasStoneComponent,
+      stoneChargeTouched: false,
+      caratWeight: product.defaultCaratWeight ?? 0,
       hsnCode: product.hsnCode ?? "",
     })
   }
@@ -415,9 +430,26 @@ export function PurchaseForm({
         patch.netWeight = Number((caratNum * GRAMS_PER_CARAT).toFixed(5))
         patch.netTouched = true
       }
+    } else if (item.hasStoneComponent && !item.stoneChargeTouched) {
+      patch.stoneCharge = Number((item.stoneRate * caratWeight).toFixed(2))
     }
 
     updateItem(item.key, patch)
+  }
+
+  const handleStoneRateChange = (item: LineItem, value: string) => {
+    const stoneRate = Number(value) || 0
+    const patch: Partial<LineItem> = { stoneRate }
+
+    if (!item.stoneChargeTouched) {
+      patch.stoneCharge = Number((stoneRate * item.caratWeight).toFixed(2))
+    }
+
+    updateItem(item.key, patch)
+  }
+
+  const handleStoneChargeChange = (item: LineItem, value: string) => {
+    updateItem(item.key, { stoneCharge: Number(value) || 0, stoneChargeTouched: true })
   }
 
   const handleNetWeightChange = (item: LineItem, value: string) => {
@@ -495,6 +527,7 @@ export function PurchaseForm({
       makingCharge: item.makingCharge,
       makingChargeType: item.makingChargeType,
       stoneCharge: item.stoneCharge,
+      stoneRate: item.hasStoneComponent ? item.stoneRate || null : null,
       dmoWeight: item.dmoWeight || null,
       stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit) || null,
       hsnCode: item.hsnCode || null,
@@ -726,9 +759,26 @@ export function PurchaseForm({
                   </div>
                 </div>
 
-                {isCaratLine(item) && (
+                {!isCaratLine(item) && (
+                  <div className="flex items-end pb-2">
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={item.hasStoneComponent}
+                        onChange={(e) =>
+                          updateItem(item.key, { hasStoneComponent: e.target.checked })
+                        }
+                      />
+                      Includes stone/diamond
+                    </label>
+                  </div>
+                )}
+
+                {(isCaratLine(item) || item.hasStoneComponent) && (
                   <div className="space-y-1">
-                    <Label className="text-xs">Carat Weight (ct)</Label>
+                    <Label className="text-xs">
+                      {isCaratLine(item) ? "Carat Weight (ct)" : "Stone Carat Weight (ct)"}
+                    </Label>
                     <Input
                       type="number"
                       step="0.001"
@@ -738,8 +788,22 @@ export function PurchaseForm({
                     <p className="text-xs text-muted-foreground">
                       {item.purity === "DIAMOND"
                         ? "Priced per carat, not per gram"
-                        : "1 ct = 0.2 g — converts with Net Weight"}
+                        : isCaratLine(item)
+                          ? "1 ct = 0.2 g — converts with Net Weight"
+                          : "Stone's own weight — independent of Net Weight"}
                     </p>
+                  </div>
+                )}
+
+                {!isCaratLine(item) && item.hasStoneComponent && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Stone Rate (₹/ct)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={item.stoneRate === 0 ? "" : item.stoneRate}
+                      onChange={(e) => handleStoneRateChange(item, e.target.value)}
+                    />
                   </div>
                 )}
 
@@ -794,11 +858,7 @@ export function PurchaseForm({
                     type="number"
                     step="0.01"
                     value={item.stoneCharge === 0 ? "" : item.stoneCharge}
-                    onChange={(e) =>
-                      updateItem(item.key, {
-                        stoneCharge: Number(e.target.value) || 0,
-                      })
-                    }
+                    onChange={(e) => handleStoneChargeChange(item, e.target.value)}
                   />
                 </div>
 

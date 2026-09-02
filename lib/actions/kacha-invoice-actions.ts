@@ -50,6 +50,7 @@ export type KachaInvoiceLineItemInput = {
   makingCharge: number;
   makingChargeType?: ChargeType | string | null;
   stoneCharge: number;
+  stoneRate?: number | null;
   dmoWeight?: number | null;
   inventoryStockId?: string | null;
 };
@@ -143,6 +144,7 @@ function mapKachaInvoice(kachaInvoice: any) {
       makingCharge: Number(item.makingCharge),
       makingChargeType: item.makingChargeType as ChargeType,
       stoneCharge: Number(item.stoneCharge),
+      stoneRate: item.stoneRate ? Number(item.stoneRate) : null,
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
@@ -495,6 +497,7 @@ export async function createKachaInvoice(
               makingCharge: item.makingCharge,
               makingChargeType: toChargeType(item.makingChargeType),
               stoneCharge: item.stoneCharge,
+              stoneRate: item.stoneRate ?? undefined,
               dmoWeight: item.dmoWeight ?? undefined,
               lineTotal: lineTotal(item),
               inventoryStockId:
@@ -743,6 +746,7 @@ export async function convertKachaToPakka(
               makingCharge: item.makingCharge,
               makingChargeType: item.makingChargeType,
               stoneCharge: item.stoneCharge,
+              stoneRate: item.stoneRate ?? undefined,
               dmoWeight: item.dmoWeight ?? undefined,
               lineTotal: item.lineTotal,
               inventoryStockId: item.inventoryStockId ?? undefined,

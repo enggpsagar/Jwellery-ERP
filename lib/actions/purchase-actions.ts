@@ -53,6 +53,7 @@ export type PurchaseLineItemInput = {
   makingCharge: number;
   makingChargeType?: ChargeType | string | null;
   stoneCharge: number;
+  stoneRate?: number | null;
   dmoWeight?: number | null;
   hsnCode?: string | null;
 };
@@ -197,6 +198,7 @@ function mapPurchase(purchase: any) {
       makingCharge: Number(item.makingCharge),
       makingChargeType: item.makingChargeType as ChargeType,
       stoneCharge: Number(item.stoneCharge),
+      stoneRate: item.stoneRate ? Number(item.stoneRate) : null,
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
       hsnCode: item.hsnCode ?? null,
       lineTotal: Number(item.lineTotal),
@@ -409,6 +411,9 @@ export async function getPurchaseFormProducts() {
       defaultMakingCharge: true,
       defaultMakingChargeType: true,
       defaultStoneCharge: true,
+      hasStoneComponent: true,
+      defaultStoneRate: true,
+      defaultCaratWeight: true,
       hsnCode: true,
       isActive: true,
     },
@@ -423,6 +428,10 @@ export async function getPurchaseFormProducts() {
       product.defaultMakingCharge !== null ? Number(product.defaultMakingCharge) : null,
     defaultStoneCharge:
       product.defaultStoneCharge !== null ? Number(product.defaultStoneCharge) : null,
+    defaultStoneRate:
+      product.defaultStoneRate !== null ? Number(product.defaultStoneRate) : null,
+    defaultCaratWeight:
+      product.defaultCaratWeight !== null ? Number(product.defaultCaratWeight) : null,
   }));
 }
 
@@ -587,11 +596,16 @@ export async function createPurchase(
             netWeight: toDecimal(item.netWeight),
             dmoWeight: toDecimal(item.dmoWeight),
             stoneWeight: toDecimal(item.stoneWeight),
+            // Previously dropped here even though it's saved onto the
+            // sibling PurchaseItem below — a purchased composite/Diamond
+            // item's stock row had nowhere to keep its own carat weight.
+            caratWeight: toDecimal(item.caratWeight),
             purchaseRate: toDecimal(item.rate),
             purchaseAmount: toDecimal(lineTotal(item)),
             makingCharge: toDecimal(item.makingCharge),
             makingChargeType: toChargeType(item.makingChargeType),
             stoneCharge: toDecimal(item.stoneCharge),
+            stoneRate: toDecimal(item.stoneRate),
             vendorId,
             vendorName: vendor.name,
             purchaseDate,
@@ -640,6 +654,7 @@ export async function createPurchase(
               makingCharge: item.makingCharge,
               makingChargeType: toChargeType(item.makingChargeType),
               stoneCharge: item.stoneCharge,
+              stoneRate: item.stoneRate ?? undefined,
               dmoWeight: item.dmoWeight ?? undefined,
               hsnCode: item.hsnCode ?? undefined,
               lineTotal: lineTotal(item),

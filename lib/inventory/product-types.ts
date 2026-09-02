@@ -16,6 +16,7 @@ export type ProductFormState = {
     defaultNetWeight?: string[]
     defaultStoneWeight?: string[]
     defaultCaratWeight?: string[]
+    defaultStoneRate?: string[]
     designCode?: string[]
     hsnCode?: string[]
     description?: string[]

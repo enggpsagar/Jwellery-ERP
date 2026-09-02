@@ -42,6 +42,7 @@ export type QuotationLineItemInput = {
   makingCharge: number;
   makingChargeType?: ChargeType | string | null;
   stoneCharge: number;
+  stoneRate?: number | null;
   inventoryStockId?: string | null;
 };
 
@@ -150,6 +151,7 @@ function mapQuotation(quotation: any) {
       makingCharge: Number(item.makingCharge),
       makingChargeType: item.makingChargeType as ChargeType,
       stoneCharge: Number(item.stoneCharge),
+      stoneRate: item.stoneRate ? Number(item.stoneRate) : null,
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
     })),
@@ -368,6 +370,8 @@ export async function getQuotationFormStockItems() {
     metalType: stock.metalType,
     purity: stock.purity,
     netWeight: stock.netWeight ? Number(stock.netWeight) : null,
+    caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
+    stoneRate: stock.stoneRate ? Number(stock.stoneRate) : null,
     saleRate: stock.saleRate ? Number(stock.saleRate) : null,
   }));
 }
@@ -523,6 +527,7 @@ export async function createQuotation(
             makingCharge: item.makingCharge,
             makingChargeType: toChargeType(item.makingChargeType),
             stoneCharge: item.stoneCharge,
+            stoneRate: item.stoneRate ?? undefined,
             lineTotal: lineTotal(item),
             inventoryStockId:
               item.inventoryStockId && validStockIds.has(item.inventoryStockId)
@@ -697,6 +702,7 @@ export async function convertQuotationToInvoice(
               makingCharge: item.makingCharge,
               makingChargeType: item.makingChargeType,
               stoneCharge: item.stoneCharge,
+              stoneRate: item.stoneRate ?? undefined,
               lineTotal: item.lineTotal,
               inventoryStockId: item.inventoryStockId ?? undefined,
             })),

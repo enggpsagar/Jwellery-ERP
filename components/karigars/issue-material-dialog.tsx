@@ -11,6 +11,7 @@ import {
 } from "@/lib/actions/inventory-stock-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { classifyMetalName } from "@/lib/business-units"
+import { todayForDateInput } from "@/lib/date-input"
 import { LocationSelect } from "@/components/shared/location-select"
 import { useToast } from "@/components/providers/toast-provider"
 
@@ -200,7 +201,7 @@ export function IssueMaterialDialog({
 
           <div className="space-y-2">
             <Label>Expected Return Date</Label>
-            <Input name="expectedDate" type="date" />
+            <Input name="expectedDate" type="date" min={todayForDateInput()} />
           </div>
 
           <div className="space-y-2">

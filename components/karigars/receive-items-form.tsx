@@ -180,8 +180,12 @@ export function ReceiveItemsForm({
     if (state.success) {
       toast.success(state.message || "Items received")
 
+      // Redirects to Stock, not back to the karigar's own page: the whole
+      // point of this action is that every returned item just became new
+      // sellable InventoryStock (see receiveItemsFromKarigar), so Stock is
+      // where the user actually wants to land to see it.
       const timer = setTimeout(() => {
-        router.push(`/karigars/${karigarId}`)
+        router.push("/inventory/stock")
         router.refresh()
       }, 800)
 
@@ -191,7 +195,7 @@ export function ReceiveItemsForm({
     if (!state.success && state.message) {
       toast.error(state.message)
     }
-  }, [state, router, toast, karigarId])
+  }, [state, router, toast])
 
   const updateItem = (key: string, patch: Partial<ReceiptItem>) => {
     setItems((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)))

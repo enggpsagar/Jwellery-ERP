@@ -3,17 +3,20 @@
 import * as React from "react";
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 
 import {
   upsertStoreMetal,
   toggleStoreMetalActive,
+  deleteStoreMetal,
   upsertStoreCategory,
   toggleStoreCategoryActive,
+  deleteStoreCategory,
   getStoreCategoryTypes,
   upsertStoreCategoryType,
   toggleStoreCategoryTypeActive,
+  deleteStoreCategoryType,
   type StoreMetalRow,
   type StoreCategoryRow,
   type StoreCategoryTypeRow,
@@ -74,6 +77,7 @@ function MetalsSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function handleToggle(id: string, isActive: boolean) {
     try {
@@ -90,6 +94,25 @@ function MetalsSection({
       toast.error("Failed to update metal");
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!window.confirm(`Delete "${name}"? This can't be undone — it only works if nothing uses it yet.`)) return
+    try {
+      setDeletingId(id);
+      const result = await deleteStoreMetal(id);
+      if (result.success) {
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete metal");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -143,6 +166,16 @@ function MetalsSection({
                     title="Edit metal"
                   >
                     <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(metal.id, metal.name)}
+                    disabled={deletingId === metal.id}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                    aria-label={`Delete ${metal.name}`}
+                    title="Delete metal (only if unused)"
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               ) : (
@@ -268,6 +301,7 @@ function CategoriesSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function handleToggle(id: string, isActive: boolean) {
     try {
@@ -284,6 +318,25 @@ function CategoriesSection({
       toast.error("Failed to update category");
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!window.confirm(`Delete "${name}"? This can't be undone — it only works if nothing uses it yet.`)) return
+    try {
+      setDeletingId(id);
+      const result = await deleteStoreCategory(id);
+      if (result.success) {
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete category");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -331,6 +384,16 @@ function CategoriesSection({
                     title="Edit category"
                   >
                     <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(category.id, category.name)}
+                    disabled={deletingId === category.id}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                    aria-label={`Delete ${category.name}`}
+                    title="Delete category (only if unused)"
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               ) : (
@@ -450,6 +513,7 @@ function TypesSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const reloadTypes = React.useCallback(async (categoryId: string) => {
     if (!categoryId) {
@@ -510,6 +574,25 @@ function TypesSection({
       toast.error("Failed to update type");
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!window.confirm(`Delete "${name}"? This can't be undone — it only works if nothing uses it yet.`)) return
+    try {
+      setDeletingId(id);
+      const result = await deleteStoreCategoryType(id);
+      if (result.success) {
+        toast.success(result.message);
+        await reloadTypes(selectedCategoryId);
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete type");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -585,6 +668,16 @@ function TypesSection({
                         title="Edit type"
                       >
                         <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(type.id, type.name)}
+                        disabled={deletingId === type.id}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                        aria-label={`Delete ${type.name}`}
+                        title="Delete type (only if unused)"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   ) : (

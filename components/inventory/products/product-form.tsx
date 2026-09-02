@@ -47,6 +47,7 @@ export type StoreMetalOption = {
   id: string;
   name: string;
   hasPurity: boolean;
+  isActive: boolean;
 };
 
 export type StoreCategoryOption = {
@@ -120,6 +121,15 @@ export function ProductForm({
 
   const [defaultPurity, setDefaultPurity] = useState(
     product?.defaultPurity ?? "__none__",
+  );
+
+  // A disabled metal (e.g. "Stone" turned off in Settings) is hidden from
+  // the picker so it can't be chosen for a NEW product — but if this
+  // product already uses one (disabled after it was picked), that entry
+  // stays visible here so editing doesn't silently drop/replace their
+  // existing selection.
+  const selectableMetals = metals.filter(
+    (item) => item.isActive || item.id === product?.metalTypeId,
   );
 
   const selectedMetal = metals.find((item) => item.id === metalTypeId);
@@ -353,9 +363,10 @@ export function ProductForm({
               </SelectTrigger>
 
               <SelectContent>
-                {metals.map((item) => (
+                {selectableMetals.map((item) => (
                   <SelectItem key={item.id} value={item.id}>
                     {item.name}
+                    {!item.isActive ? " (Disabled)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>

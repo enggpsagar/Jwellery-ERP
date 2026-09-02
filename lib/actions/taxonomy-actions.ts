@@ -167,6 +167,64 @@ export async function toggleStoreMetalActive(
   }
 }
 
+/**
+ * Deletes a metal type only when nothing references it — across every
+ * record type that carries a metalTypeId, not just Product. Blocking on
+ * ANY of these (not just the obvious ones) matters because a metal used
+ * only by, say, historical invoice lines but no live product would
+ * otherwise look "unused" and silently orphan real financial history.
+ * Disabling (toggleStoreMetalActive) is the reversible alternative for a
+ * metal that's ever been used at all.
+ */
+export async function deleteStoreMetal(id: string): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return { success: false, message: "Only a Store Admin or Super Admin can delete a metal type." };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const metal = await prisma.storeMetal.findFirst({
+      where: { id, storeId },
+      include: {
+        _count: {
+          select: {
+            products: true,
+            inventoryStocks: true,
+            kachaInvoiceItems: true,
+            invoiceItems: true,
+            ledgerEntries: true,
+            karigarJobs: true,
+            purchaseItems: true,
+            karigarReceiptItems: true,
+            quotationItems: true,
+          },
+        },
+      },
+    });
+
+    if (!metal) return { success: false, message: "Metal type not found" };
+
+    const usageCount = Object.values(metal._count).reduce((sum, n) => sum + n, 0);
+    if (usageCount > 0) {
+      return {
+        success: false,
+        message: `This metal type is used by ${usageCount} existing record(s) and cannot be deleted. Disable it instead.`,
+      };
+    }
+
+    await prisma.storeMetal.delete({ where: { id } });
+    revalidatePath(TAXONOMY_PATH);
+
+    return { success: true, message: "Metal type deleted" };
+  } catch (error) {
+    console.error("deleteStoreMetal error:", error);
+    return { success: false, message: "Failed to delete metal type" };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Store Categories
 // ---------------------------------------------------------------------------
@@ -296,6 +354,53 @@ export async function toggleStoreCategoryActive(
   } catch (error) {
     console.error("toggleStoreCategoryActive error:", error);
     return { success: false, message: "Failed to update category" };
+  }
+}
+
+/**
+ * Deletes a category only when it has no products directly on it AND none
+ * of its own types have any products either. Its types cascade-delete with
+ * it (see StoreCategoryType.category's onDelete: Cascade) — that cascade is
+ * exactly why a type-level check is required here too, not just the
+ * category's own direct product count: a category with zero of its own
+ * products can still have a type underneath it that products actually use.
+ */
+export async function deleteStoreCategory(id: string): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return { success: false, message: "Only a Store Admin or Super Admin can delete a category." };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const category = await prisma.storeCategory.findFirst({
+      where: { id, storeId },
+      include: {
+        _count: { select: { products: true } },
+        types: { include: { _count: { select: { products: true } } } },
+      },
+    });
+
+    if (!category) return { success: false, message: "Category not found" };
+
+    const typeUsage = category.types.reduce((sum, t) => sum + t._count.products, 0);
+    const usageCount = category._count.products + typeUsage;
+    if (usageCount > 0) {
+      return {
+        success: false,
+        message: `This category (or one of its types) is used by ${usageCount} product(s) and cannot be deleted. Disable it instead.`,
+      };
+    }
+
+    await prisma.storeCategory.delete({ where: { id } });
+    revalidatePath(TAXONOMY_PATH);
+
+    return { success: true, message: "Category deleted" };
+  } catch (error) {
+    console.error("deleteStoreCategory error:", error);
+    return { success: false, message: "Failed to delete category" };
   }
 }
 
@@ -449,5 +554,39 @@ export async function toggleStoreCategoryTypeActive(
   } catch (error) {
     console.error("toggleStoreCategoryTypeActive error:", error);
     return { success: false, message: "Failed to update type" };
+  }
+}
+
+export async function deleteStoreCategoryType(id: string): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return { success: false, message: "Only a Store Admin or Super Admin can delete a type." };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const type = await prisma.storeCategoryType.findFirst({
+      where: { id, storeId },
+      include: { _count: { select: { products: true } } },
+    });
+
+    if (!type) return { success: false, message: "Type not found" };
+
+    if (type._count.products > 0) {
+      return {
+        success: false,
+        message: `This type is used by ${type._count.products} product(s) and cannot be deleted. Disable it instead.`,
+      };
+    }
+
+    await prisma.storeCategoryType.delete({ where: { id } });
+    revalidatePath(TAXONOMY_PATH);
+
+    return { success: true, message: "Type deleted" };
+  } catch (error) {
+    console.error("deleteStoreCategoryType error:", error);
+    return { success: false, message: "Failed to delete type" };
   }
 }

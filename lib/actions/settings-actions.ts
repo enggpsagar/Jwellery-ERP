@@ -3,7 +3,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { UserRole, BusinessUnit } from "@prisma/client";
+import { UserRole, BusinessUnit, GstScheme } from "@prisma/client";
 import { requireStoreScope } from "@/lib/store-context";
 import { requireRole } from "@/lib/auth/auth";
 import { ALL_BUSINESS_UNITS } from "@/lib/business-units";
@@ -18,6 +18,7 @@ export type BusinessSettings = {
   panNumber: string;
   cin: string;
   stateCode: string;
+  gstScheme: GstScheme;
   address: string;
   city: string;
   state: string;
@@ -62,6 +63,7 @@ function mapSettings(settings: any): BusinessSettings {
     panNumber: settings.panNumber ?? "",
     cin: settings.cin ?? "",
     stateCode: settings.stateCode ?? "",
+    gstScheme: settings.gstScheme ?? GstScheme.REGULAR_B2C,
     address: settings.address ?? "",
     city: settings.city ?? "",
     state: settings.state ?? "",
@@ -170,6 +172,16 @@ export async function updateBusinessSettings(
       };
     }
 
+    const gstSchemeRaw = String(formData.get("gstScheme") || GstScheme.REGULAR_B2C);
+    if (!Object.values(GstScheme).includes(gstSchemeRaw as GstScheme)) {
+      return {
+        success: false,
+        message: "Invalid GST scheme",
+        errors: { gstScheme: ["Select a valid GST scheme"] },
+      };
+    }
+    const gstScheme = gstSchemeRaw as GstScheme;
+
     const storeId = await requireStoreScope();
     const businessUnits = parseBusinessUnits(formData);
 
@@ -179,6 +191,7 @@ export async function updateBusinessSettings(
         businessName,
         legalName: toOptionalString(formData.get("legalName")),
         gstNumber,
+        gstScheme,
         panNumber: toOptionalString(formData.get("panNumber")),
         cin: toOptionalString(formData.get("cin")),
         stateCode: toOptionalString(formData.get("stateCode")),
@@ -206,6 +219,7 @@ export async function updateBusinessSettings(
         businessName,
         legalName: toOptionalString(formData.get("legalName")),
         gstNumber,
+        gstScheme,
         panNumber: toOptionalString(formData.get("panNumber")),
         cin: toOptionalString(formData.get("cin")),
         stateCode: toOptionalString(formData.get("stateCode")),
@@ -233,6 +247,9 @@ export async function updateBusinessSettings(
     revalidatePath("/settings");
     revalidatePath("/ledger");
     revalidatePath("/customers");
+    revalidatePath("/billing/new");
+    revalidatePath("/quotations/new");
+    revalidatePath("/purchases/new");
 
     return { success: true, message: "Settings updated successfully" };
   } catch (error) {

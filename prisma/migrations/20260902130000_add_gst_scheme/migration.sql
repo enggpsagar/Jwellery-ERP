@@ -1,0 +1,18 @@
+-- CreateEnum
+CREATE TYPE "GstScheme" AS ENUM ('REGULAR_B2C', 'REGULAR_B2B', 'COMPOSITION');
+
+-- AlterTable
+ALTER TABLE "BusinessSettings" ADD COLUMN     "gstScheme" "GstScheme" NOT NULL DEFAULT 'REGULAR_B2C';
+
+-- AlterTable
+ALTER TABLE "InvoiceItem" ADD COLUMN     "igstAmount" DECIMAL(12,2) NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "Purchase" ADD COLUMN     "cgstAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "igstAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "sgstAmount" DECIMAL(12,2) NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "Quotation" ADD COLUMN     "cgstAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "igstAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "sgstAmount" DECIMAL(12,2) NOT NULL DEFAULT 0;

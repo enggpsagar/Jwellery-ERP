@@ -73,6 +73,8 @@ export default async function EditInvoicePage({ params }: Props) {
         stockItems={stockItems}
         locations={locations}
         defaultGstRate={businessSettings.defaultGstRate}
+        gstScheme={businessSettings.gstScheme}
+        storeState={businessSettings.state}
         initialCustomerId={invoice.customer?.id}
         initialLocationId={invoice.locationId ?? undefined}
         initialItems={initialItems}

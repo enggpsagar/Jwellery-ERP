@@ -1,7 +1,7 @@
 // lib/actions/ledger-actions.ts
 "use server"
 
-import { LedgerEntryType } from "@prisma/client"
+import { LedgerEntryType, InvoiceStatus } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
@@ -409,7 +409,9 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
       },
     }),
     prisma.invoiceItem.findMany({
-      where: { invoice: { storeId, ...locationWhere(scope) } },
+      where: {
+        invoice: { storeId, status: { not: InvoiceStatus.CANCELLED }, ...locationWhere(scope) },
+      },
       select: {
         netWeight: true,
         lineTotal: true,

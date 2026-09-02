@@ -184,7 +184,17 @@ function mapInvoice(invoice: any) {
     paidAmount: Number(invoice.paidAmount),
     balanceAmount: Number(invoice.balanceAmount),
     notes: invoice.notes,
+    locationId: invoice.locationId ?? null,
     createdByName: invoice.createdByName ?? invoice.createdBy?.name ?? null,
+    cancelledAt: invoice.cancelledAt?.toISOString() ?? null,
+    cancelledByName: invoice.cancelledByName ?? invoice.cancelledBy?.name ?? null,
+    cancellationReason: invoice.cancellationReason ?? null,
+    replaces: invoice.replaces
+      ? { id: invoice.replaces.id, invoiceNumber: invoice.replaces.invoiceNumber }
+      : null,
+    replacedBy: invoice.replacedBy
+      ? { id: invoice.replacedBy.id, invoiceNumber: invoice.replacedBy.invoiceNumber }
+      : null,
     customer: invoice.customer
       ? {
           id: invoice.customer.id,
@@ -426,9 +436,12 @@ export async function getInvoiceById(id: string) {
         },
       },
       createdBy: { select: { name: true, email: true } },
+      cancelledBy: { select: { name: true, email: true } },
       items: true,
       ledgerEntries: { orderBy: { entryDate: "desc" } },
       convertedFromKacha: { select: { id: true, slipNumber: true } },
+      replaces: { select: { id: true, invoiceNumber: true } },
+      replacedBy: { select: { id: true, invoiceNumber: true } },
     },
   });
 
@@ -513,6 +526,7 @@ export async function createInvoice(
     const dueDateRaw = String(formData.get("dueDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
     const locationId = String(formData.get("locationId") || "").trim() || null;
+    const replacesId = String(formData.get("replacesId") || "").trim() || null;
 
     const subtotal = items.reduce(
       (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
@@ -601,6 +615,23 @@ export async function createInvoice(
       }
     }
 
+    // A replacement invoice may only target a cancelled invoice in this
+    // store that hasn't already been replaced — replacesId's @unique
+    // constraint would reject a second one anyway, but this surfaces a
+    // real message instead of a raw DB constraint error.
+    if (replacesId) {
+      const replaced = await prisma.invoice.findFirst({
+        where: { id: replacesId, storeId },
+        select: { status: true, replacedBy: { select: { id: true } } },
+      });
+      if (!replaced || replaced.status !== InvoiceStatus.CANCELLED) {
+        return { success: false, message: "The invoice being replaced must be a cancelled invoice" };
+      }
+      if (replaced.replacedBy) {
+        return { success: false, message: "That cancelled invoice has already been replaced" };
+      }
+    }
+
     // Every referenced stock item must belong to this store — otherwise a
     // crafted itemsJson could link a line item to another store's stock,
     // leaking its details (and, via the SOLD-status update below, its
@@ -664,6 +695,7 @@ export async function createInvoice(
           // still says who raised it after that person leaves the shop.
           createdById: actor.id ?? null,
           createdByName: actor.name ?? actor.email ?? null,
+          replacesId: replacesId ?? undefined,
           items: {
             create: items.map((item) => ({
               itemName: item.itemName,
@@ -866,6 +898,205 @@ export async function recordInvoicePayment(
   } catch (error) {
     console.error("recordInvoicePayment error:", error);
     return { success: false, message: "Failed to record payment" };
+  }
+}
+
+/**
+ * Edit an invoice's non-financial fields only — invoice date, due date,
+ * location, and notes. Line items, amounts, and payments are never
+ * touched here on purpose: once stock has been decremented and ledger
+ * entries posted, changing those needs the same reversal logic Cancel
+ * already does, not a quiet in-place edit. A real correction goes through
+ * cancelInvoice + a replacement invoice instead.
+ */
+export async function updateInvoice(
+  id: string,
+  prevState: InvoiceFormState = initialState,
+  formData: FormData,
+): Promise<InvoiceFormState> {
+  try {
+    try {
+      await requirePermission(PERMISSIONS.BILLING_UPDATE);
+    } catch {
+      return { success: false, message: "You do not have permission to edit invoices." };
+    }
+
+    const storeId = await requireStoreScope();
+    const invoice = await prisma.invoice.findFirst({ where: { id, storeId } });
+    if (!invoice) return { success: false, message: "Invoice not found" };
+
+    if (invoice.status === InvoiceStatus.CANCELLED) {
+      return {
+        success: false,
+        message: "Cancelled invoices can't be edited — create a replacement instead.",
+      };
+    }
+
+    const invoiceDateRaw = String(formData.get("invoiceDate") || "");
+    const dueDateRaw = String(formData.get("dueDate") || "");
+    const notes = String(formData.get("notes") || "").trim() || null;
+    const locationId = String(formData.get("locationId") || "").trim() || null;
+
+    if (locationId) {
+      const location = await prisma.storeLocation.findFirst({
+        where: { id: locationId, storeId },
+        select: { id: true },
+      });
+      if (!location) {
+        return { success: false, message: "Selected location is invalid" };
+      }
+
+      const scope = await getLocationScope();
+      if (!isLocationAllowed(scope, locationId)) {
+        return { success: false, message: "You don't have access to bill against this location" };
+      }
+    }
+
+    await prisma.invoice.update({
+      where: { id },
+      data: {
+        invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : invoice.invoiceDate,
+        dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+        notes,
+        locationId: locationId ?? null,
+      },
+    });
+
+    revalidatePath("/billing");
+    revalidatePath(`/billing/${id}`);
+
+    return { success: true, message: "Invoice updated" };
+  } catch (error) {
+    console.error("updateInvoice error:", error);
+    return { success: false, message: "Failed to update invoice" };
+  }
+}
+
+/**
+ * Cancel a DRAFT or PARTIAL invoice — restores every stock-linked line's
+ * quantity (flipping SOLD back to IN_STOCK where the row had hit zero),
+ * and writes off the invoice's current outstanding balance with one
+ * offsetting CREDIT ledger entry. Payments already recorded keep their
+ * own CREDIT entries untouched — cancelling forgives what's still owed,
+ * it doesn't refund money already received. A fully PAID invoice can't be
+ * cancelled here on purpose: that needs a real refund decision, not a
+ * status flip.
+ */
+export async function cancelInvoice(
+  id: string,
+  prevState: InvoiceFormState = initialState,
+  formData: FormData,
+): Promise<InvoiceFormState> {
+  try {
+    let actor;
+    try {
+      actor = await requirePermission(PERMISSIONS.BILLING_UPDATE);
+    } catch {
+      return { success: false, message: "You do not have permission to cancel invoices." };
+    }
+
+    const storeId = await requireStoreScope();
+    const invoice = await prisma.invoice.findFirst({
+      where: { id, storeId },
+      include: { items: true },
+    });
+    if (!invoice) return { success: false, message: "Invoice not found" };
+
+    if (invoice.status !== InvoiceStatus.DRAFT && invoice.status !== InvoiceStatus.PARTIAL) {
+      return {
+        success: false,
+        message: "Only draft or partially-paid invoices can be cancelled.",
+      };
+    }
+
+    const cancellationReason = String(formData.get("cancellationReason") || "").trim() || null;
+    const balanceAmount = Number(invoice.balanceAmount);
+
+    await prisma.$transaction(async (tx) => {
+      for (const item of invoice.items) {
+        if (!item.inventoryStockId) continue;
+
+        const restoreQty = Math.max(1, item.quantity || 1);
+
+        // No `gte` guard needed for an increment — there's no way to
+        // "over-restore" past what this invoice itself decremented.
+        await tx.inventoryStock.updateMany({
+          where: { id: item.inventoryStockId, storeId },
+          data: { quantity: { increment: restoreQty } },
+        });
+
+        // Same principle as createInvoice's stock decrement: trust the
+        // post-write read, never a pre-write snapshot, when deciding
+        // whether to flip status.
+        const updatedStock = await tx.inventoryStock.findUnique({
+          where: { id: item.inventoryStockId },
+          select: { quantity: true, status: true },
+        });
+        if (
+          updatedStock &&
+          updatedStock.quantity > 0 &&
+          updatedStock.status === InventoryStockStatus.SOLD
+        ) {
+          await tx.inventoryStock.update({
+            where: { id: item.inventoryStockId },
+            data: { status: InventoryStockStatus.IN_STOCK },
+          });
+        }
+
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryStockId: item.inventoryStockId,
+            transactionType: InventoryTransactionType.SALE_RETURN,
+            quantity: restoreQty,
+            netWeight: item.netWeight ?? undefined,
+            referenceType: "Invoice",
+            referenceId: invoice.id,
+            notes: "Stock restored — invoice cancelled",
+          },
+        });
+      }
+
+      // Only the still-outstanding portion needs writing off — any
+      // payments already recorded posted their own CREDIT entries and
+      // stay exactly as they are; this doesn't touch them.
+      if (balanceAmount > 0) {
+        await tx.ledgerEntry.create({
+          data: {
+            storeId,
+            type: LedgerEntryType.CREDIT,
+            sourceType: LedgerSourceType.SALE,
+            customerId: invoice.customerId,
+            invoiceId: invoice.id,
+            amount: balanceAmount,
+            description: `Invoice ${invoice.invoiceNumber} cancelled — balance written off`,
+            locationId: invoice.locationId ?? undefined,
+          },
+        });
+      }
+
+      await tx.invoice.update({
+        where: { id },
+        data: {
+          status: InvoiceStatus.CANCELLED,
+          // The offsetting ledger entry above is what explains why this
+          // hit zero — totalAmount/paidAmount stay untouched as the
+          // historical record of what was billed and actually received.
+          balanceAmount: 0,
+          cancelledAt: new Date(),
+          cancelledById: actor.id ?? null,
+          cancelledByName: actor.name ?? actor.email ?? null,
+          cancellationReason,
+        },
+      });
+    });
+
+    revalidatePath("/billing");
+    revalidatePath(`/billing/${id}`);
+
+    return { success: true, message: `Invoice ${invoice.invoiceNumber} cancelled` };
+  } catch (error) {
+    console.error("cancelInvoice error:", error);
+    return { success: false, message: "Failed to cancel invoice" };
   }
 }
 

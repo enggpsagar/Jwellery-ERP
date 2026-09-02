@@ -1,15 +1,19 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeftCircle, Printer } from "lucide-react"
+import { ArrowLeftCircle, ArrowRightCircle, Plus, Printer } from "lucide-react"
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
+import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog"
 import { EmailInvoiceButton } from "@/components/billing/email-invoice-button"
 import { ShareWhatsAppButton } from "@/components/billing/share-whatsapp-button"
+import { EditInvoiceDialog } from "@/components/billing/edit-invoice-dialog"
+import { CancelInvoiceDialog } from "@/components/billing/cancel-invoice-dialog"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import { Button } from "@/components/ui/button"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -25,14 +29,18 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
     href: "/billing",
     label: "Back to Billing",
   })
-  const [invoice, settings] = await Promise.all([
+  const [invoice, settings, locations] = await Promise.all([
     getInvoiceById(id),
     getBusinessSettings(),
+    getStoreLocations(),
   ])
 
   if (!invoice) notFound()
 
   const whatsappMessage = `Hi! Here is your invoice ${invoice.invoiceNumber} from ${settings.businessName}. Total: ₹${invoice.totalAmount.toFixed(2)}. Balance due: ₹${invoice.balanceAmount.toFixed(2)}.`
+
+  const isCancelled = invoice.status === "CANCELLED"
+  const isCancellable = invoice.status === "DRAFT" || invoice.status === "PARTIAL"
 
   return (
     <main className="space-y-6 p-6">
@@ -55,10 +63,29 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               message={whatsappMessage}
             />
             <EmailInvoiceButton invoiceId={invoice.id} />
-            <RecordPaymentDialog
-              invoiceId={invoice.id}
-              balanceAmount={invoice.balanceAmount}
-            />
+            {!isCancelled && (
+              <EditInvoiceDialog
+                invoiceId={invoice.id}
+                invoiceDate={invoice.invoiceDate}
+                dueDate={invoice.dueDate}
+                notes={invoice.notes}
+                locationId={invoice.locationId ?? null}
+                locations={locations}
+              />
+            )}
+            {isCancellable && (
+              <CancelInvoiceDialog
+                invoiceId={invoice.id}
+                invoiceNumber={invoice.invoiceNumber}
+                balanceAmount={invoice.balanceAmount}
+              />
+            )}
+            {!isCancelled && (
+              <RecordPaymentDialog
+                invoiceId={invoice.id}
+                balanceAmount={invoice.balanceAmount}
+              />
+            )}
           </div>
         }
       />
@@ -76,6 +103,24 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                 >
                   <ArrowLeftCircle className="h-3.5 w-3.5" />
                   Converted from Kacha Slip ({invoice.convertedFromKacha.slipNumber})
+                </Link>
+              )}
+              {invoice.replaces && (
+                <Link
+                  href={`/billing/${invoice.replaces.id}?from=${encodeURIComponent(`/billing/${invoice.id}`)}`}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                >
+                  <ArrowLeftCircle className="h-3.5 w-3.5" />
+                  Replaces {invoice.replaces.invoiceNumber}
+                </Link>
+              )}
+              {invoice.replacedBy && (
+                <Link
+                  href={`/billing/${invoice.replacedBy.id}?from=${encodeURIComponent(`/billing/${invoice.id}`)}`}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                >
+                  Replaced by {invoice.replacedBy.invoiceNumber}
+                  <ArrowRightCircle className="h-3.5 w-3.5" />
                 </Link>
               )}
             </div>
@@ -128,6 +173,32 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           </div>
         </div>
       </div>
+
+      {isCancelled && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 space-y-3">
+          <div>
+            <p className="font-medium text-red-700">This invoice was cancelled</p>
+            <p className="text-sm text-red-700/80">
+              {invoice.cancelledAt &&
+                new Date(invoice.cancelledAt).toLocaleString("en-IN")}
+              {invoice.cancelledByName ? ` · by ${invoice.cancelledByName}` : ""}
+            </p>
+            {invoice.cancellationReason && (
+              <p className="mt-1 text-sm text-red-700/80">
+                Reason: {invoice.cancellationReason}
+              </p>
+            )}
+          </div>
+          {!invoice.replacedBy && (
+            <Button asChild size="sm" className="gap-2">
+              <Link href={`/billing/${invoice.id}/replace`}>
+                <Plus className="h-4 w-4" />
+                Create Replacement Invoice
+              </Link>
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-xl border bg-card">
         <table className="min-w-full text-sm">

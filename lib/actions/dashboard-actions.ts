@@ -1,7 +1,7 @@
 // FILE PATH: lib/actions/dashboard-actions.ts
 "use server";
 
-import { InventoryStockStatus } from "@prisma/client";
+import { InventoryStockStatus, InvoiceStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -99,23 +99,48 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     overdueJobs,
   ] = await Promise.all([
     prisma.invoice.aggregate({
-      where: { storeId, invoiceDate: { gte: todayStart }, ...locationWhere(scope) },
+      where: {
+        storeId,
+        invoiceDate: { gte: todayStart },
+        status: { not: InvoiceStatus.CANCELLED },
+        ...locationWhere(scope),
+      },
       _sum: { totalAmount: true },
     }),
     prisma.invoice.aggregate({
-      where: { storeId, invoiceDate: { gte: yesterdayStart, lt: todayStart }, ...locationWhere(scope) },
+      where: {
+        storeId,
+        invoiceDate: { gte: yesterdayStart, lt: todayStart },
+        status: { not: InvoiceStatus.CANCELLED },
+        ...locationWhere(scope),
+      },
       _sum: { totalAmount: true },
     }),
     prisma.invoice.aggregate({
-      where: { storeId, invoiceDate: { gte: monthStart }, ...locationWhere(scope) },
+      where: {
+        storeId,
+        invoiceDate: { gte: monthStart },
+        status: { not: InvoiceStatus.CANCELLED },
+        ...locationWhere(scope),
+      },
       _sum: { totalAmount: true },
     }),
     prisma.invoice.aggregate({
-      where: { storeId, invoiceDate: { gte: lastMonthStart, lt: monthStart }, ...locationWhere(scope) },
+      where: {
+        storeId,
+        invoiceDate: { gte: lastMonthStart, lt: monthStart },
+        status: { not: InvoiceStatus.CANCELLED },
+        ...locationWhere(scope),
+      },
       _sum: { totalAmount: true },
     }),
     prisma.invoice.aggregate({
-      where: { storeId, balanceAmount: { gt: 0 }, ...locationWhere(scope) },
+      where: {
+        storeId,
+        balanceAmount: { gt: 0 },
+        status: { not: InvoiceStatus.CANCELLED },
+        ...locationWhere(scope),
+      },
       _sum: { balanceAmount: true },
       _count: true,
     }),
@@ -454,15 +479,15 @@ export type DashboardTransaction = {
   metal: string;
   weight: string;
   amount: string;
-  status: "Paid" | "Pending" | "Partial";
+  status: "Paid" | "Pending" | "Partial" | "Cancelled";
   date: string;
 };
 
-const STATUS_MAP: Record<string, "Paid" | "Pending" | "Partial"> = {
+const STATUS_MAP: Record<string, "Paid" | "Pending" | "Partial" | "Cancelled"> = {
   PAID: "Paid",
   DRAFT: "Pending",
   PARTIAL: "Partial",
-  CANCELLED: "Pending",
+  CANCELLED: "Cancelled",
 };
 
 export async function getRecentTransactions(

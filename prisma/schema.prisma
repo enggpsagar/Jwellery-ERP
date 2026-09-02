@@ -496,10 +496,18 @@ model Invoice {
   // answer, and inventing one would be worse than showing none.
   createdById            String?
   createdByName          String?
+  // Set when this invoice is cancelled via cancelInvoice — the id/name
+  // snapshot follows the same convention as createdById/createdByName,
+  // for the same reason (staff leave and get renamed).
+  cancelledAt            DateTime?
+  cancelledById          String?
+  cancelledByName        String?
+  cancellationReason     String?
   createdAt              DateTime      @default(now())
   updatedAt              DateTime      @updatedAt
   store                  Store         @relation(fields: [storeId], references: [id])
   createdBy              User?         @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  cancelledBy            User?         @relation("InvoiceCancelledBy", fields: [cancelledById], references: [id])
   customer               Customer      @relation(fields: [customerId], references: [id])
   items                  InvoiceItem[]
   ledgerEntries          LedgerEntry[]
@@ -507,9 +515,18 @@ model Invoice {
   convertedFromQuotation Quotation?    @relation("QuotationConvertedToInvoice")
   locationId             String?
   location               StoreLocation? @relation(fields: [locationId], references: [id])
+  // Self-relation for "this invoice was raised to replace a cancelled
+  // one" — replacesId lives on the new invoice (same source-owns-the-FK
+  // convention as KachaInvoice.convertedToId/Quotation.convertedToId
+  // pointing at Invoice), @unique so a cancelled invoice can be replaced
+  // by at most one new invoice.
+  replacesId             String?       @unique
+  replaces               Invoice?      @relation("InvoiceReplaces", fields: [replacesId], references: [id])
+  replacedBy             Invoice?      @relation("InvoiceReplaces")
 
   @@unique([storeId, invoiceNumber])
   @@index([createdById])
+  @@index([cancelledById])
   @@index([customerId])
   @@index([invoiceDate])
   @@index([status])
@@ -1028,6 +1045,7 @@ model User {
   locationAccess      UserLocationAccess[]
   scanSessions        ScanSession[]
   invoicesCreated     Invoice[]     @relation("InvoiceCreatedBy")
+  invoicesCancelled   Invoice[]     @relation("InvoiceCancelledBy")
   apiKeysCreated      ApiKey[]      @relation("ApiKeyCreatedBy")
   customersCreated    Customer[]    @relation("CustomerCreatedBy")
 

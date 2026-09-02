@@ -24,6 +24,7 @@ const statusStyles: Record<string, string> = {
   Paid: "bg-emerald-50 text-emerald-700",
   Pending: "bg-amber-50 text-amber-700",
   Partial: "bg-blue-50 text-blue-700",
+  Cancelled: "bg-red-50 text-red-700",
 }
 
 type TransactionsTableProps = {

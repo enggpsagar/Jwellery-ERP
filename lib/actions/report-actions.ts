@@ -1,7 +1,7 @@
 // lib/actions/report-actions.ts
 "use server";
 
-import { InventoryStockStatus, InventoryTransactionType } from "@prisma/client";
+import { InventoryStockStatus, InventoryTransactionType, InvoiceStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -28,7 +28,12 @@ function toDateRangeWhere(range: DateRange, field: string) {
 export async function getSalesReport(range: DateRange = {}) {
   const storeId = await requireStoreScope();
   const scope = await getLocationScope();
-  const where = { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "invoiceDate") };
+  const where = {
+    storeId,
+    status: { not: InvoiceStatus.CANCELLED },
+    ...locationWhere(scope),
+    ...toDateRangeWhere(range, "invoiceDate"),
+  };
 
   const invoices = await prisma.invoice.findMany({
     where,
@@ -557,6 +562,7 @@ export async function getSalesByUserReport(range: DateRange = {}) {
   const invoices = await prisma.invoice.findMany({
     where: {
       storeId,
+      status: { not: InvoiceStatus.CANCELLED },
       ...locationWhere(scope),
       ...toDateRangeWhere(range, "invoiceDate"),
     },

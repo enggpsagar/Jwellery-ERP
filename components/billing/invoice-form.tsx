@@ -47,7 +47,7 @@ type StockOption = {
   quantity: number
 }
 
-type LineItem = {
+export type LineItem = {
   key: string
   itemName: string
   metalTypeId: string
@@ -113,15 +113,35 @@ type InvoiceFormProps = {
    * here per invoice — a store on an exempt sale, or one that changes its
    * rate mid-year, isn't stuck with whatever Settings says today. */
   defaultGstRate?: number
+  /** Prefill from a cancelled invoice being replaced — see
+   * app/(dashboard)/billing/[id]/replace/page.tsx. All optional; a fresh
+   * "New Invoice" passes none of these. */
+  initialCustomerId?: string
+  initialLocationId?: string
+  initialItems?: LineItem[]
+  replacesId?: string
+  replacesInvoiceNumber?: string
 }
 
-export function InvoiceForm({ customers, stockItems, locations, defaultGstRate = 0 }: InvoiceFormProps) {
+export function InvoiceForm({
+  customers,
+  stockItems,
+  locations,
+  defaultGstRate = 0,
+  initialCustomerId,
+  initialLocationId,
+  initialItems,
+  replacesId,
+  replacesInvoiceNumber,
+}: InvoiceFormProps) {
   const router = useRouter()
   const toast = useToast()
 
-  const [customerId, setCustomerId] = useState("")
-  const [locationId, setLocationId] = useState("")
-  const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
+  const [customerId, setCustomerId] = useState(initialCustomerId ?? "")
+  const [locationId, setLocationId] = useState(initialLocationId ?? "")
+  const [items, setItems] = useState<LineItem[]>(
+    initialItems && initialItems.length ? initialItems : [emptyLineItem()],
+  )
   const [discount, setDiscount] = useState(0)
   const [gstRate, setGstRate] = useState(defaultGstRate)
   const [paidAmount, setPaidAmount] = useState(0)
@@ -416,6 +436,14 @@ export function InvoiceForm({ customers, stockItems, locations, defaultGstRate =
       <input type="hidden" name="discount" value={discount} />
       <input type="hidden" name="taxAmount" value={taxAmount} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
+      {replacesId && <input type="hidden" name="replacesId" value={replacesId} />}
+
+      {replacesInvoiceNumber && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Replacing cancelled invoice <span className="font-medium">{replacesInvoiceNumber}</span> —
+          review the details below before saving.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2">

@@ -62,6 +62,7 @@ function serializeProduct(product: {
   defaultGrossWeight: { toString(): string } | null;
   defaultNetWeight: { toString(): string } | null;
   defaultStoneWeight: { toString(): string } | null;
+  defaultCaratWeight: { toString(): string } | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -88,6 +89,7 @@ function serializeProduct(product: {
     defaultGrossWeight: product.defaultGrossWeight?.toString() ?? null,
     defaultNetWeight: product.defaultNetWeight?.toString() ?? null,
     defaultStoneWeight: product.defaultStoneWeight?.toString() ?? null,
+    defaultCaratWeight: product.defaultCaratWeight?.toString() ?? null,
     designCode: product.designCode,
     hsnCode: product.hsnCode,
     description: product.description,
@@ -163,6 +165,7 @@ function mapProductRow(row: {
   defaultGrossWeight: { toString(): string } | null;
   defaultNetWeight: { toString(): string } | null;
   defaultStoneWeight: { toString(): string } | null;
+  defaultCaratWeight: { toString(): string } | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -191,6 +194,8 @@ function mapProductRow(row: {
       row.defaultNetWeight != null ? Number(row.defaultNetWeight) : null,
     defaultStoneWeight:
       row.defaultStoneWeight != null ? Number(row.defaultStoneWeight) : null,
+    defaultCaratWeight:
+      row.defaultCaratWeight != null ? Number(row.defaultCaratWeight) : null,
     designCode: row.designCode,
     hsnCode: row.hsnCode,
     description: row.description,
@@ -298,6 +303,7 @@ export async function exportProductsToExcel(
       "Gross Weight (g)": product.defaultGrossWeight ?? "-",
       "Net Weight (g)": product.defaultNetWeight ?? "-",
       "Stone Weight (g)": product.defaultStoneWeight ?? "-",
+      "Carat Weight (ct)": product.defaultCaratWeight ?? "-",
       Description: product.description || "-",
       Notes: product.notes || "-",
       Status: product.isActive ? "Active" : "Inactive",
@@ -441,6 +447,9 @@ export async function createProduct(
     const defaultStoneWeight = parseNullableDecimal(
       formData.get("defaultStoneWeight"),
     );
+    const defaultCaratWeight = parseNullableDecimal(
+      formData.get("defaultCaratWeight"),
+    );
 
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
@@ -510,6 +519,7 @@ export async function createProduct(
         defaultGrossWeight,
         defaultNetWeight,
         defaultStoneWeight,
+        defaultCaratWeight,
         designCode,
         hsnCode,
         description,
@@ -576,6 +586,7 @@ export async function createProduct(
               grossWeight: defaultGrossWeight,
               netWeight: defaultNetWeight,
               stoneWeight: defaultStoneWeight,
+              caratWeight: defaultCaratWeight,
             },
           });
 
@@ -674,6 +685,9 @@ export async function updateProduct(
     const defaultStoneWeight = parseNullableDecimal(
       formData.get("defaultStoneWeight"),
     );
+    const defaultCaratWeight = parseNullableDecimal(
+      formData.get("defaultCaratWeight"),
+    );
 
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
@@ -746,6 +760,7 @@ export async function updateProduct(
     defaultGrossWeight,
     defaultNetWeight,
     defaultStoneWeight,
+    defaultCaratWeight,
     designCode,
     hsnCode,
     description,

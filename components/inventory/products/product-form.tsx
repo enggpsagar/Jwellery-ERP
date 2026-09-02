@@ -76,6 +76,7 @@ type Product = {
   defaultGrossWeight: string | null;
   defaultNetWeight: string | null;
   defaultStoneWeight: string | null;
+  defaultCaratWeight: string | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -172,6 +173,40 @@ export function ProductForm({
   );
   const [netWeight, setNetWeight] = useState(product?.defaultNetWeight ?? "");
   const [netTouched, setNetTouched] = useState(false);
+
+  // Diamonds are weighed by carat, not gram, but this form only has one
+  // Weight field (Net Weight, shared with every other metal) — so a Diamond
+  // product's Carat Weight converts into it directly rather than getting a
+  // parallel weight of its own. 1 carat = 0.2 g, the standard used
+  // industry-wide.
+  const [caratWeight, setCaratWeight] = useState(
+    product?.defaultCaratWeight ?? "",
+  );
+  const CARAT_TO_GRAM = 0.2;
+
+  function handleCaratWeightChange(value: string) {
+    setCaratWeight(value);
+
+    const caratNum = Number(value);
+    if (value.trim() !== "" && Number.isFinite(caratNum)) {
+      setNetTouched(true);
+      setNetWeight(String(Number((caratNum * CARAT_TO_GRAM).toFixed(5))));
+    }
+  }
+
+  function handleNetWeightChange(value: string) {
+    setNetTouched(true);
+    setNetWeight(value);
+
+    if (metalFamily !== "DIAMOND") return;
+
+    const netNum = Number(value);
+    if (value.trim() !== "" && Number.isFinite(netNum)) {
+      setCaratWeight(String(Number((netNum / CARAT_TO_GRAM).toFixed(5))));
+    } else {
+      setCaratWeight("");
+    }
+  }
 
   const gross = Number(grossWeight);
   const stone = stoneWeight.trim() === "" ? 0 : Number(stoneWeight);
@@ -483,13 +518,7 @@ export function ProductForm({
               step="0.00001"
               min="0"
               value={netWeight}
-              onChange={(event) => {
-                // Typing here takes ownership of the field — from this point
-                // gross/stone stop driving it, so a deliberate figure is
-                // never silently overwritten.
-                setNetTouched(true);
-                setNetWeight(event.target.value);
-              }}
+              onChange={(event) => handleNetWeightChange(event.target.value)}
               placeholder="0.000"
             />
 
@@ -501,6 +530,31 @@ export function ProductForm({
 
             <ErrorText error={state.errors.defaultNetWeight} />
           </div>
+
+          {metalFamily === "DIAMOND" && (
+            <div>
+              <Label htmlFor="defaultCaratWeight">Carat Weight (ct)</Label>
+
+              <Input
+                id="defaultCaratWeight"
+                name="defaultCaratWeight"
+                type="number"
+                step="0.001"
+                min="0"
+                value={caratWeight}
+                onChange={(event) =>
+                  handleCaratWeightChange(event.target.value)
+                }
+                placeholder="0.000"
+              />
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                1 ct = 0.2 g. Converts with Net Weight automatically.
+              </p>
+
+              <ErrorText error={state.errors.defaultCaratWeight} />
+            </div>
+          )}
         </div>
       </div>
 

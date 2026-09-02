@@ -73,7 +73,7 @@ export function StoreSwitcher({ stores, activeStoreId }: StoreSwitcherProps) {
         <StoreIcon className="h-4 w-4 text-muted-foreground" />
         <SelectValue placeholder="Select a store" />
       </SelectTrigger>
-      <SelectContent position="popper" align="start" className="w-72">
+      <SelectContent position="popper" align="start" className="w-96">
         <div className="p-2">
           <Input
             placeholder="Search stores..."

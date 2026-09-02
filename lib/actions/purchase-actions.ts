@@ -162,6 +162,7 @@ function mapPurchase(purchase: any) {
   return {
     id: purchase.id,
     purchaseNumber: purchase.purchaseNumber,
+    vendorInvoiceNumber: purchase.vendorInvoiceNumber,
     purchaseDate: purchase.purchaseDate.toISOString(),
     status: purchase.status as InvoiceStatus,
     subtotal: Number(purchase.subtotal),
@@ -477,6 +478,7 @@ export async function createPurchase(
     const paidAmount = toNumber(formData.get("paidAmount"));
     const purchaseDateRaw = String(formData.get("purchaseDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
+    const vendorInvoiceNumber = String(formData.get("vendorInvoiceNumber") || "").trim() || null;
 
     const subtotal = items.reduce(
       (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
@@ -588,6 +590,7 @@ export async function createPurchase(
           paidAmount,
           balanceAmount,
           notes,
+          vendorInvoiceNumber,
           locationId: locationId ?? undefined,
           items: {
             create: items.map((item, i) => ({

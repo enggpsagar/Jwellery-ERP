@@ -59,6 +59,13 @@ export default async function PurchaseDetailPage({ params }: Props) {
               <p className="font-medium">—</p>
             )}
           </div>
+
+          {purchase.vendorInvoiceNumber && (
+            <div>
+              <p className="text-sm text-muted-foreground">Vendor Invoice Number</p>
+              <p className="font-medium">{purchase.vendorInvoiceNumber}</p>
+            </div>
+          )}
         </div>
       </div>
 

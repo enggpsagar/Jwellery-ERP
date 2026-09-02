@@ -130,6 +130,7 @@ type PurchaseDraft = {
   paidAmount: number
   purchaseDate: string
   notes: string
+  vendorInvoiceNumber: string
   /** Which line item asked for the new product, so it lands on that row. */
   pendingProductForKey?: string
 }
@@ -189,8 +190,8 @@ export function PurchaseForm({
    * vendor or product. Without this, "Add New Vendor" would silently throw
    * away every line item the user had already entered.
    *
-   * Purchase date and notes are uncontrolled inputs, so they are read off
-   * the form element rather than from state.
+   * Purchase date, notes, and vendor invoice number are uncontrolled
+   * inputs, so they are read off the form element rather than from state.
    */
   const saveDraft = (pendingProductForKey?: string) => {
     const formData = formRef.current ? new FormData(formRef.current) : null
@@ -203,6 +204,7 @@ export function PurchaseForm({
       paidAmount,
       purchaseDate: formData ? String(formData.get("purchaseDate") ?? "") : "",
       notes: formData ? String(formData.get("notes") ?? "") : "",
+      vendorInvoiceNumber: formData ? String(formData.get("vendorInvoiceNumber") ?? "") : "",
       pendingProductForKey,
     }
 
@@ -289,6 +291,13 @@ export function PurchaseForm({
           "notes",
         ) as HTMLTextAreaElement | null
         if (notesInput && draft.notes) notesInput.value = draft.notes
+
+        const vendorInvoiceNumberInput = formRef.current.elements.namedItem(
+          "vendorInvoiceNumber",
+        ) as HTMLInputElement | null
+        if (vendorInvoiceNumberInput && draft.vendorInvoiceNumber) {
+          vendorInvoiceNumberInput.value = draft.vendorInvoiceNumber
+        }
       }
 
       // Both pickers seed their selection from `defaultValue` into internal
@@ -443,6 +452,14 @@ export function PurchaseForm({
             type="date"
             name="purchaseDate"
             defaultValue={new Date().toISOString().slice(0, 10)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Vendor Invoice Number</Label>
+          <Input
+            name="vendorInvoiceNumber"
+            placeholder="Vendor's own invoice/bill number"
           />
         </div>
 

@@ -742,6 +742,10 @@ model Purchase {
   id             String         @id @default(cuid())
   storeId        String
   purchaseNumber String
+  /// The vendor's own invoice/bill number for this purchase — a free-typed
+  /// reference (not generated, not unique), so it can be matched back
+  /// against the physical bill the vendor issued.
+  vendorInvoiceNumber String?
   vendorId       String
   purchaseDate   DateTime       @default(now())
   status         InvoiceStatus  @default(PAID)

@@ -15,6 +15,8 @@ import {
   type BusinessUnit,
 } from "@/lib/business-units";
 import { getCitiesByStateId, type StateOption } from "@/lib/actions/location-actions";
+import { GST_SCHEME_OPTIONS } from "@/lib/gst";
+import type { GstScheme } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +42,8 @@ export function SettingsForm({ settings, canEdit, states = [] }: SettingsFormPro
     updateBusinessSettings,
     initialState,
   );
+
+  const [gstScheme, setGstScheme] = useState<GstScheme>(settings.gstScheme);
 
   const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>(
     settings.businessUnits,
@@ -227,7 +231,52 @@ export function SettingsForm({ settings, canEdit, states = [] }: SettingsFormPro
         <CardHeader>
           <CardTitle>Tax & Compliance</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
+        <CardContent className="grid gap-4">
+          <div className="space-y-1.5">
+            <Label>
+              GST Scheme <RequiredMark />
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Which GST registration type this business operates under. This decides what's shown and required
+              everywhere GST information matters — invoices, quotations, and purchases.
+            </p>
+            <div className="grid gap-3 md:grid-cols-3">
+              {GST_SCHEME_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className={cn(
+                    "flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm transition",
+                    gstScheme === option.value
+                      ? "border-primary bg-primary/5 ring-1 ring-primary"
+                      : "border-border hover:bg-muted/40",
+                  )}
+                >
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="gstScheme"
+                      value={option.value}
+                      checked={gstScheme === option.value}
+                      onChange={() => setGstScheme(option.value)}
+                      className="h-4 w-4"
+                    />
+                    <span className="font-medium">{option.label}</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground">{option.description}</span>
+                </label>
+              ))}
+            </div>
+            {state.errors?.gstScheme ? <p className="text-xs text-red-600">{state.errors.gstScheme[0]}</p> : null}
+            {gstScheme === "COMPOSITION" ? (
+              <p className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
+                Composition Scheme selected: every invoice, quotation, and purchase bill will print as a "Bill of
+                Supply" with the mandatory disclaimer, and will never show or collect GST as a line item — the
+                Default GST Rate below no longer applies to outward documents.
+              </p>
+            ) : null}
+          </div>
+        </CardContent>
+        <CardContent className="grid gap-4 border-t pt-4 md:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="gstNumber">GSTIN</Label>
             <Input
@@ -282,7 +331,11 @@ export function SettingsForm({ settings, canEdit, states = [] }: SettingsFormPro
               type="number"
               step="0.1"
               defaultValue={settings.defaultGstRate}
+              disabled={gstScheme === "COMPOSITION"}
             />
+            {gstScheme === "COMPOSITION" ? (
+              <p className="text-xs text-muted-foreground">Not used — Composition Scheme never charges GST.</p>
+            ) : null}
           </div>
         </CardContent>
       </Card>

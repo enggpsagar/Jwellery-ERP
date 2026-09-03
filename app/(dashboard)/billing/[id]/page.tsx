@@ -82,6 +82,8 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             <ShareWhatsAppButton
               phone={invoice.customer?.phone}
               message={whatsappMessage}
+              invoiceId={invoice.id}
+              invoiceNumber={invoice.invoiceNumber}
             />
             <EmailInvoiceButton invoiceId={invoice.id} />
             {isPaid && (

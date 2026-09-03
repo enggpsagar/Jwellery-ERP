@@ -192,15 +192,16 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   ];
 }
 
-export type SalesTrendPeriod = "weekly" | "monthly" | "quarterly" | "yearly";
+export type SalesTrendPeriod = "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
 
 // A "use server" file can only export async functions — the display labels
 // for these periods live in sales-chart.tsx instead, kept in sync with the
-// bucket counts below by convention (weekly/monthly=12, quarterly=8, yearly=5).
+// bucket counts below by convention (daily=14, weekly/monthly=12, quarterly=8, yearly=5).
 
 /** How many buckets back each period shows — enough history to read a trend
  * without the x-axis getting so dense it stops being readable. */
 const SALES_TREND_BUCKET_COUNT: Record<SalesTrendPeriod, number> = {
+  daily: 14,
   weekly: 12,
   monthly: 12,
   quarterly: 8,
@@ -245,6 +246,8 @@ function salesTrendBuckets(period: SalesTrendPeriod, now: Date): SalesTrendBucke
 /** Steps `date` back/forward by `amount` whole periods. */
 function offsetPeriod(period: SalesTrendPeriod, date: Date, amount: number): Date {
   switch (period) {
+    case "daily":
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount);
     case "weekly":
       return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount * 7);
     case "monthly":
@@ -267,6 +270,14 @@ function startOfWeekMonday(date: Date) {
 
 function salesTrendBucketFor(period: SalesTrendPeriod, date: Date): SalesTrendBucket {
   switch (period) {
+    case "daily": {
+      const start = startOfDay(date);
+      return {
+        key: start.toISOString().slice(0, 10),
+        label: start.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        start,
+      };
+    }
     case "weekly": {
       const start = startOfWeekMonday(date);
       return {

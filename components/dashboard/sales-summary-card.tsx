@@ -17,6 +17,7 @@ import {
 // same as sales-chart.tsx's own copy of these labels — a "use server" file
 // can only export async functions.
 const PERIOD_LABELS: Record<SalesTrendPeriod, string> = {
+  daily: "Daily",
   weekly: "Weekly",
   monthly: "Monthly",
   quarterly: "Quarterly",
@@ -24,6 +25,7 @@ const PERIOD_LABELS: Record<SalesTrendPeriod, string> = {
 }
 
 const PERIOD_SUB_LABELS: Record<SalesTrendPeriod, string> = {
+  daily: "vs yesterday",
   weekly: "vs last week",
   monthly: "vs last month",
   quarterly: "vs last quarter",

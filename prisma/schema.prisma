@@ -272,6 +272,16 @@ model Customer {
   state          String?
   pincode        String?
   gstin          String?
+  // Whether THIS customer is itself GST-registered (a B2B buyer), independent
+  // of the store's own gstScheme — a Wholesaler & Manufacturer store still
+  // routinely sells to individual, non-registered buyers, so B2B/B2C is a
+  // property of the counterparty, not a store-wide restriction. Only
+  // Composition-scheme stores are a genuine store-wide exception (see
+  // GstScheme's own doc comment) — this flag is ignored there. Defaults new
+  // records to whatever the store's own gstScheme suggests is more likely,
+  // but is freely editable per customer afterward. See gstinRequired() in
+  // lib/gst.ts.
+  isGstRegistered Boolean       @default(false)
   panNumber      String?
   // A customer-facing loyalty/scheme reference number some stores print on
   // the invoice (e.g. "Encircle Id") — opaque to the app, shown as-is.
@@ -764,6 +774,11 @@ model Vendor {
   state          String?
   pincode        String?
   gstin          String?
+  // Same per-record override as Customer.isGstRegistered — see its doc
+  // comment. A vendor being GST-registered is what makes their GSTIN
+  // required for a valid purchase entry, independent of the store's own
+  // gstScheme.
+  isGstRegistered Boolean         @default(false)
   notes          String?
   openingBalance Decimal          @default(0) @db.Decimal(12, 2)
   isActive       Boolean          @default(true)

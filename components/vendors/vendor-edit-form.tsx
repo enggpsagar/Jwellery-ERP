@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
 import { RequiredMark } from "@/components/shared/required-mark"
-import { customerGstinRequired } from "@/lib/gst"
+import { gstinRequired } from "@/lib/gst"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 
 type StateItem = { id: string; name: string }
@@ -46,13 +46,14 @@ export function VendorEditForm({
   vendor: Vendor
   states: StateItem[]
   returnTo?: string
-  /** Drives whether GSTIN is required below. `customerGstinRequired`'s name
-   * is customer-specific, but its rule is not — a B2B (Wholesaler/
-   * Manufacturer) store needs a proper tax invoice from its vendors just as
-   * much as it needs one from its buyers, so the same gate applies here. */
+  /** Drives whether GSTIN is required below — see gstinRequired's own doc
+   *  comment. */
   gstScheme: GstScheme
 }) {
-  const gstinRequired = customerGstinRequired(gstScheme)
+  // Initialized from this specific vendor's own saved flag, not derived from
+  // the store's scheme — see gstinRequired's doc comment.
+  const [isGstRegistered, setIsGstRegistered] = useState(vendor.isGstRegistered ?? false)
+  const gstinRequiredNow = gstinRequired(gstScheme, isGstRegistered)
 
   const router = useRouter()
   const toast = useToast()
@@ -278,19 +279,32 @@ export function VendorEditForm({
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
-              GST Number {gstinRequired ? <RequiredMark /> : null}
+              GST Number {gstinRequiredNow ? <RequiredMark /> : null}
             </label>
             <GstSchemeBadge scheme={gstScheme} />
+            {gstScheme !== "COMPOSITION" ? (
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  name="isGstRegistered"
+                  value="true"
+                  checked={isGstRegistered}
+                  onChange={(e) => setIsGstRegistered(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-input"
+                />
+                This vendor is GST-registered (B2B)
+              </label>
+            ) : null}
             <input
               name="gstNumber"
               className={FIELD}
               defaultValue={vendor.gstNumber ?? ""}
-              placeholder={gstinRequired ? "Required for a B2B tax invoice" : undefined}
-              required={gstinRequired}
+              placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : undefined}
+              required={gstinRequiredNow}
             />
-            {gstinRequired ? (
+            {gstinRequiredNow ? (
               <p className="text-xs text-muted-foreground">
-                Wholesaler/Manufacturer (B2B) purchases need the vendor's GSTIN to be valid.
+                GSTIN is required for a valid purchase entry from this vendor.
               </p>
             ) : null}
           </div>

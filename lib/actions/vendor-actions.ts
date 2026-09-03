@@ -26,6 +26,9 @@ export type Vendor = {
   creditLimit?: string
   paymentTerms?: string
   gstNumber?: string
+  /** Whether this specific vendor is GST-registered — independent of the
+   *  store's own gstScheme. See gstinRequired() in lib/gst.ts. */
+  isGstRegistered?: boolean
   totalOrders?: number
   totalPurchaseValue?: string
   pendingAmount?: string
@@ -181,6 +184,7 @@ function mapVendor(vendor: any): Vendor {
     creditLimit: "",
     paymentTerms: "",
     gstNumber: vendor.gstin ?? "",
+    isGstRegistered: vendor.isGstRegistered ?? false,
     totalOrders,
     totalPurchaseValue: formatCurrency(totalPurchaseValueNumber),
     pendingAmount: formatCurrency(pendingAmountNumber),
@@ -384,6 +388,7 @@ export async function exportVendorsToExcel(
       State: vendor.state || "",
       Pincode: vendor.pincode || "",
       "GST Number": vendor.gstNumber || "",
+      "GST Registered (B2B)": vendor.isGstRegistered ? "Yes" : "No",
       "Opening Balance": vendor.openingBalance ?? 0,
       "Current Balance": vendor.currentBalance ?? 0,
       "Balance Type": vendor.balanceType || "",
@@ -445,6 +450,7 @@ export async function addVendor(
     const state = String(formData.get("state") || "").trim()
     const pincode = String(formData.get("pincode") || "").trim()
     const gstNumber = String(formData.get("gstNumber") || "").trim()
+    const isGstRegistered = String(formData.get("isGstRegistered") || "") === "true"
     const notes = String(formData.get("notes") || "").trim()
     const openingBalance = toNumber(formData.get("openingBalance"), 0)
 
@@ -476,6 +482,7 @@ export async function addVendor(
         state: state || null,
         pincode: pincode || null,
         gstin: gstNumber || null,
+        isGstRegistered,
         notes: notes || null,
         openingBalance,
       },
@@ -512,6 +519,7 @@ export async function updateVendor(
     const state = String(formData.get("state") || "").trim()
     const pincode = String(formData.get("pincode") || "").trim()
     const gstNumber = String(formData.get("gstNumber") || "").trim()
+    const isGstRegistered = String(formData.get("isGstRegistered") || "") === "true"
     const notes = String(formData.get("notes") || "").trim()
     const openingBalance = toNumber(formData.get("openingBalance"), 0)
 
@@ -542,6 +550,7 @@ export async function updateVendor(
         state: state || null,
         pincode: pincode || null,
         gstin: gstNumber || null,
+        isGstRegistered,
         notes: notes || null,
         openingBalance,
       },

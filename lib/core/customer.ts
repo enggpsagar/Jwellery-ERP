@@ -32,6 +32,10 @@ export type CustomerRecord = {
   creditLimit?: string;
   paymentTerms?: string;
   gstNumber?: string;
+  /** Whether this specific customer is GST-registered (a B2B buyer) —
+   *  independent of the store's own gstScheme. See gstinRequired() in
+   *  lib/gst.ts. */
+  isGstRegistered?: boolean;
   panNumber?: string;
   registrationId?: string;
   createdByName?: string | null;
@@ -94,6 +98,7 @@ export type CustomerInput = {
   state?: string;
   pincode?: string;
   gstNumber?: string;
+  isGstRegistered?: boolean;
   panNumber?: string;
   registrationId?: string;
   notes?: string;
@@ -210,6 +215,7 @@ export function mapCustomer(customer: any): CustomerRecord {
     creditLimit: "",
     paymentTerms: "",
     gstNumber: customer.gstin ?? "",
+    isGstRegistered: customer.isGstRegistered ?? false,
     panNumber: customer.panNumber ?? "",
     registrationId: customer.registrationId ?? "",
     createdByName: customer.createdByName ?? null,
@@ -319,6 +325,7 @@ export async function createCustomerCore(
         state: input.state?.trim() || null,
         pincode: input.pincode?.trim() || null,
         gstin: input.gstNumber?.trim() || null,
+        isGstRegistered: input.isGstRegistered ?? false,
         panNumber: input.panNumber?.trim() || null,
         registrationId: input.registrationId?.trim() || null,
         notes: input.notes?.trim() || null,
@@ -382,6 +389,7 @@ export async function updateCustomerCore(
         state: input.state?.trim() || null,
         pincode: input.pincode?.trim() || null,
         gstin: input.gstNumber?.trim() || null,
+        isGstRegistered: input.isGstRegistered ?? false,
         panNumber: input.panNumber?.trim() || null,
         registrationId: input.registrationId?.trim() || null,
         notes: input.notes?.trim() || null,

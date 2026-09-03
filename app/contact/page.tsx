@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic"
 /**
  * Public Contact Us page — no session required (excluded from the auth
  * middleware matcher, same as /login and /register). Content is
- * platform-wide, edited by a Super Admin at /platform-content.
+ * platform-wide, edited by a Super Admin at /contact-faq.
  */
 export default async function ContactPage() {
   const content = await getPlatformContactContent()

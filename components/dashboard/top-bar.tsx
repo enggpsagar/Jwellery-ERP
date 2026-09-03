@@ -154,7 +154,7 @@ export function TopBar({
               </DropdownMenuItem>
 
               <DropdownMenuItem asChild>
-                <Link href="/help">Contact</Link>
+                <Link href="/contact-faq">Contact & FAQ</Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
 

@@ -28,10 +28,14 @@ function isHtmlEmpty(html: string): boolean {
   return html.replace(/<[^>]+>/g, "").trim().length === 0;
 }
 
-const PLATFORM_CONTENT_PATH = "/platform-content";
+// The application's own unified view+edit page — /help and /platform-content
+// (a read-only view and a SUPER_ADMIN-only editor, kept separate) were
+// merged into this single page, so there's now only one path to revalidate
+// inside the app.
+const PLATFORM_CONTENT_PATH = "/contact-faq";
 // Every place the content is actually rendered — revalidated together so an
 // edit shows up immediately everywhere, not just in the editor that made it.
-const CONTENT_CONSUMER_PATHS = ["/contact", "/faq", "/help"];
+const CONTENT_CONSUMER_PATHS = ["/contact", "/faq", "/contact-faq"];
 
 export type PlatformContactContentRow = {
   id: string;

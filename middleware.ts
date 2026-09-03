@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { MODULE_DEFINITIONS } from "@/lib/roles";
 
-const KARIGAR_ALLOWED_PREFIXES = ["/my-jobs", "/profile", "/help"];
+const KARIGAR_ALLOWED_PREFIXES = ["/my-jobs", "/profile", "/contact-faq"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -31,11 +31,6 @@ export async function middleware(request: NextRequest) {
   const role = token.role as string | undefined;
 
   if (pathname.startsWith("/stores") && role !== "SUPER_ADMIN") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  // Platform-wide Contact Us / FAQ content editor — same gate as /stores.
-  if (pathname.startsWith("/platform-content") && role !== "SUPER_ADMIN") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

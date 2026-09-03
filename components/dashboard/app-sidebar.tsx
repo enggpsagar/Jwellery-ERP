@@ -22,8 +22,6 @@ import {
   PackagePlus,
   FileText,
   CreditCard,
-  MessageCircleQuestion,
-  HelpCircle,
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
@@ -122,11 +120,6 @@ const mainNav: NavItem[] = [
     icon: UserCog,
   },
   {
-    title: "Help & Support",
-    href: "/help",
-    icon: HelpCircle,
-  },
-  {
     title: "Stores",
     href: "/stores",
     icon: Store,
@@ -136,11 +129,6 @@ const mainNav: NavItem[] = [
     href: "/plans",
     icon: CreditCard,
   },
-  {
-    title: "Contact & FAQ",
-    href: "/platform-content",
-    icon: MessageCircleQuestion,
-  },
 ];
 
 const karigarNav: NavItem[] = [
@@ -148,11 +136,6 @@ const karigarNav: NavItem[] = [
     title: "My Jobs",
     href: "/my-jobs",
     icon: ClipboardList,
-  },
-  {
-    title: "Help & Support",
-    href: "/help",
-    icon: HelpCircle,
   },
 ];
 
@@ -162,8 +145,7 @@ function getNavForRole(role?: string, permissions: string[] = []) {
   return mainNav.filter((item) => {
     if (
       item.href === "/stores" ||
-      item.href === "/plans" ||
-      item.href === "/platform-content"
+      item.href === "/plans"
     ) {
       return role === "SUPER_ADMIN";
     }

@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic"
 /**
  * Public FAQ page — no session required (excluded from the auth middleware
  * matcher, same as /login and /register). Only published entries render;
- * drafts stay visible to a Super Admin at /platform-content until toggled
+ * drafts stay visible to a Super Admin at /contact-faq until toggled
  * live.
  */
 export default async function FaqPage() {

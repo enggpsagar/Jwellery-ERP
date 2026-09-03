@@ -38,6 +38,17 @@ function fmt(value: number) {
   return value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+function fmtDate(value: string) {
+  return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Draft",
+  PARTIAL: "Partially Paid",
+  PAID: "Paid",
+  CANCELLED: "Cancelled",
+}
+
 export default async function InvoicePrintPage({ params }: Props) {
   const { id } = await params
 
@@ -98,6 +109,19 @@ export default async function InvoicePrintPage({ params }: Props) {
           <p className="text-sm font-bold uppercase tracking-wide">{heading}</p>
           {settings.gstScheme === "COMPOSITION" && (
             <p className="text-[10px] italic">{COMPOSITION_DISCLAIMER}</p>
+          )}
+        </div>
+
+        {/* Invoice No/Date is the one thing a tax invoice can never omit —
+            previously this only ever reached the browser tab title, never
+            the printed page itself. */}
+        <div className="flex flex-wrap justify-between gap-2 border-b border-black p-2 font-medium">
+          <span>Invoice No : {invoice.invoiceNumber}</span>
+          <span>Invoice Date : {fmtDate(invoice.invoiceDate)}</span>
+          {invoice.dueDate && <span>Due Date : {fmtDate(invoice.dueDate)}</span>}
+          {invoice.locationName && <span>Location : {invoice.locationName}</span>}
+          {invoice.status !== "PAID" && (
+            <span>Status : {STATUS_LABELS[invoice.status] ?? invoice.status}</span>
           )}
         </div>
 

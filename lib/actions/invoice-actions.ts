@@ -195,6 +195,7 @@ function mapInvoice(invoice: any) {
     balanceAmount: Number(invoice.balanceAmount),
     notes: invoice.notes,
     locationId: invoice.locationId ?? null,
+    locationName: invoice.location?.name ?? null,
     createdByName: invoice.createdByName ?? invoice.createdBy?.name ?? null,
     cancelledAt: invoice.cancelledAt?.toISOString() ?? null,
     cancelledByName: invoice.cancelledByName ?? invoice.cancelledBy?.name ?? null,
@@ -454,6 +455,7 @@ export async function getInvoiceById(id: string) {
       convertedFromKacha: { select: { id: true, slipNumber: true } },
       replaces: { select: { id: true, invoiceNumber: true } },
       replacedBy: { select: { id: true, invoiceNumber: true } },
+      location: { select: { name: true } },
     },
   });
 

@@ -186,6 +186,7 @@ export function ReceiveItemsForm({
 
   const [items, setItems] = useState<ReceiptItem[]>([emptyReceiptItem(defaultMetal)])
   const [labourCharge, setLabourCharge] = useState(0)
+  const [editingQuantityKeys, setEditingQuantityKeys] = useState<Set<string>>(new Set())
   const router = useRouter()
   const toast = useToast()
 
@@ -276,6 +277,18 @@ export function ReceiveItemsForm({
 
   const removeItem = (key: string) => {
     setItems((prev) => (prev.length > 1 ? prev.filter((item) => item.key !== key) : prev))
+  }
+
+  const startEditingQuantity = (key: string) => {
+    setEditingQuantityKeys((prev) => new Set(prev).add(key))
+  }
+
+  const stopEditingQuantity = (key: string) => {
+    setEditingQuantityKeys((prev) => {
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
   }
 
   // Mirrors the server's accounted-fine-weight formula in receiveItemsFromKarigar:
@@ -498,14 +511,26 @@ export function ReceiveItemsForm({
                   <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-4">
                     <div className="space-y-1">
                       <Label className="text-xs">Quantity</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={item.quantity}
-                        onChange={(e) =>
-                          updateItem(item.key, { quantity: Number(e.target.value) || 1 })
-                        }
-                      />
+                      {editingQuantityKeys.has(item.key) ? (
+                        <Input
+                          type="number"
+                          min={1}
+                          autoFocus
+                          value={item.quantity}
+                          onChange={(e) =>
+                            updateItem(item.key, { quantity: Number(e.target.value) || 1 })
+                          }
+                          onBlur={() => stopEditingQuantity(item.key)}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startEditingQuantity(item.key)}
+                          className="flex h-9 w-full items-center rounded-md border bg-background px-3 text-sm cursor-text"
+                        >
+                          {item.quantity}
+                        </button>
+                      )}
                     </div>
 
                     <div className="space-y-1">

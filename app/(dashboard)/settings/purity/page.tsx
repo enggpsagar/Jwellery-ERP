@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { UserRole } from "@prisma/client";
 
 import { getPurityFineness } from "@/lib/actions/purity-actions";
@@ -6,6 +7,10 @@ import { getCurrentUser } from "@/lib/auth/auth";
 import { PuritySettingsForm } from "@/components/settings/purity-settings-form";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { PageBackHeader } from "@/components/shared/page-back-header";
+
+export const metadata: Metadata = {
+  title: "Purity Settings",
+};
 
 export default async function PuritySettingsPage() {
   const [rows, currentUser] = await Promise.all([

@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import { ProductCreateForm } from "@/components/inventory/products/product-create-form";
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import {
@@ -5,6 +7,10 @@ import {
   getStoreMetals,
 } from "@/lib/actions/taxonomy-actions";
 import { safeReturnTo } from "@/lib/safe-return-to";
+
+export const metadata: Metadata = {
+  title: "Add Product",
+};
 
 type NewProductPageProps = {
   searchParams?: Promise<{ returnTo?: string }>;

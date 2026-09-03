@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { UserRole } from "@prisma/client";
 
 import { getStoreMetals, getStoreCategories } from "@/lib/actions/taxonomy-actions";
@@ -6,6 +7,10 @@ import { getCurrentUser } from "@/lib/auth/auth";
 import { TaxonomySettingsForm } from "@/components/settings/taxonomy-settings-form";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { PageBackHeader } from "@/components/shared/page-back-header";
+
+export const metadata: Metadata = {
+  title: "Taxonomy Settings",
+};
 
 export default async function TaxonomySettingsPage() {
   const [metals, categories, currentUser] = await Promise.all([

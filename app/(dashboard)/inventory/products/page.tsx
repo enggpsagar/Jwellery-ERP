@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
+
 import { getProducts } from "@/lib/actions/inventory/product-actions";
 import { hasPermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 
 import { ProductsClient } from "@/components/inventory/products/products-client";
+
+export const metadata: Metadata = {
+  title: "Products",
+};
 
 type InventoryProductsPageProps = {
   searchParams?: Promise<{

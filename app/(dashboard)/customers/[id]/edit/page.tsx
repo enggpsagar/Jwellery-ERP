@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import { notFound } from "next/navigation"
 
 import { getCustomerById } from "@/lib/actions/customer-actions"
@@ -13,6 +15,20 @@ type EditCustomerPageProps = {
   searchParams?: Promise<{ returnTo?: string }>
 }
 
+const getCustomer = cache(getCustomerById)
+
+export async function generateMetadata({
+  params,
+}: EditCustomerPageProps): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const customer = await getCustomer(id)
+    return { title: customer ? `Edit ${customer.name}` : "Edit Customer" }
+  } catch {
+    return { title: "Edit Customer" }
+  }
+}
+
 export default async function EditCustomerPage({
   params,
   searchParams,
@@ -22,7 +38,7 @@ export default async function EditCustomerPage({
   const returnTo = safeReturnTo(query.returnTo)
 
   const [customer, states, businessSettings] = await Promise.all([
-    getCustomerById(id),
+    getCustomer(id),
     getStates(),
     getBusinessSettings(),
   ])

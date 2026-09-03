@@ -1,4 +1,6 @@
 // app/vendors/[id]/page.tsx
+import type { Metadata } from "next"
+import { cache } from "react"
 import { notFound } from "next/navigation"
 import { IndianRupee, MapPin, Truck } from "lucide-react"
 
@@ -21,6 +23,20 @@ type VendorDetailsPageProps = {
   searchParams?: Promise<{ from?: string }>
 }
 
+const getVendor = cache(getVendorById)
+
+export async function generateMetadata({
+  params,
+}: VendorDetailsPageProps): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const vendor = await getVendor(id)
+    return { title: vendor?.name ?? "Vendor" }
+  } catch {
+    return { title: "Vendor" }
+  }
+}
+
 export default async function VendorDetailsPage({
   params,
   searchParams,
@@ -31,7 +47,7 @@ export default async function VendorDetailsPage({
     label: "Back to Vendors",
   })
 
-  const [vendor, states] = await Promise.all([getVendorById(id), getStates()])
+  const [vendor, states] = await Promise.all([getVendor(id), getStates()])
 
   if (!vendor) {
     notFound()

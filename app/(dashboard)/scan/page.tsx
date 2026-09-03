@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { CheckCircle2, ScanLine } from "lucide-react"
 
@@ -14,6 +15,10 @@ import { Card, CardContent } from "@/components/ui/card"
  */
 
 export const dynamic = "force-dynamic"
+
+export const metadata: Metadata = {
+  title: "Scan",
+}
 
 type ScanPageProps = {
   searchParams?: Promise<{ added?: string; n?: string }>

@@ -1,7 +1,13 @@
 // FILE PATH: app/(dashboard)/karigars/page.tsx
 // REPLACES the existing file at this path
+import type { Metadata } from "next"
+
 import { getKarigars } from "@/lib/actions/karigar-actions"
 import { KarigarsClient } from "@/components/karigars/karigars-client"
+
+export const metadata: Metadata = {
+  title: "Karigars",
+}
 
 type KarigarsPageProps = {
   searchParams?: Promise<{

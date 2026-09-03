@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Pencil } from "lucide-react"
@@ -13,6 +15,18 @@ import { Badge } from "@/components/ui/badge"
 type Props = {
   params: Promise<{ id: string }>
   searchParams?: Promise<{ from?: string }>
+}
+
+const getProduct = cache(getProductById)
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const product = await getProduct(id)
+    return { title: product?.name ?? "Product" }
+  } catch {
+    return { title: "Product" }
+  }
 }
 
 /**
@@ -97,7 +111,7 @@ export default async function ProductDetailsPage({ params, searchParams }: Props
   })
 
   const [product, canEdit] = await Promise.all([
-    getProductById(id),
+    getProduct(id),
     hasPermission(PERMISSIONS.PRODUCT_UPDATE),
   ])
 

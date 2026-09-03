@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import { notFound, redirect } from "next/navigation"
 
 import { getKachaInvoiceById } from "@/lib/actions/kacha-invoice-actions"
@@ -9,11 +11,27 @@ type Props = {
   params: Promise<{ id: string }>
 }
 
+const getKachaInvoice = cache(getKachaInvoiceById)
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const kachaInvoice = await getKachaInvoice(id)
+    return {
+      title: kachaInvoice
+        ? `Convert Kacha Invoice ${kachaInvoice.slipNumber}`
+        : "Convert Kacha Invoice",
+    }
+  } catch {
+    return { title: "Convert Kacha Invoice" }
+  }
+}
+
 export default async function ConvertKachaToPakkaPage({ params }: Props) {
   const { id } = await params
 
   const [kachaInvoice, businessSettings] = await Promise.all([
-    getKachaInvoiceById(id),
+    getKachaInvoice(id),
     getBusinessSettings(),
   ])
 

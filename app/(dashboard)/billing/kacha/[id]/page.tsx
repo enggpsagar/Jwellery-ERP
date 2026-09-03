@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowRightCircle } from "lucide-react"
@@ -13,9 +15,21 @@ type Props = {
   params: Promise<{ id: string }>
 }
 
+const getKachaInvoice = cache(getKachaInvoiceById)
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const kachaInvoice = await getKachaInvoice(id)
+    return { title: kachaInvoice ? `Kacha Invoice ${kachaInvoice.slipNumber}` : "Kacha Invoice" }
+  } catch {
+    return { title: "Kacha Invoice" }
+  }
+}
+
 export default async function KachaInvoiceDetailPage({ params }: Props) {
   const { id } = await params
-  const kachaInvoice = await getKachaInvoiceById(id)
+  const kachaInvoice = await getKachaInvoice(id)
 
   if (!kachaInvoice) notFound()
 

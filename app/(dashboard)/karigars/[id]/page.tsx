@@ -1,5 +1,7 @@
 // FILE PATH: app/(dashboard)/karigars/[id]/page.tsx
 
+import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
@@ -23,6 +25,18 @@ type Props = {
   params: Promise<{ id: string }>;
 };
 
+const getKarigar = cache(getKarigarById);
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  try {
+    const { id } = await params;
+    const karigar = await getKarigar(id);
+    return { title: karigar?.name ?? "Karigar" };
+  } catch {
+    return { title: "Karigar" };
+  }
+}
+
 function formatDate(date: Date | null) {
   if (!date) return "-";
   return new Intl.DateTimeFormat("en-IN", {
@@ -35,7 +49,7 @@ function formatDate(date: Date | null) {
 export default async function KarigarDetailPage({ params }: Props) {
   const { id } = await params;
 
-  const karigar = await getKarigarById(id);
+  const karigar = await getKarigar(id);
   if (!karigar) {
     notFound();
   }

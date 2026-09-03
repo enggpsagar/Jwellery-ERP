@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { ScanLine, ShieldAlert } from "lucide-react"
@@ -41,6 +42,16 @@ type QuickSalePageProps = {
   params: Promise<{ stockId: string }>
   /** `t` is the scan token from /s; `x` is set when /s could not issue one. */
   searchParams: Promise<{ t?: string; x?: string }>
+}
+
+// A static title rather than the piece's stock code: reaching a specific
+// entity here requires decoding the scan token and re-running the same
+// permission/membership checks the page body performs (several of which can
+// throw), which generateMetadata should never replicate. "Quick sale" is
+// also what every branch of this page — denied, expired, not found, or the
+// form itself — is actually showing.
+export const metadata: Metadata = {
+  title: "Quick Sale",
 }
 
 /** Full-width message card, used for every dead end on this page. */

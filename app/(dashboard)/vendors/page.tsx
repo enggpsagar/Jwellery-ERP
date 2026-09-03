@@ -1,6 +1,12 @@
+import type { Metadata } from "next"
+
 import { getVendors } from "@/lib/actions/vendor-actions"
 import { getStates } from "@/lib/actions/location-actions"
 import { VendorsClient } from "@/components/vendors/vendors-client"
+
+export const metadata: Metadata = {
+  title: "Vendors",
+}
 
 type VendorsPageProps = {
   searchParams?: Promise<{

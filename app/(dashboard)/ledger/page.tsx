@@ -1,9 +1,15 @@
+import type { Metadata } from "next"
+
 import {
   getLedgerEntries,
   getLedgerTotals,
   getMetalDailyLedger,
 } from "@/lib/actions/ledger-actions"
 import { LedgerTabs } from "@/components/ledger/ledger-tabs"
+
+export const metadata: Metadata = {
+  title: "Ledger",
+}
 
 export default async function LedgerPage() {
   const [entries, totals, metalDaily] = await Promise.all([

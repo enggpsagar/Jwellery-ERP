@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 
@@ -6,6 +7,10 @@ import { getCurrentUser } from "@/lib/auth/auth";
 import { getEffectiveStoreId } from "@/lib/store-context";
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { UserFormDialog } from "@/components/users/user-form-dialog";
+
+export const metadata: Metadata = {
+  title: "Add User",
+};
 
 export const dynamic = "force-dynamic";
 

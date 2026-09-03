@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowLeft, Pencil } from "lucide-react"
@@ -38,6 +40,20 @@ type StoreDetailPageProps = {
   params: Promise<{ id: string }>
 }
 
+const getStoreOverview = cache(getStorePlanOverview)
+
+export async function generateMetadata({
+  params,
+}: StoreDetailPageProps): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const overview = await getStoreOverview(id)
+    return { title: overview?.name ?? "Store" }
+  } catch {
+    return { title: "Store" }
+  }
+}
+
 /** One labelled figure in the summary grid. */
 function Stat({
   label,
@@ -63,7 +79,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
   const { id } = await params
 
   const [overview, history] = await Promise.all([
-    getStorePlanOverview(id),
+    getStoreOverview(id),
     getStorePlanHistory(id),
   ])
 

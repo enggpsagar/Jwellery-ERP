@@ -1,5 +1,11 @@
+import type { Metadata } from "next"
+
 import { getCustomers } from "@/lib/actions/customer-actions"
 import { ArchivedCustomersClient } from "@/components/customers/archived-customers-client"
+
+export const metadata: Metadata = {
+  title: "Archived Customers",
+}
 
 type ArchivedCustomersPageProps = {
   searchParams?: Promise<{

@@ -22,7 +22,10 @@ const headingFont = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Jewellery ERP",
+  title: {
+    template: "%s · Jewellery ERP",
+    default: "Jewellery ERP",
+  },
   description: "Admin dashboard",
 };
 

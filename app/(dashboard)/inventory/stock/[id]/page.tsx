@@ -1,5 +1,7 @@
 // app/inventory/stock/[id]/page.tsx
 
+import type { Metadata } from "next"
+import { cache } from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Pencil, ScanLine } from "lucide-react"
@@ -17,6 +19,20 @@ type InventoryStockDetailsPageProps = {
   }>
 }
 
+const getInventoryStock = cache(getInventoryStockById)
+
+export async function generateMetadata({
+  params,
+}: InventoryStockDetailsPageProps): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const stock = await getInventoryStock(id)
+    return { title: stock?.stockCode ?? "Stock" }
+  } catch {
+    return { title: "Stock" }
+  }
+}
+
 function formatDate(value: Date | string | null | undefined) {
   if (!value) return "-"
   return new Date(value).toLocaleDateString("en-IN")
@@ -31,7 +47,7 @@ export default async function InventoryStockDetailsPage({
   params,
 }: InventoryStockDetailsPageProps) {
   const { id } = await params
-  const stock = await getInventoryStockById(id)
+  const stock = await getInventoryStock(id)
 
   if (!stock) {
     notFound()

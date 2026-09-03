@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import {
   ArrowRight,
@@ -13,6 +14,10 @@ import { getInventoryStock } from "@/lib/actions/inventory/stock-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+
+export const metadata: Metadata = {
+  title: "Inventory",
+}
 
 /**
  * Tinted per measure from the validated chart palette, matching the dashboard

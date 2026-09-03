@@ -1,5 +1,7 @@
 // FILE PATH: app/(dashboard)/karigars/[id]/edit/page.tsx
 
+import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 
 import { getKarigarById } from "@/lib/actions/karigar-actions";
@@ -13,10 +15,22 @@ type Props = {
   params: Promise<{ id: string }>;
 };
 
+const getKarigar = cache(getKarigarById);
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  try {
+    const { id } = await params;
+    const karigar = await getKarigar(id);
+    return { title: karigar ? `Edit ${karigar.name}` : "Edit Karigar" };
+  } catch {
+    return { title: "Edit Karigar" };
+  }
+}
+
 export default async function EditKarigarPage({ params }: Props) {
   const { id } = await params;
   const [karigar, locations, states] = await Promise.all([
-    getKarigarById(id),
+    getKarigar(id),
     getStoreLocations(),
     getStates(),
   ]);

@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { InvoiceStatus } from "@prisma/client"
 
@@ -7,6 +8,10 @@ import { PurchasesToolbar } from "@/components/purchases/purchases-toolbar"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
+
+export const metadata: Metadata = {
+  title: "Purchases",
+}
 
 type PurchasesPageProps = {
   searchParams?: Promise<{

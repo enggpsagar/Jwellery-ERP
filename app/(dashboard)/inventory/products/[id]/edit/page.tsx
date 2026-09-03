@@ -1,5 +1,7 @@
 // app/inventory/products/[id]/edit/page.tsx
 
+import type { Metadata } from "next"
+import { cache } from "react"
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 
@@ -18,6 +20,20 @@ type ProductEditPageProps = {
   }>
 }
 
+const getProduct = cache(getProductById)
+
+export async function generateMetadata({
+  params,
+}: ProductEditPageProps): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const product = await getProduct(id)
+    return { title: product ? `Edit ${product.name}` : "Edit Product" }
+  } catch {
+    return { title: "Edit Product" }
+  }
+}
+
 export default async function ProductEditPage({
   params,
 }: ProductEditPageProps) {
@@ -32,7 +48,7 @@ export default async function ProductEditPage({
   }
 
   const [product, metals, categories] = await Promise.all([
-    getProductById(id),
+    getProduct(id),
     getStoreMetals(),
     getStoreCategories(),
   ])

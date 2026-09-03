@@ -1,11 +1,16 @@
 // app/inventory/stock/print-qr/page.tsx
 
+import type { Metadata } from "next"
 import QRCode from "qrcode"
 
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { PrintAllQrButton } from "@/components/inventory/stock/print-all-qr-button"
+
+export const metadata: Metadata = {
+  title: "Print QR Codes",
+}
 
 type PrintQrPageProps = {
   searchParams: Promise<{

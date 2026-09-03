@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
+
 import { getInventoryStockFormProducts } from "@/lib/actions/inventory/stock-actions";
 import { getStoreLocations } from "@/lib/actions/store-location-actions";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { StockCreateForm } from "@/components/inventory/stock/stock-create-form";
 
+export const metadata: Metadata = {
+  title: "Add Stock",
+};
 
 export default async function NewStockPage() {
 

@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
+
 import { getPlans } from "@/lib/actions/plan-actions";
 import { PlansClient } from "@/components/plans/plans-client";
+
+export const metadata: Metadata = {
+  title: "Plans",
+};
 
 export const dynamic = "force-dynamic";
 

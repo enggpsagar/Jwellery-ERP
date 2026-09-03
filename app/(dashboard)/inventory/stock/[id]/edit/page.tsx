@@ -1,5 +1,7 @@
 // app/(dashboard)/inventory/stock/[id]/edit/page.tsx
 
+import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 
 import {
@@ -18,6 +20,19 @@ type EditInventoryStockPageProps = {
   }>;
 };
 
+const getInventoryStock = cache(getInventoryStockById);
+
+export async function generateMetadata({
+  params,
+}: EditInventoryStockPageProps): Promise<Metadata> {
+  try {
+    const { id } = await params;
+    const stock = await getInventoryStock(id);
+    return { title: stock ? `Edit ${stock.stockCode}` : "Edit Stock" };
+  } catch {
+    return { title: "Edit Stock" };
+  }
+}
 
 export default async function EditInventoryStockPage({
   params,
@@ -27,7 +42,7 @@ export default async function EditInventoryStockPage({
 
 
   const [stock, products, locations] = await Promise.all([
-    getInventoryStockById(id),
+    getInventoryStock(id),
     getInventoryStockFormProducts(),
     getStoreLocations(),
   ]);

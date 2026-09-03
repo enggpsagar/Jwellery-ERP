@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import { notFound } from "next/navigation"
 
 import { getStoreById } from "@/lib/actions/store-actions"
@@ -8,9 +10,23 @@ type EditStorePageProps = {
   params: Promise<{ id: string }>
 }
 
+const getStore = cache(getStoreById)
+
+export async function generateMetadata({
+  params,
+}: EditStorePageProps): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const store = await getStore(id)
+    return { title: store ? `Edit ${store.name}` : "Edit Store" }
+  } catch {
+    return { title: "Edit Store" }
+  }
+}
+
 export default async function EditStorePage({ params }: EditStorePageProps) {
   const { id } = await params
-  const store = await getStoreById(id)
+  const store = await getStore(id)
 
   if (!store) {
     notFound()

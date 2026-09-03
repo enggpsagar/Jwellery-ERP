@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 
 import { getQuotations } from "@/lib/actions/quotation-actions"
@@ -6,6 +7,10 @@ import { QuotationsToolbar } from "@/components/quotations/quotations-toolbar"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
+
+export const metadata: Metadata = {
+  title: "Quotations",
+}
 
 type QuotationsPageProps = {
   searchParams?: Promise<{

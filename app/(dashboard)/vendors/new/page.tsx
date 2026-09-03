@@ -1,9 +1,15 @@
+import type { Metadata } from "next"
+
 import { getStates } from "@/lib/actions/location-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { safeReturnTo } from "@/lib/safe-return-to"
 
 import { VendorCreateForm } from "@/components/vendors/vendor-create-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+
+export const metadata: Metadata = {
+  title: "Add Vendor",
+}
 
 type NewVendorPageProps = {
   searchParams?: Promise<{ returnTo?: string }>

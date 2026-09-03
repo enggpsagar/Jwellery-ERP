@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
+
 import { getInventoryStock } from "@/lib/actions/inventory/stock-actions";
 
 import { StockClient } from "@/components/inventory/stock/stock-client";
+
+export const metadata: Metadata = {
+  title: "Stock",
+};
 
 type InventoryStockPageProps = {
   searchParams?: Promise<{

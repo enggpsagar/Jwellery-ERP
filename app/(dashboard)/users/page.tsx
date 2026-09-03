@@ -1,5 +1,6 @@
 // File: src/app/(dashboard)/users/page.tsx
 
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 
@@ -8,6 +9,10 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { getEffectiveStoreId } from "@/lib/store-context";
 import { UsersClient } from "@/components/users/users-client";
+
+export const metadata: Metadata = {
+  title: "Users",
+};
 
 type UsersPageProps = {
   searchParams?: Promise<{

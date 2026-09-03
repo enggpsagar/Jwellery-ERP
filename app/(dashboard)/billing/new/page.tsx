@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+
 import {
   getInvoiceFormCustomers,
   getInvoiceFormStockItems,
@@ -7,6 +9,10 @@ import { getStoreLocations } from "@/lib/actions/store-location-actions"
 
 import { InvoiceForm } from "@/components/billing/invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+
+export const metadata: Metadata = {
+  title: "New Invoice",
+}
 
 export default async function NewInvoicePage() {
   const [customers, stockItems, businessSettings, locations] = await Promise.all([

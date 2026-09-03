@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import {
   getStores,
   getPlatformGoldInventory,
@@ -7,6 +9,10 @@ import {
 import { getPlans } from "@/lib/actions/plan-actions";
 import { getStorePlanOverviews } from "@/lib/actions/store-plan-actions";
 import { StoresClient } from "@/components/stores/stores-client";
+
+export const metadata: Metadata = {
+  title: "Stores",
+};
 
 type StoresPageProps = {
   searchParams?: Promise<{

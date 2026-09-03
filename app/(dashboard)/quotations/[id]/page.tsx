@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowRightCircle } from "lucide-react"
@@ -28,10 +30,22 @@ type Props = {
   params: Promise<{ id: string }>
 }
 
+const getQuotation = cache(getQuotationById)
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const quotation = await getQuotation(id)
+    return { title: quotation?.quotationNumber ?? "Quotation" }
+  } catch {
+    return { title: "Quotation" }
+  }
+}
+
 export default async function QuotationDetailPage({ params }: Props) {
   const { id } = await params
   const [quotation, businessSettings] = await Promise.all([
-    getQuotationById(id),
+    getQuotation(id),
     getBusinessSettings(),
   ])
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { UserRole } from "@prisma/client";
 
 import { getStoreLocations } from "@/lib/actions/store-location-actions";
@@ -7,6 +8,10 @@ import { getCurrentUser } from "@/lib/auth/auth";
 import { LocationSettingsForm } from "@/components/settings/location-settings-form";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { PageBackHeader } from "@/components/shared/page-back-header";
+
+export const metadata: Metadata = {
+  title: "Locations",
+};
 
 export default async function LocationsSettingsPage() {
   const [locations, states, currentUser] = await Promise.all([

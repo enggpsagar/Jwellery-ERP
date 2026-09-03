@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { UserRole } from "@prisma/client";
 
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
@@ -7,6 +8,10 @@ import { getStates } from "@/lib/actions/location-actions";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { PageBackHeader } from "@/components/shared/page-back-header";
+
+export const metadata: Metadata = {
+  title: "Settings",
+};
 
 export default async function SettingsPage() {
   const [settings, currentUser, states] = await Promise.all([

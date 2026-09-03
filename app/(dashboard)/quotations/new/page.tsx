@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+
 import {
   getQuotationFormCustomers,
   getQuotationFormStockItems,
@@ -7,6 +9,10 @@ import { getStoreLocations } from "@/lib/actions/store-location-actions"
 
 import { QuotationForm } from "@/components/quotations/quotation-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+
+export const metadata: Metadata = {
+  title: "New Quotation",
+}
 
 export default async function NewQuotationPage() {
   const [customers, stockItems, locations, businessSettings] = await Promise.all([

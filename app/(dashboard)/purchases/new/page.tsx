@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { Suspense } from "react"
 
 import {
@@ -9,6 +10,10 @@ import { getStoreLocations } from "@/lib/actions/store-location-actions"
 
 import { PurchaseForm } from "@/components/purchases/purchase-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+
+export const metadata: Metadata = {
+  title: "New Purchase",
+}
 
 export default async function NewPurchasePage() {
   const [vendors, products, locations, businessSettings] = await Promise.all([

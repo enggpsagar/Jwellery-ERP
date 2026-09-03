@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import { notFound } from "next/navigation"
 
 import { getVendorById } from "@/lib/actions/vendor-actions"
@@ -13,6 +15,20 @@ type EditVendorPageProps = {
   searchParams?: Promise<{ returnTo?: string }>
 }
 
+const getVendor = cache(getVendorById)
+
+export async function generateMetadata({
+  params,
+}: EditVendorPageProps): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const vendor = await getVendor(id)
+    return { title: vendor ? `Edit ${vendor.name}` : "Edit Vendor" }
+  } catch {
+    return { title: "Edit Vendor" }
+  }
+}
+
 export default async function EditVendorPage({
   params,
   searchParams,
@@ -22,7 +38,7 @@ export default async function EditVendorPage({
   const returnTo = safeReturnTo(query.returnTo)
 
   const [vendor, states, businessSettings] = await Promise.all([
-    getVendorById(id),
+    getVendor(id),
     getStates(),
     getBusinessSettings(),
   ])

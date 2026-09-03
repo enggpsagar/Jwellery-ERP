@@ -1,5 +1,11 @@
+import type { Metadata } from "next"
+
 import { getKarigars } from "@/lib/actions/karigar-actions"
 import { DisabledKarigarsClient } from "@/components/karigars/disabled-karigars-client"
+
+export const metadata: Metadata = {
+  title: "Disabled Karigars",
+}
 
 type DisabledKarigarsPageProps = {
   searchParams?: Promise<{

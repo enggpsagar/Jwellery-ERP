@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 
@@ -13,6 +14,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+
+export const metadata: Metadata = {
+  title: "My Jobs",
+};
 
 function formatDate(date: Date | null) {
   if (!date) return "-";

@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+
 import {
   getSalesReport,
   getInventoryValuationReport,
@@ -12,6 +14,10 @@ import {
 
 import { ReportsTabs } from "@/components/reports/reports-tabs"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+
+export const metadata: Metadata = {
+  title: "Reports",
+}
 
 export default async function ReportsPage() {
   const [

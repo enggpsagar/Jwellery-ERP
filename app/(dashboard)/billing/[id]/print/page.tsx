@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import { notFound } from "next/navigation"
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
@@ -9,6 +11,18 @@ import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst"
 
 type Props = {
   params: Promise<{ id: string }>
+}
+
+const getInvoice = cache(getInvoiceById)
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const invoice = await getInvoice(id)
+    return { title: invoice ? `Invoice ${invoice.invoiceNumber}` : "Invoice" }
+  } catch {
+    return { title: "Invoice" }
+  }
 }
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -28,7 +42,7 @@ export default async function InvoicePrintPage({ params }: Props) {
   const { id } = await params
 
   const [invoice, settings, metalRates] = await Promise.all([
-    getInvoiceById(id),
+    getInvoice(id),
     getBusinessSettings(),
     getLatestMetalRates(),
   ])

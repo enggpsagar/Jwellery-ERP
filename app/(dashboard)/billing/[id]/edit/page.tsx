@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import { notFound, redirect } from "next/navigation"
 
 import {
@@ -15,10 +17,22 @@ type Props = {
   params: Promise<{ id: string }>
 }
 
+const getInvoice = cache(getInvoiceById)
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const invoice = await getInvoice(id)
+    return { title: invoice ? `Edit Invoice ${invoice.invoiceNumber}` : "Edit Invoice" }
+  } catch {
+    return { title: "Edit Invoice" }
+  }
+}
+
 export default async function EditInvoicePage({ params }: Props) {
   const { id } = await params
 
-  const invoice = await getInvoiceById(id)
+  const invoice = await getInvoice(id)
   if (!invoice) notFound()
 
   // Full line-item editing is only available for DRAFT/PARTIAL — CANCELLED

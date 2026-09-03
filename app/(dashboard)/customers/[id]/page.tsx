@@ -1,4 +1,6 @@
 // app/customers/[id]/page.tsx
+import type { Metadata } from "next"
+import { cache } from "react"
 import { notFound } from "next/navigation"
 import { IndianRupee, MapPin, User } from "lucide-react"
 
@@ -21,6 +23,20 @@ type CustomerDetailsPageProps = {
   searchParams?: Promise<{ from?: string }>
 }
 
+const getCustomer = cache(getCustomerById)
+
+export async function generateMetadata({
+  params,
+}: CustomerDetailsPageProps): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const customer = await getCustomer(id)
+    return { title: customer?.name ?? "Customer" }
+  } catch {
+    return { title: "Customer" }
+  }
+}
+
 export default async function CustomerDetailsPage({
   params,
   searchParams,
@@ -32,7 +48,7 @@ export default async function CustomerDetailsPage({
   })
 
   const [customer, states] = await Promise.all([
-    getCustomerById(id),
+    getCustomer(id),
     getStates(),
   ])
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getServerSession } from "next-auth"
@@ -25,6 +26,10 @@ import {
 import { authOptions } from "@/lib/auth/auth-options"
 import { APP_NAME } from "@/lib/constants/app"
 import { Button } from "@/components/ui/button"
+
+export const metadata: Metadata = {
+  title: "Home",
+}
 
 /**
  * Public landing page.

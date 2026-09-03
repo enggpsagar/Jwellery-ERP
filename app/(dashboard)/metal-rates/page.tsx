@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
+
 import { prisma } from "@/lib/prisma";
 import { MetalRatesTable } from "@/components/metal-rates/metal-rates-table";
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { requireStoreScope } from "@/lib/store-context";
+
+export const metadata: Metadata = {
+  title: "Metal Rates",
+};
 
 export default async function MetalRatesPage() {
   const storeId = await requireStoreScope();

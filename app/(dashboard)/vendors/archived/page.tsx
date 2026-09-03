@@ -1,5 +1,11 @@
+import type { Metadata } from "next"
+
 import { getVendors } from "@/lib/actions/vendor-actions"
 import { ArchivedVendorsClient } from "@/components/vendors/archived-vendors-client"
+
+export const metadata: Metadata = {
+  title: "Archived Vendors",
+}
 
 type ArchivedVendorsPageProps = {
   searchParams?: Promise<{

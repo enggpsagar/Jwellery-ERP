@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
@@ -10,9 +12,21 @@ type Props = {
   params: Promise<{ id: string }>
 }
 
+const getPurchase = cache(getPurchaseById)
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const purchase = await getPurchase(id)
+    return { title: purchase?.purchaseNumber ?? "Purchase" }
+  } catch {
+    return { title: "Purchase" }
+  }
+}
+
 export default async function PurchaseDetailPage({ params }: Props) {
   const { id } = await params
-  const purchase = await getPurchaseById(id)
+  const purchase = await getPurchase(id)
 
   if (!purchase) notFound()
 

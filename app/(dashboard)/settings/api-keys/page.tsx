@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { UserRole } from "@prisma/client";
 
 import { listApiKeys } from "@/lib/actions/api-key-actions";
@@ -6,6 +7,10 @@ import { getCurrentUser } from "@/lib/auth/auth";
 import { ApiKeySettingsForm } from "@/components/settings/api-key-settings-form";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { PageBackHeader } from "@/components/shared/page-back-header";
+
+export const metadata: Metadata = {
+  title: "API Keys",
+};
 
 export default async function ApiKeysSettingsPage() {
   const [keys, currentUser] = await Promise.all([

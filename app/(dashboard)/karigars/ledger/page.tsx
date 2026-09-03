@@ -1,9 +1,15 @@
 // FILE PATH: app/(dashboard)/karigars/ledger/page.tsx
 
+import type { Metadata } from "next"
+
 import { getKarigarLedgerSummary } from "@/lib/actions/ledger-actions"
 
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { KarigarLedgerSummaryTable } from "@/components/karigars/karigar-ledger-summary-table"
+
+export const metadata: Metadata = {
+  title: "Karigar Ledger",
+}
 
 export const dynamic = "force-dynamic"
 

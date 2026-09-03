@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { CreditCard } from "lucide-react"
 
 import { getOwnStorePlan } from "@/lib/actions/store-plan-actions"
@@ -18,6 +19,10 @@ import {
   formatMoney,
 } from "@/components/stores/plan-presentation"
 import { RenewalContactDialog } from "@/components/stores/renewal-contact-dialog"
+
+export const metadata: Metadata = {
+  title: "My Plan",
+}
 
 /**
  * A store owner's own plan and payment history.

@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 
@@ -15,6 +17,40 @@ type EditUserPageProps = {
 
 export const dynamic = "force-dynamic";
 
+// Scoped by store, not just id — a bare findUnique would let one store's
+// owner open a user belonging to another store. Shared with generateMetadata
+// below (via cache()) so the row is fetched once per request, not twice.
+const getUser = cache(async (id: string, storeId: string | null) => {
+  return prisma.user.findFirst({
+    where: { id, ...(storeId ? { storeId } : {}) },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      status: true,
+      isActive: true,
+      karigarId: true,
+      permissions: true,
+      locationAccess: { select: { locationId: true } },
+    },
+  });
+});
+
+export async function generateMetadata({
+  params,
+}: EditUserPageProps): Promise<Metadata> {
+  try {
+    const { id } = await params;
+    const storeId = await getEffectiveStoreId();
+    const user = await getUser(id, storeId);
+    return { title: user ? `Edit ${user.name}` : "Edit User" };
+  } catch {
+    return { title: "Edit User" };
+  }
+}
+
 export default async function EditUserPage({ params }: EditUserPageProps) {
   const { id } = await params;
   const currentUser = await getCurrentUser();
@@ -31,23 +67,7 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
   const storeId = await getEffectiveStoreId();
 
   const [user, karigars, locations] = await Promise.all([
-    // Scoped by store, not just id — a bare findUnique would let one store's
-    // owner open a user belonging to another store.
-    prisma.user.findFirst({
-      where: { id, ...(storeId ? { storeId } : {}) },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        role: true,
-        status: true,
-        isActive: true,
-        karigarId: true,
-        permissions: true,
-        locationAccess: { select: { locationId: true } },
-      },
-    }),
+    getUser(id, storeId),
     storeId
       ? prisma.karigar.findMany({
           where: { storeId, isActive: true },

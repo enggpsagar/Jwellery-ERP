@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+
 import {
   getKachaInvoiceFormCustomers,
   getKachaInvoiceFormStockItems,
@@ -6,6 +8,10 @@ import { getStoreLocations } from "@/lib/actions/store-location-actions"
 
 import { KachaInvoiceForm } from "@/components/billing/kacha/kacha-invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+
+export const metadata: Metadata = {
+  title: "New Kacha Invoice",
+}
 
 export default async function NewKachaInvoicePage() {
   const [customers, stockItems, locations] = await Promise.all([

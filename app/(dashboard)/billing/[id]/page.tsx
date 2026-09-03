@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowLeftCircle, ArrowRightCircle, Pencil, Plus, Printer } from "lucide-react"
@@ -20,6 +22,20 @@ type Props = {
   searchParams?: Promise<{ from?: string }>
 }
 
+// Shared with generateMetadata below so the invoice is only fetched once
+// per request rather than once for the tab title and again for the page.
+const getInvoice = cache(getInvoiceById)
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const invoice = await getInvoice(id)
+    return { title: invoice ? `Invoice ${invoice.invoiceNumber}` : "Invoice" }
+  } catch {
+    return { title: "Invoice" }
+  }
+}
+
 export default async function InvoiceDetailPage({ params, searchParams }: Props) {
   const { id } = await params
 
@@ -30,7 +46,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
     label: "Back to Billing",
   })
   const [invoice, settings, locations] = await Promise.all([
-    getInvoiceById(id),
+    getInvoice(id),
     getBusinessSettings(),
     getStoreLocations(),
   ])

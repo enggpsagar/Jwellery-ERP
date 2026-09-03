@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import { StatCards } from "@/components/dashboard/stat-cards";
 import { SalesChart } from "@/components/dashboard/sales-chart";
 import { CategoryChart } from "@/components/dashboard/category-chart";
@@ -10,6 +12,10 @@ import {
   getRecentTransactions,
   getRecentActivity,
 } from "@/lib/actions/dashboard-actions";
+
+export const metadata: Metadata = {
+  title: "Dashboard",
+};
 
 export default async function DashboardPage() {
   const [stats, monthlySales, revenueByCategory, transactions, activity] =

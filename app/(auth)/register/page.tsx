@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getServerSession } from "next-auth"
@@ -8,6 +9,10 @@ import { APP_NAME } from "@/lib/constants/app"
 import { prisma } from "@/lib/prisma"
 import { getStates } from "@/lib/actions/location-actions"
 import { RegisterStoreForm } from "@/components/auth/register-store-form"
+
+export const metadata: Metadata = {
+  title: "Register",
+}
 
 export const dynamic = "force-dynamic"
 

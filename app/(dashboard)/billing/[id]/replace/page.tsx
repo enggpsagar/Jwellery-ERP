@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import { notFound, redirect } from "next/navigation"
 
 import {
@@ -15,10 +17,22 @@ type Props = {
   params: Promise<{ id: string }>
 }
 
+const getInvoice = cache(getInvoiceById)
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const invoice = await getInvoice(id)
+    return { title: invoice ? `Replace Invoice ${invoice.invoiceNumber}` : "Replace Invoice" }
+  } catch {
+    return { title: "Replace Invoice" }
+  }
+}
+
 export default async function ReplaceInvoicePage({ params }: Props) {
   const { id } = await params
 
-  const cancelledInvoice = await getInvoiceById(id)
+  const cancelledInvoice = await getInvoice(id)
   if (!cancelledInvoice) notFound()
 
   if (cancelledInvoice.status !== "CANCELLED") {

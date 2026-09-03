@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import { notFound, redirect } from "next/navigation"
 
 import { getQuotationById } from "@/lib/actions/quotation-actions"
@@ -9,11 +11,27 @@ type Props = {
   params: Promise<{ id: string }>
 }
 
+const getQuotation = cache(getQuotationById)
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const quotation = await getQuotation(id)
+    return {
+      title: quotation
+        ? `Convert Quotation ${quotation.quotationNumber}`
+        : "Convert Quotation",
+    }
+  } catch {
+    return { title: "Convert Quotation" }
+  }
+}
+
 export default async function ConvertQuotationToInvoicePage({ params }: Props) {
   const { id } = await params
 
   const [quotation, businessSettings] = await Promise.all([
-    getQuotationById(id),
+    getQuotation(id),
     getBusinessSettings(),
   ])
 

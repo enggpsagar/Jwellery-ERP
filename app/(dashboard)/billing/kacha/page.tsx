@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 
 import { getKachaInvoices, type KachaInvoiceSortField } from "@/lib/actions/kacha-invoice-actions"
@@ -7,6 +8,10 @@ import { PageBackHeader } from "@/components/shared/page-back-header"
 import { KachaImportDialog } from "@/components/billing/kacha/kacha-import-dialog"
 import { getCurrentUser } from "@/lib/auth/auth"
 import { Button } from "@/components/ui/button"
+
+export const metadata: Metadata = {
+  title: "Kacha Invoices",
+}
 
 type KachaBillingPageProps = {
   searchParams?: Promise<{

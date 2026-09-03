@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 
 import { getInvoices, type InvoiceSortField } from "@/lib/actions/invoice-actions"
@@ -6,6 +7,10 @@ import { InvoicesToolbar } from "@/components/billing/invoices-toolbar"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
+
+export const metadata: Metadata = {
+  title: "Billing",
+}
 
 type BillingPageProps = {
   searchParams?: Promise<{

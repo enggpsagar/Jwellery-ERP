@@ -1,9 +1,15 @@
+import type { Metadata } from "next"
+
 import { getStates } from "@/lib/actions/location-actions"
 import { safeReturnTo } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 
 import { CustomerCreateForm } from "@/components/customers/customer-create-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+
+export const metadata: Metadata = {
+  title: "Add Customer",
+}
 
 type NewCustomerPageProps = {
   searchParams?: Promise<{ returnTo?: string }>

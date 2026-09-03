@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
+
 import { ProfileCard } from "@/components/profile/profile-card";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { AccessPermissionsCard } from "@/components/profile/access-permissions-card";
+
+export const metadata: Metadata = {
+  title: "Profile",
+};
 
 export default function ProfilePage() {
   return (

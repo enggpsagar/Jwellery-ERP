@@ -1,5 +1,7 @@
 // FILE PATH: app/(dashboard)/karigars/[id]/receive-items/[jobId]/page.tsx
 
+import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 
 import { getKarigarById } from "@/lib/actions/karigar-actions";
@@ -17,6 +19,23 @@ type Props = {
   params: Promise<{ id: string; jobId: string }>;
 };
 
+const getKarigar = cache(getKarigarById);
+
+// Only the karigar's name is used here, not the job number — the job lookup
+// below is a raw prisma call scoped by requireStoreScope(), which can throw
+// (e.g. no store selected), and generateMetadata must never throw. Reusing
+// getKarigarById (already a plain, non-throwing action) keeps the title
+// specific without duplicating that store-scoped query and its failure mode.
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  try {
+    const { id } = await params;
+    const karigar = await getKarigar(id);
+    return { title: karigar ? `Receive Items — ${karigar.name}` : "Receive Items" };
+  } catch {
+    return { title: "Receive Items" };
+  }
+}
+
 function formatDate(date: Date | null) {
   if (!date) return "-";
   return new Intl.DateTimeFormat("en-IN", {
@@ -29,7 +48,7 @@ function formatDate(date: Date | null) {
 export default async function ReceiveItemsPage({ params }: Props) {
   const { id, jobId } = await params;
 
-  const karigar = await getKarigarById(id);
+  const karigar = await getKarigar(id);
   if (!karigar) {
     notFound();
   }

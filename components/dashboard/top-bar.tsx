@@ -164,6 +164,12 @@ export function TopBar({
               <DropdownMenuItem asChild>
                 <Link href="/contact-faq">Contact & FAQ</Link>
               </DropdownMenuItem>
+
+              {isSuperAdmin ? (
+                <DropdownMenuItem asChild>
+                  <Link href="/support-tickets">Support Tickets</Link>
+                </DropdownMenuItem>
+              ) : null}
             </DropdownMenuGroup>
 
             <DropdownMenuSeparator />

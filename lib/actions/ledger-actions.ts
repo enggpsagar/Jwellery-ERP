@@ -109,6 +109,10 @@ export type KarigarLedgerRow = {
   sourceLabel: string
   description: string
   metalWeightFine: number | null
+  /** This entry's own metal, e.g. "Gold" or "Silver" — a karigar can work
+   *  different metals across different jobs, so this is read per-entry
+   *  rather than assumed from the karigar overall. */
+  metalType: string | null
   paymentMethod: string | null
   amount: number
   runningFineGoldBalance: number
@@ -119,11 +123,16 @@ export type KarigarLedgerResult = {
   rows: KarigarLedgerRow[]
   finalFineGoldBalance: number
   finalCashBalance: number
+  /** The metal name to use in "Fine X Balance"/"Running X Balance" labels —
+   *  whichever metal this karigar's entries actually carry, so a
+   *  silver-only karigar's ledger doesn't read "gold" throughout. Falls
+   *  back to "Metal" when entries mix more than one, or carry none. */
+  metalLabel: string
 }
 
 /**
- * A single karigar's ledger, oldest first, with a running fine-gold balance
- * (gold currently out with the karigar) and running cash balance (labour
+ * A single karigar's ledger, oldest first, with a running fine-metal balance
+ * (metal currently out with the karigar) and running cash balance (labour
  * charges owed to the karigar) computed by walking the entries once.
  */
 export async function getKarigarLedger(karigarId: string): Promise<KarigarLedgerResult> {
@@ -132,15 +141,19 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
   const entries = await prisma.ledgerEntry.findMany({
     where: { storeId, karigarId },
     orderBy: [{ entryDate: "asc" }, { createdAt: "asc" }],
+    include: { metalType: { select: { name: true } } },
   })
 
   let fineGoldBalance = 0
   let cashBalance = 0
+  const metalNames = new Set<string>()
 
   const rows: KarigarLedgerRow[] = entries.map((entry) => {
     const isDebit = entry.type === "DEBIT"
     const metalWeightFine = entry.metalWeightFine ? Number(entry.metalWeightFine) : null
     const amount = Number(entry.amount ?? 0)
+    const metalType = entry.metalType?.name ?? null
+    if (metalType) metalNames.add(metalType)
 
     fineGoldBalance += (isDebit ? 1 : -1) * (metalWeightFine ?? 0)
     cashBalance += (isDebit ? 1 : -1) * amount
@@ -152,6 +165,7 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
       sourceLabel: formatLedgerSource(entry.sourceType),
       description: entry.description ?? "",
       metalWeightFine,
+      metalType,
       paymentMethod: entry.paymentMethod ?? null,
       amount,
       runningFineGoldBalance: fineGoldBalance,
@@ -159,10 +173,13 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
     }
   })
 
+  const metalLabel = metalNames.size === 1 ? [...metalNames][0] : "Metal"
+
   return {
     rows,
     finalFineGoldBalance: fineGoldBalance,
     finalCashBalance: cashBalance,
+    metalLabel,
   }
 }
 

@@ -37,12 +37,17 @@ type KarigarLedgerTableProps = {
   rows: KarigarLedgerRow[]
   finalFineGoldBalance: number
   finalCashBalance: number
+  /** e.g. "Gold" or "Silver" — whichever metal this karigar's entries
+   *  actually carry, so the labels below don't say "gold" for a
+   *  silver-only karigar. See getKarigarLedger()'s own doc comment. */
+  metalLabel: string
 }
 
 export function KarigarLedgerTable({
   rows,
   finalFineGoldBalance,
   finalCashBalance,
+  metalLabel,
 }: KarigarLedgerTableProps) {
   return (
     <div className="space-y-4">
@@ -50,7 +55,7 @@ export function KarigarLedgerTable({
         <Card size="sm">
           <CardHeader>
             <CardTitle className="text-sm text-muted-foreground">
-              Fine Gold Balance (with karigar)
+              Fine {metalLabel} Balance (with karigar)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -83,7 +88,7 @@ export function KarigarLedgerTable({
               <TableHead>Source</TableHead>
               <TableHead>Description</TableHead>
               <TableHead className="text-right">Fine Weight</TableHead>
-              <TableHead className="text-right">Running Gold Balance</TableHead>
+              <TableHead className="text-right">Running {metalLabel} Balance</TableHead>
               <TableHead className="text-right">Cash Amount</TableHead>
               <TableHead className="text-right">Running Cash Balance</TableHead>
             </TableRow>
@@ -117,7 +122,7 @@ export function KarigarLedgerTable({
                           {
                             fields: [
                               {
-                                label: "Fine gold",
+                                label: `Fine ${row.metalType ?? metalLabel}`,
                                 value:
                                   row.metalWeightFine !== null
                                     ? `${row.metalWeightFine.toFixed(3)} g`
@@ -129,7 +134,7 @@ export function KarigarLedgerTable({
                           {
                             fields: [
                               {
-                                label: "Gold balance",
+                                label: `${metalLabel} balance`,
                                 value: `${row.runningFineGoldBalance.toFixed(3)} g`,
                               },
                               { label: "Cash balance", value: inr(row.runningCashBalance) },

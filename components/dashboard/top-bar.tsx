@@ -99,8 +99,8 @@ export function TopBar({
             className="bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
           >
             <Link href="/billing/new">
-              <Plus className="mr-1 h-4 w-4" />
-              New Invoice
+              <Plus className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">New Invoice</span>
             </Link>
           </Button>
         )}

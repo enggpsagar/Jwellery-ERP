@@ -29,6 +29,8 @@ import { LocationSelect } from "@/components/shared/location-select"
 
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
+import { PaidNowFields } from "@/components/shared/paid-now-fields"
+import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
 
@@ -173,7 +175,9 @@ type PurchaseDraft = {
   items: LineItem[]
   discount: number
   gstRate: number
-  paidAmount: number
+  /** "Paid Now" payment-method rows — see paymentRows' own comment below
+   * for why this is an array of rows rather than a single number. */
+  paymentRows: PaymentMethodValue[]
   purchaseDate: string
   notes: string
   vendorInvoiceNumber: string
@@ -224,7 +228,12 @@ export function PurchaseForm({
   // A Composition-scheme store can never charge/record GST — its rate
   // starts (and stays) at 0 regardless of whatever Settings has saved.
   const [gstRate, setGstRate] = useState(gstScheme === "COMPOSITION" ? 0 : defaultGstRate)
-  const [paidAmount, setPaidAmount] = useState(0)
+  // "Paid Now" collects a method (Cash/UPI/etc.) per row, same PaymentMethodFields
+  // component the "Record Payment" dialog uses — paidAmount is always derived
+  // from these rows (never tracked separately), so it can't go stale relative
+  // to what's actually been entered.
+  const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
+  const paidAmount = paymentRows.reduce((sum, row) => sum + (row.amount || 0), 0)
 
   const selectedVendor = vendors.find((vendor) => vendor.id === vendorId)
 
@@ -259,7 +268,7 @@ export function PurchaseForm({
       items,
       discount,
       gstRate,
-      paidAmount,
+      paymentRows,
       purchaseDate: formData ? String(formData.get("purchaseDate") ?? "") : "",
       notes: formData ? String(formData.get("notes") ?? "") : "",
       vendorInvoiceNumber: formData ? String(formData.get("vendorInvoiceNumber") ?? "") : "",
@@ -308,7 +317,7 @@ export function PurchaseForm({
       setVendorId(newVendorId || draft.vendorId || "")
       setDiscount(draft.discount ?? 0)
       setGstRate(draft.gstRate ?? 0)
-      setPaidAmount(draft.paidAmount ?? 0)
+      setPaymentRows(draft.paymentRows ?? [])
 
       let nextItems =
         draft.items && draft.items.length ? draft.items : [emptyLineItem()]
@@ -636,6 +645,22 @@ export function PurchaseForm({
 
   const canSubmit = vendorId && items.every((item) => item.productId)
 
+  // Zero-amount rows (a split row opened but never filled in) are dropped
+  // here — the server's parseOptionalPayments requires any row it does
+  // receive to carry a real amount.
+  const paymentsJson = JSON.stringify(
+    paymentRows
+      .filter((row) => row.amount > 0)
+      .map((row) => ({
+        method: row.method,
+        amount: row.amount,
+        reference: row.reference || null,
+        bankName: row.bankName || null,
+        attachmentUrl: row.attachmentUrl || null,
+      })),
+  )
+  const paidOverTotal = paidAmount > totalAmount
+
   return (
     <form
       ref={formRef}
@@ -660,6 +685,7 @@ export function PurchaseForm({
       <input type="hidden" name="cgstAmount" value={gstBreakdown.cgst} />
       <input type="hidden" name="igstAmount" value={gstBreakdown.igst} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
+      <input type="hidden" name="paymentsJson" value={paymentsJson} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2">
@@ -995,7 +1021,7 @@ export function PurchaseForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Discount</Label>
           <Input
@@ -1035,17 +1061,13 @@ export function PurchaseForm({
                   }`}
           </p>
         </div>
-
-        <div className="space-y-2">
-          <Label>Paid Now</Label>
-          <Input
-            type="number"
-            step="0.01"
-            value={paidAmount === 0 ? "" : paidAmount}
-            onChange={(e) => setPaidAmount(Number(e.target.value) || 0)}
-          />
-        </div>
       </div>
+
+      <PaidNowFields
+        rows={paymentRows}
+        onRowsChange={setPaymentRows}
+        maxAmount={totalAmount > 0 ? totalAmount : undefined}
+      />
 
       {gstScheme !== "COMPOSITION" && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1111,7 +1133,7 @@ export function PurchaseForm({
         </div>
       </div>
 
-      <Button type="submit" disabled={pending || !canSubmit}>
+      <Button type="submit" disabled={pending || !canSubmit || paidOverTotal}>
         {pending ? "Creating..." : "Create Purchase"}
       </Button>
     </form>

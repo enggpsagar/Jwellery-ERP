@@ -109,6 +109,37 @@ function parsePayments(raw: string): PaymentEntryInput[] | null {
   return payments;
 }
 
+/**
+ * Same shape/validation as parsePayments, but allows zero rows — used at
+ * document-CREATION time (createPurchase) where a fully-on-credit purchase
+ * (nothing paid yet) is a normal, valid case. parsePayments itself stays
+ * strict (1-2 rows required) because recordPurchasePayment's dialog only
+ * ever appears once there's a known positive balance to collect against.
+ */
+function parseOptionalPayments(raw: string): PaymentEntryInput[] | null {
+  let payments: PaymentEntryInput[];
+  try {
+    payments = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (!Array.isArray(payments) || payments.length > 2) {
+    return null;
+  }
+
+  for (const payment of payments) {
+    if (!Object.values(PaymentMethod).includes(payment.method as PaymentMethod)) {
+      return null;
+    }
+    if (!(Number(payment.amount) > 0)) {
+      return null;
+    }
+  }
+
+  return payments;
+}
+
 function toNumber(value: unknown, fallback = 0) {
   const num = Number(value);
   return Number.isNaN(num) ? fallback : num;
@@ -452,7 +483,9 @@ export async function getPurchaseFormProducts() {
  * brand new InventoryStock row — stock comes IN, it doesn't go out. If the
  * purchase isn't fully paid up front, a CREDIT ledger entry is recorded
  * against the vendor for the outstanding amount (the shop owes the vendor —
- * opposite direction from a sale's customer-owes-shop DEBIT).
+ * opposite direction from a sale's customer-owes-shop DEBIT). Whatever IS
+ * paid up front (via paymentsJson's 1-2 method rows) gets its own DEBIT
+ * ledger entry per row, same shape recordPurchasePayment writes.
  */
 export async function createPurchase(
   prevState: PurchaseFormState = initialState,
@@ -507,7 +540,24 @@ export async function createPurchase(
     const sgstAmount = toNumber(formData.get("sgstAmount"));
     const cgstAmount = toNumber(formData.get("cgstAmount"));
     const igstAmount = toNumber(formData.get("igstAmount"));
-    const paidAmount = toNumber(formData.get("paidAmount"));
+
+    // paymentsJson (1-2 method rows, or none for a fully-on-credit purchase)
+    // is what purchase-form.tsx's "Paid Now" section sends. See
+    // createInvoice's identical fallback for why a missing paymentsJson
+    // field (no current caller does this for createPurchase, but kept for
+    // the same robustness) still works off the legacy plain `paidAmount`.
+    const paymentsRaw = formData.get("paymentsJson");
+    const payments = paymentsRaw !== null ? parseOptionalPayments(String(paymentsRaw)) : [];
+    if (payments === null) {
+      return {
+        success: false,
+        message: "Add 1-2 valid payment methods with an amount, or leave Paid Now blank for a fully-on-credit purchase.",
+      };
+    }
+    const paidAmount =
+      paymentsRaw !== null
+        ? payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
+        : toNumber(formData.get("paidAmount"));
     const purchaseDateRaw = String(formData.get("purchaseDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
     const vendorInvoiceNumber = String(formData.get("vendorInvoiceNumber") || "").trim() || null;
@@ -708,6 +758,29 @@ export async function createPurchase(
             amount: balanceAmount,
             description: `Purchase ${purchaseNumber} balance due`,
             locationId: resolvedLocationId ?? undefined,
+          },
+        });
+      }
+
+      // One DEBIT entry per payment-method row actually paid out at the
+      // moment of purchase — same shape recordPurchasePayment writes for a
+      // later top-up payment (opposite direction from a Sale's CREDIT: cash
+      // paid out reduces what the shop owes the vendor).
+      for (const [index, payment] of payments.entries()) {
+        await tx.ledgerEntry.create({
+          data: {
+            storeId,
+            type: LedgerEntryType.DEBIT,
+            sourceType: LedgerSourceType.PURCHASE,
+            vendorId,
+            purchaseId: created.id,
+            amount: payment.amount,
+            paymentMethod: payment.method as PaymentMethod,
+            paymentReference: payment.reference ?? undefined,
+            bankName: payment.bankName ?? undefined,
+            attachmentUrl: payment.attachmentUrl ?? undefined,
+            locationId: resolvedLocationId ?? undefined,
+            description: index === 0 ? `Payment made for ${purchaseNumber}` : undefined,
           },
         });
       }

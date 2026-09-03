@@ -8,6 +8,7 @@ import {
   InventoryTransactionType,
   LedgerEntryType,
   LedgerSourceType,
+  PaymentMethod,
   PurityType,
   ChargeType,
   UserRole,
@@ -69,6 +70,46 @@ export type KachaInvoiceFormState = {
 };
 
 const initialState: KachaInvoiceFormState = { success: false, message: "" };
+
+// Duplicated from invoice-actions.ts/purchase-actions.ts (same per-file
+// convention as the generateXNumber helpers) rather than a shared import.
+export type PaymentEntryInput = {
+  method: string;
+  amount: number;
+  reference?: string | null;
+  bankName?: string | null;
+  attachmentUrl?: string | null;
+};
+
+/**
+ * Validates the 0-2 "Paid Now" payment-method rows kacha-invoice-form.tsx
+ * sends. Zero rows is valid here (a fresh slip may be fully on credit) —
+ * unlike recordKachaInvoicePayment's own plain `amount` field, which only
+ * ever collects against a balance already known to be positive.
+ */
+function parseOptionalPayments(raw: string): PaymentEntryInput[] | null {
+  let payments: PaymentEntryInput[];
+  try {
+    payments = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (!Array.isArray(payments) || payments.length > 2) {
+    return null;
+  }
+
+  for (const payment of payments) {
+    if (!Object.values(PaymentMethod).includes(payment.method as PaymentMethod)) {
+      return null;
+    }
+    if (!(Number(payment.amount) > 0)) {
+      return null;
+    }
+  }
+
+  return payments;
+}
 
 function toNumber(value: unknown, fallback = 0) {
   const num = Number(value);
@@ -390,7 +431,25 @@ export async function createKachaInvoice(
     }));
 
     const discount = toNumber(formData.get("discount"));
-    const paidAmount = toNumber(formData.get("paidAmount"));
+
+    // paymentsJson (1-2 method rows, or none for a fully-on-credit slip) is
+    // what kacha-invoice-form.tsx's "Paid Now" section sends. See
+    // createInvoice's identical fallback in invoice-actions.ts for why a
+    // missing paymentsJson field still works off the legacy plain
+    // `paidAmount` (no current caller relies on that here, but kept for
+    // the same robustness/consistency across all three creation actions).
+    const paymentsRaw = formData.get("paymentsJson");
+    const payments = paymentsRaw !== null ? parseOptionalPayments(String(paymentsRaw)) : [];
+    if (payments === null) {
+      return {
+        success: false,
+        message: "Add 1-2 valid payment methods with an amount, or leave Paid Now blank for a fully-on-credit slip.",
+      };
+    }
+    const paidAmount =
+      paymentsRaw !== null
+        ? payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
+        : toNumber(formData.get("paidAmount"));
     const invoiceDateRaw = String(formData.get("invoiceDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
     const locationId = String(formData.get("locationId") || "").trim() || null;
@@ -584,6 +643,30 @@ export async function createKachaInvoice(
             amount: balanceAmount,
             description: `Kacha slip ${slipNumber} balance due`,
             locationId: resolvedLocationId ?? undefined,
+          },
+        });
+      }
+
+      // One CREDIT entry per payment-method row actually collected at the
+      // moment of sale. LedgerEntry has no kachaInvoiceId column (only
+      // invoiceId/purchaseId) — same limitation the balance-due entry above
+      // already lives with, and recordKachaInvoicePayment's own CREDIT entry
+      // does too — so these rows are identified by customerId + description
+      // only, same as every other Kacha ledger entry today.
+      for (const [index, payment] of payments.entries()) {
+        await tx.ledgerEntry.create({
+          data: {
+            storeId,
+            type: LedgerEntryType.CREDIT,
+            sourceType: LedgerSourceType.SALE,
+            customerId,
+            amount: payment.amount,
+            paymentMethod: payment.method as PaymentMethod,
+            paymentReference: payment.reference ?? undefined,
+            bankName: payment.bankName ?? undefined,
+            attachmentUrl: payment.attachmentUrl ?? undefined,
+            locationId: resolvedLocationId ?? undefined,
+            description: index === 0 ? `Payment received for ${slipNumber}` : undefined,
           },
         });
       }

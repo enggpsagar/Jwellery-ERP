@@ -27,6 +27,8 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
+import { PaidNowFields } from "@/components/shared/paid-now-fields"
+import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
 import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat } from "@/lib/purity"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
@@ -238,7 +240,19 @@ export function InvoiceForm({
   // comment in schema.prisma — so its rate starts (and stays) at 0
   // regardless of whatever Settings has saved as the store's default.
   const [gstRate, setGstRate] = useState(gstScheme === "COMPOSITION" ? 0 : defaultGstRate)
-  const [paidAmount, setPaidAmount] = useState(0)
+  // Full line-item edit (editInvoiceId set) still shows a bare "Paid Now"
+  // number for the same reason it always has — updateInvoice never reads
+  // paidAmount off the form at all (it recomputes from the invoice's own
+  // already-recorded paidAmount instead, see its own doc comment), so this
+  // field is already inert there and left untouched. A fresh invoice
+  // (createInvoice) uses the payment-method rows below instead — paidAmount
+  // is always derived from them, never tracked as separate state, so it
+  // can't go stale relative to what's actually been entered.
+  const [legacyPaidAmount, setLegacyPaidAmount] = useState(0)
+  const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
+  const paidAmount = editInvoiceId
+    ? legacyPaidAmount
+    : paymentRows.reduce((sum, row) => sum + (row.amount || 0), 0)
 
   const selectedCustomer = customers.find((customer) => customer.id === customerId)
 
@@ -720,6 +734,23 @@ export function InvoiceForm({
   // matching the server's own guard in createInvoice.
   const hasInvalidRate = items.some((item) => !(item.rate > 0))
 
+  // Only meaningful for a fresh invoice — see paymentRows' own comment
+  // above. Zero-amount rows (a split row the user opened but never filled
+  // in) are dropped here rather than sent through, matching parseOptionalPayments'
+  // server-side requirement that any row it does receive have a real amount.
+  const paymentsJson = JSON.stringify(
+    paymentRows
+      .filter((row) => row.amount > 0)
+      .map((row) => ({
+        method: row.method,
+        amount: row.amount,
+        reference: row.reference || null,
+        bankName: row.bankName || null,
+        attachmentUrl: row.attachmentUrl || null,
+      })),
+  )
+  const paidOverTotal = !editInvoiceId && paidAmount > totalAmount
+
   return (
     <form
       onSubmit={(event) => {
@@ -744,6 +775,7 @@ export function InvoiceForm({
       <input type="hidden" name="discount" value={discount} />
       <input type="hidden" name="taxAmount" value={taxAmount} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
+      <input type="hidden" name="paymentsJson" value={paymentsJson} />
       {replacesId && <input type="hidden" name="replacesId" value={replacesId} />}
 
       {replacesInvoiceNumber && (
@@ -1215,7 +1247,7 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Discount</Label>
           <Input
@@ -1242,17 +1274,25 @@ export function InvoiceForm({
               : `Split into SGST+CGST (or IGST for an inter-state customer) per line — total tax ₹${taxAmount.toFixed(2)}`}
           </p>
         </div>
+      </div>
 
-        <div className="space-y-2">
+      {editInvoiceId ? (
+        <div className="max-w-sm space-y-2">
           <Label>Paid Now</Label>
           <Input
             type="number"
             step="0.01"
-            value={paidAmount === 0 ? "" : paidAmount}
-            onChange={(e) => setPaidAmount(Number(e.target.value) || 0)}
+            value={legacyPaidAmount === 0 ? "" : legacyPaidAmount}
+            onChange={(e) => setLegacyPaidAmount(Number(e.target.value) || 0)}
           />
         </div>
-      </div>
+      ) : (
+        <PaidNowFields
+          rows={paymentRows}
+          onRowsChange={setPaymentRows}
+          maxAmount={totalAmount > 0 ? totalAmount : undefined}
+        />
+      )}
 
       <div className="space-y-2">
         <Label>Notes</Label>
@@ -1294,7 +1334,7 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <Button type="submit" disabled={pending || !customerId || hasInvalidRate}>
+      <Button type="submit" disabled={pending || !customerId || hasInvalidRate || paidOverTotal}>
         {editInvoiceId
           ? pending
             ? "Saving..."

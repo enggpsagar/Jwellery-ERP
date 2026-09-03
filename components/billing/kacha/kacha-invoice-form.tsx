@@ -26,6 +26,8 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
+import { PaidNowFields } from "@/components/shared/paid-now-fields"
+import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
 import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat } from "@/lib/purity"
 import type { PurityType } from "@prisma/client"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
@@ -161,7 +163,12 @@ export function KachaInvoiceForm({
   const [locationId, setLocationId] = useState("")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
-  const [paidAmount, setPaidAmount] = useState(0)
+  // "Paid Now" collects a method (Cash/UPI/etc.) per row, same PaymentMethodFields
+  // component the "Record Payment" dialog uses — paidAmount is always derived
+  // from these rows (never tracked separately), so it can't go stale relative
+  // to what's actually been entered.
+  const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
+  const paidAmount = paymentRows.reduce((sum, row) => sum + (row.amount || 0), 0)
 
   const [state, formAction, pending] = useActionState(
     createKachaInvoice,
@@ -436,6 +443,22 @@ export function KachaInvoiceForm({
     })),
   )
 
+  // Zero-amount rows (a split row opened but never filled in) are dropped
+  // here — the server's parseOptionalPayments requires any row it does
+  // receive to carry a real amount.
+  const paymentsJson = JSON.stringify(
+    paymentRows
+      .filter((row) => row.amount > 0)
+      .map((row) => ({
+        method: row.method,
+        amount: row.amount,
+        reference: row.reference || null,
+        bankName: row.bankName || null,
+        attachmentUrl: row.attachmentUrl || null,
+      })),
+  )
+  const paidOverTotal = paidAmount > totalAmount
+
   return (
     <form
       onSubmit={(event) => {
@@ -455,6 +478,7 @@ export function KachaInvoiceForm({
       <input type="hidden" name="itemsJson" value={itemsJson} />
       <input type="hidden" name="discount" value={discount} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
+      <input type="hidden" name="paymentsJson" value={paymentsJson} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2">
@@ -792,27 +816,21 @@ export function KachaInvoiceForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Discount</Label>
-          <Input
-            type="number"
-            step="0.01"
-            value={discount === 0 ? "" : discount}
-            onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Paid Now</Label>
-          <Input
-            type="number"
-            step="0.01"
-            value={paidAmount === 0 ? "" : paidAmount}
-            onChange={(e) => setPaidAmount(Number(e.target.value) || 0)}
-          />
-        </div>
+      <div className="max-w-sm space-y-2">
+        <Label>Discount</Label>
+        <Input
+          type="number"
+          step="0.01"
+          value={discount === 0 ? "" : discount}
+          onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+        />
       </div>
+
+      <PaidNowFields
+        rows={paymentRows}
+        onRowsChange={setPaymentRows}
+        maxAmount={totalAmount > 0 ? totalAmount : undefined}
+      />
 
       <div className="space-y-2">
         <Label>Notes</Label>
@@ -846,7 +864,7 @@ export function KachaInvoiceForm({
         </div>
       </div>
 
-      <Button type="submit" disabled={pending || !customerId}>
+      <Button type="submit" disabled={pending || !customerId || paidOverTotal}>
         {pending ? "Creating..." : "Create Kacha Slip"}
       </Button>
     </form>

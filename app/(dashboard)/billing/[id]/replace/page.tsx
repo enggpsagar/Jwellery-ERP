@@ -102,6 +102,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
         initialItems={initialItems}
         replacesId={cancelledInvoice.id}
         replacesInvoiceNumber={cancelledInvoice.invoiceNumber}
+        defaultNotes={cancelledInvoice.notes || businessSettings.invoiceNotes || undefined}
       />
     </main>
   )

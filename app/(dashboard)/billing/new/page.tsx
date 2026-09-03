@@ -38,6 +38,7 @@ export default async function NewInvoicePage() {
         defaultGstRate={businessSettings.defaultGstRate}
         gstScheme={businessSettings.gstScheme}
         storeState={businessSettings.state}
+        defaultNotes={businessSettings.invoiceNotes || undefined}
       />
     </main>
   )

@@ -157,6 +157,11 @@ type InvoiceFormProps = {
    * which is the whole point — full editing needs no extra fields of its
    * own, just a different action to submit to. */
   editInvoiceId?: string
+  /** Starting text for the Notes field — the invoice's own saved notes
+   * when editing/replacing, or the store's Default Invoice Notes (Settings)
+   * for a fresh invoice. Uncontrolled (defaultValue), so typing over it
+   * doesn't fight the form. */
+  defaultNotes?: string
 }
 
 export function InvoiceForm({
@@ -172,6 +177,7 @@ export function InvoiceForm({
   replacesId,
   replacesInvoiceNumber,
   editInvoiceId,
+  defaultNotes,
 }: InvoiceFormProps) {
   const router = useRouter()
   const toast = useToast()
@@ -1092,7 +1098,7 @@ export function InvoiceForm({
 
       <div className="space-y-2">
         <Label>Notes</Label>
-        <Textarea name="notes" rows={2} />
+        <Textarea name="notes" rows={2} defaultValue={defaultNotes} />
       </div>
 
       <div className="rounded-lg border bg-muted/30 p-4 space-y-1 text-sm">

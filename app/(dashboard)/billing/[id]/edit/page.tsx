@@ -96,6 +96,7 @@ export default async function EditInvoicePage({ params }: Props) {
         initialLocationId={invoice.locationId ?? undefined}
         initialItems={initialItems}
         editInvoiceId={invoice.id}
+        defaultNotes={invoice.notes || businessSettings.invoiceNotes || undefined}
       />
     </main>
   )

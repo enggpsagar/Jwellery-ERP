@@ -70,6 +70,7 @@ export default async function InvoicePrintPage({ params }: Props) {
   )
   const totalMaking = invoice.items.reduce((sum, item) => sum + item.makingCharge, 0)
   const totalHm = invoice.items.reduce((sum, item) => sum + item.hmCharge, 0)
+  const totalStoneCharge = invoice.items.reduce((sum, item) => sum + item.stoneCharge, 0)
   const totalSchemeDiscount = invoice.items.reduce((sum, item) => sum + item.schemeDiscount, 0)
   const totalSgst = invoice.items.reduce((sum, item) => sum + item.sgstAmount, 0)
   const totalCgst = invoice.items.reduce((sum, item) => sum + item.cgstAmount, 0)
@@ -149,6 +150,7 @@ export default async function InvoicePrintPage({ params }: Props) {
               <th>Net Metal Weight (grams)</th>
               <th>Gross Product Price (Rs.)</th>
               <th>Making Charges (Rs.)</th>
+              <th>Stone Charge (Rs.)</th>
               <th>Scheme*/Discount (Rs.)</th>
               {/* One customer, one shipping state — an invoice is either
                   wholly intra-state or wholly inter-state, never a mix, so
@@ -181,6 +183,7 @@ export default async function InvoicePrintPage({ params }: Props) {
                   {fmt(item.makingCharge)}
                   {item.hmCharge > 0 ? <span className="block">HM {fmt(item.hmCharge)}</span> : null}
                 </td>
+                <td className="text-right">{fmt(item.stoneCharge)}</td>
                 <td className="text-right">{fmt(item.schemeDiscount)}</td>
                 {isInterState ? (
                   <td className="text-right">{fmt(item.igstAmount)}</td>
@@ -204,6 +207,7 @@ export default async function InvoicePrintPage({ params }: Props) {
                 {fmt(totalMaking)}
                 {totalHm > 0 ? <span className="block">HM {fmt(totalHm)}</span> : null}
               </td>
+              <td className="text-right">{fmt(totalStoneCharge)}</td>
               <td className="text-right">{fmt(totalSchemeDiscount)}</td>
               {isInterState ? (
                 <td className="text-right">{fmt(totalIgst)}</td>
@@ -294,6 +298,20 @@ export default async function InvoicePrintPage({ params }: Props) {
         <div className="border-t border-black p-2">
           <p>Value in words :- {amountInWords(invoice.totalAmount)}</p>
         </div>
+
+        {invoice.notes && (
+          <div className="border-t border-black p-2">
+            <p className="font-semibold">Notes</p>
+            <p className="whitespace-pre-wrap">{invoice.notes}</p>
+          </div>
+        )}
+
+        {settings.invoiceTerms && (
+          <div className="border-t border-black p-2">
+            <p className="font-semibold">Terms & Conditions</p>
+            <p className="whitespace-pre-wrap">{settings.invoiceTerms}</p>
+          </div>
+        )}
       </div>
     </main>
   )

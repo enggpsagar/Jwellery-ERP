@@ -17,6 +17,7 @@ import { useToast } from "@/components/providers/toast-provider"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { gstinRequired } from "@/lib/gst"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
+import { PartyGstTypeSelect } from "@/components/shared/party-gst-type-select"
 
 type StateItem = { id: string; name: string }
 type CityItem = { id: string; name: string }
@@ -52,8 +53,8 @@ export function VendorEditForm({
 }) {
   // Initialized from this specific vendor's own saved flag, not derived from
   // the store's scheme — see gstinRequired's doc comment.
-  const [isGstRegistered, setIsGstRegistered] = useState(vendor.isGstRegistered ?? false)
-  const gstinRequiredNow = gstinRequired(gstScheme, isGstRegistered)
+  const [gstType, setGstType] = useState(vendor.gstType ?? "UNREGISTERED")
+  const gstinRequiredNow = gstinRequired(gstScheme, gstType)
 
   const router = useRouter()
   const toast = useToast()
@@ -283,17 +284,7 @@ export function VendorEditForm({
             </label>
             <GstSchemeBadge scheme={gstScheme} />
             {gstScheme !== "COMPOSITION" ? (
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  name="isGstRegistered"
-                  value="true"
-                  checked={isGstRegistered}
-                  onChange={(e) => setIsGstRegistered(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-input"
-                />
-                This vendor is GST-registered (B2B)
-              </label>
+              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
             ) : null}
             <input
               name="gstNumber"

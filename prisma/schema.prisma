@@ -272,16 +272,14 @@ model Customer {
   state          String?
   pincode        String?
   gstin          String?
-  // Whether THIS customer is itself GST-registered (a B2B buyer), independent
-  // of the store's own gstScheme — a Wholesaler & Manufacturer store still
-  // routinely sells to individual, non-registered buyers, so B2B/B2C is a
-  // property of the counterparty, not a store-wide restriction. Only
-  // Composition-scheme stores are a genuine store-wide exception (see
-  // GstScheme's own doc comment) — this flag is ignored there. Defaults new
-  // records to whatever the store's own gstScheme suggests is more likely,
-  // but is freely editable per customer afterward. See gstinRequired() in
-  // lib/gst.ts.
-  isGstRegistered Boolean       @default(false)
+  // This customer's OWN GST registration status — independent of the
+  // store's own gstScheme. See PartyGstType's doc comment: it only ever
+  // affects whether GSTIN is required/shown here, never how much GST the
+  // store itself charges (that's fixed by BusinessSettings.gstScheme).
+  // Defaults new records to whatever the store's own gstScheme suggests is
+  // more likely, but is freely editable per customer afterward. See
+  // gstinRequired() in lib/gst.ts.
+  gstType        PartyGstType  @default(UNREGISTERED)
   panNumber      String?
   // A customer-facing loyalty/scheme reference number some stores print on
   // the invoice (e.g. "Encircle Id") — opaque to the app, shown as-is.
@@ -774,11 +772,12 @@ model Vendor {
   state          String?
   pincode        String?
   gstin          String?
-  // Same per-record override as Customer.isGstRegistered — see its doc
-  // comment. A vendor being GST-registered is what makes their GSTIN
-  // required for a valid purchase entry, independent of the store's own
-  // gstScheme.
-  isGstRegistered Boolean         @default(false)
+  // This vendor's OWN GST registration status. Unlike on Customer, this
+  // genuinely changes the tax math: a COMPOSITION vendor's purchase invoice
+  // to us legally never carries GST, regardless of our own store's
+  // gstScheme - see isVendorGstApplicable() in lib/gst.ts, used by the
+  // Purchases form/action instead of the store's own scheme.
+  gstType        PartyGstType    @default(UNREGISTERED)
   notes          String?
   openingBalance Decimal          @default(0) @db.Decimal(12, 2)
   isActive       Boolean          @default(true)
@@ -811,13 +810,15 @@ model Purchase {
   makingCharges       Decimal        @default(0) @db.Decimal(12, 2)
   stoneCharges        Decimal        @default(0) @db.Decimal(12, 2)
   discount            Decimal        @default(0) @db.Decimal(12, 2)
-  // Whatever GST the vendor actually charged on their bill - this is about
-  // the VENDOR's invoice, not the store's own gstScheme, so it's recorded
-  // the same way regardless of which of the three schemes the store itself
-  // operates under. What DOES depend on the store's scheme is whether this
-  // is eligible for input tax credit: a Composition-scheme store can never
-  // claim ITC on anything, no matter what a vendor charged - see the
-  // "ITC not eligible" note rendered wherever this purchase is shown.
+  // Whatever GST the vendor actually charged on their bill - driven by the
+  // VENDOR's own PartyGstType (see computePurchaseGst()/
+  // isVendorGstApplicable() in lib/gst.ts), not the store's own gstScheme,
+  // so it's recorded the same way regardless of which of the three schemes
+  // the store itself operates under. What DOES depend on the store's scheme
+  // is whether this is eligible for input tax credit: a Composition-scheme
+  // store can never claim ITC on anything, no matter what a vendor charged
+  // - see the "ITC not eligible" note rendered wherever this purchase is
+  // shown (isItcEligible() in lib/gst.ts).
   taxAmount           Decimal        @default(0) @db.Decimal(12, 2)
   sgstAmount          Decimal        @default(0) @db.Decimal(12, 2)
   cgstAmount          Decimal        @default(0) @db.Decimal(12, 2)
@@ -1307,6 +1308,30 @@ enum BusinessUnit {
 enum GstScheme {
   REGULAR_B2C
   REGULAR_B2B
+  COMPOSITION
+}
+
+// A Customer's or Vendor's OWN GST registration status - independent of
+// BusinessSettings.gstScheme above, which only describes the STORE's own
+// registration. B2B vs B2C is not a registration category a counterparty
+// can "be" - it's simply whether they're GST-registered at all, which is
+// exactly what this models:
+//   UNREGISTERED - No GSTIN. GSTIN is never required/shown for this party.
+//   REGULAR      - Has a GSTIN, charges/receives full GST normally. As a
+//                  Vendor, their invoice to us legitimately shows GST - see
+//                  gstinRequired()/isVendorGstApplicable() in lib/gst.ts.
+//   COMPOSITION  - Has a GSTIN, but (same legal restriction as GstScheme's
+//                  own COMPOSITION) can never itemize GST on an invoice THEY
+//                  issue. Only meaningful for Vendor: a Composition vendor's
+//                  purchase bill to us never carries a tax breakdown,
+//                  regardless of what GstScheme our own store operates
+//                  under. For a Customer this only affects GSTIN capture,
+//                  same as REGULAR - we're still the ones issuing the
+//                  invoice, so it's our own GstScheme, not theirs, that
+//                  decides what our invoice can show.
+enum PartyGstType {
+  UNREGISTERED
+  REGULAR
   COMPOSITION
 }
 

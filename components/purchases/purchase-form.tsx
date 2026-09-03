@@ -4,12 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
-import type { GstScheme } from "@prisma/client"
+import type { GstScheme, PartyGstType } from "@prisma/client"
 
 import { createPurchase, type PurchaseFormState } from "@/lib/actions/purchase-actions"
 import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, GRAMS_PER_CARAT } from "@/lib/purity"
 import { useToast } from "@/components/providers/toast-provider"
-import { computeGst } from "@/lib/gst"
+import { computePurchaseGst, isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 
 import { Input } from "@/components/ui/input"
@@ -36,6 +36,7 @@ type VendorOption = {
   phone: string | null
   vendorCode: string | null
   state: string | null
+  gstType: PartyGstType
 }
 
 type ProductOption = {
@@ -494,11 +495,21 @@ export function PurchaseForm({
   )
 
   // Purchase records tax at the document level, not per line (see
-  // Purchase's own schema comment) — one computeGst() call against the
-  // whole taxable base, scheme- and inter-state-aware just like Invoice.
+  // Purchase's own schema comment) — one computePurchaseGst() call against
+  // the whole taxable base. Deliberately keyed off the VENDOR's own gstType,
+  // not our store's gstScheme — a purchase's GST is whatever the vendor's
+  // real invoice shows, which depends on how THEY are registered. Our own
+  // store's Composition status never suppresses this; it only affects
+  // whether we can claim it back — a separate concern, noted below.
   const taxableValue = subtotal + makingChargesTotal + stoneChargesTotal - discount
   const gstBreakdown = useMemo(() => {
-    const breakdown = computeGst(taxableValue, gstRate, gstScheme, storeState, selectedVendor?.state)
+    const breakdown = computePurchaseGst(
+      taxableValue,
+      gstRate,
+      selectedVendor?.gstType ?? "UNREGISTERED",
+      storeState,
+      selectedVendor?.state,
+    )
     const round = (value: number) => Math.round(value * 100) / 100
     return {
       sgst: round(breakdown.sgst),
@@ -507,7 +518,7 @@ export function PurchaseForm({
       isInterState: breakdown.isInterState,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taxableValue, gstRate, gstScheme, storeState, selectedVendor?.state])
+  }, [taxableValue, gstRate, selectedVendor?.gstType, storeState, selectedVendor?.state])
   const taxAmount = gstBreakdown.sgst + gstBreakdown.cgst + gstBreakdown.igst
 
   const totalAmount =
@@ -908,19 +919,30 @@ export function PurchaseForm({
         <div className="space-y-2">
           <Label>GST Rate %</Label>
           <GstSchemeBadge scheme={gstScheme} />
+          {selectedVendor ? (
+            <p className="text-xs text-muted-foreground">
+              Vendor GST Type: <span className="font-medium">{partyGstTypeLabel(selectedVendor.gstType)}</span>
+            </p>
+          ) : null}
           <Input
             type="number"
             step="0.01"
             value={gstRate}
-            disabled={gstScheme === "COMPOSITION"}
+            // A purchase's GST depends on the VENDOR's own registration, not
+            // our store's scheme — see computePurchaseGst()'s doc comment.
+            disabled={!selectedVendor || !isVendorGstApplicable(selectedVendor.gstType)}
             onChange={(e) => setGstRate(Number(e.target.value) || 0)}
           />
           <p className="text-xs text-muted-foreground">
-            {gstScheme === "COMPOSITION"
-              ? "Not used — Composition Scheme never charges GST."
-              : gstBreakdown.isInterState
-                ? `IGST (inter-state) — total tax ₹${taxAmount.toFixed(2)}`
-                : `SGST + CGST (intra-state) — total tax ₹${taxAmount.toFixed(2)}`}
+            {!selectedVendor
+              ? "Select a vendor first."
+              : !isVendorGstApplicable(selectedVendor.gstType)
+                ? `Not used — this vendor is ${partyGstTypeLabel(selectedVendor.gstType).toLowerCase()}, so their invoice can't carry GST.`
+                : `${gstBreakdown.isInterState ? "IGST (inter-state)" : "SGST + CGST (intra-state)"} — total tax ₹${taxAmount.toFixed(2)}${
+                    gstScheme === "COMPOSITION"
+                      ? " — not claimable as input credit, your store is on Composition Scheme"
+                      : ""
+                  }`}
           </p>
         </div>
 

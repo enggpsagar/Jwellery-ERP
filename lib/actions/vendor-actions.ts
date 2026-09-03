@@ -2,9 +2,11 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { PartyGstType } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { formatLedgerSource } from "@/lib/ledger-format"
+import { partyGstTypeLabel } from "@/lib/gst"
 import * as XLSX from "xlsx"
 
 export type Vendor = {
@@ -26,9 +28,9 @@ export type Vendor = {
   creditLimit?: string
   paymentTerms?: string
   gstNumber?: string
-  /** Whether this specific vendor is GST-registered — independent of the
-   *  store's own gstScheme. See gstinRequired() in lib/gst.ts. */
-  isGstRegistered?: boolean
+  /** This vendor's own GST registration status — see gstinRequired() and
+   *  isVendorGstApplicable() in lib/gst.ts. */
+  gstType?: PartyGstType
   totalOrders?: number
   totalPurchaseValue?: string
   pendingAmount?: string
@@ -98,6 +100,13 @@ function toNumber(value: FormDataEntryValue | null, fallback = 0) {
   if (value === null || value === "") return fallback
   const num = Number(value)
   return Number.isNaN(num) ? fallback : num
+}
+
+function toPartyGstType(value: FormDataEntryValue | null): PartyGstType {
+  const parsed = String(value || "").trim()
+  return Object.values(PartyGstType).includes(parsed as PartyGstType)
+    ? (parsed as PartyGstType)
+    : PartyGstType.UNREGISTERED
 }
 
 function formatCurrency(value: number) {
@@ -184,7 +193,7 @@ function mapVendor(vendor: any): Vendor {
     creditLimit: "",
     paymentTerms: "",
     gstNumber: vendor.gstin ?? "",
-    isGstRegistered: vendor.isGstRegistered ?? false,
+    gstType: vendor.gstType ?? "UNREGISTERED",
     totalOrders,
     totalPurchaseValue: formatCurrency(totalPurchaseValueNumber),
     pendingAmount: formatCurrency(pendingAmountNumber),
@@ -388,7 +397,7 @@ export async function exportVendorsToExcel(
       State: vendor.state || "",
       Pincode: vendor.pincode || "",
       "GST Number": vendor.gstNumber || "",
-      "GST Registered (B2B)": vendor.isGstRegistered ? "Yes" : "No",
+      "GST Type": partyGstTypeLabel(vendor.gstType ?? "UNREGISTERED"),
       "Opening Balance": vendor.openingBalance ?? 0,
       "Current Balance": vendor.currentBalance ?? 0,
       "Balance Type": vendor.balanceType || "",
@@ -450,7 +459,7 @@ export async function addVendor(
     const state = String(formData.get("state") || "").trim()
     const pincode = String(formData.get("pincode") || "").trim()
     const gstNumber = String(formData.get("gstNumber") || "").trim()
-    const isGstRegistered = String(formData.get("isGstRegistered") || "") === "true"
+    const gstType = toPartyGstType(formData.get("gstType"))
     const notes = String(formData.get("notes") || "").trim()
     const openingBalance = toNumber(formData.get("openingBalance"), 0)
 
@@ -482,7 +491,7 @@ export async function addVendor(
         state: state || null,
         pincode: pincode || null,
         gstin: gstNumber || null,
-        isGstRegistered,
+        gstType,
         notes: notes || null,
         openingBalance,
       },
@@ -519,7 +528,7 @@ export async function updateVendor(
     const state = String(formData.get("state") || "").trim()
     const pincode = String(formData.get("pincode") || "").trim()
     const gstNumber = String(formData.get("gstNumber") || "").trim()
-    const isGstRegistered = String(formData.get("isGstRegistered") || "") === "true"
+    const gstType = toPartyGstType(formData.get("gstType"))
     const notes = String(formData.get("notes") || "").trim()
     const openingBalance = toNumber(formData.get("openingBalance"), 0)
 
@@ -550,7 +559,7 @@ export async function updateVendor(
         state: state || null,
         pincode: pincode || null,
         gstin: gstNumber || null,
-        isGstRegistered,
+        gstType,
         notes: notes || null,
         openingBalance,
       },

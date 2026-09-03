@@ -19,6 +19,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope } from "@/lib/store-context";
+import { isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst";
 import {
   getLocationScope,
   locationWhere,
@@ -386,8 +387,11 @@ export async function getPurchaseFormVendors() {
     where: { storeId, isActive: true, isArchived: false },
     orderBy: { name: "asc" },
     // `state` rides along so the form can tell an inter-state purchase from
-    // an intra-state one (computeGst's isInterState) without a second round trip.
-    select: { id: true, name: true, phone: true, vendorCode: true, state: true },
+    // an intra-state one (computePurchaseGst's isInterState) without a
+    // second round trip. `gstType` rides along too — a purchase's GST is
+    // computed from the VENDOR's own registration, not the store's, see
+    // computePurchaseGst() in lib/gst.ts.
+    select: { id: true, name: true, phone: true, vendorCode: true, state: true, gstType: true },
   });
 
   return vendors;
@@ -489,8 +493,9 @@ export async function createPurchase(
 
     const discount = toNumber(formData.get("discount"));
     const taxAmount = toNumber(formData.get("taxAmount"));
-    // Computed client-side by computeGst() (lib/gst.ts) — sgst+cgst on an
-    // intra-state purchase, igst alone on an inter-state one, never both.
+    // Computed client-side by computePurchaseGst() (lib/gst.ts) — sgst+cgst
+    // on an intra-state purchase, igst alone on an inter-state one, never
+    // both, and always zero when the vendor isn't GST-applicable.
     const sgstAmount = toNumber(formData.get("sgstAmount"));
     const cgstAmount = toNumber(formData.get("cgstAmount"));
     const igstAmount = toNumber(formData.get("igstAmount"));
@@ -516,29 +521,27 @@ export async function createPurchase(
 
     const vendor = await prisma.vendor.findFirst({
       where: { id: vendorId, storeId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, gstType: true },
     });
     if (!vendor) {
       return { success: false, message: "Please select a vendor" };
     }
 
-    // A Composition-scheme store is legally barred from charging (or, per
-    // the Settings screen's own explanation of this scheme, recording) any
-    // GST — see GstScheme's doc comment and computeGst() in lib/gst.ts,
-    // which the form is expected to have already zeroed these against.
-    // Enforced again here because a server action is reachable independent
-    // of whatever the form's own UI disabled.
-    const businessSettings = await prisma.businessSettings.findUnique({
-      where: { storeId },
-      select: { gstScheme: true },
-    });
+    // A purchase's GST is whatever the VENDOR's own invoice can legally
+    // show, not whatever our own store's gstScheme is — see
+    // isVendorGstApplicable()'s doc comment in lib/gst.ts. Our own store
+    // being on Composition Scheme never suppresses this; it only affects
+    // whether we can claim it back as input credit, a separate concern from
+    // whether the purchase itself carries GST. Enforced again here because
+    // a server action is reachable independent of whatever the form's own
+    // UI disabled.
     if (
-      businessSettings?.gstScheme === "COMPOSITION" &&
+      !isVendorGstApplicable(vendor.gstType) &&
       (sgstAmount !== 0 || cgstAmount !== 0 || igstAmount !== 0 || taxAmount !== 0)
     ) {
       return {
         success: false,
-        message: "This store is on the Composition Scheme and cannot record GST on a purchase.",
+        message: `This vendor is ${partyGstTypeLabel(vendor.gstType).toLowerCase()} and cannot charge GST on a purchase.`,
       };
     }
 

@@ -2,6 +2,8 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { PartyGstType } from "@prisma/client"
+import { partyGstTypeLabel } from "@/lib/gst"
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { getCurrentUser } from "@/lib/auth/auth"
@@ -49,6 +51,13 @@ function toNumber(value: FormDataEntryValue | null, fallback = 0) {
   return Number.isNaN(num) ? fallback : num
 }
 
+function toPartyGstType(value: FormDataEntryValue | null): PartyGstType {
+  const parsed = String(value || "").trim()
+  return Object.values(PartyGstType).includes(parsed as PartyGstType)
+    ? (parsed as PartyGstType)
+    : PartyGstType.UNREGISTERED
+}
+
 function formDataToCustomerInput(formData: FormData): CustomerInput {
   return {
     name: String(formData.get("name") || "").trim(),
@@ -60,7 +69,7 @@ function formDataToCustomerInput(formData: FormData): CustomerInput {
     state: String(formData.get("state") || "").trim(),
     pincode: String(formData.get("pincode") || "").trim(),
     gstNumber: String(formData.get("gstNumber") || "").trim(),
-    isGstRegistered: String(formData.get("isGstRegistered") || "") === "true",
+    gstType: toPartyGstType(formData.get("gstType")),
     panNumber: String(formData.get("panNumber") || "").trim(),
     registrationId: String(formData.get("registrationId") || "").trim(),
     notes: String(formData.get("notes") || "").trim(),
@@ -135,7 +144,7 @@ export async function exportCustomersToExcel(
       State: customer.state || "",
       Pincode: customer.pincode || "",
       "GST Number": customer.gstNumber || "",
-      "GST Registered (B2B)": customer.isGstRegistered ? "Yes" : "No",
+      "GST Type": partyGstTypeLabel(customer.gstType ?? "UNREGISTERED"),
       "Opening Balance": customer.openingBalance ?? 0,
       "Current Balance": customer.currentBalance ?? 0,
       "Balance Type": customer.balanceType || "",

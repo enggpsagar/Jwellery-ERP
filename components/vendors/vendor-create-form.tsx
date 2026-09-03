@@ -11,8 +11,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
 import { RequiredMark } from "@/components/shared/required-mark"
-import { gstinRequired, defaultIsGstRegistered } from "@/lib/gst"
+import { gstinRequired, defaultPartyGstType } from "@/lib/gst"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
+import { PartyGstTypeSelect } from "@/components/shared/party-gst-type-select"
 
 type StateItem = { id: string; name: string }
 type CityItem = { id: string; name: string }
@@ -29,9 +30,9 @@ type VendorCreateFormProps = {
    * that screen can select it on arrival.
    */
   returnTo?: string
-  /** Sets this vendor's own initial GST-registered flag — see
-   * defaultIsGstRegistered's doc comment in lib/gst.ts. Freely editable per
-   * vendor afterward, not a store-wide restriction. */
+  /** Sets this vendor's own initial GST type — see defaultPartyGstType's
+   * doc comment in lib/gst.ts. Freely editable per vendor afterward, not a
+   * store-wide restriction. */
   gstScheme: GstScheme
 }
 
@@ -42,8 +43,8 @@ type VendorCreateFormProps = {
  * mid-flow by other forms' "Add New Vendor" option via a `returnTo`.
  */
 export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFormProps) {
-  const [isGstRegistered, setIsGstRegistered] = useState(defaultIsGstRegistered(gstScheme))
-  const gstinRequiredNow = gstinRequired(gstScheme, isGstRegistered)
+  const [gstType, setGstType] = useState(defaultPartyGstType(gstScheme))
+  const gstinRequiredNow = gstinRequired(gstScheme, gstType)
 
   const router = useRouter()
   const toast = useToast()
@@ -251,17 +252,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             </label>
             <GstSchemeBadge scheme={gstScheme} />
             {gstScheme !== "COMPOSITION" ? (
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  name="isGstRegistered"
-                  value="true"
-                  checked={isGstRegistered}
-                  onChange={(e) => setIsGstRegistered(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-input"
-                />
-                This vendor is GST-registered (B2B)
-              </label>
+              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
             ) : null}
             <input
               name="gstNumber"

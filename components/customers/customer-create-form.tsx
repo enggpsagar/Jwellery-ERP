@@ -10,8 +10,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
 import { RequiredMark } from "@/components/shared/required-mark"
-import { gstinRequired, defaultIsGstRegistered } from "@/lib/gst"
+import { gstinRequired, defaultPartyGstType } from "@/lib/gst"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
+import { PartyGstTypeSelect } from "@/components/shared/party-gst-type-select"
 import type { GstScheme } from "@prisma/client"
 
 type StateItem = { id: string; name: string }
@@ -29,9 +30,9 @@ type CustomerCreateFormProps = {
    * screen can select it on arrival.
    */
   returnTo?: string
-  /** Drives whether GSTIN is required below - only a B2B (Wholesaler/
-   *  Manufacturer) store needs the buyer's GSTIN for a valid tax invoice.
-   *  See defaultIsGstRegistered's own doc comment. */
+  /** Sets this customer's own initial GST type — see defaultPartyGstType's
+   *  doc comment in lib/gst.ts. Freely editable per customer afterward, not
+   *  a store-wide restriction. */
   gstScheme: GstScheme
 }
 
@@ -52,8 +53,8 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
   // Starting point only — a Wholesaler & Manufacturer store still routinely
   // has individual, non-registered buyers, so this stays freely editable
   // per customer rather than being forced by the store's own scheme.
-  const [isGstRegistered, setIsGstRegistered] = useState(defaultIsGstRegistered(gstScheme))
-  const gstinRequiredNow = gstinRequired(gstScheme, isGstRegistered)
+  const [gstType, setGstType] = useState(defaultPartyGstType(gstScheme))
+  const gstinRequiredNow = gstinRequired(gstScheme, gstType)
 
   const router = useRouter()
   const toast = useToast()
@@ -237,17 +238,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             </label>
             <GstSchemeBadge scheme={gstScheme} />
             {gstScheme !== "COMPOSITION" ? (
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  name="isGstRegistered"
-                  value="true"
-                  checked={isGstRegistered}
-                  onChange={(e) => setIsGstRegistered(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-input"
-                />
-                This customer is GST-registered (B2B)
-              </label>
+              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
             ) : null}
             <input
               name="gstNumber"

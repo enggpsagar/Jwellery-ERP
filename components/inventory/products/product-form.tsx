@@ -12,6 +12,7 @@ import {
 } from "@/lib/actions/taxonomy-actions";
 import { classifyMetalName } from "@/lib/business-units";
 import { resolveGramsPerCarat } from "@/lib/purity";
+import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields";
 
 // A metal classifies into one of these groups by its name — GOLD/SILVER/
 // DIAMOND/OTHER via classifyMetalName (the same name-substring heuristic
@@ -104,6 +105,8 @@ type Product = {
   defaultCaratWeight: string | null;
   hasStoneComponent: boolean;
   defaultStoneRate: string | null;
+  defaultStoneMetalTypeName: string | null;
+  defaultStoneTypeNames: string | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -118,6 +121,7 @@ type ProductFormProps = {
   pending: boolean;
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
+  origins: StoreMetalOriginRow[];
   /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
    * Conversion Rules) — see the same prop on InvoiceForm. */
   caratConversionRates: Record<PurityType, number>;
@@ -134,8 +138,9 @@ export function ProductForm({
   product,
   state,
   pending,
-  metals,
+  metals: initialMetals,
   categories,
+  origins: initialOrigins,
   caratConversionRates,
 }: ProductFormProps) {
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? "");
@@ -155,6 +160,23 @@ export function ProductForm({
 
   const [stoneOrigins, setStoneOrigins] = useState<StoreMetalOriginRow[]>([]);
   const [loadingStoneOrigins, setLoadingStoneOrigins] = useState(false);
+
+  // Composite "Includes a Stone" picker state — which Stone (a gemstone
+  // StoreMetal) and which of its Stone Types this product's embedded stone
+  // is, mirroring the identical picker on Invoice/Kacha/Quotation line
+  // items exactly. `metals`/`origins` are local state (not the raw props)
+  // so StoneComponentFields' inline "Add Stone"/"Add Stone Type" dialogs
+  // can append a newly-created row without a full page reload.
+  const [metals, setMetals] = useState(initialMetals);
+  const [origins, setOrigins] = useState(initialOrigins);
+  const [stoneMetalTypeName, setStoneMetalTypeName] = useState(
+    product?.defaultStoneMetalTypeName ?? "",
+  );
+  const [stoneTypeNames, setStoneTypeNames] = useState<string[]>(
+    product?.defaultStoneTypeNames
+      ? product.defaultStoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
+      : [],
+  );
 
   const previousCategoryIdRef = useRef(categoryId);
   const previousMetalTypeIdRef = useRef(metalTypeId);
@@ -259,6 +281,14 @@ export function ProductForm({
   const [stoneWeightTouched, setStoneWeightTouched] = useState(
     Boolean(product?.defaultStoneWeight),
   );
+  // Display-only — `stoneWeight` itself (submitted as defaultStoneWeight)
+  // always stays in grams, the schema column's unit; this just controls
+  // which unit StoneComponentFields' Net Stone Weight input shows/accepts,
+  // converting to/from grams on the way in and out. Unlike a line item's
+  // stoneWeightUnit (which reinterprets the same typed digits under a new
+  // unit), switching this live-converts the displayed number so the
+  // underlying grams value never silently changes meaning.
+  const [stoneWeightUnit, setStoneWeightUnit] = useState<"GRAM" | "CARAT">("GRAM");
 
   function handleCaratWeightChange(value: string) {
     setCaratWeight(value);
@@ -817,93 +847,57 @@ export function ProductForm({
           <div className="mt-6 rounded-lg border border-dashed p-4">
             <h4 className="mb-4 text-sm font-semibold">Stone Pricing</h4>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div>
-                <Label htmlFor="defaultCaratWeight">Stone Carat Weight (ct)</Label>
+            <StoneComponentFields
+              metals={metals}
+              origins={origins}
+              onMetalsChange={setMetals}
+              onOriginsChange={setOrigins}
+              stoneMetalTypeName={stoneMetalTypeName}
+              onStoneChange={(name, typeNames) => {
+                setStoneMetalTypeName(name);
+                setStoneTypeNames(typeNames);
+              }}
+              selectedTypeNames={stoneTypeNames}
+              onTypesChange={setStoneTypeNames}
+              caratWeight={Number(caratWeight) || 0}
+              onCaratWeightChange={handleCaratWeightChange}
+              stoneRate={Number(stoneRate) || 0}
+              onStoneRateChange={handleStoneRateChange}
+              stoneCharge={Number(stoneCharge) || 0}
+              onStoneChargeChange={handleStoneChargeChange}
+              stoneChargeTouched={stoneChargeTouched}
+              stoneWeightInput={
+                stoneWeightUnit === "CARAT"
+                  ? Number(
+                      (
+                        (Number(stoneWeight) || 0) /
+                        resolveGramsPerCarat(defaultPurity, caratConversionRates)
+                      ).toFixed(3),
+                    )
+                  : Number(stoneWeight) || 0
+              }
+              onStoneWeightInputChange={(value) => {
+                const typed = Number(value) || 0;
+                const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
+                const grams = stoneWeightUnit === "CARAT" ? typed * gramsPerCarat : typed;
+                handleStoneWeightChange(String(Number(grams.toFixed(5))));
+              }}
+              stoneWeightUnit={stoneWeightUnit}
+              onStoneWeightUnitChange={setStoneWeightUnit}
+              netStoneWeightTouched={stoneWeightTouched}
+            />
 
-                <Input
-                  id="defaultCaratWeight"
-                  name="defaultCaratWeight"
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  value={caratWeight}
-                  onChange={(event) =>
-                    handleCaratWeightChange(event.target.value)
-                  }
-                  placeholder="0.000"
-                />
+            <input type="hidden" name="defaultStoneMetalTypeName" value={stoneMetalTypeName} />
+            <input type="hidden" name="defaultStoneTypeNames" value={stoneTypeNames.join(",")} />
+            <input type="hidden" name="defaultCaratWeight" value={caratWeight} />
+            <input type="hidden" name="defaultStoneRate" value={stoneRate} />
+            <input type="hidden" name="defaultStoneCharge" value={stoneCharge} />
+            <input type="hidden" name="defaultStoneWeight" value={stoneWeight} />
 
-                <p className="mt-1 text-xs text-muted-foreground">
-                  The embedded stone's weight — separate from the metal's Net Weight above.
-                </p>
-
-                <ErrorText error={state.errors.defaultCaratWeight} />
-              </div>
-
-              <div>
-                <Label htmlFor="defaultStoneRate">Stone Rate (₹/ct)</Label>
-
-                <Input
-                  id="defaultStoneRate"
-                  name="defaultStoneRate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={stoneRate}
-                  onChange={(event) => handleStoneRateChange(event.target.value)}
-                  placeholder="0.00"
-                />
-
-                <ErrorText error={state.errors.defaultStoneRate} />
-              </div>
-
-              <div>
-                <Label htmlFor="defaultStoneCharge">Stone Charge</Label>
-
-                <Input
-                  id="defaultStoneCharge"
-                  name="defaultStoneCharge"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={stoneCharge}
-                  onChange={(event) => handleStoneChargeChange(event.target.value)}
-                  placeholder="0.00"
-                />
-
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {stoneChargeTouched
-                    ? "Manually entered — won't update from Rate × Carat anymore"
-                    : "Auto-calculated from Stone Rate × Stone Carat Weight — edit to override"}
-                </p>
-
-                <ErrorText error={state.errors.defaultStoneCharge} />
-              </div>
-
-              <div>
-                <Label htmlFor="defaultStoneWeight">Stone Weight (g)</Label>
-
-                <Input
-                  id="defaultStoneWeight"
-                  name="defaultStoneWeight"
-                  type="number"
-                  step="0.00001"
-                  min="0"
-                  value={stoneWeight}
-                  onChange={(event) => handleStoneWeightChange(event.target.value)}
-                  placeholder="0.000"
-                />
-
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {stoneWeightTouched
-                    ? "Manually entered"
-                    : "Auto-filled from Stone Carat Weight — edit to override"}
-                </p>
-
-                <ErrorText error={state.errors.defaultStoneWeight} />
-              </div>
-            </div>
+            <ErrorText error={state.errors.defaultCaratWeight} />
+            <ErrorText error={state.errors.defaultStoneRate} />
+            <ErrorText error={state.errors.defaultStoneCharge} />
+            <ErrorText error={state.errors.defaultStoneWeight} />
           </div>
         )}
       </div>

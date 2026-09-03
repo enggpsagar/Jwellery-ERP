@@ -6,6 +6,7 @@ import type { PurityType } from "@prisma/client";
 
 import { useToast } from "@/components/providers/toast-provider";
 import { createProduct } from "@/lib/actions/inventory/product-actions";
+import type { StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions";
 
 import { initialProductFormState } from "@/lib/inventory/product-types";
 import {
@@ -18,6 +19,7 @@ type ProductCreateFormProps = {
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
   caratConversionRates: Record<PurityType, number>;
+  origins: StoreMetalOriginRow[];
   /** Where to go after saving; the new product's id is appended so the
    * calling screen can select it. */
   returnTo?: string
@@ -27,6 +29,7 @@ export function ProductCreateForm({
   metals,
   categories,
   caratConversionRates,
+  origins,
   returnTo,
 }: ProductCreateFormProps) {
   const router = useRouter();
@@ -85,6 +88,7 @@ export function ProductCreateForm({
         metals={metals}
         categories={categories}
         caratConversionRates={caratConversionRates}
+        origins={origins}
       />
     </form>
   );

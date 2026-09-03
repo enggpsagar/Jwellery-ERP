@@ -11,6 +11,7 @@ import {
 } from "@/lib/inventory/product-types";
 
 import { useToast } from "@/components/providers/toast-provider";
+import type { StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions";
 import {
   ProductForm,
   type StoreCategoryOption,
@@ -37,6 +38,8 @@ type EditProductFormProps = {
     defaultCaratWeight: string | null;
     hasStoneComponent: boolean;
     defaultStoneRate: string | null;
+    defaultStoneMetalTypeName: string | null;
+    defaultStoneTypeNames: string | null;
     designCode: string | null;
     hsnCode: string | null;
     description: string | null;
@@ -48,6 +51,7 @@ type EditProductFormProps = {
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
   caratConversionRates: Record<PurityType, number>;
+  origins: StoreMetalOriginRow[];
 };
 
 export function EditProductForm({
@@ -55,6 +59,7 @@ export function EditProductForm({
   metals,
   categories,
   caratConversionRates,
+  origins,
 }: EditProductFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -111,6 +116,7 @@ export function EditProductForm({
         metals={metals}
         categories={categories}
         caratConversionRates={caratConversionRates}
+        origins={origins}
       />
     </form>
   );

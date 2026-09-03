@@ -9,6 +9,7 @@ import {
 } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
+import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 
 import { InvoiceForm, type LineItem } from "@/components/billing/invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
@@ -42,11 +43,13 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     redirect(`/billing/${id}`)
   }
 
-  const [customers, stockItems, businessSettings, locations] = await Promise.all([
+  const [customers, stockItems, businessSettings, locations, metals, origins] = await Promise.all([
     getInvoiceFormCustomers(),
     getInvoiceFormStockItems(),
     getBusinessSettings(),
     getStoreLocations(),
+    getStoreMetals(),
+    getAllStoreMetalOrigins(),
   ])
 
   // Every field the form actually tracks, carried over from the cancelled
@@ -71,6 +74,10 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     stoneRate: item.stoneRate ?? 0,
     hasStoneComponent: item.stoneRate != null,
     stoneChargeTouched: true,
+    stoneMetalTypeName: item.stoneMetalTypeName ?? "",
+    stoneTypeNames: item.stoneTypeNames
+      ? item.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
+      : [],
     dmoWeight: item.dmoWeight ?? 0,
     stoneWeightInput: item.stoneWeight ?? 0,
     stoneWeightUnit: "GRAM",
@@ -94,6 +101,8 @@ export default async function ReplaceInvoicePage({ params }: Props) {
         customers={customers}
         stockItems={stockItems}
         locations={locations}
+        metals={metals}
+        origins={origins}
         defaultGstRate={businessSettings.defaultGstRate}
         gstScheme={businessSettings.gstScheme}
         storeState={businessSettings.state}

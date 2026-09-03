@@ -7,6 +7,7 @@ import {
 } from "@/lib/actions/purchase-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
+import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 
 import { PurchaseForm } from "@/components/purchases/purchase-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
@@ -16,11 +17,13 @@ export const metadata: Metadata = {
 }
 
 export default async function NewPurchasePage() {
-  const [vendors, products, locations, businessSettings] = await Promise.all([
+  const [vendors, products, locations, businessSettings, metals, origins] = await Promise.all([
     getPurchaseFormVendors(),
     getPurchaseFormProducts(),
     getStoreLocations(),
     getBusinessSettings(),
+    getStoreMetals(),
+    getAllStoreMetalOrigins(),
   ])
 
   return (
@@ -40,6 +43,8 @@ export default async function NewPurchasePage() {
           vendors={vendors}
           products={products}
           locations={locations}
+          metals={metals}
+          origins={origins}
           defaultGstRate={businessSettings.defaultGstRate}
           gstScheme={businessSettings.gstScheme}
           storeState={businessSettings.state}

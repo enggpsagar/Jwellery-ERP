@@ -56,6 +56,8 @@ export type PurchaseLineItemInput = {
   makingChargeType?: ChargeType | string | null;
   stoneCharge: number;
   stoneRate?: number | null;
+  stoneMetalTypeName?: string | null;
+  stoneTypeNames?: string | null;
   dmoWeight?: number | null;
   hsnCode?: string | null;
 };
@@ -201,6 +203,8 @@ function mapPurchase(purchase: any) {
       makingChargeType: item.makingChargeType as ChargeType,
       stoneCharge: Number(item.stoneCharge),
       stoneRate: item.stoneRate ? Number(item.stoneRate) : null,
+      stoneMetalTypeName: item.stoneMetalTypeName ?? null,
+      stoneTypeNames: item.stoneTypeNames ?? null,
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
       hsnCode: item.hsnCode ?? null,
       lineTotal: Number(item.lineTotal),
@@ -419,6 +423,8 @@ export async function getPurchaseFormProducts() {
       hasStoneComponent: true,
       defaultStoneRate: true,
       defaultCaratWeight: true,
+      defaultStoneMetalTypeName: true,
+      defaultStoneTypeNames: true,
       hsnCode: true,
       isActive: true,
     },
@@ -606,6 +612,8 @@ export async function createPurchase(
             makingChargeType: toChargeType(item.makingChargeType),
             stoneCharge: toDecimal(item.stoneCharge),
             stoneRate: toDecimal(item.stoneRate),
+            stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
+            stoneTypeNames: item.stoneTypeNames ?? undefined,
             vendorId,
             vendorName: vendor.name,
             purchaseDate,
@@ -655,6 +663,8 @@ export async function createPurchase(
               makingChargeType: toChargeType(item.makingChargeType),
               stoneCharge: item.stoneCharge,
               stoneRate: item.stoneRate ?? undefined,
+              stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
+              stoneTypeNames: item.stoneTypeNames ?? undefined,
               dmoWeight: item.dmoWeight ?? undefined,
               hsnCode: item.hsnCode ?? undefined,
               lineTotal: lineTotal(item),

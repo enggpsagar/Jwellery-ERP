@@ -153,6 +153,8 @@ function mapStockRow(row: any) {
     makingCharge: row.makingCharge?.toString() ?? null,
     stoneCharge: row.stoneCharge?.toString() ?? null,
     stoneRate: row.stoneRate?.toString() ?? null,
+    stoneMetalTypeName: row.stoneMetalTypeName ?? null,
+    stoneTypeNames: row.stoneTypeNames ?? null,
     otherCharge: row.otherCharge?.toString() ?? null,
     purchaseAmount: row.purchaseAmount?.toString() ?? null,
     saleAmount: row.saleAmount?.toString() ?? null,
@@ -419,6 +421,8 @@ export async function getInventoryStockById(id: string) {
     makingCharge: row.makingCharge?.toString() ?? null,
     stoneCharge: row.stoneCharge?.toString() ?? null,
     stoneRate: row.stoneRate?.toString() ?? null,
+    stoneMetalTypeName: row.stoneMetalTypeName ?? null,
+    stoneTypeNames: row.stoneTypeNames ?? null,
     otherCharge: row.otherCharge?.toString() ?? null,
     purchaseAmount: row.purchaseAmount?.toString() ?? null,
     saleAmount: row.saleAmount?.toString() ?? null,
@@ -526,6 +530,8 @@ export async function createInventoryStock(
         defaultStoneCharge: true,
         hasStoneComponent: true,
         defaultStoneRate: true,
+        defaultStoneMetalTypeName: true,
+        defaultStoneTypeNames: true,
       },
     })
 
@@ -597,6 +603,8 @@ export async function createInventoryStock(
       product.hasStoneComponent && product.defaultStoneRate != null && caratWeight
         ? new Prisma.Decimal(product.defaultStoneRate).mul(caratWeight)
         : product.defaultStoneCharge
+    const stoneMetalTypeName = product.hasStoneComponent ? product.defaultStoneMetalTypeName : null
+    const stoneTypeNames = product.hasStoneComponent ? product.defaultStoneTypeNames : null
 
     const existing = await prisma.inventoryStock.findFirst({
       where: { stockCode, storeId },
@@ -653,6 +661,8 @@ export async function createInventoryStock(
           makingChargeType,
           stoneCharge,
           stoneRate: stoneRate ?? undefined,
+          stoneMetalTypeName: stoneMetalTypeName ?? undefined,
+          stoneTypeNames: stoneTypeNames ?? undefined,
           otherCharge: toDecimal(otherCharge),
           purchaseAmount: toDecimal(purchaseAmount),
           saleAmount: toDecimal(saleAmount),
@@ -722,6 +732,8 @@ export async function updateInventoryStock(
         makingChargeType: true,
         stoneCharge: true,
         stoneRate: true,
+        stoneMetalTypeName: true,
+        stoneTypeNames: true,
         invoiceItems: {
           select: { id: true },
           take: 1,
@@ -878,6 +890,8 @@ export async function updateInventoryStock(
     // stoneCharge/makingCharge above, so editing other fields on this stock
     // row never silently wipes what a prior product selection already set.
     let stoneRate: Prisma.Decimal | null = existingStock.stoneRate
+    let stoneMetalTypeName: string | null = existingStock.stoneMetalTypeName
+    let stoneTypeNames: string | null = existingStock.stoneTypeNames
 
     if (!isLockedForCoreChanges) {
       const product = await prisma.product.findFirst({
@@ -891,6 +905,8 @@ export async function updateInventoryStock(
           defaultStoneCharge: true,
           hasStoneComponent: true,
           defaultStoneRate: true,
+          defaultStoneMetalTypeName: true,
+          defaultStoneTypeNames: true,
         },
       })
 
@@ -924,6 +940,8 @@ export async function updateInventoryStock(
         product.hasStoneComponent && product.defaultStoneRate != null && caratWeight
           ? new Prisma.Decimal(product.defaultStoneRate).mul(caratWeight)
           : product.defaultStoneCharge
+      stoneMetalTypeName = product.hasStoneComponent ? product.defaultStoneMetalTypeName : null
+      stoneTypeNames = product.hasStoneComponent ? product.defaultStoneTypeNames : null
     }
 
     /**
@@ -981,6 +999,8 @@ export async function updateInventoryStock(
         makingChargeType,
         stoneCharge,
         stoneRate,
+        stoneMetalTypeName,
+        stoneTypeNames,
         otherCharge: toDecimal(otherCharge),
         purchaseAmount: toDecimal(purchaseAmount),
         saleAmount: toDecimal(saleAmount),

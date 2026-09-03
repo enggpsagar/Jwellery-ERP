@@ -435,6 +435,16 @@ model Product {
   // single carat-priced item, not a metal+stone combination.
   hasStoneComponent       Boolean              @default(false)
   defaultStoneRate        Decimal?             @db.Decimal(12, 2)
+  // Which Stone (a StoreMetal row, e.g. "Diamond") and which of its Stone
+  // Type options (StoreMetalOrigin rows, e.g. "Natural, Lab-Grown" — comma
+  // joined, several may apply to one embedded stone) — plain denormalized
+  // names rather than FKs, same convention as vendorName/createdByName
+  // elsewhere: this is a descriptive label on the line, not something
+  // queried/joined on, so a real relation (times six tables) would be
+  // more machinery than the data warrants. Only meaningful alongside
+  // hasStoneComponent.
+  defaultStoneMetalTypeName String?
+  defaultStoneTypeNames     String?
   designCode              String?
   hsnCode                 String?
   description             String?
@@ -495,6 +505,10 @@ model InventoryStock {
   // needed at the stock level — a non-null caratWeight/stoneRate here is
   // signal enough.
   stoneRate           Decimal?               @db.Decimal(12, 2)
+  // Denormalized names, not FKs — see Product.defaultStoneMetalTypeName's
+  // doc comment for why.
+  stoneMetalTypeName  String?
+  stoneTypeNames      String?
   otherCharge         Decimal?               @db.Decimal(12, 2)
   purchaseAmount      Decimal?               @db.Decimal(12, 2)
   saleAmount          Decimal?               @db.Decimal(12, 2)
@@ -666,6 +680,10 @@ model KachaInvoiceItem {
   makingChargeType ChargeType      @default(FIXED)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
   stoneRate        Decimal?        @db.Decimal(12, 2)
+  // Denormalized names, not FKs — see Product.defaultStoneMetalTypeName's
+  // doc comment for why.
+  stoneMetalTypeName String?
+  stoneTypeNames     String?
   lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId String?
   createdAt        DateTime        @default(now())
@@ -703,6 +721,10 @@ model InvoiceItem {
   hmCharge         Decimal         @default(0) @db.Decimal(12, 2)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
   stoneRate        Decimal?        @db.Decimal(12, 2)
+  // Denormalized names, not FKs — see Product.defaultStoneMetalTypeName's
+  // doc comment for why.
+  stoneMetalTypeName String?
+  stoneTypeNames     String?
   // Per-line scheme/discount amount, separate from Invoice.discount (which
   // is an invoice-level total) — the printed format wants one column per
   // line, not a single amount split across items after the fact.
@@ -921,6 +943,10 @@ model PurchaseItem {
   makingChargeType ChargeType      @default(FIXED)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
   stoneRate        Decimal?        @db.Decimal(12, 2)
+  // Denormalized names, not FKs — see Product.defaultStoneMetalTypeName's
+  // doc comment for why.
+  stoneMetalTypeName String?
+  stoneTypeNames     String?
   // HSN snapshot at purchase time - same reasoning as InvoiceItem.hsnCode:
   // Product.hsnCode can change later, and this line might not even have a
   // linked product yet at the time of entry.
@@ -1033,6 +1059,10 @@ model QuotationItem {
   makingChargeType ChargeType      @default(FIXED)
   stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
   stoneRate        Decimal?        @db.Decimal(12, 2)
+  // Denormalized names, not FKs — see Product.defaultStoneMetalTypeName's
+  // doc comment for why.
+  stoneMetalTypeName String?
+  stoneTypeNames     String?
   lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId String?
   quotation        Quotation       @relation(fields: [quotationId], references: [id], onDelete: Cascade)

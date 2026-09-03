@@ -229,7 +229,15 @@ export default async function InvoicePrintPage({ params }: Props) {
           <tbody>
             {invoice.items.map((item) => (
               <tr key={item.id} className="border-b border-black [&>td]:border-r [&>td]:border-black [&>td]:p-1 print:[&>td]:p-0.5 [&>td:last-child]:border-r-0 align-top">
-                <td>{item.itemName}</td>
+                <td>
+                  {item.itemName}
+                  {item.stoneMetalTypeName ? (
+                    <span className="block">
+                      Stone: {item.stoneMetalTypeName}
+                      {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
+                    </span>
+                  ) : null}
+                </td>
                 <td>
                   {item.purity ?? "-"}
                   {item.hsnCode ? <span className="block">{item.hsnCode}</span> : null}

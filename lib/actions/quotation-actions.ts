@@ -44,6 +44,8 @@ export type QuotationLineItemInput = {
   makingChargeType?: ChargeType | string | null;
   stoneCharge: number;
   stoneRate?: number | null;
+  stoneMetalTypeName?: string | null;
+  stoneTypeNames?: string | null;
   inventoryStockId?: string | null;
 };
 
@@ -153,6 +155,8 @@ function mapQuotation(quotation: any) {
       makingChargeType: item.makingChargeType as ChargeType,
       stoneCharge: Number(item.stoneCharge),
       stoneRate: item.stoneRate ? Number(item.stoneRate) : null,
+      stoneMetalTypeName: item.stoneMetalTypeName ?? null,
+      stoneTypeNames: item.stoneTypeNames ?? null,
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
     })),
@@ -373,6 +377,8 @@ export async function getQuotationFormStockItems() {
     netWeight: stock.netWeight ? Number(stock.netWeight) : null,
     caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
     stoneRate: stock.stoneRate ? Number(stock.stoneRate) : null,
+    stoneMetalTypeName: stock.stoneMetalTypeName ?? null,
+    stoneTypeNames: stock.stoneTypeNames ?? null,
     saleRate: stock.saleRate ? Number(stock.saleRate) : null,
   }));
 }
@@ -525,6 +531,8 @@ export async function createQuotation(
             makingChargeType: toChargeType(item.makingChargeType),
             stoneCharge: item.stoneCharge,
             stoneRate: item.stoneRate ?? undefined,
+            stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
+            stoneTypeNames: item.stoneTypeNames ?? undefined,
             lineTotal: lineTotal(item),
             inventoryStockId:
               item.inventoryStockId && validStockIds.has(item.inventoryStockId)
@@ -700,6 +708,8 @@ export async function convertQuotationToInvoice(
               makingChargeType: item.makingChargeType,
               stoneCharge: item.stoneCharge,
               stoneRate: item.stoneRate ?? undefined,
+              stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
+              stoneTypeNames: item.stoneTypeNames ?? undefined,
               lineTotal: item.lineTotal,
               inventoryStockId: item.inventoryStockId ?? undefined,
             })),

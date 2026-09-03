@@ -196,8 +196,8 @@ export function VendorEditForm({
             </label>
             <textarea
               name="address"
-              className={FIELD}
-              rows={3}
+              className={`${FIELD} min-h-9 resize-y`}
+              rows={1}
               defaultValue={vendor.address ?? ""}
             />
           </div>
@@ -279,29 +279,6 @@ export function VendorEditForm({
 
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <Hash className="h-4 w-4 text-muted-foreground" />
-              GST Number {gstinRequiredNow ? <RequiredMark /> : null}
-            </label>
-            <GstSchemeBadge scheme={gstScheme} />
-            {gstScheme !== "COMPOSITION" ? (
-              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
-            ) : null}
-            <input
-              name="gstNumber"
-              className={FIELD}
-              defaultValue={vendor.gstNumber ?? ""}
-              placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : undefined}
-              required={gstinRequiredNow}
-            />
-            {gstinRequiredNow ? (
-              <p className="text-xs text-muted-foreground">
-                GSTIN is required for a valid purchase entry from this vendor.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-sm font-medium">
               <IndianRupee className="h-4 w-4 text-muted-foreground" />
               Opening Balance
             </label>
@@ -315,11 +292,34 @@ export function VendorEditForm({
           </div>
 
           <div className="space-y-1 md:col-span-2">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <Hash className="h-4 w-4 text-muted-foreground" />
+              GST Number {gstinRequiredNow ? <RequiredMark /> : null}
+            </label>
+            <GstSchemeBadge scheme={gstScheme} />
+            {gstScheme !== "COMPOSITION" ? (
+              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
+            ) : null}
+            <input
+              name="gstNumber"
+              className={`${FIELD} md:max-w-sm`}
+              defaultValue={vendor.gstNumber ?? ""}
+              placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : undefined}
+              required={gstinRequiredNow}
+            />
+            {gstinRequiredNow ? (
+              <p className="text-xs text-muted-foreground">
+                GSTIN is required for a valid purchase entry from this vendor.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="space-y-1 md:col-span-2">
             <label className="text-sm font-medium">Notes</label>
             <textarea
               name="notes"
-              className={FIELD}
-              rows={2}
+              className={`${FIELD} min-h-9 resize-y`}
+              rows={1}
               defaultValue={vendor.notes ?? ""}
             />
           </div>

@@ -272,24 +272,112 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   ];
 }
 
+export type SalesTrendPeriod = "weekly" | "monthly" | "quarterly" | "yearly";
+
+// A "use server" file can only export async functions — the display labels
+// for these periods live in sales-chart.tsx instead, kept in sync with the
+// bucket counts below by convention (weekly/monthly=12, quarterly=8, yearly=5).
+
+/** How many buckets back each period shows — enough history to read a trend
+ * without the x-axis getting so dense it stops being readable. */
+const SALES_TREND_BUCKET_COUNT: Record<SalesTrendPeriod, number> = {
+  weekly: 12,
+  monthly: 12,
+  quarterly: 8,
+  yearly: 5,
+};
+
 /**
- * A month on the sales trend.
+ * A point on the sales trend — a week, month, quarter, or year depending on
+ * the selected period.
  *
- * `sales` is the month's invoiced total; the remaining keys are one per metal
- * — Recharts needs each series as its own key on the row, so they sit
+ * `sales` is the period's invoiced total; the remaining keys are one per
+ * metal — Recharts needs each series as its own key on the row, so they sit
  * alongside rather than nested.
  */
-export type MonthlySalesPoint = {
-  month: string;
+export type SalesTrendPoint = {
+  label: string;
   sales: number;
   [metal: string]: number | string;
 };
 
-export type MonthlySalesTrend = {
-  points: MonthlySalesPoint[];
+export type SalesTrend = {
+  points: SalesTrendPoint[];
   /** Metals that actually sold in the window, biggest first. */
   metals: string[];
 };
+
+type SalesTrendBucket = { key: string; label: string; start: Date };
+
+/** The ordered list of buckets a period covers, oldest first — both the
+ * chart's x-axis and the grouping key each invoice gets sorted into. */
+function salesTrendBuckets(period: SalesTrendPeriod, now: Date): SalesTrendBucket[] {
+  const count = SALES_TREND_BUCKET_COUNT[period];
+  const buckets: SalesTrendBucket[] = [];
+
+  for (let i = count - 1; i >= 0; i--) {
+    buckets.push(salesTrendBucketFor(period, offsetPeriod(period, now, -i)));
+  }
+
+  return buckets;
+}
+
+/** Steps `date` back/forward by `amount` whole periods. */
+function offsetPeriod(period: SalesTrendPeriod, date: Date, amount: number): Date {
+  switch (period) {
+    case "weekly":
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount * 7);
+    case "monthly":
+      return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+    case "quarterly":
+      return new Date(date.getFullYear(), date.getMonth() + amount * 3, 1);
+    case "yearly":
+      return new Date(date.getFullYear() + amount, 0, 1);
+  }
+}
+
+/** Monday-start week, matching lib/date-range.ts's "This Week" convention. */
+function startOfWeekMonday(date: Date) {
+  const d = startOfDay(date);
+  const day = d.getDay();
+  const diff = day === 0 ? 6 : day - 1;
+  d.setDate(d.getDate() - diff);
+  return d;
+}
+
+function salesTrendBucketFor(period: SalesTrendPeriod, date: Date): SalesTrendBucket {
+  switch (period) {
+    case "weekly": {
+      const start = startOfWeekMonday(date);
+      return {
+        key: start.toISOString().slice(0, 10),
+        label: start.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        start,
+      };
+    }
+    case "monthly": {
+      const start = startOfMonth(date);
+      return {
+        key: `${start.getFullYear()}-${start.getMonth()}`,
+        label: start.toLocaleDateString("en-US", { month: "short" }),
+        start,
+      };
+    }
+    case "quarterly": {
+      const quarter = Math.floor(date.getMonth() / 3);
+      const start = new Date(date.getFullYear(), quarter * 3, 1);
+      return {
+        key: `${start.getFullYear()}-Q${quarter + 1}`,
+        label: `Q${quarter + 1} '${String(start.getFullYear()).slice(2)}`,
+        start,
+      };
+    }
+    case "yearly": {
+      const start = new Date(date.getFullYear(), 0, 1);
+      return { key: `${start.getFullYear()}`, label: `${start.getFullYear()}`, start };
+    }
+  }
+}
 
 /** "gold" and "Gold" are the same metal to a reader; group them as one. */
 function metalKey(name: string) {
@@ -304,17 +392,14 @@ function metalLabel(name: string) {
 /** Sales where no metal was recorded still have to appear somewhere. */
 const UNSPECIFIED_METAL = "Unspecified";
 
-export async function getMonthlySalesTrend(
-  monthsBack = 12
-): Promise<MonthlySalesTrend> {
+export async function getSalesTrend(
+  period: SalesTrendPeriod = "monthly"
+): Promise<SalesTrend> {
   const storeId = await requireStoreScope();
   const scope = await getLocationScope();
   const now = new Date();
-  const rangeStart = new Date(
-    now.getFullYear(),
-    now.getMonth() - (monthsBack - 1),
-    1
-  );
+  const buckets = salesTrendBuckets(period, now);
+  const rangeStart = buckets[0].start;
 
   const invoices = await prisma.invoice.findMany({
     where: { storeId, invoiceDate: { gte: rangeStart }, ...locationWhere(scope) },
@@ -330,22 +415,17 @@ export async function getMonthlySalesTrend(
     },
   });
 
-  const monthKeys: string[] = [];
   const totals = new Map<string, number>();
   const perMetal = new Map<string, Map<string, number>>();
   const labels = new Map<string, string>();
 
-  for (let i = monthsBack - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    monthKeys.push(key);
-    totals.set(key, 0);
-    perMetal.set(key, new Map());
+  for (const bucket of buckets) {
+    totals.set(bucket.key, 0);
+    perMetal.set(bucket.key, new Map());
   }
 
   for (const invoice of invoices) {
-    const d = invoice.invoiceDate;
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const key = salesTrendBucketFor(period, invoice.invoiceDate).key;
     if (!totals.has(key)) continue;
 
     const invoiceTotal = Number(invoice.totalAmount);
@@ -399,21 +479,18 @@ export async function getMonthlySalesTrend(
     .sort((a, b) => b[1] - a[1])
     .map(([id]) => id);
 
-  const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
+  const points: SalesTrendPoint[] = buckets.map((bucket) => {
+    const metalBucket = perMetal.get(bucket.key)!;
 
-  const points: MonthlySalesPoint[] = monthKeys.map((key) => {
-    const [year, month] = key.split("-").map(Number);
-    const bucket = perMetal.get(key)!;
-
-    const point: MonthlySalesPoint = {
-      month: monthFormatter.format(new Date(year, month, 1)),
-      sales: totals.get(key) ?? 0,
+    const point: SalesTrendPoint = {
+      label: bucket.label,
+      sales: totals.get(bucket.key) ?? 0,
     };
 
     // Every series needs a value on every row, or Recharts breaks the band
     // where a metal happened not to sell.
     for (const id of metalIds) {
-      point[labels.get(id) ?? id] = Math.round((bucket.get(id) ?? 0) * 100) / 100;
+      point[labels.get(id) ?? id] = Math.round((metalBucket.get(id) ?? 0) * 100) / 100;
     }
 
     return point;

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useTransition } from "react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
 import {
@@ -17,7 +18,31 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import type { MonthlySalesTrend } from "@/lib/actions/dashboard-actions"
+import { Button } from "@/components/ui/button"
+import {
+  getSalesTrend,
+  type SalesTrend,
+  type SalesTrendPeriod,
+} from "@/lib/actions/dashboard-actions"
+
+// Kept in sync by convention with SALES_TREND_BUCKET_COUNT in
+// dashboard-actions.ts (a "use server" file can only export async
+// functions, so these display-only labels live here instead).
+const SALES_TREND_PERIOD_LABELS: Record<SalesTrendPeriod, string> = {
+  weekly: "Weekly",
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  yearly: "Yearly",
+}
+
+const SALES_TREND_PERIOD_DESCRIPTIONS: Record<SalesTrendPeriod, string> = {
+  weekly: "last 12 weeks",
+  monthly: "last 12 months",
+  quarterly: "last 8 quarters",
+  yearly: "last 5 years",
+}
+
+const PERIOD_OPTIONS = Object.keys(SALES_TREND_PERIOD_LABELS) as SalesTrendPeriod[]
 
 /**
  * Colours for the metals a jeweller actually stocks.
@@ -57,10 +82,23 @@ function slug(metal: string) {
 const formatLakh = (v: number) => `₹${(v / 100000).toFixed(0)}L`
 
 type SalesChartProps = {
-  data: MonthlySalesTrend
+  initialData: SalesTrend
+  initialPeriod: SalesTrendPeriod
 }
 
-export function SalesChart({ data }: SalesChartProps) {
+export function SalesChart({ initialData, initialPeriod }: SalesChartProps) {
+  const [period, setPeriod] = useState(initialPeriod)
+  const [data, setData] = useState(initialData)
+  const [isPending, startTransition] = useTransition()
+
+  function handlePeriodChange(next: SalesTrendPeriod) {
+    if (next === period) return
+    setPeriod(next)
+    startTransition(async () => {
+      setData(await getSalesTrend(next))
+    })
+  }
+
   const { points, metals } = data
 
   const chartConfig = Object.fromEntries(
@@ -80,13 +118,31 @@ export function SalesChart({ data }: SalesChartProps) {
 
   return (
     <Card className="gap-0">
-      <CardHeader className="border-b [.border-b]:pb-5">
-        <CardTitle>Monthly Sales Trend</CardTitle>
-        <CardDescription>
-          {hasBreakdown
-            ? `Invoiced sales for the last 12 months, split by metal`
-            : "Invoiced sales for the last 12 months"}
-        </CardDescription>
+      <CardHeader className="flex flex-col gap-3 border-b [.border-b]:pb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <CardTitle>Sales Trend</CardTitle>
+          <CardDescription>
+            {hasBreakdown
+              ? `Invoiced sales for the ${SALES_TREND_PERIOD_DESCRIPTIONS[period]}, split by metal`
+              : `Invoiced sales for the ${SALES_TREND_PERIOD_DESCRIPTIONS[period]}`}
+          </CardDescription>
+        </div>
+
+        <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
+          {PERIOD_OPTIONS.map((option) => (
+            <Button
+              key={option}
+              type="button"
+              size="sm"
+              variant={period === option ? "default" : "ghost"}
+              disabled={isPending}
+              onClick={() => handlePeriodChange(option)}
+              className="h-7 px-2.5 text-xs"
+            >
+              {SALES_TREND_PERIOD_LABELS[option]}
+            </Button>
+          ))}
+        </div>
       </CardHeader>
 
       <CardContent className="pt-6">
@@ -129,7 +185,7 @@ export function SalesChart({ data }: SalesChartProps) {
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
 
             <XAxis
-              dataKey="month"
+              dataKey="label"
               tickLine={false}
               axisLine={false}
               tickMargin={8}

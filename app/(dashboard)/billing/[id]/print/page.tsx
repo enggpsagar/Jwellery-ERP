@@ -96,11 +96,10 @@ export default async function InvoicePrintPage({ params }: Props) {
   const totalPaid = payments.reduce((sum, entry) => sum + entry.amount, 0)
 
   return (
-    <main className="mx-auto max-w-5xl space-y-4 p-6 text-xs text-black print:max-w-none print:w-full print:p-0 print:text-[9px]">
-      {/* This table has 12-13 columns — wide enough that a portrait page
-          clips the rightmost ones off the printed sheet entirely. Landscape
-          plus tight margins gives it the width it actually needs. */}
-      <style>{"@page { size: A4 landscape; margin: 8mm; }"}</style>
+    <main className="mx-auto max-w-5xl space-y-4 p-6 text-xs text-black print:max-w-none print:w-full print:p-0 print:text-[8px]">
+      {/* Portrait A4, tight margins — the line-item table's own column
+          widths/headers are sized to fit this, not the other way around. */}
+      <style>{"@page { size: A4 portrait; margin: 8mm; }"}</style>
 
       <div className="flex justify-end print:hidden">
         <InvoicePrintButton />
@@ -170,17 +169,16 @@ export default async function InvoicePrintPage({ params }: Props) {
         {/* Line items */}
         <table className="w-full table-fixed border-collapse">
           {/* table-fixed + explicit widths, not auto layout — auto layout
-              sizes every column to its widest cell on one line, which is
-              what was pushing this 12-13 column table wider than a printed
-              page and clipping the rightmost columns off the sheet. */}
+              sizes every column to its widest cell on one line, which made
+              this 12-13 column table wider than a printed page. */}
           <colgroup>
-            <col style={{ width: "20%" }} />
-            <col style={{ width: "6%" }} />
+            <col style={{ width: isInterState ? "16%" : "14%" }} />
+            <col style={{ width: "8%" }} />
             <col style={{ width: "4%" }} />
             <col style={{ width: "7%" }} />
             <col style={{ width: "7%" }} />
             <col style={{ width: "7%" }} />
-            <col style={{ width: "8%" }} />
+            <col style={{ width: "9%" }} />
             <col style={{ width: "7%" }} />
             <col style={{ width: "7%" }} />
             <col style={{ width: "7%" }} />
@@ -188,24 +186,32 @@ export default async function InvoicePrintPage({ params }: Props) {
               <col style={{ width: "12%" }} />
             ) : (
               <>
-                <col style={{ width: "6%" }} />
-                <col style={{ width: "6%" }} />
+                <col style={{ width: "7%" }} />
+                <col style={{ width: "7%" }} />
               </>
             )}
-            <col style={{ width: "8%" }} />
+            <col style={{ width: "9%" }} />
           </colgroup>
           <thead>
-            <tr className="border-b border-black [&>th]:border-r [&>th]:border-black [&>th]:p-1 print:[&>th]:p-0.5 [&>th:last-child]:border-r-0">
-              <th className="text-left">Variant no/Product description/Fineness</th>
+            {/* The site-wide `table thead th` rule (globals.css) forces
+                small-caps, nowrap, muted-gray headers meant for the app's
+                data-table cards — on this narrow, fixed-width, 12+ column
+                table that nowrap is exactly what forced every header onto
+                one overflowing line, visually overlapping its neighbors.
+                Overridden here (a class targeting the element itself always
+                outranks that bare-element selector) so headers wrap onto
+                their own 2-3 lines and fit their column instead. */}
+            <tr className="border-b border-black [&>th]:border-r [&>th]:border-black [&>th]:p-1 print:[&>th]:p-0.5 [&>th:last-child]:border-r-0 [&>th]:whitespace-normal [&>th]:normal-case [&>th]:tracking-normal [&>th]:text-black [&>th]:font-semibold [&>th]:text-[8px] print:[&>th]:text-[6.5px] [&>th]:leading-tight [&>th]:align-bottom">
+              <th className="text-left">Item Description</th>
               <th>Purity/HSN</th>
-              <th>Net Qty</th>
-              <th>Gross Product Weight (grams)</th>
-              <th>Net Stone Weight (g)</th>
-              <th>Net Metal Weight (grams)</th>
-              <th>Gross Product Price (Rs.)</th>
-              <th>Making Charges (Rs.)</th>
-              <th>Stone Charge (Rs.)</th>
-              <th>Scheme*/Discount (Rs.)</th>
+              <th>Qty</th>
+              <th>Gross Wt (g)</th>
+              <th>Stone Wt (g)</th>
+              <th>Net Wt (g)</th>
+              <th>Gross Price (Rs.)</th>
+              <th>Making (Rs.)</th>
+              <th>Stone (Rs.)</th>
+              <th>Discount (Rs.)</th>
               {/* One customer, one shipping state — an invoice is either
                   wholly intra-state or wholly inter-state, never a mix, so
                   the column choice is made once for the whole table. */}
@@ -217,7 +223,7 @@ export default async function InvoicePrintPage({ params }: Props) {
                   <th>CGST</th>
                 </>
               )}
-              <th>Product Value (Rs.)</th>
+              <th>Value (Rs.)</th>
             </tr>
           </thead>
           <tbody>

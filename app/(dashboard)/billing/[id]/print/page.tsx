@@ -172,22 +172,22 @@ export default async function InvoicePrintPage({ params }: Props) {
               sizes every column to its widest cell on one line, which made
               this 12-13 column table wider than a printed page. */}
           <colgroup>
-            <col style={{ width: "17%" }} />
-            <col style={{ width: "6%" }} />
+            <col style={{ width: isInterState ? "16%" : "14%" }} />
+            <col style={{ width: "8%" }} />
             <col style={{ width: "4%" }} />
             <col style={{ width: "7%" }} />
             <col style={{ width: "7%" }} />
             <col style={{ width: "7%" }} />
             <col style={{ width: "9%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "8%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "7%" }} />
             {isInterState ? (
-              <col style={{ width: "10%" }} />
+              <col style={{ width: "12%" }} />
             ) : (
               <>
-                <col style={{ width: "5%" }} />
-                <col style={{ width: "5%" }} />
+                <col style={{ width: "7%" }} />
+                <col style={{ width: "7%" }} />
               </>
             )}
             <col style={{ width: "9%" }} />

@@ -1,6 +1,8 @@
+"use client"
+
+import { useState, useTransition } from "react"
 import {
   Card,
-  CardAction,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -17,7 +19,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
-import type { DashboardTransaction } from "@/lib/actions/dashboard-actions"
+import {
+  getRecentTransactions,
+  type DashboardTransaction,
+  type RecentTransactionsPeriod,
+} from "@/lib/actions/dashboard-actions"
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 
 const statusStyles: Record<string, string> = {
@@ -27,21 +33,64 @@ const statusStyles: Record<string, string> = {
   Cancelled: "bg-red-50 text-red-700",
 }
 
-type TransactionsTableProps = {
-  transactions: DashboardTransaction[]
+// Kept in sync by convention with RecentTransactionsPeriod in
+// dashboard-actions.ts — a "use server" file can only export async
+// functions.
+const PERIOD_LABELS: Record<RecentTransactionsPeriod, string> = {
+  daily: "Daily",
+  weekly: "Weekly",
+  monthly: "Monthly",
 }
 
-export function TransactionsTable({ transactions }: TransactionsTableProps) {
+const PERIOD_OPTIONS = Object.keys(PERIOD_LABELS) as RecentTransactionsPeriod[]
+
+type TransactionsTableProps = {
+  initialTransactions: DashboardTransaction[]
+  initialPeriod: RecentTransactionsPeriod
+}
+
+export function TransactionsTable({ initialTransactions, initialPeriod }: TransactionsTableProps) {
+  const [period, setPeriod] = useState(initialPeriod)
+  const [transactions, setTransactions] = useState(initialTransactions)
+  const [isPending, startTransition] = useTransition()
+
+  function handlePeriodChange(next: RecentTransactionsPeriod) {
+    if (next === period) return
+    setPeriod(next)
+    startTransition(async () => {
+      setTransactions(await getRecentTransactions(next))
+    })
+  }
+
   return (
     <Card className="gap-0 overflow-hidden">
-      <CardHeader className="border-b [.border-b]:pb-5">
-        <CardTitle>Recent Transactions</CardTitle>
-        <CardDescription>Latest invoices and ledger entries</CardDescription>
-        <CardAction>
+      <CardHeader className="flex flex-col gap-3 border-b [.border-b]:pb-5">
+        <div>
+          <CardTitle>Recent Transactions</CardTitle>
+          <CardDescription>Latest invoices and ledger entries</CardDescription>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
+            {PERIOD_OPTIONS.map((option) => (
+              <Button
+                key={option}
+                type="button"
+                size="sm"
+                variant={period === option ? "default" : "ghost"}
+                disabled={isPending}
+                onClick={() => handlePeriodChange(option)}
+                className="h-7 px-2.5 text-xs"
+              >
+                {PERIOD_LABELS[option]}
+              </Button>
+            ))}
+          </div>
+
           <Button variant="outline" size="sm" asChild>
             <Link href="/billing">View all</Link>
           </Button>
-        </CardAction>
+        </div>
       </CardHeader>
       <div className="overflow-x-auto">
         <Table>

@@ -40,16 +40,6 @@ function startOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-function percentChange(current: number, previous: number) {
-  if (previous === 0) return current === 0 ? 0 : 100;
-  return ((current - previous) / previous) * 100;
-}
-
-function formatPercent(value: number) {
-  const sign = value >= 0 ? "+" : "";
-  return `${sign}${value.toFixed(1)}%`;
-}
-
 export type DashboardStat = {
   label: string;
   value: string;
@@ -70,13 +60,6 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   const scope = await getLocationScope();
   const now = new Date();
   const todayStart = startOfDay(now);
-  const yesterdayStart = new Date(todayStart);
-  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-
-  const monthStart = startOfMonth(now);
-  const lastMonthStart = startOfMonth(
-    new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  );
 
   const activeMetals = await prisma.storeMetal.findMany({
     where: { storeId, isActive: true },
@@ -86,10 +69,6 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
   const [
-    todaySalesAgg,
-    yesterdaySalesAgg,
-    monthSalesAgg,
-    lastMonthSalesAgg,
     outstandingAgg,
     outstandingKachaAgg,
     todayPurchasesAgg,
@@ -98,42 +77,6 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     pendingJobs,
     overdueJobs,
   ] = await Promise.all([
-    prisma.invoice.aggregate({
-      where: {
-        storeId,
-        invoiceDate: { gte: todayStart },
-        status: { not: InvoiceStatus.CANCELLED },
-        ...locationWhere(scope),
-      },
-      _sum: { totalAmount: true },
-    }),
-    prisma.invoice.aggregate({
-      where: {
-        storeId,
-        invoiceDate: { gte: yesterdayStart, lt: todayStart },
-        status: { not: InvoiceStatus.CANCELLED },
-        ...locationWhere(scope),
-      },
-      _sum: { totalAmount: true },
-    }),
-    prisma.invoice.aggregate({
-      where: {
-        storeId,
-        invoiceDate: { gte: monthStart },
-        status: { not: InvoiceStatus.CANCELLED },
-        ...locationWhere(scope),
-      },
-      _sum: { totalAmount: true },
-    }),
-    prisma.invoice.aggregate({
-      where: {
-        storeId,
-        invoiceDate: { gte: lastMonthStart, lt: monthStart },
-        status: { not: InvoiceStatus.CANCELLED },
-        ...locationWhere(scope),
-      },
-      _sum: { totalAmount: true },
-    }),
     prisma.invoice.aggregate({
       where: {
         storeId,
@@ -196,10 +139,6 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     }),
   ]);
 
-  const todaySales = Number(todaySalesAgg._sum.totalAmount ?? 0);
-  const yesterdaySales = Number(yesterdaySalesAgg._sum.totalAmount ?? 0);
-  const monthSales = Number(monthSalesAgg._sum.totalAmount ?? 0);
-  const lastMonthSales = Number(lastMonthSalesAgg._sum.totalAmount ?? 0);
   const outstanding =
     Number(outstandingAgg._sum.balanceAmount ?? 0) +
     Number(outstandingKachaAgg._sum.balanceAmount ?? 0);
@@ -217,26 +156,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     ),
   }));
 
-  const todayChange = percentChange(todaySales, yesterdaySales);
-  const monthChange = percentChange(monthSales, lastMonthSales);
-
   return [
-    {
-      label: "Today's Sales",
-      value: `₹${todaySales.toLocaleString("en-IN")}`,
-      change: formatPercent(todayChange),
-      trend: todayChange >= 0 ? "up" : "down",
-      sub: "vs. yesterday",
-      icon: "rupee",
-    },
-    {
-      label: "Monthly Revenue",
-      value: `₹${monthSales.toLocaleString("en-IN")}`,
-      change: formatPercent(monthChange),
-      trend: monthChange >= 0 ? "up" : "down",
-      sub: "vs. last month",
-      icon: "trending",
-    },
     {
       label: "Outstanding Receivables",
       value: `₹${outstanding.toLocaleString("en-IN")}`,
@@ -272,15 +192,16 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   ];
 }
 
-export type SalesTrendPeriod = "weekly" | "monthly" | "quarterly" | "yearly";
+export type SalesTrendPeriod = "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
 
 // A "use server" file can only export async functions — the display labels
 // for these periods live in sales-chart.tsx instead, kept in sync with the
-// bucket counts below by convention (weekly/monthly=12, quarterly=8, yearly=5).
+// bucket counts below by convention (daily=14, weekly/monthly=12, quarterly=8, yearly=5).
 
 /** How many buckets back each period shows — enough history to read a trend
  * without the x-axis getting so dense it stops being readable. */
 const SALES_TREND_BUCKET_COUNT: Record<SalesTrendPeriod, number> = {
+  daily: 14,
   weekly: 12,
   monthly: 12,
   quarterly: 8,
@@ -325,6 +246,8 @@ function salesTrendBuckets(period: SalesTrendPeriod, now: Date): SalesTrendBucke
 /** Steps `date` back/forward by `amount` whole periods. */
 function offsetPeriod(period: SalesTrendPeriod, date: Date, amount: number): Date {
   switch (period) {
+    case "daily":
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount);
     case "weekly":
       return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount * 7);
     case "monthly":
@@ -347,6 +270,14 @@ function startOfWeekMonday(date: Date) {
 
 function salesTrendBucketFor(period: SalesTrendPeriod, date: Date): SalesTrendBucket {
   switch (period) {
+    case "daily": {
+      const start = startOfDay(date);
+      return {
+        key: start.toISOString().slice(0, 10),
+        label: start.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        start,
+      };
+    }
     case "weekly": {
       const start = startOfWeekMonday(date);
       return {
@@ -402,7 +333,12 @@ export async function getSalesTrend(
   const rangeStart = buckets[0].start;
 
   const invoices = await prisma.invoice.findMany({
-    where: { storeId, invoiceDate: { gte: rangeStart }, ...locationWhere(scope) },
+    where: {
+      storeId,
+      invoiceDate: { gte: rangeStart },
+      status: { not: InvoiceStatus.CANCELLED },
+      ...locationWhere(scope),
+    },
     select: {
       invoiceDate: true,
       totalAmount: true,
@@ -502,28 +438,56 @@ export async function getSalesTrend(
 export type CategoryRevenue = { category: string; value: number };
 
 export type RevenueByMetal = {
-  /** This month's total across every metal — the figure the bars below add up to. */
+  /** The selected period's total across every metal — the figure the bars below add up to. */
   total: number;
   rows: CategoryRevenue[];
 };
 
+export type RevenueByMetalPeriod = "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
+
+/** The start of the current period — mirrors salesTrendBucketFor's per-period
+ * math, but only ever needs the current bucket's start, not a whole series. */
+function revenueByMetalPeriodStart(period: RevenueByMetalPeriod, now: Date): Date {
+  switch (period) {
+    case "daily":
+      return startOfDay(now);
+    case "weekly":
+      return startOfWeekMonday(now);
+    case "monthly":
+      return startOfMonth(now);
+    case "quarterly": {
+      const quarter = Math.floor(now.getMonth() / 3);
+      return new Date(now.getFullYear(), quarter * 3, 1);
+    }
+    case "yearly":
+      return new Date(now.getFullYear(), 0, 1);
+  }
+}
+
 /**
- * This month's revenue split by metal (Gold/Silver/Diamond/Platinum/...),
- * not by product taxonomy — a merchant thinks of "what did we sell" in
- * terms of metal first, and this list is never a fixed set: whatever
- * StoreMetal rows a store has configured (see Taxonomy settings) show up
- * here automatically, "Unspecified" collects line items with no metal
- * recorded at all, rather than silently dropping their revenue.
+ * The selected period's revenue split by metal (Gold/Silver/Diamond/
+ * Platinum/...), not by product taxonomy — a merchant thinks of "what did we
+ * sell" in terms of metal first, and this list is never a fixed set:
+ * whatever StoreMetal rows a store has configured (see Taxonomy settings)
+ * show up here automatically, "Unspecified" collects line items with no
+ * metal recorded at all, rather than silently dropping their revenue.
  */
-export async function getRevenueByCategory(): Promise<RevenueByMetal> {
+export async function getRevenueByCategory(
+  period: RevenueByMetalPeriod = "monthly"
+): Promise<RevenueByMetal> {
   const storeId = await requireStoreScope();
   const scope = await getLocationScope();
   const now = new Date();
-  const monthStart = startOfMonth(now);
+  const rangeStart = revenueByMetalPeriodStart(period, now);
 
   const items = await prisma.invoiceItem.findMany({
     where: {
-      invoice: { storeId, invoiceDate: { gte: monthStart }, ...locationWhere(scope) },
+      invoice: {
+        storeId,
+        invoiceDate: { gte: rangeStart },
+        status: { not: InvoiceStatus.CANCELLED },
+        ...locationWhere(scope),
+      },
     },
     select: {
       lineTotal: true,
@@ -567,13 +531,28 @@ const STATUS_MAP: Record<string, "Paid" | "Pending" | "Partial" | "Cancelled"> =
   CANCELLED: "Cancelled",
 };
 
+export type RecentTransactionsPeriod = "daily" | "weekly" | "monthly";
+
+function recentTransactionsPeriodStart(period: RecentTransactionsPeriod, now: Date): Date {
+  switch (period) {
+    case "daily":
+      return startOfDay(now);
+    case "weekly":
+      return startOfWeekMonday(now);
+    case "monthly":
+      return startOfMonth(now);
+  }
+}
+
 export async function getRecentTransactions(
+  period: RecentTransactionsPeriod = "daily",
   limit = 6
 ): Promise<DashboardTransaction[]> {
   const storeId = await requireStoreScope();
   const scope = await getLocationScope();
+  const rangeStart = recentTransactionsPeriodStart(period, new Date());
   const invoices = await prisma.invoice.findMany({
-    where: { storeId, ...locationWhere(scope) },
+    where: { storeId, invoiceDate: { gte: rangeStart }, ...locationWhere(scope) },
     orderBy: { invoiceDate: "desc" },
     take: limit,
     include: {

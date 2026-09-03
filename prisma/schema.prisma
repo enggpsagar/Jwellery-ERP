@@ -517,6 +517,17 @@ model InventoryStock {
   manufactureDate     DateTime?
   locationId          String?
   remarks             String?
+  // Who manually added this stock row — only meaningful for a manual add
+  // (see createInventoryStock's own comment: "no vendor/karigar
+  // counterparty"). A row created from a Purchase or a karigar job's
+  // receipt is instead attributed via that Purchase's own createdBy or the
+  // karigarJobs relation below — see getItemLedgerReport's addedByLabel()
+  // for the priority order. Name/role are durable snapshots (same
+  // convention as Invoice.createdByName) since a user can be renamed,
+  // promoted, or deleted after adding this item.
+  createdById         String?
+  createdByName       String?
+  createdByRole       UserRole?
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
   store               Store                  @relation(fields: [storeId], references: [id])
@@ -532,6 +543,7 @@ model InventoryStock {
   quotationItems      QuotationItem[]
   metalType           StoreMetal?            @relation(fields: [metalTypeId], references: [id])
   location            StoreLocation?         @relation(fields: [locationId], references: [id])
+  createdBy           User?                  @relation("InventoryStockCreatedBy", fields: [createdById], references: [id])
 
   @@unique([storeId, stockCode])
   @@unique([storeId, tagNumber])
@@ -908,6 +920,13 @@ model Purchase {
   paidAmount          Decimal        @default(0) @db.Decimal(12, 2)
   balanceAmount       Decimal        @default(0) @db.Decimal(12, 2)
   notes               String?
+  // Which staff member recorded this purchase — previously untracked (see
+  // getItemLedgerReport's own former comment on why "Purchased by" always
+  // read "Not recorded"). Name/role are durable snapshots, same convention
+  // as Invoice.createdByName.
+  createdById         String?
+  createdByName       String?
+  createdByRole       UserRole?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   store               Store          @relation(fields: [storeId], references: [id])
@@ -916,6 +935,7 @@ model Purchase {
   ledgerEntries       LedgerEntry[]
   locationId          String?
   location            StoreLocation? @relation(fields: [locationId], references: [id])
+  createdBy           User?          @relation("PurchaseCreatedBy", fields: [createdById], references: [id])
 
   @@unique([storeId, purchaseNumber])
   @@index([vendorId])
@@ -1386,6 +1406,8 @@ model User {
   customersCreated      Customer[]             @relation("CustomerCreatedBy")
   supportTicketsFiled   SupportTicket[]        @relation("SupportTicketSubmittedBy")
   supportTicketMessages SupportTicketMessage[] @relation("SupportTicketMessageAuthor")
+  inventoryStocksAdded  InventoryStock[]       @relation("InventoryStockCreatedBy")
+  purchasesRecorded     Purchase[]             @relation("PurchaseCreatedBy")
 
   @@index([storeId])
 }

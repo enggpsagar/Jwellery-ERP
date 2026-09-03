@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useTransition } from "react"
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts"
 
 import {
@@ -15,11 +16,37 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import type { RevenueByMetal } from "@/lib/actions/dashboard-actions"
+import { Button } from "@/components/ui/button"
+import {
+  getRevenueByCategory,
+  type RevenueByMetal,
+  type RevenueByMetalPeriod,
+} from "@/lib/actions/dashboard-actions"
 
 const chartConfig = {
   value: { label: "Revenue" },
 } satisfies ChartConfig
+
+// Kept in sync by convention with RevenueByMetalPeriod in
+// dashboard-actions.ts, same as sales-chart.tsx's own copy of these labels —
+// a "use server" file can only export async functions.
+const PERIOD_LABELS: Record<RevenueByMetalPeriod, string> = {
+  daily: "Daily",
+  weekly: "Weekly",
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  yearly: "Yearly",
+}
+
+const PERIOD_DESCRIPTIONS: Record<RevenueByMetalPeriod, string> = {
+  daily: "Today's revenue split",
+  weekly: "This week's revenue split",
+  monthly: "This month's revenue split",
+  quarterly: "This quarter's revenue split",
+  yearly: "This year's revenue split",
+}
+
+const PERIOD_OPTIONS = Object.keys(PERIOD_LABELS) as RevenueByMetalPeriod[]
 
 /**
  * Fixed slot order, never cycled. These are the validated jewellery hues from
@@ -44,7 +71,8 @@ const compact = (v: number) =>
       : `₹${v}`
 
 type CategoryChartProps = {
-  data: RevenueByMetal
+  initialData: RevenueByMetal
+  initialPeriod: RevenueByMetalPeriod
 }
 
 /**
@@ -61,7 +89,19 @@ type CategoryChartProps = {
  * value labels are also the "relief" the palette's gold slot requires — it
  * falls below 3:1 against the light surface.
  */
-export function CategoryChart({ data }: CategoryChartProps) {
+export function CategoryChart({ initialData, initialPeriod }: CategoryChartProps) {
+  const [period, setPeriod] = useState(initialPeriod)
+  const [data, setData] = useState(initialData)
+  const [isPending, startTransition] = useTransition()
+
+  function handlePeriodChange(next: RevenueByMetalPeriod) {
+    if (next === period) return
+    setPeriod(next)
+    startTransition(async () => {
+      setData(await getRevenueByCategory(next))
+    })
+  }
+
   const sorted = [...data.rows].sort((a, b) => b.value - a.value)
 
   // Anything past the fixed slots is summed into one bar rather than given a
@@ -88,11 +128,11 @@ export function CategoryChart({ data }: CategoryChartProps) {
 
   return (
     <Card className="gap-0">
-      <CardHeader className="border-b [.border-b]:pb-5">
+      <CardHeader className="flex flex-col gap-3 border-b [.border-b]:pb-5">
         <div className="flex items-baseline justify-between gap-3">
           <div>
             <CardTitle>Revenue by Metal</CardTitle>
-            <CardDescription>This month&apos;s revenue split</CardDescription>
+            <CardDescription>{PERIOD_DESCRIPTIONS[period]}</CardDescription>
           </div>
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Total</p>
@@ -100,6 +140,22 @@ export function CategoryChart({ data }: CategoryChartProps) {
               ₹{data.total.toLocaleString("en-IN")}
             </p>
           </div>
+        </div>
+
+        <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
+          {PERIOD_OPTIONS.map((option) => (
+            <Button
+              key={option}
+              type="button"
+              size="sm"
+              variant={period === option ? "default" : "ghost"}
+              disabled={isPending}
+              onClick={() => handlePeriodChange(option)}
+              className="h-7 px-2.5 text-xs"
+            >
+              {PERIOD_LABELS[option]}
+            </Button>
+          ))}
         </div>
       </CardHeader>
 

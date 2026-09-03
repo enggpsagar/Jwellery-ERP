@@ -26,6 +26,8 @@ import {
 } from "@/lib/location-scope";
 import { sendMail } from "@/lib/mailer";
 import { invoiceEmail } from "@/lib/email-templates";
+import { getBusinessSettings } from "@/lib/actions/settings-actions";
+import { amountInWords } from "@/lib/number-to-words";
 import { resolveStoreName } from "@/lib/invite-email";
 import { buildExcelExport } from "@/lib/excel-export";
 import { OversellError } from "@/lib/inventory/oversell-error";
@@ -1555,15 +1557,26 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
     }
     const storeId = await requireStoreScope();
 
-    const [invoice, storeName] = await Promise.all([
+    const [invoice, storeName, settings] = await Promise.all([
       prisma.invoice.findFirst({
         where: { id: invoiceId, storeId },
         include: {
-          customer: { select: { name: true, email: true } },
+          customer: {
+            select: {
+              name: true,
+              email: true,
+              addressLine1: true,
+              addressLine2: true,
+              city: true,
+              state: true,
+              phone: true,
+            },
+          },
           items: true,
         },
       }),
       resolveStoreName(storeId),
+      getBusinessSettings(),
     ]);
 
     if (!invoice) return { success: false, message: "Invoice not found" };
@@ -1576,14 +1589,37 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
       storeName,
       invoiceNumber: invoice.invoiceNumber,
       invoiceDate: invoice.invoiceDate.toISOString(),
-      customerName: invoice.customer.name,
+      status: invoice.status,
+      gstScheme: settings.gstScheme,
+      business: {
+        name: settings.businessName,
+        address: settings.address || null,
+        city: settings.city || null,
+        state: settings.state || null,
+        pincode: settings.pincode || null,
+        phone: settings.phone || null,
+        gstNumber: settings.gstNumber || null,
+      },
+      customer: {
+        name: invoice.customer.name,
+        addressLine1: invoice.customer.addressLine1,
+        addressLine2: invoice.customer.addressLine2,
+        city: invoice.customer.city,
+        state: invoice.customer.state,
+        phone: invoice.customer.phone,
+      },
       items: invoice.items.map((item) => ({
         itemName: item.itemName,
+        purity: item.purity,
         quantity: item.quantity,
         netWeight: item.netWeight ? Number(item.netWeight) : null,
         rate: item.rate ? Number(item.rate) : null,
         makingCharge: Number(item.makingCharge),
         stoneCharge: Number(item.stoneCharge),
+        schemeDiscount: Number(item.schemeDiscount),
+        sgstAmount: Number(item.sgstAmount),
+        cgstAmount: Number(item.cgstAmount),
+        igstAmount: Number(item.igstAmount),
         lineTotal: Number(item.lineTotal),
       })),
       subtotal: Number(invoice.subtotal),
@@ -1594,6 +1630,9 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
       totalAmount: Number(invoice.totalAmount),
       paidAmount: Number(invoice.paidAmount),
       balanceAmount: Number(invoice.balanceAmount),
+      amountInWords: amountInWords(Number(invoice.totalAmount)),
+      notes: invoice.notes || null,
+      terms: settings.invoiceTerms || null,
     });
 
     const result = await sendMail({ to: invoice.customer.email, subject, html });

@@ -163,7 +163,7 @@ async function buildRows(type: ReportType, range: DateRange) {
           : "",
         "Purchase Qty": row.purchaseQuantity ?? "",
         Vendor: row.vendorName ?? "",
-        "Purchased By": row.purchasedBy,
+        "Added By": row.addedBy,
         "Last Sale Date": row.lastSaleDate
           ? new Date(row.lastSaleDate).toLocaleDateString("en-IN")
           : "",

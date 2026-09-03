@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { StatCards } from "@/components/dashboard/stat-cards";
+import { SalesSummaryCard } from "@/components/dashboard/sales-summary-card";
 import { SalesChart } from "@/components/dashboard/sales-chart";
 import { CategoryChart } from "@/components/dashboard/category-chart";
 import { TransactionsTable } from "@/components/dashboard/transactions-table";
@@ -17,15 +18,19 @@ export const metadata: Metadata = {
   title: "Dashboard",
 };
 
-const DEFAULT_SALES_TREND_PERIOD = "monthly";
+// Every period-filterable dashboard section defaults to "Daily" — the most
+// immediately relevant view for a store owner checking in on their own day.
+const DEFAULT_SALES_TREND_PERIOD = "daily";
+const DEFAULT_REVENUE_PERIOD = "daily";
+const DEFAULT_TRANSACTIONS_PERIOD = "daily";
 
 export default async function DashboardPage() {
   const [stats, salesTrend, revenueByCategory, transactions, activity] =
     await Promise.all([
       getDashboardStats(),
       getSalesTrend(DEFAULT_SALES_TREND_PERIOD),
-      getRevenueByCategory(),
-      getRecentTransactions(),
+      getRevenueByCategory(DEFAULT_REVENUE_PERIOD),
+      getRecentTransactions(DEFAULT_TRANSACTIONS_PERIOD),
       getRecentActivity(),
     ]);
 
@@ -50,6 +55,10 @@ export default async function DashboardPage() {
         </p>
       </div>
 
+      {/* Sales — merged Today's Sales / Monthly Revenue into one section
+          with its own period filter, rather than two fixed-period cards. */}
+      <SalesSummaryCard initialData={salesTrend} initialPeriod={DEFAULT_SALES_TREND_PERIOD} />
+
       {/* KPI Cards */}
       <StatCards stats={stats} />
 
@@ -60,14 +69,17 @@ export default async function DashboardPage() {
         </div>
 
         <div>
-          <CategoryChart data={revenueByCategory} />
+          <CategoryChart initialData={revenueByCategory} initialPeriod={DEFAULT_REVENUE_PERIOD} />
         </div>
       </div>
 
       {/* Transactions & Activity */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-2">
-          <TransactionsTable transactions={transactions} />
+          <TransactionsTable
+            initialTransactions={transactions}
+            initialPeriod={DEFAULT_TRANSACTIONS_PERIOD}
+          />
         </div>
 
         <div>

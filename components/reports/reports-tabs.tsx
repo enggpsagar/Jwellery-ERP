@@ -140,7 +140,7 @@ type ItemLedgerRow = {
   purchaseDate: string | null
   purchaseQuantity: number | null
   vendorName: string | null
-  purchasedBy: string
+  addedBy: string
   totalSoldQuantity: number
   lastSaleDate: string | null
   soldTo: string
@@ -1244,7 +1244,7 @@ export function ReportsTabs({
                           {row.vendorName ?? "Unknown vendor"}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Purchased by: {row.purchasedBy}
+                          Added by {row.addedBy}
                         </div>
                       </td>
                       <td className="px-4 py-3">

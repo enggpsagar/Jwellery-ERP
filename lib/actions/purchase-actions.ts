@@ -462,8 +462,9 @@ export async function createPurchase(
     // Authorization lives here, not only in middleware: a server action is a
     // POST endpoint that can be invoked from any page the caller is allowed
     // to load, so the route guard never sees it.
+    let actor;
     try {
-      await requirePermission(PERMISSIONS.PURCHASE_CREATE);
+      actor = await requirePermission(PERMISSIONS.PURCHASE_CREATE);
     } catch {
       return { success: false, message: "You do not have permission to create purchases." };
     }
@@ -647,6 +648,9 @@ export async function createPurchase(
           notes,
           vendorInvoiceNumber,
           locationId: resolvedLocationId ?? undefined,
+          createdById: actor.id ?? undefined,
+          createdByName: actor.name ?? actor.email ?? undefined,
+          createdByRole: actor.role ?? undefined,
           items: {
             create: items.map((item, i) => ({
               productId: item.productId,

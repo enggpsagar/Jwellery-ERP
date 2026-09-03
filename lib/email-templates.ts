@@ -1,3 +1,5 @@
+import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst";
+
 function formatCurrency(value: number) {
   return `₹${Number(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }
@@ -566,12 +568,92 @@ export function inviteUserEmail(params: {
   };
 }
 
+function addressBlock(lines: (string | null | undefined)[]) {
+  return lines
+    .filter((line): line is string => Boolean(line && line.trim()))
+    .map((line) => `<div>${line}</div>`)
+    .join("");
+}
+
+function invoiceLineItemsTable(
+  items: {
+    itemName: string;
+    purity: string | null;
+    quantity: number;
+    netWeight: number | null;
+    rate: number | null;
+    makingCharge: number;
+    stoneCharge: number;
+    schemeDiscount: number;
+    sgstAmount: number;
+    cgstAmount: number;
+    igstAmount: number;
+    lineTotal: number;
+  }[],
+  isInterState: boolean,
+) {
+  const rows = items
+    .map(
+      (item) => `
+      <tr>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb;">${item.itemName}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb;">${item.purity ?? "-"}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.netWeight ? item.netWeight.toFixed(3) + " g" : "-"}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.rate ? formatCurrency(item.rate) : "-"}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.makingCharge)}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.stoneCharge)}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.schemeDiscount)}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(isInterState ? item.igstAmount : item.sgstAmount + item.cgstAmount)}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.lineTotal)}</td>
+      </tr>`,
+    )
+    .join("");
+
+  return `
+  <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 11px;">
+    <thead>
+      <tr style="background: #f9fafb;">
+        <th style="padding: 6px; text-align: left;">Item</th>
+        <th style="padding: 6px; text-align: left;">Purity</th>
+        <th style="padding: 6px; text-align: center;">Qty</th>
+        <th style="padding: 6px; text-align: right;">Net Wt</th>
+        <th style="padding: 6px; text-align: right;">Rate</th>
+        <th style="padding: 6px; text-align: right;">Making</th>
+        <th style="padding: 6px; text-align: right;">Stone</th>
+        <th style="padding: 6px; text-align: right;">Discount</th>
+        <th style="padding: 6px; text-align: right;">${isInterState ? "IGST" : "SGST+CGST"}</th>
+        <th style="padding: 6px; text-align: right;">Total</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
 export function invoiceEmail(params: {
   storeName: string;
   invoiceNumber: string;
   invoiceDate: string;
-  customerName: string;
-  items: Parameters<typeof itemsTable>[0];
+  status: string;
+  gstScheme: "REGULAR_B2C" | "REGULAR_B2B" | "COMPOSITION";
+  business: {
+    name: string;
+    address: string | null;
+    city: string | null;
+    state: string | null;
+    pincode: string | null;
+    phone: string | null;
+    gstNumber: string | null;
+  };
+  customer: {
+    name: string;
+    addressLine1: string | null;
+    addressLine2: string | null;
+    city: string | null;
+    state: string | null;
+    phone: string | null;
+  };
+  items: Parameters<typeof invoiceLineItemsTable>[0];
   subtotal: number;
   makingCharges: number;
   stoneCharges: number;
@@ -580,11 +662,59 @@ export function invoiceEmail(params: {
   totalAmount: number;
   paidAmount: number;
   balanceAmount: number;
+  amountInWords: string;
+  notes: string | null;
+  terms: string | null;
 }) {
+  const isInterState = params.items.some((item) => item.igstAmount > 0);
+  const heading = documentHeading(params.gstScheme);
+
+  const businessLines = addressBlock([
+    `<strong>${params.business.name}</strong>`,
+    params.business.address,
+    [params.business.city, params.business.state].filter(Boolean).join(", ") || null,
+    params.business.pincode ? `PIN: ${params.business.pincode}` : null,
+    params.business.phone ? `Phone: ${params.business.phone}` : null,
+    params.business.gstNumber ? `GSTIN: ${params.business.gstNumber}` : null,
+  ]);
+
+  const customerLines = addressBlock([
+    `<strong>${params.customer.name || "Customer"}</strong>`,
+    params.customer.addressLine1,
+    params.customer.addressLine2,
+    [params.customer.city, params.customer.state].filter(Boolean).join(", ") || null,
+    params.customer.phone ? `Phone: ${params.customer.phone}` : null,
+  ]);
+
   const body = `
-    <p>Hi ${params.customerName || "Customer"},</p>
-    <p>Here is your invoice <strong>${params.invoiceNumber}</strong> dated ${formatDate(params.invoiceDate)}.</p>
-    ${itemsTable(params.items)}
+    <p style="text-align: center; font-weight: bold; font-size: 15px; margin-bottom: 2px;">${heading}</p>
+    ${
+      params.gstScheme === "COMPOSITION"
+        ? `<p style="text-align: center; font-size: 11px; font-style: italic; color: #6b7280; margin-top: 0;">${COMPOSITION_DISCLAIMER}</p>`
+        : ""
+    }
+
+    <div style="display: flex; justify-content: space-between; font-size: 12px; margin: 12px 0;">
+      <span>Invoice No: <strong>${params.invoiceNumber}</strong></span>
+      <span>Date: ${formatDate(params.invoiceDate)}</span>
+      <span>Status: ${params.status}</span>
+    </div>
+
+    <table style="width: 100%; margin-bottom: 12px;">
+      <tr>
+        <td style="vertical-align: top; width: 50%; font-size: 12px; padding-right: 12px;">
+          <div style="color: #6b7280; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">From</div>
+          ${businessLines}
+        </td>
+        <td style="vertical-align: top; width: 50%; font-size: 12px;">
+          <div style="color: #6b7280; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Bill To</div>
+          ${customerLines}
+        </td>
+      </tr>
+    </table>
+
+    ${invoiceLineItemsTable(params.items, isInterState)}
+
     <div style="font-size: 13px; max-width: 260px; margin-left: auto;">
       ${summaryRow("Subtotal", formatCurrency(params.subtotal))}
       ${summaryRow("Making Charges", formatCurrency(params.makingCharges))}
@@ -595,6 +725,11 @@ export function invoiceEmail(params: {
       ${summaryRow("Paid", formatCurrency(params.paidAmount))}
       ${summaryRow("Balance Due", formatCurrency(params.balanceAmount), true)}
     </div>
+
+    <p style="font-size: 11px; color: #6b7280; margin-top: 16px;">Value in words: ${params.amountInWords}</p>
+
+    ${params.notes ? `<p style="font-size: 12px;"><strong>Notes:</strong> ${params.notes}</p>` : ""}
+    ${params.terms ? `<p style="font-size: 10px; color: #6b7280;"><strong>Terms &amp; Conditions:</strong> ${params.terms}</p>` : ""}
   `;
 
   return {

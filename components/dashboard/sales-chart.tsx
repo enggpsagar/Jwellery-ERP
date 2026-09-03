@@ -29,6 +29,7 @@ import {
 // dashboard-actions.ts (a "use server" file can only export async
 // functions, so these display-only labels live here instead).
 const SALES_TREND_PERIOD_LABELS: Record<SalesTrendPeriod, string> = {
+  daily: "Daily",
   weekly: "Weekly",
   monthly: "Monthly",
   quarterly: "Quarterly",
@@ -36,6 +37,7 @@ const SALES_TREND_PERIOD_LABELS: Record<SalesTrendPeriod, string> = {
 }
 
 const SALES_TREND_PERIOD_DESCRIPTIONS: Record<SalesTrendPeriod, string> = {
+  daily: "last 14 days",
   weekly: "last 12 weeks",
   monthly: "last 12 months",
   quarterly: "last 8 quarters",

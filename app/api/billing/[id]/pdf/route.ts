@@ -156,7 +156,13 @@ export async function GET(
       const isTotal = label === "Total" || label === "Balance Due";
       doc.setFont("helvetica", isTotal ? "bold" : "normal");
       doc.text(label, pageWidth - margin - 140, y);
-      doc.text(`₹${value}`, pageWidth - margin, y, { align: "right" });
+      // jsPDF's built-in fonts (helvetica/times/courier) are the old PDF
+      // base-14 set — pre-Unicode, no ₹ (U+20B9) glyph at all — so it drew
+      // as a broken/missing character in the generated file even though the
+      // HTML email and browser print view render ₹ fine (real Unicode
+      // fonts). "Rs." is the safe ASCII fallback rather than embedding a
+      // custom Unicode font just for one symbol.
+      doc.text(`Rs. ${value}`, pageWidth - margin, y, { align: "right" });
       y += 14;
     }
 

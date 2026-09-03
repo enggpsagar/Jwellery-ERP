@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { StatCards } from "@/components/dashboard/stat-cards";
+import { SalesSummaryCard } from "@/components/dashboard/sales-summary-card";
 import { SalesChart } from "@/components/dashboard/sales-chart";
 import { CategoryChart } from "@/components/dashboard/category-chart";
 import { TransactionsTable } from "@/components/dashboard/transactions-table";
@@ -18,13 +19,14 @@ export const metadata: Metadata = {
 };
 
 const DEFAULT_SALES_TREND_PERIOD = "monthly";
+const DEFAULT_REVENUE_PERIOD = "monthly";
 
 export default async function DashboardPage() {
   const [stats, salesTrend, revenueByCategory, transactions, activity] =
     await Promise.all([
       getDashboardStats(),
       getSalesTrend(DEFAULT_SALES_TREND_PERIOD),
-      getRevenueByCategory(),
+      getRevenueByCategory(DEFAULT_REVENUE_PERIOD),
       getRecentTransactions(),
       getRecentActivity(),
     ]);
@@ -50,6 +52,10 @@ export default async function DashboardPage() {
         </p>
       </div>
 
+      {/* Sales — merged Today's Sales / Monthly Revenue into one section
+          with its own period filter, rather than two fixed-period cards. */}
+      <SalesSummaryCard initialData={salesTrend} initialPeriod={DEFAULT_SALES_TREND_PERIOD} />
+
       {/* KPI Cards */}
       <StatCards stats={stats} />
 
@@ -60,7 +66,7 @@ export default async function DashboardPage() {
         </div>
 
         <div>
-          <CategoryChart data={revenueByCategory} />
+          <CategoryChart initialData={revenueByCategory} initialPeriod={DEFAULT_REVENUE_PERIOD} />
         </div>
       </div>
 

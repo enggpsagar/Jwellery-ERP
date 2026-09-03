@@ -153,11 +153,9 @@ export function TopBar({
                 <Link href="/settings">Store Settings</Link>
               </DropdownMenuItem>
 
-              {canAccessBilling && (
-                <DropdownMenuItem asChild>
-                  <Link href="/billing">Billing</Link>
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem asChild>
+                <Link href="/help">Contact</Link>
+              </DropdownMenuItem>
             </DropdownMenuGroup>
 
             <DropdownMenuSeparator />

@@ -42,7 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/providers/toast-provider";
-// Note: StoneOriginsSection below still uses the plain Select above for the
+// Note: StoneTypesSection below still uses the plain Select above for the
 // *parent stone* picker (unchanged) — only the child Stone Type value
 // itself moved from a fixed Select to a free-text Input, mirroring
 // TypeFormRow under Categories.

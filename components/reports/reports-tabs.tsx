@@ -1,12 +1,16 @@
 "use client"
 
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 
 import { ExportMenu } from "@/components/shared/export-menu"
+import { ReportDateFilter } from "@/components/reports/report-date-filter"
+import { useReportTable } from "@/components/reports/use-report-table"
+import { ReportSearchBar, SortableTh, ReportPagination } from "@/components/reports/report-table-controls"
 
 type SalesReport = {
   invoiceCount: number
@@ -191,6 +195,12 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"]
 
+// The 5 report actions that accept a DateRange (see report-actions.ts) —
+// the other 4 are point-in-time snapshots (current stock, currently open
+// karigar jobs, current customer dues, an item's full lifecycle) that a
+// date range has no meaning for.
+const DATE_AWARE_TABS = new Set<TabKey>(["sales", "byUser", "vendorPurchase", "goldFlow", "metalWise"])
+
 function StatCard({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="rounded-xl border bg-card p-5 shadow-sm">
@@ -212,6 +222,146 @@ export function ReportsTabs({
   itemLedger,
 }: ReportsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("sales")
+  const searchParams = useSearchParams()
+
+  const exportHref = useMemo(() => {
+    const params = new URLSearchParams({ type: activeTab })
+    const from = searchParams.get("from")
+    const to = searchParams.get("to")
+    if (DATE_AWARE_TABS.has(activeTab)) {
+      if (from) params.set("from", from)
+      if (to) params.set("to", to)
+    }
+    return `/reports/export?${params.toString()}`
+  }, [activeTab, searchParams])
+
+  // One useReportTable per tab's row list, called unconditionally (hooks
+  // can't be conditional on activeTab) — each is cheap client-side memo
+  // work over data that's already in memory, so running all 9 regardless
+  // of which tab is showing costs nothing observable.
+  const salesTable = useReportTable(sales.invoices, {
+    searchText: (row) => `${row.invoiceNumber} ${row.customerName} ${row.status}`,
+    getSortValue: (row, key) => {
+      switch (key) {
+        case "invoiceNumber": return row.invoiceNumber
+        case "date": return row.invoiceDate
+        case "customer": return row.customerName
+        case "total": return row.totalAmount
+        case "balance": return row.balanceAmount
+        default: return null
+      }
+    },
+    defaultSortKey: "date",
+  })
+
+  const byUserTable = useReportTable(salesByUser.rows, {
+    searchText: (row) => row.name,
+    getSortValue: (row, key) => {
+      switch (key) {
+        case "name": return row.name
+        case "invoices": return row.invoiceCount
+        case "revenue": return row.totalRevenue
+        case "collected": return row.totalCollected
+        case "outstanding": return row.totalOutstanding
+        case "lastSale": return row.lastSale ? new Date(row.lastSale).getTime() : null
+        default: return null
+      }
+    },
+    defaultSortKey: "revenue",
+  })
+
+  const vendorPurchaseTable = useReportTable(vendorPurchase.rows, {
+    searchText: (row) => row.vendorName,
+    getSortValue: (row, key) => {
+      switch (key) {
+        case "vendor": return row.vendorName
+        case "purchases": return row.purchaseCount
+        case "qty": return row.totalQuantity
+        case "weight": return row.totalWeight
+        case "amount": return row.totalAmount
+        case "paid": return row.paidAmount
+        case "balance": return row.balanceAmount
+        case "lastPurchase": return row.lastPurchase ? new Date(row.lastPurchase).getTime() : null
+        default: return null
+      }
+    },
+    defaultSortKey: "amount",
+  })
+
+  const inventoryTable = useReportTable(valuation.byStatus, {
+    searchText: (row) => row.status,
+    getSortValue: (row, key) => {
+      switch (key) {
+        case "status": return row.status
+        case "count": return row.count
+        case "netWeight": return row.netWeight
+        case "estimatedValue": return row.estimatedValue
+        default: return null
+      }
+    },
+    pageSize: 50,
+  })
+
+  const karigarTable = useReportTable(karigarOutstanding.byKarigar, {
+    searchText: (row) => row.name,
+    getSortValue: (row, key) => {
+      switch (key) {
+        case "name": return row.name
+        case "jobs": return row.jobs
+        case "weightOut": return row.weightOut
+        default: return null
+      }
+    },
+    defaultSortKey: "weightOut",
+  })
+
+  const duesTable = useReportTable(customerDues.customers, {
+    searchText: (row) => `${row.name} ${row.phone ?? ""}`,
+    getSortValue: (row, key) => {
+      switch (key) {
+        case "name": return row.name
+        case "phone": return row.phone
+        case "invoices": return row.invoiceCount
+        case "totalDue": return row.totalDue
+        default: return null
+      }
+    },
+    defaultSortKey: "totalDue",
+  })
+
+  const metalWiseTable = useReportTable(metalWise.metals, {
+    searchText: (row) => row.metalName,
+    getSortValue: (row, key) => {
+      switch (key) {
+        case "metal": return row.metalName
+        case "purchasedWeight": return row.purchasedWeight
+        case "soldWeight": return row.soldWeight
+        case "inStockWeight": return row.inStockWeight
+        case "withKarigarWeight": return row.withKarigarWeight
+        case "reconciliationGap": return Math.abs(row.reconciliationGap)
+        default: return null
+      }
+    },
+    defaultSortKey: "metal",
+    defaultSortDir: "asc",
+    pageSize: 50,
+  })
+
+  const itemLedgerTable = useReportTable(itemLedger.rows, {
+    searchText: (row) =>
+      `${row.stockCode} ${row.productName} ${row.status} ${row.vendorName ?? ""} ${row.soldTo} ${row.soldBy}`,
+    getSortValue: (row, key) => {
+      switch (key) {
+        case "item": return `${row.productName} ${row.stockCode}`
+        case "status": return row.status
+        case "purchaseDate": return row.purchaseDate ? new Date(row.purchaseDate).getTime() : null
+        case "sold": return row.lastSaleDate ? new Date(row.lastSaleDate).getTime() : null
+        case "qty": return row.quantityRemaining
+        default: return null
+      }
+    },
+    defaultSortKey: "purchaseDate",
+  })
 
   return (
     <div className="space-y-6">
@@ -234,11 +384,13 @@ export function ReportsTabs({
 
         <div className="pb-2">
           <ExportMenu
-            href={`/reports/export?type=${activeTab}`}
+            href={exportHref}
             label={`Export ${TABS.find((tab) => tab.key === activeTab)?.label}`}
           />
         </div>
       </div>
+
+      <ReportDateFilter applies={DATE_AWARE_TABS.has(activeTab)} />
 
       {activeTab === "sales" && (
         <div className="space-y-6">
@@ -248,26 +400,33 @@ export function ReportsTabs({
             <StatCard title="Outstanding" value={`₹${sales.totalOutstanding.toFixed(2)}`} />
           </div>
 
+          <ReportSearchBar
+            value={salesTable.search}
+            onChange={salesTable.setSearch}
+            placeholder="Search invoice #, customer, status..."
+            resultSummary={`${salesTable.totalCount} of ${salesTable.rawCount}`}
+          />
+
           <div className="overflow-hidden rounded-xl border bg-card">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="border-b">
-                  <th className="px-4 py-3 text-left font-medium">Invoice #</th>
-                  <th className="px-4 py-3 text-left font-medium">Date</th>
-                  <th className="px-4 py-3 text-left font-medium">Customer</th>
-                  <th className="px-4 py-3 text-left font-medium">Total</th>
-                  <th className="px-4 py-3 text-left font-medium">Balance</th>
+                  <SortableTh label="Invoice #" sortKey="invoiceNumber" activeSortKey={salesTable.sortKey} sortDir={salesTable.sortDir} onSort={salesTable.toggleSort} />
+                  <SortableTh label="Date" sortKey="date" activeSortKey={salesTable.sortKey} sortDir={salesTable.sortDir} onSort={salesTable.toggleSort} />
+                  <SortableTh label="Customer" sortKey="customer" activeSortKey={salesTable.sortKey} sortDir={salesTable.sortDir} onSort={salesTable.toggleSort} />
+                  <SortableTh label="Total" sortKey="total" activeSortKey={salesTable.sortKey} sortDir={salesTable.sortDir} onSort={salesTable.toggleSort} />
+                  <SortableTh label="Balance" sortKey="balance" activeSortKey={salesTable.sortKey} sortDir={salesTable.sortDir} onSort={salesTable.toggleSort} />
                 </tr>
               </thead>
               <tbody>
-                {sales.invoices.length === 0 ? (
+                {salesTable.pageRows.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                      No invoices in this range.
+                      No invoices match this range/search.
                     </td>
                   </tr>
                 ) : (
-                  sales.invoices.map((invoice) => (
+                  salesTable.pageRows.map((invoice) => (
                     <tr key={invoice.id} className="border-b last:border-0">
                       <td className="px-4 py-3 font-medium">
                         <RecordHoverCard
@@ -319,6 +478,13 @@ export function ReportsTabs({
                 )}
               </tbody>
             </table>
+            <ReportPagination
+              page={salesTable.page}
+              totalPages={salesTable.totalPages}
+              totalCount={salesTable.totalCount}
+              pageSize={salesTable.pageSize}
+              onPageChange={salesTable.setPage}
+            />
           </div>
         </div>
       )}
@@ -346,30 +512,37 @@ export function ReportsTabs({
             </p>
           ) : null}
 
+          <ReportSearchBar
+            value={byUserTable.search}
+            onChange={byUserTable.setSearch}
+            placeholder="Search user..."
+            resultSummary={`${byUserTable.totalCount} of ${byUserTable.rawCount}`}
+          />
+
           <div className="overflow-hidden rounded-xl border bg-card">
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-muted/40">
                   <tr className="border-b">
-                    <th className="px-4 py-3 text-left font-medium">User</th>
-                    <th className="px-4 py-3 text-right font-medium">Invoices</th>
-                    <th className="px-4 py-3 text-right font-medium">Revenue</th>
-                    <th className="px-4 py-3 text-right font-medium">Collected</th>
-                    <th className="px-4 py-3 text-right font-medium">Outstanding</th>
+                    <SortableTh label="User" sortKey="name" activeSortKey={byUserTable.sortKey} sortDir={byUserTable.sortDir} onSort={byUserTable.toggleSort} />
+                    <SortableTh label="Invoices" sortKey="invoices" activeSortKey={byUserTable.sortKey} sortDir={byUserTable.sortDir} onSort={byUserTable.toggleSort} align="right" />
+                    <SortableTh label="Revenue" sortKey="revenue" activeSortKey={byUserTable.sortKey} sortDir={byUserTable.sortDir} onSort={byUserTable.toggleSort} align="right" />
+                    <SortableTh label="Collected" sortKey="collected" activeSortKey={byUserTable.sortKey} sortDir={byUserTable.sortDir} onSort={byUserTable.toggleSort} align="right" />
+                    <SortableTh label="Outstanding" sortKey="outstanding" activeSortKey={byUserTable.sortKey} sortDir={byUserTable.sortDir} onSort={byUserTable.toggleSort} align="right" />
                     <th className="px-4 py-3 text-right font-medium">Avg / invoice</th>
-                    <th className="px-4 py-3 text-left font-medium">Last sale</th>
+                    <SortableTh label="Last sale" sortKey="lastSale" activeSortKey={byUserTable.sortKey} sortDir={byUserTable.sortDir} onSort={byUserTable.toggleSort} />
                   </tr>
                 </thead>
 
                 <tbody>
-                  {salesByUser.rows.length === 0 ? (
+                  {byUserTable.pageRows.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
-                        No sales in this period.
+                        No sales match this period/search.
                       </td>
                     </tr>
                   ) : (
-                    salesByUser.rows.map((row) => (
+                    byUserTable.pageRows.map((row) => (
                       <tr
                         key={row.userId ?? "unrecorded"}
                         className="border-b last:border-0"
@@ -449,6 +622,13 @@ export function ReportsTabs({
                   )}
                 </tbody>
               </table>
+              <ReportPagination
+                page={byUserTable.page}
+                totalPages={byUserTable.totalPages}
+                totalCount={byUserTable.totalCount}
+                pageSize={byUserTable.pageSize}
+                onPageChange={byUserTable.setPage}
+              />
             </div>
           </div>
         </div>
@@ -465,31 +645,38 @@ export function ReportsTabs({
             />
           </div>
 
+          <ReportSearchBar
+            value={vendorPurchaseTable.search}
+            onChange={vendorPurchaseTable.setSearch}
+            placeholder="Search vendor..."
+            resultSummary={`${vendorPurchaseTable.totalCount} of ${vendorPurchaseTable.rawCount}`}
+          />
+
           <div className="overflow-hidden rounded-xl border bg-card">
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-muted/40">
                   <tr className="border-b">
-                    <th className="px-4 py-3 text-left font-medium">Vendor</th>
-                    <th className="px-4 py-3 text-right font-medium">Purchases</th>
-                    <th className="px-4 py-3 text-right font-medium">Qty</th>
-                    <th className="px-4 py-3 text-right font-medium">Weight</th>
-                    <th className="px-4 py-3 text-right font-medium">Amount</th>
-                    <th className="px-4 py-3 text-right font-medium">Paid</th>
-                    <th className="px-4 py-3 text-right font-medium">Balance</th>
-                    <th className="px-4 py-3 text-left font-medium">Last purchase</th>
+                    <SortableTh label="Vendor" sortKey="vendor" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} />
+                    <SortableTh label="Purchases" sortKey="purchases" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} align="right" />
+                    <SortableTh label="Qty" sortKey="qty" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} align="right" />
+                    <SortableTh label="Weight" sortKey="weight" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} align="right" />
+                    <SortableTh label="Amount" sortKey="amount" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} align="right" />
+                    <SortableTh label="Paid" sortKey="paid" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} align="right" />
+                    <SortableTh label="Balance" sortKey="balance" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} align="right" />
+                    <SortableTh label="Last purchase" sortKey="lastPurchase" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} />
                   </tr>
                 </thead>
 
                 <tbody>
-                  {vendorPurchase.rows.length === 0 ? (
+                  {vendorPurchaseTable.pageRows.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-6 text-center text-muted-foreground">
-                        No purchases in this period.
+                        No purchases match this period/search.
                       </td>
                     </tr>
                   ) : (
-                    vendorPurchase.rows.map((row) => (
+                    vendorPurchaseTable.pageRows.map((row) => (
                       <tr key={row.vendorId} className="border-b last:border-0">
                         <td className="px-4 py-3 font-medium">
                           <RecordHoverCard
@@ -554,6 +741,13 @@ export function ReportsTabs({
                   )}
                 </tbody>
               </table>
+              <ReportPagination
+                page={vendorPurchaseTable.page}
+                totalPages={vendorPurchaseTable.totalPages}
+                totalCount={vendorPurchaseTable.totalCount}
+                pageSize={vendorPurchaseTable.pageSize}
+                onPageChange={vendorPurchaseTable.setPage}
+              />
             </div>
           </div>
         </div>
@@ -569,54 +763,76 @@ export function ReportsTabs({
             />
           </div>
 
+          <ReportSearchBar
+            value={inventoryTable.search}
+            onChange={inventoryTable.setSearch}
+            placeholder="Search status..."
+            resultSummary={`${inventoryTable.totalCount} of ${inventoryTable.rawCount}`}
+          />
+
           <div className="overflow-hidden rounded-xl border bg-card">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="border-b">
-                  <th className="px-4 py-3 text-left font-medium">Status</th>
-                  <th className="px-4 py-3 text-left font-medium">Count</th>
-                  <th className="px-4 py-3 text-left font-medium">Net Weight (g)</th>
-                  <th className="px-4 py-3 text-left font-medium">Estimated Value</th>
+                  <SortableTh label="Status" sortKey="status" activeSortKey={inventoryTable.sortKey} sortDir={inventoryTable.sortDir} onSort={inventoryTable.toggleSort} />
+                  <SortableTh label="Count" sortKey="count" activeSortKey={inventoryTable.sortKey} sortDir={inventoryTable.sortDir} onSort={inventoryTable.toggleSort} />
+                  <SortableTh label="Net Weight (g)" sortKey="netWeight" activeSortKey={inventoryTable.sortKey} sortDir={inventoryTable.sortDir} onSort={inventoryTable.toggleSort} />
+                  <SortableTh label="Estimated Value" sortKey="estimatedValue" activeSortKey={inventoryTable.sortKey} sortDir={inventoryTable.sortDir} onSort={inventoryTable.toggleSort} />
                 </tr>
               </thead>
               <tbody>
-                {valuation.byStatus.map((row) => (
-                  <tr key={row.status} className="border-b last:border-0">
-                    <td className="px-4 py-3">
-                      <RecordHoverCard
-                        label={row.status}
-                        title={row.status}
-                        subtitle="Stock valuation"
-                        sections={[
-                          {
-                            fields: [
-                              { label: "Items", value: row.count },
-                              { label: "Net weight", value: `${row.netWeight.toFixed(3)} g` },
-                              {
-                                label: "Estimated value",
-                                value: reportInr(row.estimatedValue),
-                              },
-                              {
-                                // The figure the row cannot show: what one
-                                // piece in this state is worth on average.
-                                label: "Average per item",
-                                value:
-                                  row.count > 0
-                                    ? reportInr(row.estimatedValue / row.count)
-                                    : null,
-                              },
-                            ],
-                          },
-                        ]}
-                      />
+                {inventoryTable.pageRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
+                      No stock statuses match this search.
                     </td>
-                    <td className="px-4 py-3">{row.count}</td>
-                    <td className="px-4 py-3">{row.netWeight.toFixed(3)}</td>
-                    <td className="px-4 py-3">₹{row.estimatedValue.toFixed(2)}</td>
                   </tr>
-                ))}
+                ) : (
+                  inventoryTable.pageRows.map((row) => (
+                    <tr key={row.status} className="border-b last:border-0">
+                      <td className="px-4 py-3">
+                        <RecordHoverCard
+                          label={row.status}
+                          title={row.status}
+                          subtitle="Stock valuation"
+                          sections={[
+                            {
+                              fields: [
+                                { label: "Items", value: row.count },
+                                { label: "Net weight", value: `${row.netWeight.toFixed(3)} g` },
+                                {
+                                  label: "Estimated value",
+                                  value: reportInr(row.estimatedValue),
+                                },
+                                {
+                                  // The figure the row cannot show: what one
+                                  // piece in this state is worth on average.
+                                  label: "Average per item",
+                                  value:
+                                    row.count > 0
+                                      ? reportInr(row.estimatedValue / row.count)
+                                      : null,
+                                },
+                              ],
+                            },
+                          ]}
+                        />
+                      </td>
+                      <td className="px-4 py-3">{row.count}</td>
+                      <td className="px-4 py-3">{row.netWeight.toFixed(3)}</td>
+                      <td className="px-4 py-3">₹{row.estimatedValue.toFixed(2)}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
+            <ReportPagination
+              page={inventoryTable.page}
+              totalPages={inventoryTable.totalPages}
+              totalCount={inventoryTable.totalCount}
+              pageSize={inventoryTable.pageSize}
+              onPageChange={inventoryTable.setPage}
+            />
           </div>
         </div>
       )}
@@ -625,24 +841,31 @@ export function ReportsTabs({
         <div className="space-y-6">
           <StatCard title="Open Jobs" value={karigarOutstanding.openJobCount} />
 
+          <ReportSearchBar
+            value={karigarTable.search}
+            onChange={karigarTable.setSearch}
+            placeholder="Search karigar..."
+            resultSummary={`${karigarTable.totalCount} of ${karigarTable.rawCount}`}
+          />
+
           <div className="overflow-hidden rounded-xl border bg-card">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="border-b">
-                  <th className="px-4 py-3 text-left font-medium">Karigar</th>
-                  <th className="px-4 py-3 text-left font-medium">Open Jobs</th>
-                  <th className="px-4 py-3 text-left font-medium">Weight Out (g)</th>
+                  <SortableTh label="Karigar" sortKey="name" activeSortKey={karigarTable.sortKey} sortDir={karigarTable.sortDir} onSort={karigarTable.toggleSort} />
+                  <SortableTh label="Open Jobs" sortKey="jobs" activeSortKey={karigarTable.sortKey} sortDir={karigarTable.sortDir} onSort={karigarTable.toggleSort} />
+                  <SortableTh label="Weight Out (g)" sortKey="weightOut" activeSortKey={karigarTable.sortKey} sortDir={karigarTable.sortDir} onSort={karigarTable.toggleSort} />
                 </tr>
               </thead>
               <tbody>
-                {karigarOutstanding.byKarigar.length === 0 ? (
+                {karigarTable.pageRows.length === 0 ? (
                   <tr>
                     <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
-                      No open karigar jobs.
+                      No open karigar jobs match this search.
                     </td>
                   </tr>
                 ) : (
-                  karigarOutstanding.byKarigar.map((row) => (
+                  karigarTable.pageRows.map((row) => (
                     <tr key={row.name} className="border-b last:border-0">
                       <td className="px-4 py-3 font-medium">
                         <RecordHoverCard
@@ -676,6 +899,13 @@ export function ReportsTabs({
                 )}
               </tbody>
             </table>
+            <ReportPagination
+              page={karigarTable.page}
+              totalPages={karigarTable.totalPages}
+              totalCount={karigarTable.totalCount}
+              pageSize={karigarTable.pageSize}
+              onPageChange={karigarTable.setPage}
+            />
           </div>
         </div>
       )}
@@ -687,25 +917,32 @@ export function ReportsTabs({
             <StatCard title="Total Outstanding" value={`₹${customerDues.totalDue.toFixed(2)}`} />
           </div>
 
+          <ReportSearchBar
+            value={duesTable.search}
+            onChange={duesTable.setSearch}
+            placeholder="Search customer, phone..."
+            resultSummary={`${duesTable.totalCount} of ${duesTable.rawCount}`}
+          />
+
           <div className="overflow-hidden rounded-xl border bg-card">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="border-b">
-                  <th className="px-4 py-3 text-left font-medium">Customer</th>
-                  <th className="px-4 py-3 text-left font-medium">Phone</th>
-                  <th className="px-4 py-3 text-left font-medium">Invoices</th>
-                  <th className="px-4 py-3 text-left font-medium">Total Due</th>
+                  <SortableTh label="Customer" sortKey="name" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
+                  <SortableTh label="Phone" sortKey="phone" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
+                  <SortableTh label="Invoices" sortKey="invoices" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
+                  <SortableTh label="Total Due" sortKey="totalDue" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
                 </tr>
               </thead>
               <tbody>
-                {customerDues.customers.length === 0 ? (
+                {duesTable.pageRows.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
-                      No outstanding customer dues.
+                      No outstanding customer dues match this search.
                     </td>
                   </tr>
                 ) : (
-                  customerDues.customers.map((customer) => (
+                  duesTable.pageRows.map((customer) => (
                     <tr key={customer.id} className="border-b last:border-0">
                       <td className="px-4 py-3 font-medium">
                         <RecordHoverCard
@@ -747,6 +984,13 @@ export function ReportsTabs({
                 )}
               </tbody>
             </table>
+            <ReportPagination
+              page={duesTable.page}
+              totalPages={duesTable.totalPages}
+              totalCount={duesTable.totalCount}
+              pageSize={duesTable.pageSize}
+              onPageChange={duesTable.setPage}
+            />
           </div>
         </div>
       )}
@@ -818,27 +1062,34 @@ export function ReportsTabs({
             add a new metal there and it appears here automatically, no code change needed.
           </p>
 
+          <ReportSearchBar
+            value={metalWiseTable.search}
+            onChange={metalWiseTable.setSearch}
+            placeholder="Search metal..."
+            resultSummary={`${metalWiseTable.totalCount} of ${metalWiseTable.rawCount}`}
+          />
+
           <div className="overflow-x-auto rounded-xl border bg-card">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="border-b">
-                  <th className="px-4 py-3 text-left font-medium">Metal</th>
-                  <th className="px-4 py-3 text-left font-medium">Purchased</th>
-                  <th className="px-4 py-3 text-left font-medium">Sold</th>
-                  <th className="px-4 py-3 text-left font-medium">In Stock</th>
-                  <th className="px-4 py-3 text-left font-medium">With Karigar</th>
-                  <th className="px-4 py-3 text-left font-medium">Status</th>
+                  <SortableTh label="Metal" sortKey="metal" activeSortKey={metalWiseTable.sortKey} sortDir={metalWiseTable.sortDir} onSort={metalWiseTable.toggleSort} />
+                  <SortableTh label="Purchased" sortKey="purchasedWeight" activeSortKey={metalWiseTable.sortKey} sortDir={metalWiseTable.sortDir} onSort={metalWiseTable.toggleSort} />
+                  <SortableTh label="Sold" sortKey="soldWeight" activeSortKey={metalWiseTable.sortKey} sortDir={metalWiseTable.sortDir} onSort={metalWiseTable.toggleSort} />
+                  <SortableTh label="In Stock" sortKey="inStockWeight" activeSortKey={metalWiseTable.sortKey} sortDir={metalWiseTable.sortDir} onSort={metalWiseTable.toggleSort} />
+                  <SortableTh label="With Karigar" sortKey="withKarigarWeight" activeSortKey={metalWiseTable.sortKey} sortDir={metalWiseTable.sortDir} onSort={metalWiseTable.toggleSort} />
+                  <SortableTh label="Status" sortKey="reconciliationGap" activeSortKey={metalWiseTable.sortKey} sortDir={metalWiseTable.sortDir} onSort={metalWiseTable.toggleSort} />
                 </tr>
               </thead>
               <tbody>
-                {metalWise.metals.length === 0 ? (
+                {metalWiseTable.pageRows.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
-                      No metals configured yet — add one in Settings → Metals &amp; Categories.
+                      No metals match this search.
                     </td>
                   </tr>
                 ) : (
-                  metalWise.metals.map((row) => (
+                  metalWiseTable.pageRows.map((row) => (
                     <tr key={row.metalId} className="border-b last:border-0 align-top">
                       <td className="px-4 py-3 font-medium">
                         {/* The row splits each metal across five columns;
@@ -911,6 +1162,13 @@ export function ReportsTabs({
                 )}
               </tbody>
             </table>
+            <ReportPagination
+              page={metalWiseTable.page}
+              totalPages={metalWiseTable.totalPages}
+              totalCount={metalWiseTable.totalCount}
+              pageSize={metalWiseTable.pageSize}
+              onPageChange={metalWiseTable.setPage}
+            />
           </div>
         </div>
       )}
@@ -925,26 +1183,33 @@ export function ReportsTabs({
             />
           </div>
 
+          <ReportSearchBar
+            value={itemLedgerTable.search}
+            onChange={itemLedgerTable.setSearch}
+            placeholder="Search stock code, item, vendor, customer..."
+            resultSummary={`${itemLedgerTable.totalCount} of ${itemLedgerTable.rawCount}`}
+          />
+
           <div className="overflow-x-auto rounded-xl border bg-card">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="border-b">
-                  <th className="px-4 py-3 text-left font-medium">Item</th>
-                  <th className="px-4 py-3 text-left font-medium">Status</th>
-                  <th className="px-4 py-3 text-left font-medium">Purchased</th>
-                  <th className="px-4 py-3 text-left font-medium">Sold</th>
+                  <SortableTh label="Item" sortKey="item" activeSortKey={itemLedgerTable.sortKey} sortDir={itemLedgerTable.sortDir} onSort={itemLedgerTable.toggleSort} />
+                  <SortableTh label="Status" sortKey="status" activeSortKey={itemLedgerTable.sortKey} sortDir={itemLedgerTable.sortDir} onSort={itemLedgerTable.toggleSort} />
+                  <SortableTh label="Purchased" sortKey="purchaseDate" activeSortKey={itemLedgerTable.sortKey} sortDir={itemLedgerTable.sortDir} onSort={itemLedgerTable.toggleSort} />
+                  <SortableTh label="Sold" sortKey="sold" activeSortKey={itemLedgerTable.sortKey} sortDir={itemLedgerTable.sortDir} onSort={itemLedgerTable.toggleSort} />
                   <th className="px-4 py-3 text-left font-medium">History</th>
                 </tr>
               </thead>
               <tbody>
-                {itemLedger.rows.length === 0 ? (
+                {itemLedgerTable.pageRows.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                      No inventory items recorded yet.
+                      No inventory items match this search.
                     </td>
                   </tr>
                 ) : (
-                  itemLedger.rows.map((row) => (
+                  itemLedgerTable.pageRows.map((row) => (
                     <tr key={row.stockId} className="border-b last:border-0 align-top">
                       <td className="px-4 py-3">
                         <RecordHoverCard
@@ -1022,6 +1287,13 @@ export function ReportsTabs({
                 )}
               </tbody>
             </table>
+            <ReportPagination
+              page={itemLedgerTable.page}
+              totalPages={itemLedgerTable.totalPages}
+              totalCount={itemLedgerTable.totalCount}
+              pageSize={itemLedgerTable.pageSize}
+              onPageChange={itemLedgerTable.setPage}
+            />
           </div>
         </div>
       )}

@@ -19,7 +19,14 @@ export const metadata: Metadata = {
   title: "Reports",
 }
 
-export default async function ReportsPage() {
+type Props = {
+  searchParams: Promise<{ from?: string; to?: string }>
+}
+
+export default async function ReportsPage({ searchParams }: Props) {
+  const { from, to } = await searchParams
+  const range = { from, to }
+
   const [
     sales,
     valuation,
@@ -31,14 +38,14 @@ export default async function ReportsPage() {
     vendorPurchase,
     itemLedger,
   ] = await Promise.all([
-      getSalesReport(),
+      getSalesReport(range),
       getInventoryValuationReport(),
       getKarigarOutstandingReport(),
       getCustomerDuesReport(),
-      getGoldFlowReport(),
-      getMetalWiseReport(),
-      getSalesByUserReport(),
-      getVendorPurchaseReport(),
+      getGoldFlowReport(range),
+      getMetalWiseReport(range),
+      getSalesByUserReport(range),
+      getVendorPurchaseReport(range),
       getItemLedgerReport(),
     ])
 

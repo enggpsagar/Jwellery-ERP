@@ -12,6 +12,7 @@ import {
   getGoldFlowReport,
   getMetalWiseReport,
   getItemLedgerReport,
+  type DateRange,
 } from "@/lib/actions/report-actions"
 import { buildCsvExport, buildExcelExport } from "@/lib/excel-export"
 
@@ -39,10 +40,10 @@ const REPORT_LABELS: Record<ReportType, string> = {
   itemLedger: "Item Ledger",
 }
 
-async function buildRows(type: ReportType) {
+async function buildRows(type: ReportType, range: DateRange) {
   switch (type) {
     case "sales": {
-      const report = await getSalesReport()
+      const report = await getSalesReport(range)
       return report.invoices.map((invoice) => ({
         "Invoice #": invoice.invoiceNumber,
         Date: new Date(invoice.invoiceDate).toLocaleDateString("en-IN"),
@@ -53,7 +54,7 @@ async function buildRows(type: ReportType) {
       }))
     }
     case "byUser": {
-      const report = await getSalesByUserReport()
+      const report = await getSalesByUserReport(range)
       return report.rows.map((row) => ({
         User: row.name,
         Invoices: row.invoiceCount,
@@ -69,7 +70,7 @@ async function buildRows(type: ReportType) {
       }))
     }
     case "vendorPurchase": {
-      const report = await getVendorPurchaseReport()
+      const report = await getVendorPurchaseReport(range)
       return report.rows.map((row) => ({
         Vendor: row.vendorName,
         Purchases: row.purchaseCount,
@@ -118,7 +119,7 @@ async function buildRows(type: ReportType) {
       }))
     }
     case "goldFlow": {
-      const report = await getGoldFlowReport()
+      const report = await getGoldFlowReport(range)
       return [
         {
           "Purchased (fine g)": report.purchasedFine,
@@ -136,7 +137,7 @@ async function buildRows(type: ReportType) {
       ]
     }
     case "metalWise": {
-      const report = await getMetalWiseReport()
+      const report = await getMetalWiseReport(range)
       return report.metals.map((row) => ({
         Metal: row.metalName,
         "Purchased Weight (g)": row.purchasedWeight,
@@ -185,12 +186,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const type = (searchParams.get("type") ?? "sales") as ReportType
     const format = (searchParams.get("format") ?? "csv") as Format
+    const range: DateRange = {
+      from: searchParams.get("from") ?? undefined,
+      to: searchParams.get("to") ?? undefined,
+    }
 
     if (!(type in REPORT_LABELS)) {
       return NextResponse.json({ success: false, message: "Invalid report type" }, { status: 400 })
     }
 
-    const rows = await buildRows(type)
+    const rows = await buildRows(type, range)
     const filePrefix = `report-${type}`
 
     if (format === "excel") {

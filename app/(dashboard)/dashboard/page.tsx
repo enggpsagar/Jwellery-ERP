@@ -7,7 +7,7 @@ import { TransactionsTable } from "@/components/dashboard/transactions-table";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import {
   getDashboardStats,
-  getMonthlySalesTrend,
+  getSalesTrend,
   getRevenueByCategory,
   getRecentTransactions,
   getRecentActivity,
@@ -17,11 +17,13 @@ export const metadata: Metadata = {
   title: "Dashboard",
 };
 
+const DEFAULT_SALES_TREND_PERIOD = "monthly";
+
 export default async function DashboardPage() {
-  const [stats, monthlySales, revenueByCategory, transactions, activity] =
+  const [stats, salesTrend, revenueByCategory, transactions, activity] =
     await Promise.all([
       getDashboardStats(),
-      getMonthlySalesTrend(),
+      getSalesTrend(DEFAULT_SALES_TREND_PERIOD),
       getRevenueByCategory(),
       getRecentTransactions(),
       getRecentActivity(),
@@ -54,7 +56,7 @@ export default async function DashboardPage() {
       {/* Existing Dashboard Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <SalesChart data={monthlySales} />
+          <SalesChart initialData={salesTrend} initialPeriod={DEFAULT_SALES_TREND_PERIOD} />
         </div>
 
         <div>

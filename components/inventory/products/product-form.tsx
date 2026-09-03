@@ -233,23 +233,93 @@ export function ProductForm({
     product?.hasStoneComponent ?? false,
   );
   const [stoneRate, setStoneRate] = useState(product?.defaultStoneRate ?? "");
-  const showCaratWeight = isCaratFamily || hasStoneComponent;
+
+  // Stone Charge — Stone Rate x Stone Carat Weight — had no input on this
+  // form at all (defaultStoneCharge was a dead field: product-actions.ts
+  // has always read it from form data, but nothing here ever rendered it),
+  // so every product silently saved a null Stone Charge regardless of
+  // Stone Rate/Carat Weight. Added below alongside the same auto-calc +
+  // override pattern the line-item forms (invoice/purchase/kacha/quotation)
+  // already use for their own Stone Charge field, for the "same logic...
+  // when adding or editing a Product" parity the store owner asked for.
+  const [stoneCharge, setStoneCharge] = useState(
+    product?.defaultStoneCharge ?? "",
+  );
+  // Edit mode: a product that already has a saved Stone Charge shouldn't
+  // have it silently recomputed the moment Stone Rate or Carat Weight is
+  // touched for an unrelated correction.
+  const [stoneChargeTouched, setStoneChargeTouched] = useState(
+    Boolean(product?.defaultStoneCharge),
+  );
+  // Stone Weight (g) already existed and already feeds Net = Gross - Stone
+  // below — it's this form's one physical-weight field, playing the same
+  // role a line item's separate "Net Stone Weight" field does. Edit mode:
+  // an already-recorded Stone Weight is authoritative and shouldn't be
+  // silently overwritten by a later Carat Weight correction either.
+  const [stoneWeightTouched, setStoneWeightTouched] = useState(
+    Boolean(product?.defaultStoneWeight),
+  );
 
   function handleCaratWeightChange(value: string) {
     setCaratWeight(value);
 
-    // Only a genuinely carat-weighed item (Diamond/Stone as the product's
-    // own metal) converts Carat Weight into Net Weight — for a composite
-    // piece, Carat Weight is the embedded stone's own weight, independent
-    // of the metal's Net Weight, so no conversion applies.
-    if (!isCaratFamily) return;
+    // A genuinely carat-weighed item (Diamond/Stone as the product's own
+    // metal) converts Carat Weight into Net Weight.
+    if (isCaratFamily) {
+      const caratNum = Number(value);
+      if (value.trim() !== "" && Number.isFinite(caratNum)) {
+        setNetTouched(true);
+        const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
+        setNetWeight(String(Number((caratNum * gramsPerCarat).toFixed(5))));
+      }
+      return;
+    }
+
+    // For a composite piece, Carat Weight is the embedded stone's own
+    // weight, independent of the metal's Net Weight — no conversion into
+    // Net Weight applies. Instead it drives this stone's own pricing
+    // (Stone Charge) and its own physical weight (Stone Weight), mirroring
+    // the stoneChargeTouched/stoneWeightTouched pattern on every line-item
+    // form's Stone Charge/Net Stone Weight fields.
+    if (!hasStoneComponent) return;
 
     const caratNum = Number(value);
-    if (value.trim() !== "" && Number.isFinite(caratNum)) {
-      setNetTouched(true);
-      const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
-      setNetWeight(String(Number((caratNum * gramsPerCarat).toFixed(5))));
+    const carat = value.trim() !== "" && Number.isFinite(caratNum) ? caratNum : 0;
+
+    if (!stoneChargeTouched) {
+      const rate = stoneRate.trim() === "" ? 0 : Number(stoneRate) || 0;
+      setStoneCharge(String(Number((rate * carat).toFixed(2))));
     }
+
+    // Stone Weight (g) has no unit toggle here (always grams, unlike a line
+    // item's stoneWeightUnit) — always converts carat -> grams using the
+    // same store-configurable resolveGramsPerCarat rate as everywhere else
+    // on this form, rather than leaving Stone Weight alone.
+    if (!stoneWeightTouched) {
+      const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
+      setStoneWeight(String(Number((carat * gramsPerCarat).toFixed(5))));
+    }
+  }
+
+  function handleStoneRateChange(value: string) {
+    setStoneRate(value);
+    if (stoneChargeTouched) return;
+
+    const rateNum = value.trim() === "" ? 0 : Number(value);
+    const caratNum = caratWeight.trim() === "" ? 0 : Number(caratWeight);
+    const rate = Number.isFinite(rateNum) ? rateNum : 0;
+    const carat = Number.isFinite(caratNum) ? caratNum : 0;
+    setStoneCharge(String(Number((rate * carat).toFixed(2))));
+  }
+
+  function handleStoneChargeChange(value: string) {
+    setStoneCharge(value);
+    setStoneChargeTouched(true);
+  }
+
+  function handleStoneWeightChange(value: string) {
+    setStoneWeight(value);
+    setStoneWeightTouched(true);
   }
 
   function handleNetWeightChange(value: string) {
@@ -664,22 +734,28 @@ export function ProductForm({
             <ErrorText error={state.errors.defaultGrossWeight} />
           </div>
 
-          <div>
-            <Label htmlFor="defaultStoneWeight">Stone Weight (g)</Label>
+          {/* Once this is a composite piece with "Includes a Stone" checked,
+              Stone Weight moves down into the Stone Pricing box below, next
+              to the Stone Carat Weight it mirrors — see there. It stays here
+              for a plain metal item or a genuinely carat-weighed one. */}
+          {!(hasStoneComponent && !isCaratFamily) && (
+            <div>
+              <Label htmlFor="defaultStoneWeight">Stone Weight (g)</Label>
 
-            <Input
-              id="defaultStoneWeight"
-              name="defaultStoneWeight"
-              type="number"
-              step="0.00001"
-              min="0"
-              value={stoneWeight}
-              onChange={(event) => setStoneWeight(event.target.value)}
-              placeholder="0.000"
-            />
+              <Input
+                id="defaultStoneWeight"
+                name="defaultStoneWeight"
+                type="number"
+                step="0.00001"
+                min="0"
+                value={stoneWeight}
+                onChange={(event) => handleStoneWeightChange(event.target.value)}
+                placeholder="0.000"
+              />
 
-            <ErrorText error={state.errors.defaultStoneWeight} />
-          </div>
+              <ErrorText error={state.errors.defaultStoneWeight} />
+            </div>
+          )}
 
           <div>
             <Label htmlFor="defaultNetWeight">Net Weight (g)</Label>
@@ -704,11 +780,13 @@ export function ProductForm({
             <ErrorText error={state.errors.defaultNetWeight} />
           </div>
 
-          {showCaratWeight && (
+          {/* Carat Weight for a genuinely carat-weighed item (a loose
+              Diamond/Stone product, its own entire weight) stays here.
+              The composite case (Carat Weight as an embedded stone's own
+              weight) moves into the Stone Pricing box below instead. */}
+          {isCaratFamily && (
             <div>
-              <Label htmlFor="defaultCaratWeight">
-                {isCaratFamily ? "Carat Weight (ct)" : "Stone Carat Weight (ct)"}
-              </Label>
+              <Label htmlFor="defaultCaratWeight">Carat Weight (ct)</Label>
 
               <Input
                 id="defaultCaratWeight"
@@ -724,38 +802,110 @@ export function ProductForm({
               />
 
               <p className="mt-1 text-xs text-muted-foreground">
-                {isCaratFamily
-                  ? "1 ct = 0.2 g. Converts with Net Weight automatically."
-                  : "The embedded stone's weight — separate from the metal's Net Weight above."}
+                1 ct = 0.2 g. Converts with Net Weight automatically.
               </p>
 
               <ErrorText error={state.errors.defaultCaratWeight} />
             </div>
           )}
-
-          {hasStoneComponent && !isCaratFamily && (
-            <div>
-              <Label htmlFor="defaultStoneRate">Stone Rate (₹/ct)</Label>
-
-              <Input
-                id="defaultStoneRate"
-                name="defaultStoneRate"
-                type="number"
-                step="0.01"
-                min="0"
-                value={stoneRate}
-                onChange={(event) => setStoneRate(event.target.value)}
-                placeholder="0.00"
-              />
-
-              <p className="mt-1 text-xs text-muted-foreground">
-                Prefills Stone Charge as Stone Rate × Stone Carat Weight on stock/documents.
-              </p>
-
-              <ErrorText error={state.errors.defaultStoneRate} />
-            </div>
-          )}
         </div>
+
+        {/* Every stone-pricing field grouped together once "Includes a
+            Stone" is checked, mirroring the same grouping used for a
+            composite line item on Invoice/Purchase/Kacha/Quotation. */}
+        {hasStoneComponent && !isCaratFamily && (
+          <div className="mt-6 rounded-lg border border-dashed p-4">
+            <h4 className="mb-4 text-sm font-semibold">Stone Pricing</h4>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div>
+                <Label htmlFor="defaultCaratWeight">Stone Carat Weight (ct)</Label>
+
+                <Input
+                  id="defaultCaratWeight"
+                  name="defaultCaratWeight"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={caratWeight}
+                  onChange={(event) =>
+                    handleCaratWeightChange(event.target.value)
+                  }
+                  placeholder="0.000"
+                />
+
+                <p className="mt-1 text-xs text-muted-foreground">
+                  The embedded stone's weight — separate from the metal's Net Weight above.
+                </p>
+
+                <ErrorText error={state.errors.defaultCaratWeight} />
+              </div>
+
+              <div>
+                <Label htmlFor="defaultStoneRate">Stone Rate (₹/ct)</Label>
+
+                <Input
+                  id="defaultStoneRate"
+                  name="defaultStoneRate"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={stoneRate}
+                  onChange={(event) => handleStoneRateChange(event.target.value)}
+                  placeholder="0.00"
+                />
+
+                <ErrorText error={state.errors.defaultStoneRate} />
+              </div>
+
+              <div>
+                <Label htmlFor="defaultStoneCharge">Stone Charge</Label>
+
+                <Input
+                  id="defaultStoneCharge"
+                  name="defaultStoneCharge"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={stoneCharge}
+                  onChange={(event) => handleStoneChargeChange(event.target.value)}
+                  placeholder="0.00"
+                />
+
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {stoneChargeTouched
+                    ? "Manually entered — won't update from Rate × Carat anymore"
+                    : "Auto-calculated from Stone Rate × Stone Carat Weight — edit to override"}
+                </p>
+
+                <ErrorText error={state.errors.defaultStoneCharge} />
+              </div>
+
+              <div>
+                <Label htmlFor="defaultStoneWeight">Stone Weight (g)</Label>
+
+                <Input
+                  id="defaultStoneWeight"
+                  name="defaultStoneWeight"
+                  type="number"
+                  step="0.00001"
+                  min="0"
+                  value={stoneWeight}
+                  onChange={(event) => handleStoneWeightChange(event.target.value)}
+                  placeholder="0.000"
+                />
+
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {stoneWeightTouched
+                    ? "Manually entered"
+                    : "Auto-filled from Stone Carat Weight — edit to override"}
+                </p>
+
+                <ErrorText error={state.errors.defaultStoneWeight} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ============================

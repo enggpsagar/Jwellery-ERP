@@ -83,6 +83,10 @@ export type LineItem = {
   /** Once Stone Charge is edited directly, the stoneRate × caratWeight
    * auto-calc stops overwriting it — same escape hatch as netTouched. */
   stoneChargeTouched: boolean
+  /** Once Net Stone Weight is edited directly, the Stone Carat Weight ->
+   * Net Stone Weight auto-fill (see handleCaratWeightChange) stops
+   * overwriting it — same escape hatch as stoneChargeTouched. */
+  netStoneWeightTouched: boolean
   /** Which Stone (e.g. "Diamond") and which of its Stone Types (e.g.
    * "Natural", "Lab-Grown" — several may apply to one embedded stone)
    * this line's stone component is. Plain names, not ids — see the
@@ -124,6 +128,7 @@ function emptyLineItem(): LineItem {
     stoneRate: 0,
     hasStoneComponent: false,
     stoneChargeTouched: false,
+    netStoneWeightTouched: false,
     stoneMetalTypeName: "",
     stoneTypeNames: [],
     dmoWeight: 0,
@@ -285,6 +290,10 @@ export function InvoiceForm({
         ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
         : 0,
       stoneChargeTouched: false,
+      // The linked stock row's own recorded stone weight is authoritative —
+      // the Carat Weight -> Net Stone Weight auto-fill must not silently
+      // overwrite it if the carat weight is tweaked afterward.
+      netStoneWeightTouched: true,
       stoneMetalTypeName: stock.stoneMetalTypeName ?? "",
       stoneTypeNames: stock.stoneTypeNames
         ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
@@ -382,6 +391,7 @@ export function InvoiceForm({
             ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
             : 0,
           stoneChargeTouched: false,
+          netStoneWeightTouched: true,
           stoneMetalTypeName: stock.stoneMetalTypeName ?? "",
           stoneTypeNames: stock.stoneTypeNames
             ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
@@ -456,8 +466,33 @@ export function InvoiceForm({
         patch.netWeight = Number((caratNum * gramsPerCarat).toFixed(5))
         patch.netTouched = true
       }
-    } else if (item.hasStoneComponent && !item.stoneChargeTouched) {
-      patch.stoneCharge = Number((item.stoneRate * caratWeight).toFixed(2))
+    } else if (item.hasStoneComponent) {
+      if (!item.stoneChargeTouched) {
+        patch.stoneCharge = Number((item.stoneRate * caratWeight).toFixed(2))
+      }
+
+      // Net Stone Weight mirrors Stone Carat Weight until the user edits Net
+      // Stone Weight directly (netStoneWeightTouched — same override escape
+      // hatch as stoneChargeTouched). Converted to grams when the Net Stone
+      // Weight unit is set to grams (via the same resolveGramsPerCarat rate
+      // this line already uses elsewhere), so the mirrored value is always
+      // correct regardless of which unit is displayed — this also then feeds
+      // the metal's own Net Weight via the same gross/stone/dmo calc used
+      // elsewhere, unless that has separately been taken over (netTouched).
+      if (!item.netStoneWeightTouched) {
+        const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+        const stoneWeightInput =
+          item.stoneWeightUnit === "CARAT"
+            ? caratWeight
+            : Number((caratWeight * gramsPerCarat).toFixed(5))
+        patch.stoneWeightInput = stoneWeightInput
+
+        if (!item.netTouched) {
+          const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit, gramsPerCarat)
+          const derived = deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+          if (derived !== null) patch.netWeight = derived
+        }
+      }
     }
 
     updateItem(item.key, patch)
@@ -480,6 +515,32 @@ export function InvoiceForm({
 
   const handleStoneChargeChange = (item: LineItem, value: string) => {
     updateItem(item.key, { stoneCharge: Number(value) || 0, stoneChargeTouched: true })
+  }
+
+  // Editing Net Stone Weight directly is the escape hatch out of the Stone
+  // Carat Weight auto-fill above — same override pattern as Stone Charge.
+  const handleStoneWeightInputChange = (item: LineItem, value: string) => {
+    const stoneWeightInput = Number(value) || 0
+    const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
+    const derived = item.netTouched
+      ? null
+      : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+    updateItem(item.key, {
+      stoneWeightInput,
+      netStoneWeightTouched: true,
+      ...(derived !== null ? { netWeight: derived } : {}),
+    })
+  }
+
+  const handleStoneWeightUnitChange = (item: LineItem, unit: "GRAM" | "CARAT") => {
+    const grams = stoneWeightToGrams(item.stoneWeightInput, unit, resolveGramsPerCarat(item.purity, caratConversionRates))
+    const derived = item.netTouched
+      ? null
+      : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+    updateItem(item.key, {
+      stoneWeightUnit: unit,
+      ...(derived !== null ? { netWeight: derived } : {}),
+    })
   }
 
   const handleNetWeightChange = (item: LineItem, value: string) => {
@@ -929,15 +990,20 @@ export function InvoiceForm({
                   onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
                 />
 
-                <div className="space-y-1">
-                  <Label className="text-xs">Stone Charge</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={item.stoneCharge === 0 ? "" : item.stoneCharge}
-                    onChange={(e) => handleStoneChargeChange(item, e.target.value)}
-                  />
-                </div>
+                {/* Once this is a composite line with "Includes a Stone"
+                    checked, Stone Charge moves down into that box, next to
+                    the Carat Weight/Rate it's computed from — see below. */}
+                {(isCaratLine(item) || !item.hasStoneComponent) && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Stone Charge</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={item.stoneCharge === 0 ? "" : item.stoneCharge}
+                      onChange={(e) => handleStoneChargeChange(item, e.target.value)}
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <Label className="text-xs">Line Total</Label>
@@ -981,6 +1047,14 @@ export function InvoiceForm({
                       onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
                       stoneRate={item.stoneRate}
                       onStoneRateChange={(value) => handleStoneRateChange(item, value)}
+                      stoneCharge={item.stoneCharge}
+                      onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
+                      stoneChargeTouched={item.stoneChargeTouched}
+                      stoneWeightInput={item.stoneWeightInput}
+                      onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
+                      stoneWeightUnit={item.stoneWeightUnit}
+                      onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
+                      netStoneWeightTouched={item.netStoneWeightTouched}
                     />
                   )}
                 </div>
@@ -995,50 +1069,35 @@ export function InvoiceForm({
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs">Net Stone Weight</Label>
-                  <div className="flex gap-1">
-                    <Input
-                      type="number"
-                      step="0.00001"
-                      className="flex-1"
-                      value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
-                      onChange={(e) => {
-                        const stoneWeightInput = Number(e.target.value) || 0
-                        const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
-                        const derived = item.netTouched
-                          ? null
-                          : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
-                        updateItem(item.key, {
-                          stoneWeightInput,
-                          ...(derived !== null ? { netWeight: derived } : {}),
-                        })
-                      }}
-                    />
-                    <Select
-                      value={item.stoneWeightUnit}
-                      onValueChange={(unit) => {
-                        const stoneWeightUnit = unit as "GRAM" | "CARAT"
-                        const grams = stoneWeightToGrams(item.stoneWeightInput, stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
-                        const derived = item.netTouched
-                          ? null
-                          : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
-                        updateItem(item.key, {
-                          stoneWeightUnit,
-                          ...(derived !== null ? { netWeight: derived } : {}),
-                        })
-                      }}
-                    >
-                      <SelectTrigger className="w-16">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="GRAM">g</SelectItem>
-                        <SelectItem value="CARAT">ct</SelectItem>
-                      </SelectContent>
-                    </Select>
+                {/* Once this is a composite line with "Includes a Stone"
+                    checked, Net Stone Weight moves up into that box, next to
+                    the Stone Carat Weight it mirrors — see above. */}
+                {(isCaratLine(item) || !item.hasStoneComponent) && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Net Stone Weight</Label>
+                    <div className="flex gap-1">
+                      <Input
+                        type="number"
+                        step="0.00001"
+                        className="flex-1"
+                        value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
+                        onChange={(e) => handleStoneWeightInputChange(item, e.target.value)}
+                      />
+                      <Select
+                        value={item.stoneWeightUnit}
+                        onValueChange={(unit) => handleStoneWeightUnitChange(item, unit as "GRAM" | "CARAT")}
+                      >
+                        <SelectTrigger className="w-16">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GRAM">g</SelectItem>
+                          <SelectItem value="CARAT">ct</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="space-y-1">
                   <Label className="text-xs">HM Charge</Label>

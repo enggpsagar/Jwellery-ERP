@@ -77,6 +77,10 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     stoneRate: item.stoneRate ?? 0,
     hasStoneComponent: item.stoneRate != null,
     stoneChargeTouched: true,
+    // Same reasoning as stoneChargeTouched/netTouched below — the cancelled
+    // invoice's own saved Net Stone Weight is authoritative and must not be
+    // silently recomputed from Stone Carat Weight when this line loads.
+    netStoneWeightTouched: true,
     stoneMetalTypeName: item.stoneMetalTypeName ?? "",
     stoneTypeNames: item.stoneTypeNames
       ? item.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)

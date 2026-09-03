@@ -42,7 +42,7 @@ export default async function SupportTicketDetailPage({ params }: SupportTicketD
   return (
     <div className="flex flex-col gap-6">
       <PageBackHeader
-        title={ticket.subject}
+        title={`${ticket.ticketNumber} · ${ticket.subject}`}
         description={`From ${ticket.submitterName} (${ticket.submitterEmail}, ${ticket.submitterPhone})${
           ticket.storeName ? ` · ${ticket.storeName}` : " · public site visitor"
         }`}

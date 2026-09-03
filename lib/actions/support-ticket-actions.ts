@@ -11,6 +11,7 @@ import { sendMail } from "@/lib/mailer";
 import { getSuperAdminEmails } from "@/lib/super-admin";
 import { APP_NAME } from "@/lib/constants/app";
 import { sanitizeTicketHtml } from "@/lib/sanitize-html";
+import { validateTicketAttachment } from "@/lib/ticket-attachments";
 import {
   newSupportTicketEmail,
   supportTicketReplyEmail,
@@ -51,6 +52,26 @@ function baseUrl() {
   return process.env.NEXTAUTH_URL || "http://localhost:3000";
 }
 
+/**
+ * `TKT-{year}-{padded sequence}` — same `{prefix}-{year}-{padded count}`
+ * shape as every other numbered document in this app (see e.g.
+ * generateInvoiceNumber in invoice-actions.ts, generateQuotationNumber in
+ * quotation-actions.ts), except counted across every store rather than one:
+ * a SupportTicket is platform-wide, not per-store (see its own doc comment
+ * in prisma/schema.prisma), so the count here is global, not storeId-scoped.
+ * Like those siblings, this is a count-then-format read with no explicit
+ * locking — ticket submission volume doesn't approach the concurrency where
+ * that would collide in practice, same tradeoff those other functions
+ * already accept.
+ */
+async function generateTicketNumber() {
+  const year = new Date().getFullYear();
+  const count = await prisma.supportTicket.count({
+    where: { ticketNumber: { startsWith: `TKT-${year}-` } },
+  });
+  return `TKT-${year}-${String(count + 1).padStart(4, "0")}`;
+}
+
 export type SupportTicketFormState = {
   success: boolean;
   message: string;
@@ -63,10 +84,55 @@ export type TicketMessageRow = {
   isFromSuperAdmin: boolean;
   body: string;
   createdAt: string;
+  attachmentUrl: string | null;
+  attachmentName: string | null;
+  attachmentMimeType: string | null;
+  attachmentSize: number | null;
 };
+
+/** The four optional attachment fields, as persisted on SupportTicketMessage. */
+type TicketAttachmentFields = {
+  attachmentUrl: string | null;
+  attachmentName: string | null;
+  attachmentMimeType: string | null;
+  attachmentSize: number | null;
+};
+
+/**
+ * Reads the attachment fields a client populates as hidden form fields
+ * after its direct-to-Blob upload completes (see
+ * app/api/support-tickets/upload/route.ts and the file-picker wiring in
+ * support-ticket-form.tsx / ticket-reply-form.tsx). All four are optional —
+ * a message with no attachment omits them entirely, same as today.
+ *
+ * Re-validates mimeType/size here too: the upload route is the real
+ * enforcement boundary for what actually lands in Blob storage, but nothing
+ * stops a crafted POST straight at this server action from attaching
+ * arbitrary metadata to a message. Rather than failing the whole
+ * submission over a bad attachment, invalid/incomplete attachment data is
+ * silently dropped and the message is still created without one.
+ */
+function readAttachmentFields(formData: FormData): TicketAttachmentFields {
+  const url = String(formData.get("attachmentUrl") || "").trim();
+  const name = String(formData.get("attachmentName") || "").trim();
+  const mimeType = String(formData.get("attachmentMimeType") || "").trim();
+  const sizeRaw = String(formData.get("attachmentSize") || "").trim();
+  const size = sizeRaw ? Number(sizeRaw) : NaN;
+
+  if (!url || !name || !mimeType || !Number.isFinite(size)) {
+    return { attachmentUrl: null, attachmentName: null, attachmentMimeType: null, attachmentSize: null };
+  }
+
+  if (validateTicketAttachment({ mimeType, size })) {
+    return { attachmentUrl: null, attachmentName: null, attachmentMimeType: null, attachmentSize: null };
+  }
+
+  return { attachmentUrl: url, attachmentName: name, attachmentMimeType: mimeType, attachmentSize: size };
+}
 
 export type SupportTicketRow = {
   id: string;
+  ticketNumber: string;
   subject: string;
   status: TicketStatus;
   storeName: string | null;
@@ -84,6 +150,7 @@ export type SupportTicketDetail = SupportTicketRow & {
 
 const TICKET_LIST_SELECT = {
   id: true,
+  ticketNumber: true,
   subject: true,
   status: true,
   submitterName: true,
@@ -102,6 +169,7 @@ type TicketListRow = Prisma.SupportTicketGetPayload<{
 function toTicketRow(ticket: TicketListRow): SupportTicketRow {
   return {
     id: ticket.id,
+    ticketNumber: ticket.ticketNumber,
     subject: ticket.subject,
     status: ticket.status,
     storeName: ticket.store?.name ?? null,
@@ -120,6 +188,10 @@ function toMessageRow(message: {
   isFromSuperAdmin: boolean;
   body: string;
   createdAt: Date;
+  attachmentUrl: string | null;
+  attachmentName: string | null;
+  attachmentMimeType: string | null;
+  attachmentSize: number | null;
 }): TicketMessageRow {
   return {
     id: message.id,
@@ -127,18 +199,24 @@ function toMessageRow(message: {
     isFromSuperAdmin: message.isFromSuperAdmin,
     body: message.body,
     createdAt: message.createdAt.toISOString(),
+    attachmentUrl: message.attachmentUrl,
+    attachmentName: message.attachmentName,
+    attachmentMimeType: message.attachmentMimeType,
+    attachmentSize: message.attachmentSize,
   };
 }
 
 /** Best-effort — a notification failure must never fail the ticket action itself. */
 async function notifySuperAdminsOfNewTicket(params: {
   ticketId: string;
+  ticketNumber: string;
   subject: string;
   submitterName: string;
   submitterEmail: string;
   submitterPhone: string;
   storeName: string | null;
   messageHtml: string;
+  attachment?: { name: string; url: string } | null;
 }) {
   try {
     const recipients = getSuperAdminEmails();
@@ -146,6 +224,7 @@ async function notifySuperAdminsOfNewTicket(params: {
 
     const mail = newSupportTicketEmail({
       appName: APP_NAME,
+      ticketNumber: params.ticketNumber,
       subject: params.subject,
       submitterName: params.submitterName,
       submitterEmail: params.submitterEmail,
@@ -153,6 +232,7 @@ async function notifySuperAdminsOfNewTicket(params: {
       storeName: params.storeName,
       messageHtml: params.messageHtml,
       viewUrl: `${baseUrl()}/support-tickets/${params.ticketId}`,
+      attachment: params.attachment,
     });
 
     await Promise.all(
@@ -168,19 +248,23 @@ async function notifySuperAdminsOfNewTicket(params: {
 /** Best-effort notification to the submitter that a Super Admin replied. */
 async function notifySubmitterOfReply(params: {
   ticketId: string;
+  ticketNumber: string;
   subject: string;
   submitterName: string;
   submitterEmail: string;
   messageHtml: string;
+  attachment?: { name: string; url: string } | null;
 }) {
   try {
     const mail = supportTicketReplyEmail({
       appName: APP_NAME,
+      ticketNumber: params.ticketNumber,
       subject: params.subject,
       recipientName: params.submitterName,
       replierLabel: "The Support Team",
       messageHtml: params.messageHtml,
       viewUrl: `${baseUrl()}/contact-faq?ticket=${params.ticketId}`,
+      attachment: params.attachment,
     });
 
     await sendMail({
@@ -197,9 +281,11 @@ async function notifySubmitterOfReply(params: {
 /** Best-effort notification to every Super Admin that a submitter replied. */
 async function notifySuperAdminsOfReply(params: {
   ticketId: string;
+  ticketNumber: string;
   subject: string;
   submitterName: string;
   messageHtml: string;
+  attachment?: { name: string; url: string } | null;
 }) {
   try {
     const recipients = getSuperAdminEmails();
@@ -207,11 +293,13 @@ async function notifySuperAdminsOfReply(params: {
 
     const mail = supportTicketReplyEmail({
       appName: APP_NAME,
+      ticketNumber: params.ticketNumber,
       subject: params.subject,
       recipientName: "Team",
       replierLabel: params.submitterName,
       messageHtml: params.messageHtml,
       viewUrl: `${baseUrl()}/support-tickets/${params.ticketId}`,
+      attachment: params.attachment,
     });
 
     await Promise.all(
@@ -273,6 +361,7 @@ export async function submitPublicSupportTicket(
   // Sanitized immediately — this is the one HTML field in this app a fully
   // unauthenticated party can submit (see lib/sanitize-html.ts).
   const message = sanitizeTicketHtml(String(formData.get("message") || "").trim());
+  const attachmentFields = readAttachmentFields(formData);
 
   const errors = validateTicketFields({ name, email, phone, subject, message });
   if (Object.keys(errors).length > 0) {
@@ -280,8 +369,11 @@ export async function submitPublicSupportTicket(
   }
 
   try {
+    const ticketNumber = await generateTicketNumber();
+
     const ticket = await prisma.supportTicket.create({
       data: {
+        ticketNumber,
         subject,
         submitterName: name,
         submitterEmail: email,
@@ -291,6 +383,7 @@ export async function submitPublicSupportTicket(
             authorName: name,
             isFromSuperAdmin: false,
             body: message,
+            ...attachmentFields,
           },
         },
       },
@@ -298,12 +391,16 @@ export async function submitPublicSupportTicket(
 
     await notifySuperAdminsOfNewTicket({
       ticketId: ticket.id,
+      ticketNumber,
       subject,
       submitterName: name,
       submitterEmail: email,
       submitterPhone: phone,
       storeName: null,
       messageHtml: message,
+      attachment: attachmentFields.attachmentUrl
+        ? { name: attachmentFields.attachmentName!, url: attachmentFields.attachmentUrl }
+        : null,
     });
 
     revalidatePath("/support-tickets");
@@ -339,6 +436,7 @@ export async function submitAuthenticatedSupportTicket(
   const subject = String(formData.get("subject") || "").trim();
   const message = sanitizeTicketHtml(String(formData.get("message") || "").trim());
   const name = user.name || "User";
+  const attachmentFields = readAttachmentFields(formData);
 
   const errors = validateTicketFields({ name, email, phone, subject, message });
   if (Object.keys(errors).length > 0) {
@@ -347,9 +445,11 @@ export async function submitAuthenticatedSupportTicket(
 
   try {
     const storeId = await getEffectiveStoreId();
+    const ticketNumber = await generateTicketNumber();
 
     const ticket = await prisma.supportTicket.create({
       data: {
+        ticketNumber,
         subject,
         storeId,
         submittedById: user.id,
@@ -365,6 +465,7 @@ export async function submitAuthenticatedSupportTicket(
             // submitter happens to be a SUPER_ADMIN filing their own ticket.
             isFromSuperAdmin: false,
             body: message,
+            ...attachmentFields,
           },
         },
       },
@@ -373,12 +474,16 @@ export async function submitAuthenticatedSupportTicket(
 
     await notifySuperAdminsOfNewTicket({
       ticketId: ticket.id,
+      ticketNumber,
       subject,
       submitterName: name,
       submitterEmail: email,
       submitterPhone: phone,
       storeName: ticket.store?.name ?? null,
       messageHtml: message,
+      attachment: attachmentFields.attachmentUrl
+        ? { name: attachmentFields.attachmentName!, url: attachmentFields.attachmentUrl }
+        : null,
     });
 
     revalidatePath("/contact-faq");
@@ -486,6 +591,7 @@ export async function replySupportTicket(
     const user = await requireAuth();
     const ticketId = String(formData.get("ticketId") || "").trim();
     const body = sanitizeTicketHtml(String(formData.get("body") || "").trim());
+    const attachmentFields = readAttachmentFields(formData);
 
     if (!ticketId) return { success: false, message: "Ticket not found" };
     if (isHtmlEmpty(body)) {
@@ -500,6 +606,7 @@ export async function replySupportTicket(
       where: { id: ticketId },
       select: {
         id: true,
+        ticketNumber: true,
         subject: true,
         status: true,
         submittedById: true,
@@ -543,25 +650,34 @@ export async function replySupportTicket(
             authorName: user.name || (isFromSuperAdmin ? "Support Team" : "User"),
             isFromSuperAdmin,
             body,
+            ...attachmentFields,
           },
         },
       },
     });
 
+    const attachment = attachmentFields.attachmentUrl
+      ? { name: attachmentFields.attachmentName!, url: attachmentFields.attachmentUrl }
+      : null;
+
     if (isFromSuperAdmin) {
       await notifySubmitterOfReply({
         ticketId: ticket.id,
+        ticketNumber: ticket.ticketNumber,
         subject: ticket.subject,
         submitterName: ticket.submitterName,
         submitterEmail: ticket.submitterEmail,
         messageHtml: body,
+        attachment,
       });
     } else {
       await notifySuperAdminsOfReply({
         ticketId: ticket.id,
+        ticketNumber: ticket.ticketNumber,
         subject: ticket.subject,
         submitterName: ticket.submitterName,
         messageHtml: body,
+        attachment,
       });
     }
 

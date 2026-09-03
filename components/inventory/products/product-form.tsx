@@ -337,13 +337,14 @@ export function ProductForm({
     }
   }, [categoryId]);
 
-  // Fetch the Natural/Lab-Grown options for whichever gemstone Metal is
+  // Fetch the Store-Admin-defined Stone Type options (Natural, Lab-Grown,
+  // or anything else the store has added) for whichever gemstone Metal is
   // currently selected — the exact same Category -> Type cascade above,
   // just keyed off metalTypeId + isGemstone instead of categoryId.
   useEffect(() => {
     let cancelled = false;
 
-    async function loadStoneOrigins() {
+    async function loadStoneTypes() {
       if (!metalTypeId || !selectedMetal?.isGemstone) {
         setStoneOrigins([]);
         return;
@@ -357,7 +358,7 @@ export function ProductForm({
           setStoneOrigins(data || []);
         }
       } catch (err) {
-        console.error("Failed to load stone origins:", err);
+        console.error("Failed to load Stone Types:", err);
         if (!cancelled) {
           setStoneOrigins([]);
         }
@@ -368,7 +369,7 @@ export function ProductForm({
       }
     }
 
-    loadStoneOrigins();
+    loadStoneTypes();
 
     return () => {
       cancelled = true;
@@ -376,9 +377,9 @@ export function ProductForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metalTypeId, selectedMetal?.isGemstone]);
 
-  // Only reset the selected Origin when the Metal actually changes as a
+  // Only reset the selected Stone Type when the Metal actually changes as a
   // result of user interaction — not on initial mount (edit mode needs to
-  // keep the product's existing origin selected while options load).
+  // keep the product's existing Stone Type selected while options load).
   useEffect(() => {
     if (previousMetalTypeIdRef.current !== metalTypeId) {
       setStoneOriginOptionId("");
@@ -578,7 +579,7 @@ export function ProductForm({
 
           {selectedMetal?.isGemstone && (
             <div>
-              <Label>Origin</Label>
+              <Label>Stone Type</Label>
 
               <Select
                 value={stoneOriginOptionId || "__none__"}
@@ -591,8 +592,8 @@ export function ProductForm({
                   <SelectValue
                     placeholder={
                       loadingStoneOrigins
-                        ? "Loading origins..."
-                        : "Select Natural or Lab-Grown"
+                        ? "Loading Stone Types..."
+                        : "Select Stone Type"
                     }
                   />
                 </SelectTrigger>
@@ -602,7 +603,7 @@ export function ProductForm({
 
                   {stoneOrigins.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
-                      {item.origin === "NATURAL" ? "Natural" : "Lab-Grown"}
+                      {item.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -610,8 +611,8 @@ export function ProductForm({
 
               {!loadingStoneOrigins && stoneOrigins.length === 0 ? (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  No origin options set up for {selectedMetal.name} yet — add
-                  them under Settings → Taxonomy → Stone Origins.
+                  No Stone Types set up for {selectedMetal.name} yet — add
+                  them under Settings → Taxonomy → Stone Types.
                 </p>
               ) : null}
 

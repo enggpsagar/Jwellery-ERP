@@ -42,6 +42,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/providers/toast-provider";
+// Note: StoneOriginsSection below still uses the plain Select above for the
+// *parent stone* picker (unchanged) — only the child Stone Type value
+// itself moved from a fixed Select to a free-text Input, mirroring
+// TypeFormRow under Categories.
 
 const initialState: TaxonomyFormState = { success: false, message: "" };
 
@@ -67,7 +71,7 @@ export function TaxonomySettingsForm({
     <div className="space-y-6">
       <MetalsSection metals={metalRows} canEdit={canEdit} />
       <StonesSection stones={stoneRows} canEdit={canEdit} />
-      <StoneOriginsSection stones={stoneRows} canEdit={canEdit} />
+      <StoneTypesSection stones={stoneRows} canEdit={canEdit} />
       <CategoriesSection categories={categories} canEdit={canEdit} />
       <TypesSection categories={categories} canEdit={canEdit} />
     </div>
@@ -305,10 +309,12 @@ function MetalFormRow({
 // Same StoreMetal table/actions as Metals above (upsertStoreMetal,
 // toggleStoreMetalActive, deleteStoreMetal all work by id regardless of
 // which section a row is shown under) — this section just always submits
-// isGemstone="on" instead of Has Purity. A Stone's Natural/Lab-Grown options
-// no longer live on this row (StoreMetal.stoneOrigin is gone) — they're a
-// separate child list managed in StoneOriginsSection below, the exact same
-// two-level split as Categories (this section) / Types (TypesSection).
+// isGemstone="on" instead of Has Purity. A Stone's Stone Type options
+// (Natural, Lab-Grown, Moissanite, or anything else the store adds) no
+// longer live on this row (StoreMetal.stoneOrigin is gone) — they're a
+// separate, free-text, Store-Admin-managed child list in StoneTypesSection
+// below, the exact same two-level split as Categories (this section) /
+// Types (TypesSection).
 
 function StonesSection({
   stones,
@@ -368,8 +374,9 @@ function StonesSection({
         <CardTitle>Stones</CardTitle>
         <p className="text-sm text-muted-foreground">
           Gemstones your store deals in — Diamond, Ruby, Emerald, Sapphire,
-          and so on. Manage each stone&apos;s Natural / Lab-Grown options
-          below, since the two price very differently.
+          and so on. Manage each stone&apos;s Stone Types below (Natural,
+          Lab-Grown, or any other type you deal in), since they can price
+          very differently.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -513,12 +520,12 @@ function StoneFormRow({
 }
 
 // ---------------------------------------------------------------------------
-// Stone Origins (cascading under a selected Stone) — the direct mirror of
-// Category Types (TypesSection/TypeFormRow) below, just with a fixed
-// Natural/Lab-Grown Select in place of a free-text Name input.
+// Stone Types (cascading under a selected Stone) — the direct mirror of
+// Category Types (TypesSection/TypeFormRow) below: a free-text Name input
+// the Store Admin manages themselves, not a fixed Natural/Lab-Grown Select.
 // ---------------------------------------------------------------------------
 
-function StoneOriginsSection({
+function StoneTypesSection({
   stones,
   canEdit,
 }: {
@@ -528,51 +535,51 @@ function StoneOriginsSection({
   const toast = useToast();
 
   const [selectedStoneId, setSelectedStoneId] = useState("");
-  const [origins, setOrigins] = useState<StoreMetalOriginRow[]>([]);
-  const [loadingOrigins, setLoadingOrigins] = useState(false);
+  const [stoneTypes, setStoneTypes] = useState<StoreMetalOriginRow[]>([]);
+  const [loadingStoneTypes, setLoadingStoneTypes] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const reloadOrigins = React.useCallback(async (storeMetalId: string) => {
+  const reloadStoneTypes = React.useCallback(async (storeMetalId: string) => {
     if (!storeMetalId) {
-      setOrigins([]);
+      setStoneTypes([]);
       return;
     }
 
     try {
       const data = await getStoreMetalOrigins(storeMetalId);
-      setOrigins(data);
+      setStoneTypes(data);
     } catch (error) {
-      console.error("Failed to reload origins:", error);
+      console.error("Failed to reload Stone Types:", error);
     }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadOrigins() {
+    async function loadStoneTypes() {
       if (!selectedStoneId) {
-        setOrigins([]);
+        setStoneTypes([]);
         return;
       }
 
       try {
-        setLoadingOrigins(true);
+        setLoadingStoneTypes(true);
         const data = await getStoreMetalOrigins(selectedStoneId);
-        if (!cancelled) setOrigins(data);
+        if (!cancelled) setStoneTypes(data);
       } catch (error) {
-        console.error("Failed to load origins:", error);
-        if (!cancelled) setOrigins([]);
+        console.error("Failed to load Stone Types:", error);
+        if (!cancelled) setStoneTypes([]);
       } finally {
-        if (!cancelled) setLoadingOrigins(false);
+        if (!cancelled) setLoadingStoneTypes(false);
       }
     }
 
     setEditingId(null);
     setShowAdd(false);
-    loadOrigins();
+    loadStoneTypes();
 
     return () => {
       cancelled = true;
@@ -585,13 +592,13 @@ function StoneOriginsSection({
       const result = await toggleStoreMetalOriginActive(id, isActive);
       if (result.success) {
         toast.success(result.message);
-        await reloadOrigins(selectedStoneId);
+        await reloadStoneTypes(selectedStoneId);
       } else {
         toast.error(result.message);
       }
     } catch (error) {
       console.error(error);
-      toast.error("Failed to update origin");
+      toast.error("Failed to update Stone Type");
     } finally {
       setTogglingId(null);
     }
@@ -604,29 +611,25 @@ function StoneOriginsSection({
       const result = await deleteStoreMetalOrigin(id);
       if (result.success) {
         toast.success(result.message);
-        await reloadOrigins(selectedStoneId);
+        await reloadStoneTypes(selectedStoneId);
       } else {
         toast.error(result.message);
       }
     } catch (error) {
       console.error(error);
-      toast.error("Failed to delete origin");
+      toast.error("Failed to delete Stone Type");
     } finally {
       setDeletingId(null);
     }
   }
 
-  function originLabel(origin: "NATURAL" | "LAB_GROWN") {
-    return origin === "NATURAL" ? "Natural" : "Lab-Grown";
-  }
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Stone Origins</CardTitle>
+        <CardTitle>Stone Types</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Natural / Lab-Grown options scoped under a stone, e.g. both Natural
-          and Lab-Grown under Diamond.
+          Stone Type options scoped under a stone, e.g. Natural and Lab-Grown
+          under Diamond — add as many as your store deals in.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -648,26 +651,26 @@ function StoneOriginsSection({
 
         {!selectedStoneId ? (
           <p className="text-sm text-muted-foreground">
-            Select a stone to manage its Natural / Lab-Grown options.
+            Select a stone to manage its Stone Types.
           </p>
-        ) : loadingOrigins ? (
-          <p className="text-sm text-muted-foreground">Loading origins...</p>
+        ) : loadingStoneTypes ? (
+          <p className="text-sm text-muted-foreground">Loading Stone Types...</p>
         ) : (
           <div className="space-y-3">
-            {origins.length === 0 && !showAdd ? (
+            {stoneTypes.length === 0 && !showAdd ? (
               <p className="text-sm text-muted-foreground">
-                No origin options configured for this stone yet.
+                No Stone Types configured for this stone yet.
               </p>
             ) : null}
 
-            {origins.map((option) =>
+            {stoneTypes.map((option) =>
               editingId === option.id ? (
-                <StoneOriginFormRow
+                <StoneTypeFormRow
                   key={option.id}
                   option={option}
                   storeMetalId={selectedStoneId}
                   onDone={() => setEditingId(null)}
-                  onSaved={() => reloadOrigins(selectedStoneId)}
+                  onSaved={() => reloadStoneTypes(selectedStoneId)}
                 />
               ) : (
                 <div
@@ -675,7 +678,7 @@ function StoneOriginsSection({
                   className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
                 >
                   <span className={option.isActive ? "" : "text-muted-foreground line-through"}>
-                    {originLabel(option.origin)}
+                    {option.name}
                   </span>
 
                   {canEdit ? (
@@ -689,18 +692,18 @@ function StoneOriginsSection({
                         type="button"
                         onClick={() => setEditingId(option.id)}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
-                        aria-label={`Edit ${originLabel(option.origin)}`}
-                        title="Edit origin"
+                        aria-label={`Edit ${option.name}`}
+                        title="Edit Stone Type"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDelete(option.id, originLabel(option.origin))}
+                        onClick={() => handleDelete(option.id, option.name)}
                         disabled={deletingId === option.id}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-                        aria-label={`Delete ${originLabel(option.origin)}`}
-                        title="Delete origin (only if unused)"
+                        aria-label={`Delete ${option.name}`}
+                        title="Delete Stone Type (only if unused)"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -716,10 +719,10 @@ function StoneOriginsSection({
 
             {canEdit ? (
               showAdd ? (
-                <StoneOriginFormRow
+                <StoneTypeFormRow
                   storeMetalId={selectedStoneId}
                   onDone={() => setShowAdd(false)}
-                  onSaved={() => reloadOrigins(selectedStoneId)}
+                  onSaved={() => reloadStoneTypes(selectedStoneId)}
                 />
               ) : (
                 <Button
@@ -729,7 +732,7 @@ function StoneOriginsSection({
                   onClick={() => setShowAdd(true)}
                 >
                   <Plus className="h-4 w-4" />
-                  Add Origin
+                  Add Stone Type
                 </Button>
               )
             ) : null}
@@ -740,7 +743,7 @@ function StoneOriginsSection({
   );
 }
 
-function StoneOriginFormRow({
+function StoneTypeFormRow({
   option,
   storeMetalId,
   onDone,
@@ -756,7 +759,6 @@ function StoneOriginFormRow({
     upsertStoreMetalOrigin,
     initialState,
   );
-  const [origin, setOrigin] = useState(option?.origin ?? "");
 
   useEffect(() => {
     if (state.success) {
@@ -772,8 +774,10 @@ function StoneOriginFormRow({
   return (
     <form
       onSubmit={(event) => {
-        // Same deliberate preventDefault + manual dispatch as TypeFormRow —
-        // see the comment there for why.
+        // Deliberately not `action={formAction}` directly on the form — same
+        // reasoning as TypeFormRow above: React would reset uncontrolled
+        // fields (like this Name input) on every settled submission,
+        // including a failed one, wiping what the user just typed.
         event.preventDefault()
         formAction(new FormData(event.currentTarget))
       }}
@@ -783,19 +787,16 @@ function StoneOriginFormRow({
       <input type="hidden" name="storeMetalId" value={storeMetalId} />
 
       <div className="space-y-1.5">
-        <Label required>Origin</Label>
-        <Select value={origin} onValueChange={setOrigin}>
-          <SelectTrigger className="h-10 w-[160px]">
-            <SelectValue placeholder="Select origin" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="NATURAL">Natural</SelectItem>
-            <SelectItem value="LAB_GROWN">Lab-Grown</SelectItem>
-          </SelectContent>
-        </Select>
-        <input type="hidden" name="origin" value={origin} />
-        {state.errors?.origin?.[0] ? (
-          <p className="text-sm text-red-600">{state.errors.origin[0]}</p>
+        <Label htmlFor="stone-type-name" required>Name</Label>
+        <Input
+          id="stone-type-name"
+          name="name"
+          defaultValue={option?.name ?? ""}
+          placeholder="e.g. Natural, Lab-Grown, Moissanite"
+          required
+        />
+        {state.errors?.name?.[0] ? (
+          <p className="text-sm text-red-600">{state.errors.name[0]}</p>
         ) : null}
       </div>
 

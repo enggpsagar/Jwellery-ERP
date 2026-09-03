@@ -244,30 +244,40 @@ model StoreMetal {
   // StoreMetal.stoneOrigin column: a store dealing in BOTH natural and
   // lab-grown Diamond needs to express both as independently manageable
   // options under the one "Diamond" row, not two separate StoreMetal rows.
-  // See StoreMetalOrigin for the child shape and Product.stoneOriginOptionId
-  // for how a product picks exactly one.
+  // Free-text since 2026-09 (was a fixed Natural/Lab-Grown enum — see
+  // StoreMetalOrigin's own doc comment). See Product.stoneOriginOptionId for
+  // how a product picks exactly one.
   origins             StoreMetalOrigin[]
 
   @@unique([storeId, name])
 }
 
-// A single Natural/Lab-Grown option under a gemstone StoreMetal row (Diamond,
+// A single Stone Type option under a gemstone StoreMetal row (Diamond,
 // Ruby, ...) — mirrors StoreCategoryType's shape/role under StoreCategory
-// exactly. Only ever created for a row with isGemstone=true; nothing enforces
-// that at the DB level, same as StoreCategoryType not enforcing its parent
-// is any particular kind of category — the taxonomy actions gate it instead.
+// exactly, including being free-text (`name`), Store-Admin-managed, not
+// restricted to a predefined set. Only ever created for a row with
+// isGemstone=true; nothing enforces that at the DB level, same as
+// StoreCategoryType not enforcing its parent is any particular kind of
+// category — the taxonomy actions gate it instead.
+//
+// Was a fixed `origin: StoneOrigin` enum (NATURAL/LAB_GROWN only) until
+// 2026-09, when it was converted to free text so a Store Admin can add any
+// Stone Type they deal in (Natural, Lab-Grown, Moissanite, ...) the same way
+// they already add Category Types — see the hand-written migration
+// `20260903080000_convert_stone_origin_to_free_text` for the backfill of
+// existing NATURAL/LAB_GROWN rows into `name` values.
 model StoreMetalOrigin {
-  id           String      @id @default(cuid())
+  id           String     @id @default(cuid())
   storeId      String
   storeMetalId String
-  origin       StoneOrigin
-  isActive     Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  storeMetal   StoreMetal  @relation(fields: [storeMetalId], references: [id], onDelete: Cascade)
+  name         String
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  storeMetal   StoreMetal @relation(fields: [storeMetalId], references: [id], onDelete: Cascade)
   products     Product[]
 
-  @@unique([storeMetalId, origin])
+  @@unique([storeMetalId, name])
 }
 
 model StoreCategory {
@@ -400,7 +410,9 @@ model Product {
   // Only meaningful when metalType.isGemstone is true — mirrors
   // categoryTypeId's role exactly: metalTypeId stays the stone selector
   // (Diamond, Ruby, ...), this is the finer-grained pick of which of that
-  // stone's origin options (Natural, Lab-Grown, ...) this product is.
+  // stone's Store-Admin-defined Stone Type options (Natural, Lab-Grown,
+  // Moissanite, or whatever else the store has added — see
+  // StoreMetalOrigin) this product is.
   stoneOriginOptionId     String?
   defaultPurity           PurityType?
   defaultMakingCharge     Decimal?             @db.Decimal(12, 2)
@@ -1227,9 +1239,20 @@ enum TicketStatus {
  * a denormalized copy of the latest message's `createdAt`, kept here purely
  * so the Super Admin inbox can sort/filter by recent activity with a single
  * indexed column instead of an aggregate subquery per row.
+ * `ticketNumber` is a human-readable, platform-wide identifier
+ * (`TKT-{year}-{padded sequence}`) assigned at creation — mirrors the
+ * `{prefix}-{year}-{padded count}` shape every other numbered document in
+ * this schema already uses (Invoice.invoiceNumber, PurchaseBill's own
+ * number, Quotation.quotationNumber, KachaInvoice's slip number — see each
+ * one's own `generate*Number` in lib/actions/*.ts), except counted across
+ * every store rather than scoped to one, since a ticket itself is
+ * platform-wide, not a per-store record (see storeId above). Shown to both
+ * the submitter and the Super Admin, and threaded into the ticket's emails
+ * via an identical `[TKT-...]` subject prefix on every notification for it.
  */
 model SupportTicket {
   id             String                 @id @default(cuid())
+  ticketNumber   String                 @unique
   subject        String
   status         TicketStatus           @default(OPEN)
   storeId        String?
@@ -1266,15 +1289,26 @@ model SupportTicket {
  * keep showing which side of the conversation it was actually sent from.
  */
 model SupportTicketMessage {
-  id               String        @id @default(cuid())
-  ticketId         String
-  authorId         String?
-  authorName       String
-  isFromSuperAdmin Boolean       @default(false)
-  body             String
-  createdAt        DateTime      @default(now())
-  ticket           SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  author           User?         @relation("SupportTicketMessageAuthor", fields: [authorId], references: [id])
+  id                 String        @id @default(cuid())
+  ticketId           String
+  authorId           String?
+  authorName         String
+  isFromSuperAdmin   Boolean       @default(false)
+  body               String
+  // At most one attachment per message (no separate Attachment/Media model
+  // anywhere in this schema — same single-nullable-field convention as
+  // LedgerEntry.attachmentUrl). All four are optional and only ever set
+  // together, populated after a direct-to-browser Vercel Blob client
+  // upload completes (see app/api/support-tickets/upload/route.ts) —
+  // attachmentName preserves the original filename for display since the
+  // blob's own pathname gets a random suffix.
+  attachmentUrl      String?
+  attachmentName     String?
+  attachmentMimeType String?
+  attachmentSize     Int?
+  createdAt          DateTime      @default(now())
+  ticket             SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author             User?         @relation("SupportTicketMessageAuthor", fields: [authorId], references: [id])
 
   @@index([ticketId])
   @@index([authorId])
@@ -1476,15 +1510,6 @@ enum InvoiceStatus {
   CANCELLED
 }
 
-// Commercial classification for a gemstone StoreMetal row (see
-// StoreMetal.isGemstone and its StoreMetalOrigin children) — lab-grown
-// diamonds/stones price very differently from natural ones, and a store can
-// stock BOTH under the same stone (e.g. Diamond), each as its own
-// StoreMetalOrigin row rather than one fixed value per StoreMetal.
-enum StoneOrigin {
-  NATURAL
-  LAB_GROWN
-}
 
 enum ChargeType {
   FIXED

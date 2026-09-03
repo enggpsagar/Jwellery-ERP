@@ -817,6 +817,36 @@ function stripHtmlForEmailText(html: string) {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** A support ticket message's optional attachment (see
+ *  prisma/schema.prisma's SupportTicketMessage doc comment) — the email
+ *  never embeds the file itself, just a line noting its name with a link
+ *  out to it (or to the ticket, whichever reads better in context). */
+type TicketMessageAttachment = { name: string; url: string } | null | undefined;
+
+function ticketAttachmentLineHtml(attachment: TicketMessageAttachment) {
+  if (!attachment) return "";
+  return `<p style="margin: 8px 0 0; font-size: 13px; color: #4b5563;">📎 Attachment: <a href="${attachment.url}" style="color: #111827; font-weight: bold;">${attachment.name}</a></p>`;
+}
+
+function ticketAttachmentLineText(attachment: TicketMessageAttachment) {
+  if (!attachment) return [];
+  return [`Attachment: ${attachment.name} (${attachment.url})`];
+}
+
+/**
+ * Every email sent about one ticket — the initial submission notice and
+ * every reply in both directions — shares this exact subject string, so
+ * mail clients thread them together as one conversation rather than the
+ * "New support ticket: X" / "Re: X" pair this used to be (which never
+ * matched each other, let alone across replies). Carries the human-readable
+ * ticketNumber (see SupportTicket.ticketNumber's own doc comment) so a
+ * Super Admin or submitter searching their inbox can find the whole thread
+ * by it.
+ */
+function ticketEmailSubject(ticketNumber: string, subject: string) {
+  return `[${ticketNumber}] ${subject}`;
+}
+
 /**
  * Sent to the Super Admin(s) when a new support ticket is submitted from
  * either Contact Us surface (public /contact or the authenticated app's
@@ -827,6 +857,7 @@ function stripHtmlForEmailText(html: string) {
  */
 export function newSupportTicketEmail(params: {
   appName: string;
+  ticketNumber: string;
   subject: string;
   submitterName: string;
   submitterEmail: string;
@@ -834,8 +865,9 @@ export function newSupportTicketEmail(params: {
   storeName: string | null;
   messageHtml: string;
   viewUrl: string;
+  attachment?: TicketMessageAttachment;
 }) {
-  const { appName, subject, submitterName, submitterEmail, submitterPhone, storeName, messageHtml, viewUrl } = params;
+  const { appName, ticketNumber, subject, submitterName, submitterEmail, submitterPhone, storeName, messageHtml, viewUrl, attachment } = params;
 
   const body = `
     <p style="margin-top: 0;">A new support ticket was submitted on ${appName}.</p>
@@ -851,6 +883,7 @@ export function newSupportTicketEmail(params: {
     </table>
 
     ${ticketMessageBlock(messageHtml)}
+    ${ticketAttachmentLineHtml(attachment)}
 
     <p style="margin-top: 20px;">
       <a href="${viewUrl}" style="background: #111827; color: #ffffff; padding: 10px 18px; border-radius: 6px; text-decoration: none; display: inline-block;">
@@ -869,12 +902,13 @@ export function newSupportTicketEmail(params: {
     `Store: ${storeName ?? "— (public site visitor)"}`,
     "",
     stripHtmlForEmailText(messageHtml),
+    ...ticketAttachmentLineText(attachment),
     "",
     `View & reply: ${viewUrl}`,
   ].join("\n");
 
   return {
-    subject: `New support ticket: ${subject}`,
+    subject: ticketEmailSubject(ticketNumber, subject),
     html: wrapEmail(appName, "New support ticket", body),
     text,
   };
@@ -890,19 +924,22 @@ export function newSupportTicketEmail(params: {
  */
 export function supportTicketReplyEmail(params: {
   appName: string;
+  ticketNumber: string;
   subject: string;
   recipientName: string;
   replierLabel: string;
   messageHtml: string;
   viewUrl: string;
+  attachment?: TicketMessageAttachment;
 }) {
-  const { appName, subject, recipientName, replierLabel, messageHtml, viewUrl } = params;
+  const { appName, ticketNumber, subject, recipientName, replierLabel, messageHtml, viewUrl, attachment } = params;
 
   const body = `
     <p style="margin-top: 0;">Hi ${recipientName},</p>
     <p>${replierLabel} replied on your support ticket <strong>${subject}</strong>.</p>
 
     ${ticketMessageBlock(messageHtml)}
+    ${ticketAttachmentLineHtml(attachment)}
 
     <p style="margin-top: 20px;">
       <a href="${viewUrl}" style="background: #111827; color: #ffffff; padding: 10px 18px; border-radius: 6px; text-decoration: none; display: inline-block;">
@@ -917,12 +954,13 @@ export function supportTicketReplyEmail(params: {
     `${replierLabel} replied on your support ticket "${subject}":`,
     "",
     stripHtmlForEmailText(messageHtml),
+    ...ticketAttachmentLineText(attachment),
     "",
     `View & reply: ${viewUrl}`,
   ].join("\n");
 
   return {
-    subject: `Re: ${subject}`,
+    subject: ticketEmailSubject(ticketNumber, subject),
     html: wrapEmail(appName, "New reply on your support ticket", body),
     text,
   };

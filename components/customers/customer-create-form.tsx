@@ -172,7 +172,12 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
               <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
             </label>
-            <textarea name="address" className={FIELD} rows={3} placeholder="Enter full address" />
+            <textarea
+              name="address"
+              className={`${FIELD} min-h-9 resize-y`}
+              rows={1}
+              placeholder="Enter full address"
+            />
           </div>
 
           <div className="space-y-1">
@@ -234,28 +239,6 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
           <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
-              GST Number {gstinRequiredNow ? <RequiredMark /> : null}
-            </label>
-            <GstSchemeBadge scheme={gstScheme} />
-            {gstScheme !== "COMPOSITION" ? (
-              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
-            ) : null}
-            <input
-              name="gstNumber"
-              className={FIELD}
-              placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : "Optional"}
-              required={gstinRequiredNow}
-            />
-            {gstinRequiredNow ? (
-              <p className="text-xs text-muted-foreground">
-                GSTIN is required for a valid B2B tax invoice to this customer.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <Hash className="h-4 w-4 text-muted-foreground" />
               PAN Number
             </label>
             <input name="panNumber" className={FIELD} placeholder="Optional" />
@@ -284,8 +267,35 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
           </div>
 
           <div className="space-y-1 md:col-span-2">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <Hash className="h-4 w-4 text-muted-foreground" />
+              GST Number {gstinRequiredNow ? <RequiredMark /> : null}
+            </label>
+            <GstSchemeBadge scheme={gstScheme} />
+            {gstScheme !== "COMPOSITION" ? (
+              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
+            ) : null}
+            <input
+              name="gstNumber"
+              className={`${FIELD} md:max-w-sm`}
+              placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : "Optional"}
+              required={gstinRequiredNow}
+            />
+            {gstinRequiredNow ? (
+              <p className="text-xs text-muted-foreground">
+                GSTIN is required for a valid B2B tax invoice to this customer.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="space-y-1 md:col-span-2">
             <label className="text-sm font-medium">Notes</label>
-            <textarea name="notes" className={FIELD} rows={2} placeholder="Anything worth remembering" />
+            <textarea
+              name="notes"
+              className={`${FIELD} min-h-9 resize-y`}
+              rows={1}
+              placeholder="Anything worth remembering"
+            />
           </div>
 
           <div className="flex gap-3 md:col-span-2">

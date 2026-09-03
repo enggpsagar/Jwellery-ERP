@@ -88,9 +88,9 @@ export function IssueMaterialDialog({
 
   // Purity options depend on which metal is selected — Silver should never
   // offer Gold purities and vice versa. classifyMetalName's own return type
-  // is tied to the BusinessUnit enum, which has no Platinum unit, so
-  // Platinum is matched separately by name here rather than widening that
-  // shared classifier (see the same reasoning in product-form.tsx).
+  // (GOLD | SILVER | DIAMOND | OTHER) has no Platinum bucket, so Platinum is
+  // matched separately by name here rather than widening that shared
+  // classifier (see the same reasoning in product-form.tsx).
   const metalFamily = selectedMetal?.name.toLowerCase().includes("platinum")
     ? "PLATINUM"
     : classifyMetalName(selectedMetal?.name)

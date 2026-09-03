@@ -8,7 +8,6 @@ import {
 } from "@/lib/actions/customer-ledger-actions"
 import { classifyMetalName } from "@/lib/business-units"
 import { getActiveBusinessUnits } from "@/lib/business-units.server"
-import { getStoreMetals } from "@/lib/actions/taxonomy-actions"
 import { AddCustomerSaleEntryDialog } from "@/components/customers/ledger/add-customer-sale-entry-dialog"
 import { AddCustomerRefundEntryDialog } from "@/components/customers/ledger/add-customer-refund-entry-dialog"
 import { EmailLedgerStatementButton } from "@/components/customers/ledger/email-ledger-statement-button"
@@ -69,11 +68,10 @@ function formatEntryAmount(entry: {
 export async function CustomerLedgerCard({
   customerId,
 }: CustomerLedgerCardProps) {
-  const [entries, summary, activeUnits, metals] = await Promise.all([
+  const [entries, summary, activeUnits] = await Promise.all([
     getCustomerLedgerEntries(customerId),
     getCustomerLedgerSummary(customerId),
     getActiveBusinessUnits(),
-    getStoreMetals(),
   ])
 
   return (
@@ -93,12 +91,10 @@ export async function CustomerLedgerCard({
           <AddCustomerSaleEntryDialog
             customerId={customerId}
             activeUnits={activeUnits}
-            metals={metals}
           />
           <AddCustomerRefundEntryDialog
             customerId={customerId}
             activeUnits={activeUnits}
-            metals={metals}
           />
         </div>
       </div>
@@ -146,7 +142,7 @@ export async function CustomerLedgerCard({
           )}
 
           {summary.unitSummaries.map((unit) => {
-            const format = unit.unit === "DIAMOND" ? formatCarat : formatWeight
+            const format = unit.isGemstone ? formatCarat : formatWeight
 
             return (
               <div key={unit.unit} className="grid grid-cols-1 gap-4 md:grid-cols-3">

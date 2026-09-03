@@ -1186,7 +1186,16 @@ model BusinessSettings {
 
   // Which unit(s) this business transacts and settles balances in.
   // Drives how the ledger (general + per-customer) totals/entries are denominated.
-  businessUnits BusinessUnit[] @default([MONEY])
+  // Each entry is either the literal sentinel "MONEY" (always available, not
+  // a real row anywhere) or a live StoreMetal.id — covering both plain
+  // metals and gemstones (StoreMetal.isGemstone), since a store's actual set
+  // of settlement units is whatever it has configured in Taxonomy, not a
+  // fixed Gold/Silver/Diamond list. Used to be BusinessUnit[] (a fixed
+  // Postgres enum) — see the dynamic-business-units migration for the
+  // one-time backfill from that enum to StoreMetal ids. Resolve this via
+  // getActiveBusinessUnits()/getAvailableBusinessUnitOptions()
+  // (lib/business-units.server.ts), never read raw.
+  businessUnits String[] @default(["MONEY"])
 
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
@@ -1566,13 +1575,6 @@ enum InvoiceStatus {
 enum ChargeType {
   FIXED
   PERCENTAGE
-}
-
-enum BusinessUnit {
-  MONEY
-  GOLD
-  SILVER
-  DIAMOND
 }
 
 // The three GST registration types a jewellery business can operate under

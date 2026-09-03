@@ -13,12 +13,12 @@ import {
 import { classifyMetalName } from "@/lib/business-units";
 
 // A metal classifies into one of these groups by its name — GOLD/SILVER/
-// DIAMOND/OTHER via classifyMetalName (the same heuristic Business Units
-// uses), plus local PLATINUM and STONE checks on top of it (classifyMetalName's
-// own return type is tied to the BusinessUnit enum, which has neither a
-// Platinum nor a Stone unit, so extending it there would ripple into the
-// Ledger/Dashboard's per-unit totals — out of scope here, this only decides
-// which purities to offer and whether to show the Carat Weight field).
+// DIAMOND/OTHER via classifyMetalName (the same name-substring heuristic
+// used for formatting historical records elsewhere), plus local PLATINUM
+// and STONE checks on top of it (classifyMetalName's own return type has
+// neither a Platinum nor a generic Stone bucket, so extending it there
+// would ripple into every other call site — out of scope here, this only
+// decides which purities to offer and whether to show the Carat Weight field).
 // STONE is a stand-alone loose-gemstone product line (a StoreMetal literally
 // named e.g. "Stone"), not the stone embedded in a metal piece — that's the
 // separate defaultStoneWeight field below, untouched by this.

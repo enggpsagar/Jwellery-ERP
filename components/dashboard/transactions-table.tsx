@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react"
 import {
   Card,
-  CardAction,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -66,32 +65,31 @@ export function TransactionsTable({ initialTransactions, initialPeriod }: Transa
   return (
     <Card className="gap-0 overflow-hidden">
       <CardHeader className="flex flex-col gap-3 border-b [.border-b]:pb-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle>Recent Transactions</CardTitle>
-            <CardDescription>Latest invoices and ledger entries</CardDescription>
-          </div>
-          <CardAction>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/billing">View all</Link>
-            </Button>
-          </CardAction>
+        <div>
+          <CardTitle>Recent Transactions</CardTitle>
+          <CardDescription>Latest invoices and ledger entries</CardDescription>
         </div>
 
-        <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
-          {PERIOD_OPTIONS.map((option) => (
-            <Button
-              key={option}
-              type="button"
-              size="sm"
-              variant={period === option ? "default" : "ghost"}
-              disabled={isPending}
-              onClick={() => handlePeriodChange(option)}
-              className="h-7 px-2.5 text-xs"
-            >
-              {PERIOD_LABELS[option]}
-            </Button>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
+            {PERIOD_OPTIONS.map((option) => (
+              <Button
+                key={option}
+                type="button"
+                size="sm"
+                variant={period === option ? "default" : "ghost"}
+                disabled={isPending}
+                onClick={() => handlePeriodChange(option)}
+                className="h-7 px-2.5 text-xs"
+              >
+                {PERIOD_LABELS[option]}
+              </Button>
+            ))}
+          </div>
+
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/billing">View all</Link>
+          </Button>
         </div>
       </CardHeader>
       <div className="overflow-x-auto">

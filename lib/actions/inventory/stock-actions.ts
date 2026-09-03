@@ -13,6 +13,7 @@ import {
 } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { getCurrentUser } from "@/lib/auth/auth"
 import { requireStoreScope } from "@/lib/store-context"
 import { getLocationScope, locationWhere, isLocationAllowed, type LocationScope } from "@/lib/location-scope"
 import type { StockFormState } from "@/lib/inventory/stock-types"
@@ -514,6 +515,7 @@ export async function createInventoryStock(
     }
 
     const storeId = await requireStoreScope()
+    const currentUser = await getCurrentUser()
 
     const product = await prisma.product.findFirst({
       where: { id: productId, storeId },
@@ -661,6 +663,9 @@ export async function createInventoryStock(
           manufactureDate,
           locationId,
           remarks,
+          createdById: currentUser?.id ?? undefined,
+          createdByName: currentUser?.name ?? undefined,
+          createdByRole: currentUser?.role ?? undefined,
         },
       }),
       ...(netWeight && netWeight > 0

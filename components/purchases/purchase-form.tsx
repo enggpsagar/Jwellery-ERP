@@ -771,26 +771,9 @@ export function PurchaseForm({
                   </div>
                 </div>
 
-                {!isCaratLine(item) && (
-                  <div className="flex items-end pb-2">
-                    <label className="flex items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={item.hasStoneComponent}
-                        onChange={(e) =>
-                          updateItem(item.key, { hasStoneComponent: e.target.checked })
-                        }
-                      />
-                      Includes stone/diamond
-                    </label>
-                  </div>
-                )}
-
-                {(isCaratLine(item) || item.hasStoneComponent) && (
+                {isCaratLine(item) && (
                   <div className="space-y-1">
-                    <Label className="text-xs">
-                      {isCaratLine(item) ? "Carat Weight (ct)" : "Stone Carat Weight (ct)"}
-                    </Label>
+                    <Label className="text-xs">Carat Weight (ct)</Label>
                     <Input
                       type="number"
                       step="0.001"
@@ -800,22 +783,8 @@ export function PurchaseForm({
                     <p className="text-xs text-muted-foreground">
                       {item.purity === "DIAMOND"
                         ? "Priced per carat, not per gram"
-                        : isCaratLine(item)
-                          ? "1 ct = 0.2 g — converts with Net Weight"
-                          : "Stone's own weight — independent of Net Weight"}
+                        : "1 ct = 0.2 g — converts with Net Weight"}
                     </p>
-                  </div>
-                )}
-
-                {!isCaratLine(item) && item.hasStoneComponent && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Stone Rate (₹/ct)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={item.stoneRate === 0 ? "" : item.stoneRate}
-                      onChange={(e) => handleStoneRateChange(item, e.target.value)}
-                    />
                   </div>
                 )}
 
@@ -841,6 +810,52 @@ export function PurchaseForm({
                   />
                 </div>
               </div>
+
+              {/* A composite piece (metal + an embedded stone) is the
+                  exception, not the rule, for a line whose own metal isn't
+                  Diamond/Stone — kept as its own toggled strip rather than
+                  wedged into the grid above, so a plain Gold line's fields
+                  don't reflow every time this gets checked/unchecked. */}
+              {!isCaratLine(item) && (
+                <div className="flex flex-wrap items-end gap-4 rounded-md border border-dashed p-3">
+                  <label className="flex items-center gap-2 text-xs font-medium">
+                    <input
+                      type="checkbox"
+                      checked={item.hasStoneComponent}
+                      onChange={(e) =>
+                        updateItem(item.key, { hasStoneComponent: e.target.checked })
+                      }
+                    />
+                    Includes a stone/diamond
+                  </label>
+
+                  {item.hasStoneComponent && (
+                    <>
+                      <div className="w-36 space-y-1">
+                        <Label className="text-xs">Stone Carat Weight (ct)</Label>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={item.caratWeight === 0 ? "" : item.caratWeight}
+                          onChange={(e) => handleCaratWeightChange(item, e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Stone's own weight — independent of Net Weight
+                        </p>
+                      </div>
+                      <div className="w-36 space-y-1">
+                        <Label className="text-xs">Stone Rate (₹/ct)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.stoneRate === 0 ? "" : item.stoneRate}
+                          onChange={(e) => handleStoneRateChange(item, e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="space-y-1">

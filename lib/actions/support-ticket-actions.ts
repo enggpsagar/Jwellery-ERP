@@ -53,23 +53,30 @@ function baseUrl() {
 }
 
 /**
- * `TKT-{year}-{padded sequence}` — same `{prefix}-{year}-{padded count}`
- * shape as every other numbered document in this app (see e.g.
+ * `TKT-{YYYYMMDD}-{HHMM}-{padded daily sequence}`, e.g. `TKT-20260903-1745-0003`
+ * — unlike every other numbered document in this app (see e.g.
  * generateInvoiceNumber in invoice-actions.ts, generateQuotationNumber in
- * quotation-actions.ts), except counted across every store rather than one:
- * a SupportTicket is platform-wide, not per-store (see its own doc comment
- * in prisma/schema.prisma), so the count here is global, not storeId-scoped.
- * Like those siblings, this is a count-then-format read with no explicit
- * locking — ticket submission volume doesn't approach the concurrency where
- * that would collide in practice, same tradeoff those other functions
- * already accept.
+ * quotation-actions.ts, which are just `{prefix}-{year}-{padded count}`), a
+ * ticket ID needs to be readable at a glance without opening it — when it
+ * was raised, not just its position in a yearly count — so the date and
+ * time it was created are encoded directly into the number itself. The
+ * trailing sequence (reset daily, via the same startsWith-then-count
+ * approach every sibling numbering function already uses, same
+ * no-explicit-locking tradeoff) exists only to keep two tickets filed in
+ * the same minute unique; it isn't meant to be read as "the Nth ticket
+ * ever." Counted across every store rather than one: a SupportTicket is
+ * platform-wide, not per-store (see its own doc comment in
+ * prisma/schema.prisma).
  */
 async function generateTicketNumber() {
-  const year = new Date().getFullYear();
+  const now = new Date();
+  const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const timePart = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+  const prefix = `TKT-${datePart}-`;
   const count = await prisma.supportTicket.count({
-    where: { ticketNumber: { startsWith: `TKT-${year}-` } },
+    where: { ticketNumber: { startsWith: prefix } },
   });
-  return `TKT-${year}-${String(count + 1).padStart(4, "0")}`;
+  return `${prefix}${timePart}-${String(count + 1).padStart(4, "0")}`;
 }
 
 export type SupportTicketFormState = {

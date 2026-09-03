@@ -6,10 +6,11 @@ import {
   InventoryStockStatus,
   InventoryFinish,
   ChargeType,
+  type PurityType,
 } from "@prisma/client";
 
 import type { StockFormState } from "@/lib/inventory/stock-types";
-import { isCaratWeighedMetal, GRAMS_PER_CARAT } from "@/lib/purity";
+import { isCaratWeighedMetal, resolveGramsPerCarat } from "@/lib/purity";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,6 +122,10 @@ type StockFormProps = {
 
   locations: LocationOption[];
 
+  /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
+   * Conversion Rules) — see the same prop on InvoiceForm. */
+  caratConversionRates: Record<PurityType, number>;
+
   state: StockFormState;
 
   pending: boolean;
@@ -137,6 +142,7 @@ export function StockForm({
   stock,
   products,
   locations,
+  caratConversionRates,
   state,
   pending,
 }: StockFormProps) {
@@ -228,7 +234,8 @@ export function StockForm({
 
     const netNum = Number(value);
     if (value.trim() !== "" && Number.isFinite(netNum)) {
-      setCaratWeight(String(Number((netNum / GRAMS_PER_CARAT).toFixed(3))));
+      const gramsPerCarat = resolveGramsPerCarat(selectedProduct?.defaultPurity, caratConversionRates);
+      setCaratWeight(String(Number((netNum / gramsPerCarat).toFixed(3))));
     } else {
       setCaratWeight("");
     }
@@ -241,7 +248,8 @@ export function StockForm({
     const caratNum = Number(value);
     if (value.trim() !== "" && Number.isFinite(caratNum)) {
       setNetTouched(true);
-      setNetWeight(String(Number((caratNum * GRAMS_PER_CARAT).toFixed(5))));
+      const gramsPerCarat = resolveGramsPerCarat(selectedProduct?.defaultPurity, caratConversionRates);
+      setNetWeight(String(Number((caratNum * gramsPerCarat).toFixed(5))));
     }
   }
 

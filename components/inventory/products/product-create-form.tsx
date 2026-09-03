@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import type { PurityType } from "@prisma/client";
 
 import { useToast } from "@/components/providers/toast-provider";
 import { createProduct } from "@/lib/actions/inventory/product-actions";
@@ -16,6 +17,7 @@ import {
 type ProductCreateFormProps = {
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
+  caratConversionRates: Record<PurityType, number>;
   /** Where to go after saving; the new product's id is appended so the
    * calling screen can select it. */
   returnTo?: string
@@ -24,6 +26,7 @@ type ProductCreateFormProps = {
 export function ProductCreateForm({
   metals,
   categories,
+  caratConversionRates,
   returnTo,
 }: ProductCreateFormProps) {
   const router = useRouter();
@@ -81,6 +84,7 @@ export function ProductCreateForm({
         pending={pending}
         metals={metals}
         categories={categories}
+        caratConversionRates={caratConversionRates}
       />
     </form>
   );

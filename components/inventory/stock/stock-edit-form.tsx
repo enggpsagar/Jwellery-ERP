@@ -4,6 +4,7 @@
 
 import { useActionState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import type { PurityType } from "@prisma/client";
 
 import { updateInventoryStock } from "@/lib/actions/inventory/stock-actions";
 
@@ -21,6 +22,7 @@ type StockEditFormProps = {
   stock: any;
   products: any[];
   locations: any[];
+  caratConversionRates: Record<PurityType, number>;
 };
 
 
@@ -28,6 +30,7 @@ export function StockEditForm({
   stock,
   products,
   locations,
+  caratConversionRates,
 }: StockEditFormProps) {
 
   const router = useRouter();
@@ -94,6 +97,7 @@ export function StockEditForm({
         stock={stock}
         products={products}
         locations={locations}
+        caratConversionRates={caratConversionRates}
         state={state}
         pending={pending}
       />

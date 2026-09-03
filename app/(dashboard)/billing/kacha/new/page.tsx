@@ -6,6 +6,7 @@ import {
 } from "@/lib/actions/kacha-invoice-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
+import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 
 import { KachaInvoiceForm } from "@/components/billing/kacha/kacha-invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
@@ -15,12 +16,13 @@ export const metadata: Metadata = {
 }
 
 export default async function NewKachaInvoicePage() {
-  const [customers, stockItems, locations, metals, origins] = await Promise.all([
+  const [customers, stockItems, locations, metals, origins, caratConversionRates] = await Promise.all([
     getKachaInvoiceFormCustomers(),
     getKachaInvoiceFormStockItems(),
     getStoreLocations(),
     getStoreMetals(),
     getAllStoreMetalOrigins(),
+    getCaratConversionRateMap(),
   ])
 
   return (
@@ -38,6 +40,7 @@ export default async function NewKachaInvoicePage() {
         locations={locations}
         metals={metals}
         origins={origins}
+        caratConversionRates={caratConversionRates}
       />
     </main>
   )

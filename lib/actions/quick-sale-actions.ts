@@ -260,7 +260,18 @@ export async function completeQuickSale(
 
     const stock = await prisma.inventoryStock.findFirst({
       where: { id: stockId, storeId },
-      select: { metalTypeId: true, purity: true, netWeight: true, grossWeight: true },
+      select: {
+        metalTypeId: true,
+        purity: true,
+        netWeight: true,
+        grossWeight: true,
+        // Identity only, not pricing — the operator types one flat price for
+        // the whole piece, so what stone it contains still needs to survive
+        // onto the invoice line for the print/detail view even though its
+        // charge stays folded into makingCharge rather than broken out.
+        stoneMetalTypeName: true,
+        stoneTypeNames: true,
+      },
     });
 
     const netWeight = stock?.netWeight ? Number(stock.netWeight) : 0;
@@ -296,6 +307,8 @@ export async function completeQuickSale(
       makingCharge: netWeight > 0 ? sellingPrice - metalValue : sellingPrice,
       makingChargeType: "FIXED",
       stoneCharge: 0,
+      stoneMetalTypeName: stock?.stoneMetalTypeName ?? null,
+      stoneTypeNames: stock?.stoneTypeNames ?? null,
       inventoryStockId: stockId,
     };
 

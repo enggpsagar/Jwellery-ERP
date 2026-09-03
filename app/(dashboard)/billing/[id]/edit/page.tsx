@@ -10,6 +10,7 @@ import {
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
+import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 
 import { InvoiceForm, type LineItem } from "@/components/billing/invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
@@ -44,14 +45,16 @@ export default async function EditInvoicePage({ params }: Props) {
     redirect(`/billing/${id}`)
   }
 
-  const [customers, stockItems, businessSettings, locations, metals, origins] = await Promise.all([
-    getInvoiceFormCustomers(),
-    getInvoiceFormStockItems(id),
-    getBusinessSettings(),
-    getStoreLocations(),
-    getStoreMetals(),
-    getAllStoreMetalOrigins(),
-  ])
+  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates] =
+    await Promise.all([
+      getInvoiceFormCustomers(),
+      getInvoiceFormStockItems(id),
+      getBusinessSettings(),
+      getStoreLocations(),
+      getStoreMetals(),
+      getAllStoreMetalOrigins(),
+      getCaratConversionRateMap(),
+    ])
 
   const initialItems: LineItem[] = invoice.items.map((item) => ({
     key: crypto.randomUUID(),
@@ -98,6 +101,7 @@ export default async function EditInvoicePage({ params }: Props) {
         locations={locations}
         metals={metals}
         origins={origins}
+        caratConversionRates={caratConversionRates}
         defaultGstRate={businessSettings.defaultGstRate}
         gstScheme={businessSettings.gstScheme}
         storeState={businessSettings.state}

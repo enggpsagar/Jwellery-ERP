@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { UserRole } from "@prisma/client";
 import { redirect } from "next/navigation";
 
-import { getPurityFineness } from "@/lib/actions/purity-actions";
+import { getPurityFineness, getCaratConversionRates } from "@/lib/actions/purity-actions";
 import { getCurrentUser } from "@/lib/auth/auth";
 
 import { PuritySettingsForm } from "@/components/settings/purity-settings-form";
+import { CaratConversionForm } from "@/components/settings/carat-conversion-form";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { PageBackHeader } from "@/components/shared/page-back-header";
 
@@ -22,7 +23,10 @@ export default async function PuritySettingsPage() {
     currentUser?.role === UserRole.SUPER_ADMIN;
   if (!canEdit) redirect("/dashboard");
 
-  const rows = await getPurityFineness();
+  const [rows, caratRows] = await Promise.all([
+    getPurityFineness(),
+    getCaratConversionRates(),
+  ]);
 
   return (
     <main className="space-y-6 p-6">
@@ -36,6 +40,8 @@ export default async function PuritySettingsPage() {
       <SettingsTabs active="purity" />
 
       <PuritySettingsForm rows={rows} canEdit={canEdit} />
+
+      <CaratConversionForm rows={caratRows} canEdit={canEdit} />
     </main>
   );
 }

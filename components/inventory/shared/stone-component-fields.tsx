@@ -29,6 +29,14 @@ type StoneComponentFieldsProps = {
   onStoneChange: (name: string, typeNames: string[]) => void
   selectedTypeNames: string[]
   onTypesChange: (names: string[]) => void
+  /** Carat Weight and Stone Rate render as part of this component's own
+   * grid (not a separate block the caller stacks below it) so the whole
+   * "Stone" section shares one consistent set of column widths instead of
+   * a full-width picker sitting above two independently-sized inputs. */
+  caratWeight: number
+  onCaratWeightChange: (value: string) => void
+  stoneRate: number
+  onStoneRateChange: (value: string) => void
 }
 
 /**
@@ -54,6 +62,10 @@ export function StoneComponentFields({
   onStoneChange,
   selectedTypeNames,
   onTypesChange,
+  caratWeight,
+  onCaratWeightChange,
+  stoneRate,
+  onStoneRateChange,
 }: StoneComponentFieldsProps) {
   const [stoneSearch, setStoneSearch] = useState("")
   const [typeSearch, setTypeSearch] = useState("")
@@ -103,51 +115,76 @@ export function StoneComponentFields({
 
   return (
     <div className="space-y-3">
-      <div className="space-y-1">
-        <Label className="text-xs">Stone</Label>
-        <div className="flex gap-1.5">
-          <Select value={stoneMetalTypeName} onValueChange={handleStoneSelect}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a stone" />
-            </SelectTrigger>
-            <SelectContent>
-              <div className="p-2">
-                <Input
-                  placeholder="Search stones..."
-                  value={stoneSearch}
-                  onChange={(event) => setStoneSearch(event.target.value)}
-                  onKeyDown={(event) => event.stopPropagation()}
-                />
-              </div>
-
-              {filteredStones.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                  No stones found{stoneSearch ? ` for "${stoneSearch}"` : ""}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="col-span-2 space-y-1">
+          <Label className="text-xs">Stone</Label>
+          <div className="flex gap-1.5">
+            <Select value={stoneMetalTypeName} onValueChange={handleStoneSelect}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a stone" />
+              </SelectTrigger>
+              <SelectContent>
+                <div className="p-2">
+                  <Input
+                    placeholder="Search stones..."
+                    value={stoneSearch}
+                    onChange={(event) => setStoneSearch(event.target.value)}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  />
                 </div>
-              ) : (
-                filteredStones.map((stone) => (
-                  <SelectItem key={stone.id} value={stone.name}>
-                    {stone.name}
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            title="Add Stone"
-            onClick={() => setAddStoneOpen(true)}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+                {filteredStones.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    No stones found{stoneSearch ? ` for "${stoneSearch}"` : ""}
+                  </div>
+                ) : (
+                  filteredStones.map((stone) => (
+                    <SelectItem key={stone.id} value={stone.name}>
+                      {stone.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              title="Add Stone"
+              onClick={() => setAddStoneOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs">Stone Carat Weight (ct)</Label>
+          <Input
+            type="number"
+            step="0.001"
+            value={caratWeight === 0 ? "" : caratWeight}
+            onChange={(event) => onCaratWeightChange(event.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Stone's own weight — independent of Net Weight
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs">Stone Rate (₹/ct)</Label>
+          <Input
+            type="number"
+            step="0.01"
+            value={stoneRate === 0 ? "" : stoneRate}
+            onChange={(event) => onStoneRateChange(event.target.value)}
+          />
         </div>
       </div>
 
       {selectedStone && (
-        <div className="space-y-1.5 rounded-md border p-2.5">
+        <div className="space-y-1.5 rounded-md bg-muted/40 p-2.5">
           <div className="flex items-center justify-between">
             <Label className="text-xs">Stone Types</Label>
             <Button

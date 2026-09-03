@@ -11,6 +11,7 @@ import {
   type StoreMetalOriginRow,
 } from "@/lib/actions/taxonomy-actions";
 import { classifyMetalName } from "@/lib/business-units";
+import { resolveGramsPerCarat } from "@/lib/purity";
 
 // A metal classifies into one of these groups by its name — GOLD/SILVER/
 // DIAMOND/OTHER via classifyMetalName (the same heuristic Business Units
@@ -117,6 +118,9 @@ type ProductFormProps = {
   pending: boolean;
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
+  /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
+   * Conversion Rules) — see the same prop on InvoiceForm. */
+  caratConversionRates: Record<PurityType, number>;
 };
 
 function ErrorText({ error }: { error?: string[] }) {
@@ -132,6 +136,7 @@ export function ProductForm({
   pending,
   metals,
   categories,
+  caratConversionRates,
 }: ProductFormProps) {
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? "");
 
@@ -216,7 +221,6 @@ export function ProductForm({
   const [caratWeight, setCaratWeight] = useState(
     product?.defaultCaratWeight ?? "",
   );
-  const CARAT_TO_GRAM = 0.2;
   const isCaratFamily = metalFamily === "DIAMOND" || metalFamily === "STONE";
 
   // A composite piece — e.g. a Gold ring with an embedded diamond — keeps
@@ -243,7 +247,8 @@ export function ProductForm({
     const caratNum = Number(value);
     if (value.trim() !== "" && Number.isFinite(caratNum)) {
       setNetTouched(true);
-      setNetWeight(String(Number((caratNum * CARAT_TO_GRAM).toFixed(5))));
+      const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
+      setNetWeight(String(Number((caratNum * gramsPerCarat).toFixed(5))));
     }
   }
 
@@ -255,7 +260,8 @@ export function ProductForm({
 
     const netNum = Number(value);
     if (value.trim() !== "" && Number.isFinite(netNum)) {
-      setCaratWeight(String(Number((netNum / CARAT_TO_GRAM).toFixed(5))));
+      const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
+      setCaratWeight(String(Number((netNum / gramsPerCarat).toFixed(5))));
     } else {
       setCaratWeight("");
     }

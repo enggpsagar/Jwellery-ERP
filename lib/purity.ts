@@ -85,16 +85,93 @@ export function toFineWeight(
   return (weight * percent) / 100;
 }
 
+/** The real diamond-carat standard (1 ct = 0.2g) — the fallback used
+ * wherever a store hasn't (or can't; see resolveGramsPerCarat) override it
+ * via Settings > Purity & Carat > Carat Conversion Rules. */
 export const GRAMS_PER_CARAT = 0.2;
+
+/** Same value for every PurityType until a store overrides one — the
+ * conversion is a fixed physical unit in reality, but some stores keep
+ * their own trade convention, so each purity is independently editable
+ * rather than a single global number (mirrors DEFAULT_FINENESS's shape). */
+export const DEFAULT_GRAMS_PER_CARAT: Record<PurityType, number> = {
+  GOLD_24K: GRAMS_PER_CARAT,
+  GOLD_22K: GRAMS_PER_CARAT,
+  GOLD_20K: GRAMS_PER_CARAT,
+  GOLD_18K: GRAMS_PER_CARAT,
+  SILVER_999: GRAMS_PER_CARAT,
+  SILVER_925: GRAMS_PER_CARAT,
+  PLATINUM_950: GRAMS_PER_CARAT,
+  PLATINUM_900: GRAMS_PER_CARAT,
+  DIAMOND: GRAMS_PER_CARAT,
+  OTHER: GRAMS_PER_CARAT,
+};
+
+/**
+ * Grams-per-carat per PurityType for a store, lazily seeded from
+ * DEFAULT_GRAMS_PER_CARAT on first read — same pattern as getFinenessMap.
+ * Server-only (reads the DB), so every client form that needs this fetches
+ * it once server-side and receives the resolved map as a prop; the actual
+ * per-keystroke conversion then runs client-side via resolveGramsPerCarat.
+ */
+export async function getGramsPerCaratMap(
+  storeId: string,
+): Promise<Record<PurityType, number>> {
+  const rows = await prisma.caratConversionRate.findMany({ where: { storeId } });
+
+  const map = { ...DEFAULT_GRAMS_PER_CARAT };
+  for (const row of rows) {
+    map[row.purity] = Number(row.gramsPerCarat);
+  }
+
+  const missing = (Object.keys(DEFAULT_GRAMS_PER_CARAT) as PurityType[]).filter(
+    (purity) => !rows.some((row) => row.purity === purity),
+  );
+
+  if (missing.length > 0) {
+    await prisma.caratConversionRate.createMany({
+      data: missing.map((purity) => ({
+        storeId,
+        purity,
+        gramsPerCarat: DEFAULT_GRAMS_PER_CARAT[purity],
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  return map;
+}
+
+/**
+ * Resolves which grams-per-carat figure applies to a line, from the map
+ * getGramsPerCaratMap() produced. A carat-priced line whose purity isn't
+ * set yet (or isn't a recognised PurityType — a free-text Stone metal name
+ * carries no PurityType at all) falls back to the store's own Diamond rate
+ * rather than the hardcoded default, so an override actually takes effect
+ * for the common "Stone" case too, not just literal Diamond lines.
+ */
+export function resolveGramsPerCarat(
+  purity: string | null | undefined,
+  rates: Record<PurityType, number>,
+): number {
+  if (purity && purity in rates) return rates[purity as PurityType];
+  return rates[PurityType.DIAMOND] ?? GRAMS_PER_CARAT;
+}
 
 /** Stone weight is always stored/calculated in grams (same convention as
  * grossWeight/netWeight/dmoWeight) — this converts a value a user typed in
  * a chosen unit into grams before it's used in any weight math or sent to
  * a server action. Shared across every line-item form's Stone Weight
  * field, unlike the per-file business-logic helpers elsewhere in this
- * codebase, since a unit conversion factor must never drift between them. */
-export function stoneWeightToGrams(value: number, unit: "GRAM" | "CARAT"): number {
-  return unit === "CARAT" ? value * GRAMS_PER_CARAT : value;
+ * codebase, since a unit conversion factor must never drift between them.
+ * `gramsPerCarat` defaults to the universal constant for a caller that
+ * hasn't threaded a store's configured rate through yet. */
+export function stoneWeightToGrams(
+  value: number,
+  unit: "GRAM" | "CARAT",
+  gramsPerCarat: number = GRAMS_PER_CARAT,
+): number {
+  return unit === "CARAT" ? value * gramsPerCarat : value;
 }
 
 /**

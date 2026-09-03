@@ -23,6 +23,8 @@ type QuotationItemRow = {
   makingCharge: number
   makingChargeType?: string
   stoneCharge: number
+  stoneMetalTypeName?: string | null
+  stoneTypeNames?: string | null
   lineTotal: number
 }
 
@@ -151,7 +153,15 @@ export default async function QuotationDetailPage({ params }: Props) {
           <tbody>
             {quotation.items.map((item: QuotationItemRow) => (
               <tr key={item.id} className="border-b last:border-0">
-                <td className="px-4 py-3">{item.itemName}</td>
+                <td className="px-4 py-3">
+                  {item.itemName}
+                  {item.stoneMetalTypeName ? (
+                    <span className="block text-xs text-muted-foreground">
+                      Stone: {item.stoneMetalTypeName}
+                      {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3">{item.quantity}</td>
                 <td className="px-4 py-3">
                   {item.purity === "DIAMOND"

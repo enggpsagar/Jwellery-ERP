@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
-import type { GstScheme } from "@prisma/client"
+import type { GstScheme, PurityType } from "@prisma/client"
 
 import { createInvoice, updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
@@ -27,7 +27,7 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
-import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, GRAMS_PER_CARAT } from "@/lib/purity"
+import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, resolveGramsPerCarat } from "@/lib/purity"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
@@ -150,6 +150,10 @@ type InvoiceFormProps = {
    * whatever else has already been entered on this document. */
   metals: StoreMetalRow[]
   origins: StoreMetalOriginRow[]
+  /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
+   * Conversion Rules), resolved via resolveGramsPerCarat() wherever a
+   * Carat Weight is converted to/from grams on this form. */
+  caratConversionRates: Record<PurityType, number>
   /** Store's default GST%, split into SGST+CGST (intra-state) or IGST
    * (inter-state) per line via computeGst() — see lib/gst.ts. Editable here
    * per invoice — a store on an exempt sale, or one that changes its rate
@@ -189,6 +193,7 @@ export function InvoiceForm({
   locations,
   metals: initialMetals,
   origins: initialOrigins,
+  caratConversionRates,
   defaultGstRate = 0,
   gstScheme,
   storeState,
@@ -447,7 +452,8 @@ export function InvoiceForm({
     if (isCaratLine(item)) {
       const caratNum = Number(value)
       if (value.trim() !== "" && Number.isFinite(caratNum)) {
-        patch.netWeight = Number((caratNum * GRAMS_PER_CARAT).toFixed(5))
+        const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+        patch.netWeight = Number((caratNum * gramsPerCarat).toFixed(5))
         patch.netTouched = true
       }
     } else if (item.hasStoneComponent && !item.stoneChargeTouched) {
@@ -482,9 +488,10 @@ export function InvoiceForm({
 
     if (isCaratLine(item)) {
       const netNum = Number(value)
+      const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
       patch.caratWeight =
         value.trim() !== "" && Number.isFinite(netNum)
-          ? Number((netNum / GRAMS_PER_CARAT).toFixed(3))
+          ? Number((netNum / gramsPerCarat).toFixed(3))
           : 0
     }
 
@@ -585,7 +592,7 @@ export function InvoiceForm({
             ? item.stoneTypeNames.join(", ")
             : null,
         dmoWeight: item.dmoWeight || null,
-        stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit) || null,
+        stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates)) || null,
         hmCharge: item.hmCharge,
         schemeDiscount: item.schemeDiscount,
         sgstAmount: sgst,
@@ -834,7 +841,7 @@ export function InvoiceForm({
                     value={item.grossWeight === 0 ? "" : item.grossWeight}
                     onChange={(e) => {
                       const grossWeight = Number(e.target.value) || 0
-                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit)
+                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
                       const derived = item.netTouched
                         ? null
                         : deriveNetWeight(grossWeight, stoneWeightGrams, item.dmoWeight)
@@ -884,7 +891,7 @@ export function InvoiceForm({
                     value={item.dmoWeight === 0 ? "" : item.dmoWeight}
                     onChange={(e) => {
                       const dmoWeight = Number(e.target.value) || 0
-                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit)
+                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
                       const derived = item.netTouched
                         ? null
                         : deriveNetWeight(item.grossWeight, stoneWeightGrams, dmoWeight)
@@ -959,44 +966,22 @@ export function InvoiceForm({
                   </label>
 
                   {item.hasStoneComponent && (
-                    <>
-                      <StoneComponentFields
-                        metals={metals}
-                        origins={origins}
-                        onMetalsChange={setMetals}
-                        onOriginsChange={setOrigins}
-                        stoneMetalTypeName={item.stoneMetalTypeName}
-                        onStoneChange={(name, typeNames) =>
-                          updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
-                        }
-                        selectedTypeNames={item.stoneTypeNames}
-                        onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
-                      />
-
-                      <div className="flex flex-wrap items-end gap-4">
-                        <div className="w-36 space-y-1">
-                          <Label className="text-xs">Stone Carat Weight (ct)</Label>
-                          <Input
-                            type="number"
-                            step="0.001"
-                            value={item.caratWeight === 0 ? "" : item.caratWeight}
-                            onChange={(e) => handleCaratWeightChange(item, e.target.value)}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Stone's own weight — independent of Net Weight
-                          </p>
-                        </div>
-                        <div className="w-36 space-y-1">
-                          <Label className="text-xs">Stone Rate (₹/ct)</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={item.stoneRate === 0 ? "" : item.stoneRate}
-                            onChange={(e) => handleStoneRateChange(item, e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </>
+                    <StoneComponentFields
+                      metals={metals}
+                      origins={origins}
+                      onMetalsChange={setMetals}
+                      onOriginsChange={setOrigins}
+                      stoneMetalTypeName={item.stoneMetalTypeName}
+                      onStoneChange={(name, typeNames) =>
+                        updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
+                      }
+                      selectedTypeNames={item.stoneTypeNames}
+                      onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
+                      caratWeight={item.caratWeight}
+                      onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
+                      stoneRate={item.stoneRate}
+                      onStoneRateChange={(value) => handleStoneRateChange(item, value)}
+                    />
                   )}
                 </div>
               )}
@@ -1020,7 +1005,7 @@ export function InvoiceForm({
                       value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
                       onChange={(e) => {
                         const stoneWeightInput = Number(e.target.value) || 0
-                        const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit)
+                        const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
                         const derived = item.netTouched
                           ? null
                           : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
@@ -1034,7 +1019,7 @@ export function InvoiceForm({
                       value={item.stoneWeightUnit}
                       onValueChange={(unit) => {
                         const stoneWeightUnit = unit as "GRAM" | "CARAT"
-                        const grams = stoneWeightToGrams(item.stoneWeightInput, stoneWeightUnit)
+                        const grams = stoneWeightToGrams(item.stoneWeightInput, stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
                         const derived = item.netTouched
                           ? null
                           : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)

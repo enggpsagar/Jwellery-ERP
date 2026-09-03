@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import type { PurityType } from "@prisma/client";
 
 import { updateProduct } from "@/lib/actions/inventory/product-actions";
 import {
@@ -46,12 +47,14 @@ type EditProductFormProps = {
   };
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
+  caratConversionRates: Record<PurityType, number>;
 };
 
 export function EditProductForm({
   product,
   metals,
   categories,
+  caratConversionRates,
 }: EditProductFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -107,6 +110,7 @@ export function EditProductForm({
         pending={pending}
         metals={metals}
         categories={categories}
+        caratConversionRates={caratConversionRates}
       />
     </form>
   );

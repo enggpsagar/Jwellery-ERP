@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import type { PurityType } from "@prisma/client";
 
 import { createInventoryStock } from "@/lib/actions/inventory/stock-actions";
 import {
@@ -14,9 +15,10 @@ import { StockForm } from "./stock-form";
 type StockCreateFormProps = {
   products: any[];
   locations: any[];
+  caratConversionRates: Record<PurityType, number>;
 };
 
-export function StockCreateForm({ products, locations }: StockCreateFormProps) {
+export function StockCreateForm({ products, locations, caratConversionRates }: StockCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
 
@@ -61,6 +63,7 @@ export function StockCreateForm({ products, locations }: StockCreateFormProps) {
         mode="create"
         products={products}
         locations={locations}
+        caratConversionRates={caratConversionRates}
         state={state}
         pending={pending}
       />

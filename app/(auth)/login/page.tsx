@@ -190,9 +190,6 @@ export default function LoginPage() {
           </span>
           <span className="text-left leading-tight">
             <span className="block font-semibold">{APP_NAME}</span>
-            <span className="block text-[11px] text-muted-foreground">
-              Jewellery ERP
-            </span>
           </span>
         </Link>
 

@@ -279,7 +279,6 @@ export default async function LandingPage() {
             </div>
             <div className="leading-tight">
               <p className="font-semibold">{APP_NAME}</p>
-              <p className="text-[11px] text-muted-foreground">Jewellery ERP</p>
             </div>
           </div>
 
@@ -535,9 +534,7 @@ export default async function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 text-sm text-muted-foreground sm:flex-row sm:px-6">
           <div className="flex items-center gap-2">
             <Gem className="size-4 text-[var(--chart-2)]" />
-            <span>
-              {APP_NAME} — Jewellery ERP
-            </span>
+            <span>{APP_NAME}</span>
           </div>
 
           <div className="flex items-center gap-4">

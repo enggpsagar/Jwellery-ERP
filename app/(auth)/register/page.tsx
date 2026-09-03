@@ -45,7 +45,6 @@ export default async function RegisterStorePage() {
             </div>
             <div className="leading-tight">
               <p className="font-semibold">{APP_NAME}</p>
-              <p className="text-[11px] text-muted-foreground">Jewellery ERP</p>
             </div>
           </Link>
 

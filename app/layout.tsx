@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { ToastProvider } from "@/components/providers/toast-provider";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { APP_NAME } from "@/lib/constants/app";
 
 // Inter (body) + Playfair Display (headings) — the premium-jewellery pairing
 // behind the app-wide theme in globals.css: a warm, high-contrast serif for
@@ -23,8 +24,8 @@ const headingFont = Playfair_Display({
 
 export const metadata: Metadata = {
   title: {
-    template: "%s · Jewellery ERP",
-    default: "Jewellery ERP",
+    template: `%s · ${APP_NAME}`,
+    default: APP_NAME,
   },
   description: "Admin dashboard",
 };

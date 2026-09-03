@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
+import { APP_NAME } from "@/lib/constants/app";
 import { avatarColor, initialsOf } from "@/lib/avatar-color";
 
 import {
@@ -339,8 +340,8 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
           </div>
 
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <h2 className="truncate font-heading font-semibold">{storeName || "Swarna Suite"}</h2>
-            <p className="text-xs text-muted-foreground">Jewellery ERP</p>
+            <h2 className="truncate font-heading font-semibold">{storeName || APP_NAME}</h2>
+            <p className="text-xs text-muted-foreground">{APP_NAME}</p>
           </div>
         </div>
       </SidebarHeader>

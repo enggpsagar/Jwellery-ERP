@@ -78,3 +78,63 @@ export function isLocationAllowed(scope: LocationScope, locationId: string | nul
   if (!scope.restricted) return true;
   return scope.locationIds.includes(locationId);
 }
+
+export type LocationResolution =
+  | { ok: true; locationId: string | null }
+  | { ok: false; message: string };
+
+/**
+ * Resolves the locationId to actually persist for a create/update action,
+ * given what the form submitted and the current user's location scope.
+ *
+ * Every create/update action across invoices, purchases, quotations, and
+ * kacha invoices used to validate a submitted locationId only when one was
+ * actually submitted (`if (locationId) { ... }`) — leaving nothing to stop
+ * a location-restricted Staff user from submitting none at all (the
+ * location picker always offers a "None" option, unconditionally). That
+ * saved the record with `locationId: null`, which then never matches that
+ * same user's own list query (`locationWhere` filters `{ locationId: { in:
+ * scope.locationIds } }`, and Prisma's `in` never matches `null`) — they
+ * could create an invoice/purchase/quotation and then never see it again,
+ * including the one they just made. This is the single place that gap is
+ * now closed; every one of those actions should call this instead of
+ * re-deriving the same validation ad hoc.
+ */
+export async function resolveWritableLocationId(
+  storeId: string,
+  submittedLocationId: string | null,
+  scope: LocationScope,
+): Promise<LocationResolution> {
+  if (submittedLocationId) {
+    const location = await prisma.storeLocation.findFirst({
+      where: { id: submittedLocationId, storeId },
+      select: { id: true },
+    });
+    if (!location) {
+      return { ok: false, message: "Selected location is invalid" };
+    }
+    if (!isLocationAllowed(scope, submittedLocationId)) {
+      return { ok: false, message: "You don't have access to bill against this location" };
+    }
+    return { ok: true, locationId: submittedLocationId };
+  }
+
+  if (!scope.restricted) {
+    return { ok: true, locationId: null };
+  }
+
+  // Restricted with exactly one grant: use it automatically rather than
+  // making a single-branch Staff user pick what they only ever have one
+  // option for.
+  if (scope.locationIds.length === 1) {
+    return { ok: true, locationId: scope.locationIds[0] };
+  }
+
+  // Restricted with more than one grant and nothing chosen: this is exactly
+  // the case that used to silently save as locationId: null. Require an
+  // explicit choice instead.
+  return {
+    ok: false,
+    message: "Please select which of your locations this is for.",
+  };
+}

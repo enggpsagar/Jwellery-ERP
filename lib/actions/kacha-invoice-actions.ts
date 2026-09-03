@@ -19,6 +19,7 @@ import {
   getLocationScope,
   locationWhere,
   isLocationAllowed,
+  resolveWritableLocationId,
   type LocationScope,
 } from "@/lib/location-scope";
 import { requireAuth, requireRole } from "@/lib/auth/auth";
@@ -407,25 +408,16 @@ export async function createKachaInvoice(
       return { success: false, message: "Please select a customer" };
     }
 
-    // Without this, every slip saved with locationId: null — a
-    // location-restricted Staff user's own list filters by
-    // `locationId: { in: scope.locationIds }`, so they could create a slip
-    // and then never see it again, including the one they just made. Same
-    // validation as invoice-actions.ts/purchase-actions.ts.
-    if (locationId) {
-      const location = await prisma.storeLocation.findFirst({
-        where: { id: locationId, storeId },
-        select: { id: true },
-      });
-      if (!location) {
-        return { success: false, message: "Selected location is invalid" };
-      }
-
-      const scope = await getLocationScope();
-      if (!isLocationAllowed(scope, locationId)) {
-        return { success: false, message: "You don't have access to bill against this location" };
-      }
+    // See resolveWritableLocationId's own doc comment — without this, a
+    // location-restricted Staff user submitting no location at all saved
+    // the slip with locationId: null, which then never matches their own
+    // location-scoped list afterward.
+    const locationScope = await getLocationScope();
+    const locationResolution = await resolveWritableLocationId(storeId, locationId, locationScope);
+    if (!locationResolution.ok) {
+      return { success: false, message: locationResolution.message };
     }
+    const resolvedLocationId = locationResolution.locationId;
 
     // Every referenced stock item must belong to this store — otherwise a
     // crafted itemsJson could link a line item to another store's stock,
@@ -482,7 +474,7 @@ export async function createKachaInvoice(
           paidAmount,
           balanceAmount,
           notes,
-          locationId: locationId ?? undefined,
+          locationId: resolvedLocationId ?? undefined,
           items: {
             create: items.map((item) => ({
               itemName: item.itemName,
@@ -573,7 +565,7 @@ export async function createKachaInvoice(
             customerId,
             amount: balanceAmount,
             description: `Kacha slip ${slipNumber} balance due`,
-            locationId: locationId ?? undefined,
+            locationId: resolvedLocationId ?? undefined,
           },
         });
       }

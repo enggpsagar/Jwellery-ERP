@@ -21,6 +21,7 @@ import {
   getLocationScope,
   locationWhere,
   isLocationAllowed,
+  resolveWritableLocationId,
   type LocationScope,
 } from "@/lib/location-scope";
 import { sendMail } from "@/lib/mailer";
@@ -710,25 +711,16 @@ export async function createInvoice(
       };
     }
 
-    // Without this, every invoice saved with locationId: null — a
-    // location-restricted Staff user's own `getInvoices` list filters by
-    // `locationId: { in: scope.locationIds }`, so they could create an
-    // invoice and then never see it again, including the one they just
-    // made. Same validation as purchase-actions.ts/quotation-actions.ts.
-    if (locationId) {
-      const location = await prisma.storeLocation.findFirst({
-        where: { id: locationId, storeId },
-        select: { id: true },
-      });
-      if (!location) {
-        return { success: false, message: "Selected location is invalid" };
-      }
-
-      const scope = await getLocationScope();
-      if (!isLocationAllowed(scope, locationId)) {
-        return { success: false, message: "You don't have access to bill against this location" };
-      }
+    // See resolveWritableLocationId's own doc comment — without this, a
+    // location-restricted Staff user submitting no location at all (the
+    // picker always offers "None") saved the invoice with locationId: null,
+    // which then never matches their own location-scoped list afterward.
+    const locationScope = await getLocationScope();
+    const locationResolution = await resolveWritableLocationId(storeId, locationId, locationScope);
+    if (!locationResolution.ok) {
+      return { success: false, message: locationResolution.message };
     }
+    const resolvedLocationId = locationResolution.locationId;
 
     // A replacement invoice may only target a cancelled invoice in this
     // store that hasn't already been replaced — replacesId's @unique
@@ -805,7 +797,7 @@ export async function createInvoice(
           paidAmount,
           balanceAmount,
           notes,
-          locationId: locationId ?? undefined,
+          locationId: resolvedLocationId ?? undefined,
           // Recorded at the moment of sale, name included, so the invoice
           // still says who raised it after that person leaves the shop.
           createdById: actor.id ?? null,
@@ -915,7 +907,7 @@ export async function createInvoice(
             invoiceId: created.id,
             amount: balanceAmount,
             description: `Invoice ${invoiceNumber} balance due`,
-            locationId: locationId ?? undefined,
+            locationId: resolvedLocationId ?? undefined,
           },
         });
       }
@@ -1074,20 +1066,12 @@ export async function updateInvoice(
     const notes = String(formData.get("notes") || "").trim() || null;
     const locationId = String(formData.get("locationId") || "").trim() || null;
 
-    if (locationId) {
-      const location = await prisma.storeLocation.findFirst({
-        where: { id: locationId, storeId },
-        select: { id: true },
-      });
-      if (!location) {
-        return { success: false, message: "Selected location is invalid" };
-      }
-
-      const scope = await getLocationScope();
-      if (!isLocationAllowed(scope, locationId)) {
-        return { success: false, message: "You don't have access to bill against this location" };
-      }
+    const locationScope = await getLocationScope();
+    const locationResolution = await resolveWritableLocationId(storeId, locationId, locationScope);
+    if (!locationResolution.ok) {
+      return { success: false, message: locationResolution.message };
     }
+    const resolvedLocationId = locationResolution.locationId;
 
     const hasItems = formData.has("itemsJson");
 
@@ -1098,7 +1082,7 @@ export async function updateInvoice(
           invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : invoice.invoiceDate,
           dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
           notes,
-          locationId: locationId ?? null,
+          locationId: resolvedLocationId ?? null,
         },
       });
 
@@ -1266,7 +1250,7 @@ export async function updateInvoice(
           invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : invoice.invoiceDate,
           dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
           notes,
-          locationId: locationId ?? null,
+          locationId: resolvedLocationId ?? null,
           items: {
             deleteMany: {},
             create: items.map((item) => ({
@@ -1358,7 +1342,7 @@ export async function updateInvoice(
             invoiceId: invoice.id,
             amount: Math.abs(delta),
             description: `Invoice ${invoice.invoiceNumber} revised — balance ${delta > 0 ? "increased" : "decreased"}`,
-            locationId: locationId ?? undefined,
+            locationId: resolvedLocationId ?? undefined,
           },
         });
       }

@@ -21,6 +21,7 @@ import {
   getLocationScope,
   locationWhere,
   isLocationAllowed,
+  resolveWritableLocationId,
   type LocationScope,
 } from "@/lib/location-scope";
 import { buildExcelExport } from "@/lib/excel-export";
@@ -477,20 +478,16 @@ export async function createQuotation(
       : [];
     const validStockIds = new Set(validStock.map((s) => s.id));
 
-    if (locationId) {
-      const location = await prisma.storeLocation.findFirst({
-        where: { id: locationId, storeId },
-        select: { id: true },
-      });
-      if (!location) {
-        return { success: false, message: "Selected location is invalid" };
-      }
-
-      const scope = await getLocationScope();
-      if (!isLocationAllowed(scope, locationId)) {
-        return { success: false, message: "You don't have access to file a quotation against this location" };
-      }
+    // See resolveWritableLocationId's own doc comment — without this, a
+    // location-restricted Staff user submitting no location at all saved
+    // the quotation with locationId: null, which then never matches their
+    // own location-scoped list afterward.
+    const locationScope = await getLocationScope();
+    const locationResolution = await resolveWritableLocationId(storeId, locationId, locationScope);
+    if (!locationResolution.ok) {
+      return { success: false, message: locationResolution.message };
     }
+    const resolvedLocationId = locationResolution.locationId;
 
     const quotationNumber = await generateQuotationNumber(storeId);
 
@@ -512,7 +509,7 @@ export async function createQuotation(
         igstAmount,
         totalAmount,
         notes,
-        locationId: locationId ?? undefined,
+        locationId: resolvedLocationId ?? undefined,
         items: {
           create: items.map((item) => ({
             itemName: item.itemName,

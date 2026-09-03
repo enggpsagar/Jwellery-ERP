@@ -24,6 +24,7 @@ import {
   getLocationScope,
   locationWhere,
   isLocationAllowed,
+  resolveWritableLocationId,
   type LocationScope,
 } from "@/lib/location-scope";
 import { buildExcelExport } from "@/lib/excel-export";
@@ -554,20 +555,16 @@ export async function createPurchase(
       return { success: false, message: "One or more selected products are invalid" };
     }
 
-    if (locationId) {
-      const location = await prisma.storeLocation.findFirst({
-        where: { id: locationId, storeId },
-        select: { id: true },
-      });
-      if (!location) {
-        return { success: false, message: "Selected location is invalid" };
-      }
-
-      const scope = await getLocationScope();
-      if (!isLocationAllowed(scope, locationId)) {
-        return { success: false, message: "You don't have access to file a purchase against this location" };
-      }
+    // See resolveWritableLocationId's own doc comment — without this, a
+    // location-restricted Staff user submitting no location at all saved
+    // the purchase with locationId: null, which then never matches their
+    // own location-scoped list afterward.
+    const locationScope = await getLocationScope();
+    const locationResolution = await resolveWritableLocationId(storeId, locationId, locationScope);
+    if (!locationResolution.ok) {
+      return { success: false, message: locationResolution.message };
     }
+    const resolvedLocationId = locationResolution.locationId;
 
     const purchaseNumber = await generatePurchaseNumber(storeId);
     const purchaseDate = purchaseDateRaw ? new Date(purchaseDateRaw) : new Date();
@@ -612,7 +609,7 @@ export async function createPurchase(
             vendorId,
             vendorName: vendor.name,
             purchaseDate,
-            locationId: locationId ?? undefined,
+            locationId: resolvedLocationId ?? undefined,
           },
           select: { id: true },
         });
@@ -641,7 +638,7 @@ export async function createPurchase(
           balanceAmount,
           notes,
           vendorInvoiceNumber,
-          locationId: locationId ?? undefined,
+          locationId: resolvedLocationId ?? undefined,
           items: {
             create: items.map((item, i) => ({
               productId: item.productId,
@@ -696,7 +693,7 @@ export async function createPurchase(
             purchaseId: created.id,
             amount: balanceAmount,
             description: `Purchase ${purchaseNumber} balance due`,
-            locationId: locationId ?? undefined,
+            locationId: resolvedLocationId ?? undefined,
           },
         });
       }

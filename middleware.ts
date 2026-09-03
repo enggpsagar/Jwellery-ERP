@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { MODULE_DEFINITIONS } from "@/lib/roles";
 
-const KARIGAR_ALLOWED_PREFIXES = ["/my-jobs", "/profile"];
+const KARIGAR_ALLOWED_PREFIXES = ["/my-jobs", "/profile", "/help"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -31,6 +31,11 @@ export async function middleware(request: NextRequest) {
   const role = token.role as string | undefined;
 
   if (pathname.startsWith("/stores") && role !== "SUPER_ADMIN") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // Platform-wide Contact Us / FAQ content editor — same gate as /stores.
+  if (pathname.startsWith("/platform-content") && role !== "SUPER_ADMIN") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
@@ -70,5 +75,7 @@ export const config = {
   // was redirected to /login before the page rendered. Requiring at least
   // one character after the slash leaves "/" public and protects everything
   // below it exactly as before.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|login|register).+)"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|login|register|contact|faq).+)",
+  ],
 };

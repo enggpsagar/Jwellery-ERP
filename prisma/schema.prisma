@@ -1083,6 +1083,60 @@ model BusinessSettings {
   createdAt DateTime @default(now())
 }
 
+/**
+ * Swarna Suite's own Contact Us content — platform-wide, not per-store.
+ *
+ * Deliberately has NO storeId, unlike almost every other model in this
+ * schema. This is the platform operator's support info (message, optional
+ * image, contact details) shown identically to every store's users and
+ * every public-site visitor — not a per-tenant setting like
+ * BusinessSettings above. This is a correct, intentional exception to the
+ * storeId-scoping convention, not an oversight — do not add storeId here.
+ *
+ * A singleton: the service layer fetches the first row (creating a default
+ * one on first access, same pattern as getBusinessSettings) rather than
+ * looking up by a caller-supplied id. Editable only by SUPER_ADMIN — see
+ * lib/actions/platform-content-actions.ts.
+ */
+model PlatformContactContent {
+  id    String @id @default(cuid())
+  // Editable multi-line message shown on the public Contact Us page and in
+  // the app's Help & Support section. Plain text, not rich text/HTML — see
+  // the doc comment on ContactContentForm for why.
+  message String
+
+  // Optional supporting image (e.g. a support-desk photo, a QR code to a
+  // WhatsApp line). Uploaded via Vercel Blob, same convention as
+  // BusinessSettings.logoUrl / app/api/store/logo/route.ts.
+  imageUrl String?
+
+  email   String?
+  phone   String?
+  address String?
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+/**
+ * A single FAQ question/answer pair, platform-wide (no storeId — same
+ * reasoning as PlatformContactContent above). `position` drives manual
+ * ordering in the SUPER_ADMIN editor; `isPublished` lets a draft entry be
+ * prepared before it appears on the public FAQ page / app Help section.
+ */
+model PlatformFaq {
+  id          String   @id @default(cuid())
+  question    String
+  answer      String
+  position    Int      @default(0)
+  isPublished Boolean  @default(true)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([isPublished, position])
+}
+
 model User {
   id                  String                @id @default(cuid())
   name                String?

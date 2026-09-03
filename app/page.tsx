@@ -282,7 +282,13 @@ export default async function LandingPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button asChild variant="ghost" className="hidden sm:inline-flex">
+              <Link href="/faq">FAQ</Link>
+            </Button>
+            <Button asChild variant="ghost" className="hidden sm:inline-flex">
+              <Link href="/contact">Contact Us</Link>
+            </Button>
             <Button asChild variant="ghost" className="hidden sm:inline-flex">
               <Link href="/register">Register your store</Link>
             </Button>
@@ -538,6 +544,12 @@ export default async function LandingPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            <Link href="/faq" className="hover:text-foreground">
+              FAQ
+            </Link>
+            <Link href="/contact" className="hover:text-foreground">
+              Contact Us
+            </Link>
             <Link href="/register" className="hover:text-foreground">
               Register
             </Link>

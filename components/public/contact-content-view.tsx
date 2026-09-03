@@ -22,11 +22,13 @@ export function ContactContentView({ content }: ContactContentViewProps) {
   return (
     <div className="grid gap-8 sm:grid-cols-2 sm:items-start">
       <div>
-        {/* Plain text, not HTML — whitespace-pre-line preserves the line
-            breaks a store owner types without needing a rich text editor. */}
-        <p className="whitespace-pre-line text-base leading-relaxed text-muted-foreground">
-          {content.message}
-        </p>
+        {/* content.message is TipTap-authored HTML from a SUPER_ADMIN-only
+            editor (see components/shared/rich-text-editor.tsx) — never
+            user-generated, so rendered directly without sanitization. */}
+        <div
+          className="prose prose-sm max-w-none text-base leading-relaxed text-muted-foreground [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5"
+          dangerouslySetInnerHTML={{ __html: content.message }}
+        />
 
         {details.length > 0 ? (
           <dl className="mt-6 space-y-3">

@@ -18,13 +18,19 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { RichTextEditor } from "@/components/shared/rich-text-editor"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Loader } from "@/components/ui/loader"
 import { useToast } from "@/components/providers/toast-provider"
 
 const initialState: PlatformContentFormState = { success: false, message: "" }
+
+/** faq.answer is TipTap HTML — this admin list row is a plain-text preview,
+ *  not a rendered view, so tags are stripped rather than shown raw. */
+function stripHtml(html: string) {
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+}
 
 /**
  * SUPER_ADMIN editor for the FAQ list. Mirrors components/plans/plans-client.tsx's
@@ -114,7 +120,7 @@ export function FaqManager({ faqs }: { faqs: PlatformFaqRow[] }) {
                 </span>
                 {!faq.isPublished ? <Badge variant="outline">Draft</Badge> : null}
               </div>
-              <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{faq.answer}</p>
+              <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{stripHtml(faq.answer)}</p>
             </div>
 
             <div className="flex shrink-0 items-center gap-1.5">
@@ -230,10 +236,9 @@ function FaqFormRow({ faq, onDone }: { faq?: PlatformFaqRow; onDone: () => void 
 
       <div className="space-y-1.5">
         <Label htmlFor="answer" required>Answer</Label>
-        <Textarea
+        <RichTextEditor
           id="answer"
           name="answer"
-          rows={3}
           defaultValue={faq?.answer ?? ""}
           required
         />

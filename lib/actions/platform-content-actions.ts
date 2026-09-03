@@ -20,6 +20,14 @@ import { requireRole } from "@/lib/auth/auth";
  * there is exactly one source of truth.
  */
 
+/** message/answer arrive as TipTap HTML (see components/shared/rich-text-
+ *  editor.tsx) — an editor with nothing typed still submits "<p></p>", not
+ *  an empty string, so "required" has to check the stripped text, not the
+ *  raw HTML. */
+function isHtmlEmpty(html: string): boolean {
+  return html.replace(/<[^>]+>/g, "").trim().length === 0;
+}
+
 const PLATFORM_CONTENT_PATH = "/platform-content";
 // Every place the content is actually rendered — revalidated together so an
 // edit shows up immediately everywhere, not just in the editor that made it.
@@ -129,7 +137,7 @@ export async function updatePlatformContactContent(
   }
 
   const message = String(formData.get("message") || "").trim();
-  if (!message) {
+  if (isHtmlEmpty(message)) {
     return {
       success: false,
       message: "Please fix the form errors",
@@ -225,7 +233,7 @@ function parseFaqFields(formData: FormData) {
 
   const errors: Record<string, string[]> = {};
   if (!question) errors.question = ["Question is required"];
-  if (!answer) errors.answer = ["Answer is required"];
+  if (isHtmlEmpty(answer)) errors.answer = ["Answer is required"];
 
   return { question, answer, errors };
 }

@@ -12,20 +12,13 @@ import { ContactImageUpload } from "@/components/platform-content/contact-image-
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { RichTextEditor } from "@/components/shared/rich-text-editor"
 import { useToast } from "@/components/providers/toast-provider"
 
 const initialState: PlatformContentFormState = { success: false, message: "" }
 
 /**
  * SUPER_ADMIN editor for the platform-wide Contact Us content.
- *
- * A plain textarea rather than a rich text editor: no WYSIWYG library is
- * installed anywhere in this app, the ask was an editable message with
- * image support (not rich formatting), and this app's own convention for
- * every other free-text field (invoice terms/notes, addresses) is already
- * a plain <Textarea> — see components/settings/settings-form.tsx. Adding a
- * new dependency for one short paragraph wasn't justified.
  */
 export function ContactContentForm({
   content,
@@ -72,10 +65,9 @@ export function ContactContentForm({
         <Label htmlFor="message" required>
           Message
         </Label>
-        <Textarea
+        <RichTextEditor
           id="message"
           name="message"
-          rows={6}
           defaultValue={content.message}
           placeholder="Have a question or need help with your account? Reach out and we'll get back to you."
           required

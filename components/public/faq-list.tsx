@@ -31,7 +31,12 @@ export function FaqList({ faqs }: FaqListProps) {
         <AccordionItem key={faq.id} value={faq.id}>
           <AccordionTrigger>{faq.question}</AccordionTrigger>
           <AccordionContent>
-            <p className="whitespace-pre-line">{faq.answer}</p>
+            {/* faq.answer is TipTap-authored HTML from a SUPER_ADMIN-only
+                editor — never user-generated, so rendered directly. */}
+            <div
+              className="prose prose-sm max-w-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5"
+              dangerouslySetInnerHTML={{ __html: faq.answer }}
+            />
           </AccordionContent>
         </AccordionItem>
       ))}

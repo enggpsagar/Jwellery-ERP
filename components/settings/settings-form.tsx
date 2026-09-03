@@ -8,12 +8,7 @@ import {
   type BusinessSettings,
   type SettingsFormState,
 } from "@/lib/actions/settings-actions";
-import {
-  ALL_BUSINESS_UNITS,
-  BUSINESS_UNIT_LABELS,
-  BUSINESS_UNIT_DESCRIPTIONS,
-  type BusinessUnit,
-} from "@/lib/business-units";
+import type { BusinessUnitOption } from "@/lib/business-units.server";
 import { getCitiesByStateId, type StateOption } from "@/lib/actions/location-actions";
 import { GST_SCHEME_OPTIONS } from "@/lib/gst";
 import type { GstScheme } from "@prisma/client";
@@ -33,11 +28,15 @@ type SettingsFormProps = {
   settings: BusinessSettings;
   canEdit: boolean;
   states?: StateOption[];
+  // Money plus every currently-configured metal/gemstone (StoreMetal) this
+  // store has in Taxonomy settings — see getAvailableBusinessUnitOptions.
+  // Always render the Business Model checkboxes from this, never a fixed list.
+  unitOptions: BusinessUnitOption[];
 };
 
 const initialState: SettingsFormState = { success: false, message: "" };
 
-export function SettingsForm({ settings, canEdit, states = [] }: SettingsFormProps) {
+export function SettingsForm({ settings, canEdit, states = [], unitOptions }: SettingsFormProps) {
   const [state, formAction, isPending] = useActionState(
     updateBusinessSettings,
     initialState,
@@ -45,11 +44,11 @@ export function SettingsForm({ settings, canEdit, states = [] }: SettingsFormPro
 
   const [gstScheme, setGstScheme] = useState<GstScheme>(settings.gstScheme);
 
-  const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>(
+  const [businessUnits, setBusinessUnits] = useState<string[]>(
     settings.businessUnits,
   );
 
-  function toggleUnit(unit: BusinessUnit) {
+  function toggleUnit(unit: string) {
     setBusinessUnits((current) =>
       current.includes(unit)
         ? current.filter((u) => u !== unit)
@@ -427,12 +426,18 @@ export function SettingsForm({ settings, canEdit, states = [] }: SettingsFormPro
           </p>
 
           <div className="grid gap-3 md:grid-cols-2">
-            {ALL_BUSINESS_UNITS.map((unit) => {
-              const checked = businessUnits.includes(unit);
+            {unitOptions.map((option) => {
+              const checked = businessUnits.includes(option.value);
+              const description =
+                option.value === "MONEY"
+                  ? "Track customer/karigar dues and payments in rupees."
+                  : option.isGemstone
+                    ? `Track dues and payments in carats of ${option.label.toLowerCase()} weight.`
+                    : `Track dues and payments in grams of fine ${option.label.toLowerCase()}.`;
 
               return (
                 <label
-                  key={unit}
+                  key={option.value}
                   className={cn(
                     "flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm transition-colors",
                     checked
@@ -443,18 +448,18 @@ export function SettingsForm({ settings, canEdit, states = [] }: SettingsFormPro
                   <input
                     type="checkbox"
                     name="businessUnits"
-                    value={unit}
+                    value={option.value}
                     checked={checked}
-                    onChange={() => toggleUnit(unit)}
+                    onChange={() => toggleUnit(option.value)}
                     className="mt-0.5 size-4"
                   />
 
                   <span>
                     <span className="block font-medium">
-                      {BUSINESS_UNIT_LABELS[unit]}
+                      {option.label}
                     </span>
                     <span className="block text-xs text-muted-foreground">
-                      {BUSINESS_UNIT_DESCRIPTIONS[unit]}
+                      {description}
                     </span>
                   </span>
                 </label>

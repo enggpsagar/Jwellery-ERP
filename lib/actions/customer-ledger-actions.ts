@@ -10,12 +10,8 @@ import { formatLedgerSource } from "@/lib/ledger-format"
 import { sendMail } from "@/lib/mailer"
 import { ledgerStatementEmail } from "@/lib/email-templates"
 import { resolveStoreName } from "@/lib/invite-email"
-import {
-  classifyMetalName,
-  BUSINESS_UNIT_LABELS,
-  type BusinessUnit,
-} from "@/lib/business-units"
-import { getActiveBusinessUnits } from "@/lib/business-units.server"
+import { MONEY_UNIT } from "@/lib/business-units"
+import { getActiveBusinessUnits, type BusinessUnitOption } from "@/lib/business-units.server"
 
 export type CustomerLedgerFormState = {
   success: boolean
@@ -31,8 +27,8 @@ export type CustomerLedgerEntryItem = {
   amount: number
   metalType: string | null
   metalWeight: number | null
-  /** Carat quantity for a Diamond entry — Diamond is carat-based, not
-   * weight-based (see business-units.ts's CARAT_BASED_UNITS). */
+  /** Carat quantity for a gemstone-unit entry — a gemstone is carat-based,
+   * not weight-based (StoreMetal.isGemstone). */
   caratWeight: number | null
   paymentMethod: string | null
   entryDate: string
@@ -41,8 +37,10 @@ export type CustomerLedgerEntryItem = {
 }
 
 export type CustomerLedgerUnitSummary = {
-  unit: BusinessUnit
+  /** StoreMetal.id */
+  unit: string
   label: string
+  isGemstone: boolean
   debitTotal: number
   creditTotal: number
   currentBalance: number
@@ -103,6 +101,14 @@ export async function getCustomerLedgerEntries(
   }))
 }
 
+/**
+ * Non-money balances bucket by each entry's own `metalTypeId` FK against the
+ * store's *currently configured* business-unit StoreMetal ids, rather than
+ * name-substring-classifying `metalType.name` into a fixed Gold/Silver/
+ * Diamond family — see getLedgerTotals's doc comment in ledger-actions.ts
+ * for why: that old approach silently dropped any custom metal or
+ * non-Diamond gemstone from these totals entirely.
+ */
 export async function getCustomerLedgerSummary(
   customerId: string
 ): Promise<CustomerLedgerSummary | null> {
@@ -115,31 +121,30 @@ export async function getCustomerLedgerSummary(
 
   if (!customer) return null
 
-  const [entries, activeUnits] = await Promise.all([
-    prisma.ledgerEntry.findMany({
-      where: { customerId, storeId },
-      select: {
-        type: true,
-        amount: true,
-        metalWeight: true,
-        metalWeightFine: true,
-        caratWeight: true,
-        metalType: { select: { name: true } },
-      },
-    }),
-    getActiveBusinessUnits(),
-  ])
+  const activeUnits = await getActiveBusinessUnits()
+  const nonMoneyUnits = activeUnits.filter((unit) => unit.value !== MONEY_UNIT)
+  const unitById = new Map(nonMoneyUnits.map((unit) => [unit.value, unit]))
+
+  const entries = await prisma.ledgerEntry.findMany({
+    where: { customerId, storeId },
+    select: {
+      type: true,
+      amount: true,
+      metalTypeId: true,
+      metalWeight: true,
+      metalWeightFine: true,
+      caratWeight: true,
+    },
+  })
 
   const openingBalance = Number(customer.openingBalance ?? 0)
 
   let ledgerDebitTotal = 0
   let ledgerCreditTotal = 0
 
-  const weightTotals: Record<string, { debit: number; credit: number }> = {
-    GOLD: { debit: 0, credit: 0 },
-    SILVER: { debit: 0, credit: 0 },
-    DIAMOND: { debit: 0, credit: 0 },
-  }
+  const weightTotals = new Map<string, { debit: number; credit: number }>(
+    nonMoneyUnits.map((unit) => [unit.value, { debit: 0, credit: 0 }]),
+  )
 
   for (const entry of entries) {
     const amount = Number(entry.amount ?? 0)
@@ -151,41 +156,40 @@ export async function getCustomerLedgerSummary(
       ledgerCreditTotal += amount
     }
 
-    const family = classifyMetalName(entry.metalType?.name)
-    if (family === "OTHER") continue
+    if (!entry.metalTypeId) continue
+    const unit = unitById.get(entry.metalTypeId)
+    if (!unit) continue
 
-    // Diamond is carat-based, not weight-based (see business-units.ts's
-    // CARAT_BASED_UNITS) — reads its own caratWeight column, never the
-    // Gold/Silver metalWeight/metalWeightFine columns or the rupee amount.
-    const value =
-      family === "DIAMOND"
-        ? Number(entry.caratWeight ?? 0)
-        : Number(entry.metalWeightFine ?? entry.metalWeight ?? 0)
+    // A gemstone unit is carat-based, not weight-based — reads its own
+    // caratWeight column, never metalWeight/metalWeightFine or the rupee amount.
+    const value = unit.isGemstone
+      ? Number(entry.caratWeight ?? 0)
+      : Number(entry.metalWeightFine ?? entry.metalWeight ?? 0)
 
-    weightTotals[family][isDebit ? "debit" : "credit"] += value
+    const bucket = weightTotals.get(unit.value)!
+    bucket[isDebit ? "debit" : "credit"] += value
   }
 
-  const unitSummaries: CustomerLedgerUnitSummary[] = activeUnits
-    .filter((unit) => unit !== "MONEY")
-    .map((unit) => {
-      const debitTotal = weightTotals[unit]?.debit ?? 0
-      const creditTotal = weightTotals[unit]?.credit ?? 0
+  const unitSummaries: CustomerLedgerUnitSummary[] = nonMoneyUnits.map((unit) => {
+    const debitTotal = weightTotals.get(unit.value)?.debit ?? 0
+    const creditTotal = weightTotals.get(unit.value)?.credit ?? 0
 
-      return {
-        unit,
-        label: BUSINESS_UNIT_LABELS[unit],
-        debitTotal,
-        creditTotal,
-        currentBalance: debitTotal - creditTotal,
-      }
-    })
+    return {
+      unit: unit.value,
+      label: unit.label,
+      isGemstone: unit.isGemstone,
+      debitTotal,
+      creditTotal,
+      currentBalance: debitTotal - creditTotal,
+    }
+  })
 
   return {
     openingBalance,
     ledgerDebitTotal,
     ledgerCreditTotal,
     currentBalance: openingBalance + ledgerDebitTotal - ledgerCreditTotal,
-    moneyActive: activeUnits.includes("MONEY"),
+    moneyActive: activeUnits.some((unit) => unit.value === MONEY_UNIT),
     unitSummaries,
   }
 }
@@ -200,43 +204,47 @@ type ManualEntryFields = {
 
 /**
  * A manual ledger entry can be denominated in money (a ₹ amount) or, for a
- * business that also deals in Gold/Silver/Diamond, in a quantity of that unit
- * instead — the unit picked in the dialog decides which fields formData
- * actually carries. Diamond is carat-based (see lib/business-units.ts's
- * CARAT_BASED_UNITS), so it's parsed the same way Gold/Silver's weight is —
- * a required metal type plus a required positive quantity — just written
- * into caratWeight instead of metalWeight/metalWeightFine.
+ * business that also deals in a configured metal/gemstone unit, in a
+ * quantity of that unit instead — the unit picked in the dialog decides
+ * which fields formData actually carries. `unit` is now either "MONEY" or a
+ * live StoreMetal.id directly (see business-units.server.ts's
+ * BusinessUnitOption) — there's no separate "type within the unit" field
+ * any more, since each configured business unit already *is* one specific
+ * StoreMetal row. The unit's own `isGemstone` flag (resolved server-side
+ * against the store's currently active units, not trusted from the form)
+ * decides carat vs. gram, same as formatUnitValue.
  */
 function parseManualEntryFields(
   formData: FormData,
+  activeUnits: BusinessUnitOption[],
 ): { ok: true; fields: ManualEntryFields } | { ok: false; errors: Record<string, string[]> } {
-  const unit = String(formData.get("unit") || "MONEY") as BusinessUnit
+  const unitValue = String(formData.get("unit") || MONEY_UNIT)
   const errors: Record<string, string[]> = {}
 
-  if (unit === "GOLD" || unit === "SILVER" || unit === "DIAMOND") {
-    const metalTypeId = String(formData.get("metalTypeId") || "").trim()
+  if (unitValue !== MONEY_UNIT) {
+    const unit = activeUnits.find((option) => option.value === unitValue)
     const weight = toNumber(formData.get("weight"), 0)
 
-    if (!metalTypeId) {
-      errors.metalTypeId = [`Select which ${unit.toLowerCase()} type this entry is for`]
+    if (!unit) {
+      errors.unit = ["Select a valid unit"]
     }
 
     if (!weight || weight <= 0) {
       errors.weight = ["Weight must be greater than 0"]
     }
 
-    if (Object.keys(errors).length > 0) return { ok: false, errors }
+    if (!unit || Object.keys(errors).length > 0) return { ok: false, errors }
 
-    if (unit === "DIAMOND") {
+    if (unit.isGemstone) {
       return {
         ok: true,
-        fields: { amount: 0, metalTypeId, metalWeight: null, metalWeightFine: null, caratWeight: weight },
+        fields: { amount: 0, metalTypeId: unit.value, metalWeight: null, metalWeightFine: null, caratWeight: weight },
       }
     }
 
     return {
       ok: true,
-      fields: { amount: 0, metalTypeId, metalWeight: weight, metalWeightFine: weight, caratWeight: null },
+      fields: { amount: 0, metalTypeId: unit.value, metalWeight: weight, metalWeightFine: weight, caratWeight: null },
     }
   }
 
@@ -259,7 +267,9 @@ export async function addCustomerSaleEntry(
   formData: FormData
 ): Promise<CustomerLedgerFormState> {
   try {
-    const parsed = parseManualEntryFields(formData)
+    const storeId = await requireStoreScope()
+    const activeUnits = await getActiveBusinessUnits()
+    const parsed = parseManualEntryFields(formData, activeUnits)
     const description = String(formData.get("description") || "").trim()
 
     if (!parsed.ok) {
@@ -269,8 +279,6 @@ export async function addCustomerSaleEntry(
         errors: parsed.errors,
       }
     }
-
-    const storeId = await requireStoreScope()
 
     const customer = await prisma.customer.findFirst({
       where: { id: customerId, storeId },
@@ -318,7 +326,9 @@ export async function addCustomerRefundEntry(
   formData: FormData
 ): Promise<CustomerLedgerFormState> {
   try {
-    const parsed = parseManualEntryFields(formData)
+    const storeId = await requireStoreScope()
+    const activeUnits = await getActiveBusinessUnits()
+    const parsed = parseManualEntryFields(formData, activeUnits)
     const description = String(formData.get("description") || "").trim()
 
     if (!parsed.ok) {
@@ -328,8 +338,6 @@ export async function addCustomerRefundEntry(
         errors: parsed.errors,
       }
     }
-
-    const storeId = await requireStoreScope()
 
     const customer = await prisma.customer.findFirst({
       where: { id: customerId, storeId },

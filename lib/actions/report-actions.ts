@@ -865,11 +865,23 @@ export async function getItemLedgerReport(): Promise<ItemLedgerReport> {
           },
         },
       },
-      karigarJobs: {
+      // NOT stock.karigarJobs — that relation is populated via
+      // KarigarJob.inventoryStockId, which no current code path (issue or
+      // receive) ever sets; it's dead. The receive flow
+      // (receiveItemsFromKarigar) links a newly-created stock row back to
+      // its originating job through KarigarReceiptItem.inventoryStockId
+      // instead — confirmed by grepping every karigarJob.create/update call
+      // in the codebase for inventoryStockId (found none) while verifying
+      // this fix against a real end-to-end run.
+      karigarReceiptItems: {
         select: {
-          issueDate: true,
-          receivedDate: true,
-          karigar: { select: { name: true } },
+          karigarJob: {
+            select: {
+              issueDate: true,
+              receivedDate: true,
+              karigar: { select: { name: true } },
+            },
+          },
         },
       },
       transactions: {
@@ -886,7 +898,7 @@ export async function getItemLedgerReport(): Promise<ItemLedgerReport> {
       stock.purchaseItems.reduce((sum, item) => sum + item.quantity, 0) || null;
     const purchaseCreator =
       stock.purchaseItems.find((item) => item.purchase.createdByName)?.purchase ?? null;
-    const karigarName = stock.karigarJobs[0]?.karigar.name ?? null;
+    const karigarName = stock.karigarReceiptItems[0]?.karigarJob.karigar.name ?? null;
 
     if (stock.purchaseDate) {
       events.push({
@@ -897,7 +909,8 @@ export async function getItemLedgerReport(): Promise<ItemLedgerReport> {
       });
     }
 
-    for (const job of stock.karigarJobs) {
+    for (const receiptItem of stock.karigarReceiptItems) {
+      const job = receiptItem.karigarJob;
       events.push({
         date: job.issueDate,
         label: `Issued to Karigar ${job.karigar.name}`,

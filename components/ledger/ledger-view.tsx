@@ -178,11 +178,11 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
     setDrawerOpen(true)
   }
 
-  // Delegates to the shared formatUnitValue (grams for Gold/Silver, carats
-  // for Diamond — business-units.ts's CARAT_BASED_UNITS) rather than
-  // reimplementing the Diamond special-case locally.
+  // Delegates to the shared formatUnitValue (grams for a plain metal, carats
+  // for a gemstone unit — driven by the unit's own isGemstone flag) rather
+  // than reimplementing the carat special-case locally.
   const formatUnitTotal = (unit: LedgerTotals["unitTotals"][number], value: number) =>
-    formatUnitValue(unit.unit, value)
+    formatUnitValue({ value: unit.unit, isGemstone: unit.isGemstone }, value)
 
   const summaryCards = [
     ...(totals.moneyActive

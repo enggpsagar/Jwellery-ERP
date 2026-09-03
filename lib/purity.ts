@@ -182,8 +182,8 @@ export function stoneWeightToGrams(
  * Matched the same way `classifyMetalName` / product-form's
  * `classifyPurityFamily` do: a case-insensitive substring on the metal's
  * free-text name. Kept separate from `classifyMetalName`'s `MetalFamily`
- * (tied to the `BusinessUnit` enum, which has no Stone unit) so this stays a
- * pure, local carat/weight concern shared by every line-item form.
+ * (GOLD | SILVER | DIAMOND | OTHER — no generic Stone bucket) so this stays
+ * a pure, local carat/weight concern shared by every line-item form.
  *
  * `isGemstone` is `StoreMetal.isGemstone` (see schema.prisma /
  * Settings' Stones section) — the real, store-set flag, passed in as an

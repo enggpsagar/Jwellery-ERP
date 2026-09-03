@@ -1,20 +1,15 @@
 // components/customers/ledger/add-customer-refund-entry-dialog.tsx
 "use client"
 
-import { useActionState, useEffect, useMemo, useState } from "react"
+import { useActionState, useEffect, useState } from "react"
 import { IndianRupee, NotebookText, RotateCcw, Scale } from "lucide-react"
 
 import {
   addCustomerRefundEntry,
   type CustomerLedgerFormState,
 } from "@/lib/actions/customer-ledger-actions"
-import {
-  classifyMetalName,
-  BUSINESS_UNIT_LABELS,
-  WEIGHT_BASED_UNITS,
-  type BusinessUnit,
-} from "@/lib/business-units"
-import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import { MONEY_UNIT } from "@/lib/business-units"
+import type { BusinessUnitOption } from "@/lib/business-units.server"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -28,8 +23,11 @@ import { RequiredMark } from "@/components/shared/required-mark"
 
 type AddCustomerRefundEntryDialogProps = {
   customerId: string
-  activeUnits: BusinessUnit[]
-  metals: StoreMetalRow[]
+  /** Money plus every currently-configured metal/gemstone this store deals
+   * in (see getActiveBusinessUnits) — each option already resolves to one
+   * specific StoreMetal row, so picking a unit here directly picks the
+   * metal type too; there's no separate nested "type" selector any more. */
+  activeUnits: BusinessUnitOption[]
 }
 
 const initialLedgerState: CustomerLedgerFormState = {
@@ -41,11 +39,10 @@ const initialLedgerState: CustomerLedgerFormState = {
 export function AddCustomerRefundEntryDialog({
   customerId,
   activeUnits,
-  metals,
 }: AddCustomerRefundEntryDialogProps) {
   const toast = useToast()
   const [open, setOpen] = useState(false)
-  const [unit, setUnit] = useState<BusinessUnit>(activeUnits[0] ?? "MONEY")
+  const [unitValue, setUnitValue] = useState<string>(activeUnits[0]?.value ?? MONEY_UNIT)
 
   const action = addCustomerRefundEntry.bind(null, customerId)
   const [state, formAction, pending] = useActionState(action, initialLedgerState)
@@ -62,17 +59,11 @@ export function AddCustomerRefundEntryDialog({
     }
   }, [state, toast])
 
-  const isWeightBased = WEIGHT_BASED_UNITS.includes(unit)
-  // Diamond is carat-based, not a rupee value — same quantity-entry pattern
-  // as Gold/Silver's weight, just labelled in carats (see business-units.ts's
-  // CARAT_BASED_UNITS).
-  const isCaratBased = unit === "DIAMOND"
-  const isQuantityBased = isWeightBased || isCaratBased
-
-  const matchingMetals = useMemo(
-    () => metals.filter((metal) => classifyMetalName(metal.name) === unit),
-    [metals, unit],
-  )
+  const unit = activeUnits.find((option) => option.value === unitValue)
+  const isQuantityBased = unitValue !== MONEY_UNIT
+  // A gemstone unit is carat-based, not a rupee value — same quantity-entry
+  // pattern as a plain metal's weight, just labelled in carats.
+  const isCaratBased = unit?.isGemstone ?? false
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -106,45 +97,24 @@ export function AddCustomerRefundEntryDialog({
               <label className="text-sm font-medium">Unit</label>
               <select
                 name="unit"
-                value={unit}
-                onChange={(event) => setUnit(event.target.value as BusinessUnit)}
+                value={unitValue}
+                onChange={(event) => setUnitValue(event.target.value)}
                 className="w-full rounded-md border px-3 py-2 text-sm"
               >
-                {activeUnits.map((u) => (
-                  <option key={u} value={u}>
-                    {BUSINESS_UNIT_LABELS[u]}
+                {activeUnits.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
+              {state.errors?.unit?.[0] && (
+                <p className="text-sm text-red-600">{state.errors.unit[0]}</p>
+              )}
             </div>
           )}
 
           {activeUnits.length <= 1 && (
-            <input type="hidden" name="unit" value={unit} />
-          )}
-
-          {isQuantityBased && (
-            <div className="space-y-1">
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <Scale className="h-4 w-4 text-muted-foreground" />
-                {BUSINESS_UNIT_LABELS[unit]} Type <RequiredMark />
-              </label>
-              <select
-                name="metalTypeId"
-                className="w-full rounded-md border px-3 py-2 text-sm"
-                required
-              >
-                <option value="">Select {BUSINESS_UNIT_LABELS[unit].toLowerCase()} type</option>
-                {matchingMetals.map((metal) => (
-                  <option key={metal.id} value={metal.id}>
-                    {metal.name}
-                  </option>
-                ))}
-              </select>
-              {state.errors?.metalTypeId?.[0] && (
-                <p className="text-sm text-red-600">{state.errors.metalTypeId[0]}</p>
-              )}
-            </div>
+            <input type="hidden" name="unit" value={unitValue} />
           )}
 
           {isQuantityBased ? (

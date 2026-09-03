@@ -7,12 +7,8 @@ import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { getLocationScope, locationWhere } from "@/lib/location-scope"
 import { formatLedgerSource } from "@/lib/ledger-format"
-import {
-  classifyMetalName,
-  BUSINESS_UNIT_LABELS,
-  type BusinessUnit,
-} from "@/lib/business-units"
-import { getActiveBusinessUnits } from "@/lib/business-units.server"
+import { MONEY_UNIT } from "@/lib/business-units"
+import { getActiveBusinessUnits, type BusinessUnitOption } from "@/lib/business-units.server"
 
 export type LedgerEntryRow = {
   id: string
@@ -27,9 +23,8 @@ export type LedgerEntryRow = {
   amount: number
   metalType: string | null
   metalWeight: number | null
-  /** Carat quantity for a Diamond entry — Diamond is carat-based, not
-   * weight-based (see business-units.ts's CARAT_BASED_UNITS), so it never
-   * shares metalWeight with Gold/Silver. */
+  /** Carat quantity for a gemstone entry — a gemstone is carat-based, not
+   * weight-based, so it never shares metalWeight with a plain metal. */
   caratWeight: number | null
   paymentMethod: string | null
   description: string
@@ -289,8 +284,10 @@ export async function getKarigarLedgerSummary(): Promise<KarigarLedgerSummary> {
 }
 
 export type LedgerUnitTotal = {
-  unit: BusinessUnit
+  /** StoreMetal.id */
+  unit: string
   label: string
+  isGemstone: boolean
   debit: number
   credit: number
 }
@@ -304,6 +301,18 @@ export type LedgerTotals = {
   unitTotals: LedgerUnitTotal[]
 }
 
+/**
+ * Money debit/credit are storeId-wide LedgerEntry.amount aggregates as
+ * before. The non-money side buckets by each entry's own `metalTypeId` (a
+ * real FK LedgerEntry already carries — see schema.prisma) against the
+ * store's *currently configured* business-unit StoreMetal ids, rather than
+ * name-substring-classifying `metalType.name` into a fixed Gold/Silver/
+ * Diamond family: that old approach silently dropped any custom metal or
+ * non-Diamond gemstone (e.g. a configured "Platinum" or "Ruby" unit) from
+ * these totals entirely, since classifyMetalName only recognizes those
+ * three names. Bucketing by the live FK instead means any configured unit
+ * shows correct totals here, matching the dynamic Business Model config.
+ */
 export async function getLedgerTotals(): Promise<LedgerTotals> {
   const storeId = await requireStoreScope()
   const scope = await getLocationScope()
@@ -312,7 +321,8 @@ export async function getLedgerTotals(): Promise<LedgerTotals> {
   startOfToday.setHours(0, 0, 0, 0)
 
   const activeUnits = await getActiveBusinessUnits()
-  const nonMoneyUnits = activeUnits.filter((unit) => unit !== "MONEY")
+  const nonMoneyUnits = activeUnits.filter((unit) => unit.value !== MONEY_UNIT)
+  const unitById = new Map(nonMoneyUnits.map((unit) => [unit.value, unit]))
 
   const [debitAgg, creditAgg, todayCount, metalEntries] = await Promise.all([
     prisma.ledgerEntry.aggregate({
@@ -328,61 +338,65 @@ export async function getLedgerTotals(): Promise<LedgerTotals> {
     }),
     nonMoneyUnits.length
       ? prisma.ledgerEntry.findMany({
-          where: { storeId, metalTypeId: { not: null }, ...locationWhere(scope) },
+          where: {
+            storeId,
+            metalTypeId: { in: nonMoneyUnits.map((unit) => unit.value) },
+            ...locationWhere(scope),
+          },
           select: {
             type: true,
-            amount: true,
+            metalTypeId: true,
             metalWeight: true,
             metalWeightFine: true,
             caratWeight: true,
-            metalType: { select: { name: true } },
           },
         })
       : Promise.resolve([]),
   ])
 
-  const weightTotals: Record<string, { debit: number; credit: number }> = {
-    GOLD: { debit: 0, credit: 0 },
-    SILVER: { debit: 0, credit: 0 },
-    DIAMOND: { debit: 0, credit: 0 },
-  }
+  const weightTotals = new Map<string, { debit: number; credit: number }>(
+    nonMoneyUnits.map((unit) => [unit.value, { debit: 0, credit: 0 }]),
+  )
 
   for (const entry of metalEntries) {
-    const family = classifyMetalName(entry.metalType?.name)
-    if (family === "OTHER") continue
+    if (!entry.metalTypeId) continue
+    const unit = unitById.get(entry.metalTypeId)
+    if (!unit) continue
 
     const isDebit = entry.type === LedgerEntryType.DEBIT
-    // Diamond is carat-based, not weight-based — see business-units.ts's
-    // CARAT_BASED_UNITS — so it reads its own caratWeight column, never the
-    // Gold/Silver metalWeight/metalWeightFine columns.
-    const value =
-      family === "DIAMOND"
-        ? Number(entry.caratWeight ?? 0)
-        : Number(entry.metalWeightFine ?? entry.metalWeight ?? 0)
+    // A gemstone unit is carat-based, not weight-based — reads its own
+    // caratWeight column, never the metalWeight/metalWeightFine columns.
+    const value = unit.isGemstone
+      ? Number(entry.caratWeight ?? 0)
+      : Number(entry.metalWeightFine ?? entry.metalWeight ?? 0)
 
-    weightTotals[family][isDebit ? "debit" : "credit"] += value
+    const bucket = weightTotals.get(unit.value)!
+    bucket[isDebit ? "debit" : "credit"] += value
   }
 
   const unitTotals: LedgerUnitTotal[] = nonMoneyUnits.map((unit) => ({
-    unit,
-    label: BUSINESS_UNIT_LABELS[unit],
-    debit: weightTotals[unit]?.debit ?? 0,
-    credit: weightTotals[unit]?.credit ?? 0,
+    unit: unit.value,
+    label: unit.label,
+    isGemstone: unit.isGemstone,
+    debit: weightTotals.get(unit.value)?.debit ?? 0,
+    credit: weightTotals.get(unit.value)?.credit ?? 0,
   }))
 
   return {
     totalDebit: Number(debitAgg._sum.amount ?? 0),
     totalCredit: Number(creditAgg._sum.amount ?? 0),
     todayCount,
-    moneyActive: activeUnits.includes("MONEY"),
+    moneyActive: activeUnits.some((unit) => unit.value === MONEY_UNIT),
     unitTotals,
   }
 }
 
 export type MetalDailyUnitEntry = {
-  unit: BusinessUnit
+  /** StoreMetal.id */
+  unit: string
   label: string
-  /** Grams for GOLD/SILVER, carats for DIAMOND — same convention as getLedgerTotals's weightTotals. */
+  isGemstone: boolean
+  /** Grams for a plain metal, carats for a gemstone unit — same convention as getLedgerTotals's weightTotals. */
   purchasedValue: number
   purchasedAmount: number
   soldValue: number
@@ -400,60 +414,70 @@ export type MetalDailyRow = {
 export type MetalDailyLedgerResult = {
   /** Oldest first, one row per day that had at least one purchase or sale — matches a running balance reading top-to-bottom. */
   rows: MetalDailyRow[]
-  activeUnits: BusinessUnit[]
+  activeUnits: BusinessUnitOption[]
 }
 
 /**
- * Daily Gold/Silver/Diamond purchased-vs-sold breakdown with a running
- * closing balance per metal, built from PurchaseItem/InvoiceItem/
- * KachaInvoiceItem (not LedgerEntry — a SALE/PURCHASE LedgerEntry only
- * carries a money balance-due amount, never metal weight/type, and is only
- * created when a balance is outstanding, so it can't answer "how much gold
- * moved today"). Only days with actual purchase/sale activity are
- * included; a metal absent from the store's configured business units
- * (Settings → Business Units) is omitted the same way getLedgerTotals
- * drops it from unitTotals.
+ * Daily per-metal purchased-vs-sold breakdown with a running closing balance,
+ * built from PurchaseItem/InvoiceItem/KachaInvoiceItem (not LedgerEntry — a
+ * SALE/PURCHASE LedgerEntry only carries a money balance-due amount, never
+ * metal weight/type, and is only created when a balance is outstanding, so
+ * it can't answer "how much gold moved today"). Buckets by each line item's
+ * own `metalTypeId` FK against the store's currently configured business
+ * units (see getLedgerTotals's doc comment for why the FK, not a
+ * classifyMetalName name-guess, is the right join key here) — a metal
+ * outside the store's configured units is omitted, same as before. Only
+ * days with actual purchase/sale activity are included.
  */
 export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
   const storeId = await requireStoreScope()
 
-  const activeUnits = (await getActiveBusinessUnits()).filter((unit) => unit !== "MONEY")
+  const activeUnits = (await getActiveBusinessUnits()).filter((unit) => unit.value !== MONEY_UNIT)
   if (activeUnits.length === 0) {
     return { rows: [], activeUnits: [] }
   }
+  const unitById = new Map(activeUnits.map((unit) => [unit.value, unit]))
+  const activeMetalIds = activeUnits.map((unit) => unit.value)
 
   const scope = await getLocationScope()
 
   const [purchaseItems, invoiceItems, kachaInvoiceItems] = await Promise.all([
     prisma.purchaseItem.findMany({
-      where: { purchase: { storeId, ...locationWhere(scope) } },
+      where: {
+        purchase: { storeId, ...locationWhere(scope) },
+        metalTypeId: { in: activeMetalIds },
+      },
       select: {
         netWeight: true,
         caratWeight: true,
         lineTotal: true,
-        metalType: { select: { name: true } },
+        metalTypeId: true,
         purchase: { select: { purchaseDate: true } },
       },
     }),
     prisma.invoiceItem.findMany({
       where: {
         invoice: { storeId, status: { not: InvoiceStatus.CANCELLED }, ...locationWhere(scope) },
+        metalTypeId: { in: activeMetalIds },
       },
       select: {
         netWeight: true,
         caratWeight: true,
         lineTotal: true,
-        metalType: { select: { name: true } },
+        metalTypeId: true,
         invoice: { select: { invoiceDate: true } },
       },
     }),
     prisma.kachaInvoiceItem.findMany({
-      where: { kachaInvoice: { storeId, ...locationWhere(scope) } },
+      where: {
+        kachaInvoice: { storeId, ...locationWhere(scope) },
+        metalTypeId: { in: activeMetalIds },
+      },
       select: {
         netWeight: true,
         caratWeight: true,
         lineTotal: true,
-        metalType: { select: { name: true } },
+        metalTypeId: true,
         kachaInvoice: { select: { invoiceDate: true } },
       },
     }),
@@ -471,62 +495,64 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
     return totals
   }
 
-  function unitTotals(totals: DayTotals, unit: BusinessUnit) {
-    let entry = totals[unit]
+  function unitTotals(totals: DayTotals, unitId: string) {
+    let entry = totals[unitId]
     if (!entry) {
       entry = { purchasedValue: 0, purchasedAmount: 0, soldValue: 0, soldAmount: 0 }
-      totals[unit] = entry
+      totals[unitId] = entry
     }
     return entry
   }
 
-  // Diamond is carat-based, not weight-based (see business-units.ts's
-  // CARAT_BASED_UNITS) — its "quantity" is caratWeight, never the line's
-  // rupee amount.
-  function valueFor(family: BusinessUnit, netWeight: unknown, caratWeight: unknown) {
-    return family === "DIAMOND" ? Number(caratWeight ?? 0) : Number(netWeight ?? 0)
+  // A gemstone unit is carat-based, not weight-based — its "quantity" is
+  // caratWeight, never the line's rupee amount.
+  function valueFor(unit: BusinessUnitOption, netWeight: unknown, caratWeight: unknown) {
+    return unit.isGemstone ? Number(caratWeight ?? 0) : Number(netWeight ?? 0)
   }
 
   for (const item of purchaseItems) {
-    const family = classifyMetalName(item.metalType?.name)
-    if (family === "OTHER" || !activeUnits.includes(family)) continue
+    if (!item.metalTypeId) continue
+    const unit = unitById.get(item.metalTypeId)
+    if (!unit) continue
 
     const dateISO = item.purchase.purchaseDate.toISOString().slice(0, 10)
     const amount = Number(item.lineTotal ?? 0)
-    const entry = unitTotals(dayTotals(dateISO), family)
-    entry.purchasedValue += valueFor(family, item.netWeight, item.caratWeight)
+    const entry = unitTotals(dayTotals(dateISO), unit.value)
+    entry.purchasedValue += valueFor(unit, item.netWeight, item.caratWeight)
     entry.purchasedAmount += amount
   }
 
   for (const item of [...invoiceItems, ...kachaInvoiceItems]) {
-    const family = classifyMetalName(item.metalType?.name)
-    if (family === "OTHER" || !activeUnits.includes(family)) continue
+    if (!item.metalTypeId) continue
+    const unit = unitById.get(item.metalTypeId)
+    if (!unit) continue
 
     const invoiceDate = "invoice" in item ? item.invoice.invoiceDate : item.kachaInvoice.invoiceDate
     const dateISO = invoiceDate.toISOString().slice(0, 10)
     const amount = Number(item.lineTotal ?? 0)
-    const entry = unitTotals(dayTotals(dateISO), family)
-    entry.soldValue += valueFor(family, item.netWeight, item.caratWeight)
+    const entry = unitTotals(dayTotals(dateISO), unit.value)
+    entry.soldValue += valueFor(unit, item.netWeight, item.caratWeight)
     entry.soldAmount += amount
   }
 
   const sortedDays = Array.from(byDay.keys()).sort()
-  const runningBalance: Record<string, number> = {}
+  const runningBalance = new Map<string, number>()
 
   const rows: MetalDailyRow[] = sortedDays.map((dateISO) => {
     const totals = byDay.get(dateISO)!
 
     const units: MetalDailyUnitEntry[] = activeUnits
-      .filter((unit) => totals[unit])
+      .filter((unit) => totals[unit.value])
       .map((unit) => {
-        const entry = totals[unit]!
-        const opening = runningBalance[unit] ?? 0
+        const entry = totals[unit.value]!
+        const opening = runningBalance.get(unit.value) ?? 0
         const closingBalance = opening + entry.purchasedValue - entry.soldValue
-        runningBalance[unit] = closingBalance
+        runningBalance.set(unit.value, closingBalance)
 
         return {
-          unit,
-          label: BUSINESS_UNIT_LABELS[unit],
+          unit: unit.value,
+          label: unit.label,
+          isGemstone: unit.isGemstone,
           purchasedValue: entry.purchasedValue,
           purchasedAmount: entry.purchasedAmount,
           soldValue: entry.soldValue,

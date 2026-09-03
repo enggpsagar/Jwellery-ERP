@@ -18,8 +18,11 @@ export const metadata: Metadata = {
   title: "Dashboard",
 };
 
-const DEFAULT_SALES_TREND_PERIOD = "monthly";
-const DEFAULT_REVENUE_PERIOD = "monthly";
+// Every period-filterable dashboard section defaults to "Daily" — the most
+// immediately relevant view for a store owner checking in on their own day.
+const DEFAULT_SALES_TREND_PERIOD = "daily";
+const DEFAULT_REVENUE_PERIOD = "daily";
+const DEFAULT_TRANSACTIONS_PERIOD = "daily";
 
 export default async function DashboardPage() {
   const [stats, salesTrend, revenueByCategory, transactions, activity] =
@@ -27,7 +30,7 @@ export default async function DashboardPage() {
       getDashboardStats(),
       getSalesTrend(DEFAULT_SALES_TREND_PERIOD),
       getRevenueByCategory(DEFAULT_REVENUE_PERIOD),
-      getRecentTransactions(),
+      getRecentTransactions(DEFAULT_TRANSACTIONS_PERIOD),
       getRecentActivity(),
     ]);
 
@@ -73,7 +76,10 @@ export default async function DashboardPage() {
       {/* Transactions & Activity */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-2">
-          <TransactionsTable transactions={transactions} />
+          <TransactionsTable
+            initialTransactions={transactions}
+            initialPeriod={DEFAULT_TRANSACTIONS_PERIOD}
+          />
         </div>
 
         <div>

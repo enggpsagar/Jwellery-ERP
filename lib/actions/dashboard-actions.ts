@@ -531,13 +531,28 @@ const STATUS_MAP: Record<string, "Paid" | "Pending" | "Partial" | "Cancelled"> =
   CANCELLED: "Cancelled",
 };
 
+export type RecentTransactionsPeriod = "daily" | "weekly" | "monthly";
+
+function recentTransactionsPeriodStart(period: RecentTransactionsPeriod, now: Date): Date {
+  switch (period) {
+    case "daily":
+      return startOfDay(now);
+    case "weekly":
+      return startOfWeekMonday(now);
+    case "monthly":
+      return startOfMonth(now);
+  }
+}
+
 export async function getRecentTransactions(
+  period: RecentTransactionsPeriod = "daily",
   limit = 6
 ): Promise<DashboardTransaction[]> {
   const storeId = await requireStoreScope();
   const scope = await getLocationScope();
+  const rangeStart = recentTransactionsPeriodStart(period, new Date());
   const invoices = await prisma.invoice.findMany({
-    where: { storeId, ...locationWhere(scope) },
+    where: { storeId, invoiceDate: { gte: rangeStart }, ...locationWhere(scope) },
     orderBy: { invoiceDate: "desc" },
     take: limit,
     include: {

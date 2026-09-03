@@ -29,6 +29,8 @@ import { LocationSelect } from "@/components/shared/location-select"
 
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
+import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
+import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
 
 type VendorOption = {
   id: string
@@ -53,6 +55,8 @@ type ProductOption = {
   hasStoneComponent: boolean
   defaultStoneRate: number | null
   defaultCaratWeight: number | null
+  defaultStoneMetalTypeName: string | null
+  defaultStoneTypeNames: string | null
   hsnCode: string | null
   isActive: boolean
 }
@@ -74,6 +78,8 @@ type LineItem = {
   stoneRate: number
   hasStoneComponent: boolean
   stoneChargeTouched: boolean
+  stoneMetalTypeName: string
+  stoneTypeNames: string[]
   dmoWeight: number
   stoneWeightInput: number
   stoneWeightUnit: "GRAM" | "CARAT"
@@ -103,6 +109,8 @@ function emptyLineItem(): LineItem {
     stoneRate: 0,
     hasStoneComponent: false,
     stoneChargeTouched: false,
+    stoneMetalTypeName: "",
+    stoneTypeNames: [],
     dmoWeight: 0,
     stoneWeightInput: 0,
     stoneWeightUnit: "GRAM",
@@ -128,6 +136,10 @@ type PurchaseFormProps = {
   vendors: VendorOption[]
   products: ProductOption[]
   locations?: LocationOption[]
+  /** Stones/Stone Types for the "Includes a Stone" picker — see the same
+   * prop on InvoiceForm for the full explanation. */
+  metals: StoreMetalRow[]
+  origins: StoreMetalOriginRow[]
   /** Store's default GST%, split into SGST+CGST (intra-state) or IGST
    * (inter-state) via computeGst() — see lib/gst.ts. */
   defaultGstRate?: number
@@ -165,10 +177,14 @@ export function PurchaseForm({
   vendors,
   products,
   locations = [],
+  metals: initialMetals,
+  origins: initialOrigins,
   defaultGstRate = 0,
   gstScheme,
   storeState,
 }: PurchaseFormProps) {
+  const [metals, setMetals] = useState(initialMetals)
+  const [origins, setOrigins] = useState(initialOrigins)
   const router = useRouter()
   const searchParams = useSearchParams()
   const toast = useToast()
@@ -395,6 +411,11 @@ export function PurchaseForm({
       stoneRate: product.hasStoneComponent ? product.defaultStoneRate ?? 0 : 0,
       hasStoneComponent: product.hasStoneComponent,
       stoneChargeTouched: false,
+      stoneMetalTypeName: product.hasStoneComponent ? product.defaultStoneMetalTypeName ?? "" : "",
+      stoneTypeNames:
+        product.hasStoneComponent && product.defaultStoneTypeNames
+          ? product.defaultStoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
+          : [],
       caratWeight: product.defaultCaratWeight ?? 0,
       hsnCode: product.hsnCode ?? "",
     })
@@ -540,6 +561,11 @@ export function PurchaseForm({
       makingChargeType: item.makingChargeType,
       stoneCharge: item.stoneCharge,
       stoneRate: item.hasStoneComponent ? item.stoneRate || null : null,
+      stoneMetalTypeName: item.hasStoneComponent ? item.stoneMetalTypeName || null : null,
+      stoneTypeNames:
+        item.hasStoneComponent && item.stoneTypeNames.length
+          ? item.stoneTypeNames.join(", ")
+          : null,
       dmoWeight: item.dmoWeight || null,
       stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit) || null,
       hsnCode: item.hsnCode || null,
@@ -817,7 +843,7 @@ export function PurchaseForm({
                   wedged into the grid above, so a plain Gold line's fields
                   don't reflow every time this gets checked/unchecked. */}
               {!isCaratLine(item) && (
-                <div className="flex flex-wrap items-end gap-4 rounded-md border border-dashed p-3">
+                <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
                   <label className="flex items-center gap-2 text-xs font-medium">
                     <input
                       type="checkbox"
@@ -826,31 +852,46 @@ export function PurchaseForm({
                         updateItem(item.key, { hasStoneComponent: e.target.checked })
                       }
                     />
-                    Includes a stone/diamond
+                    Includes a Stone
                   </label>
 
                   {item.hasStoneComponent && (
                     <>
-                      <div className="w-36 space-y-1">
-                        <Label className="text-xs">Stone Carat Weight (ct)</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={item.caratWeight === 0 ? "" : item.caratWeight}
-                          onChange={(e) => handleCaratWeightChange(item, e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Stone's own weight — independent of Net Weight
-                        </p>
-                      </div>
-                      <div className="w-36 space-y-1">
-                        <Label className="text-xs">Stone Rate (₹/ct)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={item.stoneRate === 0 ? "" : item.stoneRate}
-                          onChange={(e) => handleStoneRateChange(item, e.target.value)}
-                        />
+                      <StoneComponentFields
+                        metals={metals}
+                        origins={origins}
+                        onMetalsChange={setMetals}
+                        onOriginsChange={setOrigins}
+                        stoneMetalTypeName={item.stoneMetalTypeName}
+                        onStoneChange={(name, typeNames) =>
+                          updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
+                        }
+                        selectedTypeNames={item.stoneTypeNames}
+                        onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
+                      />
+
+                      <div className="flex flex-wrap items-end gap-4">
+                        <div className="w-36 space-y-1">
+                          <Label className="text-xs">Stone Carat Weight (ct)</Label>
+                          <Input
+                            type="number"
+                            step="0.001"
+                            value={item.caratWeight === 0 ? "" : item.caratWeight}
+                            onChange={(e) => handleCaratWeightChange(item, e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Stone's own weight — independent of Net Weight
+                          </p>
+                        </div>
+                        <div className="w-36 space-y-1">
+                          <Label className="text-xs">Stone Rate (₹/ct)</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.stoneRate === 0 ? "" : item.stoneRate}
+                            onChange={(e) => handleStoneRateChange(item, e.target.value)}
+                          />
+                        </div>
                       </div>
                     </>
                   )}

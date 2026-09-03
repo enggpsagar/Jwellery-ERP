@@ -6,6 +6,7 @@ import {
 } from "@/lib/actions/quotation-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
+import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 
 import { QuotationForm } from "@/components/quotations/quotation-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
@@ -15,11 +16,13 @@ export const metadata: Metadata = {
 }
 
 export default async function NewQuotationPage() {
-  const [customers, stockItems, locations, businessSettings] = await Promise.all([
+  const [customers, stockItems, locations, businessSettings, metals, origins] = await Promise.all([
     getQuotationFormCustomers(),
     getQuotationFormStockItems(),
     getStoreLocations(),
     getBusinessSettings(),
+    getStoreMetals(),
+    getAllStoreMetalOrigins(),
   ])
 
   return (
@@ -35,6 +38,8 @@ export default async function NewQuotationPage() {
         customers={customers}
         stockItems={stockItems}
         locations={locations}
+        metals={metals}
+        origins={origins}
         defaultGstRate={businessSettings.defaultGstRate}
         gstScheme={businessSettings.gstScheme}
         storeState={businessSettings.state}

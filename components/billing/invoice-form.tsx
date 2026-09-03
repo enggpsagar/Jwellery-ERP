@@ -29,6 +29,8 @@ import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
 import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, GRAMS_PER_CARAT } from "@/lib/purity"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
+import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
+import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
 
 type CustomerOption = {
   id: string
@@ -49,6 +51,8 @@ type StockOption = {
   stoneWeight: number | null
   caratWeight: number | null
   stoneRate: number | null
+  stoneMetalTypeName: string | null
+  stoneTypeNames: string | null
   saleRate: number | null
   quantity: number
 }
@@ -79,6 +83,12 @@ export type LineItem = {
   /** Once Stone Charge is edited directly, the stoneRate × caratWeight
    * auto-calc stops overwriting it — same escape hatch as netTouched. */
   stoneChargeTouched: boolean
+  /** Which Stone (e.g. "Diamond") and which of its Stone Types (e.g.
+   * "Natural", "Lab-Grown" — several may apply to one embedded stone)
+   * this line's stone component is. Plain names, not ids — see the
+   * Product.defaultStoneMetalTypeName schema comment for why. */
+  stoneMetalTypeName: string
+  stoneTypeNames: string[]
   dmoWeight: number
   stoneWeightInput: number
   stoneWeightUnit: "GRAM" | "CARAT"
@@ -114,6 +124,8 @@ function emptyLineItem(): LineItem {
     stoneRate: 0,
     hasStoneComponent: false,
     stoneChargeTouched: false,
+    stoneMetalTypeName: "",
+    stoneTypeNames: [],
     dmoWeight: 0,
     stoneWeightInput: 0,
     stoneWeightUnit: "GRAM",
@@ -131,6 +143,13 @@ type InvoiceFormProps = {
   customers: CustomerOption[]
   stockItems: StockOption[]
   locations: LocationOption[]
+  /** Stones (isGemstone StoreMetal rows) and their Stone Types
+   * (StoreMetalOrigin rows), for the "Includes a Stone" picker on each
+   * line. Lifted into local state below so an inline "Add Stone"/"Add
+   * Stone Type" can extend the list without navigating away or losing
+   * whatever else has already been entered on this document. */
+  metals: StoreMetalRow[]
+  origins: StoreMetalOriginRow[]
   /** Store's default GST%, split into SGST+CGST (intra-state) or IGST
    * (inter-state) per line via computeGst() — see lib/gst.ts. Editable here
    * per invoice — a store on an exempt sale, or one that changes its rate
@@ -168,6 +187,8 @@ export function InvoiceForm({
   customers,
   stockItems,
   locations,
+  metals: initialMetals,
+  origins: initialOrigins,
   defaultGstRate = 0,
   gstScheme,
   storeState,
@@ -181,6 +202,8 @@ export function InvoiceForm({
 }: InvoiceFormProps) {
   const router = useRouter()
   const toast = useToast()
+  const [metals, setMetals] = useState(initialMetals)
+  const [origins, setOrigins] = useState(initialOrigins)
 
   const [customerId, setCustomerId] = useState(initialCustomerId ?? "")
   const [locationId, setLocationId] = useState(initialLocationId ?? "")
@@ -257,6 +280,10 @@ export function InvoiceForm({
         ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
         : 0,
       stoneChargeTouched: false,
+      stoneMetalTypeName: stock.stoneMetalTypeName ?? "",
+      stoneTypeNames: stock.stoneTypeNames
+        ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
+        : [],
       // The linked stock row's own net weight is authoritative — the
       // gross/stone/dmo calc below must not silently recompute over it.
       netTouched: true,
@@ -350,6 +377,10 @@ export function InvoiceForm({
             ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
             : 0,
           stoneChargeTouched: false,
+          stoneMetalTypeName: stock.stoneMetalTypeName ?? "",
+          stoneTypeNames: stock.stoneTypeNames
+            ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
+            : [],
           netTouched: true,
         }
 
@@ -548,6 +579,11 @@ export function InvoiceForm({
         makingChargeType: item.makingChargeType,
         stoneCharge: item.stoneCharge,
         stoneRate: item.hasStoneComponent ? item.stoneRate || null : null,
+        stoneMetalTypeName: item.hasStoneComponent ? item.stoneMetalTypeName || null : null,
+        stoneTypeNames:
+          item.hasStoneComponent && item.stoneTypeNames.length
+            ? item.stoneTypeNames.join(", ")
+            : null,
         dmoWeight: item.dmoWeight || null,
         stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit) || null,
         hmCharge: item.hmCharge,
@@ -910,7 +946,7 @@ export function InvoiceForm({
                   wedged into the grid above, so a plain Gold line's fields
                   don't reflow every time this gets checked/unchecked. */}
               {!isCaratLine(item) && (
-                <div className="flex flex-wrap items-end gap-4 rounded-md border border-dashed p-3">
+                <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
                   <label className="flex items-center gap-2 text-xs font-medium">
                     <input
                       type="checkbox"
@@ -919,31 +955,46 @@ export function InvoiceForm({
                         updateItem(item.key, { hasStoneComponent: e.target.checked })
                       }
                     />
-                    Includes a stone/diamond
+                    Includes a Stone
                   </label>
 
                   {item.hasStoneComponent && (
                     <>
-                      <div className="w-36 space-y-1">
-                        <Label className="text-xs">Stone Carat Weight (ct)</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={item.caratWeight === 0 ? "" : item.caratWeight}
-                          onChange={(e) => handleCaratWeightChange(item, e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Stone's own weight — independent of Net Weight
-                        </p>
-                      </div>
-                      <div className="w-36 space-y-1">
-                        <Label className="text-xs">Stone Rate (₹/ct)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={item.stoneRate === 0 ? "" : item.stoneRate}
-                          onChange={(e) => handleStoneRateChange(item, e.target.value)}
-                        />
+                      <StoneComponentFields
+                        metals={metals}
+                        origins={origins}
+                        onMetalsChange={setMetals}
+                        onOriginsChange={setOrigins}
+                        stoneMetalTypeName={item.stoneMetalTypeName}
+                        onStoneChange={(name, typeNames) =>
+                          updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
+                        }
+                        selectedTypeNames={item.stoneTypeNames}
+                        onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
+                      />
+
+                      <div className="flex flex-wrap items-end gap-4">
+                        <div className="w-36 space-y-1">
+                          <Label className="text-xs">Stone Carat Weight (ct)</Label>
+                          <Input
+                            type="number"
+                            step="0.001"
+                            value={item.caratWeight === 0 ? "" : item.caratWeight}
+                            onChange={(e) => handleCaratWeightChange(item, e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Stone's own weight — independent of Net Weight
+                          </p>
+                        </div>
+                        <div className="w-36 space-y-1">
+                          <Label className="text-xs">Stone Rate (₹/ct)</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.stoneRate === 0 ? "" : item.stoneRate}
+                            onChange={(e) => handleStoneRateChange(item, e.target.value)}
+                          />
+                        </div>
                       </div>
                     </>
                   )}

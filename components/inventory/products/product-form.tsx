@@ -568,7 +568,7 @@ export function ProductForm({
                 checked={hasStoneComponent}
                 onChange={(event) => setHasStoneComponent(event.target.checked)}
               />
-              Includes a stone/diamond
+              Includes a Stone
             </label>
             <input
               type="hidden"

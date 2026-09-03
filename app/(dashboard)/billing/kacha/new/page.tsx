@@ -5,6 +5,7 @@ import {
   getKachaInvoiceFormStockItems,
 } from "@/lib/actions/kacha-invoice-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
+import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 
 import { KachaInvoiceForm } from "@/components/billing/kacha/kacha-invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
@@ -14,10 +15,12 @@ export const metadata: Metadata = {
 }
 
 export default async function NewKachaInvoicePage() {
-  const [customers, stockItems, locations] = await Promise.all([
+  const [customers, stockItems, locations, metals, origins] = await Promise.all([
     getKachaInvoiceFormCustomers(),
     getKachaInvoiceFormStockItems(),
     getStoreLocations(),
+    getStoreMetals(),
+    getAllStoreMetalOrigins(),
   ])
 
   return (
@@ -29,7 +32,13 @@ export default async function NewKachaInvoicePage() {
         backLabel="Back to Kacha Slips"
       />
 
-      <KachaInvoiceForm customers={customers} stockItems={stockItems} locations={locations} />
+      <KachaInvoiceForm
+        customers={customers}
+        stockItems={stockItems}
+        locations={locations}
+        metals={metals}
+        origins={origins}
+      />
     </main>
   )
 }

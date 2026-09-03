@@ -252,7 +252,15 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               const quantity = isDiamond ? item.caratWeight : item.netWeight
               return (
               <tr key={item.id} className="border-b last:border-0">
-                <td className="px-4 py-3">{item.itemName}</td>
+                <td className="px-4 py-3">
+                  {item.itemName}
+                  {item.stoneMetalTypeName ? (
+                    <span className="block text-xs text-muted-foreground">
+                      Stone: {item.stoneMetalTypeName}
+                      {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3">{item.quantity}</td>
                 <td className="px-4 py-3">
                   {quantity != null ? `${quantity.toFixed(3)} ${isDiamond ? "ct" : "g"}` : "-"}

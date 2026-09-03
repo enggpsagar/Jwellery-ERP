@@ -45,6 +45,10 @@ export type TaxonomyFormState = {
   success: boolean;
   message: string;
   errors?: Record<string, string[]>;
+  /** The created/updated row's id — lets a caller that just created a new
+   * Stone/Stone Type (e.g. an inline "Add Stone" dialog on a billing form)
+   * select it immediately without a second round-trip to find it by name. */
+  id?: string;
 };
 
 const TAXONOMY_PATH = "/settings/taxonomy";
@@ -114,6 +118,8 @@ export async function upsertStoreMetal(
       return { success: false, message, errors: { name: [message] } };
     }
 
+    let savedId = id;
+
     if (id) {
       const { count } = await prisma.storeMetal.updateMany({
         where: { id, storeId },
@@ -124,15 +130,18 @@ export async function upsertStoreMetal(
         return { success: false, message: isGemstone ? "Stone not found" : "Metal not found" };
       }
     } else {
-      await prisma.storeMetal.create({
+      const created = await prisma.storeMetal.create({
         data: { storeId, name, hasPurity, isGemstone },
+        select: { id: true },
       });
+      savedId = created.id;
     }
 
     revalidatePath(TAXONOMY_PATH);
 
     return {
       success: true,
+      id: savedId,
       message: isGemstone
         ? id
           ? "Stone updated successfully"
@@ -268,6 +277,29 @@ export async function deleteStoreMetal(id: string): Promise<TaxonomyFormState> {
 // Mirrors the Store Category Types section below exactly: a Stone's own
 // list of Stone Type options, managed the same way a Category's Types are.
 
+/**
+ * Every Stone Type across every Stone in the store, in one call — for a
+ * picker (billing/purchase/kacha/quotation line items) that needs to filter
+ * by whichever Stone gets picked without a fetch per selection, unlike
+ * getStoreMetalOrigins below (Settings' Taxonomy page only ever needs one
+ * Stone's options at a time, since it edits one at a time).
+ */
+export async function getAllStoreMetalOrigins(): Promise<StoreMetalOriginRow[]> {
+  const storeId = await requireStoreScope();
+
+  const origins = await prisma.storeMetalOrigin.findMany({
+    where: { storeId },
+    orderBy: { name: "asc" },
+  });
+
+  return origins.map((option) => ({
+    id: option.id,
+    storeMetalId: option.storeMetalId,
+    name: option.name,
+    isActive: option.isActive,
+  }));
+}
+
 export async function getStoreMetalOrigins(
   storeMetalId: string,
 ): Promise<StoreMetalOriginRow[]> {
@@ -345,6 +377,8 @@ export async function upsertStoreMetalOrigin(
       };
     }
 
+    let savedId = id;
+
     if (id) {
       const { count } = await prisma.storeMetalOrigin.updateMany({
         where: { id, storeId },
@@ -355,15 +389,18 @@ export async function upsertStoreMetalOrigin(
         return { success: false, message: "Stone Type not found" };
       }
     } else {
-      await prisma.storeMetalOrigin.create({
+      const created = await prisma.storeMetalOrigin.create({
         data: { storeId, storeMetalId, name },
+        select: { id: true },
       });
+      savedId = created.id;
     }
 
     revalidatePath(TAXONOMY_PATH);
 
     return {
       success: true,
+      id: savedId,
       message: id ? "Stone Type updated successfully" : "Stone Type added successfully",
     };
   } catch (error: any) {

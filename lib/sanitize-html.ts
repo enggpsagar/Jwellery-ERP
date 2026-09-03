@@ -1,4 +1,4 @@
-import DOMPurify from "isomorphic-dompurify";
+import sanitizeHtml from "sanitize-html";
 
 /**
  * The exact tag set components/shared/rich-text-editor.tsx's TipTap
@@ -6,8 +6,8 @@ import DOMPurify from "isomorphic-dompurify";
  * (bold/italic/lists) plus the handful of other StarterKit nodes/marks a
  * keyboard shortcut can still reach (blockquote, code, strike, hr) — no
  * attributes are ever needed for any of them (no `<a href>`, no
- * `<img src>`), so ALLOWED_ATTR is empty rather than trying to allowlist
- * "safe" attribute values.
+ * `<img src>`), so allowedAttributes is empty rather than trying to
+ * allowlist "safe" attribute values.
  */
 const ALLOWED_TAGS = [
   "p",
@@ -41,10 +41,20 @@ const ALLOWED_TAGS = [
  * a security boundary. Sanitize once, on write (here), rather than at every
  * render site, so a stored row is safe by construction and nothing can
  * forget to re-sanitize it later.
+ *
+ * Uses `sanitize-html` (pure JS, htmlparser2-based) rather than DOMPurify —
+ * DOMPurify's Node build depends on jsdom, which pulls in an ESM-only
+ * transitive dependency (@exodus/bytes, via html-encoding-sniffer) that
+ * Vercel's Turbopack production bundling cannot require() — this crashed
+ * every page that imported this module in production
+ * (ERR_REQUIRE_ESM, "Failed to load external module jsdom-...") despite
+ * building and running cleanly in every local check. sanitize-html has no
+ * such dependency and is a standard, widely-used server-side sanitizer for
+ * exactly this use case.
  */
 export function sanitizeTicketHtml(html: string): string {
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR: [],
+  return sanitizeHtml(html, {
+    allowedTags: ALLOWED_TAGS,
+    allowedAttributes: {},
   });
 }

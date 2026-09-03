@@ -69,6 +69,7 @@ model Store {
   storeCategories  StoreCategory[]
   storeLocations   StoreLocation[]
   apiKeys          ApiKey[]
+  supportTickets   SupportTicket[]
 
   @@index([code])
 }
@@ -297,7 +298,7 @@ model Customer {
   // Defaults new records to whatever the store's own gstScheme suggests is
   // more likely, but is freely editable per customer afterward. See
   // gstinRequired() in lib/gst.ts.
-  gstType        PartyGstType  @default(UNREGISTERED)
+  gstType        PartyGstType   @default(UNREGISTERED)
   panNumber      String?
   // A customer-facing loyalty/scheme reference number some stores print on
   // the invoice (e.g. "Encircle Id") — opaque to the app, shown as-is.
@@ -559,9 +560,9 @@ model Invoice {
   // convention as KachaInvoice.convertedToId/Quotation.convertedToId
   // pointing at Invoice), @unique so a cancelled invoice can be replaced
   // by at most one new invoice.
-  replacesId             String?       @unique
-  replaces               Invoice?      @relation("InvoiceReplaces", fields: [replacesId], references: [id])
-  replacedBy             Invoice?      @relation("InvoiceReplaces")
+  replacesId             String?        @unique
+  replaces               Invoice?       @relation("InvoiceReplaces", fields: [replacesId], references: [id])
+  replacedBy             Invoice?       @relation("InvoiceReplaces")
 
   @@unique([storeId, invoiceNumber])
   @@index([createdById])
@@ -795,7 +796,7 @@ model Vendor {
   // to us legally never carries GST, regardless of our own store's
   // gstScheme - see isVendorGstApplicable() in lib/gst.ts, used by the
   // Purchases form/action instead of the store's own scheme.
-  gstType        PartyGstType    @default(UNREGISTERED)
+  gstType        PartyGstType     @default(UNREGISTERED)
   notes          String?
   openingBalance Decimal          @default(0) @db.Decimal(12, 2)
   isActive       Boolean          @default(true)
@@ -1103,21 +1104,19 @@ model BusinessSettings {
 
 /**
  * Swarna Suite's own Contact Us content — platform-wide, not per-store.
- *
  * Deliberately has NO storeId, unlike almost every other model in this
  * schema. This is the platform operator's support info (message, optional
  * image, contact details) shown identically to every store's users and
  * every public-site visitor — not a per-tenant setting like
  * BusinessSettings above. This is a correct, intentional exception to the
  * storeId-scoping convention, not an oversight — do not add storeId here.
- *
  * A singleton: the service layer fetches the first row (creating a default
  * one on first access, same pattern as getBusinessSettings) rather than
  * looking up by a caller-supplied id. Editable only by SUPER_ADMIN — see
  * lib/actions/platform-content-actions.ts.
  */
 model PlatformContactContent {
-  id    String @id @default(cuid())
+  id      String @id @default(cuid())
   // Editable multi-line message shown on the public Contact Us page and in
   // the app's Help & Support section. Plain text, not rich text/HTML — see
   // the doc comment on ContactContentForm for why.
@@ -1143,11 +1142,11 @@ model PlatformContactContent {
  * prepared before it appears on the public FAQ page / app Help section.
  */
 model PlatformFaq {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   question    String
   answer      String
-  position    Int      @default(0)
-  isPublished Boolean  @default(true)
+  position    Int     @default(0)
+  isPublished Boolean @default(true)
 
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
@@ -1155,46 +1154,146 @@ model PlatformFaq {
   @@index([isPublished, position])
 }
 
+/**
+ * A ticket's lifecycle, set by SUPER_ADMIN (see SupportTicket.status):
+ * OPEN        - Just submitted (or reopened by a submitter reply after
+ * RESOLVED/CLOSED), awaiting a first/next look.
+ * IN_PROGRESS - A Super Admin has replied and is actively working it.
+ * Set automatically on a Super Admin reply to an OPEN
+ * ticket, and settable by hand too.
+ * RESOLVED    - The Super Admin considers the issue addressed. Still
+ * replyable — a submitter who isn't satisfied replying
+ * flips it back to OPEN (see replyToSupportTicket).
+ * CLOSED      - Terminal from the Super Admin's side (e.g. a duplicate,
+ * or no response after resolution). A submitter reply still
+ * reopens it to OPEN, same as RESOLVED — a two-way thread
+ * that couldn't be reopened by the person it's about would
+ * defeat the point of building it two-way at all.
+ */
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+/**
+ * A support ticket raised through the Contact Us form — either the public,
+ * unauthenticated site (app/contact/page.tsx) or the authenticated app's own
+ * Contact & FAQ page (app/(dashboard)/contact-faq/page.tsx). Platform
+ * support, not a per-store record: every ticket is visible to every
+ * SUPER_ADMIN regardless of which store (if any) it came from, which is why
+ * `storeId` is optional rather than the mandatory scoping field almost every
+ * other model in this schema carries.
+ * `submittedById` is null for an anonymous public-site visitor (no account
+ * to attribute it to); `submitterName`/`submitterEmail`/`submitterPhone` are
+ * always captured as plain-text snapshots — even for a signed-in submitter
+ * — so the ticket keeps saying who to reach and how, unaffected by a later
+ * profile edit or the account being removed. Email and phone are both
+ * required at submission (enforced in submitSupportTicket*, not just the
+ * form's `required` attribute) so a Super Admin always has two independent
+ * ways to reach back out.
+ * The first message in the thread (the submission itself) is the first row
+ * in `messages`, not a field on this model — everything after it, from
+ * either side, is just another SupportTicketMessage row. `lastMessageAt` is
+ * a denormalized copy of the latest message's `createdAt`, kept here purely
+ * so the Super Admin inbox can sort/filter by recent activity with a single
+ * indexed column instead of an aggregate subquery per row.
+ */
+model SupportTicket {
+  id             String                 @id @default(cuid())
+  subject        String
+  status         TicketStatus           @default(OPEN)
+  storeId        String?
+  submittedById  String?
+  submitterName  String
+  submitterEmail String
+  submitterPhone String
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  lastMessageAt  DateTime               @default(now())
+  store          Store?                 @relation(fields: [storeId], references: [id])
+  submittedBy    User?                  @relation("SupportTicketSubmittedBy", fields: [submittedById], references: [id])
+  messages       SupportTicketMessage[]
+
+  @@index([storeId])
+  @@index([submittedById])
+  @@index([status])
+  @@index([lastMessageAt])
+}
+
+/**
+ * One message in a SupportTicket's thread — the original submission and
+ * every reply after it, from either side, are all rows here (see
+ * SupportTicket's own doc comment for why the first message isn't a field
+ * on the ticket itself).
+ * `authorId` is null for an anonymous public submission (no account) and
+ * for a Super Admin reply if that's ever sent by something other than a
+ * logged-in User row (it never is today, but the snapshot fields make that
+ * safe either way); `authorName` is always a plain-text snapshot, same
+ * reasoning as SupportTicket's submitter fields. `isFromSuperAdmin` is the
+ * one flag the thread UI actually branches on to align a bubble left/right
+ * — deliberately not inferred from `authorId`/role at render time, since a
+ * Super Admin's own role could change after the fact and the message should
+ * keep showing which side of the conversation it was actually sent from.
+ */
+model SupportTicketMessage {
+  id               String        @id @default(cuid())
+  ticketId         String
+  authorId         String?
+  authorName       String
+  isFromSuperAdmin Boolean       @default(false)
+  body             String
+  createdAt        DateTime      @default(now())
+  ticket           SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author           User?         @relation("SupportTicketMessageAuthor", fields: [authorId], references: [id])
+
+  @@index([ticketId])
+  @@index([authorId])
+}
+
 model User {
-  id                  String                @id @default(cuid())
-  name                String?
-  email               String?               @unique
-  phone               String?               @unique
-  image               String?
-  role                UserRole              @default(STAFF)
-  status              UserStatus            @default(INVITED)
-  isActive            Boolean               @default(true)
-  emailVerified       DateTime?
-  phoneVerified       DateTime?
-  invitedById         String?
-  storeId             String?
-  karigarId           String?               @unique
-  permissions         String[]              @default([])
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  addressLine1        String?
-  addressLine2        String?
-  city                String?
-  country             String?               @default("India")
-  pincode             String?
-  state               String?
-  accounts            Account[]
-  employee            Employee?
-  store               Store?                @relation(fields: [storeId], references: [id])
-  storeMemberships    UserStoreMembership[]
-  karigar             Karigar?              @relation(fields: [karigarId], references: [id])
-  createdInviteTokens InviteToken[]         @relation("UserCreatedInvites")
-  inviteTokens        InviteToken[]         @relation("InviteTokenUser")
-  otpCodes            OtpCode[]
-  sessions            Session[]
-  invitedBy           User?                 @relation("UserInvites", fields: [invitedById], references: [id])
-  invitedUsers        User[]                @relation("UserInvites")
-  locationAccess      UserLocationAccess[]
-  scanSessions        ScanSession[]
-  invoicesCreated     Invoice[]             @relation("InvoiceCreatedBy")
-  invoicesCancelled   Invoice[]             @relation("InvoiceCancelledBy")
-  apiKeysCreated      ApiKey[]              @relation("ApiKeyCreatedBy")
-  customersCreated    Customer[]            @relation("CustomerCreatedBy")
+  id                    String                 @id @default(cuid())
+  name                  String?
+  email                 String?                @unique
+  phone                 String?                @unique
+  image                 String?
+  role                  UserRole               @default(STAFF)
+  status                UserStatus             @default(INVITED)
+  isActive              Boolean                @default(true)
+  emailVerified         DateTime?
+  phoneVerified         DateTime?
+  invitedById           String?
+  storeId               String?
+  karigarId             String?                @unique
+  permissions           String[]               @default([])
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  addressLine1          String?
+  addressLine2          String?
+  city                  String?
+  country               String?                @default("India")
+  pincode               String?
+  state                 String?
+  accounts              Account[]
+  employee              Employee?
+  store                 Store?                 @relation(fields: [storeId], references: [id])
+  storeMemberships      UserStoreMembership[]
+  karigar               Karigar?               @relation(fields: [karigarId], references: [id])
+  createdInviteTokens   InviteToken[]          @relation("UserCreatedInvites")
+  inviteTokens          InviteToken[]          @relation("InviteTokenUser")
+  otpCodes              OtpCode[]
+  sessions              Session[]
+  invitedBy             User?                  @relation("UserInvites", fields: [invitedById], references: [id])
+  invitedUsers          User[]                 @relation("UserInvites")
+  locationAccess        UserLocationAccess[]
+  scanSessions          ScanSession[]
+  invoicesCreated       Invoice[]              @relation("InvoiceCreatedBy")
+  invoicesCancelled     Invoice[]              @relation("InvoiceCancelledBy")
+  apiKeysCreated        ApiKey[]               @relation("ApiKeyCreatedBy")
+  customersCreated      Customer[]             @relation("CustomerCreatedBy")
+  supportTicketsFiled   SupportTicket[]        @relation("SupportTicketSubmittedBy")
+  supportTicketMessages SupportTicketMessage[] @relation("SupportTicketMessageAuthor")
 
   @@index([storeId])
 }

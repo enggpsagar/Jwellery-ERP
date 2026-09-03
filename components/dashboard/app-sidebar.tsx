@@ -22,6 +22,7 @@ import {
   PackagePlus,
   FileText,
   CreditCard,
+  LifeBuoy,
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
@@ -129,6 +130,11 @@ const mainNav: NavItem[] = [
     href: "/plans",
     icon: CreditCard,
   },
+  {
+    title: "Support Tickets",
+    href: "/support-tickets",
+    icon: LifeBuoy,
+  },
 ];
 
 const karigarNav: NavItem[] = [
@@ -145,7 +151,8 @@ function getNavForRole(role?: string, permissions: string[] = []) {
   return mainNav.filter((item) => {
     if (
       item.href === "/stores" ||
-      item.href === "/plans"
+      item.href === "/plans" ||
+      item.href === "/support-tickets"
     ) {
       return role === "SUPER_ADMIN";
     }

@@ -804,3 +804,126 @@ export function dailyReportEmail(params: {
     text,
   };
 }
+
+/** message is TipTap-authored HTML (see components/shared/rich-text-editor.tsx)
+ *  — rendered as-is inside the email body, same trust boundary as the read
+ *  side of Contact Us / FAQ content: a signed-in user's own ticket message,
+ *  or a Super Admin's reply. Stripped for the plain-text alternative. */
+function ticketMessageBlock(bodyHtml: string) {
+  return `<div style="margin: 16px 0; padding: 14px 16px; background: #f9fafb; border-radius: 8px; font-size: 14px; line-height: 1.6;">${bodyHtml}</div>`;
+}
+
+function stripHtmlForEmailText(html: string) {
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Sent to the Super Admin(s) when a new support ticket is submitted from
+ * either Contact Us surface (public /contact or the authenticated app's
+ * /contact-faq) — see lib/actions/support-ticket-actions.ts. Carries the
+ * submitter's snapshot contact details (name/email/phone) plus store, so a
+ * Super Admin can reply without opening the app first, though the "real"
+ * reply still happens in the ticket thread via `viewUrl`.
+ */
+export function newSupportTicketEmail(params: {
+  appName: string;
+  subject: string;
+  submitterName: string;
+  submitterEmail: string;
+  submitterPhone: string;
+  storeName: string | null;
+  messageHtml: string;
+  viewUrl: string;
+}) {
+  const { appName, subject, submitterName, submitterEmail, submitterPhone, storeName, messageHtml, viewUrl } = params;
+
+  const body = `
+    <p style="margin-top: 0;">A new support ticket was submitted on ${appName}.</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+      <tbody>
+        ${detailRow("Subject", subject)}
+        ${detailRow("From", submitterName)}
+        ${detailRow("Email", submitterEmail)}
+        ${detailRow("Phone", submitterPhone)}
+        ${storeName ? detailRow("Store", storeName) : detailRow("Store", "— (public site visitor)")}
+      </tbody>
+    </table>
+
+    ${ticketMessageBlock(messageHtml)}
+
+    <p style="margin-top: 20px;">
+      <a href="${viewUrl}" style="background: #111827; color: #ffffff; padding: 10px 18px; border-radius: 6px; text-decoration: none; display: inline-block;">
+        View &amp; reply
+      </a>
+    </p>
+  `;
+
+  const text = [
+    `A new support ticket was submitted on ${appName}.`,
+    "",
+    `Subject: ${subject}`,
+    `From: ${submitterName}`,
+    `Email: ${submitterEmail}`,
+    `Phone: ${submitterPhone}`,
+    `Store: ${storeName ?? "— (public site visitor)"}`,
+    "",
+    stripHtmlForEmailText(messageHtml),
+    "",
+    `View & reply: ${viewUrl}`,
+  ].join("\n");
+
+  return {
+    subject: `New support ticket: ${subject}`,
+    html: wrapEmail(appName, "New support ticket", body),
+    text,
+  };
+}
+
+/**
+ * Sent whenever a new message lands on a ticket's thread, to whichever side
+ * did NOT just post it — the submitter after a Super Admin reply, or every
+ * Super Admin after a submitter reply (same recipient list as
+ * newSupportTicketEmail). `recipientName` greets the person being notified;
+ * `replierLabel` names who just replied ("the Support Team" or the
+ * submitter's own name) since the two directions otherwise read identically.
+ */
+export function supportTicketReplyEmail(params: {
+  appName: string;
+  subject: string;
+  recipientName: string;
+  replierLabel: string;
+  messageHtml: string;
+  viewUrl: string;
+}) {
+  const { appName, subject, recipientName, replierLabel, messageHtml, viewUrl } = params;
+
+  const body = `
+    <p style="margin-top: 0;">Hi ${recipientName},</p>
+    <p>${replierLabel} replied on your support ticket <strong>${subject}</strong>.</p>
+
+    ${ticketMessageBlock(messageHtml)}
+
+    <p style="margin-top: 20px;">
+      <a href="${viewUrl}" style="background: #111827; color: #ffffff; padding: 10px 18px; border-radius: 6px; text-decoration: none; display: inline-block;">
+        View &amp; reply
+      </a>
+    </p>
+  `;
+
+  const text = [
+    `Hi ${recipientName},`,
+    "",
+    `${replierLabel} replied on your support ticket "${subject}":`,
+    "",
+    stripHtmlForEmailText(messageHtml),
+    "",
+    `View & reply: ${viewUrl}`,
+  ].join("\n");
+
+  return {
+    subject: `Re: ${subject}`,
+    html: wrapEmail(appName, "New reply on your support ticket", body),
+    text,
+  };
+}

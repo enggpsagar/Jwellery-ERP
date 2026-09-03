@@ -6,10 +6,16 @@ import {
   getPlatformContactContent,
   getPlatformFaqs,
 } from "@/lib/actions/platform-content-actions"
+import {
+  getMyContactDefaults,
+  getMyTickets,
+} from "@/lib/actions/support-ticket-actions"
 import { ContactContentView } from "@/components/public/contact-content-view"
 import { FaqList } from "@/components/public/faq-list"
 import { ContactContentForm } from "@/components/platform-content/contact-content-form"
 import { FaqManager } from "@/components/platform-content/faq-manager"
+import { SupportTicketForm } from "@/components/support/support-ticket-form"
+import { MyTickets } from "@/components/support/my-tickets"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export const metadata: Metadata = {
@@ -17,6 +23,10 @@ export const metadata: Metadata = {
 }
 
 export const dynamic = "force-dynamic"
+
+type ContactFaqPageProps = {
+  searchParams?: Promise<{ ticket?: string }>
+}
 
 /**
  * The application's single Contact & FAQ destination — reachable from the
@@ -32,16 +42,27 @@ export const dynamic = "force-dynamic"
  * deliberately has no storeId) — merging the two pages didn't change who
  * can write, only where a SUPER_ADMIN goes to do it.
  */
-export default async function ContactFaqPage() {
+export default async function ContactFaqPage({ searchParams }: ContactFaqPageProps) {
   const user = await getCurrentUser()
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
+  const params = (await searchParams) ?? {}
 
-  const [content, faqs] = await Promise.all([
+  // This route is reachable without a session (see the module doc comment
+  // on middleware.ts's matcher — "/contact-faq" starts with the same
+  // "contact"/"faq" substrings that public page is deliberately excluded
+  // from auth on, so an anonymous visitor can land here too). The read-only
+  // sections above have always tolerated that (getCurrentUser() is null but
+  // nothing throws); the ticket submission/My Tickets sections below are
+  // genuinely account-bound, so they're skipped entirely rather than
+  // calling requireAuth()-backed actions that would throw for no session.
+  const [content, faqs, contactDefaults, myTickets] = await Promise.all([
     getPlatformContactContent(),
     // SUPER_ADMIN sees every entry (including drafts) so the management
     // list below reflects reality; everyone else only ever gets published
     // ones, same as the FAQ list itself has always shown.
     getPlatformFaqs(isSuperAdmin ? {} : { publishedOnly: true }),
+    user ? getMyContactDefaults() : Promise.resolve(null),
+    user ? getMyTickets() : Promise.resolve(null),
   ])
 
   const publishedFaqs = isSuperAdmin ? faqs.filter((faq) => faq.isPublished) : faqs
@@ -72,6 +93,28 @@ export default async function ContactFaqPage() {
           <ContactContentView content={content} />
         </CardContent>
       </Card>
+
+      {user && contactDefaults ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Submit a Support Ticket</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SupportTicketForm mode="authenticated" defaults={contactDefaults} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {user && myTickets ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>My Tickets</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MyTickets tickets={myTickets} initialExpandedId={params.ticket ?? null} />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {isSuperAdmin ? (
         <>

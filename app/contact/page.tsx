@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 
 import { getPlatformContactContent } from "@/lib/actions/platform-content-actions"
 import { ContactContentView } from "@/components/public/contact-content-view"
+import { SupportTicketForm } from "@/components/support/support-ticket-form"
 import {
   PublicSiteFooter,
   PublicSiteHeader,
@@ -36,6 +37,17 @@ export default async function ContactPage() {
 
         <div className="mt-10 rounded-2xl border bg-card p-6 sm:p-8">
           <ContactContentView content={content} />
+        </div>
+
+        <div className="mt-8 rounded-2xl border bg-card p-6 sm:p-8">
+          <h2 className="text-lg font-semibold tracking-tight">Send us a message</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            This creates a support ticket and we'll reply to the email address you provide. Signed-in
+            users can track and reply to their tickets from Contact & FAQ inside the app.
+          </p>
+          <div className="mt-6">
+            <SupportTicketForm mode="public" />
+          </div>
         </div>
       </section>
 

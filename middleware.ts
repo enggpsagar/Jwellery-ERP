@@ -34,6 +34,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
+  // The support ticket inbox is platform support, not a per-store feature —
+  // same SUPER_ADMIN-only gate as /stores. Submitting a ticket and viewing
+  // one's own (/contact-faq) stays open to every role; only the inbox that
+  // sees every ticket across every store is restricted here.
+  if (pathname.startsWith("/support-tickets") && role !== "SUPER_ADMIN") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
   if (
     role === "KARIGAR" &&
     !KARIGAR_ALLOWED_PREFIXES.some((prefix) => pathname.startsWith(prefix))

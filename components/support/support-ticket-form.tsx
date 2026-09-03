@@ -9,6 +9,7 @@ import {
   type SupportTicketFormState,
 } from "@/lib/actions/support-ticket-actions"
 import { RichTextEditor } from "@/components/shared/rich-text-editor"
+import { TicketAttachmentField } from "@/components/support/ticket-attachment-field"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -150,6 +151,12 @@ export function SupportTicketForm({ mode, defaults, onSubmitted }: SupportTicket
           <p className="text-xs text-red-600">{state.errors.message[0]}</p>
         ) : null}
       </div>
+
+      {/* No ticketId yet — this creates the ticket, so any attachment lands
+          under support-tickets/new/... (see TicketAttachmentField's own
+          comment). Remounts on a successful submit for the same reason
+          RichTextEditor above does. */}
+      <TicketAttachmentField key={state.success ? `${state.message}-attachment` : "ticket-attachment"} />
 
       <div className="flex justify-end">
         <Button type="submit" disabled={isPending}>

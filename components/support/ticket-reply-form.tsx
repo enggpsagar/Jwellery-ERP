@@ -7,6 +7,7 @@ import {
   type SupportTicketFormState,
 } from "@/lib/actions/support-ticket-actions"
 import { RichTextEditor } from "@/components/shared/rich-text-editor"
+import { TicketAttachmentField } from "@/components/support/ticket-attachment-field"
 import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/loader"
 import { useToast } from "@/components/providers/toast-provider"
@@ -66,6 +67,14 @@ export function TicketReplyForm({ ticketId, onSent }: TicketReplyFormProps) {
       {state.errors?.body?.[0] ? (
         <p className="text-xs text-red-600">{state.errors.body[0]}</p>
       ) : null}
+
+      {/* Same remount-on-success convention as RichTextEditor above. The
+          ticket already exists here (unlike the initial submission form),
+          so the attachment's blob path is scoped to this ticket's own id. */}
+      <TicketAttachmentField
+        key={state.success ? `${state.message}-attachment` : "reply-attachment"}
+        ticketId={ticketId}
+      />
 
       <div className="flex justify-end">
         <Button type="submit" size="sm" disabled={isPending}>

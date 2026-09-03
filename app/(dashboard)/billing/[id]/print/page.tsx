@@ -96,7 +96,12 @@ export default async function InvoicePrintPage({ params }: Props) {
   const totalPaid = payments.reduce((sum, entry) => sum + entry.amount, 0)
 
   return (
-    <main className="mx-auto max-w-5xl space-y-4 p-6 text-xs text-black print:p-0 print:text-[10px]">
+    <main className="mx-auto max-w-5xl space-y-4 p-6 text-xs text-black print:max-w-none print:w-full print:p-0 print:text-[9px]">
+      {/* This table has 12-13 columns — wide enough that a portrait page
+          clips the rightmost ones off the printed sheet entirely. Landscape
+          plus tight margins gives it the width it actually needs. */}
+      <style>{"@page { size: A4 landscape; margin: 8mm; }"}</style>
+
       <div className="flex justify-end print:hidden">
         <InvoicePrintButton />
       </div>
@@ -163,9 +168,34 @@ export default async function InvoicePrintPage({ params }: Props) {
         )}
 
         {/* Line items */}
-        <table className="w-full border-collapse">
+        <table className="w-full table-fixed border-collapse">
+          {/* table-fixed + explicit widths, not auto layout — auto layout
+              sizes every column to its widest cell on one line, which is
+              what was pushing this 12-13 column table wider than a printed
+              page and clipping the rightmost columns off the sheet. */}
+          <colgroup>
+            <col style={{ width: "20%" }} />
+            <col style={{ width: "6%" }} />
+            <col style={{ width: "4%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "7%" }} />
+            {isInterState ? (
+              <col style={{ width: "12%" }} />
+            ) : (
+              <>
+                <col style={{ width: "6%" }} />
+                <col style={{ width: "6%" }} />
+              </>
+            )}
+            <col style={{ width: "8%" }} />
+          </colgroup>
           <thead>
-            <tr className="border-b border-black [&>th]:border-r [&>th]:border-black [&>th]:p-1 [&>th:last-child]:border-r-0">
+            <tr className="border-b border-black [&>th]:border-r [&>th]:border-black [&>th]:p-1 print:[&>th]:p-0.5 [&>th:last-child]:border-r-0">
               <th className="text-left">Variant no/Product description/Fineness</th>
               <th>Purity/HSN</th>
               <th>Net Qty</th>
@@ -192,56 +222,56 @@ export default async function InvoicePrintPage({ params }: Props) {
           </thead>
           <tbody>
             {invoice.items.map((item) => (
-              <tr key={item.id} className="border-b border-black [&>td]:border-r [&>td]:border-black [&>td]:p-1 [&>td:last-child]:border-r-0 align-top">
+              <tr key={item.id} className="border-b border-black [&>td]:border-r [&>td]:border-black [&>td]:p-1 print:[&>td]:p-0.5 [&>td:last-child]:border-r-0 align-top">
                 <td>{item.itemName}</td>
                 <td>
                   {item.purity ?? "-"}
                   {item.hsnCode ? <span className="block">{item.hsnCode}</span> : null}
                 </td>
                 <td className="text-center">{item.quantity}N</td>
-                <td className="text-right">{(item.grossWeight ?? 0).toFixed(3)}</td>
-                <td className="text-right">{(item.stoneWeight ?? 0).toFixed(3)}</td>
-                <td className="text-right">{(item.netWeight ?? 0).toFixed(3)}</td>
-                <td className="text-right">{fmt((item.rate ?? 0) * (item.netWeight ?? 0))}</td>
-                <td className="text-right">
+                <td className="text-right whitespace-nowrap">{(item.grossWeight ?? 0).toFixed(3)}</td>
+                <td className="text-right whitespace-nowrap">{(item.stoneWeight ?? 0).toFixed(3)}</td>
+                <td className="text-right whitespace-nowrap">{(item.netWeight ?? 0).toFixed(3)}</td>
+                <td className="text-right whitespace-nowrap">{fmt((item.rate ?? 0) * (item.netWeight ?? 0))}</td>
+                <td className="text-right whitespace-nowrap">
                   {fmt(item.makingCharge)}
                   {item.hmCharge > 0 ? <span className="block">HM {fmt(item.hmCharge)}</span> : null}
                 </td>
-                <td className="text-right">{fmt(item.stoneCharge)}</td>
-                <td className="text-right">{fmt(item.schemeDiscount)}</td>
+                <td className="text-right whitespace-nowrap">{fmt(item.stoneCharge)}</td>
+                <td className="text-right whitespace-nowrap">{fmt(item.schemeDiscount)}</td>
                 {isInterState ? (
-                  <td className="text-right">{fmt(item.igstAmount)}</td>
+                  <td className="text-right whitespace-nowrap">{fmt(item.igstAmount)}</td>
                 ) : (
                   <>
-                    <td className="text-right">{fmt(item.sgstAmount)}</td>
-                    <td className="text-right">{fmt(item.cgstAmount)}</td>
+                    <td className="text-right whitespace-nowrap">{fmt(item.sgstAmount)}</td>
+                    <td className="text-right whitespace-nowrap">{fmt(item.cgstAmount)}</td>
                   </>
                 )}
-                <td className="text-right font-medium">{fmt(item.lineTotal)}</td>
+                <td className="text-right whitespace-nowrap font-medium">{fmt(item.lineTotal)}</td>
               </tr>
             ))}
-            <tr className="border-b border-black font-semibold [&>td]:border-r [&>td]:border-black [&>td]:p-1 [&>td:last-child]:border-r-0">
-              <td className="text-right" colSpan={2}>Total</td>
+            <tr className="border-b border-black font-semibold [&>td]:border-r [&>td]:border-black [&>td]:p-1 print:[&>td]:p-0.5 [&>td:last-child]:border-r-0">
+              <td className="text-right whitespace-nowrap" colSpan={2}>Total</td>
               <td className="text-center">{totalQty}N</td>
-              <td className="text-right">{totalGrossWeight.toFixed(3)}</td>
-              <td className="text-right">{totalStoneWeight.toFixed(3)}</td>
-              <td className="text-right">{totalNetWeight.toFixed(3)}</td>
-              <td className="text-right">{fmt(totalGrossPrice)}</td>
-              <td className="text-right">
+              <td className="text-right whitespace-nowrap">{totalGrossWeight.toFixed(3)}</td>
+              <td className="text-right whitespace-nowrap">{totalStoneWeight.toFixed(3)}</td>
+              <td className="text-right whitespace-nowrap">{totalNetWeight.toFixed(3)}</td>
+              <td className="text-right whitespace-nowrap">{fmt(totalGrossPrice)}</td>
+              <td className="text-right whitespace-nowrap">
                 {fmt(totalMaking)}
                 {totalHm > 0 ? <span className="block">HM {fmt(totalHm)}</span> : null}
               </td>
-              <td className="text-right">{fmt(totalStoneCharge)}</td>
-              <td className="text-right">{fmt(totalSchemeDiscount)}</td>
+              <td className="text-right whitespace-nowrap">{fmt(totalStoneCharge)}</td>
+              <td className="text-right whitespace-nowrap">{fmt(totalSchemeDiscount)}</td>
               {isInterState ? (
-                <td className="text-right">{fmt(totalIgst)}</td>
+                <td className="text-right whitespace-nowrap">{fmt(totalIgst)}</td>
               ) : (
                 <>
-                  <td className="text-right">{fmt(totalSgst)}</td>
-                  <td className="text-right">{fmt(totalCgst)}</td>
+                  <td className="text-right whitespace-nowrap">{fmt(totalSgst)}</td>
+                  <td className="text-right whitespace-nowrap">{fmt(totalCgst)}</td>
                 </>
               )}
-              <td className="text-right">{fmt(invoice.totalAmount)}</td>
+              <td className="text-right whitespace-nowrap">{fmt(invoice.totalAmount)}</td>
             </tr>
           </tbody>
         </table>
@@ -260,7 +290,7 @@ export default async function InvoicePrintPage({ params }: Props) {
                 <tr className="border-b border-black [&>th]:p-1 [&>th]:text-left">
                   <th>Payment Mode</th>
                   <th>Doc No</th>
-                  <th className="text-right">Amount (Rs.)</th>
+                  <th className="text-right whitespace-nowrap">Amount (Rs.)</th>
                 </tr>
               </thead>
               <tbody>
@@ -275,7 +305,7 @@ export default async function InvoicePrintPage({ params }: Props) {
                     <tr key={entry.id} className="[&>td]:p-1">
                       <td>{entry.paymentMethod ? PAYMENT_METHOD_LABELS[entry.paymentMethod] ?? entry.paymentMethod : "-"}</td>
                       <td>{entry.paymentReference || entry.bankName || "-"}</td>
-                      <td className="text-right">{fmt(entry.amount)}</td>
+                      <td className="text-right whitespace-nowrap">{fmt(entry.amount)}</td>
                     </tr>
                   ))
                 )}
@@ -283,7 +313,7 @@ export default async function InvoicePrintPage({ params }: Props) {
               <tfoot>
                 <tr className="border-t border-black font-semibold [&>td]:p-1">
                   <td colSpan={2}>Total Amount Paid</td>
-                  <td className="text-right">{fmt(totalPaid)}</td>
+                  <td className="text-right whitespace-nowrap">{fmt(totalPaid)}</td>
                 </tr>
               </tfoot>
             </table>

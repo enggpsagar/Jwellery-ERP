@@ -44,6 +44,12 @@ export function TopBar({
 }: TopBarProps) {
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
+  // Settings is Admin/Super Admin only (enforced in middleware.ts) — hiding
+  // the link for every other role matches the sidebar's own `showSettings`
+  // gate (components/dashboard/app-sidebar.tsx) instead of showing a link
+  // that just bounces Karigar/Staff/Manager back to /dashboard.
+  const canAccessSettings =
+    session?.user?.role === "ADMIN" || session?.user?.role === "SUPER_ADMIN";
   // A user whose module access doesn't cover Billing gets no billing entry
   // points in the header — middleware would bounce them off /billing anyway.
   const canAccessBilling = hasModuleAccess("billing", {
@@ -149,9 +155,11 @@ export function TopBar({
                 <Link href="/profile">Profile</Link>
               </DropdownMenuItem>
 
-              <DropdownMenuItem asChild>
-                <Link href="/settings">Store Settings</Link>
-              </DropdownMenuItem>
+              {canAccessSettings ? (
+                <DropdownMenuItem asChild>
+                  <Link href="/settings">Store Settings</Link>
+                </DropdownMenuItem>
+              ) : null}
 
               <DropdownMenuItem asChild>
                 <Link href="/contact-faq">Contact & FAQ</Link>

@@ -34,6 +34,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
+  // Settings (business profile, GST, purity, taxonomy, locations, API keys)
+  // is Admin/Super Admin only — see the doc comment on SettingsPage's own
+  // `canEdit` check, which only ever disabled editing and never actually
+  // blocked read access for Manager/Staff, despite that being the intent.
+  // The sidebar already hides this link for Staff/Karigar/Manager
+  // (app-sidebar.tsx's `showSettings`), but the header's Account dropdown
+  // linked to it unconditionally — this is the server-side gate that
+  // actually stops those roles from reaching it, not just hiding the link.
+  if (
+    pathname.startsWith("/settings") &&
+    role !== "ADMIN" &&
+    role !== "SUPER_ADMIN"
+  ) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
   // The support ticket inbox is platform support, not a per-store feature —
   // same SUPER_ADMIN-only gate as /stores. Submitting a ticket and viewing
   // one's own (/contact-faq) stays open to every role; only the inbox that

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { UserRole } from "@prisma/client";
+import { redirect } from "next/navigation";
 
 import { getStoreMetals, getStoreCategories } from "@/lib/actions/taxonomy-actions";
 import { getCurrentUser } from "@/lib/auth/auth";
@@ -13,15 +14,18 @@ export const metadata: Metadata = {
 };
 
 export default async function TaxonomySettingsPage() {
-  const [metals, categories, currentUser] = await Promise.all([
-    getStoreMetals(),
-    getStoreCategories(),
-    getCurrentUser(),
-  ]);
+  const currentUser = await getCurrentUser();
 
+  // Admin/Super Admin only — see the matching comment in ../page.tsx.
   const canEdit =
     currentUser?.role === UserRole.ADMIN ||
     currentUser?.role === UserRole.SUPER_ADMIN;
+  if (!canEdit) redirect("/dashboard");
+
+  const [metals, categories] = await Promise.all([
+    getStoreMetals(),
+    getStoreCategories(),
+  ]);
 
   return (
     <main className="space-y-6 p-6">

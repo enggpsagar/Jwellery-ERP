@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { UserRole } from "@prisma/client";
+import { redirect } from "next/navigation";
 
 import { listApiKeys } from "@/lib/actions/api-key-actions";
 import { getCurrentUser } from "@/lib/auth/auth";
@@ -13,14 +14,15 @@ export const metadata: Metadata = {
 };
 
 export default async function ApiKeysSettingsPage() {
-  const [keys, currentUser] = await Promise.all([
-    listApiKeys(),
-    getCurrentUser(),
-  ]);
+  const currentUser = await getCurrentUser();
 
+  // Admin/Super Admin only — see the matching comment in ../page.tsx.
   const canEdit =
     currentUser?.role === UserRole.ADMIN ||
     currentUser?.role === UserRole.SUPER_ADMIN;
+  if (!canEdit) redirect("/dashboard");
+
+  const keys = await listApiKeys();
 
   return (
     <main className="space-y-6 p-6">

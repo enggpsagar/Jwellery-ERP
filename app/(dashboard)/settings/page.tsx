@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { UserRole } from "@prisma/client";
+import { redirect } from "next/navigation";
 
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { getCurrentUser } from "@/lib/auth/auth";
@@ -14,15 +15,21 @@ export const metadata: Metadata = {
 };
 
 export default async function SettingsPage() {
-  const [settings, currentUser, states] = await Promise.all([
-    getBusinessSettings(),
-    getCurrentUser(),
-    getStates(),
-  ]);
+  const currentUser = await getCurrentUser();
 
+  // Admin/Super Admin only — already gated in middleware.ts, re-checked here
+  // as the same defense-in-depth every other permission boundary in this app
+  // uses (e.g. getAllSupportTickets/getSupportTicketForAdmin re-check
+  // SUPER_ADMIN even though their routes are middleware-gated too).
   const canEdit =
     currentUser?.role === UserRole.ADMIN ||
     currentUser?.role === UserRole.SUPER_ADMIN;
+  if (!canEdit) redirect("/dashboard");
+
+  const [settings, states] = await Promise.all([
+    getBusinessSettings(),
+    getStates(),
+  ]);
 
   return (
     <main className="space-y-6 p-6">

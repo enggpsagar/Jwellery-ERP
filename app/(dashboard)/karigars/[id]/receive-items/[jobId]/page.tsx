@@ -57,6 +57,7 @@ export default async function ReceiveItemsPage({ params }: Props) {
 
   const job = await prisma.karigarJob.findFirst({
     where: { id: jobId, karigarId: id, storeId },
+    include: { metalType: { select: { id: true, name: true } } },
   });
 
   if (!job || job.status === "received") {
@@ -115,6 +116,8 @@ export default async function ReceiveItemsPage({ params }: Props) {
         fineness={fineness}
         metals={metals}
         locations={locations}
+        jobMetalTypeId={job.metalTypeId}
+        jobMetalTypeName={job.metalType?.name ?? null}
       />
     </main>
   );

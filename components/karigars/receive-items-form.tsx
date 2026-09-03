@@ -146,6 +146,15 @@ type ReceiveItemsFormProps = {
   fineness: Record<string, number>
   metals: StoreMetalRow[]
   locations: LocationOption[]
+  /** The metal issued to the karigar for this job (KarigarJob.metalTypeId).
+   * Every returned item must come back in the same metal it was issued in —
+   * a karigar given Gold can't return the job as Silver — so when this is
+   * set, the per-item Metal Type picker is locked to it instead of offering
+   * every active store metal. Null for jobs issued before this field
+   * existed, or with no metal recorded; those fall back to the old
+   * free-choice behavior rather than locking to nothing. */
+  jobMetalTypeId?: string | null
+  jobMetalTypeName?: string | null
 }
 
 export function ReceiveItemsForm({
@@ -155,17 +164,24 @@ export function ReceiveItemsForm({
   fineness,
   metals,
   locations,
+  jobMetalTypeId,
+  jobMetalTypeName,
 }: ReceiveItemsFormProps) {
   const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
-  // Mirrors the old hardcoded default of "GOLD": prefer a hasPurity metal if
-  // one exists, otherwise just fall back to whatever is first in the list.
+  // The job's own issued metal always wins when set — a karigar job can only
+  // ever be received back in the metal it was issued in. Falls back to the
+  // old "first hasPurity metal" default only when the job has none recorded.
+  const lockedMetal = useMemo(
+    () => (jobMetalTypeId ? metals.find((m) => m.id === jobMetalTypeId) : undefined),
+    [metals, jobMetalTypeId],
+  )
   const defaultMetal = useMemo(
-    () => activeMetals.find((m) => m.hasPurity) ?? activeMetals[0],
-    [activeMetals],
+    () => lockedMetal ?? activeMetals.find((m) => m.hasPurity) ?? activeMetals[0],
+    [lockedMetal, activeMetals],
   )
   const metalById = useMemo(
-    () => new Map(activeMetals.map((metal) => [metal.id, metal])),
-    [activeMetals],
+    () => new Map(metals.map((metal) => [metal.id, metal])),
+    [metals],
   )
 
   const [items, setItems] = useState<ReceiptItem[]>([emptyReceiptItem(defaultMetal)])
@@ -417,21 +433,29 @@ export function ReceiveItemsForm({
 
                   <div className="space-y-1">
                     <Label className="text-xs">Metal Type <RequiredMark /></Label>
-                    <Select
-                      value={item.metalTypeId}
-                      onValueChange={(value) => updateItemMetal(item.key, value)}
-                    >
-                      <SelectTrigger className="h-11 w-full">
-                        <SelectValue placeholder="Select metal" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {activeMetals.map((metal) => (
-                          <SelectItem key={metal.id} value={metal.id}>
-                            {metal.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {jobMetalTypeId ? (
+                      // Locked to what was actually issued for this job — a
+                      // karigar given Gold can't return the job as Silver.
+                      <div className="flex h-11 items-center rounded-md border bg-muted px-3 text-sm">
+                        {jobMetalTypeName ?? metalById.get(jobMetalTypeId)?.name ?? "—"}
+                      </div>
+                    ) : (
+                      <Select
+                        value={item.metalTypeId}
+                        onValueChange={(value) => updateItemMetal(item.key, value)}
+                      >
+                        <SelectTrigger className="h-11 w-full">
+                          <SelectValue placeholder="Select metal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {activeMetals.map((metal) => (
+                            <SelectItem key={metal.id} value={metal.id}>
+                              {metal.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   {hasPurity && (

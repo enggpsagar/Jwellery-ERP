@@ -492,6 +492,18 @@ export async function receiveItemsFromKarigar(
       if (!item.metalTypeId || !metalById.has(item.metalTypeId)) {
         return { success: false, message: "Each returned item needs a valid metal type" };
       }
+      // A karigar job's issued metal is fixed at issue time — returned items
+      // can't come back in a different metal than what was actually handed
+      // out. Only enforced when the job has one recorded (older jobs, or
+      // ones issued before this field existed, have none — nothing to check
+      // against). Mirrors the lock in receive-items-form.tsx; this is the
+      // server-side backstop for it.
+      if (job.metalTypeId && item.metalTypeId !== job.metalTypeId) {
+        return {
+          success: false,
+          message: "Returned items must use the same metal type that was issued for this job",
+        };
+      }
       if (!Object.values(PurityType).includes(item.purity)) {
         return { success: false, message: "Each returned item needs a valid purity" };
       }

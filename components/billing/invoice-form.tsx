@@ -290,10 +290,14 @@ export function InvoiceForm({
         ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
         : 0,
       stoneChargeTouched: false,
-      // The linked stock row's own recorded stone weight is authoritative —
-      // the Carat Weight -> Net Stone Weight auto-fill must not silently
-      // overwrite it if the carat weight is tweaked afterward.
-      netStoneWeightTouched: true,
+      // Only lock the auto-fill when the linked stock row actually has a
+      // recorded stone weight worth protecting — a fresh stock item with no
+      // stoneWeight set (0/null) has nothing authoritative to preserve, and
+      // locking it anyway (unconditional `true`, the previous bug here)
+      // permanently blocked Net Stone Weight from ever auto-filling from
+      // Stone Carat Weight on that line, even after "Includes a Stone" was
+      // just checked and a fresh carat weight typed in.
+      netStoneWeightTouched: stock.stoneWeight != null && Number(stock.stoneWeight) > 0,
       stoneMetalTypeName: stock.stoneMetalTypeName ?? "",
       stoneTypeNames: stock.stoneTypeNames
         ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
@@ -391,7 +395,10 @@ export function InvoiceForm({
             ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
             : 0,
           stoneChargeTouched: false,
-          netStoneWeightTouched: true,
+          // See applyStockToItem's identical comment above — only lock the
+          // auto-fill when this stock row actually has a stone weight worth
+          // protecting.
+          netStoneWeightTouched: stock.stoneWeight != null && Number(stock.stoneWeight) > 0,
           stoneMetalTypeName: stock.stoneMetalTypeName ?? "",
           stoneTypeNames: stock.stoneTypeNames
             ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)

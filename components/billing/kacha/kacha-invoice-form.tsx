@@ -204,10 +204,12 @@ export function KachaInvoiceForm({
         ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
         : 0,
       stoneChargeTouched: false,
-      // The linked stock row's own recorded stone weight is authoritative —
-      // the Carat Weight -> Net Stone Weight auto-fill must not silently
-      // overwrite it if the carat weight is tweaked afterward.
-      netStoneWeightTouched: true,
+      // Unlike invoice-form.tsx, this form's StockOption never carries the
+      // stock row's own stoneWeight to begin with (nothing set above), so
+      // there's nothing authoritative here to protect — locking this
+      // unconditionally to `true` (the previous bug) permanently blocked
+      // Net Stone Weight from ever auto-filling from Stone Carat Weight.
+      netStoneWeightTouched: false,
       stoneMetalTypeName: stock.stoneMetalTypeName ?? "",
       stoneTypeNames: stock.stoneTypeNames
         ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)

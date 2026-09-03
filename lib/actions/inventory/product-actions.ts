@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ChargeType, PurityType, StoneOrigin, Prisma } from "@prisma/client";
+import { ChargeType, PurityType, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -51,14 +51,15 @@ function serializeProduct(product: {
   categoryId: string | null;
   categoryTypeId: string | null;
   metalTypeId: string | null;
+  stoneOriginOptionId: string | null;
   category: { id: string; name: string } | null;
   categoryType: { id: string; name: string } | null;
   metalType: {
     id: string;
     name: string;
     isGemstone: boolean;
-    stoneOrigin: StoneOrigin | null;
   } | null;
+  stoneOriginOption: { id: string; origin: "NATURAL" | "LAB_GROWN" } | null;
   defaultPurity: PurityType | null;
   defaultMakingCharge: { toString(): string } | null;
   defaultMakingChargeType: ChargeType;
@@ -85,9 +86,11 @@ function serializeProduct(product: {
     categoryId: product.categoryId,
     categoryTypeId: product.categoryTypeId,
     metalTypeId: product.metalTypeId,
+    stoneOriginOptionId: product.stoneOriginOptionId,
     category: product.category,
     categoryType: product.categoryType,
     metalType: product.metalType,
+    stoneOriginOption: product.stoneOriginOption,
     defaultPurity: product.defaultPurity,
     defaultMakingCharge: product.defaultMakingCharge?.toString() ?? null,
     defaultMakingChargeType: product.defaultMakingChargeType,
@@ -113,8 +116,9 @@ const PRODUCT_RELATIONS = {
   category: { select: { id: true, name: true } },
   categoryType: { select: { id: true, name: true } },
   metalType: {
-    select: { id: true, name: true, isGemstone: true, stoneOrigin: true },
+    select: { id: true, name: true, isGemstone: true },
   },
+  stoneOriginOption: { select: { id: true, origin: true } },
 } as const;
 
 export type ProductSortBy = "name" | "productCode" | "createdAt";
@@ -364,19 +368,20 @@ export async function getProductById(id: string) {
 }
 
 /**
- * Validate that categoryId / metalTypeId / (optional) categoryTypeId
- * reference real, store-scoped rows. Returns field errors for anything
- * that doesn't resolve.
+ * Validate that categoryId / metalTypeId / (optional) categoryTypeId /
+ * (optional) stoneOriginOptionId reference real, store-scoped rows. Returns
+ * field errors for anything that doesn't resolve.
  */
 async function validateTaxonomySelection(
   storeId: string,
   categoryId: string,
   metalTypeId: string,
   categoryTypeId: string | null,
+  stoneOriginOptionId: string | null,
 ): Promise<Record<string, string[]>> {
   const errors: Record<string, string[]> = {};
 
-  const [categoryRow, metalRow, typeRow] = await Promise.all([
+  const [categoryRow, metalRow, typeRow, originRow] = await Promise.all([
     categoryId
       ? prisma.storeCategory.findFirst({
           where: { id: categoryId, storeId },
@@ -392,6 +397,12 @@ async function validateTaxonomySelection(
     categoryTypeId
       ? prisma.storeCategoryType.findFirst({
           where: { id: categoryTypeId, storeId, categoryId: categoryId || undefined },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    stoneOriginOptionId
+      ? prisma.storeMetalOrigin.findFirst({
+          where: { id: stoneOriginOptionId, storeId, storeMetalId: metalTypeId || undefined },
           select: { id: true },
         })
       : Promise.resolve(null),
@@ -413,6 +424,10 @@ async function validateTaxonomySelection(
     errors.categoryTypeId = ["Selected type is invalid for this category"];
   }
 
+  if (stoneOriginOptionId && !originRow) {
+    errors.stoneOriginOptionId = ["Selected origin is invalid for this metal"];
+  }
+
   return errors;
 }
 
@@ -427,6 +442,9 @@ export async function createProduct(
     const categoryId = String(formData.get("categoryId") ?? "").trim();
     const categoryTypeId = parseNullableString(formData.get("categoryTypeId"));
     const metalTypeId = String(formData.get("metalTypeId") ?? "").trim();
+    const stoneOriginOptionId = parseNullableString(
+      formData.get("stoneOriginOptionId"),
+    );
 
     const defaultPurity = parseOptionalEnum(
       formData.get("defaultPurity"),
@@ -498,6 +516,7 @@ export async function createProduct(
         categoryId,
         metalTypeId,
         categoryTypeId,
+        stoneOriginOptionId,
       ),
     );
 
@@ -533,6 +552,7 @@ export async function createProduct(
         categoryId,
         categoryTypeId,
         metalTypeId,
+        stoneOriginOptionId,
         defaultPurity,
         defaultMakingCharge,
         defaultMakingChargeType,
@@ -673,6 +693,9 @@ export async function updateProduct(
     const categoryId = String(formData.get("categoryId") ?? "").trim();
     const categoryTypeId = parseNullableString(formData.get("categoryTypeId"));
     const metalTypeId = String(formData.get("metalTypeId") ?? "").trim();
+    const stoneOriginOptionId = parseNullableString(
+      formData.get("stoneOriginOptionId"),
+    );
 
     const defaultPurity = parseOptionalEnum(
       formData.get("defaultPurity"),
@@ -743,6 +766,7 @@ export async function updateProduct(
         categoryId,
         metalTypeId,
         categoryTypeId,
+        stoneOriginOptionId,
       ),
     );
 
@@ -781,6 +805,7 @@ export async function updateProduct(
     categoryId,
     categoryTypeId,
     metalTypeId,
+    stoneOriginOptionId,
     defaultPurity,
     defaultMakingCharge,
     defaultMakingChargeType,

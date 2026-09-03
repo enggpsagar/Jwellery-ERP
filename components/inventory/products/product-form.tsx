@@ -5,7 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import { PurityType } from "@prisma/client";
 
 import type { ProductFormState } from "@/lib/inventory/product-types";
-import { getStoreCategoryTypes } from "@/lib/actions/taxonomy-actions";
+import {
+  getStoreCategoryTypes,
+  getStoreMetalOrigins,
+  type StoreMetalOriginRow,
+} from "@/lib/actions/taxonomy-actions";
 import { classifyMetalName } from "@/lib/business-units";
 
 // A metal classifies into one of these groups by its name — GOLD/SILVER/
@@ -67,7 +71,6 @@ export type StoreMetalOption = {
   hasPurity: boolean;
   isActive: boolean;
   isGemstone: boolean;
-  stoneOrigin: "NATURAL" | "LAB_GROWN" | null;
 };
 
 export type StoreCategoryOption = {
@@ -88,6 +91,7 @@ type Product = {
   categoryId: string | null;
   categoryTypeId: string | null;
   metalTypeId: string | null;
+  stoneOriginOptionId: string | null;
   defaultPurity: string | null;
   defaultMakingCharge: string | null;
   defaultMakingChargeType: "FIXED" | "PERCENTAGE" | null;
@@ -137,10 +141,18 @@ export function ProductForm({
 
   const [metalTypeId, setMetalTypeId] = useState(product?.metalTypeId ?? "");
 
+  const [stoneOriginOptionId, setStoneOriginOptionId] = useState(
+    product?.stoneOriginOptionId ?? "",
+  );
+
   const [types, setTypes] = useState<StoreCategoryTypeOption[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(false);
 
+  const [stoneOrigins, setStoneOrigins] = useState<StoreMetalOriginRow[]>([]);
+  const [loadingStoneOrigins, setLoadingStoneOrigins] = useState(false);
+
   const previousCategoryIdRef = useRef(categoryId);
+  const previousMetalTypeIdRef = useRef(metalTypeId);
 
   const [defaultPurity, setDefaultPurity] = useState(
     product?.defaultPurity ?? "__none__",
@@ -324,6 +336,55 @@ export function ProductForm({
       previousCategoryIdRef.current = categoryId;
     }
   }, [categoryId]);
+
+  // Fetch the Natural/Lab-Grown options for whichever gemstone Metal is
+  // currently selected — the exact same Category -> Type cascade above,
+  // just keyed off metalTypeId + isGemstone instead of categoryId.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStoneOrigins() {
+      if (!metalTypeId || !selectedMetal?.isGemstone) {
+        setStoneOrigins([]);
+        return;
+      }
+
+      try {
+        setLoadingStoneOrigins(true);
+        const data = await getStoreMetalOrigins(metalTypeId);
+
+        if (!cancelled) {
+          setStoneOrigins(data || []);
+        }
+      } catch (err) {
+        console.error("Failed to load stone origins:", err);
+        if (!cancelled) {
+          setStoneOrigins([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingStoneOrigins(false);
+        }
+      }
+    }
+
+    loadStoneOrigins();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metalTypeId, selectedMetal?.isGemstone]);
+
+  // Only reset the selected Origin when the Metal actually changes as a
+  // result of user interaction — not on initial mount (edit mode needs to
+  // keep the product's existing origin selected while options load).
+  useEffect(() => {
+    if (previousMetalTypeIdRef.current !== metalTypeId) {
+      setStoneOriginOptionId("");
+      previousMetalTypeIdRef.current = metalTypeId;
+    }
+  }, [metalTypeId]);
 
   return (
     <div className="space-y-8">
@@ -518,13 +579,49 @@ export function ProductForm({
           {selectedMetal?.isGemstone && (
             <div>
               <Label>Origin</Label>
-              <p className="mt-1 flex h-11 items-center text-sm text-muted-foreground">
-                {selectedMetal.stoneOrigin === "NATURAL"
-                  ? "Natural"
-                  : selectedMetal.stoneOrigin === "LAB_GROWN"
-                    ? "Lab-Grown"
-                    : "Not set — edit this stone in Settings"}
-              </p>
+
+              <Select
+                value={stoneOriginOptionId || "__none__"}
+                onValueChange={(value) =>
+                  setStoneOriginOptionId(value === "__none__" ? "" : value)
+                }
+                disabled={loadingStoneOrigins}
+              >
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue
+                    placeholder={
+                      loadingStoneOrigins
+                        ? "Loading origins..."
+                        : "Select Natural or Lab-Grown"
+                    }
+                  />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+
+                  {stoneOrigins.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.origin === "NATURAL" ? "Natural" : "Lab-Grown"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {!loadingStoneOrigins && stoneOrigins.length === 0 ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  No origin options set up for {selectedMetal.name} yet — add
+                  them under Settings → Taxonomy → Stone Origins.
+                </p>
+              ) : null}
+
+              <input
+                type="hidden"
+                name="stoneOriginOptionId"
+                value={stoneOriginOptionId}
+              />
+
+              <ErrorText error={state.errors.stoneOriginOptionId} />
             </div>
           )}
         </div>

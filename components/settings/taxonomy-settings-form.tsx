@@ -10,6 +10,10 @@ import {
   upsertStoreMetal,
   toggleStoreMetalActive,
   deleteStoreMetal,
+  getStoreMetalOrigins,
+  upsertStoreMetalOrigin,
+  toggleStoreMetalOriginActive,
+  deleteStoreMetalOrigin,
   upsertStoreCategory,
   toggleStoreCategoryActive,
   deleteStoreCategory,
@@ -18,6 +22,7 @@ import {
   toggleStoreCategoryTypeActive,
   deleteStoreCategoryType,
   type StoreMetalRow,
+  type StoreMetalOriginRow,
   type StoreCategoryRow,
   type StoreCategoryTypeRow,
   type TaxonomyFormState,
@@ -62,6 +67,7 @@ export function TaxonomySettingsForm({
     <div className="space-y-6">
       <MetalsSection metals={metalRows} canEdit={canEdit} />
       <StonesSection stones={stoneRows} canEdit={canEdit} />
+      <StoneOriginsSection stones={stoneRows} canEdit={canEdit} />
       <CategoriesSection categories={categories} canEdit={canEdit} />
       <TypesSection categories={categories} canEdit={canEdit} />
     </div>
@@ -299,7 +305,10 @@ function MetalFormRow({
 // Same StoreMetal table/actions as Metals above (upsertStoreMetal,
 // toggleStoreMetalActive, deleteStoreMetal all work by id regardless of
 // which section a row is shown under) — this section just always submits
-// isGemstone="on" and asks for Natural/Lab-Grown instead of Has Purity.
+// isGemstone="on" instead of Has Purity. A Stone's Natural/Lab-Grown options
+// no longer live on this row (StoreMetal.stoneOrigin is gone) — they're a
+// separate child list managed in StoneOriginsSection below, the exact same
+// two-level split as Categories (this section) / Types (TypesSection).
 
 function StonesSection({
   stones,
@@ -359,8 +368,8 @@ function StonesSection({
         <CardTitle>Stones</CardTitle>
         <p className="text-sm text-muted-foreground">
           Gemstones your store deals in — Diamond, Ruby, Emerald, Sapphire,
-          and so on. Mark each one Natural or Lab-Grown, since the two price
-          very differently.
+          and so on. Manage each stone&apos;s Natural / Lab-Grown options
+          below, since the two price very differently.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -384,13 +393,6 @@ function StonesSection({
                 <span className={stone.isActive ? "" : "text-muted-foreground line-through"}>
                   {stone.name}
                 </span>
-                <Badge variant="secondary">
-                  {stone.stoneOrigin === "NATURAL"
-                    ? "Natural"
-                    : stone.stoneOrigin === "LAB_GROWN"
-                      ? "Lab-Grown"
-                      : "Origin not set"}
-                </Badge>
               </div>
 
               {canEdit ? (
@@ -459,7 +461,6 @@ function StoneFormRow({
   const router = useRouter();
   const toast = useToast();
   const [state, formAction, pending] = useActionState(upsertStoreMetal, initialState);
-  const [stoneOrigin, setStoneOrigin] = useState(stone?.stoneOrigin ?? "");
 
   useEffect(() => {
     if (state.success) {
@@ -499,9 +500,291 @@ function StoneFormRow({
         ) : null}
       </div>
 
+      <div className="flex gap-2 pb-0.5">
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? <Loader className="h-4 w-4" /> : "Save"}
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={onDone}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stone Origins (cascading under a selected Stone) — the direct mirror of
+// Category Types (TypesSection/TypeFormRow) below, just with a fixed
+// Natural/Lab-Grown Select in place of a free-text Name input.
+// ---------------------------------------------------------------------------
+
+function StoneOriginsSection({
+  stones,
+  canEdit,
+}: {
+  stones: StoreMetalRow[];
+  canEdit: boolean;
+}) {
+  const toast = useToast();
+
+  const [selectedStoneId, setSelectedStoneId] = useState("");
+  const [origins, setOrigins] = useState<StoreMetalOriginRow[]>([]);
+  const [loadingOrigins, setLoadingOrigins] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const reloadOrigins = React.useCallback(async (storeMetalId: string) => {
+    if (!storeMetalId) {
+      setOrigins([]);
+      return;
+    }
+
+    try {
+      const data = await getStoreMetalOrigins(storeMetalId);
+      setOrigins(data);
+    } catch (error) {
+      console.error("Failed to reload origins:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadOrigins() {
+      if (!selectedStoneId) {
+        setOrigins([]);
+        return;
+      }
+
+      try {
+        setLoadingOrigins(true);
+        const data = await getStoreMetalOrigins(selectedStoneId);
+        if (!cancelled) setOrigins(data);
+      } catch (error) {
+        console.error("Failed to load origins:", error);
+        if (!cancelled) setOrigins([]);
+      } finally {
+        if (!cancelled) setLoadingOrigins(false);
+      }
+    }
+
+    setEditingId(null);
+    setShowAdd(false);
+    loadOrigins();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStoneId]);
+
+  async function handleToggle(id: string, isActive: boolean) {
+    try {
+      setTogglingId(id);
+      const result = await toggleStoreMetalOriginActive(id, isActive);
+      if (result.success) {
+        toast.success(result.message);
+        await reloadOrigins(selectedStoneId);
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update origin");
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
+  async function handleDelete(id: string, label: string) {
+    if (!window.confirm(`Delete "${label}"? This can't be undone — it only works if nothing uses it yet.`)) return
+    try {
+      setDeletingId(id);
+      const result = await deleteStoreMetalOrigin(id);
+      if (result.success) {
+        toast.success(result.message);
+        await reloadOrigins(selectedStoneId);
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete origin");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function originLabel(origin: "NATURAL" | "LAB_GROWN") {
+    return origin === "NATURAL" ? "Natural" : "Lab-Grown";
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Stone Origins</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Natural / Lab-Grown options scoped under a stone, e.g. both Natural
+          and Lab-Grown under Diamond.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="max-w-xs space-y-1.5">
+          <Label>Stone</Label>
+          <Select value={selectedStoneId} onValueChange={setSelectedStoneId}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select a stone" />
+            </SelectTrigger>
+            <SelectContent>
+              {stones.map((stone) => (
+                <SelectItem key={stone.id} value={stone.id}>
+                  {stone.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {!selectedStoneId ? (
+          <p className="text-sm text-muted-foreground">
+            Select a stone to manage its Natural / Lab-Grown options.
+          </p>
+        ) : loadingOrigins ? (
+          <p className="text-sm text-muted-foreground">Loading origins...</p>
+        ) : (
+          <div className="space-y-3">
+            {origins.length === 0 && !showAdd ? (
+              <p className="text-sm text-muted-foreground">
+                No origin options configured for this stone yet.
+              </p>
+            ) : null}
+
+            {origins.map((option) =>
+              editingId === option.id ? (
+                <StoneOriginFormRow
+                  key={option.id}
+                  option={option}
+                  storeMetalId={selectedStoneId}
+                  onDone={() => setEditingId(null)}
+                  onSaved={() => reloadOrigins(selectedStoneId)}
+                />
+              ) : (
+                <div
+                  key={option.id}
+                  className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+                >
+                  <span className={option.isActive ? "" : "text-muted-foreground line-through"}>
+                    {originLabel(option.origin)}
+                  </span>
+
+                  {canEdit ? (
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={option.isActive}
+                        disabled={togglingId === option.id}
+                        onCheckedChange={(checked) => handleToggle(option.id, checked)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(option.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                        aria-label={`Edit ${originLabel(option.origin)}`}
+                        title="Edit origin"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(option.id, originLabel(option.origin))}
+                        disabled={deletingId === option.id}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                        aria-label={`Delete ${originLabel(option.origin)}`}
+                        title="Delete origin (only if unused)"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <Badge variant={option.isActive ? "outline" : "secondary"}>
+                      {option.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  )}
+                </div>
+              ),
+            )}
+
+            {canEdit ? (
+              showAdd ? (
+                <StoneOriginFormRow
+                  storeMetalId={selectedStoneId}
+                  onDone={() => setShowAdd(false)}
+                  onSaved={() => reloadOrigins(selectedStoneId)}
+                />
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => setShowAdd(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Origin
+                </Button>
+              )
+            ) : null}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StoneOriginFormRow({
+  option,
+  storeMetalId,
+  onDone,
+  onSaved,
+}: {
+  option?: StoreMetalOriginRow;
+  storeMetalId: string;
+  onDone: () => void;
+  onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [state, formAction, pending] = useActionState(
+    upsertStoreMetalOrigin,
+    initialState,
+  );
+  const [origin, setOrigin] = useState(option?.origin ?? "");
+
+  useEffect(() => {
+    if (state.success) {
+      toast.success(state.message);
+      onSaved();
+      onDone();
+    } else if (state.message && !state.success) {
+      toast.error(state.message);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  return (
+    <form
+      onSubmit={(event) => {
+        // Same deliberate preventDefault + manual dispatch as TypeFormRow —
+        // see the comment there for why.
+        event.preventDefault()
+        formAction(new FormData(event.currentTarget))
+      }}
+      className="flex flex-wrap items-end gap-3 rounded-md border border-dashed p-3"
+    >
+      <input type="hidden" name="id" value={option?.id ?? ""} />
+      <input type="hidden" name="storeMetalId" value={storeMetalId} />
+
       <div className="space-y-1.5">
         <Label required>Origin</Label>
-        <Select value={stoneOrigin} onValueChange={setStoneOrigin}>
+        <Select value={origin} onValueChange={setOrigin}>
           <SelectTrigger className="h-10 w-[160px]">
             <SelectValue placeholder="Select origin" />
           </SelectTrigger>
@@ -510,9 +793,9 @@ function StoneFormRow({
             <SelectItem value="LAB_GROWN">Lab-Grown</SelectItem>
           </SelectContent>
         </Select>
-        <input type="hidden" name="stoneOrigin" value={stoneOrigin} />
-        {state.errors?.stoneOrigin?.[0] ? (
-          <p className="text-sm text-red-600">{state.errors.stoneOrigin[0]}</p>
+        <input type="hidden" name="origin" value={origin} />
+        {state.errors?.origin?.[0] ? (
+          <p className="text-sm text-red-600">{state.errors.origin[0]}</p>
         ) : null}
       </div>
 

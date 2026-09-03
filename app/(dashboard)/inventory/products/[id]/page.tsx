@@ -172,9 +172,9 @@ export default async function ProductDetailsPage({ params, searchParams }: Props
             label="Origin"
             value={
               <Badge variant="secondary">
-                {product.metalType.stoneOrigin === "NATURAL"
+                {product.stoneOriginOption?.origin === "NATURAL"
                   ? "Natural"
-                  : product.metalType.stoneOrigin === "LAB_GROWN"
+                  : product.stoneOriginOption?.origin === "LAB_GROWN"
                     ? "Lab-Grown"
                     : "Not set"}
               </Badge>

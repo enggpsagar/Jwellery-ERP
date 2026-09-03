@@ -24,6 +24,7 @@ type EditProductFormProps = {
     categoryId: string | null;
     categoryTypeId: string | null;
     metalTypeId: string | null;
+    stoneOriginOptionId: string | null;
     defaultPurity: string | null;
     defaultMakingCharge: string | null;
     defaultMakingChargeType: "FIXED" | "PERCENTAGE" | null;

@@ -217,7 +217,7 @@ model StoreMetal {
   // True for a gemstone row (Diamond, Ruby, Emerald, Sapphire, ...) managed
   // from Settings' Stones section rather than its Metals section — same
   // table, same metalTypeId FK everywhere, just a second lens onto it (see
-  // stoneOrigin below and the Settings Taxonomy UI). This is now the
+  // the origins relation below and the Settings Taxonomy UI). This is now the
   // authoritative signal for "is this row a stone" wherever it's cheap to
   // plumb through (product-form.tsx's classifyPurityFamily); the older
   // name-substring heuristics (classifyMetalName, isCaratWeighedMetal) are
@@ -226,12 +226,6 @@ model StoreMetal {
   // work with (historical ledger entries, purchase/invoice line items) —
   // see the comments on those functions for the reconciliation reasoning.
   isGemstone          Boolean              @default(false)
-  // Only meaningful when isGemstone is true. Nullable rather than defaulted
-  // to NATURAL: a store's pre-existing "Diamond" row (backfilled to
-  // isGemstone=true by this same migration) has no recorded origin, and
-  // guessing one would misrepresent real lab-grown stock as natural (or
-  // vice versa) — left null until the store explicitly sets it.
-  stoneOrigin         StoneOrigin?
   isActive            Boolean              @default(true)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -245,8 +239,35 @@ model StoreMetal {
   purchaseItems       PurchaseItem[]
   karigarReceiptItems KarigarReceiptItem[]
   quotationItems      QuotationItem[]
+  // Only meaningful when isGemstone is true — the same one-to-many shape as
+  // StoreCategory.types below. Replaces the old single nullable
+  // StoreMetal.stoneOrigin column: a store dealing in BOTH natural and
+  // lab-grown Diamond needs to express both as independently manageable
+  // options under the one "Diamond" row, not two separate StoreMetal rows.
+  // See StoreMetalOrigin for the child shape and Product.stoneOriginOptionId
+  // for how a product picks exactly one.
+  origins             StoreMetalOrigin[]
 
   @@unique([storeId, name])
+}
+
+// A single Natural/Lab-Grown option under a gemstone StoreMetal row (Diamond,
+// Ruby, ...) — mirrors StoreCategoryType's shape/role under StoreCategory
+// exactly. Only ever created for a row with isGemstone=true; nothing enforces
+// that at the DB level, same as StoreCategoryType not enforcing its parent
+// is any particular kind of category — the taxonomy actions gate it instead.
+model StoreMetalOrigin {
+  id           String      @id @default(cuid())
+  storeId      String
+  storeMetalId String
+  origin       StoneOrigin
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  storeMetal   StoreMetal  @relation(fields: [storeMetalId], references: [id], onDelete: Cascade)
+  products     Product[]
+
+  @@unique([storeMetalId, origin])
 }
 
 model StoreCategory {
@@ -376,6 +397,11 @@ model Product {
   categoryId              String?
   categoryTypeId          String?
   metalTypeId             String?
+  // Only meaningful when metalType.isGemstone is true — mirrors
+  // categoryTypeId's role exactly: metalTypeId stays the stone selector
+  // (Diamond, Ruby, ...), this is the finer-grained pick of which of that
+  // stone's origin options (Natural, Lab-Grown, ...) this product is.
+  stoneOriginOptionId     String?
   defaultPurity           PurityType?
   defaultMakingCharge     Decimal?             @db.Decimal(12, 2)
   defaultMakingChargeType ChargeType           @default(FIXED)
@@ -411,11 +437,13 @@ model Product {
   category                StoreCategory?       @relation(fields: [categoryId], references: [id])
   categoryType            StoreCategoryType?   @relation(fields: [categoryTypeId], references: [id])
   metalType               StoreMetal?          @relation(fields: [metalTypeId], references: [id])
+  stoneOriginOption       StoreMetalOrigin?    @relation(fields: [stoneOriginOptionId], references: [id])
 
   @@unique([storeId, productCode])
   @@index([categoryId])
   @@index([categoryTypeId])
   @@index([metalTypeId])
+  @@index([stoneOriginOptionId])
   @@index([name])
   @@index([productCode])
   @@index([designCode])
@@ -1449,9 +1477,10 @@ enum InvoiceStatus {
 }
 
 // Commercial classification for a gemstone StoreMetal row (see
-// StoreMetal.isGemstone/stoneOrigin) — lab-grown diamonds/stones price very
-// differently from natural ones, so the store needs to record which is which
-// per stone type it stocks.
+// StoreMetal.isGemstone and its StoreMetalOrigin children) — lab-grown
+// diamonds/stones price very differently from natural ones, and a store can
+// stock BOTH under the same stone (e.g. Diamond), each as its own
+// StoreMetalOrigin row rather than one fixed value per StoreMetal.
 enum StoneOrigin {
   NATURAL
   LAB_GROWN

@@ -167,6 +167,20 @@ export default async function ProductDetailsPage({ params, searchParams }: Props
           label="Default Purity"
           value={product.defaultPurity?.replaceAll("_", " ")}
         />
+        {product.metalType?.isGemstone ? (
+          <Field
+            label="Origin"
+            value={
+              <Badge variant="secondary">
+                {product.metalType.stoneOrigin === "NATURAL"
+                  ? "Natural"
+                  : product.metalType.stoneOrigin === "LAB_GROWN"
+                    ? "Lab-Grown"
+                    : "Not set"}
+              </Badge>
+            }
+          />
+        ) : null}
       </Section>
 
       <Section title="Default Charges">

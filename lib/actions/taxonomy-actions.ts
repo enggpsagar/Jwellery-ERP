@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { UserRole } from "@prisma/client";
+import { UserRole, StoneOrigin } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -12,6 +12,11 @@ export type StoreMetalRow = {
   name: string;
   hasPurity: boolean;
   isActive: boolean;
+  // isGemstone: false -> a Metals-section row. true -> a Stones-section row
+  // (see TaxonomySettingsForm, which splits this same list by the flag).
+  // stoneOrigin is only ever set when isGemstone is true.
+  isGemstone: boolean;
+  stoneOrigin: StoneOrigin | null;
 };
 
 export type StoreCategoryRow = {
@@ -52,6 +57,8 @@ export async function getStoreMetals(): Promise<StoreMetalRow[]> {
     name: metal.name,
     hasPurity: metal.hasPurity,
     isActive: metal.isActive,
+    isGemstone: metal.isGemstone,
+    stoneOrigin: metal.stoneOrigin,
   }));
 }
 
@@ -72,13 +79,26 @@ export async function upsertStoreMetal(
     const id = String(formData.get("id") || "").trim();
     const name = String(formData.get("name") || "").trim();
     const hasPurity = formData.get("hasPurity") === "on";
+    // Not a user-facing checkbox on either form — MetalFormRow simply never
+    // sends this field (so it defaults false here), while StoneFormRow sends
+    // a fixed hidden "on" — the two forms post to this same action, and this
+    // is how it tells which section's row it's saving.
+    const isGemstone = formData.get("isGemstone") === "on";
+    const stoneOriginRaw = String(formData.get("stoneOrigin") || "").trim();
+    const stoneOrigin = isGemstone
+      ? stoneOriginRaw === "NATURAL" || stoneOriginRaw === "LAB_GROWN"
+        ? (stoneOriginRaw as StoneOrigin)
+        : null
+      : null; // a plain metal never carries an origin, regardless of what was posted
 
-    if (!name) {
-      return {
-        success: false,
-        message: "Please fix the form errors",
-        errors: { name: ["Metal name is required"] },
-      };
+    const errors: Record<string, string[]> = {};
+    if (!name) errors.name = ["Name is required"];
+    if (isGemstone && !stoneOrigin) {
+      errors.stoneOrigin = ["Select Natural or Lab-Grown"];
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return { success: false, message: "Please fix the form errors", errors };
     }
 
     const storeId = await requireStoreScope();
@@ -89,25 +109,24 @@ export async function upsertStoreMetal(
     });
 
     if (existing) {
-      return {
-        success: false,
-        message: "A metal with this name already exists",
-        errors: { name: ["A metal with this name already exists"] },
-      };
+      const message = isGemstone
+        ? "A stone with this name already exists"
+        : "A metal with this name already exists";
+      return { success: false, message, errors: { name: [message] } };
     }
 
     if (id) {
       const { count } = await prisma.storeMetal.updateMany({
         where: { id, storeId },
-        data: { name, hasPurity },
+        data: { name, hasPurity, isGemstone, stoneOrigin },
       });
 
       if (count === 0) {
-        return { success: false, message: "Metal not found" };
+        return { success: false, message: isGemstone ? "Stone not found" : "Metal not found" };
       }
     } else {
       await prisma.storeMetal.create({
-        data: { storeId, name, hasPurity },
+        data: { storeId, name, hasPurity, isGemstone, stoneOrigin },
       });
     }
 
@@ -115,7 +134,13 @@ export async function upsertStoreMetal(
 
     return {
       success: true,
-      message: id ? "Metal updated successfully" : "Metal added successfully",
+      message: isGemstone
+        ? id
+          ? "Stone updated successfully"
+          : "Stone added successfully"
+        : id
+          ? "Metal updated successfully"
+          : "Metal added successfully",
     };
   } catch (error: any) {
     if (error?.code === "P2002") {

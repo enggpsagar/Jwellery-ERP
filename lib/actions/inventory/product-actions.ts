@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ChargeType, PurityType, Prisma } from "@prisma/client";
+import { ChargeType, PurityType, StoneOrigin, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -53,7 +53,12 @@ function serializeProduct(product: {
   metalTypeId: string | null;
   category: { id: string; name: string } | null;
   categoryType: { id: string; name: string } | null;
-  metalType: { id: string; name: string } | null;
+  metalType: {
+    id: string;
+    name: string;
+    isGemstone: boolean;
+    stoneOrigin: StoneOrigin | null;
+  } | null;
   defaultPurity: PurityType | null;
   defaultMakingCharge: { toString(): string } | null;
   defaultMakingChargeType: ChargeType;
@@ -107,7 +112,9 @@ function serializeProduct(product: {
 const PRODUCT_RELATIONS = {
   category: { select: { id: true, name: true } },
   categoryType: { select: { id: true, name: true } },
-  metalType: { select: { id: true, name: true } },
+  metalType: {
+    select: { id: true, name: true, isGemstone: true, stoneOrigin: true },
+  },
 } as const;
 
 export type ProductSortBy = "name" | "productCode" | "createdAt";

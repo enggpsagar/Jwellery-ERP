@@ -31,11 +31,20 @@ const PURITY_OPTIONS_BY_METAL: Record<PurityFamily, PurityType[]> = {
   OTHER: [PurityType.OTHER],
 };
 
-function classifyPurityFamily(metalName: string): PurityFamily {
-  const lower = metalName.toLowerCase();
+// Checked ahead of the name-substring guess: `isGemstone` is the real,
+// store-set flag from Settings' Stones section (StoreMetal.isGemstone), so a
+// gemstone named e.g. "Ruby" or "Emerald" — no "diamond"/"stone" substring —
+// still correctly gets the STONE family (carat weight, no fixed purity)
+// instead of silently falling through to OTHER. A name containing "diamond"
+// still wins DIAMOND specifically (its own real PurityType), matching
+// existing Diamond products created before this flag existed.
+function classifyPurityFamily(metal: { name: string; isGemstone?: boolean }): PurityFamily {
+  const lower = metal.name.toLowerCase();
   if (lower.includes("platinum")) return "PLATINUM";
+  if (lower.includes("diamond")) return "DIAMOND";
   if (lower.includes("stone")) return "STONE";
-  return classifyMetalName(metalName) as PurityFamily;
+  if (metal.isGemstone) return "STONE";
+  return classifyMetalName(metal.name) as PurityFamily;
 }
 
 import { Button } from "@/components/ui/button";
@@ -57,6 +66,8 @@ export type StoreMetalOption = {
   name: string;
   hasPurity: boolean;
   isActive: boolean;
+  isGemstone: boolean;
+  stoneOrigin: "NATURAL" | "LAB_GROWN" | null;
 };
 
 export type StoreCategoryOption = {
@@ -146,7 +157,7 @@ export function ProductForm({
 
   const selectedMetal = metals.find((item) => item.id === metalTypeId);
   const metalFamily = selectedMetal
-    ? classifyPurityFamily(selectedMetal.name)
+    ? classifyPurityFamily(selectedMetal)
     : null;
   const availablePurities = metalFamily
     ? PURITY_OPTIONS_BY_METAL[metalFamily]
@@ -504,6 +515,18 @@ export function ProductForm({
             />
           </div>
 
+          {selectedMetal?.isGemstone && (
+            <div>
+              <Label>Origin</Label>
+              <p className="mt-1 flex h-11 items-center text-sm text-muted-foreground">
+                {selectedMetal.stoneOrigin === "NATURAL"
+                  ? "Natural"
+                  : selectedMetal.stoneOrigin === "LAB_GROWN"
+                    ? "Lab-Grown"
+                    : "Not set — edit this stone in Settings"}
+              </p>
+            </div>
+          )}
         </div>
       </div>
       {/* ============================

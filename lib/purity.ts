@@ -107,8 +107,22 @@ export function stoneWeightToGrams(value: number, unit: "GRAM" | "CARAT"): numbe
  * free-text name. Kept separate from `classifyMetalName`'s `MetalFamily`
  * (tied to the `BusinessUnit` enum, which has no Stone unit) so this stays a
  * pure, local carat/weight concern shared by every line-item form.
+ *
+ * `isGemstone` is `StoreMetal.isGemstone` (see schema.prisma /
+ * Settings' Stones section) — the real, store-set flag, passed in as an
+ * optional second signal that ORs into the name guess rather than replacing
+ * it. Most callers (purchase/quotation/invoice/kacha line items) only ever
+ * carry a bare metal *name* string this deep, not the full StoreMetal row,
+ * so they keep calling this with one argument and behave exactly as before.
+ * Pass the real flag wherever it's already on hand (e.g. a metal picked
+ * straight from Settings' list) so a gemstone named e.g. "Ruby" — no
+ * "diamond"/"stone" substring — still gets correctly treated as carat-weighed
+ * instead of silently falling back to gram-based like a normal metal.
  */
-export function isCaratWeighedMetal(metalName: string | null | undefined): boolean {
+export function isCaratWeighedMetal(
+  metalName: string | null | undefined,
+  isGemstone?: boolean,
+): boolean {
   const lower = (metalName ?? "").toLowerCase();
-  return lower.includes("diamond") || lower.includes("stone");
+  return lower.includes("diamond") || lower.includes("stone") || isGemstone === true;
 }

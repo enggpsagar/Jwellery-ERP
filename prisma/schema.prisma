@@ -213,6 +213,24 @@ model StoreMetal {
   storeId             String
   name                String
   hasPurity           Boolean              @default(false)
+  // True for a gemstone row (Diamond, Ruby, Emerald, Sapphire, ...) managed
+  // from Settings' Stones section rather than its Metals section — same
+  // table, same metalTypeId FK everywhere, just a second lens onto it (see
+  // stoneOrigin below and the Settings Taxonomy UI). This is now the
+  // authoritative signal for "is this row a stone" wherever it's cheap to
+  // plumb through (product-form.tsx's classifyPurityFamily); the older
+  // name-substring heuristics (classifyMetalName, isCaratWeighedMetal) are
+  // left alongside it rather than replaced everywhere they're called, since
+  // several of those call sites only ever had a bare metal *name* string to
+  // work with (historical ledger entries, purchase/invoice line items) —
+  // see the comments on those functions for the reconciliation reasoning.
+  isGemstone          Boolean              @default(false)
+  // Only meaningful when isGemstone is true. Nullable rather than defaulted
+  // to NATURAL: a store's pre-existing "Diamond" row (backfilled to
+  // isGemstone=true by this same migration) has no recorded origin, and
+  // guessing one would misrepresent real lab-grown stock as natural (or
+  // vice versa) — left null until the store explicitly sets it.
+  stoneOrigin         StoneOrigin?
   isActive            Boolean              @default(true)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -1329,6 +1347,15 @@ enum InvoiceStatus {
   PAID
   PARTIAL
   CANCELLED
+}
+
+// Commercial classification for a gemstone StoreMetal row (see
+// StoreMetal.isGemstone/stoneOrigin) — lab-grown diamonds/stones price very
+// differently from natural ones, so the store needs to record which is which
+// per stone type it stocks.
+enum StoneOrigin {
+  NATURAL
+  LAB_GROWN
 }
 
 enum ChargeType {

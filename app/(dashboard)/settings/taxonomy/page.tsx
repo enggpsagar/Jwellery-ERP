@@ -26,8 +26,8 @@ export default async function TaxonomySettingsPage() {
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
-        title="Metals & Categories"
-        description="Define the metals, categories, and item types your store deals in."
+        title="Metals, Stones & Categories"
+        description="Define the metals, stones, categories, and item types your store deals in."
         backHref="/dashboard"
         backLabel="Back to Dashboard"
       />

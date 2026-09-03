@@ -54,6 +54,19 @@ const METAL_NAME_MATCHERS: Record<Exclude<MetalFamily, "OTHER">, string> = {
  * there's no fixed foreign key to "the Gold row" — entries are matched to a
  * business unit by a case-insensitive substring on the metal's name (e.g. a
  * StoreMetal named "Gold 22K" or "Yellow Gold" both classify as GOLD).
+ *
+ * StoreMetal also now carries a real `isGemstone` flag (Settings' Stones
+ * section — see schema.prisma), which product-form.tsx's
+ * `classifyPurityFamily` and lib/purity.ts's `isCaratWeighedMetal` both
+ * prefer over this name guess where it's cheap to plumb through. Deliberately
+ * NOT threaded in here: `MetalFamily`/`BusinessUnit` has no generic "stone"
+ * ledger unit (only DIAMOND), and most of this function's ~10 call sites
+ * (Ledger, Customer Ledger, dashboard/report aggregates) only ever see a
+ * bare metal-name *string* pulled off a historical record, not the live
+ * StoreMetal row — there's no `isGemstone` to pass even if this function
+ * accepted one. Widening the BusinessUnit enum to add a real stone bucket
+ * (so a Ruby/Emerald ledger entry has somewhere sensible to land) is a
+ * bigger, separate decision than this taxonomy change; left alone for now.
  */
 export function classifyMetalName(name: string | null | undefined): MetalFamily {
   const lower = (name ?? "").toLowerCase()

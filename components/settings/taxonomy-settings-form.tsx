@@ -51,9 +51,17 @@ export function TaxonomySettingsForm({
   categories,
   canEdit,
 }: TaxonomySettingsFormProps) {
+  // Stones live in the same StoreMetal table as Metals (same metalTypeId FK
+  // everywhere a product/stock/invoice/purchase line references one) — this
+  // is just a second, filtered view onto the one list getStoreMetals()
+  // already fetched, not a separate query.
+  const metalRows = metals.filter((metal) => !metal.isGemstone);
+  const stoneRows = metals.filter((metal) => metal.isGemstone);
+
   return (
     <div className="space-y-6">
-      <MetalsSection metals={metals} canEdit={canEdit} />
+      <MetalsSection metals={metalRows} canEdit={canEdit} />
+      <StonesSection stones={stoneRows} canEdit={canEdit} />
       <CategoriesSection categories={categories} canEdit={canEdit} />
       <TypesSection categories={categories} canEdit={canEdit} />
     </div>
@@ -270,6 +278,242 @@ function MetalFormRow({
           className="h-4 w-4"
         />
         <Label htmlFor="metal-hasPurity">Has Purity</Label>
+      </div>
+
+      <div className="flex gap-2 pb-0.5">
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? <Loader className="h-4 w-4" /> : "Save"}
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={onDone}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stones
+// ---------------------------------------------------------------------------
+//
+// Same StoreMetal table/actions as Metals above (upsertStoreMetal,
+// toggleStoreMetalActive, deleteStoreMetal all work by id regardless of
+// which section a row is shown under) — this section just always submits
+// isGemstone="on" and asks for Natural/Lab-Grown instead of Has Purity.
+
+function StonesSection({
+  stones,
+  canEdit,
+}: {
+  stones: StoreMetalRow[];
+  canEdit: boolean;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleToggle(id: string, isActive: boolean) {
+    try {
+      setTogglingId(id);
+      const result = await toggleStoreMetalActive(id, isActive);
+      if (result.success) {
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update stone");
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!window.confirm(`Delete "${name}"? This can't be undone — it only works if nothing uses it yet.`)) return
+    try {
+      setDeletingId(id);
+      const result = await deleteStoreMetal(id);
+      if (result.success) {
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete stone");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Stones</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Gemstones your store deals in — Diamond, Ruby, Emerald, Sapphire,
+          and so on. Mark each one Natural or Lab-Grown, since the two price
+          very differently.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {stones.length === 0 && !showAdd ? (
+          <p className="text-sm text-muted-foreground">No stones configured yet.</p>
+        ) : null}
+
+        {stones.map((stone) =>
+          editingId === stone.id ? (
+            <StoneFormRow
+              key={stone.id}
+              stone={stone}
+              onDone={() => setEditingId(null)}
+            />
+          ) : (
+            <div
+              key={stone.id}
+              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+            >
+              <div className="flex items-center gap-2">
+                <span className={stone.isActive ? "" : "text-muted-foreground line-through"}>
+                  {stone.name}
+                </span>
+                <Badge variant="secondary">
+                  {stone.stoneOrigin === "NATURAL"
+                    ? "Natural"
+                    : stone.stoneOrigin === "LAB_GROWN"
+                      ? "Lab-Grown"
+                      : "Origin not set"}
+                </Badge>
+              </div>
+
+              {canEdit ? (
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={stone.isActive}
+                    disabled={togglingId === stone.id}
+                    onCheckedChange={(checked) => handleToggle(stone.id, checked)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(stone.id)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                    aria-label={`Edit ${stone.name}`}
+                    title="Edit stone"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(stone.id, stone.name)}
+                    disabled={deletingId === stone.id}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                    aria-label={`Delete ${stone.name}`}
+                    title="Delete stone (only if unused)"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <Badge variant={stone.isActive ? "outline" : "secondary"}>
+                  {stone.isActive ? "Active" : "Inactive"}
+                </Badge>
+              )}
+            </div>
+          ),
+        )}
+
+        {canEdit ? (
+          showAdd ? (
+            <StoneFormRow onDone={() => setShowAdd(false)} />
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2"
+              onClick={() => setShowAdd(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Add Stone
+            </Button>
+          )
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StoneFormRow({
+  stone,
+  onDone,
+}: {
+  stone?: StoreMetalRow;
+  onDone: () => void;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [state, formAction, pending] = useActionState(upsertStoreMetal, initialState);
+  const [stoneOrigin, setStoneOrigin] = useState(stone?.stoneOrigin ?? "");
+
+  useEffect(() => {
+    if (state.success) {
+      toast.success(state.message);
+      router.refresh();
+      onDone();
+    } else if (state.message && !state.success) {
+      toast.error(state.message);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  return (
+    <form
+      onSubmit={(event) => {
+        // Same deliberate preventDefault + manual dispatch as MetalFormRow —
+        // see the comment there for why.
+        event.preventDefault()
+        formAction(new FormData(event.currentTarget))
+      }}
+      className="flex flex-wrap items-end gap-3 rounded-md border border-dashed p-3"
+    >
+      <input type="hidden" name="id" value={stone?.id ?? ""} />
+      <input type="hidden" name="isGemstone" value="on" />
+
+      <div className="space-y-1.5">
+        <Label htmlFor="stone-name" required>Name</Label>
+        <Input
+          id="stone-name"
+          name="name"
+          defaultValue={stone?.name ?? ""}
+          placeholder="e.g. Ruby"
+          required
+        />
+        {state.errors?.name?.[0] ? (
+          <p className="text-sm text-red-600">{state.errors.name[0]}</p>
+        ) : null}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label required>Origin</Label>
+        <Select value={stoneOrigin} onValueChange={setStoneOrigin}>
+          <SelectTrigger className="h-10 w-[160px]">
+            <SelectValue placeholder="Select origin" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="NATURAL">Natural</SelectItem>
+            <SelectItem value="LAB_GROWN">Lab-Grown</SelectItem>
+          </SelectContent>
+        </Select>
+        <input type="hidden" name="stoneOrigin" value={stoneOrigin} />
+        {state.errors?.stoneOrigin?.[0] ? (
+          <p className="text-sm text-red-600">{state.errors.stoneOrigin[0]}</p>
+        ) : null}
       </div>
 
       <div className="flex gap-2 pb-0.5">

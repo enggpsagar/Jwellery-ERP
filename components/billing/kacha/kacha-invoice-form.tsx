@@ -26,7 +26,7 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
-import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, resolveGramsPerCarat } from "@/lib/purity"
+import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat } from "@/lib/purity"
 import type { PurityType } from "@prisma/client"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
@@ -78,6 +78,12 @@ type LineItem = {
   dmoWeight: number
   stoneWeightInput: number
   stoneWeightUnit: "GRAM" | "CARAT"
+  hmCharge: number
+  /** Once HM Charge is edited directly, the Purity -> HM Charge auto-fill
+   * (Settings' per-piece BIS hallmark rate, applied on Gold/Silver purities
+   * only — see isHallmarkablePurity) stops overwriting it — same escape
+   * hatch as stoneChargeTouched/netStoneWeightTouched. */
+  hmChargeTouched: boolean
   inventoryStockId: string
   /** Once Net Weight is edited directly, the gross/dmo auto-calc stops
    * overwriting it. */
@@ -107,6 +113,8 @@ function emptyLineItem(): LineItem {
     dmoWeight: 0,
     stoneWeightInput: 0,
     stoneWeightUnit: "GRAM",
+    hmCharge: 0,
+    hmChargeTouched: false,
     inventoryStockId: "",
     netTouched: false,
   }
@@ -127,6 +135,12 @@ type KachaInvoiceFormProps = {
   metals: StoreMetalRow[]
   origins: StoreMetalOriginRow[]
   caratConversionRates: Record<PurityType, number>
+  /** Store's configured per-piece BIS hallmark charge (Settings > Hallmark
+   * Charge) — auto-filled into a line's HM Charge the moment its Purity is
+   * set to a Gold/Silver value (isHallmarkablePurity), while hmChargeTouched
+   * is false. See BusinessSettings.hallmarkChargePerPiece's own doc comment
+   * for why this is a store-verified figure, not a guaranteed-current rate. */
+  hallmarkChargePerPiece?: number
 }
 
 export function KachaInvoiceForm({
@@ -136,6 +150,7 @@ export function KachaInvoiceForm({
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
+  hallmarkChargePerPiece = 0,
 }: KachaInvoiceFormProps) {
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
@@ -167,6 +182,25 @@ export function KachaInvoiceForm({
     setItems((prev) =>
       prev.map((item) => (item.key === key ? { ...item, ...patch } : item)),
     )
+  }
+
+  // Auto-fills HM Charge to the store's configured per-piece BIS hallmark
+  // rate the moment a line's Purity becomes a Gold/Silver value — never for
+  // Platinum/Diamond/Other, and never once the user has typed into HM
+  // Charge directly (hmChargeTouched). Plain inline logic in the
+  // purity-change handler, not a separate useEffect/local component state —
+  // see making-charge-input.tsx's own doc comment for the class of bug that
+  // pattern avoids.
+  const handlePurityChange = (item: LineItem, purity: string) => {
+    const patch: Partial<LineItem> = { purity }
+    if (!item.hmChargeTouched && isHallmarkablePurity(purity)) {
+      patch.hmCharge = hallmarkChargePerPiece
+    }
+    updateItem(item.key, patch)
+  }
+
+  const handleHmChargeChange = (item: LineItem, value: string) => {
+    updateItem(item.key, { hmCharge: Number(value) || 0, hmChargeTouched: true })
   }
 
   // How many units of a stock row are still free to add, given what other
@@ -214,6 +248,11 @@ export function KachaInvoiceForm({
       stoneTypeNames: stock.stoneTypeNames
         ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
         : [],
+      // Same reasoning as netStoneWeightTouched above — InventoryStock
+      // carries no hmCharge of its own, so there's nothing authoritative to
+      // protect; left untouched so the Purity-driven auto-fill populates it.
+      hmCharge: isHallmarkablePurity(stock.purity) ? hallmarkChargePerPiece : 0,
+      hmChargeTouched: false,
       // The linked stock row's own net weight is authoritative — the
       // gross/dmo calc below must not silently recompute over it.
       netTouched: true,
@@ -351,15 +390,17 @@ export function KachaInvoiceForm({
     item.purity === "DIAMOND" ? item.caratWeight : item.netWeight
 
   const lineTotal = (item: LineItem) =>
-    item.rate * lineQuantity(item) + item.makingCharge + item.stoneCharge
+    item.rate * lineQuantity(item) + item.makingCharge + item.hmCharge + item.stoneCharge
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.rate * lineQuantity(item), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
+  // Hallmarking charge folds into the slip's Making Charges total — same
+  // convention as invoice-form.tsx's own makingChargesTotal.
   const makingChargesTotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.makingCharge, 0),
+    () => items.reduce((sum, item) => sum + item.makingCharge + item.hmCharge, 0),
     [items],
   )
   const stoneChargesTotal = useMemo(
@@ -390,6 +431,7 @@ export function KachaInvoiceForm({
           : null,
       dmoWeight: item.dmoWeight || null,
       stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates)) || null,
+      hmCharge: item.hmCharge,
       inventoryStockId: item.inventoryStockId || null,
     })),
   )
@@ -520,7 +562,7 @@ export function KachaInvoiceForm({
                   <Label className="text-xs">Purity</Label>
                   <Select
                     value={item.purity}
-                    onValueChange={(value) => updateItem(item.key, { purity: value })}
+                    onValueChange={(value) => handlePurityChange(item, value)}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select purity" />
@@ -672,6 +714,16 @@ export function KachaInvoiceForm({
                 )}
 
                 <div className="space-y-1">
+                  <Label className="text-xs">HM Charge</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={item.hmCharge === 0 ? "" : item.hmCharge}
+                    onChange={(e) => handleHmChargeChange(item, e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1">
                   <Label className="text-xs">Line Total</Label>
                   <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-medium">
                     ₹{lineTotal(item).toFixed(2)}
@@ -773,7 +825,7 @@ export function KachaInvoiceForm({
           <span>₹{subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Making Charges</span>
+          <span>Making Charges (incl. HM)</span>
           <span>₹{makingChargesTotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">

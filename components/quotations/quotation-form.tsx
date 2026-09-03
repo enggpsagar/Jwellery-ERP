@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { LocationSelect } from "@/components/shared/location-select"
-import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, resolveGramsPerCarat } from "@/lib/purity"
+import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat } from "@/lib/purity"
 import { RequiredMark } from "@/components/shared/required-mark"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
@@ -76,6 +76,12 @@ type LineItem = {
   stoneTypeNames: string[]
   stoneWeightInput: number
   stoneWeightUnit: "GRAM" | "CARAT"
+  hmCharge: number
+  /** Once HM Charge is edited directly, the Purity -> HM Charge auto-fill
+   * (Settings' per-piece BIS hallmark rate, applied on Gold/Silver purities
+   * only — see isHallmarkablePurity) stops overwriting it — same escape
+   * hatch as stoneChargeTouched/netStoneWeightTouched. */
+  hmChargeTouched: boolean
   inventoryStockId: string
 }
 
@@ -101,6 +107,8 @@ function emptyLineItem(): LineItem {
     stoneTypeNames: [],
     stoneWeightInput: 0,
     stoneWeightUnit: "GRAM",
+    hmCharge: 0,
+    hmChargeTouched: false,
     inventoryStockId: "",
   }
 }
@@ -122,6 +130,12 @@ type QuotationFormProps = {
   /** Store's default GST%, split into SGST+CGST (intra-state) or IGST
    * (inter-state) via computeGst() — see lib/gst.ts. */
   defaultGstRate?: number
+  /** Store's configured per-piece BIS hallmark charge (Settings > Hallmark
+   * Charge) — auto-filled into a line's HM Charge the moment its Purity is
+   * set to a Gold/Silver value (isHallmarkablePurity), while hmChargeTouched
+   * is false. See BusinessSettings.hallmarkChargePerPiece's own doc comment
+   * for why this is a store-verified figure, not a guaranteed-current rate. */
+  hallmarkChargePerPiece?: number
   /** Drives whether GST can be charged at all (never, for Composition) and
    * how it's split — see computeGst()'s own doc comment in lib/gst.ts. */
   gstScheme: GstScheme
@@ -138,6 +152,7 @@ export function QuotationForm({
   origins: initialOrigins,
   caratConversionRates,
   defaultGstRate = 0,
+  hallmarkChargePerPiece = 0,
   gstScheme,
   storeState,
 }: QuotationFormProps) {
@@ -177,6 +192,25 @@ export function QuotationForm({
     )
   }
 
+  // Auto-fills HM Charge to the store's configured per-piece BIS hallmark
+  // rate the moment a line's Purity becomes a Gold/Silver value — never for
+  // Platinum/Diamond/Other, and never once the user has typed into HM
+  // Charge directly (hmChargeTouched). Plain inline logic in the
+  // purity-change handler, not a separate useEffect/local component state —
+  // see making-charge-input.tsx's own doc comment for the class of bug that
+  // pattern avoids.
+  const handlePurityChange = (item: LineItem, purity: string) => {
+    const patch: Partial<LineItem> = { purity }
+    if (!item.hmChargeTouched && isHallmarkablePurity(purity)) {
+      patch.hmCharge = hallmarkChargePerPiece
+    }
+    updateItem(item.key, patch)
+  }
+
+  const handleHmChargeChange = (item: LineItem, value: string) => {
+    updateItem(item.key, { hmCharge: Number(value) || 0, hmChargeTouched: true })
+  }
+
   const applyStockToItem = (key: string, stockId: string) => {
     const stock = stockItems.find((s) => s.id === stockId)
     if (!stock) {
@@ -202,6 +236,11 @@ export function QuotationForm({
       stoneTypeNames: stock.stoneTypeNames
         ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
         : [],
+      // InventoryStock carries no hmCharge of its own — nothing
+      // authoritative to protect, so this stays untouched and lets the
+      // Purity-driven auto-fill populate it instead of locking in a stale 0.
+      hmCharge: isHallmarkablePurity(stock.purity) ? hallmarkChargePerPiece : 0,
+      hmChargeTouched: false,
     })
   }
 
@@ -311,15 +350,17 @@ export function QuotationForm({
     item.purity === "DIAMOND" ? item.caratWeight : item.netWeight
 
   const lineTotal = (item: LineItem) =>
-    item.rate * lineQuantity(item) + item.makingCharge + item.stoneCharge
+    item.rate * lineQuantity(item) + item.makingCharge + item.hmCharge + item.stoneCharge
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.rate * lineQuantity(item), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
+  // Hallmarking charge folds into the quotation's Making Charges total —
+  // same convention as invoice-form.tsx's own makingChargesTotal.
   const makingChargesTotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.makingCharge, 0),
+    () => items.reduce((sum, item) => sum + item.makingCharge + item.hmCharge, 0),
     [items],
   )
   const stoneChargesTotal = useMemo(
@@ -367,6 +408,7 @@ export function QuotationForm({
           ? item.stoneTypeNames.join(", ")
           : null,
       stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates)) || null,
+      hmCharge: item.hmCharge,
       inventoryStockId: item.inventoryStockId || null,
     })),
   )
@@ -487,12 +529,12 @@ export function QuotationForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Purity</Label>
                   <Select
                     value={item.purity}
-                    onValueChange={(value) => updateItem(item.key, { purity: value })}
+                    onValueChange={(value) => handlePurityChange(item, value)}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select purity" />
@@ -601,6 +643,16 @@ export function QuotationForm({
                     />
                   </div>
                 )}
+
+                <div className="space-y-1">
+                  <Label className="text-xs">HM Charge</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={item.hmCharge === 0 ? "" : item.hmCharge}
+                    onChange={(e) => handleHmChargeChange(item, e.target.value)}
+                  />
+                </div>
 
                 <div className="space-y-1">
                   <Label className="text-xs">Line Total</Label>
@@ -741,7 +793,7 @@ export function QuotationForm({
           <span>₹{subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Making Charges</span>
+          <span>Making Charges (incl. HM)</span>
           <span>₹{makingChargesTotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">

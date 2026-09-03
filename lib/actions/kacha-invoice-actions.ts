@@ -55,6 +55,9 @@ export type KachaInvoiceLineItemInput = {
   stoneMetalTypeName?: string | null;
   stoneTypeNames?: string | null;
   dmoWeight?: number | null;
+  // Hallmarking charge, folded into the slip's Making Charges total — same
+  // convention as InvoiceLineItemInput.hmCharge's own doc comment.
+  hmCharge?: number;
   inventoryStockId?: string | null;
 };
 
@@ -89,7 +92,9 @@ function lineQuantity(item: { purity?: PurityType | null; netWeight?: number | n
 
 function lineTotal(item: KachaInvoiceLineItemInput) {
   const metalValue = toNumber(item.rate) * lineQuantity(item);
-  return metalValue + toNumber(item.makingCharge) + toNumber(item.stoneCharge);
+  return (
+    metalValue + toNumber(item.makingCharge) + toNumber(item.hmCharge) + toNumber(item.stoneCharge)
+  );
 }
 
 async function generateSlipNumber(storeId: string) {
@@ -151,6 +156,7 @@ function mapKachaInvoice(kachaInvoice: any) {
       stoneMetalTypeName: item.stoneMetalTypeName ?? null,
       stoneTypeNames: item.stoneTypeNames ?? null,
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
+      hmCharge: Number(item.hmCharge ?? 0),
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
     })),
@@ -393,7 +399,12 @@ export async function createKachaInvoice(
       (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
       0,
     );
-    const makingCharges = items.reduce((sum, item) => sum + toNumber(item.makingCharge), 0);
+    // Hallmarking charge folds into the slip's Making Charges total — same
+    // convention as invoice-actions.ts's own makingCharges.
+    const makingCharges = items.reduce(
+      (sum, item) => sum + toNumber(item.makingCharge) + toNumber(item.hmCharge),
+      0,
+    );
     const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
     const totalAmount = subtotal + makingCharges + stoneCharges - discount;
     const balanceAmount = Math.max(0, totalAmount - paidAmount);
@@ -497,6 +508,7 @@ export async function createKachaInvoice(
               stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
               stoneTypeNames: item.stoneTypeNames ?? undefined,
               dmoWeight: item.dmoWeight ?? undefined,
+              hmCharge: item.hmCharge ?? 0,
               lineTotal: lineTotal(item),
               inventoryStockId:
                 item.inventoryStockId && validStockIds.has(item.inventoryStockId)
@@ -748,6 +760,7 @@ export async function convertKachaToPakka(
               stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
               stoneTypeNames: item.stoneTypeNames ?? undefined,
               dmoWeight: item.dmoWeight ?? undefined,
+              hmCharge: item.hmCharge,
               lineTotal: item.lineTotal,
               inventoryStockId: item.inventoryStockId ?? undefined,
             })),

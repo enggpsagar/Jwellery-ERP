@@ -46,6 +46,9 @@ export type QuotationLineItemInput = {
   stoneRate?: number | null;
   stoneMetalTypeName?: string | null;
   stoneTypeNames?: string | null;
+  // Hallmarking charge, folded into the quotation's Making Charges total —
+  // same convention as InvoiceLineItemInput.hmCharge's own doc comment.
+  hmCharge?: number;
   inventoryStockId?: string | null;
 };
 
@@ -80,7 +83,9 @@ function lineQuantity(item: { purity?: PurityType | null; netWeight?: number | n
 
 function lineTotal(item: QuotationLineItemInput) {
   const metalValue = toNumber(item.rate) * lineQuantity(item);
-  return metalValue + toNumber(item.makingCharge) + toNumber(item.stoneCharge);
+  return (
+    metalValue + toNumber(item.makingCharge) + toNumber(item.hmCharge) + toNumber(item.stoneCharge)
+  );
 }
 
 async function generateQuotationNumber(storeId: string) {
@@ -157,6 +162,7 @@ function mapQuotation(quotation: any) {
       stoneRate: item.stoneRate ? Number(item.stoneRate) : null,
       stoneMetalTypeName: item.stoneMetalTypeName ?? null,
       stoneTypeNames: item.stoneTypeNames ?? null,
+      hmCharge: Number(item.hmCharge ?? 0),
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
     })),
@@ -438,7 +444,12 @@ export async function createQuotation(
       (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
       0,
     );
-    const makingCharges = items.reduce((sum, item) => sum + toNumber(item.makingCharge), 0);
+    // Hallmarking charge folds into the quotation's Making Charges total —
+    // same convention as invoice-actions.ts's own makingCharges.
+    const makingCharges = items.reduce(
+      (sum, item) => sum + toNumber(item.makingCharge) + toNumber(item.hmCharge),
+      0,
+    );
     const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
     const totalAmount = subtotal + makingCharges + stoneCharges - discount + taxAmount;
 
@@ -533,6 +544,7 @@ export async function createQuotation(
             stoneRate: item.stoneRate ?? undefined,
             stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
             stoneTypeNames: item.stoneTypeNames ?? undefined,
+            hmCharge: item.hmCharge ?? 0,
             lineTotal: lineTotal(item),
             inventoryStockId:
               item.inventoryStockId && validStockIds.has(item.inventoryStockId)
@@ -710,6 +722,7 @@ export async function convertQuotationToInvoice(
               stoneRate: item.stoneRate ?? undefined,
               stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
               stoneTypeNames: item.stoneTypeNames ?? undefined,
+              hmCharge: item.hmCharge,
               lineTotal: item.lineTotal,
               inventoryStockId: item.inventoryStockId ?? undefined,
             })),

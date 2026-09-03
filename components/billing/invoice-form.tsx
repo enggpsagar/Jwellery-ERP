@@ -27,7 +27,7 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
-import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, resolveGramsPerCarat } from "@/lib/purity"
+import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat } from "@/lib/purity"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
@@ -97,6 +97,11 @@ export type LineItem = {
   stoneWeightInput: number
   stoneWeightUnit: "GRAM" | "CARAT"
   hmCharge: number
+  /** Once HM Charge is edited directly, the Purity -> HM Charge auto-fill
+   * (Settings' per-piece BIS hallmark rate, applied on Gold/Silver purities
+   * only — see isHallmarkablePurity) stops overwriting it — same escape
+   * hatch as stoneChargeTouched/netStoneWeightTouched. */
+  hmChargeTouched: boolean
   schemeDiscount: number
   hsnCode: string
   inventoryStockId: string
@@ -135,6 +140,7 @@ function emptyLineItem(): LineItem {
     stoneWeightInput: 0,
     stoneWeightUnit: "GRAM",
     hmCharge: 0,
+    hmChargeTouched: false,
     schemeDiscount: 0,
     hsnCode: "",
     inventoryStockId: "",
@@ -164,6 +170,12 @@ type InvoiceFormProps = {
    * per invoice — a store on an exempt sale, or one that changes its rate
    * mid-year, isn't stuck with whatever Settings says today. */
   defaultGstRate?: number
+  /** Store's configured per-piece BIS hallmark charge (Settings > Hallmark
+   * Charge) — auto-filled into a line's HM Charge the moment its Purity is
+   * set to a Gold/Silver value (isHallmarkablePurity), while hmChargeTouched
+   * is false. See BusinessSettings.hallmarkChargePerPiece's own doc comment
+   * for why this is a store-verified figure, not a guaranteed-current rate. */
+  hallmarkChargePerPiece?: number
   /** Drives whether GST can be charged at all (never, for Composition) and
    * how it's split — see computeGst()'s own doc comment in lib/gst.ts. */
   gstScheme: GstScheme
@@ -200,6 +212,7 @@ export function InvoiceForm({
   origins: initialOrigins,
   caratConversionRates,
   defaultGstRate = 0,
+  hallmarkChargePerPiece = 0,
   gstScheme,
   storeState,
   initialCustomerId,
@@ -248,6 +261,25 @@ export function InvoiceForm({
     setItems((prev) =>
       prev.map((item) => (item.key === key ? { ...item, ...patch } : item)),
     )
+  }
+
+  // Auto-fills HM Charge to the store's configured per-piece BIS hallmark
+  // rate the moment a line's Purity becomes a Gold/Silver value — never for
+  // Platinum/Diamond/Other, and never once the user has typed into HM
+  // Charge directly (hmChargeTouched). Kept as plain inline logic in the
+  // purity-change handler (not a separate useEffect/local component state)
+  // so it can't fall into the same "never re-fires on a later-changing
+  // dependency" class of bug MakingChargeInput's percent mode had.
+  const handlePurityChange = (item: LineItem, purity: string) => {
+    const patch: Partial<LineItem> = { purity }
+    if (!item.hmChargeTouched && isHallmarkablePurity(purity)) {
+      patch.hmCharge = hallmarkChargePerPiece
+    }
+    updateItem(item.key, patch)
+  }
+
+  const handleHmChargeChange = (item: LineItem, value: string) => {
+    updateItem(item.key, { hmCharge: Number(value) || 0, hmChargeTouched: true })
   }
 
   // How many units of a stock row are still free to add, given what other
@@ -302,6 +334,13 @@ export function InvoiceForm({
       stoneTypeNames: stock.stoneTypeNames
         ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
         : [],
+      // InventoryStock carries no hmCharge field of its own — there's
+      // nothing authoritative here to protect (same reasoning as
+      // netStoneWeightTouched above when a stock row has no recorded stone
+      // weight), so this stays untouched and lets the Purity-driven
+      // auto-fill below populate it instead of locking in a stale 0.
+      hmCharge: isHallmarkablePurity(stock.purity) ? hallmarkChargePerPiece : 0,
+      hmChargeTouched: false,
       // The linked stock row's own net weight is authoritative — the
       // gross/stone/dmo calc below must not silently recompute over it.
       netTouched: true,
@@ -403,6 +442,10 @@ export function InvoiceForm({
           stoneTypeNames: stock.stoneTypeNames
             ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
             : [],
+          // Same reasoning as applyStockToItem — InventoryStock has no
+          // hmCharge of its own, so this is left untouched.
+          hmCharge: isHallmarkablePurity(stock.purity) ? hallmarkChargePerPiece : 0,
+          hmChargeTouched: false,
           netTouched: true,
         }
 
@@ -886,7 +929,7 @@ export function InvoiceForm({
                   <Label className="text-xs">Purity</Label>
                   <Select
                     value={item.purity}
-                    onValueChange={(value) => updateItem(item.key, { purity: value })}
+                    onValueChange={(value) => handlePurityChange(item, value)}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select purity" />
@@ -1112,9 +1155,7 @@ export function InvoiceForm({
                     type="number"
                     step="0.01"
                     value={item.hmCharge === 0 ? "" : item.hmCharge}
-                    onChange={(e) =>
-                      updateItem(item.key, { hmCharge: Number(e.target.value) || 0 })
-                    }
+                    onChange={(e) => handleHmChargeChange(item, e.target.value)}
                   />
                 </div>
 

@@ -84,6 +84,10 @@ export default async function EditInvoicePage({ params }: Props) {
     stoneWeightInput: item.stoneWeight ?? 0,
     stoneWeightUnit: "GRAM",
     hmCharge: item.hmCharge,
+    // This invoice's own saved HM Charge is authoritative — must not be
+    // silently recomputed from Purity the moment this line is reopened
+    // (same reasoning as stoneChargeTouched/netStoneWeightTouched above).
+    hmChargeTouched: true,
     schemeDiscount: item.schemeDiscount,
     hsnCode: item.hsnCode ?? "",
     inventoryStockId: item.inventoryStockId ?? "",
@@ -107,6 +111,7 @@ export default async function EditInvoicePage({ params }: Props) {
         origins={origins}
         caratConversionRates={caratConversionRates}
         defaultGstRate={businessSettings.defaultGstRate}
+        hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
         gstScheme={businessSettings.gstScheme}
         storeState={businessSettings.state}
         initialCustomerId={invoice.customer?.id}

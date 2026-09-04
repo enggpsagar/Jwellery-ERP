@@ -607,7 +607,7 @@ export function ProductForm({
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-11 w-11 shrink-0"
+                className="h-11 w-9 shrink-0 px-0"
                 title="Add Category"
                 onClick={() => setAddCategoryOpen(true)}
               >
@@ -674,7 +674,7 @@ export function ProductForm({
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-11 w-11 shrink-0"
+                className="h-11 w-9 shrink-0 px-0"
                 title="Add Type"
                 disabled={!categoryId || loadingTypes}
                 onClick={() => setAddTypeOpen(true)}
@@ -762,7 +762,7 @@ export function ProductForm({
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-11 w-11 shrink-0"
+                className="h-11 w-9 shrink-0 px-0"
                 title="Add Metal Type"
                 onClick={() => setAddMetalOpen(true)}
               >

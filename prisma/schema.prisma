@@ -1341,12 +1341,14 @@ enum TicketStatus {
  * indexed column instead of an aggregate subquery per row.
  * `ticketNumber` is a human-readable, platform-wide identifier
  * (`TKT-{YYYYMMDD}-{HHMM}-{padded daily sequence}`, e.g.
- * `TKT-20260903-1745-0003`) assigned at creation — unlike every other
- * numbered document in this schema (Invoice.invoiceNumber, PurchaseBill's
- * own number, Quotation.quotationNumber, KachaInvoice's slip number, all
- * `{prefix}-{year}-{padded count}` — see each one's own `generate*Number` in
- * lib/actions/*.ts), a ticket's own date/time is encoded directly into the
- * number so it's readable at a glance without opening it. Counted across
+ * `TKT-20260903-1745-0003`) assigned at creation — same idea as
+ * Invoice.invoiceNumber's own `{prefix}-{YYYYMMDD}-{padded daily sequence}`
+ * (see generateInvoiceNumber in lib/actions/invoice-actions.ts), except
+ * this one also encodes the time, since Purchase/Quotation/KachaInvoice
+ * still use the older `{prefix}-{year}-{padded count}` shape (see each
+ * one's own `generate*Number` in lib/actions/*.ts) — a ticket's own
+ * date/time is encoded directly into the number so it's readable at a
+ * glance without opening it. Counted across
  * every store rather than scoped to one, since a ticket itself is
  * platform-wide, not a per-store record (see storeId above). Shown to both
  * the submitter and the Super Admin, and threaded into the ticket's emails

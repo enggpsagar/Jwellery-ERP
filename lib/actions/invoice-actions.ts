@@ -167,19 +167,31 @@ function lineTotal(item: InvoiceLineItemInput) {
   );
 }
 
+/**
+ * `{prefix}-{YYYYMMDD}-{padded sequence}`, e.g. `MJJ-20260904-0001` — unlike
+ * the old `{prefix}-{year}-{padded count}` shape, the full date is encoded
+ * directly into the number so it's readable at a glance without opening the
+ * invoice (same reasoning as the support ticket number's own date/time
+ * encoding — see generateTicketNumber in support-ticket-actions.ts). The
+ * sequence resets daily rather than yearly to match: `invoiceStartingNo`
+ * still seeds the first number of each day, same as it always seeded the
+ * first number of each year before.
+ */
 async function generateInvoiceNumber(storeId: string) {
   const settings = await prisma.businessSettings.findUnique({ where: { storeId } });
   const prefix = settings?.invoicePrefix?.trim() || "INV";
   const startingNo = settings?.invoiceStartingNo ?? 1;
-  const year = new Date().getFullYear();
+  const now = new Date();
+  const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const prefixPart = `${prefix}-${datePart}-`;
   const count = await prisma.invoice.count({
     where: {
       storeId,
-      invoiceNumber: { startsWith: `${prefix}-${year}-` },
+      invoiceNumber: { startsWith: prefixPart },
     },
   });
 
-  return `${prefix}-${year}-${String(count + startingNo).padStart(4, "0")}`;
+  return `${prefixPart}${String(count + startingNo).padStart(4, "0")}`;
 }
 
 /**

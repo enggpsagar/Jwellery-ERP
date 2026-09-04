@@ -1072,7 +1072,12 @@ export function InvoiceForm({
                   chargeType={item.makingChargeType}
                   onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
                 />
+              </div>
 
+              {/* Its own row, sized to its own two fields, rather than
+                  wrapping onto a mostly-empty line of the 6-column grid
+                  above (2 of 6 columns filled, 4 columns of dead space). */}
+              <div className="grid grid-cols-2 gap-3 sm:max-w-md">
                 {/* Once this is a composite line with "Includes a Stone"
                     checked, Stone Charge moves down into that box, next to
                     the Carat Weight/Rate it's computed from — see below. */}
@@ -1258,8 +1263,10 @@ export function InvoiceForm({
         </div>
 
         <div className="space-y-2">
-          <Label>GST Rate %</Label>
-          <GstSchemeBadge scheme={gstScheme} />
+          <div className="flex items-center justify-between">
+            <Label>GST Rate %</Label>
+            <GstSchemeBadge scheme={gstScheme} />
+          </div>
           <Input
             type="number"
             step="0.01"

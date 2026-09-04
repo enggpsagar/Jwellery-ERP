@@ -714,6 +714,11 @@ export function KachaInvoiceForm({
                   />
                 </div>
 
+              </div>
+
+              {/* Its own row, sized to its own fields, rather than wrapping
+                  onto a mostly-empty line of the 6-column grid above. */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <MakingChargeInput
                   rate={item.rate}
                   netWeight={item.netWeight}

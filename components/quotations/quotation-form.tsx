@@ -530,7 +530,7 @@ export function QuotationForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Purity</Label>
                   <Select
@@ -734,8 +734,10 @@ export function QuotationForm({
         </div>
 
         <div className="space-y-2">
-          <Label>GST Rate %</Label>
-          <GstSchemeBadge scheme={gstScheme} />
+          <div className="flex items-center justify-between">
+            <Label>GST Rate %</Label>
+            <GstSchemeBadge scheme={gstScheme} />
+          </div>
           <Input
             type="number"
             step="0.01"

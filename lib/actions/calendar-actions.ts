@@ -9,13 +9,15 @@ import { getEffectiveStoreId, requireStoreScope } from "@/lib/store-context";
 import { getCurrentUser, hasPermission, requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { getLocationScope, locationWhere, resolveWritableLocationId } from "@/lib/location-scope";
+import { getIndianHolidays } from "@/lib/india-holidays";
 
 export type CalendarEventType =
   | "INVOICE_DUE"
   | "QUOTATION_EXPIRY"
   | "KARIGAR_RETURN"
   | "PLAN_RENEWAL"
-  | "REMINDER";
+  | "REMINDER"
+  | "HOLIDAY";
 
 export type CalendarEvent = {
   id: string;
@@ -183,6 +185,21 @@ export async function getCalendarEvents(year: number, month: number): Promise<Ca
         isReminder: false,
       });
     }
+  }
+
+  // Public info, not store data — no permission/location gating needed.
+  for (const holiday of getIndianHolidays(year, month)) {
+    const date = new Date(Date.UTC(year, month - 1, holiday.day));
+    events.push({
+      id: `holiday-${year}-${month}-${holiday.day}-${holiday.name}`,
+      type: "HOLIDAY",
+      date: date.toISOString(),
+      title: holiday.name,
+      description: "Public holiday",
+      href: null,
+      isOverdue: false,
+      isReminder: false,
+    });
   }
 
   const reminders = await prisma.reminder.findMany({

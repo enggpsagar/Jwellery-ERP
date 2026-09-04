@@ -11,13 +11,17 @@ import { cn } from "@/lib/utils"
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
-const TYPE_META: Record<CalendarEvent["type"], { label: string; dot: string }> = {
-  INVOICE_DUE: { label: "Invoice Due", dot: "bg-blue-500" },
-  QUOTATION_EXPIRY: { label: "Quotation Expiry", dot: "bg-amber-500" },
-  KARIGAR_RETURN: { label: "Karigar Return", dot: "bg-purple-500" },
-  PLAN_RENEWAL: { label: "Plan Renewal", dot: "bg-rose-500" },
-  REMINDER: { label: "Reminder", dot: "bg-emerald-500" },
+const TYPE_META: Record<CalendarEvent["type"], { label: string; dot: string; chip: string }> = {
+  INVOICE_DUE: { label: "Invoice Due", dot: "bg-blue-500", chip: "bg-blue-100 text-blue-800" },
+  QUOTATION_EXPIRY: { label: "Quotation Expiry", dot: "bg-amber-500", chip: "bg-amber-100 text-amber-800" },
+  KARIGAR_RETURN: { label: "Karigar Return", dot: "bg-purple-500", chip: "bg-purple-100 text-purple-800" },
+  PLAN_RENEWAL: { label: "Plan Renewal", dot: "bg-rose-500", chip: "bg-rose-100 text-rose-800" },
+  REMINDER: { label: "Reminder", dot: "bg-emerald-500", chip: "bg-emerald-100 text-emerald-800" },
+  HOLIDAY: { label: "Holiday", dot: "bg-orange-500", chip: "bg-orange-100 text-orange-800" },
 }
+
+/** How many event chips a day cell shows before collapsing the rest into "+N more" — matches how much a ~7.5rem-tall cell can actually fit without crowding the day number. */
+const MAX_VISIBLE_CHIPS = 3
 
 /** UTC date-only key, e.g. "2026-09-10" — matches how a plain <input type="date"> value round-trips through Date/toISOString, so grid days and event dates agree regardless of server/browser timezone. */
 function dateKey(isoOrDate: string | Date): string {
@@ -92,100 +96,78 @@ export function CalendarView({ year, month, events }: CalendarViewProps) {
         <div className="grid grid-cols-7">
           {cells.map((key, index) => {
             if (!key) {
-              return <div key={index} className="min-h-24 border-b border-r bg-muted/10" />
+              return <div key={index} className="min-h-32 border-b border-r bg-muted/10" />
             }
 
             const dayEvents = eventsByDay.get(key) ?? []
-            const hasOverdue = dayEvents.some((event) => event.isOverdue)
+            const visibleEvents = dayEvents.slice(0, MAX_VISIBLE_CHIPS)
+            const overflowCount = dayEvents.length - visibleEvents.length
             const isToday = key === todayKey
             const isSelected = key === selectedDate
 
-            const cell = (
+            return (
               <button
+                key={index}
                 type="button"
                 onClick={() => setSelectedDate(key)}
                 className={cn(
-                  "flex min-h-24 w-full flex-col items-start gap-1 border-b border-r p-2 text-left transition-colors hover:bg-accent",
+                  "flex min-h-32 w-full flex-col items-stretch gap-1 border-b border-r p-1.5 text-left align-top transition-colors hover:bg-accent",
                   isSelected && "bg-accent",
                 )}
               >
-                <div className="flex w-full items-center justify-between">
-                  <span
-                    className={cn(
-                      "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
-                      isToday && "bg-primary text-primary-foreground",
-                    )}
-                  >
-                    {Number(key.slice(8, 10))}
-                  </span>
-
-                  {/* A number, not just dots — dots alone cap out visually
-                      at a handful before they stop reading as "how many,"
-                      exactly the case a busy day with several reminders
-                      needs to communicate clearly. */}
-                  {dayEvents.length > 1 && (
-                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      {dayEvents.length}
-                    </span>
+                <span
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
+                    isToday && "bg-primary text-primary-foreground",
                   )}
-                </div>
+                >
+                  {Number(key.slice(8, 10))}
+                </span>
 
-                <div className="flex flex-wrap gap-1">
-                  {dayEvents.slice(0, 4).map((event) => (
-                    <span
-                      key={event.id}
-                      className={cn(
-                        "h-1.5 w-1.5 rounded-full",
-                        TYPE_META[event.type].dot,
-                        event.isDone && "opacity-40",
-                      )}
-                    />
-                  ))}
-                  {dayEvents.length > 4 && (
-                    <span className="text-[10px] text-muted-foreground">+{dayEvents.length - 4}</span>
-                  )}
-                </div>
-
-                {hasOverdue && (
-                  <span className="text-[10px] font-medium text-red-600">Overdue</span>
-                )}
-              </button>
-            )
-
-            if (dayEvents.length === 0) {
-              return <div key={index}>{cell}</div>
-            }
-
-            return (
-              <Tooltip key={index}>
-                <TooltipTrigger asChild>{cell}</TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-64 p-0">
-                  <div className="max-h-64 w-64 space-y-2 overflow-y-auto p-2.5">
-                    {dayEvents.map((event) => (
-                      <div key={event.id} className="flex items-start gap-2">
-                        <span
+                {/* Google Calendar-style event chips — a short label sits
+                    right on the grid so "what needs doing" is readable at a
+                    glance, with the tooltip reserved for the fuller detail
+                    (description, type, overdue) rather than being the only
+                    place any information shows up at all. */}
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  {visibleEvents.map((event) => (
+                    <Tooltip key={event.id}>
+                      <TooltipTrigger asChild>
+                        <div
                           className={cn(
-                            "mt-1 h-1.5 w-1.5 shrink-0 rounded-full",
-                            TYPE_META[event.type].dot,
+                            "truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight",
+                            TYPE_META[event.type].chip,
+                            event.isDone && "opacity-50 line-through",
+                            event.isOverdue && "ring-1 ring-inset ring-red-500",
                           )}
-                        />
-                        <div className="min-w-0">
-                          <p className={cn("truncate font-medium", event.isDone && "line-through opacity-70")}>
+                        >
+                          {event.title}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-64">
+                        <div className="space-y-0.5">
+                          <p className={cn("font-medium", event.isDone && "line-through opacity-70")}>
                             {event.title}
                           </p>
                           {event.description && (
-                            <p className="truncate text-[11px] opacity-80">{event.description}</p>
+                            <p className="text-[11px] opacity-80">{event.description}</p>
                           )}
                           <p className="text-[11px] opacity-70">
                             {TYPE_META[event.type].label}
                             {event.isOverdue ? " · Overdue" : ""}
                           </p>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+
+                  {overflowCount > 0 && (
+                    <span className="px-1 text-[10px] font-medium text-muted-foreground">
+                      +{overflowCount} more
+                    </span>
+                  )}
+                </div>
+              </button>
             )
           })}
         </div>

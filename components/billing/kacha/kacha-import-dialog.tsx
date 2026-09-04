@@ -108,7 +108,7 @@ export function KachaImportDialog() {
             Download template
           </Button>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="kacha-import-file" required>Spreadsheet</Label>
             <Input
               id="kacha-import-file"

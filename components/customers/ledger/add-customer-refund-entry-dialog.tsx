@@ -93,7 +93,7 @@ export function AddCustomerRefundEntryDialog({
           className="space-y-4"
         >
           {activeUnits.length > 1 && (
-            <div className="space-y-1">
+            <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
               <label className="text-sm font-medium">Unit</label>
               <select
                 name="unit"
@@ -118,7 +118,7 @@ export function AddCustomerRefundEntryDialog({
           )}
 
           {isQuantityBased ? (
-            <div className="space-y-1">
+            <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <Scale className="h-4 w-4 text-muted-foreground" />
                 {isCaratBased ? "Carat Weight (ct)" : "Weight (grams)"} <RequiredMark />
@@ -137,7 +137,7 @@ export function AddCustomerRefundEntryDialog({
               )}
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <IndianRupee className="h-4 w-4 text-muted-foreground" />
                 Amount <RequiredMark />
@@ -157,7 +157,7 @@ export function AddCustomerRefundEntryDialog({
             </div>
           )}
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <NotebookText className="h-4 w-4 text-muted-foreground" />
               Description

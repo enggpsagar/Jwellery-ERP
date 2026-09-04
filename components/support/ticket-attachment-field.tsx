@@ -111,7 +111,7 @@ export function TicketAttachmentField({ ticketId }: TicketAttachmentFieldProps) 
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
       <Label>Attachment (optional)</Label>
 
       {attachment ? (

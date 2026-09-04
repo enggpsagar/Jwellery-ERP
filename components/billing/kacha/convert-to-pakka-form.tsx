@@ -133,7 +133,7 @@ export function ConvertToPakkaForm({
         <h2 className="text-lg font-semibold">GST Details</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Customer GSTIN</Label>
             <Input
               defaultValue={kachaInvoice.customer?.gstin ?? ""}
@@ -145,7 +145,7 @@ export function ConvertToPakkaForm({
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>GST Rate (%)</Label>
             <Input
               type="number"
@@ -155,13 +155,13 @@ export function ConvertToPakkaForm({
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Due Date</Label>
             <Input type="date" name="dueDate" min={todayForDateInput()} />
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Notes</Label>
           <Textarea
             name="notes"

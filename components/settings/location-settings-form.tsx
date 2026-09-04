@@ -227,7 +227,7 @@ function LocationFormRow({
         value={states.find((item) => item.id === selectedStateId)?.name ?? ""}
       />
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="location-name" required>Name</Label>
         <Input
           id="location-name"
@@ -241,7 +241,7 @@ function LocationFormRow({
         ) : null}
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="location-state">State</Label>
         <select
           id="location-state"
@@ -261,7 +261,7 @@ function LocationFormRow({
         </select>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="location-city">City</Label>
         <select
           id="location-city"

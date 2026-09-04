@@ -80,7 +80,7 @@ export function AddStoneTypeDialog({
         >
           <input type="hidden" name="storeMetalId" value={storeMetalId} />
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="stone-type-name">Name</Label>
             <Input
               id="stone-type-name"

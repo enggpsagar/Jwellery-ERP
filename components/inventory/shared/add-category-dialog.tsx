@@ -76,7 +76,7 @@ export function AddCategoryDialog({ open, onOpenChange, onCreated }: AddCategory
           }}
           className="space-y-4"
         >
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="category-dialog-name">Name</Label>
             <Input
               id="category-dialog-name"

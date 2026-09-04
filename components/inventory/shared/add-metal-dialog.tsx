@@ -102,7 +102,7 @@ export function AddMetalDialog({ open, onOpenChange, onCreated, isGemstone = fal
         >
           {isGemstone && <input type="hidden" name="isGemstone" value="on" />}
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="metal-dialog-name">Name</Label>
             <Input
               id="metal-dialog-name"

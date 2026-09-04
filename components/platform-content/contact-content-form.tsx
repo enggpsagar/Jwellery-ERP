@@ -61,7 +61,7 @@ export function ContactContentForm({
         </p>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="message" required>
           Message
         </Label>
@@ -78,7 +78,7 @@ export function ContactContentForm({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label htmlFor="email">Email</Label>
           <Input
             id="email"
@@ -92,12 +92,12 @@ export function ContactContentForm({
           ) : null}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label htmlFor="phone">Phone</Label>
           <Input id="phone" name="phone" defaultValue={content.phone} />
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label htmlFor="address">Address</Label>
           <Input id="address" name="address" defaultValue={content.address} />
         </div>

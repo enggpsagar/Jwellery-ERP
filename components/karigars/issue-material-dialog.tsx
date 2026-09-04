@@ -159,7 +159,7 @@ export function IssueMaterialDialog({
           )}
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
               <Label>Metal Type <RequiredMark /></Label>
               <Select value={metalTypeId} onValueChange={setMetalTypeId}>
                 <SelectTrigger>
@@ -176,7 +176,7 @@ export function IssueMaterialDialog({
             </div>
 
             {isPreciousMetal && (
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
                 <Label>Purity</Label>
                 <Select value={issuePurity} onValueChange={setIssuePurity}>
                   <SelectTrigger>
@@ -194,17 +194,17 @@ export function IssueMaterialDialog({
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Issue Weight (g) <RequiredMark /></Label>
             <Input name="issueWeight" type="number" step="0.001" min="0" required />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Expected Return Date</Label>
             <Input name="expectedDate" type="date" min={todayForDateInput()} />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Location</Label>
             <LocationSelect
               locations={locations}
@@ -214,7 +214,7 @@ export function IssueMaterialDialog({
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>{isPreciousMetal ? (
               "Notes"
             ) : (

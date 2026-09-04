@@ -80,7 +80,7 @@ export function AddCategoryTypeDialog({
         >
           <input type="hidden" name="categoryId" value={categoryId} />
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="category-type-dialog-name">Name</Label>
             <Input
               id="category-type-dialog-name"

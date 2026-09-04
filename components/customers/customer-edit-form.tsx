@@ -135,7 +135,7 @@ export function CustomerEditForm({
           }}
           className="grid gap-5 md:grid-cols-2"
         >
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4 text-muted-foreground" />
               Name <RequiredMark />
@@ -150,7 +150,7 @@ export function CustomerEditForm({
             <FieldError errors={state.errors?.name} />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
               Phone <RequiredMark />
@@ -165,7 +165,7 @@ export function CustomerEditForm({
             <FieldError errors={state.errors?.phone} />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
               Alternate Phone
@@ -178,7 +178,7 @@ export function CustomerEditForm({
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Mail className="h-4 w-4 text-muted-foreground" />
               Email
@@ -191,7 +191,7 @@ export function CustomerEditForm({
             />
           </div>
 
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
@@ -204,7 +204,7 @@ export function CustomerEditForm({
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               State
@@ -235,7 +235,7 @@ export function CustomerEditForm({
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               City
@@ -267,7 +267,7 @@ export function CustomerEditForm({
             </select>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               Pincode
@@ -279,7 +279,7 @@ export function CustomerEditForm({
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               PAN Number
@@ -291,7 +291,7 @@ export function CustomerEditForm({
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               Registration / Encircle Id
@@ -303,7 +303,7 @@ export function CustomerEditForm({
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <IndianRupee className="h-4 w-4 text-muted-foreground" />
               Opening Balance
@@ -340,7 +340,7 @@ export function CustomerEditForm({
             ) : null}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">Notes</label>
             <textarea
               name="notes"

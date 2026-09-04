@@ -207,12 +207,12 @@ export function UserFormDialog({
 
   const formBody = (
     <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label required>Name</Label>
             <Input name="name" defaultValue={user?.name ?? ""} required />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Email</Label>
             <Input
               name="email"
@@ -222,7 +222,7 @@ export function UserFormDialog({
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label required>Phone</Label>
             <Input
               name="phone"
@@ -231,7 +231,7 @@ export function UserFormDialog({
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label required>Role</Label>
             <input type="hidden" name="role" value={role} />
             <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
@@ -310,7 +310,7 @@ export function UserFormDialog({
           )}
 
           {role === UserRole.KARIGAR && (
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
               <Label>Linked Karigar</Label>
               <Select value={karigarId} onValueChange={handleKarigarSelect}>
                 <SelectTrigger>

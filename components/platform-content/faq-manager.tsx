@@ -220,7 +220,7 @@ function FaqFormRow({ faq, onDone }: { faq?: PlatformFaqRow; onDone: () => void 
     >
       <input type="hidden" name="id" value={faq?.id ?? ""} />
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="question" required>Question</Label>
         <Input
           id="question"
@@ -234,7 +234,7 @@ function FaqFormRow({ faq, onDone }: { faq?: PlatformFaqRow; onDone: () => void 
         ) : null}
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="answer" required>Answer</Label>
         <RichTextEditor
           id="answer"

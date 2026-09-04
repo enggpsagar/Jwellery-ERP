@@ -68,7 +68,7 @@ export function CaratConversionForm({ rows, canEdit }: CaratConversionFormProps)
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             {rows.map((row) => (
-              <div key={row.purity} className="space-y-1.5">
+              <div key={row.purity} className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
                 <Label htmlFor={`gramsPerCarat_${row.purity}`}>
                   {getPurityLabel(row.purity)}
                 </Label>

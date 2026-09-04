@@ -486,7 +486,7 @@ export function KachaInvoiceForm({
       <input type="hidden" name="paymentsJson" value={paymentsJson} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Customer <RequiredMark /></Label>
           <CustomerSelect
             customers={customers}
@@ -496,7 +496,7 @@ export function KachaInvoiceForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Slip Date</Label>
           <Input
             type="date"
@@ -505,7 +505,7 @@ export function KachaInvoiceForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Location</Label>
           <LocationSelect
             locations={locations}
@@ -533,7 +533,7 @@ export function KachaInvoiceForm({
           {items.map((item) => (
             <div key={item.key} className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="md:col-span-2 space-y-1">
+                <div className="md:col-span-2 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Link Stock Item (optional)</Label>
                   <StockItemSelect
                     stockItems={stockItems}
@@ -551,7 +551,7 @@ export function KachaInvoiceForm({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Item Name</Label>
                   <Input
                     value={item.itemName}
@@ -559,7 +559,7 @@ export function KachaInvoiceForm({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Quantity</Label>
                   <Input
                     type="number"
@@ -583,7 +583,7 @@ export function KachaInvoiceForm({
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Purity</Label>
                   <Select
                     value={item.purity}
@@ -602,7 +602,7 @@ export function KachaInvoiceForm({
                   </Select>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Gross Weight (g)</Label>
                   <Input
                     type="number"
@@ -622,7 +622,7 @@ export function KachaInvoiceForm({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Net Weight (g)</Label>
                   <Input
                     type="number"
@@ -666,7 +666,7 @@ export function KachaInvoiceForm({
                 )}
 
                 {isCaratLine(item) && (
-                  <div className="space-y-1">
+                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Carat Weight (ct)</Label>
                     <Input
                       type="number"
@@ -682,7 +682,7 @@ export function KachaInvoiceForm({
                   </div>
                 )}
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Dust/Making/Other Wt (g)</Label>
                   <Input
                     type="number"
@@ -702,7 +702,7 @@ export function KachaInvoiceForm({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Rate / g</Label>
                   <Input
                     type="number"
@@ -732,7 +732,7 @@ export function KachaInvoiceForm({
                     checked, Stone Charge moves down into that box, next to
                     the Carat Weight/Rate it's computed from — see below. */}
                 {(isCaratLine(item) || !item.hasStoneComponent) && (
-                  <div className="space-y-1">
+                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Stone Charge</Label>
                     <Input
                       type="number"
@@ -743,7 +743,7 @@ export function KachaInvoiceForm({
                   </div>
                 )}
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">HM Charge</Label>
                   <Input
                     type="number"
@@ -830,7 +830,7 @@ export function KachaInvoiceForm({
         maxAmount={totalAmount > 0 ? totalAmount : undefined}
       />
 
-      <div className="space-y-2">
+      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label>Notes</Label>
         <Textarea name="notes" rows={2} />
       </div>

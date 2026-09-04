@@ -993,3 +993,31 @@ export async function deleteProduct(id: string): Promise<ProductFormState> {
     };
   }
 }
+
+export type BulkDeleteResult = {
+  deletedCount: number;
+  failures: { id: string; message: string }[];
+};
+
+/**
+ * Deletes each selected product through the exact same deleteProduct()
+ * call a single-row delete uses — never a bare deleteMany — so a bulk
+ * selection can't bypass the stock/dependency guard just because several
+ * rows were ticked at once. Partial success is expected and reported per
+ * row, not treated as a whole-batch failure.
+ */
+export async function bulkDeleteProducts(ids: string[]): Promise<BulkDeleteResult> {
+  const failures: BulkDeleteResult["failures"] = [];
+  let deletedCount = 0;
+
+  for (const id of ids) {
+    const result = await deleteProduct(id);
+    if (result.success) {
+      deletedCount++;
+    } else {
+      failures.push({ id, message: result.message });
+    }
+  }
+
+  return { deletedCount, failures };
+}

@@ -6,8 +6,9 @@ import Link from "next/link"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
 import { DataTableToolbar } from "@/components/shared/data-table-toolbar"
+import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
 import { ProductsTable } from "@/components/inventory/products/products-table"
-import { exportProductsToExcel } from "@/lib/actions/inventory/product-actions"
+import { exportProductsToExcel, bulkDeleteProducts } from "@/lib/actions/inventory/product-actions"
 
 type ProductRow = React.ComponentProps<typeof ProductsTable>["products"][number]
 
@@ -57,24 +58,34 @@ export function ProductsClient({
         }
       />
 
-      <DataTableToolbar
-        searchPlaceholder="Search by name, product code, design code..."
-        sortOptions={[
-          { value: "name", label: "Sort by Name" },
-          { value: "productCode", label: "Sort by Product Code" },
-          { value: "createdAt", label: "Sort by Created Date" },
-          { value: "category", label: "Sort by Category" },
-          { value: "categoryType", label: "Sort by Type" },
-          { value: "metalType", label: "Sort by Metal" },
-          { value: "defaultPurity", label: "Sort by Purity" },
-          { value: "defaultNetWeight", label: "Sort by Net Weight" },
-          { value: "isActive", label: "Sort by Status" },
-        ]}
-        defaultSortBy="createdAt"
-        selectedIds={selectedIds}
-        entityLabel="products"
-        exportAction={exportProductsToExcel}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <DataTableToolbar
+          searchPlaceholder="Search by name, product code, design code..."
+          sortOptions={[
+            { value: "name", label: "Sort by Name" },
+            { value: "productCode", label: "Sort by Product Code" },
+            { value: "createdAt", label: "Sort by Created Date" },
+            { value: "category", label: "Sort by Category" },
+            { value: "categoryType", label: "Sort by Type" },
+            { value: "metalType", label: "Sort by Metal" },
+            { value: "defaultPurity", label: "Sort by Purity" },
+            { value: "defaultNetWeight", label: "Sort by Net Weight" },
+            { value: "isActive", label: "Sort by Status" },
+          ]}
+          defaultSortBy="createdAt"
+          selectedIds={selectedIds}
+          entityLabel="products"
+          exportAction={exportProductsToExcel}
+        />
+        <BulkDeleteButton
+          selectedIds={selectedIds}
+          itemLabelSingular="product"
+          itemLabelPlural="products"
+          getDisplayName={(id) => products.find((product) => product.id === id)?.name ?? id}
+          onDelete={bulkDeleteProducts}
+          onDone={() => setSelectedIds([])}
+        />
+      </div>
 
       <ProductsTable
         canEdit={canEdit}

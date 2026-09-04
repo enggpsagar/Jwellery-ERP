@@ -5,7 +5,8 @@ import Link from "next/link"
 import { VendorsTable } from "@/components/vendors/vendors-table"
 import { VendorsToolbar } from "@/components/vendors/vendors-toolbar"
 import { Button } from "@/components/ui/button"
-import type { Vendor } from "@/lib/actions/vendor-actions"
+import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
+import { bulkDeleteVendors, type Vendor } from "@/lib/actions/vendor-actions"
 
 type StateItem = {
   id: string
@@ -57,7 +58,17 @@ export function VendorsClient({
         </div>
       </div>
 
-      <VendorsToolbar selectedVendorIds={selectedVendorIds} />
+      <div className="flex flex-wrap items-center gap-2">
+        <VendorsToolbar selectedVendorIds={selectedVendorIds} />
+        <BulkDeleteButton
+          selectedIds={selectedVendorIds}
+          itemLabelSingular="vendor"
+          itemLabelPlural="vendors"
+          getDisplayName={(id) => vendors.find((vendor) => vendor.id === id)?.name ?? id}
+          onDelete={bulkDeleteVendors}
+          onDone={() => setSelectedVendorIds([])}
+        />
+      </div>
 
       <VendorsTable
         vendors={vendors}

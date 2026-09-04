@@ -8,7 +8,8 @@ import { KarigarTable } from "@/components/karigars/karigar-table"
 import { KarigarsToolbar } from "@/components/karigars/karigars-toolbar"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
-import type { Karigar } from "@/lib/actions/karigar-actions"
+import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
+import { bulkDeleteKarigars, type Karigar } from "@/lib/actions/karigar-actions"
 
 type PaginationInfo = {
   page: number
@@ -53,7 +54,17 @@ export function KarigarsClient({ karigars, pagination }: KarigarsClientProps) {
         }
       />
 
-      <KarigarsToolbar selectedKarigarIds={selectedKarigarIds} />
+      <div className="flex flex-wrap items-center gap-2">
+        <KarigarsToolbar selectedKarigarIds={selectedKarigarIds} />
+        <BulkDeleteButton
+          selectedIds={selectedKarigarIds}
+          itemLabelSingular="karigar"
+          itemLabelPlural="karigars"
+          getDisplayName={(id) => karigars.find((karigar) => karigar.id === id)?.name ?? id}
+          onDelete={bulkDeleteKarigars}
+          onDone={() => setSelectedKarigarIds([])}
+        />
+      </div>
 
       <KarigarTable
         karigars={karigars}

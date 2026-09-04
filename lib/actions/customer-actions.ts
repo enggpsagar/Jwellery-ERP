@@ -345,3 +345,31 @@ export async function deleteCustomer(id: string): Promise<CustomerFormState> {
     }
   }
 }
+
+export type BulkDeleteResult = {
+  deletedCount: number
+  failures: { id: string; message: string }[]
+}
+
+/**
+ * Deletes each selected customer through the exact same deleteCustomer()
+ * call a single-row delete uses — never a bare deleteMany — so a bulk
+ * selection can't bypass the invoice/ledger dependency guard just because
+ * several rows were ticked at once. Partial success is expected and
+ * reported per row, not treated as a whole-batch failure.
+ */
+export async function bulkDeleteCustomers(ids: string[]): Promise<BulkDeleteResult> {
+  const failures: BulkDeleteResult["failures"] = []
+  let deletedCount = 0
+
+  for (const id of ids) {
+    const result = await deleteCustomer(id)
+    if (result.success) {
+      deletedCount++
+    } else {
+      failures.push({ id, message: result.message })
+    }
+  }
+
+  return { deletedCount, failures }
+}

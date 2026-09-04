@@ -6,7 +6,8 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { CustomersTable } from "@/components/customers/customers-table"
 import { CustomersToolbar } from "@/components/customers/customers-toolbar"
-import type { Customer } from "@/lib/actions/customer-actions"
+import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
+import { bulkDeleteCustomers, type Customer } from "@/lib/actions/customer-actions"
 
 type StateItem = {
   id: string
@@ -60,7 +61,17 @@ export function CustomersClient({
         </div>
       </div>
 
-      <CustomersToolbar selectedCustomerIds={selectedCustomerIds} />
+      <div className="flex flex-wrap items-center gap-2">
+        <CustomersToolbar selectedCustomerIds={selectedCustomerIds} />
+        <BulkDeleteButton
+          selectedIds={selectedCustomerIds}
+          itemLabelSingular="customer"
+          itemLabelPlural="customers"
+          getDisplayName={(id) => customers.find((customer) => customer.id === id)?.name ?? id}
+          onDelete={bulkDeleteCustomers}
+          onDone={() => setSelectedCustomerIds([])}
+        />
+      </div>
 
       <CustomersTable
         customers={customers}

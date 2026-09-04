@@ -1343,15 +1343,17 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <Button type="submit" disabled={pending || !customerId || hasInvalidRate || paidOverTotal}>
-        {editInvoiceId
-          ? pending
-            ? "Saving..."
-            : "Save Changes"
-          : pending
-            ? "Creating..."
-            : "Create Invoice"}
-      </Button>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={pending || !customerId || hasInvalidRate || paidOverTotal}>
+          {editInvoiceId
+            ? pending
+              ? "Saving..."
+              : "Save Changes"
+            : pending
+              ? "Creating..."
+              : "Create Invoice"}
+        </Button>
+      </div>
     </form>
   )
 }

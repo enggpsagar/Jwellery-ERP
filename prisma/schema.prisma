@@ -72,6 +72,7 @@ model Store {
   apiKeys              ApiKey[]
   supportTickets       SupportTicket[]
   creditNotes          CreditNote[]
+  reminders            Reminder[]
 
   @@index([code])
 }
@@ -153,6 +154,7 @@ model StoreLocation {
   quotations      Quotation[]
   userAccess      UserLocationAccess[]
   creditNotes     CreditNote[]
+  reminders       Reminder[]
 
   @@unique([storeId, name])
 }
@@ -717,6 +719,36 @@ model CreditNoteItem {
   @@index([creditNoteId])
   @@index([invoiceItemId])
   @@index([inventoryStockId])
+}
+
+/// A free-form, manually-added reminder for the Calendar View — the catch-all
+/// for "other important tasks/deadlines" that don't already have a date
+/// field somewhere else in the schema (Invoice.dueDate, Quotation.validUntil,
+/// KarigarJob.expectedDate, Store.planExpiresAt — see
+/// lib/actions/calendar-actions.ts's getCalendarEvents, which merges all of
+/// these into one feed). Not itself tied to any other record on purpose:
+/// a reminder here is exactly the kind of thing that has no natural home
+/// elsewhere.
+model Reminder {
+  id            String   @id @default(cuid())
+  storeId       String
+  title         String
+  notes         String?
+  dueDate       DateTime
+  isDone        Boolean  @default(false)
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  store      Store          @relation(fields: [storeId], references: [id])
+  createdBy  User?          @relation("ReminderCreatedBy", fields: [createdById], references: [id])
+  locationId String?
+  location   StoreLocation? @relation(fields: [locationId], references: [id])
+
+  @@index([storeId])
+  @@index([dueDate])
+  @@index([locationId])
 }
 
 model KachaInvoice {
@@ -1551,6 +1583,7 @@ model User {
   inventoryStocksAdded  InventoryStock[]       @relation("InventoryStockCreatedBy")
   purchasesRecorded     Purchase[]             @relation("PurchaseCreatedBy")
   creditNotesCreated    CreditNote[]           @relation("CreditNoteCreatedBy")
+  remindersCreated      Reminder[]             @relation("ReminderCreatedBy")
 
   @@index([storeId])
 }

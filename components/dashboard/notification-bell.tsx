@@ -173,6 +173,16 @@ export function NotificationBell() {
             </div>
           )}
         </ScrollArea>
+
+        <div className="border-t px-4 py-2">
+          <Link
+            href="/calendar"
+            onClick={() => setOpen(false)}
+            className="block text-center text-xs font-medium text-primary hover:underline"
+          >
+            View Calendar
+          </Link>
+        </div>
       </PopoverContent>
     </Popover>
   );

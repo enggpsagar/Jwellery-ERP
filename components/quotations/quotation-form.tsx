@@ -500,7 +500,11 @@ export function QuotationForm({
                     stockItems={stockItems}
                     value={item.inventoryStockId}
                     onValueChange={(value) => applyStockToItem(item.key, value)}
-                    onCreateNew={() => applyStockToItem(item.key, "")}
+                    // See invoice-form.tsx's identical comment — a plain
+                    // applyStockToItem(key, "") only clears inventoryStockId,
+                    // leaving a previously-linked stock's Item Name/weights/
+                    // rate in place, so this resets the whole row instead.
+                    onCreateNew={() => updateItem(item.key, { ...emptyLineItem(), key: item.key })}
                   />
                 </div>
 

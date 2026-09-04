@@ -69,8 +69,8 @@
   --accent: oklch(0.93 0.03 80);
   --accent-foreground: oklch(0.28 0.02 40);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.88 0.015 70);
-  --input: oklch(0.9 0.014 70);
+  --border: oklch(0.78 0.02 70);
+  --input: oklch(0.8 0.018 70);
   --ring: oklch(0.75 0.12 80);
   /* Jewellery categorical palette — sapphire, gold, emerald, amethyst, ruby.
      Validated with the data-viz six checks on the light surface: CVD adjacent
@@ -126,8 +126,8 @@
   --accent: oklch(0.28 0.03 60);
   --accent-foreground: oklch(0.96 0.01 75);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(0.9 0.02 70 / 12%);
-  --input: oklch(0.9 0.02 70 / 16%);
+  --border: oklch(0.9 0.02 70 / 20%);
+  --input: oklch(0.9 0.02 70 / 24%);
   --ring: oklch(0.7 0.12 80);
   /* The same five hues re-stepped for the dark surface, not an automatic
      flip: validated separately - CVD adjacent dE 9.6, normal-vision 16.9,
@@ -169,8 +169,8 @@
     --accent: oklch(0.28 0.03 60);
     --accent-foreground: oklch(0.96 0.01 75);
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(0.9 0.02 70 / 12%);
-    --input: oklch(0.9 0.02 70 / 16%);
+    --border: oklch(0.9 0.02 70 / 20%);
+    --input: oklch(0.9 0.02 70 / 24%);
     --ring: oklch(0.7 0.12 80);
     /* The same five hues re-stepped for the dark surface, not an automatic
        flip: validated separately - CVD adjacent dE 9.6, normal-vision 16.9,

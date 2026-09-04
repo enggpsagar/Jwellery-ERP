@@ -915,7 +915,14 @@ export function InvoiceForm({
                     stockItems={stockItems}
                     value={item.inventoryStockId}
                     onValueChange={(value) => applyStockToItem(item.key, value)}
-                    onCreateNew={() => applyStockToItem(item.key, "")}
+                    // A plain applyStockToItem(key, "") only clears
+                    // inventoryStockId — Item Name/weights/rate etc. from
+                    // whatever stock was previously linked stayed put, so
+                    // picking "Create New Line Item" on an already-linked
+                    // row looked like it did nothing. This resets the whole
+                    // row to a blank manual-entry line instead, keeping only
+                    // its identity (key) so it doesn't jump position.
+                    onCreateNew={() => updateItem(item.key, { ...emptyLineItem(), key: item.key })}
                     isDisabled={(stock) => availableForStock(stock.id, item.key) <= 0}
                     renderLabel={(stock) =>
                       `${stock.stockCode} — ${stock.productName} (${availableForStock(stock.id, item.key)} available)`

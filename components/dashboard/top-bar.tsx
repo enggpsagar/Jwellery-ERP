@@ -155,6 +155,10 @@ export function TopBar({
                 <Link href="/profile">Profile</Link>
               </DropdownMenuItem>
 
+              <DropdownMenuItem asChild>
+                <Link href="/calendar">Calendar</Link>
+              </DropdownMenuItem>
+
               {canAccessSettings ? (
                 <DropdownMenuItem asChild>
                   <Link href="/settings">Store Settings</Link>

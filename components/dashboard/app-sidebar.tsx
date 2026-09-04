@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   LayoutDashboard,
-  CalendarDays,
   Users,
   UserCog,
   CircleDollarSign,
@@ -65,11 +64,6 @@ const mainNav: NavItem[] = [
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-  },
-  {
-    title: "Calendar",
-    href: "/calendar",
-    icon: CalendarDays,
   },
   {
     title: "Customers",

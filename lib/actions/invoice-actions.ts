@@ -1687,6 +1687,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
         pincode: settings.pincode || null,
         phone: settings.phone || null,
         gstNumber: settings.gstNumber || null,
+        logoUrl: settings.logoUrl || null,
       },
       customer: {
         name: invoice.customer.name,

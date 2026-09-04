@@ -10,6 +10,7 @@ import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getReturnEligibility } from "@/lib/return-window"
+import { APP_NAME } from "@/lib/constants/app"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog"
 import { EmailInvoiceButton } from "@/components/billing/email-invoice-button"
@@ -58,7 +59,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
 
   const creditNotes = await getCreditNotesForInvoice(invoice.id)
 
-  const whatsappMessage = `Hi! Here is your invoice ${invoice.invoiceNumber} from ${settings.businessName}. Total: ₹${invoice.totalAmount.toFixed(2)}. Balance due: ₹${invoice.balanceAmount.toFixed(2)}.`
+  const whatsappMessage = `Hi! Here is your invoice ${invoice.invoiceNumber} from ${settings.businessName}. Total: ₹${invoice.totalAmount.toFixed(2)}. Balance due: ₹${invoice.balanceAmount.toFixed(2)}.\n\nSent via ${APP_NAME}`
 
   const isCancelled = invoice.status === "CANCELLED"
   // Same statuses on purpose: a fully paid invoice's total can't silently

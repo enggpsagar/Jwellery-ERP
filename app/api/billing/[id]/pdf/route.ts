@@ -18,6 +18,7 @@ import { getInvoiceById } from "@/lib/actions/invoice-actions";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { amountInWords } from "@/lib/number-to-words";
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst";
+import { APP_NAME } from "@/lib/constants/app";
 
 function fmt(value: number) {
   return value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -68,6 +69,27 @@ export async function GET(
     doc.text(`Date: ${fmtDate(invoice.invoiceDate)}`, pageWidth / 2 - 40, y);
     doc.text(`Status: ${invoice.status}`, pageWidth - margin, y, { align: "right" });
     y += 18;
+
+    // Store logo — fetched and base64-embedded since jsPDF's addImage can't
+    // take a remote URL directly (see this route's header comment on why
+    // jsPDF over a headless-browser renderer in the first place). Best-
+    // effort: a slow/broken blob URL degrades to a logo-less PDF, it must
+    // never break the whole invoice download.
+    if (settings.logoUrl) {
+      try {
+        const logoResponse = await fetch(settings.logoUrl);
+        if (logoResponse.ok) {
+          const contentType = logoResponse.headers.get("content-type") ?? "image/png";
+          const format = contentType.includes("png") ? "PNG" : "JPEG";
+          const buffer = Buffer.from(await logoResponse.arrayBuffer());
+          const dataUri = `data:${contentType};base64,${buffer.toString("base64")}`;
+          doc.addImage(dataUri, format, margin, y, 32, 32);
+          y += 40;
+        }
+      } catch (error) {
+        console.error("Invoice PDF: failed to embed store logo", error);
+      }
+    }
 
     // Business (left) / Customer (right)
     const colWidth = (pageWidth - margin * 2 - 16) / 2;
@@ -193,6 +215,13 @@ export async function GET(
       const termLines = doc.splitTextToSize(settings.invoiceTerms, pageWidth - margin * 2);
       doc.text(termLines, margin, y);
     }
+
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(120);
+    doc.text(`Generated with ${APP_NAME}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 16, {
+      align: "center",
+    });
 
     const pdfBuffer = doc.output("arraybuffer");
     const fileName = `${invoice.invoiceNumber}.pdf`;

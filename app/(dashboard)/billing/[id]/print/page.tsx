@@ -8,6 +8,7 @@ import { getLatestMetalRates } from "@/lib/actions/metal-rate-actions"
 import { amountInWords } from "@/lib/number-to-words"
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button"
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst"
+import { APP_NAME } from "@/lib/constants/app"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -132,7 +133,17 @@ export default async function InvoicePrintPage({ params }: Props) {
         {/* Header: business (left) / customer (right) */}
         <div className="grid grid-cols-2 border-b border-black">
           <div className="border-r border-black p-2 space-y-0.5">
-            <p className="font-semibold">{settings.businessName}</p>
+            <div className="flex items-center gap-2">
+              {settings.logoUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={settings.logoUrl}
+                  alt={settings.businessName}
+                  className="h-8 w-8 shrink-0 rounded object-cover print:h-6 print:w-6"
+                />
+              )}
+              <p className="font-semibold">{settings.businessName}</p>
+            </div>
             {businessAddressLines.map((line, index) => (
               <p key={index}>{line}</p>
             ))}
@@ -381,6 +392,10 @@ export default async function InvoicePrintPage({ params }: Props) {
           </div>
         )}
       </div>
+
+      <p className="text-center text-[9px] text-gray-500 print:text-[7px]">
+        Generated with {APP_NAME}
+      </p>
     </main>
   )
 }

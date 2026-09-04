@@ -71,6 +71,7 @@ model Store {
   storeLocations       StoreLocation[]
   apiKeys              ApiKey[]
   supportTickets       SupportTicket[]
+  creditNotes          CreditNote[]
 
   @@index([code])
 }
@@ -151,6 +152,7 @@ model StoreLocation {
   ledgerEntries   LedgerEntry[]
   quotations      Quotation[]
   userAccess      UserLocationAccess[]
+  creditNotes     CreditNote[]
 
   @@unique([storeId, name])
 }
@@ -353,6 +355,7 @@ model Customer {
   kachaInvoices  KachaInvoice[]
   ledgerEntries  LedgerEntry[]
   quotations     Quotation[]
+  creditNotes    CreditNote[]
 
   @@unique([storeId, customerCode])
   @@unique([storeId, phone])
@@ -545,6 +548,7 @@ model InventoryStock {
   metalType           StoreMetal?            @relation(fields: [metalTypeId], references: [id])
   location            StoreLocation?         @relation(fields: [locationId], references: [id])
   createdBy           User?                  @relation("InventoryStockCreatedBy", fields: [createdById], references: [id])
+  creditNoteItems     CreditNoteItem[]
 
   @@unique([storeId, stockCode])
   @@unique([storeId, tagNumber])
@@ -630,6 +634,7 @@ model Invoice {
   replacesId             String?        @unique
   replaces               Invoice?       @relation("InvoiceReplaces", fields: [replacesId], references: [id])
   replacedBy             Invoice?       @relation("InvoiceReplaces")
+  creditNotes            CreditNote[]
 
   @@unique([storeId, invoiceNumber])
   @@index([createdById])
@@ -640,6 +645,78 @@ model Invoice {
   @@index([invoiceNumber])
   @@index([storeId])
   @@index([locationId])
+}
+
+/// A return against a PAID/PARTIAL invoice, raised within the store's
+/// configured returnWindowDays (BusinessSettings) of that invoice's
+/// invoiceDate — see lib/actions/credit-note-actions.ts's isReturnEligible().
+/// Deliberately its own document (own number series, own date), not a
+/// mutation of the original Invoice: the invoice must keep saying what was
+/// actually billed/received historically, same reasoning as
+/// Invoice.cancelledAt leaving totalAmount/paidAmount untouched and
+/// explaining itself via an offsetting LedgerEntry instead.
+model CreditNote {
+  id               String   @id @default(cuid())
+  storeId          String
+  creditNoteNumber String
+  invoiceId        String
+  customerId       String
+  creditNoteDate   DateTime @default(now())
+  reason           String?
+  totalAmount      Decimal  @default(0) @db.Decimal(12, 2)
+  notes            String?
+  // Same id/name-snapshot convention as Invoice.createdById/createdByName —
+  // staff leave and get renamed, and a credit note has to keep saying who
+  // processed it.
+  createdById      String?
+  createdByName    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  store         Store            @relation(fields: [storeId], references: [id])
+  invoice       Invoice          @relation(fields: [invoiceId], references: [id])
+  customer      Customer         @relation(fields: [customerId], references: [id])
+  createdBy     User?            @relation("CreditNoteCreatedBy", fields: [createdById], references: [id])
+  items         CreditNoteItem[]
+  ledgerEntries LedgerEntry[]
+  locationId    String?
+  location      StoreLocation?   @relation(fields: [locationId], references: [id])
+
+  @@unique([storeId, creditNoteNumber])
+  @@index([creditNoteNumber])
+  @@index([invoiceId])
+  @@index([customerId])
+  @@index([storeId])
+  @@index([locationId])
+}
+
+/// One returned line, snapshotting the InvoiceItem it came from — quantity
+/// here is how many of that line's pieces this particular credit note
+/// covers, which can be less than the original quantity, and a second
+/// return against the same invoice line is only blocked from exceeding
+/// what's left by summing prior CreditNoteItem rows for the same
+/// invoiceItemId (see getReturnableQuantity in credit-note-actions.ts) —
+/// no denormalized "remaining" counter is kept on InvoiceItem itself, to
+/// avoid it drifting out of sync with the credit notes that are the actual
+/// source of truth.
+model CreditNoteItem {
+  id               String   @id @default(cuid())
+  creditNoteId     String
+  invoiceItemId    String
+  inventoryStockId String?
+  itemName         String
+  quantity         Int      @default(1)
+  rate             Decimal? @db.Decimal(12, 2)
+  lineTotal        Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt        DateTime @default(now())
+
+  creditNote     CreditNote      @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+  invoiceItem    InvoiceItem     @relation(fields: [invoiceItemId], references: [id])
+  inventoryStock InventoryStock? @relation(fields: [inventoryStockId], references: [id])
+
+  @@index([creditNoteId])
+  @@index([invoiceItemId])
+  @@index([inventoryStockId])
 }
 
 model KachaInvoice {
@@ -763,6 +840,7 @@ model InvoiceItem {
   inventoryStock     InventoryStock? @relation(fields: [inventoryStockId], references: [id])
   invoice            Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   metalType          StoreMetal?     @relation(fields: [metalTypeId], references: [id])
+  creditNoteItems    CreditNoteItem[]
 
   @@index([invoiceId])
   @@index([inventoryStockId])
@@ -777,6 +855,7 @@ model LedgerEntry {
   customerId       String?
   karigarId        String?
   invoiceId        String?
+  creditNoteId     String?
   purchaseId       String?
   vendorId         String?
   metalTypeId      String?
@@ -799,6 +878,7 @@ model LedgerEntry {
   store            Store            @relation(fields: [storeId], references: [id])
   customer         Customer?        @relation(fields: [customerId], references: [id])
   invoice          Invoice?         @relation(fields: [invoiceId], references: [id])
+  creditNote       CreditNote?      @relation(fields: [creditNoteId], references: [id])
   karigar          Karigar?         @relation(fields: [karigarId], references: [id])
   purchase         Purchase?        @relation(fields: [purchaseId], references: [id])
   vendor           Vendor?          @relation(fields: [vendorId], references: [id])
@@ -810,6 +890,7 @@ model LedgerEntry {
   @@index([customerId])
   @@index([karigarId])
   @@index([invoiceId])
+  @@index([creditNoteId])
   @@index([purchaseId])
   @@index([vendorId])
   @@index([type])
@@ -1222,6 +1303,13 @@ model BusinessSettings {
   // verify/correct this figure, not present it as an authoritative rate.
   hallmarkChargePerPiece Decimal @default(45) @db.Decimal(12, 2)
 
+  // How many days after invoiceDate a sold item may still be returned via a
+  // Credit Note — see CreditNote and lib/actions/credit-note-actions.ts'
+  // isReturnEligible(). A store-wide figure (not per-product/category) by
+  // design: this is a policy the whole store states to every customer, not
+  // a per-item attribute.
+  returnWindowDays Int @default(30)
+
   // Financial year
   financialYearStartMonth Int @default(4) // April = 4, common in India
 
@@ -1462,6 +1550,7 @@ model User {
   supportTicketMessages SupportTicketMessage[] @relation("SupportTicketMessageAuthor")
   inventoryStocksAdded  InventoryStock[]       @relation("InventoryStockCreatedBy")
   purchasesRecorded     Purchase[]             @relation("PurchaseCreatedBy")
+  creditNotesCreated    CreditNote[]           @relation("CreditNoteCreatedBy")
 
   @@index([storeId])
 }
@@ -1603,6 +1692,10 @@ enum PaymentMethod {
 enum LedgerSourceType {
   MANUAL
   SALE
+  // A Credit Note's refund entry — same naming as the pre-existing
+  // InventoryTransactionType.SALE_RETURN so both sides of a return use one
+  // consistent term.
+  SALE_RETURN
   PURCHASE
   KARIGAR_ISSUE
   KARIGAR_RECEIPT

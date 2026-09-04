@@ -356,6 +356,25 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               centre currently charges before relying on it.
             </p>
           </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="returnWindowDays">Return Window (days)</Label>
+            <Input
+              id="returnWindowDays"
+              name="returnWindowDays"
+              type="number"
+              step="1"
+              min="0"
+              placeholder="e.g. 7, 15, or 30"
+              defaultValue={settings.returnWindowDays}
+            />
+            <p className="text-xs text-muted-foreground">
+              How many days after an invoice's date a sold item may still be
+              returned via a Credit Note. Counted from the Invoice Date shown
+              on each invoice — an invoice past this window shows as return-
+              ineligible and can no longer have items returned against it.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

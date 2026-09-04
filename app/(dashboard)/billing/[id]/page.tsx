@@ -2,18 +2,21 @@ import type { Metadata } from "next"
 import { cache } from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeftCircle, ArrowRightCircle, Pencil, Plus, Printer } from "lucide-react"
+import { ArrowLeftCircle, ArrowRightCircle, Pencil, Plus, Printer, Receipt } from "lucide-react"
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
+import { getCreditNotesForInvoice } from "@/lib/actions/credit-note-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
+import { getReturnEligibility } from "@/lib/return-window"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog"
 import { EmailInvoiceButton } from "@/components/billing/email-invoice-button"
 import { ShareWhatsAppButton } from "@/components/billing/share-whatsapp-button"
 import { EditInvoiceDialog } from "@/components/billing/edit-invoice-dialog"
 import { CancelInvoiceDialog } from "@/components/billing/cancel-invoice-dialog"
+import { ReturnItemsDialog } from "@/components/billing/return-items-dialog"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
 
@@ -53,6 +56,8 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
 
   if (!invoice) notFound()
 
+  const creditNotes = await getCreditNotesForInvoice(invoice.id)
+
   const whatsappMessage = `Hi! Here is your invoice ${invoice.invoiceNumber} from ${settings.businessName}. Total: ₹${invoice.totalAmount.toFixed(2)}. Balance due: ₹${invoice.balanceAmount.toFixed(2)}.`
 
   const isCancelled = invoice.status === "CANCELLED"
@@ -62,6 +67,16 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   const isCancellable = invoice.status === "DRAFT" || invoice.status === "PARTIAL"
   const canFullyEdit = isCancellable
   const isPaid = invoice.status === "PAID"
+
+  // Returns only ever apply to an invoice the customer actually paid for
+  // and took delivery of — DRAFT (never billed) and CANCELLED (already
+  // reversed) invoices have nothing to return.
+  const isReturnable = invoice.status === "PAID" || invoice.status === "PARTIAL"
+  const returnEligibility = getReturnEligibility(
+    new Date(invoice.invoiceDate),
+    settings.returnWindowDays,
+  )
+  const canReturnItems = isReturnable && returnEligibility.eligible
 
   return (
     <main className="space-y-6 p-6">
@@ -110,6 +125,9 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                 invoiceNumber={invoice.invoiceNumber}
                 balanceAmount={invoice.balanceAmount}
               />
+            )}
+            {canReturnItems && (
+              <ReturnItemsDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
             )}
             {!isCancelled && (
               <RecordPaymentDialog
@@ -173,6 +191,24 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             </div>
           )}
 
+          {isReturnable && (
+            <div>
+              <p className="text-sm text-muted-foreground">Return Window</p>
+              {returnEligibility.eligible ? (
+                <p className="font-medium text-green-700">
+                  Eligible until {returnEligibility.windowExpiresAt.toLocaleDateString("en-IN")}
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    {returnEligibility.daysRemaining} day{returnEligibility.daysRemaining === 1 ? "" : "s"} left
+                  </span>
+                </p>
+              ) : (
+                <p className="font-medium text-red-600">
+                  Expired {returnEligibility.windowExpiresAt.toLocaleDateString("en-IN")}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Always shown, including when it is not known: an invoice with
               no answer is different from one nobody has looked at, and the
               blank would otherwise read as a missing field. */}
@@ -228,6 +264,32 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               </Link>
             </Button>
           )}
+        </div>
+      )}
+
+      {creditNotes.length > 0 && (
+        <div className="rounded-xl border bg-card p-6 space-y-3">
+          <p className="font-medium">Credit Notes against this invoice</p>
+          <div className="space-y-2">
+            {creditNotes.map((creditNote) => (
+              <Link
+                key={creditNote.id}
+                href={`/billing/credit-notes/${creditNote.id}`}
+                className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-accent"
+              >
+                <span className="inline-flex items-center gap-2 font-medium">
+                  <Receipt className="h-4 w-4" />
+                  {creditNote.creditNoteNumber}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {new Date(creditNote.creditNoteDate).toLocaleDateString("en-IN")}
+                  </span>
+                </span>
+                <span className="font-medium text-red-600">
+                  -₹{creditNote.totalAmount.toFixed(2)}
+                </span>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 

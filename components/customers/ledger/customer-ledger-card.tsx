@@ -232,7 +232,15 @@ export async function CustomerLedgerCard({
                       {entry.description || "-"}
                     </td>
                     <td className="px-4 py-3">
-                      {entry.invoiceId && entry.invoiceNumber ? (
+                      {entry.creditNoteId && entry.creditNoteNumber ? (
+                        <Link
+                          href={`/billing/credit-notes/${entry.creditNoteId}`}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
+                        >
+                          <Receipt className="h-3.5 w-3.5" />
+                          {entry.creditNoteNumber}
+                        </Link>
+                      ) : entry.invoiceId && entry.invoiceNumber ? (
                         <Link
                           href={`/billing/${entry.invoiceId}`}
                           className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"

@@ -10,6 +10,8 @@ export function formatLedgerSource(
       return "Manual"
     case LedgerSourceType.SALE:
       return "Sale"
+    case LedgerSourceType.SALE_RETURN:
+      return "Credit Note"
     case LedgerSourceType.PURCHASE:
       return "Purchase"
     case LedgerSourceType.KARIGAR_ISSUE:

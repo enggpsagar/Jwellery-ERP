@@ -34,6 +34,8 @@ export type CustomerLedgerEntryItem = {
   entryDate: string
   invoiceId: string | null
   invoiceNumber: string | null
+  creditNoteId: string | null
+  creditNoteNumber: string | null
 }
 
 export type CustomerLedgerUnitSummary = {
@@ -81,6 +83,7 @@ export async function getCustomerLedgerEntries(
     orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
     include: {
       invoice: { select: { id: true, invoiceNumber: true } },
+      creditNote: { select: { id: true, creditNoteNumber: true } },
       metalType: { select: { name: true } },
     },
   })
@@ -98,6 +101,8 @@ export async function getCustomerLedgerEntries(
     entryDate: formatDate(entry.entryDate),
     invoiceId: entry.invoice?.id ?? null,
     invoiceNumber: entry.invoice?.invoiceNumber ?? null,
+    creditNoteId: entry.creditNote?.id ?? null,
+    creditNoteNumber: entry.creditNote?.creditNoteNumber ?? null,
   }))
 }
 

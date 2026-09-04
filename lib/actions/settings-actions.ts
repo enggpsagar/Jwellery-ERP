@@ -38,6 +38,10 @@ export type BusinessSettings = {
   // default is a placeholder that needs store confirmation, not a
   // guaranteed-current government rate.
   hallmarkChargePerPiece: number;
+  // How many days after invoiceDate a sold item may still be returned via a
+  // Credit Note — see prisma/schema.prisma's BusinessSettings.returnWindowDays
+  // doc comment and lib/return-window.ts's getReturnEligibility().
+  returnWindowDays: number;
   financialYearStartMonth: number;
   // Each entry is "MONEY" or a live StoreMetal.id — see
   // lib/business-units.server.ts's BusinessUnitOption for the resolved
@@ -87,6 +91,7 @@ function mapSettings(settings: any): BusinessSettings {
     invoiceNotes: settings.invoiceNotes ?? "",
     defaultGstRate: Number(settings.defaultGstRate ?? 3.0),
     hallmarkChargePerPiece: Number(settings.hallmarkChargePerPiece ?? 45),
+    returnWindowDays: settings.returnWindowDays ?? 30,
     financialYearStartMonth: settings.financialYearStartMonth ?? 4,
     businessUnits: settings.businessUnits?.length
       ? settings.businessUnits
@@ -230,6 +235,7 @@ export async function updateBusinessSettings(
           formData.get("hallmarkChargePerPiece"),
           45,
         ),
+        returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),
           4,
@@ -262,6 +268,7 @@ export async function updateBusinessSettings(
           formData.get("hallmarkChargePerPiece"),
           45,
         ),
+        returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),
           4,

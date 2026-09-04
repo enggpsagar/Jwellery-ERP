@@ -107,6 +107,7 @@ const mainNav: NavItem[] = [
     items: [
       { title: "Pakka Invoices", href: "/billing" },
       { title: "Kacha Slips", href: "/billing/kacha" },
+      { title: "Credit Notes", href: "/billing/credit-notes" },
     ],
   },
   {

@@ -291,7 +291,7 @@ export function VendorEditForm({
             />
           </div>
 
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               GST Number {gstinRequiredNow ? <RequiredMark /> : null}
@@ -302,7 +302,7 @@ export function VendorEditForm({
             ) : null}
             <input
               name="gstNumber"
-              className={`${FIELD} md:max-w-sm`}
+              className={FIELD}
               defaultValue={vendor.gstNumber ?? ""}
               placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : undefined}
               required={gstinRequiredNow}
@@ -314,12 +314,12 @@ export function VendorEditForm({
             ) : null}
           </div>
 
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1">
             <label className="text-sm font-medium">Notes</label>
             <textarea
               name="notes"
-              className={`${FIELD} min-h-9 resize-y`}
-              rows={1}
+              className={`${FIELD} h-full min-h-24 resize-y`}
+              rows={4}
               defaultValue={vendor.notes ?? ""}
             />
           </div>

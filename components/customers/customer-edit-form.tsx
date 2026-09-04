@@ -317,7 +317,7 @@ export function CustomerEditForm({
             />
           </div>
 
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               GST Number {gstinRequiredNow ? <RequiredMark /> : null}
@@ -328,7 +328,7 @@ export function CustomerEditForm({
             ) : null}
             <input
               name="gstNumber"
-              className={`${FIELD} md:max-w-sm`}
+              className={FIELD}
               defaultValue={customer.gstNumber ?? ""}
               placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : undefined}
               required={gstinRequiredNow}
@@ -340,17 +340,17 @@ export function CustomerEditForm({
             ) : null}
           </div>
 
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1">
             <label className="text-sm font-medium">Notes</label>
             <textarea
               name="notes"
-              className={`${FIELD} min-h-9 resize-y`}
-              rows={1}
+              className={`${FIELD} min-h-24 resize-y`}
+              rows={4}
               defaultValue={customer.notes ?? ""}
             />
           </div>
 
-          <div className="flex gap-3 md:col-span-2">
+          <div className="flex gap-3 pt-2 md:col-span-2">
             <Button type="submit" disabled={pending} size="lg">
               {pending ? "Saving..." : "Save changes"}
             </Button>

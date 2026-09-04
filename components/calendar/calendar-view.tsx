@@ -6,6 +6,7 @@ import { Trash2 } from "lucide-react"
 
 import { toggleReminderDone, deleteReminder, type CalendarEvent } from "@/lib/actions/calendar-actions"
 import { useToast } from "@/components/providers/toast-provider"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -99,31 +100,45 @@ export function CalendarView({ year, month, events }: CalendarViewProps) {
             const isToday = key === todayKey
             const isSelected = key === selectedDate
 
-            return (
+            const cell = (
               <button
-                key={index}
                 type="button"
                 onClick={() => setSelectedDate(key)}
                 className={cn(
-                  "flex min-h-24 flex-col items-start gap-1 border-b border-r p-2 text-left transition-colors hover:bg-accent",
+                  "flex min-h-24 w-full flex-col items-start gap-1 border-b border-r p-2 text-left transition-colors hover:bg-accent",
                   isSelected && "bg-accent",
                 )}
               >
-                <span
-                  className={cn(
-                    "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
-                    isToday && "bg-primary text-primary-foreground",
+                <div className="flex w-full items-center justify-between">
+                  <span
+                    className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
+                      isToday && "bg-primary text-primary-foreground",
+                    )}
+                  >
+                    {Number(key.slice(8, 10))}
+                  </span>
+
+                  {/* A number, not just dots — dots alone cap out visually
+                      at a handful before they stop reading as "how many,"
+                      exactly the case a busy day with several reminders
+                      needs to communicate clearly. */}
+                  {dayEvents.length > 1 && (
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {dayEvents.length}
+                    </span>
                   )}
-                >
-                  {Number(key.slice(8, 10))}
-                </span>
+                </div>
 
                 <div className="flex flex-wrap gap-1">
                   {dayEvents.slice(0, 4).map((event) => (
                     <span
                       key={event.id}
-                      title={event.title}
-                      className={cn("h-1.5 w-1.5 rounded-full", TYPE_META[event.type].dot)}
+                      className={cn(
+                        "h-1.5 w-1.5 rounded-full",
+                        TYPE_META[event.type].dot,
+                        event.isDone && "opacity-40",
+                      )}
                     />
                   ))}
                   {dayEvents.length > 4 && (
@@ -135,6 +150,42 @@ export function CalendarView({ year, month, events }: CalendarViewProps) {
                   <span className="text-[10px] font-medium text-red-600">Overdue</span>
                 )}
               </button>
+            )
+
+            if (dayEvents.length === 0) {
+              return <div key={index}>{cell}</div>
+            }
+
+            return (
+              <Tooltip key={index}>
+                <TooltipTrigger asChild>{cell}</TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-64 p-0">
+                  <div className="max-h-64 w-64 space-y-2 overflow-y-auto p-2.5">
+                    {dayEvents.map((event) => (
+                      <div key={event.id} className="flex items-start gap-2">
+                        <span
+                          className={cn(
+                            "mt-1 h-1.5 w-1.5 shrink-0 rounded-full",
+                            TYPE_META[event.type].dot,
+                          )}
+                        />
+                        <div className="min-w-0">
+                          <p className={cn("truncate font-medium", event.isDone && "line-through opacity-70")}>
+                            {event.title}
+                          </p>
+                          {event.description && (
+                            <p className="truncate text-[11px] opacity-80">{event.description}</p>
+                          )}
+                          <p className="text-[11px] opacity-70">
+                            {TYPE_META[event.type].label}
+                            {event.isOverdue ? " · Overdue" : ""}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             )
           })}
         </div>

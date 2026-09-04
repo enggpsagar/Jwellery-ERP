@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus } from "lucide-react";
 
 import { PurityType } from "@prisma/client";
 
@@ -13,6 +14,9 @@ import {
 import { classifyMetalName } from "@/lib/business-units";
 import { resolveGramsPerCarat } from "@/lib/purity";
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields";
+import { AddCategoryDialog } from "@/components/inventory/shared/add-category-dialog";
+import { AddCategoryTypeDialog } from "@/components/inventory/shared/add-category-type-dialog";
+import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog";
 
 // A metal classifies into one of these groups by its name — GOLD/SILVER/
 // DIAMOND/OTHER via classifyMetalName (the same name-substring heuristic
@@ -139,7 +143,7 @@ export function ProductForm({
   state,
   pending,
   metals: initialMetals,
-  categories,
+  categories: initialCategories,
   origins: initialOrigins,
   caratConversionRates,
 }: ProductFormProps) {
@@ -155,8 +159,30 @@ export function ProductForm({
     product?.stoneOriginOptionId ?? "",
   );
 
+  // Local state (not the raw `categories` prop) for the same reason
+  // `metals`/`origins` below are local — the inline "Add Category" dialog
+  // needs to append a newly-created row and select it without a full page
+  // reload, mid-way through filling out the rest of this form.
+  const [categories, setCategories] = useState(initialCategories);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [addCategoryOpen, setAddCategoryOpen] = useState(false);
+
+  const filteredCategories = useMemo(() => {
+    const query = categorySearch.trim().toLowerCase();
+    if (!query) return categories;
+    return categories.filter((item) => item.name.toLowerCase().includes(query));
+  }, [categories, categorySearch]);
+
   const [types, setTypes] = useState<StoreCategoryTypeOption[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(false);
+  const [typeSearch, setTypeSearch] = useState("");
+  const [addTypeOpen, setAddTypeOpen] = useState(false);
+
+  const filteredTypes = useMemo(() => {
+    const query = typeSearch.trim().toLowerCase();
+    if (!query) return types;
+    return types.filter((item) => item.name.toLowerCase().includes(query));
+  }, [types, typeSearch]);
 
   const [stoneOrigins, setStoneOrigins] = useState<StoreMetalOriginRow[]>([]);
   const [loadingStoneOrigins, setLoadingStoneOrigins] = useState(false);
@@ -194,6 +220,15 @@ export function ProductForm({
     (item) => item.isActive || item.id === product?.metalTypeId,
   );
 
+  const [metalSearch, setMetalSearch] = useState("");
+  const [addMetalOpen, setAddMetalOpen] = useState(false);
+
+  const filteredMetals = useMemo(() => {
+    const query = metalSearch.trim().toLowerCase();
+    if (!query) return selectableMetals;
+    return selectableMetals.filter((item) => item.name.toLowerCase().includes(query));
+  }, [selectableMetals, metalSearch]);
+
   const selectedMetal = metals.find((item) => item.id === metalTypeId);
   const metalFamily = selectedMetal
     ? classifyPurityFamily(selectedMetal)
@@ -201,6 +236,16 @@ export function ProductForm({
   const availablePurities = metalFamily
     ? PURITY_OPTIONS_BY_METAL[metalFamily]
     : Object.values(PurityType);
+
+  const [puritySearch, setPuritySearch] = useState("");
+
+  const filteredPurities = useMemo(() => {
+    const query = puritySearch.trim().toLowerCase();
+    if (!query) return availablePurities;
+    return availablePurities.filter((item) =>
+      item.replaceAll("_", " ").toLowerCase().includes(query),
+    );
+  }, [availablePurities, puritySearch]);
 
   // Switching metal (or its purity family no longer including what was
   // picked) clears a now-invalid Default Purity rather than silently
@@ -528,19 +573,47 @@ export function ProductForm({
           <div>
             <Label>Category <RequiredMark /></Label>
 
-            <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
+            <div className="flex gap-1.5">
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
 
-              <SelectContent>
-                {categories.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <SelectContent>
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search categories..."
+                      value={categorySearch}
+                      onChange={(event) => setCategorySearch(event.target.value)}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    />
+                  </div>
+
+                  {filteredCategories.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      No categories found{categorySearch ? ` for "${categorySearch}"` : ""}
+                    </div>
+                  ) : (
+                    filteredCategories.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-11 w-11 shrink-0"
+                title="Add Category"
+                onClick={() => setAddCategoryOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
 
             <input type="hidden" name="categoryId" value={categoryId} />
 
@@ -549,35 +622,66 @@ export function ProductForm({
           <div>
             <Label>Type</Label>
 
-            <Select
-              value={categoryTypeId || "__none__"}
-              onValueChange={(value) =>
-                setCategoryTypeId(value === "__none__" ? "" : value)
-              }
-              disabled={!categoryId || loadingTypes}
-            >
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue
-                  placeholder={
-                    !categoryId
-                      ? "Select a category first"
-                      : loadingTypes
-                        ? "Loading types..."
-                        : "Select Type"
-                  }
-                />
-              </SelectTrigger>
+            <div className="flex gap-1.5">
+              <Select
+                value={categoryTypeId || "__none__"}
+                onValueChange={(value) =>
+                  setCategoryTypeId(value === "__none__" ? "" : value)
+                }
+                disabled={!categoryId || loadingTypes}
+              >
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue
+                    placeholder={
+                      !categoryId
+                        ? "Select a category first"
+                        : loadingTypes
+                          ? "Loading types..."
+                          : "Select Type"
+                    }
+                  />
+                </SelectTrigger>
 
-              <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
+                <SelectContent>
+                  {types.length > 3 && (
+                    <div className="p-2">
+                      <Input
+                        placeholder="Search types..."
+                        value={typeSearch}
+                        onChange={(event) => setTypeSearch(event.target.value)}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      />
+                    </div>
+                  )}
 
-                {types.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  <SelectItem value="__none__">None</SelectItem>
+
+                  {filteredTypes.length === 0 && typeSearch ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      No types found for "{typeSearch}"
+                    </div>
+                  ) : (
+                    filteredTypes.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-11 w-11 shrink-0"
+                title="Add Type"
+                disabled={!categoryId || loadingTypes}
+                onClick={() => setAddTypeOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
 
             <input
               type="hidden"
@@ -590,6 +694,28 @@ export function ProductForm({
         </div>
       </div>
 
+      <AddCategoryDialog
+        open={addCategoryOpen}
+        onOpenChange={setAddCategoryOpen}
+        onCreated={(category) => {
+          setCategories((prev) => [...prev, category]);
+          setCategoryId(category.id);
+        }}
+      />
+
+      {categoryId && (
+        <AddCategoryTypeDialog
+          open={addTypeOpen}
+          onOpenChange={setAddTypeOpen}
+          categoryId={categoryId}
+          categoryName={categories.find((item) => item.id === categoryId)?.name ?? ""}
+          onCreated={(type) => {
+            setTypes((prev) => [...prev, type]);
+            setCategoryTypeId(type.id);
+          }}
+        />
+      )}
+
       {/* ============================
           METAL DETAILS
       ============================= */}
@@ -601,20 +727,48 @@ export function ProductForm({
           <div>
             <Label>Metal Type <RequiredMark /></Label>
 
-            <Select value={metalTypeId} onValueChange={setMetalTypeId}>
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="Select metal type" />
-              </SelectTrigger>
+            <div className="flex gap-1.5">
+              <Select value={metalTypeId} onValueChange={setMetalTypeId}>
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue placeholder="Select metal type" />
+                </SelectTrigger>
 
-              <SelectContent>
-                {selectableMetals.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                    {!item.isActive ? " (Disabled)" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <SelectContent>
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search metal types..."
+                      value={metalSearch}
+                      onChange={(event) => setMetalSearch(event.target.value)}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    />
+                  </div>
+
+                  {filteredMetals.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      No metal types found{metalSearch ? ` for "${metalSearch}"` : ""}
+                    </div>
+                  ) : (
+                    filteredMetals.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                        {!item.isActive ? " (Disabled)" : ""}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-11 w-11 shrink-0"
+                title="Add Metal Type"
+                onClick={() => setAddMetalOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
 
             <input type="hidden" name="metalTypeId" value={metalTypeId} />
 
@@ -640,13 +794,30 @@ export function ProductForm({
               </SelectTrigger>
 
               <SelectContent>
+                {availablePurities.length > 5 && (
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search purities..."
+                      value={puritySearch}
+                      onChange={(event) => setPuritySearch(event.target.value)}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    />
+                  </div>
+                )}
+
                 <SelectItem value="__none__">None</SelectItem>
 
-                {availablePurities.map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item.replaceAll("_", " ")}
-                  </SelectItem>
-                ))}
+                {filteredPurities.length === 0 && puritySearch ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    No purities found for "{puritySearch}"
+                  </div>
+                ) : (
+                  filteredPurities.map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {item.replaceAll("_", " ")}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
 
@@ -733,6 +904,16 @@ export function ProductForm({
           )}
         </div>
       </div>
+
+      <AddMetalDialog
+        open={addMetalOpen}
+        onOpenChange={setAddMetalOpen}
+        onCreated={(metal) => {
+          setMetals((prev) => [...prev, metal]);
+          setMetalTypeId(metal.id);
+        }}
+      />
+
       {/* ============================
           WEIGHTS
       ============================= */}

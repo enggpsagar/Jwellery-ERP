@@ -5,8 +5,8 @@ import { useActionState } from "react"
 import { Loader2 } from "lucide-react"
 
 import {
-  upsertStoreMetalOrigin,
-  type StoreMetalOriginRow,
+  upsertStoreCategoryType,
+  type StoreCategoryTypeRow,
   type TaxonomyFormState,
 } from "@/lib/actions/taxonomy-actions"
 import { useToast } from "@/components/providers/toast-provider"
@@ -24,29 +24,29 @@ import { Label } from "@/components/ui/label"
 
 const initialState: TaxonomyFormState = { success: false, message: "" }
 
-type AddStoneTypeDialogProps = {
+type AddCategoryTypeDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  storeMetalId: string
-  storeMetalName: string
-  /** Called with the newly created Stone Type — see AddMetalDialog's own
+  categoryId: string
+  categoryName: string
+  /** Called with the newly created Type — see AddCategoryDialog's own
    * comment for why this updates the caller's in-memory list directly
    * rather than navigating or refetching. */
-  onCreated: (origin: StoreMetalOriginRow) => void
+  onCreated: (type: StoreCategoryTypeRow) => void
 }
 
-/** Quick "Add Stone Type" — a StoreMetalOrigin row under one specific
- * Stone, via the same upsertStoreMetalOrigin action Settings → Taxonomy
- * uses (Admin/Super Admin only, same permission note as AddMetalDialog). */
-export function AddStoneTypeDialog({
+/** Quick "Add Type" — a StoreCategoryType row under one specific Category,
+ * via the same upsertStoreCategoryType action Settings -> Taxonomy uses
+ * (Admin/Super Admin only, same permission note as AddCategoryDialog). */
+export function AddCategoryTypeDialog({
   open,
   onOpenChange,
-  storeMetalId,
-  storeMetalName,
+  categoryId,
+  categoryName,
   onCreated,
-}: AddStoneTypeDialogProps) {
+}: AddCategoryTypeDialogProps) {
   const toast = useToast()
-  const [state, formAction, pending] = useActionState(upsertStoreMetalOrigin, initialState)
+  const [state, formAction, pending] = useActionState(upsertStoreCategoryType, initialState)
   const [name, setName] = useState("")
 
   useEffect(() => {
@@ -55,8 +55,8 @@ export function AddStoneTypeDialog({
 
   useEffect(() => {
     if (state.success && state.id) {
-      toast.success(state.message || "Stone Type added")
-      onCreated({ id: state.id, storeMetalId, name, isActive: true })
+      toast.success(state.message || "Type added")
+      onCreated({ id: state.id, categoryId, name, isActive: true })
       onOpenChange(false)
     } else if (!state.success && state.message) {
       toast.error(state.message)
@@ -68,7 +68,7 @@ export function AddStoneTypeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Stone Type for {storeMetalName}</DialogTitle>
+          <DialogTitle>Add Type for {categoryName}</DialogTitle>
         </DialogHeader>
 
         <form
@@ -78,15 +78,15 @@ export function AddStoneTypeDialog({
           }}
           className="space-y-4"
         >
-          <input type="hidden" name="storeMetalId" value={storeMetalId} />
+          <input type="hidden" name="categoryId" value={categoryId} />
 
           <div className="space-y-1.5">
-            <Label htmlFor="stone-type-name">Name</Label>
+            <Label htmlFor="category-type-dialog-name">Name</Label>
             <Input
-              id="stone-type-name"
+              id="category-type-dialog-name"
               name="name"
               autoFocus
-              placeholder="e.g. Natural, Lab-Grown, Moissanite"
+              placeholder="e.g. Ladies, Gents, Kids"
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
@@ -101,7 +101,7 @@ export function AddStoneTypeDialog({
             </Button>
             <Button type="submit" disabled={pending || !name.trim()}>
               {pending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-              Add Stone Type
+              Add Type
             </Button>
           </DialogFooter>
         </form>

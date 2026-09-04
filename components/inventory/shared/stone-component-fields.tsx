@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { Plus } from "lucide-react"
 
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
-import { AddStoneDialog } from "@/components/inventory/shared/add-stone-dialog"
+import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddStoneTypeDialog } from "@/components/inventory/shared/add-stone-type-dialog"
 
 import { Button } from "@/components/ui/button"
@@ -66,7 +66,7 @@ type StoneComponentFieldsProps = {
  * Settings → Taxonomy tables (StoreMetal rows with isGemstone=true are
  * Stones; StoreMetalOrigin rows under one are its Stone Types), each with
  * its own search box and an inline "Add" that doesn't navigate away from
- * the in-progress document — see AddStoneDialog's own comment for why.
+ * the in-progress document — see AddMetalDialog's own comment for why.
  *
  * Picking a Stone defaults every one of its Stone Types to checked — most
  * pieces are simply "Diamond", but a piece can genuinely mix e.g. natural
@@ -300,9 +300,10 @@ export function StoneComponentFields({
         </div>
       )}
 
-      <AddStoneDialog
+      <AddMetalDialog
         open={addStoneOpen}
         onOpenChange={setAddStoneOpen}
+        isGemstone
         onCreated={(stone) => {
           onMetalsChange([...metals, stone])
           handleStoneSelect(stone.name)

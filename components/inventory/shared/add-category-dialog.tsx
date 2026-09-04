@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useActionState } from "react"
 import { Loader2 } from "lucide-react"
 
-import { upsertStoreMetal, type StoreMetalRow, type TaxonomyFormState } from "@/lib/actions/taxonomy-actions"
+import { upsertStoreCategory, type StoreCategoryRow, type TaxonomyFormState } from "@/lib/actions/taxonomy-actions"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { Button } from "@/components/ui/button"
@@ -20,31 +20,31 @@ import { Label } from "@/components/ui/label"
 
 const initialState: TaxonomyFormState = { success: false, message: "" }
 
-type AddStoneDialogProps = {
+type AddCategoryDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** Called with the newly created Stone once saved, so the caller can add
-   * it to its own in-memory list and select it immediately — no page
-   * navigation, no refetch, since a line item's in-progress entries would
-   * otherwise be lost (this dialog is opened mid-invoice, not from a blank
-   * page the way Settings' own taxonomy form is). */
-  onCreated: (stone: StoreMetalRow) => void
+  /** Called with the newly created Category once saved, so the caller can
+   * add it to its own in-memory list and select it immediately — no page
+   * navigation, no refetch, since a Product mid-entry would otherwise lose
+   * every other field already filled in (this dialog opens mid-form, not
+   * from a blank Settings page). Mirrors AddMetalDialog's own reasoning. */
+  onCreated: (category: StoreCategoryRow) => void
 }
 
 /**
- * Quick "Add Stone" — creates a StoreMetal row with isGemstone=true via the
- * same upsertStoreMetal action Settings → Taxonomy uses (Admin/Super Admin
+ * Quick "Add Category" — creates a StoreCategory row via the same
+ * upsertStoreCategory action Settings -> Taxonomy uses (Admin/Super Admin
  * only; a Staff user opening this gets that action's own permission error
  * as a toast, same as if they'd tried Settings directly).
  *
- * Triggered by a plain button next to the Stone <Select>, not a SelectItem
- * inside its dropdown — CustomerSelect's own comment explains why a modal
- * launched from within an open dropdown fights that dropdown's overlay for
- * pointer/focus on touch devices.
+ * Triggered by a plain button next to the Category <Select>, not a
+ * SelectItem inside its dropdown — see AddMetalDialog's own comment for why
+ * a modal launched from within an open dropdown fights that dropdown's
+ * overlay for pointer/focus on touch devices.
  */
-export function AddStoneDialog({ open, onOpenChange, onCreated }: AddStoneDialogProps) {
+export function AddCategoryDialog({ open, onOpenChange, onCreated }: AddCategoryDialogProps) {
   const toast = useToast()
-  const [state, formAction, pending] = useActionState(upsertStoreMetal, initialState)
+  const [state, formAction, pending] = useActionState(upsertStoreCategory, initialState)
   const [name, setName] = useState("")
 
   useEffect(() => {
@@ -53,8 +53,8 @@ export function AddStoneDialog({ open, onOpenChange, onCreated }: AddStoneDialog
 
   useEffect(() => {
     if (state.success && state.id) {
-      toast.success(state.message || "Stone added")
-      onCreated({ id: state.id, name, hasPurity: false, isActive: true, isGemstone: true })
+      toast.success(state.message || "Category added")
+      onCreated({ id: state.id, name, isActive: true })
       onOpenChange(false)
     } else if (!state.success && state.message) {
       toast.error(state.message)
@@ -66,7 +66,7 @@ export function AddStoneDialog({ open, onOpenChange, onCreated }: AddStoneDialog
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Stone</DialogTitle>
+          <DialogTitle>Add Category</DialogTitle>
         </DialogHeader>
 
         <form
@@ -76,15 +76,13 @@ export function AddStoneDialog({ open, onOpenChange, onCreated }: AddStoneDialog
           }}
           className="space-y-4"
         >
-          <input type="hidden" name="isGemstone" value="on" />
-
           <div className="space-y-1.5">
-            <Label htmlFor="stone-name">Name</Label>
+            <Label htmlFor="category-dialog-name">Name</Label>
             <Input
-              id="stone-name"
+              id="category-dialog-name"
               name="name"
               autoFocus
-              placeholder="e.g. Diamond, Ruby, Emerald"
+              placeholder="e.g. Ring, Necklace, Bangle"
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
@@ -99,7 +97,7 @@ export function AddStoneDialog({ open, onOpenChange, onCreated }: AddStoneDialog
             </Button>
             <Button type="submit" disabled={pending || !name.trim()}>
               {pending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-              Add Stone
+              Add Category
             </Button>
           </DialogFooter>
         </form>

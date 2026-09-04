@@ -31,6 +31,7 @@ import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, resolve
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
+import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 
 type CustomerOption = {
   id: string
@@ -954,16 +955,10 @@ export function InvoiceForm({
                   don't reflow every time this gets checked/unchecked. */}
               {!isCaratLine(item) && (
                 <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
-                  <label className="flex items-center gap-2 text-xs font-medium">
-                    <input
-                      type="checkbox"
-                      checked={item.hasStoneComponent}
-                      onChange={(e) =>
-                        updateItem(item.key, { hasStoneComponent: e.target.checked })
-                      }
-                    />
-                    Includes a Stone
-                  </label>
+                  <IncludesStoneToggle
+                    checked={item.hasStoneComponent}
+                    onChange={(checked) => updateItem(item.key, { hasStoneComponent: checked })}
+                  />
 
                   {item.hasStoneComponent && (
                     <StoneComponentFields

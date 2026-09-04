@@ -12,6 +12,7 @@ import {
 } from "@/lib/actions/taxonomy-actions";
 import { classifyMetalName } from "@/lib/business-units";
 import { resolveGramsPerCarat } from "@/lib/purity";
+import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle";
 
 // A metal classifies into one of these groups by its name — GOLD/SILVER/
 // DIAMOND/OTHER via classifyMetalName (the same name-substring heuristic
@@ -568,14 +569,7 @@ export function ProductForm({
           </div>
 
           <div className="flex items-end pb-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={hasStoneComponent}
-                onChange={(event) => setHasStoneComponent(event.target.checked)}
-              />
-              Includes a Stone
-            </label>
+            <IncludesStoneToggle checked={hasStoneComponent} onChange={setHasStoneComponent} />
             <input
               type="hidden"
               name="hasStoneComponent"

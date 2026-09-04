@@ -125,7 +125,16 @@ const PRODUCT_RELATIONS = {
   stoneOriginOption: { select: { id: true, name: true } },
 } as const;
 
-export type ProductSortBy = "name" | "productCode" | "createdAt";
+export type ProductSortBy =
+  | "name"
+  | "productCode"
+  | "createdAt"
+  | "category"
+  | "categoryType"
+  | "metalType"
+  | "defaultPurity"
+  | "defaultNetWeight"
+  | "isActive";
 export type ProductSortOrder = "asc" | "desc";
 
 export type GetProductsParams = {
@@ -166,6 +175,12 @@ function getProductOrderBy(
 ) {
   if (sortBy === "name") return { name: sortOrder };
   if (sortBy === "productCode") return { productCode: sortOrder };
+  if (sortBy === "category") return { category: { name: sortOrder } };
+  if (sortBy === "categoryType") return { categoryType: { name: sortOrder } };
+  if (sortBy === "metalType") return { metalType: { name: sortOrder } };
+  if (sortBy === "defaultPurity") return { defaultPurity: sortOrder };
+  if (sortBy === "defaultNetWeight") return { defaultNetWeight: sortOrder };
+  if (sortBy === "isActive") return { isActive: sortOrder };
   return { createdAt: sortOrder };
 }
 
@@ -273,7 +288,17 @@ export async function getProducts(params: GetProductsParams = {}) {
 }
 
 async function getAllProductsForExport(params: ExportProductsParams = {}) {
-  const validSortBy: ProductSortBy[] = ["name", "productCode", "createdAt"];
+  const validSortBy: ProductSortBy[] = [
+    "name",
+    "productCode",
+    "createdAt",
+    "category",
+    "categoryType",
+    "metalType",
+    "defaultPurity",
+    "defaultNetWeight",
+    "isActive",
+  ];
   const sortBy: ProductSortBy = validSortBy.includes(params.sortBy as ProductSortBy)
     ? (params.sortBy as ProductSortBy)
     : "createdAt";

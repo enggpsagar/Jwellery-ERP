@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { getProducts } from "@/lib/actions/inventory/product-actions";
+import { getProducts, type ProductSortBy } from "@/lib/actions/inventory/product-actions";
 import { hasPermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 
@@ -15,7 +15,7 @@ type InventoryProductsPageProps = {
     page?: string
     pageSize?: string
     search?: string
-    sortBy?: "name" | "productCode" | "createdAt"
+    sortBy?: ProductSortBy
     sortOrder?: "asc" | "desc"
   }>
 }

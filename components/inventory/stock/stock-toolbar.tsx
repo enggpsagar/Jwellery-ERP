@@ -28,6 +28,14 @@ export function StockToolbar({ selectedIds }: StockToolbarProps) {
           { value: "stockCode", label: "Sort by Stock Code" },
           { value: "netWeight", label: "Sort by Net Weight" },
           { value: "saleAmount", label: "Sort by Sale Amount" },
+          { value: "product", label: "Sort by Product" },
+          { value: "metalType", label: "Sort by Metal" },
+          { value: "purity", label: "Sort by Purity" },
+          { value: "quantity", label: "Sort by Qty" },
+          { value: "status", label: "Sort by Status" },
+          { value: "finish", label: "Sort by Finish" },
+          { value: "location", label: "Sort by Location" },
+          { value: "purchaseDate", label: "Sort by Purchase Date" },
         ]}
         defaultSortBy="createdAt"
         selectedIds={selectedIds}

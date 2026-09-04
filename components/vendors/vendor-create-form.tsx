@@ -286,12 +286,12 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             <textarea
               name="notes"
               rows={4}
-              className={`${FIELD} h-full min-h-24 resize-y`}
+              className={`${FIELD} min-h-24 resize-y`}
               placeholder="Any notes about this vendor"
             />
           </div>
 
-          <div className="flex justify-end gap-2 md:col-span-2">
+          <div className="flex justify-end gap-2 pt-2 md:col-span-2">
             <Button
               type="button"
               variant="outline"

@@ -318,13 +318,13 @@ export function VendorEditForm({
             <label className="text-sm font-medium">Notes</label>
             <textarea
               name="notes"
-              className={`${FIELD} h-full min-h-24 resize-y`}
+              className={`${FIELD} min-h-24 resize-y`}
               rows={4}
               defaultValue={vendor.notes ?? ""}
             />
           </div>
 
-          <div className="flex gap-3 md:col-span-2">
+          <div className="flex gap-3 pt-2 md:col-span-2">
             <Button type="submit" disabled={pending} size="lg">
               {pending ? "Saving..." : "Save changes"}
             </Button>

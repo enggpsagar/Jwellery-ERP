@@ -217,20 +217,23 @@ type OpenMenu = string | null | undefined;
 const NAV_CONTROL_CLASS = "text-white/70 hover:bg-card/10 hover:text-white";
 
 /**
- * "Customers - 3" — inline right after the label, not a right-aligned
+ * "Customers (3)" — inline right after the label, not a right-aligned
  * badge. Plain text rather than a pill: it sits in the same flex row as the
  * icon/title with normal document flow, so it never has to fight the
  * absolutely-positioned chevron/quick-add "+" for the same right-edge slot
- * the way a SidebarMenuBadge would.
+ * the way a SidebarMenuBadge would. Colored with the same gold accent the
+ * active-item highlight uses (--chart-2), not a dim white/50 — a count
+ * that's meant to be noticed shouldn't read as more muted than the label
+ * it's attached to.
  */
 function NavCount({ count }: { count?: number }) {
-  // A brand-new store's empty lists don't need "- 0" cluttering every item —
+  // A brand-new store's empty lists don't need "(0)" cluttering every item —
   // this exists to answer "how many," and zero isn't news.
   if (!count) return null;
   return (
-    <span className="font-normal text-white/50">
+    <span className="font-semibold text-[color-mix(in_oklab,var(--chart-2)_75%,white)]">
       {" "}
-      - {count > 999 ? "999+" : count}
+      ({count > 999 ? "999+" : count})
     </span>
   );
 }

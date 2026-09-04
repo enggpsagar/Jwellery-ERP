@@ -50,6 +50,7 @@ type StockOption = {
   hsnCode: string | null
   metalType: { id: string; name: string } | null
   purity: string | null
+  grossWeight: number | null
   netWeight: number | null
   stoneWeight: number | null
   caratWeight: number | null
@@ -325,6 +326,7 @@ export function InvoiceForm({
       itemName: stock.productName,
       metalTypeId: stock.metalType?.id ?? "",
       purity: stock.purity ?? "",
+      grossWeight: stock.grossWeight ?? 0,
       netWeight: stock.netWeight ?? 0,
       stoneWeightInput: stock.stoneWeight ?? 0,
       stoneWeightUnit: "GRAM",
@@ -437,6 +439,7 @@ export function InvoiceForm({
           itemName: stock.productName,
           metalTypeId: stock.metalType?.id ?? "",
           purity: stock.purity ?? "",
+          grossWeight: stock.grossWeight ?? 0,
           netWeight: stock.netWeight ?? 0,
           stoneWeightInput: stock.stoneWeight ?? 0,
           stoneWeightUnit: "GRAM",

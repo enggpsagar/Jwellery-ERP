@@ -560,6 +560,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       ? { id: stock.metalType.id, name: stock.metalType.name }
       : null,
     purity: stock.purity,
+    grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,
     netWeight: stock.netWeight ? Number(stock.netWeight) : null,
     stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
     caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
@@ -609,6 +610,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       hsnCode: stock.product.hsnCode,
       metalType: stock.metalType ? { id: stock.metalType.id, name: stock.metalType.name } : null,
       purity: stock.purity,
+      grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,
       netWeight: stock.netWeight ? Number(stock.netWeight) : null,
       stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
       caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,

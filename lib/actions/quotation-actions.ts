@@ -380,6 +380,7 @@ export async function getQuotationFormStockItems() {
     productName: stock.product.name,
     metalType: stock.metalType,
     purity: stock.purity,
+    grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,
     netWeight: stock.netWeight ? Number(stock.netWeight) : null,
     caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
     stoneRate: stock.stoneRate ? Number(stock.stoneRate) : null,

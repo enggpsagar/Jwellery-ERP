@@ -45,6 +45,7 @@ type StockOption = {
   productName: string
   metalType: { id: string; name: string } | null
   purity: string | null
+  grossWeight: number | null
   netWeight: number | null
   caratWeight: number | null
   stoneRate: number | null
@@ -224,6 +225,7 @@ export function QuotationForm({
       itemName: stock.productName,
       metalTypeId: stock.metalType?.id ?? "",
       purity: stock.purity ?? "",
+      grossWeight: stock.grossWeight ?? 0,
       netWeight: stock.netWeight ?? 0,
       rate: stock.saleRate ?? 0,
       caratWeight: stock.caratWeight ?? 0,

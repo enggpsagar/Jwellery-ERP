@@ -7,6 +7,7 @@ import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { Eye, ArrowRightCircle } from "lucide-react"
 
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
+import { SortableTableHead } from "@/components/shared/sortable-table-head"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -107,11 +108,11 @@ export function KachaInvoiceTable({
                   className="h-4 w-4 rounded border-input"
                 />
               </th>
-              <th className="px-4 py-3 text-left font-medium">Slip #</th>
-              <th className="px-4 py-3 text-left font-medium">Date</th>
+              <SortableTableHead label="Slip #" sortKey="slipNumber" defaultSortBy="invoiceDate" />
+              <SortableTableHead label="Date" sortKey="invoiceDate" defaultSortBy="invoiceDate" />
               <th className="px-4 py-3 text-left font-medium">Customer</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
-              <th className="px-4 py-3 text-left font-medium">Total</th>
+              <SortableTableHead label="Total" sortKey="totalAmount" defaultSortBy="invoiceDate" />
               <th className="px-4 py-3 text-left font-medium">Balance</th>
               <th className="px-4 py-3 text-left font-medium">Converted</th>
               <th className="px-4 py-3 text-left font-medium">Actions</th>

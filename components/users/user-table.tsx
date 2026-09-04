@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/users/status-badge";
 import { useToast } from "@/components/providers/toast-provider";
+import { SortableTableHead } from "@/components/shared/sortable-table-head";
 
 import {
   disableUserAction,
@@ -128,10 +129,25 @@ export function UserTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
+            <SortableTableHead
+              label="Name"
+              sortKey="name"
+              defaultSortBy="createdAt"
+              className="h-10 px-2 whitespace-nowrap"
+            />
+            <SortableTableHead
+              label="Email"
+              sortKey="email"
+              defaultSortBy="createdAt"
+              className="h-10 px-2 whitespace-nowrap"
+            />
             <TableHead>Phone</TableHead>
-            <TableHead>Role</TableHead>
+            <SortableTableHead
+              label="Role"
+              sortKey="role"
+              defaultSortBy="createdAt"
+              className="h-10 px-2 whitespace-nowrap"
+            />
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Action</TableHead>
           </TableRow>

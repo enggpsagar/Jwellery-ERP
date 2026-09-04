@@ -6,6 +6,7 @@ import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { Eye, ArrowLeftCircle } from "lucide-react"
 
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
+import { SortableTableHead } from "@/components/shared/sortable-table-head"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -49,12 +50,12 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40">
             <tr className="border-b">
-              <th className="px-4 py-3 text-left font-medium">Invoice #</th>
-              <th className="px-4 py-3 text-left font-medium">Date</th>
+              <SortableTableHead label="Invoice #" sortKey="invoiceNumber" defaultSortBy="invoiceDate" />
+              <SortableTableHead label="Date" sortKey="invoiceDate" defaultSortBy="invoiceDate" />
               <th className="px-4 py-3 text-left font-medium">Customer</th>
               <th className="px-4 py-3 text-left font-medium">Source</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
-              <th className="px-4 py-3 text-left font-medium">Total</th>
+              <SortableTableHead label="Total" sortKey="totalAmount" defaultSortBy="invoiceDate" />
               <th className="px-4 py-3 text-left font-medium">Balance</th>
               <th className="px-4 py-3 text-left font-medium">Actions</th>
             </tr>

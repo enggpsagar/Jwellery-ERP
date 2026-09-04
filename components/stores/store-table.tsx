@@ -17,6 +17,7 @@ import { ChangePlanDialog } from "@/components/stores/change-plan-dialog"
 import type { PlanRow } from "@/lib/actions/plan-actions"
 import type { StorePlanOverview } from "@/lib/actions/store-plan-actions"
 import { StorePlanHover } from "@/components/stores/store-plan-hover"
+import { SortableTableHead } from "@/components/shared/sortable-table-head"
 
 type StoreRow = {
   id: string
@@ -78,8 +79,18 @@ export function StoreTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Store</TableHead>
-            <TableHead>Code</TableHead>
+            <SortableTableHead
+              label="Store"
+              sortKey="name"
+              defaultSortBy="createdAt"
+              className="h-10 px-2 whitespace-nowrap"
+            />
+            <SortableTableHead
+              label="Code"
+              sortKey="code"
+              defaultSortBy="createdAt"
+              className="h-10 px-2 whitespace-nowrap"
+            />
             <TableHead>City</TableHead>
             <TableHead>Users</TableHead>
             <TableHead>Customers</TableHead>

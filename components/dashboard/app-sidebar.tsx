@@ -39,6 +39,7 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuAction,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -48,15 +49,22 @@ import {
 } from "@/components/ui/sidebar";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import type { SidebarCounts } from "@/lib/actions/sidebar-actions";
+
+type CountKey = keyof SidebarCounts;
 
 type NavItem = {
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  /** When set, renders a live record-count badge beside this item —
+   * omitted for items with no single "count of records" meaning
+   * (Dashboard, Ledger, Reports, Plans, and any parent with sub-items). */
+  countKey?: CountKey;
   /** quickAddHref, when set, renders a persistent "+" beside that sub-item —
    * a direct link to its Create/New page, skipping the list-then-Add-button
    * detour. Omitted for sub-items with no single obvious "new" page. */
-  items?: { title: string; href: string; quickAddHref?: string }[];
+  items?: { title: string; href: string; quickAddHref?: string; countKey?: CountKey }[];
 };
 
 const mainNav: NavItem[] = [
@@ -69,11 +77,13 @@ const mainNav: NavItem[] = [
     title: "Customers",
     href: "/customers",
     icon: Users,
+    countKey: "customers",
   },
   {
     title: "Vendors",
     href: "/vendors",
     icon: Truck,
+    countKey: "vendors",
   },
   {
     title: "Ledger",
@@ -85,33 +95,38 @@ const mainNav: NavItem[] = [
     href: "/inventory",
     icon: Package,
     items: [
-      { title: "Products", href: "/inventory/products", quickAddHref: "/inventory/products/new" },
-      { title: "Stock", href: "/inventory/stock", quickAddHref: "/inventory/stock/new" },
+      { title: "Products", href: "/inventory/products", quickAddHref: "/inventory/products/new", countKey: "products" },
+      { title: "Stock", href: "/inventory/stock", quickAddHref: "/inventory/stock/new", countKey: "stock" },
     ],
   },
   {
     title: "Purchases",
     href: "/purchases",
     icon: PackagePlus,
+    countKey: "purchases",
   },
   {
     title: "Karigar Management",
     href: "/karigars",
     icon: Hammer,
+    countKey: "karigars",
   },
   {
     title: "Quotations",
     href: "/quotations",
     icon: FileText,
+    countKey: "quotations",
   },
   {
     title: "Billing",
     href: "/billing",
     icon: ReceiptText,
     items: [
-      { title: "Pakka Invoices", href: "/billing", quickAddHref: "/billing/new" },
-      { title: "Kacha Slips", href: "/billing/kacha", quickAddHref: "/billing/kacha/new" },
-      { title: "Credit Notes", href: "/billing/credit-notes" },
+      { title: "Pakka Invoices", href: "/billing", quickAddHref: "/billing/new", countKey: "invoices" },
+      { title: "Kacha Slips", href: "/billing/kacha", quickAddHref: "/billing/kacha/new", countKey: "kachaInvoices" },
+      // No quickAddHref — a Credit Note is always issued from an existing
+      // invoice's return flow, there is no standalone "new" page for one.
+      { title: "Credit Notes", href: "/billing/credit-notes", countKey: "creditNotes" },
     ],
   },
   {
@@ -123,11 +138,13 @@ const mainNav: NavItem[] = [
     title: "Users",
     href: "/users",
     icon: UserCog,
+    countKey: "users",
   },
   {
     title: "Stores",
     href: "/stores",
     icon: Store,
+    countKey: "stores",
   },
   {
     title: "Plans",
@@ -196,16 +213,36 @@ const ACTIVE_NAV_CLASS = [
  */
 type OpenMenu = string | null | undefined;
 
+// Same override classes as the section-expand chevron and the quick-add
+// "+" — every small sidebar control shares one look, not a look per section.
+const NAV_CONTROL_CLASS = "text-white/70 hover:bg-card/10 hover:text-white";
+// A static pill, not an interactive control, so no hover state of its own —
+// just enough contrast against the dark sidebar to read as a count chip.
+const NAV_BADGE_CLASS = "bg-white/10 text-white/70";
+
+function NavCountBadge({ count, className }: { count?: number; className?: string }) {
+  // A brand-new store's empty lists don't need a "0" badge cluttering every
+  // item — the badge exists to answer "how many," and zero isn't news.
+  if (!count) return null;
+  return (
+    <SidebarMenuBadge className={`${NAV_BADGE_CLASS} ${className ?? ""}`}>
+      {count > 999 ? "999+" : count}
+    </SidebarMenuBadge>
+  );
+}
+
 function SidebarNavItem({
   item,
   pathname,
   openMenu,
   setOpenMenu,
+  counts,
 }: {
   item: NavItem;
   pathname: string;
   openMenu: OpenMenu;
   setOpenMenu: (next: OpenMenu) => void;
+  counts: SidebarCounts;
 }) {
   const Icon = item.icon;
   const isActive = isNavItemActive(pathname, item.href);
@@ -237,6 +274,8 @@ function SidebarNavItem({
             <span>{item.title}</span>
           </Link>
         </SidebarMenuButton>
+
+        {item.countKey && <NavCountBadge count={counts[item.countKey]} />}
       </SidebarMenuItem>
     );
   }
@@ -267,7 +306,7 @@ function SidebarNavItem({
         onClick={() => setOpenMenu(open ? null : item.title)}
         aria-expanded={open}
         aria-label={`${open ? "Collapse" : "Expand"} ${item.title}`}
-        className="text-white/70 hover:bg-card/10 hover:text-white"
+        className={NAV_CONTROL_CLASS}
       >
         <ChevronRight
           className={`h-4 w-4 shrink-0 transition-transform ${
@@ -290,14 +329,22 @@ function SidebarNavItem({
                 </Link>
               </SidebarMenuSubButton>
 
+              {/* The count badge sits left of the "+" quick-add button when
+                  both are present — both hardcode `right-1` by default, so
+                  the badge is shifted clear of the button rather than the
+                  two overlapping. */}
+              {subItem.countKey && (
+                <NavCountBadge
+                  count={counts[subItem.countKey]}
+                  className={subItem.quickAddHref ? "right-7" : undefined}
+                />
+              )}
+
               {/* Same override classes as the section-level chevron above —
                   "+" icons must look and behave identically everywhere they
                   appear, not just within one section. */}
               {subItem.quickAddHref && (
-                <SidebarMenuAction
-                  asChild
-                  className="text-white/70 hover:bg-card/10 hover:text-white"
-                >
+                <SidebarMenuAction asChild className={NAV_CONTROL_CLASS}>
                   <Link href={subItem.quickAddHref} aria-label={`Add new ${subItem.title}`}>
                     <Plus className="h-4 w-4" />
                   </Link>
@@ -314,9 +361,25 @@ function SidebarNavItem({
 type AppSidebarProps = {
   storeName?: string | null;
   storeLogoUrl?: string | null;
+  counts?: SidebarCounts;
 };
 
-export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
+const EMPTY_COUNTS: SidebarCounts = {
+  customers: 0,
+  vendors: 0,
+  products: 0,
+  stock: 0,
+  purchases: 0,
+  karigars: 0,
+  quotations: 0,
+  invoices: 0,
+  kachaInvoices: 0,
+  creditNotes: 0,
+  users: 0,
+  stores: 0,
+};
+
+export function AppSidebar({ storeName, storeLogoUrl, counts = EMPTY_COUNTS }: AppSidebarProps = {}) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const role = session?.user?.role;
@@ -382,6 +445,7 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
                   pathname={pathname}
                   openMenu={openMenu}
                   setOpenMenu={setOpenMenu}
+                  counts={counts}
                 />
               ))}
             </SidebarMenu>

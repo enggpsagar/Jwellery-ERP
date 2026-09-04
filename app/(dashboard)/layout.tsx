@@ -8,6 +8,7 @@ import {
   getEffectiveStoreId,
   getUserStoreMemberships,
 } from "@/lib/store-context";
+import { getSidebarCounts } from "@/lib/actions/sidebar-actions";
 
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { TopBar } from "@/components/dashboard/top-bar";
@@ -67,18 +68,22 @@ export default async function DashboardLayout({
 
   // Brand the sidebar with the store actually being worked in, not the one
   // on the User row — those differ the moment someone switches.
-  const storeBranding = activeStoreId
-    ? await prisma.store.findUnique({
-        where: { id: activeStoreId },
-        select: { name: true, businessSettings: { select: { logoUrl: true } } },
-      })
-    : null;
+  const [storeBranding, sidebarCounts] = await Promise.all([
+    activeStoreId
+      ? prisma.store.findUnique({
+          where: { id: activeStoreId },
+          select: { name: true, businessSettings: { select: { logoUrl: true } } },
+        })
+      : Promise.resolve(null),
+    getSidebarCounts(activeStoreId, session.user.role),
+  ]);
 
   return (
     <SidebarProvider>
       <AppSidebar
         storeName={storeBranding?.name}
         storeLogoUrl={storeBranding?.businessSettings?.logoUrl}
+        counts={sidebarCounts}
       />
 
       <SidebarInset>

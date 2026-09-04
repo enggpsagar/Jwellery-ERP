@@ -1039,7 +1039,7 @@ export function PurchaseForm({
           <Input
             type="number"
             step="0.01"
-            value={gstRate}
+            value={gstRate === 0 ? "" : gstRate}
             // A purchase's GST depends on the VENDOR's own registration, not
             // our store's scheme — see computePurchaseGst()'s doc comment.
             disabled={!selectedVendor || !isVendorGstApplicable(selectedVendor.gstType)}

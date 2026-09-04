@@ -730,7 +730,7 @@ export function QuotationForm({
           <Input
             type="number"
             step="0.01"
-            value={gstRate}
+            value={gstRate === 0 ? "" : gstRate}
             disabled={gstScheme === "COMPOSITION"}
             onChange={(e) => setGstRate(Number(e.target.value) || 0)}
           />

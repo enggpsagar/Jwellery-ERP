@@ -70,7 +70,7 @@ export function SupportTicketForm({ mode, defaults, onSubmitted }: SupportTicket
       className="space-y-4"
     >
       {mode === "public" ? (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label htmlFor="ticket-name" required>
             Your Name
           </Label>
@@ -82,7 +82,7 @@ export function SupportTicketForm({ mode, defaults, onSubmitted }: SupportTicket
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label htmlFor="ticket-email" required>
             Email
           </Label>
@@ -99,7 +99,7 @@ export function SupportTicketForm({ mode, defaults, onSubmitted }: SupportTicket
           ) : null}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label htmlFor="ticket-phone" required>
             Phone
           </Label>
@@ -118,7 +118,7 @@ export function SupportTicketForm({ mode, defaults, onSubmitted }: SupportTicket
         </div>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="ticket-subject" required>
           Subject
         </Label>
@@ -133,7 +133,7 @@ export function SupportTicketForm({ mode, defaults, onSubmitted }: SupportTicket
         ) : null}
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="ticket-message" required>
           Message
         </Label>

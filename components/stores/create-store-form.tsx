@@ -70,7 +70,7 @@ export function CreateStoreForm({ plans }: { plans: PlanRow[] }) {
           onSubmit={handleSubmit}
           className="grid grid-cols-1 gap-4 md:grid-cols-2"
         >
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <StoreIcon className="h-4 w-4 text-muted-foreground" />
               Store Name <RequiredMark />
@@ -86,7 +86,7 @@ export function CreateStoreForm({ plans }: { plans: PlanRow[] }) {
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               Store Code <RequiredMark />
@@ -102,7 +102,7 @@ export function CreateStoreForm({ plans }: { plans: PlanRow[] }) {
             )}
           </div>
 
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
@@ -114,27 +114,27 @@ export function CreateStoreForm({ plans }: { plans: PlanRow[] }) {
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">City</label>
             <input name="city" className="w-full rounded-md border px-3 py-2 text-sm" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">State</label>
             <input name="state" className="w-full rounded-md border px-3 py-2 text-sm" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">Pincode</label>
             <input name="pincode" className="w-full rounded-md border px-3 py-2 text-sm" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">GST Number</label>
             <input name="gstNumber" className="w-full rounded-md border px-3 py-2 text-sm" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <CreditCard className="h-4 w-4 text-muted-foreground" />
               Plan
@@ -158,7 +158,7 @@ export function CreateStoreForm({ plans }: { plans: PlanRow[] }) {
             </p>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
               Phone <RequiredMark />
@@ -175,7 +175,7 @@ export function CreateStoreForm({ plans }: { plans: PlanRow[] }) {
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Mail className="h-4 w-4 text-muted-foreground" />
               Email <RequiredMark />
@@ -201,7 +201,7 @@ export function CreateStoreForm({ plans }: { plans: PlanRow[] }) {
             </p>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4 text-muted-foreground" />
               Admin Name <RequiredMark />
@@ -218,7 +218,7 @@ export function CreateStoreForm({ plans }: { plans: PlanRow[] }) {
 
           <div />
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Mail className="h-4 w-4 text-muted-foreground" />
               Admin Email <RequiredMark />
@@ -236,7 +236,7 @@ export function CreateStoreForm({ plans }: { plans: PlanRow[] }) {
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
               Admin Phone <RequiredMark />

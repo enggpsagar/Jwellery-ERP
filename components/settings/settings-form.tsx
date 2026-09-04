@@ -164,7 +164,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
           <CardTitle>Business Details</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5 md:col-span-2">
+          <div className="space-y-1.5 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="businessName">Business Name <RequiredMark /></Label>
             <Input
               id="businessName"
@@ -179,7 +179,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             ) : null}
           </div>
 
-          <div className="space-y-1.5 md:col-span-2">
+          <div className="space-y-1.5 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="legalName">Legal / Registered Name</Label>
             <Input
               id="legalName"
@@ -188,12 +188,12 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="phone">Phone</Label>
             <Input id="phone" name="phone" defaultValue={settings.phone} />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
@@ -203,12 +203,12 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="website">Website</Label>
             <Input id="website" name="website" defaultValue={settings.website} />
           </div>
 
-          <div className="space-y-1.5 md:col-span-2">
+          <div className="space-y-1.5 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="backupEmail">Backup email</Label>
             <Input
               id="backupEmail"
@@ -276,7 +276,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
           </div>
         </CardContent>
         <CardContent className="grid gap-4 border-t pt-4 md:grid-cols-2">
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="gstNumber">GSTIN</Label>
             <Input
               id="gstNumber"
@@ -291,7 +291,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             ) : null}
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="panNumber">PAN Number</Label>
             <Input
               id="panNumber"
@@ -301,7 +301,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="cin">CIN</Label>
             <Input
               id="cin"
@@ -312,7 +312,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="stateCode">GST State Code</Label>
             <Input
               id="stateCode"
@@ -322,7 +322,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="defaultGstRate">Default GST Rate (%)</Label>
             <Input
               id="defaultGstRate"
@@ -337,7 +337,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             ) : null}
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="hallmarkChargePerPiece">Hallmark Charge (per piece)</Label>
             <Input
               id="hallmarkChargePerPiece"
@@ -364,12 +364,12 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
           <CardTitle>Address</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5 md:col-span-2">
+          <div className="space-y-1.5 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="address">Address</Label>
             <Textarea id="address" name="address" defaultValue={settings.address} />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="state">State</Label>
             <select
               id="state"
@@ -398,7 +398,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="city">City</Label>
             <select
               id="city"
@@ -427,7 +427,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             </select>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="pincode">Pincode</Label>
             <Input id="pincode" name="pincode" defaultValue={settings.pincode} />
           </div>
@@ -507,7 +507,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
           <CardTitle>Invoice Preferences</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="invoicePrefix">Invoice Prefix</Label>
             <Input
               id="invoicePrefix"
@@ -516,7 +516,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="invoiceStartingNo">Next Invoice No.</Label>
             <Input
               id="invoiceStartingNo"
@@ -526,7 +526,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="financialYearStartMonth">
               Financial Year Start Month
             </Label>
@@ -540,7 +540,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             />
           </div>
 
-          <div className="space-y-1.5 md:col-span-2">
+          <div className="space-y-1.5 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="invoiceTerms">Invoice Terms & Conditions</Label>
             <Textarea
               id="invoiceTerms"
@@ -549,7 +549,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             />
           </div>
 
-          <div className="space-y-1.5 md:col-span-2">
+          <div className="space-y-1.5 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="invoiceNotes">Default Invoice Notes</Label>
             <Textarea
               id="invoiceNotes"

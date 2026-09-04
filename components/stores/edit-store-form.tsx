@@ -58,7 +58,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
           }}
           className="grid grid-cols-1 gap-4 md:grid-cols-2"
         >
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <StoreIcon className="h-4 w-4 text-muted-foreground" />
               Store Name <RequiredMark />
@@ -74,7 +74,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               Store Code <RequiredMark />
@@ -90,7 +90,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
             )}
           </div>
 
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
@@ -102,7 +102,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">City</label>
             <input
               name="city"
@@ -111,7 +111,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">State</label>
             <input
               name="state"
@@ -120,7 +120,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">Pincode</label>
             <input
               name="pincode"
@@ -129,7 +129,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">GST Number</label>
             <input
               name="gstNumber"
@@ -138,7 +138,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
               Phone <RequiredMark />
@@ -155,7 +155,7 @@ export function EditStoreForm({ store }: EditStoreFormProps) {
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Mail className="h-4 w-4 text-muted-foreground" />
               Email <RequiredMark />

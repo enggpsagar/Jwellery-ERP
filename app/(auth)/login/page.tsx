@@ -260,7 +260,7 @@ export default function LoginPage() {
 
         <div className="space-y-4">
 
-          <div>
+          <div className="rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="mb-1 block text-sm font-medium">
               {mode === "phone" ? "Mobile Number" : "Email"}
             </label>
@@ -284,7 +284,7 @@ export default function LoginPage() {
             </button>
           ) : (
             <>
-              <div>
+              <div className="rounded-lg transition-colors focus-within:bg-accent/40">
                 <label className="mb-1 block text-sm font-medium">
                   Enter OTP
                 </label>

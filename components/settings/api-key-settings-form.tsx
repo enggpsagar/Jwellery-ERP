@@ -122,7 +122,7 @@ export function ApiKeySettingsForm({
               }}
               className="space-y-4"
             >
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
                 <Label htmlFor="name">Name <RequiredMark /></Label>
                 <Input
                   id="name"

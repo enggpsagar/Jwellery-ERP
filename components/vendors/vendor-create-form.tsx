@@ -121,7 +121,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
           }}
           className="grid grid-cols-1 gap-4 md:grid-cols-2"
         >
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4 text-muted-foreground" />
               Vendor Name <RequiredMark />
@@ -138,7 +138,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
               Phone <RequiredMark />
@@ -155,7 +155,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
               Alternate Phone
@@ -168,7 +168,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Mail className="h-4 w-4 text-muted-foreground" />
               Email
@@ -181,7 +181,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             />
           </div>
 
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
@@ -194,7 +194,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">State</label>
             {/* Selected/keyed by id (to drive the city fetch below), but the
                 form field itself must submit the state's name — Vendor.state
@@ -218,7 +218,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">City</label>
             <select
               name="city"
@@ -240,12 +240,12 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             </select>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">Pincode</label>
             <input name="pincode" className={FIELD} placeholder="Enter pincode" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <IndianRupee className="h-4 w-4 text-muted-foreground" />
               Opening Balance
@@ -281,7 +281,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             ) : null}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">Notes</label>
             <textarea
               name="notes"

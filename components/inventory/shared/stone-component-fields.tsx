@@ -188,7 +188,7 @@ export function StoneComponentFields({
           </div>
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label className="text-xs">Stone Carat Weight (ct)</Label>
           <Input
             type="number"
@@ -201,7 +201,7 @@ export function StoneComponentFields({
           </p>
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label className="text-xs">Stone Rate (₹/ct)</Label>
           <Input
             type="number"
@@ -211,7 +211,7 @@ export function StoneComponentFields({
           />
         </div>
 
-        <div className="space-y-1 md:col-span-2">
+        <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label className="text-xs">Stone Charge</Label>
           <Input
             type="number"

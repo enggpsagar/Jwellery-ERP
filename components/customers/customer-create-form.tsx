@@ -133,7 +133,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
           }}
           className="grid gap-5 md:grid-cols-2"
         >
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4 text-muted-foreground" />
               Name <RequiredMark />
@@ -142,7 +142,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             <FieldError errors={state.errors?.name} />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
               Phone <RequiredMark />
@@ -151,7 +151,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             <FieldError errors={state.errors?.phone} />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
               Alternate Phone
@@ -159,7 +159,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             <input name="altPhone" type="tel" className={FIELD} placeholder="Optional" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Mail className="h-4 w-4 text-muted-foreground" />
               Email
@@ -167,7 +167,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             <input name="email" type="email" className={FIELD} placeholder="name@example.com" />
           </div>
 
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
@@ -180,7 +180,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               State
@@ -206,7 +206,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               City
@@ -228,7 +228,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             </select>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               Pincode
@@ -236,7 +236,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             <input name="pincode" className={FIELD} placeholder="440001" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               PAN Number
@@ -244,7 +244,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             <input name="panNumber" className={FIELD} placeholder="Optional" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               Registration / Encircle Id
@@ -252,7 +252,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             <input name="registrationId" className={FIELD} placeholder="Optional" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <IndianRupee className="h-4 w-4 text-muted-foreground" />
               Opening Balance
@@ -288,7 +288,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             ) : null}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">Notes</label>
             <textarea
               name="notes"

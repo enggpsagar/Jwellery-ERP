@@ -95,7 +95,7 @@ export function PaymentMethodFields({ value, onChange, maxAmount }: PaymentMetho
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label required>Payment Method</Label>
           <Select
             value={value.method}
@@ -114,7 +114,7 @@ export function PaymentMethodFields({ value, onChange, maxAmount }: PaymentMetho
           </Select>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label required>Amount{maxAmount !== undefined ? ` (max ₹${maxAmount.toFixed(2)})` : ""}</Label>
           <Input
             type="number"
@@ -128,7 +128,7 @@ export function PaymentMethodFields({ value, onChange, maxAmount }: PaymentMetho
       </div>
 
       {value.method === "UPI" && (
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>UPI Transaction ID</Label>
           <Input
             value={value.reference}
@@ -140,14 +140,14 @@ export function PaymentMethodFields({ value, onChange, maxAmount }: PaymentMetho
 
       {value.method === "NET_BANKING" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Bank Name</Label>
             <Input
               value={value.bankName}
               onChange={(e) => onChange({ bankName: e.target.value })}
             />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Reference / UTR Number</Label>
             <Input
               value={value.reference}
@@ -159,14 +159,14 @@ export function PaymentMethodFields({ value, onChange, maxAmount }: PaymentMetho
 
       {value.method === "CHEQUE" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Bank Name</Label>
             <Input
               value={value.bankName}
               onChange={(e) => onChange({ bankName: e.target.value })}
             />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Cheque Number</Label>
             <Input
               value={value.reference}
@@ -176,7 +176,7 @@ export function PaymentMethodFields({ value, onChange, maxAmount }: PaymentMetho
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label>Attach Receipt (optional)</Label>
         <input
           ref={fileInputRef}

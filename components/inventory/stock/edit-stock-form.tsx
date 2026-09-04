@@ -130,7 +130,7 @@ useEffect(() => {
       ) : null}
 
       <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="stockCode" className="text-sm font-medium">
             Stock Code <RequiredMark />
           </label>
@@ -145,7 +145,7 @@ useEffect(() => {
           ) : null}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="tagNumber" className="text-sm font-medium">
             Tag Number
           </label>
@@ -157,7 +157,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="productId" className="text-sm font-medium">
             Product <RequiredMark />
           </label>
@@ -179,7 +179,7 @@ useEffect(() => {
           ) : null}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="quantity" className="text-sm font-medium">
             Quantity <RequiredMark />
           </label>
@@ -193,7 +193,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="metalType" className="text-sm font-medium">
             Metal Type <RequiredMark />
           </label>
@@ -209,7 +209,7 @@ useEffect(() => {
           </select>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="purity" className="text-sm font-medium">
             Purity
           </label>
@@ -230,7 +230,7 @@ useEffect(() => {
           </select>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="status" className="text-sm font-medium">
             Status <RequiredMark />
           </label>
@@ -249,7 +249,7 @@ useEffect(() => {
           </select>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="grossWeight" className="text-sm font-medium">
             Gross Weight
           </label>
@@ -261,7 +261,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="lessWeight" className="text-sm font-medium">
             Less Weight
           </label>
@@ -273,7 +273,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="netWeight" className="text-sm font-medium">
             Net Weight
           </label>
@@ -286,7 +286,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="stoneWeight" className="text-sm font-medium">
             Stone Weight
           </label>
@@ -298,7 +298,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="wastagePercent" className="text-sm font-medium">
             Wastage %
           </label>
@@ -310,7 +310,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="purchaseRate" className="text-sm font-medium">
             Purchase Rate
           </label>
@@ -323,7 +323,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="saleRate" className="text-sm font-medium">
             Sale Rate
           </label>
@@ -349,7 +349,7 @@ useEffect(() => {
           <input type="hidden" name="makingChargeType" value={makingChargeType} />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="stoneCharge" className="text-sm font-medium">
             Stone Charge
           </label>
@@ -361,7 +361,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="otherCharge" className="text-sm font-medium">
             Other Charge
           </label>
@@ -373,7 +373,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="purchaseAmount" className="text-sm font-medium">
             Purchase Amount
           </label>
@@ -385,7 +385,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="saleAmount" className="text-sm font-medium">
             Sale Amount
           </label>
@@ -397,7 +397,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="vendorName" className="text-sm font-medium">
             Vendor Name
           </label>
@@ -409,7 +409,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="purchaseDate" className="text-sm font-medium">
             Purchase Date
           </label>
@@ -422,7 +422,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="location" className="text-sm font-medium">
             Location
           </label>
@@ -434,7 +434,7 @@ useEffect(() => {
           />
         </div>
 
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <label htmlFor="remarks" className="text-sm font-medium">
             Remarks
           </label>

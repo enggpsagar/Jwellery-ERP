@@ -93,22 +93,22 @@ export function EditInvoiceDialog({
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
               <Label>Invoice Date</Label>
               <Input type="date" name="invoiceDate" defaultValue={invoiceDate.slice(0, 10)} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
               <Label>Due Date</Label>
               <Input type="date" name="dueDate" defaultValue={dueDate?.slice(0, 10) ?? ""} />
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Location</Label>
             <LocationSelect locations={locations} name="locationId" defaultValue={locationId ?? ""} />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Notes</Label>
             <Textarea name="notes" rows={3} defaultValue={notes ?? ""} />
           </div>

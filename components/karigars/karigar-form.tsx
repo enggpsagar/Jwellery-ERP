@@ -88,7 +88,7 @@ export function KarigarForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Karigar Code</Label>
           <Input
             name="code"
@@ -97,7 +97,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Name <RequiredMark /></Label>
           <Input
             name="name"
@@ -107,7 +107,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Mobile</Label>
           <Input
             name="mobile"
@@ -122,7 +122,7 @@ export function KarigarForm({
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>WhatsApp</Label>
           <Input
             name="whatsapp"
@@ -131,7 +131,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Email</Label>
           <Input
             name="email"
@@ -143,7 +143,7 @@ export function KarigarForm({
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>State</Label>
           <select
             className="w-full rounded-md border bg-background px-3 py-2 text-sm"
@@ -171,7 +171,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>City</Label>
           <select
             name="city"
@@ -199,7 +199,7 @@ export function KarigarForm({
           </select>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Pincode</Label>
           <Input
             name="pincode"
@@ -207,7 +207,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Specialization</Label>
           <Input
             name="specialization"
@@ -216,7 +216,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Location</Label>
           <LocationSelect
             locations={locations}
@@ -229,7 +229,7 @@ export function KarigarForm({
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>GST Number</Label>
           <Input
             name="gstNumber"
@@ -237,7 +237,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>PAN Number</Label>
           <Input
             name="panNumber"
@@ -245,7 +245,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Aadhaar Number</Label>
           <Input
             name="aadhaarNumber"
@@ -255,7 +255,7 @@ export function KarigarForm({
 
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label>Address</Label>
         <Textarea
           name="address"
@@ -264,7 +264,7 @@ export function KarigarForm({
         />
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label>Notes</Label>
         <Textarea
           name="notes"
@@ -275,7 +275,7 @@ export function KarigarForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Opening Gold (grams)</Label>
           <Input
             name="openingGold"
@@ -285,7 +285,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Opening Cash</Label>
           <Input
             name="openingCash"

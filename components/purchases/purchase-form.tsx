@@ -690,7 +690,7 @@ export function PurchaseForm({
       <input type="hidden" name="paymentsJson" value={paymentsJson} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Vendor <RequiredMark /></Label>
           <VendorSelect
             key={vendorSelectKey}
@@ -703,7 +703,7 @@ export function PurchaseForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Purchase Date</Label>
           <Input
             type="date"
@@ -712,7 +712,7 @@ export function PurchaseForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Vendor Invoice Number</Label>
           <Input
             name="vendorInvoiceNumber"
@@ -720,7 +720,7 @@ export function PurchaseForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Location</Label>
           <LocationSelect
             locations={locations}
@@ -748,7 +748,7 @@ export function PurchaseForm({
           {items.map((item) => (
             <div key={item.key} className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="md:col-span-2 space-y-1">
+                <div className="md:col-span-2 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Product <RequiredMark /></Label>
                   <ProductSelect
                     key={productSelectKeys[item.key] ?? 0}
@@ -761,7 +761,7 @@ export function PurchaseForm({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Item Name</Label>
                   <Input
                     value={item.itemName}
@@ -769,7 +769,7 @@ export function PurchaseForm({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Quantity</Label>
                   <Input
                     type="number"
@@ -784,7 +784,7 @@ export function PurchaseForm({
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Purity</Label>
                   <Select
                     value={item.purity}
@@ -803,7 +803,7 @@ export function PurchaseForm({
                   </Select>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Gross Weight (g)</Label>
                   <Input
                     type="number"
@@ -825,7 +825,7 @@ export function PurchaseForm({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Net Weight (g)</Label>
                   <Input
                     type="number"
@@ -869,7 +869,7 @@ export function PurchaseForm({
                 )}
 
                 {isCaratLine(item) && (
-                  <div className="space-y-1">
+                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Carat Weight (ct)</Label>
                     <Input
                       type="number"
@@ -885,7 +885,7 @@ export function PurchaseForm({
                   </div>
                 )}
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Dust/Making/Other Wt (g)</Label>
                   <Input
                     type="number"
@@ -950,7 +950,7 @@ export function PurchaseForm({
               )}
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Rate / g</Label>
                   <Input
                     type="number"
@@ -975,7 +975,7 @@ export function PurchaseForm({
                     checked, Stone Charge moves up into that box, next to the
                     Carat Weight/Rate it's computed from — see above. */}
                 {(isCaratLine(item) || !item.hasStoneComponent) && (
-                  <div className="space-y-1">
+                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Stone Charge</Label>
                     <Input
                       type="number"
@@ -986,7 +986,7 @@ export function PurchaseForm({
                   </div>
                 )}
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">HSN Code</Label>
                   <Input
                     value={item.hsnCode}
@@ -1026,7 +1026,7 @@ export function PurchaseForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <div className="flex items-center justify-between">
             <Label>GST Rate %</Label>
             <GstSchemeBadge scheme={gstScheme} />
@@ -1093,7 +1093,7 @@ export function PurchaseForm({
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label>Notes</Label>
         <Textarea name="notes" rows={2} />
       </div>

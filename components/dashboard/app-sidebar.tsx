@@ -22,6 +22,7 @@ import {
   PackagePlus,
   FileText,
   CreditCard,
+  Plus,
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
@@ -52,7 +53,10 @@ type NavItem = {
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  items?: { title: string; href: string }[];
+  /** quickAddHref, when set, renders a persistent "+" beside that sub-item —
+   * a direct link to its Create/New page, skipping the list-then-Add-button
+   * detour. Omitted for sub-items with no single obvious "new" page. */
+  items?: { title: string; href: string; quickAddHref?: string }[];
 };
 
 const mainNav: NavItem[] = [
@@ -81,8 +85,8 @@ const mainNav: NavItem[] = [
     href: "/inventory",
     icon: Package,
     items: [
-      { title: "Products", href: "/inventory/products" },
-      { title: "Stock", href: "/inventory/stock" },
+      { title: "Products", href: "/inventory/products", quickAddHref: "/inventory/products/new" },
+      { title: "Stock", href: "/inventory/stock", quickAddHref: "/inventory/stock/new" },
     ],
   },
   {
@@ -105,8 +109,8 @@ const mainNav: NavItem[] = [
     href: "/billing",
     icon: ReceiptText,
     items: [
-      { title: "Pakka Invoices", href: "/billing" },
-      { title: "Kacha Slips", href: "/billing/kacha" },
+      { title: "Pakka Invoices", href: "/billing", quickAddHref: "/billing/new" },
+      { title: "Kacha Slips", href: "/billing/kacha", quickAddHref: "/billing/kacha/new" },
     ],
   },
   {
@@ -284,6 +288,20 @@ function SidebarNavItem({
                   <span>{subItem.title}</span>
                 </Link>
               </SidebarMenuSubButton>
+
+              {/* Same override classes as the section-level chevron above —
+                  "+" icons must look and behave identically everywhere they
+                  appear, not just within one section. */}
+              {subItem.quickAddHref && (
+                <SidebarMenuAction
+                  asChild
+                  className="text-white/70 hover:bg-card/10 hover:text-white"
+                >
+                  <Link href={subItem.quickAddHref} aria-label={`Add new ${subItem.title}`}>
+                    <Plus className="h-4 w-4" />
+                  </Link>
+                </SidebarMenuAction>
+              )}
             </SidebarMenuSubItem>
           ))}
         </SidebarMenuSub>

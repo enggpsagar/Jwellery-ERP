@@ -13,7 +13,11 @@ const STATUS_LABELS: Record<InventoryStockStatus, string> = {
 
 const STATUS_STYLES: Record<InventoryStockStatus, string> = {
   IN_STOCK: "bg-green-100 text-green-700",
-  SOLD: "bg-blue-100 text-blue-700",
+  // Solid red + white, not the pastel red-100/red-700 DAMAGED uses below —
+  // Sold/Out of Stock are the two statuses a merchant most needs to notice
+  // at a glance (don't quote this piece, it's gone), so they get the
+  // loudest treatment on the table.
+  SOLD: "bg-red-600 text-white",
   RESERVED: "bg-yellow-100 text-yellow-700",
   ISSUED_TO_KARIGAR: "bg-purple-100 text-purple-700",
   DAMAGED: "bg-red-100 text-red-700",
@@ -48,7 +52,7 @@ export function StockStatusBadge({
     <span
       className={cn(
         "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
-        isEmpty ? "bg-orange-100 text-orange-700" : STATUS_STYLES[status],
+        isEmpty ? "bg-red-600 text-white" : STATUS_STYLES[status],
         className,
       )}
     >

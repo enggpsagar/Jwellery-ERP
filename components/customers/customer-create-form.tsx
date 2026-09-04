@@ -298,7 +298,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             />
           </div>
 
-          <div className="flex gap-3 pt-2 md:col-span-2">
+          <div className="flex justify-end gap-3 pt-2 md:col-span-2">
             <Button type="submit" disabled={pending} size="lg">
               {pending ? "Saving..." : "Save customer"}
             </Button>

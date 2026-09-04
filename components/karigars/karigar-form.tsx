@@ -310,13 +310,15 @@ export function KarigarForm({
         </div>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="px-5 py-2 rounded-md bg-primary text-primary-foreground"
-      >
-        {pending ? "Saving..." : karigar ? "Update Karigar" : "Save Karigar"}
-      </button>
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={pending}
+          className="px-5 py-2 rounded-md bg-primary text-primary-foreground"
+        >
+          {pending ? "Saving..." : karigar ? "Update Karigar" : "Save Karigar"}
+        </button>
+      </div>
 
     </div>
   )

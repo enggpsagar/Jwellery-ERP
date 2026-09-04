@@ -462,7 +462,7 @@ useEffect(() => {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 pt-2">
+      <div className="flex items-center justify-end gap-3 pt-2">
         <button
           type="submit"
           disabled={pending}

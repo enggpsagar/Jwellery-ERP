@@ -1129,9 +1129,11 @@ export function PurchaseForm({
         </div>
       </div>
 
-      <Button type="submit" disabled={pending || !canSubmit || paidOverTotal}>
-        {pending ? "Creating..." : "Create Purchase"}
-      </Button>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={pending || !canSubmit || paidOverTotal}>
+          {pending ? "Creating..." : "Create Purchase"}
+        </Button>
+      </div>
     </form>
   )
 }

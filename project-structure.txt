@@ -1,13 +1,21 @@
 .
 ├──   middleware.ts
+├── CLAUDE.md
+├── README.md
 ├── app
 │   ├── (auth)
-│   │   └── login
+│   │   ├── login
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx
+│   │   └── register
 │   │       └── page.tsx
 │   ├── (dashboard)
 │   │   ├── billing
 │   │   │   ├── [id]
-│   │   │   │   └── page.tsx
+│   │   │   │   ├── edit
+│   │   │   │   ├── page.tsx
+│   │   │   │   ├── print
+│   │   │   │   └── replace
 │   │   │   ├── kacha
 │   │   │   │   ├── [id]
 │   │   │   │   ├── new
@@ -15,12 +23,19 @@
 │   │   │   ├── new
 │   │   │   │   └── page.tsx
 │   │   │   └── page.tsx
+│   │   ├── contact-faq
+│   │   │   └── page.tsx
 │   │   ├── customers
 │   │   │   ├── [id]
+│   │   │   │   ├── edit
+│   │   │   │   └── page.tsx
+│   │   │   ├── archived
 │   │   │   │   └── page.tsx
 │   │   │   ├── export
 │   │   │   │   └── route.ts
 │   │   │   ├── loading.tsx
+│   │   │   ├── new
+│   │   │   │   └── page.tsx
 │   │   │   └── page.tsx
 │   │   ├── dashboard
 │   │   │   └── page.tsx
@@ -36,99 +51,217 @@
 │   │   │       ├── [id]
 │   │   │       ├── loading.tsx
 │   │   │       ├── new
-│   │   │       └── page.tsx
+│   │   │       ├── page.tsx
+│   │   │       └── print-qr
 │   │   ├── karigars
 │   │   │   ├── [id]
-│   │   │   │   └── edit
+│   │   │   │   ├── edit
+│   │   │   │   ├── page.tsx
+│   │   │   │   └── receive-items
+│   │   │   ├── disabled
+│   │   │   │   └── page.tsx
+│   │   │   ├── ledger
+│   │   │   │   └── page.tsx
 │   │   │   ├── loading.tsx
 │   │   │   ├── new
 │   │   │   │   └── page.tsx
 │   │   │   └── page.tsx
 │   │   ├── layout.tsx
 │   │   ├── ledger
+│   │   │   ├── export
+│   │   │   │   └── route.ts
 │   │   │   └── page.tsx
 │   │   ├── metal-rates
 │   │   │   └── page.tsx
 │   │   ├── my-jobs
 │   │   │   └── page.tsx
+│   │   ├── my-plan
+│   │   │   └── page.tsx
 │   │   ├── not-found.tsx
+│   │   ├── plans
+│   │   │   └── page.tsx
 │   │   ├── profile
 │   │   │   └── page.tsx
+│   │   ├── purchases
+│   │   │   ├── [id]
+│   │   │   │   └── page.tsx
+│   │   │   ├── loading.tsx
+│   │   │   ├── new
+│   │   │   │   └── page.tsx
+│   │   │   └── page.tsx
+│   │   ├── q
+│   │   │   └── [stockId]
+│   │   │       └── page.tsx
+│   │   ├── quotations
+│   │   │   ├── [id]
+│   │   │   │   ├── convert
+│   │   │   │   └── page.tsx
+│   │   │   ├── loading.tsx
+│   │   │   ├── new
+│   │   │   │   └── page.tsx
+│   │   │   └── page.tsx
 │   │   ├── reports
+│   │   │   ├── export
+│   │   │   │   └── route.ts
+│   │   │   └── page.tsx
+│   │   ├── scan
 │   │   │   └── page.tsx
 │   │   ├── settings
-│   │   │   └── page.tsx
+│   │   │   ├── api-keys
+│   │   │   │   └── page.tsx
+│   │   │   ├── locations
+│   │   │   │   └── page.tsx
+│   │   │   ├── page.tsx
+│   │   │   ├── purity
+│   │   │   │   └── page.tsx
+│   │   │   └── taxonomy
+│   │   │       └── page.tsx
 │   │   ├── stores
+│   │   │   ├── [id]
+│   │   │   │   ├── edit
+│   │   │   │   └── page.tsx
+│   │   │   ├── new
+│   │   │   │   └── page.tsx
 │   │   │   └── page.tsx
-│   │   └── users
-│   │       ├── actions.ts
+│   │   ├── support-tickets
+│   │   │   ├── [id]
+│   │   │   │   └── page.tsx
+│   │   │   └── page.tsx
+│   │   ├── users
+│   │   │   ├── [id]
+│   │   │   │   └── edit
+│   │   │   ├── actions.ts
+│   │   │   ├── new
+│   │   │   │   └── page.tsx
+│   │   │   └── page.tsx
+│   │   └── vendors
+│   │       ├── [id]
+│   │       │   ├── edit
+│   │       │   └── page.tsx
+│   │       ├── archived
+│   │       │   └── page.tsx
+│   │       ├── export
+│   │       │   └── route.ts
+│   │       ├── loading.tsx
+│   │       ├── new
+│   │       │   └── page.tsx
 │   │       └── page.tsx
 │   ├── api
 │   │   ├── auth
 │   │   │   ├── [...nextauth]
 │   │   │   │   └── route.ts
-│   │   │   ├── route.ts
 │   │   │   └── send-otp
 │   │   │       └── route.ts
+│   │   ├── billing
+│   │   │   └── [id]
+│   │   │       └── pdf
 │   │   ├── cities
 │   │   │   └── route.ts
 │   │   ├── cron
-│   │   │   └── metal-rates
+│   │   │   ├── daily-report
+│   │   │   │   └── route.ts
+│   │   │   ├── metal-rates
+│   │   │   │   └── route.ts
+│   │   │   └── plan-reminders
 │   │   │       └── route.ts
 │   │   ├── inventory
 │   │   │   └── products
 │   │   │       └── route.ts
+│   │   ├── mcp
+│   │   │   └── route.ts
 │   │   ├── metal-rates
 │   │   │   ├── export
 │   │   │   │   └── route.ts
 │   │   │   ├── history
 │   │   │   │   └── route.ts
 │   │   │   └── route.ts
+│   │   ├── payments
+│   │   │   └── upload
+│   │   │       └── route.ts
+│   │   ├── platform-content
+│   │   │   └── image
+│   │   │       └── route.ts
 │   │   ├── profile
 │   │   │   ├── route.ts
 │   │   │   └── upload
 │   │   │       └── route.ts
-│   │   └── test-env
-│   │       └── route.ts
+│   │   ├── scan-session
+│   │   │   └── close
+│   │   │       └── route.ts
+│   │   ├── store
+│   │   │   └── logo
+│   │   │       └── route.ts
+│   │   ├── support-tickets
+│   │   │   └── upload
+│   │   │       └── route.ts
+│   │   ├── test-env
+│   │   │   └── route.ts
+│   │   └── v1
+│   │       └── customers
+│   │           ├── [id]
+│   │           └── route.ts
+│   ├── contact
+│   │   └── page.tsx
+│   ├── faq
+│   │   └── page.tsx
 │   ├── globals.css
 │   ├── layout.tsx
-│   └── page.tsx
-├── auth.config.ts
+│   ├── page.tsx
+│   └── s
+│       └── [stockId]
+│           └── route.ts
 ├── components
 │   ├── auth
 │   │   ├── login-form.tsx
-│   │   └── logout-button.tsx
+│   │   ├── logout-button.tsx
+│   │   └── register-store-form.tsx
 │   ├── billing
+│   │   ├── cancel-invoice-dialog.tsx
+│   │   ├── edit-invoice-dialog.tsx
+│   │   ├── email-invoice-button.tsx
 │   │   ├── invoice-form.tsx
+│   │   ├── invoice-print-button.tsx
 │   │   ├── invoice-status-badge.tsx
 │   │   ├── invoice-table.tsx
+│   │   ├── invoices-toolbar.tsx
 │   │   ├── kacha
 │   │   │   ├── convert-to-pakka-form.tsx
+│   │   │   ├── delete-all-kacha-dialog.tsx
+│   │   │   ├── email-kacha-invoice-button.tsx
+│   │   │   ├── kacha-import-dialog.tsx
 │   │   │   ├── kacha-invoice-form.tsx
 │   │   │   ├── kacha-invoice-table.tsx
+│   │   │   ├── kacha-invoices-client.tsx
+│   │   │   ├── kacha-invoices-toolbar.tsx
 │   │   │   └── record-kacha-payment-dialog.tsx
-│   │   └── record-payment-dialog.tsx
+│   │   ├── record-payment-dialog.tsx
+│   │   ├── scan-to-add-panel.tsx
+│   │   └── share-whatsapp-button.tsx
 │   ├── customers
-│   │   ├── add-customer-dialog.tsx
+│   │   ├── archived-customer-restore-button.tsx
+│   │   ├── archived-customers-client.tsx
+│   │   ├── customer-create-form.tsx
+│   │   ├── customer-edit-form.tsx
 │   │   ├── customer-row-actions.tsx
+│   │   ├── customer-select.tsx
 │   │   ├── customer-view.tsx
 │   │   ├── customers-client.tsx
 │   │   ├── customers-pagination.tsx
 │   │   ├── customers-table.tsx
 │   │   ├── customers-toolbar.tsx
-│   │   ├── edit-customer-dialog.tsx
 │   │   └── ledger
-│   │       ├── add-customer-ledger-entry-dialog.tsx
 │   │       ├── add-customer-refund-entry-dialog.tsx
 │   │       ├── add-customer-sale-entry-dialog.tsx
-│   │       └── customer-ledger-card.tsx
+│   │       ├── customer-ledger-card.tsx
+│   │       └── email-ledger-statement-button.tsx
 │   ├── dashboard
 │   │   ├── activity-feed.tsx
 │   │   ├── app-sidebar.tsx
 │   │   ├── category-chart.tsx
 │   │   ├── global-search.tsx
-│   │   ├── metal-price-chart.tsx
+│   │   ├── notification-bell.tsx
 │   │   ├── sales-chart.tsx
+│   │   ├── sales-summary-card.tsx
 │   │   ├── stat-cards.tsx
 │   │   ├── store-switcher.tsx
 │   │   ├── top-bar.tsx
@@ -138,59 +271,146 @@
 │   │   ├── inventory-view.tsx
 │   │   ├── products
 │   │   │   ├── delete-product-button.tsx
-│   │   │   ├── edit-product-dialog.tsx
 │   │   │   ├── edit-product-form.tsx
 │   │   │   ├── product-create-form.tsx
 │   │   │   ├── product-form.tsx
 │   │   │   ├── product-row-actions.tsx
+│   │   │   ├── products-client.tsx
 │   │   │   └── products-table.tsx
 │   │   ├── shared
+│   │   │   ├── add-category-dialog.tsx
+│   │   │   ├── add-category-type-dialog.tsx
+│   │   │   ├── add-metal-dialog.tsx
+│   │   │   ├── add-stone-type-dialog.tsx
 │   │   │   ├── finish-badge.tsx
 │   │   │   ├── product-select.tsx
 │   │   │   ├── purity-badge.tsx
-│   │   │   └── stock-status-badge.tsx
+│   │   │   ├── stock-status-badge.tsx
+│   │   │   └── stone-component-fields.tsx
 │   │   └── stock
 │   │       ├── [id]
 │   │       ├── edit-stock-form.tsx
+│   │       ├── print-all-qr-button.tsx
+│   │       ├── quick-sale-form.tsx
+│   │       ├── stock-client.tsx
 │   │       ├── stock-create-form.tsx
 │   │       ├── stock-edit-form.tsx
 │   │       ├── stock-form.tsx
-│   │       ├── stock-row-actions.tsx
-│   │       └── stock-table.tsx
+│   │       ├── stock-qr-card.tsx
+│   │       ├── stock-table.tsx
+│   │       └── stock-toolbar.tsx
 │   ├── karigars
 │   │   ├── delete-karigar-button.tsx
+│   │   ├── disabled-karigar-restore-button.tsx
+│   │   ├── disabled-karigars-client.tsx
+│   │   ├── issue-material-dialog.tsx
 │   │   ├── karigar-create-form.tsx
 │   │   ├── karigar-edit-form.tsx
 │   │   ├── karigar-form.tsx
+│   │   ├── karigar-ledger-summary-table.tsx
+│   │   ├── karigar-ledger-table.tsx
 │   │   ├── karigar-row-actions.tsx
+│   │   ├── karigar-status-card.tsx
 │   │   ├── karigar-table.tsx
 │   │   ├── karigars-client.tsx
 │   │   ├── karigars-pagination.tsx
-│   │   └── karigars-toolbar.tsx
+│   │   ├── karigars-toolbar.tsx
+│   │   ├── receive-items-form.tsx
+│   │   └── record-karigar-payment-dialog.tsx
 │   ├── ledger
 │   │   ├── ledger-detail-drawer.tsx
-│   │   └── ledger-view.tsx
+│   │   ├── ledger-tabs.tsx
+│   │   ├── ledger-view.tsx
+│   │   └── metal-daily-ledger.tsx
 │   ├── metal-rates
 │   │   └── metal-rates-table.tsx
+│   ├── plans
+│   │   └── plans-client.tsx
+│   ├── platform-content
+│   │   ├── contact-content-form.tsx
+│   │   ├── contact-image-upload.tsx
+│   │   └── faq-manager.tsx
 │   ├── profile
+│   │   ├── access-permissions-card.tsx
 │   │   ├── avatar-upload.tsx
 │   │   ├── change-password-dialog.tsx
+│   │   ├── delete-account-dialog.tsx
 │   │   ├── profile-card.tsx
 │   │   └── profile-form.tsx
 │   ├── providers
 │   │   ├── providers.tsx
 │   │   ├── session-provider.tsx
 │   │   └── toast-provider.tsx
+│   ├── public
+│   │   ├── contact-content-view.tsx
+│   │   ├── faq-list.tsx
+│   │   └── public-site-chrome.tsx
+│   ├── purchases
+│   │   ├── purchase-form.tsx
+│   │   ├── purchase-status-badge.tsx
+│   │   ├── purchase-table.tsx
+│   │   ├── purchases-toolbar.tsx
+│   │   └── record-purchase-payment-dialog.tsx
+│   ├── quotations
+│   │   ├── convert-to-invoice-form.tsx
+│   │   ├── delete-quotation-button.tsx
+│   │   ├── quotation-form.tsx
+│   │   ├── quotation-status-badge.tsx
+│   │   ├── quotation-table.tsx
+│   │   └── quotations-toolbar.tsx
 │   ├── reports
-│   │   └── reports-tabs.tsx
+│   │   ├── report-date-filter.tsx
+│   │   ├── report-table-controls.tsx
+│   │   ├── reports-tabs.tsx
+│   │   └── use-report-table.ts
 │   ├── settings
-│   │   └── settings-form.tsx
+│   │   ├── api-key-settings-form.tsx
+│   │   ├── carat-conversion-form.tsx
+│   │   ├── location-settings-form.tsx
+│   │   ├── purity-settings-form.tsx
+│   │   ├── settings-form.tsx
+│   │   ├── settings-tabs.tsx
+│   │   ├── store-logo-upload.tsx
+│   │   └── taxonomy-settings-form.tsx
 │   ├── shared
-│   │   └── page-back-header.tsx
+│   │   ├── data-table-pagination.tsx
+│   │   ├── data-table-toolbar.tsx
+│   │   ├── detail-section.tsx
+│   │   ├── export-menu.tsx
+│   │   ├── gst-scheme-badge.tsx
+│   │   ├── location-select.tsx
+│   │   ├── making-charge-input.tsx
+│   │   ├── page-back-header.tsx
+│   │   ├── paid-now-fields.tsx
+│   │   ├── party-gst-type-select.tsx
+│   │   ├── payment-method-fields.tsx
+│   │   ├── percent-or-flat-input.tsx
+│   │   ├── record-hover-card.tsx
+│   │   ├── required-mark.tsx
+│   │   ├── reveal-once-secret-dialog.tsx
+│   │   ├── rich-text-editor.tsx
+│   │   └── webcam-qr-scanner.tsx
 │   ├── stores
-│   │   ├── store-form-dialog.tsx
-│   │   └── store-table.tsx
+│   │   ├── change-plan-dialog.tsx
+│   │   ├── create-store-form.tsx
+│   │   ├── edit-store-form.tsx
+│   │   ├── plan-presentation.tsx
+│   │   ├── renewal-contact-dialog.tsx
+│   │   ├── store-plan-hover.tsx
+│   │   ├── store-reminder-channels.tsx
+│   │   ├── store-row-actions.tsx
+│   │   ├── store-table.tsx
+│   │   └── stores-client.tsx
+│   ├── support
+│   │   ├── admin-ticket-detail.tsx
+│   │   ├── my-tickets.tsx
+│   │   ├── support-ticket-form.tsx
+│   │   ├── ticket-attachment-field.tsx
+│   │   ├── ticket-message-bubbles.tsx
+│   │   ├── ticket-reply-form.tsx
+│   │   └── ticket-status-badge.tsx
 │   ├── ui
+│   │   ├── accordion.tsx
 │   │   ├── avatar.tsx
 │   │   ├── badge.tsx
 │   │   ├── breadcrumb.tsx
@@ -200,8 +420,10 @@
 │   │   ├── chart.tsx
 │   │   ├── dialog.tsx
 │   │   ├── dropdown-menu.tsx
+│   │   ├── hover-card.tsx
 │   │   ├── input.tsx
 │   │   ├── label.tsx
+│   │   ├── loader.tsx
 │   │   ├── popover.tsx
 │   │   ├── scroll-area.tsx
 │   │   ├── select.tsx
@@ -214,12 +436,28 @@
 │   │   ├── textarea.tsx
 │   │   ├── toast.tsx
 │   │   └── tooltip.tsx
-│   └── users
-│       ├── status-badge.tsx
-│       ├── user-form-dialog.tsx
-│       └── user-table.tsx
+│   ├── users
+│   │   ├── status-badge.tsx
+│   │   ├── user-form-dialog.tsx
+│   │   ├── user-store-access.tsx
+│   │   ├── user-table.tsx
+│   │   └── users-client.tsx
+│   └── vendors
+│       ├── archived-vendor-restore-button.tsx
+│       ├── archived-vendors-client.tsx
+│       ├── ledger
+│       │   └── vendor-ledger-card.tsx
+│       ├── vendor-create-form.tsx
+│       ├── vendor-edit-form.tsx
+│       ├── vendor-row-actions.tsx
+│       ├── vendor-select.tsx
+│       ├── vendors-client.tsx
+│       ├── vendors-pagination.tsx
+│       ├── vendors-table.tsx
+│       └── vendors-toolbar.tsx
 ├── components.json
 ├── docs
+│   ├── USER-GUIDE.md
 │   ├── charts.png
 │   ├── dashboard.png
 │   ├── drawer.png
@@ -229,6 +467,7 @@
 │   └── use-mobile.ts
 ├── lib
 │   ├── actions
+│   │   ├── api-key-actions.ts
 │   │   ├── customer-actions.ts
 │   │   ├── customer-ledger-actions.ts
 │   │   ├── dashboard-actions.ts
@@ -241,40 +480,85 @@
 │   │   ├── invoice-actions.ts
 │   │   ├── kacha-invoice-actions.ts
 │   │   ├── karigar-actions.ts
+│   │   ├── ledger-actions.ts
 │   │   ├── location-actions.ts
 │   │   ├── metal-rate-actions.ts
-│   │   ├── profile-actions.ts
+│   │   ├── notification-actions.ts
+│   │   ├── plan-actions.ts
+│   │   ├── platform-content-actions.ts
+│   │   ├── profile-security-actions.ts
+│   │   ├── purchase-actions.ts
+│   │   ├── purity-actions.ts
+│   │   ├── quick-sale-actions.ts
+│   │   ├── quotation-actions.ts
 │   │   ├── report-actions.ts
+│   │   ├── scan-session-actions.ts
 │   │   ├── settings-actions.ts
-│   │   └── store-actions.ts
+│   │   ├── store-actions.ts
+│   │   ├── store-location-actions.ts
+│   │   ├── store-plan-actions.ts
+│   │   ├── store-registration-actions.ts
+│   │   ├── support-ticket-actions.ts
+│   │   ├── taxonomy-actions.ts
+│   │   ├── user-membership-actions.ts
+│   │   └── vendor-actions.ts
+│   ├── api
+│   │   └── respond.ts
 │   ├── auth
+│   │   ├── api-key.ts
 │   │   ├── auth-options.ts
 │   │   ├── auth.ts
 │   │   ├── otp-auth.ts
 │   │   ├── otp.ts
 │   │   ├── prisma-adapter.ts
 │   │   └── sms.ts
+│   ├── avatar-color.ts
+│   ├── business-units.server.ts
+│   ├── business-units.ts
 │   ├── constants
-│   │   └── customer-ledger.ts
+│   │   └── app.ts
+│   ├── core
+│   │   └── customer.ts
 │   ├── customer-ledger
 │   │   └── customer-ledger-form-state.ts
-│   ├── data.ts
+│   ├── daily-report.ts
+│   ├── date-input.ts
+│   ├── date-range.ts
 │   ├── db.ts
+│   ├── download-file.ts
+│   ├── email-templates.ts
+│   ├── excel-export.ts
+│   ├── gst.ts
 │   ├── inventory
 │   │   ├── constants.ts
-│   │   ├── enums.ts
+│   │   ├── oversell-error.ts
 │   │   ├── product-types.ts
 │   │   ├── stock-types.ts
 │   │   └── utils.ts
+│   ├── invite-email.ts
+│   ├── ledger-format.ts
+│   ├── location-scope.ts
+│   ├── mailer.ts
+│   ├── number-to-words.ts
 │   ├── permissions.ts
+│   ├── plan-status.ts
 │   ├── prisma.ts
+│   ├── purity.ts
+│   ├── quick-sale-token.ts
 │   ├── roles.ts
+│   ├── safe-return-to.ts
+│   ├── sanitize-html.ts
+│   ├── store-code.ts
 │   ├── store-context.ts
+│   ├── store-membership.ts
+│   ├── super-admin.ts
+│   ├── ticket-attachments.ts
 │   ├── types
 │   │   └── next-auth.d.ts
 │   ├── user.ts
 │   ├── utils.ts
 │   └── validation
+│       ├── customer.ts
 │       └── user.ts
 ├── middleware.ts
 ├── next-env.d.ts
@@ -311,8 +595,107 @@
 │   │   │   └── migration.sql
 │   │   ├── 20260819120000_add_store_multitenancy
 │   │   │   └── migration.sql
+│   │   ├── 20260819190000_add_user_permissions
+│   │   │   └── migration.sql
+│   │   ├── 20260823073834_add_purchase_vendor_karigar_carat
+│   │   │   └── migration.sql
+│   │   ├── 20260823082449_add_quotation_and_dmo_weight
+│   │   │   └── migration.sql
+│   │   ├── 20260823180559_customer_phone_unique
+│   │   │   └── migration.sql
+│   │   ├── 20260823182817_taxonomy_pass1_additive
+│   │   │   └── migration.sql
+│   │   ├── 20260823183500_taxonomy_pass2_cleanup
+│   │   │   └── migration.sql
+│   │   ├── 20260823202546_payment_method_and_mfg_date
+│   │   │   └── migration.sql
+│   │   ├── 20260825154617_add_product_charge_type
+│   │   │   └── migration.sql
+│   │   ├── 20260825161138_add_business_units
+│   │   │   └── migration.sql
+│   │   ├── 20260825171335_making_charge_type_and_profile_otp
+│   │   │   └── migration.sql
+│   │   ├── 20260826081052_add_business_settings_logo
+│   │   │   └── migration.sql
+│   │   ├── 20260826150000_add_backup_email
+│   │   │   └── migration.sql
+│   │   ├── 20260826180000_add_store_location
+│   │   │   └── migration.sql
+│   │   ├── 20260826190000_add_location_access_control
+│   │   │   └── migration.sql
+│   │   ├── 20260827090000_add_quotation_location
+│   │   │   └── migration.sql
+│   │   ├── 20260827100000_add_store_location_state_city
+│   │   │   └── migration.sql
+│   │   ├── 20260827120000_add_user_store_membership
+│   │   │   └── migration.sql
+│   │   ├── 20260828090000_add_store_archive_notified_at
+│   │   │   └── migration.sql
+│   │   ├── 20260828100000_add_plan_management
+│   │   │   └── migration.sql
+│   │   ├── 20260828120000_add_store_plan_history
+│   │   │   └── migration.sql
+│   │   ├── 20260828140000_add_product_default_weights
+│   │   │   └── migration.sql
+│   │   ├── 20260828160000_add_scan_session
+│   │   │   └── migration.sql
+│   │   ├── 20260828170000_add_invoice_created_by
+│   │   │   └── migration.sql
+│   │   ├── 20260831140000_widen_weights_and_invoice_format_fields
+│   │   │   └── migration.sql
+│   │   ├── 20260831180000_add_api_keys_and_customer_attribution
+│   │   │   └── migration.sql
+│   │   ├── 20260901190138_add_karigar_state
+│   │   │   └── migration.sql
+│   │   ├── 20260901191500_add_platinum_diamond_purity
+│   │   │   └── migration.sql
+│   │   ├── 20260901193000_add_diamond_carat_weight
+│   │   │   └── migration.sql
+│   │   ├── 20260902130000_add_gst_scheme
+│   │   │   └── migration.sql
+│   │   ├── 20260902170000_add_stone_weight_to_line_items
+│   │   │   └── migration.sql
+│   │   ├── 20260902180000_add_purchase_vendor_invoice_number
+│   │   │   └── migration.sql
+│   │   ├── 20260902190000_add_hsn_to_purchase_item
+│   │   │   └── migration.sql
+│   │   ├── 20260902190000_add_invoice_cancel_and_replace
+│   │   │   └── migration.sql
+│   │   ├── 20260902200000_add_ledger_entry_carat_weight
+│   │   │   └── migration.sql
+│   │   ├── 20260902210000_add_stone_rate
+│   │   │   └── migration.sql
+│   │   ├── 20260903000000_add_customer_vendor_gst_registered
+│   │   │   └── migration.sql
+│   │   ├── 20260903010000_add_party_gst_type
+│   │   │   └── migration.sql
+│   │   ├── 20260903020000_add_platform_contact_faq
+│   │   │   └── migration.sql
+│   │   ├── 20260903030000_add_stone_taxonomy
+│   │   │   └── migration.sql
+│   │   ├── 20260903040000_add_support_tickets
+│   │   │   └── migration.sql
+│   │   ├── 20260903050000_stone_origin_options
+│   │   │   └── migration.sql
+│   │   ├── 20260903060000_add_support_ticket_message_attachment
+│   │   │   └── migration.sql
+│   │   ├── 20260903070000_add_support_ticket_number
+│   │   │   └── migration.sql
+│   │   ├── 20260903080000_convert_stone_origin_to_free_text
+│   │   │   └── migration.sql
+│   │   ├── 20260903090000_add_inventory_and_purchase_created_by
+│   │   │   └── migration.sql
+│   │   ├── 20260903090000_add_stone_type_details
+│   │   │   └── migration.sql
+│   │   ├── 20260903100000_add_carat_conversion_rate
+│   │   │   └── migration.sql
+│   │   ├── 20260903100000_dynamic_business_units
+│   │   │   └── migration.sql
+│   │   ├── 20260903110000_add_hallmark_charge_settings
+│   │   │   └── migration.sql
 │   │   └── migration_lock.toml
 │   ├── schema.prisma
+│   ├── seed-business-units-demo.ts
 │   ├── seed-demo.ts
 │   ├── seed-inventory.ts
 │   ├── seed-kacha-demo.ts
@@ -334,13 +717,16 @@
 │           └── 1782488691818-Stack-Outline-BlueLSLogo (1).png
 ├── query.js
 ├── script
+│   ├── seed-cities-only.ts
 │   └── seed-metal.ts
 ├── scripts
-│   └── checkMigration.js
+│   ├── checkMigration.js
+│   ├── fix-karigar-jobs.ts
+│   └── fix-orphaned-invoice-locations.ts
 ├── skills-lock.json
 ├── tsconfig.json
 ├── tsconfig.tsbuildinfo
 ├── types
 └── vercel.json
 
-103 directories, 241 files
+229 directories, 501 files

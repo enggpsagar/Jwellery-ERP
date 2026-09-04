@@ -194,9 +194,11 @@ export function ConvertToInvoiceForm({
         </div>
       </div>
 
-      <Button type="submit" disabled={pending}>
-        {pending ? "Converting..." : "Convert to Invoice"}
-      </Button>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={pending}>
+          {pending ? "Converting..." : "Convert to Invoice"}
+        </Button>
+      </div>
     </form>
   )
 }

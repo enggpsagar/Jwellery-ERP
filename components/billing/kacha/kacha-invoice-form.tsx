@@ -870,9 +870,11 @@ export function KachaInvoiceForm({
         </div>
       </div>
 
-      <Button type="submit" disabled={pending || !customerId || paidOverTotal}>
-        {pending ? "Creating..." : "Create Kacha Slip"}
-      </Button>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={pending || !customerId || paidOverTotal}>
+          {pending ? "Creating..." : "Create Kacha Slip"}
+        </Button>
+      </div>
     </form>
   )
 }

@@ -175,14 +175,16 @@ export function ApiKeySettingsForm({
                 </div>
               </div>
 
-              <Button type="submit" disabled={pending}>
-                {pending ? (
-                  <Loader className="mr-1.5 h-4 w-4" />
-                ) : (
-                  <Plus className="mr-1.5 h-4 w-4" />
-                )}
-                {pending ? "Creating..." : "Create key"}
-              </Button>
+              <div className="flex justify-end">
+                <Button type="submit" disabled={pending}>
+                  {pending ? (
+                    <Loader className="mr-1.5 h-4 w-4" />
+                  ) : (
+                    <Plus className="mr-1.5 h-4 w-4" />
+                  )}
+                  {pending ? "Creating..." : "Create key"}
+                </Button>
+              </div>
             </form>
           </fieldset>
         </CardContent>

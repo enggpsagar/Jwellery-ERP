@@ -817,9 +817,11 @@ export function QuotationForm({
         </div>
       </div>
 
-      <Button type="submit" disabled={pending || !customerId}>
-        {pending ? "Creating..." : "Create Quotation"}
-      </Button>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={pending || !customerId}>
+          {pending ? "Creating..." : "Create Quotation"}
+        </Button>
+      </div>
     </form>
   )
 }

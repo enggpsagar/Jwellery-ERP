@@ -247,12 +247,12 @@ function FaqFormRow({ faq, onDone }: { faq?: PlatformFaqRow; onDone: () => void 
         ) : null}
       </div>
 
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
-        </Button>
+      <div className="flex justify-end gap-2">
         <Button type="button" size="sm" variant="outline" onClick={onDone}>
           Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? <Loader className="h-4 w-4" /> : "Save"}
         </Button>
       </div>
     </form>

@@ -39,7 +39,6 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuAction,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -106,7 +105,7 @@ const mainNav: NavItem[] = [
     countKey: "purchases",
   },
   {
-    title: "Karigar Management",
+    title: "Karigar",
     href: "/karigars",
     icon: Hammer,
     countKey: "karigars",
@@ -216,18 +215,23 @@ type OpenMenu = string | null | undefined;
 // Same override classes as the section-expand chevron and the quick-add
 // "+" — every small sidebar control shares one look, not a look per section.
 const NAV_CONTROL_CLASS = "text-white/70 hover:bg-card/10 hover:text-white";
-// A static pill, not an interactive control, so no hover state of its own —
-// just enough contrast against the dark sidebar to read as a count chip.
-const NAV_BADGE_CLASS = "bg-white/10 text-white/70";
 
-function NavCountBadge({ count, className }: { count?: number; className?: string }) {
-  // A brand-new store's empty lists don't need a "0" badge cluttering every
-  // item — the badge exists to answer "how many," and zero isn't news.
+/**
+ * "Customers - 3" — inline right after the label, not a right-aligned
+ * badge. Plain text rather than a pill: it sits in the same flex row as the
+ * icon/title with normal document flow, so it never has to fight the
+ * absolutely-positioned chevron/quick-add "+" for the same right-edge slot
+ * the way a SidebarMenuBadge would.
+ */
+function NavCount({ count }: { count?: number }) {
+  // A brand-new store's empty lists don't need "- 0" cluttering every item —
+  // this exists to answer "how many," and zero isn't news.
   if (!count) return null;
   return (
-    <SidebarMenuBadge className={`${NAV_BADGE_CLASS} ${className ?? ""}`}>
-      {count > 999 ? "999+" : count}
-    </SidebarMenuBadge>
+    <span className="font-normal text-white/50">
+      {" "}
+      - {count > 999 ? "999+" : count}
+    </span>
   );
 }
 
@@ -271,11 +275,12 @@ function SidebarNavItem({
         >
           <Link href={item.href}>
             <Icon className="h-4 w-4" />
-            <span>{item.title}</span>
+            <span>
+              {item.title}
+              {item.countKey && <NavCount count={counts[item.countKey]} />}
+            </span>
           </Link>
         </SidebarMenuButton>
-
-        {item.countKey && <NavCountBadge count={counts[item.countKey]} />}
       </SidebarMenuItem>
     );
   }
@@ -325,20 +330,12 @@ function SidebarNavItem({
                 className={ACTIVE_NAV_CLASS}
               >
                 <Link href={subItem.href}>
-                  <span>{subItem.title}</span>
+                  <span>
+                    {subItem.title}
+                    {subItem.countKey && <NavCount count={counts[subItem.countKey]} />}
+                  </span>
                 </Link>
               </SidebarMenuSubButton>
-
-              {/* The count badge sits left of the "+" quick-add button when
-                  both are present — both hardcode `right-1` by default, so
-                  the badge is shifted clear of the button rather than the
-                  two overlapping. */}
-              {subItem.countKey && (
-                <NavCountBadge
-                  count={counts[subItem.countKey]}
-                  className={subItem.quickAddHref ? "right-7" : undefined}
-                />
-              )}
 
               {/* Same override classes as the section-level chevron above —
                   "+" icons must look and behave identically everywhere they

@@ -90,19 +90,32 @@ export function TopBar({
 
       <div className="ml-auto flex items-center gap-1.5">
         {canAccessBilling && (
-          <Button
-            size="sm"
-            asChild
-            // Gold, because this is the one action the bar exists to offer.
-            // Deep enough (slot 2's dark step) to hold white text at 4.5:1 —
-            // the light gold used for chart fills would not.
-            className="bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
-          >
-            <Link href="/billing/new">
-              <Plus className="h-4 w-4 sm:mr-1" />
-              <span className="hidden sm:inline">New Invoice</span>
-            </Link>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                // Gold, because this is the one action the bar exists to offer.
+                // Deep enough (slot 2's dark step) to hold white text at 4.5:1 —
+                // the light gold used for chart fills would not.
+                className="bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
+              >
+                <Plus className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">New Invoice</span>
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end">
+              {/* Pakka and Kacha are different documents with different
+                  forms/number series — asking here instead of guessing
+                  avoids landing on the wrong one and having to start over. */}
+              <DropdownMenuItem asChild>
+                <Link href="/billing/new">Pakka Invoice</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/billing/kacha/new">Kacha Slip</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
 
         <NotificationBell />

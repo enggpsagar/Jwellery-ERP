@@ -33,6 +33,7 @@ import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, isHallm
 import type { PurityType } from "@prisma/client"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
+import { StockItemSelect } from "@/components/inventory/shared/stock-item-select"
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 
 type CustomerOption = {
@@ -534,24 +535,16 @@ export function KachaInvoiceForm({
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="md:col-span-2 space-y-1">
                   <Label className="text-xs">Link Stock Item (optional)</Label>
-                  <Select
+                  <StockItemSelect
+                    stockItems={stockItems}
                     value={item.inventoryStockId}
                     onValueChange={(value) => applyStockToItem(item.key, value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Not linked to stock" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {stockItems.map((stock) => {
-                        const available = availableForStock(stock.id, item.key)
-                        return (
-                          <SelectItem key={stock.id} value={stock.id} disabled={available <= 0}>
-                            {stock.stockCode} — {stock.productName} ({available} available)
-                          </SelectItem>
-                        )
-                      })}
-                    </SelectContent>
-                  </Select>
+                    onCreateNew={() => applyStockToItem(item.key, "")}
+                    isDisabled={(stock) => availableForStock(stock.id, item.key) <= 0}
+                    renderLabel={(stock) =>
+                      `${stock.stockCode} — ${stock.productName} (${availableForStock(stock.id, item.key)} available)`
+                    }
+                  />
                 </div>
 
                 <div className="space-y-1">

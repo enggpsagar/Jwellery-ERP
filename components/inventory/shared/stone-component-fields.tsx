@@ -178,7 +178,7 @@ export function StoneComponentFields({
 
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               size="icon"
               title="Add Stone"
               onClick={() => setAddStoneOpen(true)}

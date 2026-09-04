@@ -606,7 +606,7 @@ export function ProductForm({
 
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="icon"
                 className="h-11 w-9 shrink-0 px-0"
                 title="Add Category"
@@ -673,7 +673,7 @@ export function ProductForm({
 
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="icon"
                 className="h-11 w-9 shrink-0 px-0"
                 title="Add Type"
@@ -761,7 +761,7 @@ export function ProductForm({
 
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="icon"
                 className="h-11 w-9 shrink-0 px-0"
                 title="Add Metal Type"

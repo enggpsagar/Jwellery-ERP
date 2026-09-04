@@ -24,9 +24,12 @@ import {
 import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
+import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
-import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, resolveGramsPerCarat } from "@/lib/purity"
+import { PaidNowFields } from "@/components/shared/paid-now-fields"
+import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
+import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat } from "@/lib/purity"
 import type { PurityType } from "@prisma/client"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
@@ -45,6 +48,7 @@ type StockOption = {
   productName: string
   metalType: { id: string; name: string } | null
   purity: string | null
+  grossWeight: number | null
   netWeight: number | null
   caratWeight: number | null
   stoneRate: number | null
@@ -70,11 +74,21 @@ type LineItem = {
   stoneRate: number
   hasStoneComponent: boolean
   stoneChargeTouched: boolean
+  /** Once Net Stone Weight is edited directly, the Stone Carat Weight ->
+   * Net Stone Weight auto-fill (see handleCaratWeightChange) stops
+   * overwriting it — same escape hatch as stoneChargeTouched. */
+  netStoneWeightTouched: boolean
   stoneMetalTypeName: string
   stoneTypeNames: string[]
   dmoWeight: number
   stoneWeightInput: number
   stoneWeightUnit: "GRAM" | "CARAT"
+  hmCharge: number
+  /** Once HM Charge is edited directly, the Purity -> HM Charge auto-fill
+   * (Settings' per-piece BIS hallmark rate, applied on Gold/Silver purities
+   * only — see isHallmarkablePurity) stops overwriting it — same escape
+   * hatch as stoneChargeTouched/netStoneWeightTouched. */
+  hmChargeTouched: boolean
   inventoryStockId: string
   /** Once Net Weight is edited directly, the gross/dmo auto-calc stops
    * overwriting it. */
@@ -98,11 +112,14 @@ function emptyLineItem(): LineItem {
     stoneRate: 0,
     hasStoneComponent: false,
     stoneChargeTouched: false,
+    netStoneWeightTouched: false,
     stoneMetalTypeName: "",
     stoneTypeNames: [],
     dmoWeight: 0,
     stoneWeightInput: 0,
     stoneWeightUnit: "GRAM",
+    hmCharge: 0,
+    hmChargeTouched: false,
     inventoryStockId: "",
     netTouched: false,
   }
@@ -123,6 +140,12 @@ type KachaInvoiceFormProps = {
   metals: StoreMetalRow[]
   origins: StoreMetalOriginRow[]
   caratConversionRates: Record<PurityType, number>
+  /** Store's configured per-piece BIS hallmark charge (Settings > Hallmark
+   * Charge) — auto-filled into a line's HM Charge the moment its Purity is
+   * set to a Gold/Silver value (isHallmarkablePurity), while hmChargeTouched
+   * is false. See BusinessSettings.hallmarkChargePerPiece's own doc comment
+   * for why this is a store-verified figure, not a guaranteed-current rate. */
+  hallmarkChargePerPiece?: number
 }
 
 export function KachaInvoiceForm({
@@ -132,6 +155,7 @@ export function KachaInvoiceForm({
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
+  hallmarkChargePerPiece = 0,
 }: KachaInvoiceFormProps) {
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
@@ -142,7 +166,12 @@ export function KachaInvoiceForm({
   const [locationId, setLocationId] = useState("")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
-  const [paidAmount, setPaidAmount] = useState(0)
+  // "Paid Now" collects a method (Cash/UPI/etc.) per row, same PaymentMethodFields
+  // component the "Record Payment" dialog uses — paidAmount is always derived
+  // from these rows (never tracked separately), so it can't go stale relative
+  // to what's actually been entered.
+  const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
+  const paidAmount = paymentRows.reduce((sum, row) => sum + (row.amount || 0), 0)
 
   const [state, formAction, pending] = useActionState(
     createKachaInvoice,
@@ -163,6 +192,25 @@ export function KachaInvoiceForm({
     setItems((prev) =>
       prev.map((item) => (item.key === key ? { ...item, ...patch } : item)),
     )
+  }
+
+  // Auto-fills HM Charge to the store's configured per-piece BIS hallmark
+  // rate the moment a line's Purity becomes a Gold/Silver value — never for
+  // Platinum/Diamond/Other, and never once the user has typed into HM
+  // Charge directly (hmChargeTouched). Plain inline logic in the
+  // purity-change handler, not a separate useEffect/local component state —
+  // see making-charge-input.tsx's own doc comment for the class of bug that
+  // pattern avoids.
+  const handlePurityChange = (item: LineItem, purity: string) => {
+    const patch: Partial<LineItem> = { purity }
+    if (!item.hmChargeTouched && isHallmarkablePurity(purity)) {
+      patch.hmCharge = hallmarkChargePerPiece
+    }
+    updateItem(item.key, patch)
+  }
+
+  const handleHmChargeChange = (item: LineItem, value: string) => {
+    updateItem(item.key, { hmCharge: Number(value) || 0, hmChargeTouched: true })
   }
 
   // How many units of a stock row are still free to add, given what other
@@ -190,6 +238,7 @@ export function KachaInvoiceForm({
       itemName: stock.productName,
       metalTypeId: stock.metalType?.id ?? "",
       purity: stock.purity ?? "",
+      grossWeight: stock.grossWeight ?? 0,
       netWeight: stock.netWeight ?? 0,
       rate: stock.saleRate ?? 0,
       quantity: available > 0 ? 1 : 0,
@@ -200,10 +249,21 @@ export function KachaInvoiceForm({
         ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
         : 0,
       stoneChargeTouched: false,
+      // Unlike invoice-form.tsx, this form's StockOption never carries the
+      // stock row's own stoneWeight to begin with (nothing set above), so
+      // there's nothing authoritative here to protect — locking this
+      // unconditionally to `true` (the previous bug) permanently blocked
+      // Net Stone Weight from ever auto-filling from Stone Carat Weight.
+      netStoneWeightTouched: false,
       stoneMetalTypeName: stock.stoneMetalTypeName ?? "",
       stoneTypeNames: stock.stoneTypeNames
         ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
         : [],
+      // Same reasoning as netStoneWeightTouched above — InventoryStock
+      // carries no hmCharge of its own, so there's nothing authoritative to
+      // protect; left untouched so the Purity-driven auto-fill populates it.
+      hmCharge: isHallmarkablePurity(stock.purity) ? hallmarkChargePerPiece : 0,
+      hmChargeTouched: false,
       // The linked stock row's own net weight is authoritative — the
       // gross/dmo calc below must not silently recompute over it.
       netTouched: true,
@@ -243,8 +303,33 @@ export function KachaInvoiceForm({
         patch.netWeight = Number((caratNum * gramsPerCarat).toFixed(5))
         patch.netTouched = true
       }
-    } else if (item.hasStoneComponent && !item.stoneChargeTouched) {
-      patch.stoneCharge = Number((item.stoneRate * caratWeight).toFixed(2))
+    } else if (item.hasStoneComponent) {
+      if (!item.stoneChargeTouched) {
+        patch.stoneCharge = Number((item.stoneRate * caratWeight).toFixed(2))
+      }
+
+      // Net Stone Weight mirrors Stone Carat Weight until the user edits Net
+      // Stone Weight directly (netStoneWeightTouched — same override escape
+      // hatch as stoneChargeTouched). Converted to grams when the Net Stone
+      // Weight unit is set to grams (via the same resolveGramsPerCarat rate
+      // this line already uses elsewhere), so the mirrored value is always
+      // correct regardless of which unit is displayed — this also then feeds
+      // the metal's own Net Weight via the same gross/stone/dmo calc used
+      // elsewhere, unless that has separately been taken over (netTouched).
+      if (!item.netStoneWeightTouched) {
+        const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+        const stoneWeightInput =
+          item.stoneWeightUnit === "CARAT"
+            ? caratWeight
+            : Number((caratWeight * gramsPerCarat).toFixed(5))
+        patch.stoneWeightInput = stoneWeightInput
+
+        if (!item.netTouched) {
+          const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit, gramsPerCarat)
+          const derived = deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+          if (derived !== null) patch.netWeight = derived
+        }
+      }
     }
 
     updateItem(item.key, patch)
@@ -263,6 +348,32 @@ export function KachaInvoiceForm({
 
   const handleStoneChargeChange = (item: LineItem, value: string) => {
     updateItem(item.key, { stoneCharge: Number(value) || 0, stoneChargeTouched: true })
+  }
+
+  // Editing Net Stone Weight directly is the escape hatch out of the Stone
+  // Carat Weight auto-fill above — same override pattern as Stone Charge.
+  const handleStoneWeightInputChange = (item: LineItem, value: string) => {
+    const stoneWeightInput = Number(value) || 0
+    const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
+    const derived = item.netTouched
+      ? null
+      : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+    updateItem(item.key, {
+      stoneWeightInput,
+      netStoneWeightTouched: true,
+      ...(derived !== null ? { netWeight: derived } : {}),
+    })
+  }
+
+  const handleStoneWeightUnitChange = (item: LineItem, unit: "GRAM" | "CARAT") => {
+    const grams = stoneWeightToGrams(item.stoneWeightInput, unit, resolveGramsPerCarat(item.purity, caratConversionRates))
+    const derived = item.netTouched
+      ? null
+      : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+    updateItem(item.key, {
+      stoneWeightUnit: unit,
+      ...(derived !== null ? { netWeight: derived } : {}),
+    })
   }
 
   const handleNetWeightChange = (item: LineItem, value: string) => {
@@ -290,15 +401,17 @@ export function KachaInvoiceForm({
     item.purity === "DIAMOND" ? item.caratWeight : item.netWeight
 
   const lineTotal = (item: LineItem) =>
-    item.rate * lineQuantity(item) + item.makingCharge + item.stoneCharge
+    item.rate * lineQuantity(item) + item.makingCharge + item.hmCharge + item.stoneCharge
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.rate * lineQuantity(item), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
+  // Hallmarking charge folds into the slip's Making Charges total — same
+  // convention as invoice-form.tsx's own makingChargesTotal.
   const makingChargesTotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.makingCharge, 0),
+    () => items.reduce((sum, item) => sum + item.makingCharge + item.hmCharge, 0),
     [items],
   )
   const stoneChargesTotal = useMemo(
@@ -329,9 +442,26 @@ export function KachaInvoiceForm({
           : null,
       dmoWeight: item.dmoWeight || null,
       stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates)) || null,
+      hmCharge: item.hmCharge,
       inventoryStockId: item.inventoryStockId || null,
     })),
   )
+
+  // Zero-amount rows (a split row opened but never filled in) are dropped
+  // here — the server's parseOptionalPayments requires any row it does
+  // receive to carry a real amount.
+  const paymentsJson = JSON.stringify(
+    paymentRows
+      .filter((row) => row.amount > 0)
+      .map((row) => ({
+        method: row.method,
+        amount: row.amount,
+        reference: row.reference || null,
+        bankName: row.bankName || null,
+        attachmentUrl: row.attachmentUrl || null,
+      })),
+  )
+  const paidOverTotal = paidAmount > totalAmount
 
   return (
     <form
@@ -352,6 +482,7 @@ export function KachaInvoiceForm({
       <input type="hidden" name="itemsJson" value={itemsJson} />
       <input type="hidden" name="discount" value={discount} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
+      <input type="hidden" name="paymentsJson" value={paymentsJson} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2">
@@ -459,7 +590,7 @@ export function KachaInvoiceForm({
                   <Label className="text-xs">Purity</Label>
                   <Select
                     value={item.purity}
-                    onValueChange={(value) => updateItem(item.key, { purity: value })}
+                    onValueChange={(value) => handlePurityChange(item, value)}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select purity" />
@@ -507,50 +638,35 @@ export function KachaInvoiceForm({
                   )}
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs">Net Stone Weight</Label>
-                  <div className="flex gap-1">
-                    <Input
-                      type="number"
-                      step="0.00001"
-                      className="flex-1"
-                      value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
-                      onChange={(e) => {
-                        const stoneWeightInput = Number(e.target.value) || 0
-                        const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
-                        const derived = item.netTouched
-                          ? null
-                          : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
-                        updateItem(item.key, {
-                          stoneWeightInput,
-                          ...(derived !== null ? { netWeight: derived } : {}),
-                        })
-                      }}
-                    />
-                    <Select
-                      value={item.stoneWeightUnit}
-                      onValueChange={(unit) => {
-                        const stoneWeightUnit = unit as "GRAM" | "CARAT"
-                        const grams = stoneWeightToGrams(item.stoneWeightInput, stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
-                        const derived = item.netTouched
-                          ? null
-                          : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
-                        updateItem(item.key, {
-                          stoneWeightUnit,
-                          ...(derived !== null ? { netWeight: derived } : {}),
-                        })
-                      }}
-                    >
-                      <SelectTrigger className="w-16">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="GRAM">g</SelectItem>
-                        <SelectItem value="CARAT">ct</SelectItem>
-                      </SelectContent>
-                    </Select>
+                {/* Once this is a composite line with "Includes a Stone"
+                    checked, Net Stone Weight moves down into that box, next
+                    to the Stone Carat Weight it mirrors — see below. */}
+                {(isCaratLine(item) || !item.hasStoneComponent) && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Net Stone Weight</Label>
+                    <div className="flex gap-1">
+                      <Input
+                        type="number"
+                        step="0.00001"
+                        className="flex-1"
+                        value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
+                        onChange={(e) => handleStoneWeightInputChange(item, e.target.value)}
+                      />
+                      <Select
+                        value={item.stoneWeightUnit}
+                        onValueChange={(unit) => handleStoneWeightUnitChange(item, unit as "GRAM" | "CARAT")}
+                      >
+                        <SelectTrigger className="w-16">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GRAM">g</SelectItem>
+                          <SelectItem value="CARAT">ct</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {isCaratLine(item) && (
                   <div className="space-y-1">
@@ -601,6 +717,11 @@ export function KachaInvoiceForm({
                   />
                 </div>
 
+              </div>
+
+              {/* Its own row, sized to its own fields, rather than wrapping
+                  onto a mostly-empty line of the 6-column grid above. */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <MakingChargeInput
                   rate={item.rate}
                   netWeight={item.netWeight}
@@ -610,13 +731,28 @@ export function KachaInvoiceForm({
                   onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
                 />
 
+                {/* Once this is a composite line with "Includes a Stone"
+                    checked, Stone Charge moves down into that box, next to
+                    the Carat Weight/Rate it's computed from — see below. */}
+                {(isCaratLine(item) || !item.hasStoneComponent) && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Stone Charge</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={item.stoneCharge === 0 ? "" : item.stoneCharge}
+                      onChange={(e) => handleStoneChargeChange(item, e.target.value)}
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-1">
-                  <Label className="text-xs">Stone Charge</Label>
+                  <Label className="text-xs">HM Charge</Label>
                   <Input
                     type="number"
                     step="0.01"
-                    value={item.stoneCharge === 0 ? "" : item.stoneCharge}
-                    onChange={(e) => handleStoneChargeChange(item, e.target.value)}
+                    value={item.hmCharge === 0 ? "" : item.hmCharge}
+                    onChange={(e) => handleHmChargeChange(item, e.target.value)}
                   />
                 </div>
 
@@ -656,6 +792,14 @@ export function KachaInvoiceForm({
                       onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
                       stoneRate={item.stoneRate}
                       onStoneRateChange={(value) => handleStoneRateChange(item, value)}
+                      stoneCharge={item.stoneCharge}
+                      onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
+                      stoneChargeTouched={item.stoneChargeTouched}
+                      stoneWeightInput={item.stoneWeightInput}
+                      onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
+                      stoneWeightUnit={item.stoneWeightUnit}
+                      onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
+                      netStoneWeightTouched={item.netStoneWeightTouched}
                     />
                   )}
                 </div>
@@ -675,27 +819,19 @@ export function KachaInvoiceForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Discount</Label>
-          <Input
-            type="number"
-            step="0.01"
-            value={discount === 0 ? "" : discount}
-            onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Paid Now</Label>
-          <Input
-            type="number"
-            step="0.01"
-            value={paidAmount === 0 ? "" : paidAmount}
-            onChange={(e) => setPaidAmount(Number(e.target.value) || 0)}
-          />
-        </div>
+      <div className="max-w-sm space-y-2">
+        <PercentOrFlatInput
+          base={subtotal + makingChargesTotal + stoneChargesTotal}
+          value={discount}
+          onChange={setDiscount}
+        />
       </div>
+
+      <PaidNowFields
+        rows={paymentRows}
+        onRowsChange={setPaymentRows}
+        maxAmount={totalAmount > 0 ? totalAmount : undefined}
+      />
 
       <div className="space-y-2">
         <Label>Notes</Label>
@@ -708,7 +844,7 @@ export function KachaInvoiceForm({
           <span>₹{subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Making Charges</span>
+          <span>Making Charges (incl. HM)</span>
           <span>₹{makingChargesTotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
@@ -729,7 +865,7 @@ export function KachaInvoiceForm({
         </div>
       </div>
 
-      <Button type="submit" disabled={pending || !customerId}>
+      <Button type="submit" disabled={pending || !customerId || paidOverTotal}>
         {pending ? "Creating..." : "Create Kacha Slip"}
       </Button>
     </form>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Plus } from "lucide-react"
 
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 
 /**
  * Sentinel value for the "Add New Location" row — mirrors ProductSelect's
@@ -53,6 +54,13 @@ export function LocationSelect({
   const router = useRouter()
   const [selected, setSelected] = useState(defaultValue ?? "")
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
+
+  const filteredLocations = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return locations
+    return locations.filter((location) => location.name.toLowerCase().includes(query))
+  }, [locations, search])
 
   return (
     <div className="space-y-2">
@@ -61,7 +69,10 @@ export function LocationSelect({
       <Select
         value={selected || NONE_VALUE}
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={(next) => {
+          setOpen(next)
+          if (!next) setSearch("")
+        }}
         onValueChange={(value) => {
           if (value === ADD_NEW_VALUE) {
             setOpen(false)
@@ -79,13 +90,30 @@ export function LocationSelect({
         </SelectTrigger>
 
         <SelectContent>
+          {locations.length > 3 && (
+            <div className="p-2">
+              <Input
+                placeholder="Search locations..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                onKeyDown={(event) => event.stopPropagation()}
+              />
+            </div>
+          )}
+
           <SelectItem value={NONE_VALUE}>None</SelectItem>
 
-          {locations.map((location) => (
-            <SelectItem key={location.id} value={location.id}>
-              {location.name}
-            </SelectItem>
-          ))}
+          {filteredLocations.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              No locations found{search ? ` for "${search}"` : ""}
+            </div>
+          ) : (
+            filteredLocations.map((location) => (
+              <SelectItem key={location.id} value={location.id}>
+                {location.name}
+              </SelectItem>
+            ))
+          )}
 
           <div className="my-1 border-t" />
           <SelectItem value={ADD_NEW_VALUE} className="font-medium text-primary">

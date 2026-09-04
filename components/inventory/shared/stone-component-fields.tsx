@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { Plus } from "lucide-react"
 
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
-import { AddStoneDialog } from "@/components/inventory/shared/add-stone-dialog"
+import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddStoneTypeDialog } from "@/components/inventory/shared/add-stone-type-dialog"
 
 import { Button } from "@/components/ui/button"
@@ -37,6 +37,27 @@ type StoneComponentFieldsProps = {
   onCaratWeightChange: (value: string) => void
   stoneRate: number
   onStoneRateChange: (value: string) => void
+  /** Stone Charge — Stone Rate x Stone Carat Weight, auto-calculated by the
+   * caller until edited directly (stoneChargeTouched flips the hint below
+   * from "auto-calculated" to "manually entered", same escape-hatch pattern
+   * as every other auto-filled field in these forms). Rendered in this same
+   * grid, right after the Carat Weight/Rate it's computed from, so a store
+   * owner can see the relationship instead of finding Stone Charge as a
+   * disconnected field elsewhere on the line. */
+  stoneCharge: number
+  onStoneChargeChange: (value: string) => void
+  stoneChargeTouched: boolean
+  /** Net Stone Weight — this stone's own physical weight, subtracted out of
+   * Gross Weight elsewhere on the line to get the metal's own Net Weight.
+   * Mirrors Stone Carat Weight (same physical stone, common case) until
+   * edited directly — see netStoneWeightTouched. Grouped here last since,
+   * of every stone-pricing field, this is the one that reaches out and
+   * affects the metal's own weight math. */
+  stoneWeightInput: number
+  onStoneWeightInputChange: (value: string) => void
+  stoneWeightUnit: "GRAM" | "CARAT"
+  onStoneWeightUnitChange: (unit: "GRAM" | "CARAT") => void
+  netStoneWeightTouched: boolean
 }
 
 /**
@@ -45,7 +66,7 @@ type StoneComponentFieldsProps = {
  * Settings → Taxonomy tables (StoreMetal rows with isGemstone=true are
  * Stones; StoreMetalOrigin rows under one are its Stone Types), each with
  * its own search box and an inline "Add" that doesn't navigate away from
- * the in-progress document — see AddStoneDialog's own comment for why.
+ * the in-progress document — see AddMetalDialog's own comment for why.
  *
  * Picking a Stone defaults every one of its Stone Types to checked — most
  * pieces are simply "Diamond", but a piece can genuinely mix e.g. natural
@@ -66,6 +87,14 @@ export function StoneComponentFields({
   onCaratWeightChange,
   stoneRate,
   onStoneRateChange,
+  stoneCharge,
+  onStoneChargeChange,
+  stoneChargeTouched,
+  stoneWeightInput,
+  onStoneWeightInputChange,
+  stoneWeightUnit,
+  onStoneWeightUnitChange,
+  netStoneWeightTouched,
 }: StoneComponentFieldsProps) {
   const [stoneSearch, setStoneSearch] = useState("")
   const [typeSearch, setTypeSearch] = useState("")
@@ -181,6 +210,48 @@ export function StoneComponentFields({
             onChange={(event) => onStoneRateChange(event.target.value)}
           />
         </div>
+
+        <div className="space-y-1 md:col-span-2">
+          <Label className="text-xs">Stone Charge</Label>
+          <Input
+            type="number"
+            step="0.01"
+            value={stoneCharge === 0 ? "" : stoneCharge}
+            onChange={(event) => onStoneChargeChange(event.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            {stoneChargeTouched
+              ? "Manually entered — won't update from Carat × Rate anymore"
+              : "Auto-calculated from Carat × Rate — edit to override"}
+          </p>
+        </div>
+
+        <div className="space-y-1 md:col-span-2">
+          <Label className="text-xs">Net Stone Weight</Label>
+          <div className="flex gap-1">
+            <Input
+              type="number"
+              step="0.00001"
+              className="flex-1"
+              value={stoneWeightInput === 0 ? "" : stoneWeightInput}
+              onChange={(event) => onStoneWeightInputChange(event.target.value)}
+            />
+            <Select value={stoneWeightUnit} onValueChange={(unit) => onStoneWeightUnitChange(unit as "GRAM" | "CARAT")}>
+              <SelectTrigger className="w-16">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="GRAM">g</SelectItem>
+                <SelectItem value="CARAT">ct</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {netStoneWeightTouched
+              ? "Manually entered"
+              : "Auto-filled from Stone Carat Weight — edit to override"}
+          </p>
+        </div>
       </div>
 
       {selectedStone && (
@@ -229,9 +300,10 @@ export function StoneComponentFields({
         </div>
       )}
 
-      <AddStoneDialog
+      <AddMetalDialog
         open={addStoneOpen}
         onOpenChange={setAddStoneOpen}
+        isGemstone
         onCreated={(stone) => {
           onMetalsChange([...metals, stone])
           handleStoneSelect(stone.name)

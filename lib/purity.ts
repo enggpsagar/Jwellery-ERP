@@ -203,3 +203,28 @@ export function isCaratWeighedMetal(
   const lower = (metalName ?? "").toLowerCase();
   return lower.includes("diamond") || lower.includes("stone") || isGemstone === true;
 }
+
+/** Purities BIS hallmarking charges actually apply to — Gold and Silver
+ * only, never Platinum/Diamond/Other (per BIS's own hallmarking scope).
+ * Drives the per-piece BIS hallmark charge auto-fill (Settings' own
+ * `hallmarkChargePerPiece`) on a Billing/Kacha/Quotation line the moment
+ * its Purity is set to one of these — see each form's purity change
+ * handler / stock-link / scan-to-add logic. */
+export function isHallmarkablePurity(
+  purity: string | null | undefined,
+): purity is
+  | "GOLD_18K"
+  | "GOLD_20K"
+  | "GOLD_22K"
+  | "GOLD_24K"
+  | "SILVER_925"
+  | "SILVER_999" {
+  return (
+    purity === PurityType.GOLD_18K ||
+    purity === PurityType.GOLD_20K ||
+    purity === PurityType.GOLD_22K ||
+    purity === PurityType.GOLD_24K ||
+    purity === PurityType.SILVER_925 ||
+    purity === PurityType.SILVER_999
+  );
+}

@@ -548,6 +548,8 @@ export async function upsertStoreCategory(
       };
     }
 
+    let savedId = id;
+
     if (id) {
       const { count } = await prisma.storeCategory.updateMany({
         where: { id, storeId },
@@ -558,15 +560,18 @@ export async function upsertStoreCategory(
         return { success: false, message: "Category not found" };
       }
     } else {
-      await prisma.storeCategory.create({
+      const created = await prisma.storeCategory.create({
         data: { storeId, name },
+        select: { id: true },
       });
+      savedId = created.id;
     }
 
     revalidatePath(TAXONOMY_PATH);
 
     return {
       success: true,
+      id: savedId,
       message: id
         ? "Category updated successfully"
         : "Category added successfully",
@@ -748,6 +753,8 @@ export async function upsertStoreCategoryType(
       };
     }
 
+    let savedId = id;
+
     if (id) {
       const { count } = await prisma.storeCategoryType.updateMany({
         where: { id, storeId },
@@ -758,15 +765,18 @@ export async function upsertStoreCategoryType(
         return { success: false, message: "Type not found" };
       }
     } else {
-      await prisma.storeCategoryType.create({
+      const created = await prisma.storeCategoryType.create({
         data: { storeId, categoryId, name },
+        select: { id: true },
       });
+      savedId = created.id;
     }
 
     revalidatePath(TAXONOMY_PATH);
 
     return {
       success: true,
+      id: savedId,
       message: id ? "Type updated successfully" : "Type added successfully",
     };
   } catch (error: any) {

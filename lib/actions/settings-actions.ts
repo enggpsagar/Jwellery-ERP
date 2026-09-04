@@ -33,6 +33,11 @@ export type BusinessSettings = {
   invoiceTerms: string;
   invoiceNotes: string;
   defaultGstRate: number;
+  // BIS hallmarking fee, per hallmarked piece — see the schema field's own
+  // doc comment (BusinessSettings.hallmarkChargePerPiece) for why the
+  // default is a placeholder that needs store confirmation, not a
+  // guaranteed-current government rate.
+  hallmarkChargePerPiece: number;
   financialYearStartMonth: number;
   // Each entry is "MONEY" or a live StoreMetal.id — see
   // lib/business-units.server.ts's BusinessUnitOption for the resolved
@@ -81,6 +86,7 @@ function mapSettings(settings: any): BusinessSettings {
     invoiceTerms: settings.invoiceTerms ?? "",
     invoiceNotes: settings.invoiceNotes ?? "",
     defaultGstRate: Number(settings.defaultGstRate ?? 3.0),
+    hallmarkChargePerPiece: Number(settings.hallmarkChargePerPiece ?? 45),
     financialYearStartMonth: settings.financialYearStartMonth ?? 4,
     businessUnits: settings.businessUnits?.length
       ? settings.businessUnits
@@ -220,6 +226,10 @@ export async function updateBusinessSettings(
         invoiceTerms: toOptionalString(formData.get("invoiceTerms")),
         invoiceNotes: toOptionalString(formData.get("invoiceNotes")),
         defaultGstRate: toNumber(formData.get("defaultGstRate"), 3.0),
+        hallmarkChargePerPiece: toNumber(
+          formData.get("hallmarkChargePerPiece"),
+          45,
+        ),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),
           4,
@@ -248,6 +258,10 @@ export async function updateBusinessSettings(
         invoiceTerms: toOptionalString(formData.get("invoiceTerms")),
         invoiceNotes: toOptionalString(formData.get("invoiceNotes")),
         defaultGstRate: toNumber(formData.get("defaultGstRate"), 3.0),
+        hallmarkChargePerPiece: toNumber(
+          formData.get("hallmarkChargePerPiece"),
+          45,
+        ),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),
           4,
@@ -260,6 +274,7 @@ export async function updateBusinessSettings(
     revalidatePath("/ledger");
     revalidatePath("/customers");
     revalidatePath("/billing/new");
+    revalidatePath("/billing/kacha/new");
     revalidatePath("/quotations/new");
     revalidatePath("/purchases/new");
 

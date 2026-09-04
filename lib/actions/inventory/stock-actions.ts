@@ -69,7 +69,19 @@ function toDecimal(value: number | null | undefined): Prisma.Decimal | undefined
   return new Prisma.Decimal(value)
 }
 
-export type StockSortBy = "createdAt" | "stockCode" | "netWeight" | "saleAmount"
+export type StockSortBy =
+  | "createdAt"
+  | "stockCode"
+  | "netWeight"
+  | "saleAmount"
+  | "product"
+  | "metalType"
+  | "purity"
+  | "quantity"
+  | "status"
+  | "finish"
+  | "location"
+  | "purchaseDate"
 export type StockSortOrder = "asc" | "desc"
 
 export type GetInventoryStockParams = {
@@ -136,6 +148,14 @@ function getStockOrderBy(
   if (sortBy === "stockCode") return { stockCode: sortOrder }
   if (sortBy === "netWeight") return { netWeight: sortOrder }
   if (sortBy === "saleAmount") return { saleAmount: sortOrder }
+  if (sortBy === "product") return { product: { name: sortOrder } }
+  if (sortBy === "metalType") return { metalType: { name: sortOrder } }
+  if (sortBy === "purity") return { purity: sortOrder }
+  if (sortBy === "quantity") return { quantity: sortOrder }
+  if (sortBy === "status") return { status: sortOrder }
+  if (sortBy === "finish") return { finish: sortOrder }
+  if (sortBy === "location") return { location: { name: sortOrder } }
+  if (sortBy === "purchaseDate") return { purchaseDate: sortOrder }
   return { createdAt: sortOrder }
 }
 
@@ -204,7 +224,20 @@ export async function getInventoryStock(params: GetInventoryStockParams = {}) {
 async function getAllInventoryStockForExport(
   params: ExportInventoryStockParams = {}
 ) {
-  const validSortBy: StockSortBy[] = ["createdAt", "stockCode", "netWeight", "saleAmount"]
+  const validSortBy: StockSortBy[] = [
+    "createdAt",
+    "stockCode",
+    "netWeight",
+    "saleAmount",
+    "product",
+    "metalType",
+    "purity",
+    "quantity",
+    "status",
+    "finish",
+    "location",
+    "purchaseDate",
+  ]
   const sortBy: StockSortBy = validSortBy.includes(params.sortBy as StockSortBy)
     ? (params.sortBy as StockSortBy)
     : "createdAt"

@@ -5,6 +5,7 @@ import { PageBackHeader } from "@/components/shared/page-back-header";
 import {
   getStoreCategories,
   getStoreMetals,
+  getAllStoreMetalOrigins,
 } from "@/lib/actions/taxonomy-actions";
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions";
 import { safeReturnTo } from "@/lib/safe-return-to";
@@ -23,10 +24,11 @@ export default async function NewProductPage({
   const params = (await searchParams) ?? {};
   const returnTo = safeReturnTo(params.returnTo);
 
-  const [metals, categories, caratConversionRates] = await Promise.all([
+  const [metals, categories, caratConversionRates, origins] = await Promise.all([
     getStoreMetals(),
     getStoreCategories(),
     getCaratConversionRateMap(),
+    getAllStoreMetalOrigins(),
   ]);
 
   return (
@@ -42,6 +44,7 @@ export default async function NewProductPage({
         metals={metals}
         categories={categories}
         caratConversionRates={caratConversionRates}
+        origins={origins}
         returnTo={returnTo}
       />
     </main>

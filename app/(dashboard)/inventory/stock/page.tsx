@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { getInventoryStock } from "@/lib/actions/inventory/stock-actions";
+import { getInventoryStock, type StockSortBy } from "@/lib/actions/inventory/stock-actions";
 
 import { StockClient } from "@/components/inventory/stock/stock-client";
 
@@ -13,7 +13,7 @@ type InventoryStockPageProps = {
     page?: string
     pageSize?: string
     search?: string
-    sortBy?: "createdAt" | "stockCode" | "netWeight" | "saleAmount"
+    sortBy?: StockSortBy
     sortOrder?: "asc" | "desc"
   }>
 }

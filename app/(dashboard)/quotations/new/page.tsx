@@ -45,6 +45,7 @@ export default async function NewQuotationPage() {
         origins={origins}
         caratConversionRates={caratConversionRates}
         defaultGstRate={businessSettings.defaultGstRate}
+        hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
         gstScheme={businessSettings.gstScheme}
         storeState={businessSettings.state}
       />

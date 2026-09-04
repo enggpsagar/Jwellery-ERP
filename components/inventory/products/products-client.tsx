@@ -63,6 +63,12 @@ export function ProductsClient({
           { value: "name", label: "Sort by Name" },
           { value: "productCode", label: "Sort by Product Code" },
           { value: "createdAt", label: "Sort by Created Date" },
+          { value: "category", label: "Sort by Category" },
+          { value: "categoryType", label: "Sort by Type" },
+          { value: "metalType", label: "Sort by Metal" },
+          { value: "defaultPurity", label: "Sort by Purity" },
+          { value: "defaultNetWeight", label: "Sort by Net Weight" },
+          { value: "isActive", label: "Sort by Status" },
         ]}
         defaultSortBy="createdAt"
         selectedIds={selectedIds}

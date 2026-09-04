@@ -41,6 +41,13 @@ type KarigarLedgerTableProps = {
    *  actually carry, so the labels below don't say "gold" for a
    *  silver-only karigar. See getKarigarLedger()'s own doc comment. */
   metalLabel: string
+  /** "financial" shows only cash movements (wages, advances, payments);
+   *  "material" shows only metal movements (issued/received fine weight).
+   *  Every row's running balance was already computed across the FULL
+   *  entry sequence in getKarigarLedger(), so filtering which rows are
+   *  displayed here never changes what a visible row's balance reads —
+   *  it's a display-only split, not a different calculation. */
+  variant: "financial" | "material"
 }
 
 export function KarigarLedgerTable({
@@ -48,36 +55,44 @@ export function KarigarLedgerTable({
   finalFineGoldBalance,
   finalCashBalance,
   metalLabel,
+  variant,
 }: KarigarLedgerTableProps) {
+  const isFinancial = variant === "financial"
+  const visibleRows = rows.filter((row) =>
+    isFinancial ? row.amount !== null : row.metalWeightFine !== null
+  )
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">
-              Fine {metalLabel} Balance (with karigar)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">
-              {finalFineGoldBalance.toFixed(3)}g
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">
-              Cash Balance (owed to karigar)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">
-              ₹ {finalCashBalance.toLocaleString("en-IN")}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card size="sm" className="md:max-w-sm">
+        {isFinancial ? (
+          <>
+            <CardHeader>
+              <CardTitle className="text-sm text-muted-foreground">
+                Cash Balance (owed to karigar)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-semibold">
+                ₹ {finalCashBalance.toLocaleString("en-IN")}
+              </div>
+            </CardContent>
+          </>
+        ) : (
+          <>
+            <CardHeader>
+              <CardTitle className="text-sm text-muted-foreground">
+                Fine {metalLabel} Balance (with karigar)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-semibold">
+                {finalFineGoldBalance.toFixed(3)}g
+              </div>
+            </CardContent>
+          </>
+        )}
+      </Card>
 
       <div className="rounded-lg border">
         <Table>
@@ -87,22 +102,29 @@ export function KarigarLedgerTable({
               <TableHead>Type</TableHead>
               <TableHead>Source</TableHead>
               <TableHead>Description</TableHead>
-              <TableHead className="text-right">Fine Weight</TableHead>
-              <TableHead className="text-right">Running {metalLabel} Balance</TableHead>
-              <TableHead className="text-right">Cash Amount</TableHead>
-              <TableHead className="text-right">Running Cash Balance</TableHead>
+              {isFinancial ? (
+                <>
+                  <TableHead className="text-right">Cash Amount</TableHead>
+                  <TableHead className="text-right">Running Cash Balance</TableHead>
+                </>
+              ) : (
+                <>
+                  <TableHead className="text-right">Fine Weight</TableHead>
+                  <TableHead className="text-right">Running {metalLabel} Balance</TableHead>
+                </>
+              )}
             </TableRow>
           </TableHeader>
 
           <TableBody>
-            {rows.length === 0 ? (
+            {visibleRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                  No ledger entries yet.
+                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                  No {isFinancial ? "financial" : "material"} ledger entries yet.
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((row) => {
+              visibleRows.map((row) => {
                 const isDebit = row.type === "DEBIT"
                 return (
                   <TableRow key={row.id}>
@@ -159,22 +181,29 @@ export function KarigarLedgerTable({
                     <TableCell className="max-w-xs truncate" title={row.description}>
                       {row.description}
                     </TableCell>
-                    <TableCell className="text-right">
-                      {row.metalWeightFine
-                        ? `${isDebit ? "+" : "-"}${row.metalWeightFine.toFixed(3)}g`
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {row.runningFineGoldBalance.toFixed(3)}g
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {row.amount
-                        ? `${isDebit ? "+" : "-"}₹${row.amount.toLocaleString("en-IN")}`
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      ₹ {row.runningCashBalance.toLocaleString("en-IN")}
-                    </TableCell>
+                    {isFinancial ? (
+                      <>
+                        <TableCell className="text-right">
+                          {row.amount
+                            ? `${isDebit ? "+" : "-"}₹${row.amount.toLocaleString("en-IN")}`
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          ₹ {row.runningCashBalance.toLocaleString("en-IN")}
+                        </TableCell>
+                      </>
+                    ) : (
+                      <>
+                        <TableCell className="text-right">
+                          {row.metalWeightFine
+                            ? `${isDebit ? "+" : "-"}${row.metalWeightFine.toFixed(3)}g`
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {row.runningFineGoldBalance.toFixed(3)}g
+                        </TableCell>
+                      </>
+                    )}
                   </TableRow>
                 )
               })

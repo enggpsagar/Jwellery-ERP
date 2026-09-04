@@ -259,7 +259,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             />
           </div>
 
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               GSTIN {gstinRequiredNow ? <RequiredMark /> : null}
@@ -270,7 +270,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             ) : null}
             <input
               name="gstNumber"
-              className={`${FIELD} md:max-w-sm`}
+              className={FIELD}
               placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : "Enter GSTIN"}
               required={gstinRequiredNow}
             />
@@ -281,17 +281,17 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             ) : null}
           </div>
 
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1">
             <label className="text-sm font-medium">Notes</label>
             <textarea
               name="notes"
-              rows={1}
-              className={`${FIELD} min-h-9 resize-y`}
+              rows={4}
+              className={`${FIELD} min-h-24 resize-y`}
               placeholder="Any notes about this vendor"
             />
           </div>
 
-          <div className="flex justify-end gap-2 md:col-span-2">
+          <div className="flex justify-end gap-2 pt-2 md:col-span-2">
             <Button
               type="button"
               variant="outline"

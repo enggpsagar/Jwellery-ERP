@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus } from "lucide-react";
 
 import { PurityType } from "@prisma/client";
 
@@ -13,6 +14,10 @@ import {
 import { classifyMetalName } from "@/lib/business-units";
 import { resolveGramsPerCarat } from "@/lib/purity";
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle";
+import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields";
+import { AddCategoryDialog } from "@/components/inventory/shared/add-category-dialog";
+import { AddCategoryTypeDialog } from "@/components/inventory/shared/add-category-type-dialog";
+import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog";
 
 // A metal classifies into one of these groups by its name — GOLD/SILVER/
 // DIAMOND/OTHER via classifyMetalName (the same name-substring heuristic
@@ -105,6 +110,8 @@ type Product = {
   defaultCaratWeight: string | null;
   hasStoneComponent: boolean;
   defaultStoneRate: string | null;
+  defaultStoneMetalTypeName: string | null;
+  defaultStoneTypeNames: string | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -119,6 +126,7 @@ type ProductFormProps = {
   pending: boolean;
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
+  origins: StoreMetalOriginRow[];
   /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
    * Conversion Rules) — see the same prop on InvoiceForm. */
   caratConversionRates: Record<PurityType, number>;
@@ -135,8 +143,9 @@ export function ProductForm({
   product,
   state,
   pending,
-  metals,
-  categories,
+  metals: initialMetals,
+  categories: initialCategories,
+  origins: initialOrigins,
   caratConversionRates,
 }: ProductFormProps) {
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? "");
@@ -151,11 +160,50 @@ export function ProductForm({
     product?.stoneOriginOptionId ?? "",
   );
 
+  // Local state (not the raw `categories` prop) for the same reason
+  // `metals`/`origins` below are local — the inline "Add Category" dialog
+  // needs to append a newly-created row and select it without a full page
+  // reload, mid-way through filling out the rest of this form.
+  const [categories, setCategories] = useState(initialCategories);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [addCategoryOpen, setAddCategoryOpen] = useState(false);
+
+  const filteredCategories = useMemo(() => {
+    const query = categorySearch.trim().toLowerCase();
+    if (!query) return categories;
+    return categories.filter((item) => item.name.toLowerCase().includes(query));
+  }, [categories, categorySearch]);
+
   const [types, setTypes] = useState<StoreCategoryTypeOption[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(false);
+  const [typeSearch, setTypeSearch] = useState("");
+  const [addTypeOpen, setAddTypeOpen] = useState(false);
+
+  const filteredTypes = useMemo(() => {
+    const query = typeSearch.trim().toLowerCase();
+    if (!query) return types;
+    return types.filter((item) => item.name.toLowerCase().includes(query));
+  }, [types, typeSearch]);
 
   const [stoneOrigins, setStoneOrigins] = useState<StoreMetalOriginRow[]>([]);
   const [loadingStoneOrigins, setLoadingStoneOrigins] = useState(false);
+
+  // Composite "Includes a Stone" picker state — which Stone (a gemstone
+  // StoreMetal) and which of its Stone Types this product's embedded stone
+  // is, mirroring the identical picker on Invoice/Kacha/Quotation line
+  // items exactly. `metals`/`origins` are local state (not the raw props)
+  // so StoneComponentFields' inline "Add Stone"/"Add Stone Type" dialogs
+  // can append a newly-created row without a full page reload.
+  const [metals, setMetals] = useState(initialMetals);
+  const [origins, setOrigins] = useState(initialOrigins);
+  const [stoneMetalTypeName, setStoneMetalTypeName] = useState(
+    product?.defaultStoneMetalTypeName ?? "",
+  );
+  const [stoneTypeNames, setStoneTypeNames] = useState<string[]>(
+    product?.defaultStoneTypeNames
+      ? product.defaultStoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
+      : [],
+  );
 
   const previousCategoryIdRef = useRef(categoryId);
   const previousMetalTypeIdRef = useRef(metalTypeId);
@@ -173,6 +221,15 @@ export function ProductForm({
     (item) => item.isActive || item.id === product?.metalTypeId,
   );
 
+  const [metalSearch, setMetalSearch] = useState("");
+  const [addMetalOpen, setAddMetalOpen] = useState(false);
+
+  const filteredMetals = useMemo(() => {
+    const query = metalSearch.trim().toLowerCase();
+    if (!query) return selectableMetals;
+    return selectableMetals.filter((item) => item.name.toLowerCase().includes(query));
+  }, [selectableMetals, metalSearch]);
+
   const selectedMetal = metals.find((item) => item.id === metalTypeId);
   const metalFamily = selectedMetal
     ? classifyPurityFamily(selectedMetal)
@@ -180,6 +237,16 @@ export function ProductForm({
   const availablePurities = metalFamily
     ? PURITY_OPTIONS_BY_METAL[metalFamily]
     : Object.values(PurityType);
+
+  const [puritySearch, setPuritySearch] = useState("");
+
+  const filteredPurities = useMemo(() => {
+    const query = puritySearch.trim().toLowerCase();
+    if (!query) return availablePurities;
+    return availablePurities.filter((item) =>
+      item.replaceAll("_", " ").toLowerCase().includes(query),
+    );
+  }, [availablePurities, puritySearch]);
 
   // Switching metal (or its purity family no longer including what was
   // picked) clears a now-invalid Default Purity rather than silently
@@ -234,23 +301,101 @@ export function ProductForm({
     product?.hasStoneComponent ?? false,
   );
   const [stoneRate, setStoneRate] = useState(product?.defaultStoneRate ?? "");
-  const showCaratWeight = isCaratFamily || hasStoneComponent;
+
+  // Stone Charge — Stone Rate x Stone Carat Weight — had no input on this
+  // form at all (defaultStoneCharge was a dead field: product-actions.ts
+  // has always read it from form data, but nothing here ever rendered it),
+  // so every product silently saved a null Stone Charge regardless of
+  // Stone Rate/Carat Weight. Added below alongside the same auto-calc +
+  // override pattern the line-item forms (invoice/purchase/kacha/quotation)
+  // already use for their own Stone Charge field, for the "same logic...
+  // when adding or editing a Product" parity the store owner asked for.
+  const [stoneCharge, setStoneCharge] = useState(
+    product?.defaultStoneCharge ?? "",
+  );
+  // Edit mode: a product that already has a saved Stone Charge shouldn't
+  // have it silently recomputed the moment Stone Rate or Carat Weight is
+  // touched for an unrelated correction.
+  const [stoneChargeTouched, setStoneChargeTouched] = useState(
+    Boolean(product?.defaultStoneCharge),
+  );
+  // Stone Weight (g) already existed and already feeds Net = Gross - Stone
+  // below — it's this form's one physical-weight field, playing the same
+  // role a line item's separate "Net Stone Weight" field does. Edit mode:
+  // an already-recorded Stone Weight is authoritative and shouldn't be
+  // silently overwritten by a later Carat Weight correction either.
+  const [stoneWeightTouched, setStoneWeightTouched] = useState(
+    Boolean(product?.defaultStoneWeight),
+  );
+  // Display-only — `stoneWeight` itself (submitted as defaultStoneWeight)
+  // always stays in grams, the schema column's unit; this just controls
+  // which unit StoneComponentFields' Net Stone Weight input shows/accepts,
+  // converting to/from grams on the way in and out. Unlike a line item's
+  // stoneWeightUnit (which reinterprets the same typed digits under a new
+  // unit), switching this live-converts the displayed number so the
+  // underlying grams value never silently changes meaning.
+  const [stoneWeightUnit, setStoneWeightUnit] = useState<"GRAM" | "CARAT">("GRAM");
 
   function handleCaratWeightChange(value: string) {
     setCaratWeight(value);
 
-    // Only a genuinely carat-weighed item (Diamond/Stone as the product's
-    // own metal) converts Carat Weight into Net Weight — for a composite
-    // piece, Carat Weight is the embedded stone's own weight, independent
-    // of the metal's Net Weight, so no conversion applies.
-    if (!isCaratFamily) return;
+    // A genuinely carat-weighed item (Diamond/Stone as the product's own
+    // metal) converts Carat Weight into Net Weight.
+    if (isCaratFamily) {
+      const caratNum = Number(value);
+      if (value.trim() !== "" && Number.isFinite(caratNum)) {
+        setNetTouched(true);
+        const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
+        setNetWeight(String(Number((caratNum * gramsPerCarat).toFixed(5))));
+      }
+      return;
+    }
+
+    // For a composite piece, Carat Weight is the embedded stone's own
+    // weight, independent of the metal's Net Weight — no conversion into
+    // Net Weight applies. Instead it drives this stone's own pricing
+    // (Stone Charge) and its own physical weight (Stone Weight), mirroring
+    // the stoneChargeTouched/stoneWeightTouched pattern on every line-item
+    // form's Stone Charge/Net Stone Weight fields.
+    if (!hasStoneComponent) return;
 
     const caratNum = Number(value);
-    if (value.trim() !== "" && Number.isFinite(caratNum)) {
-      setNetTouched(true);
-      const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
-      setNetWeight(String(Number((caratNum * gramsPerCarat).toFixed(5))));
+    const carat = value.trim() !== "" && Number.isFinite(caratNum) ? caratNum : 0;
+
+    if (!stoneChargeTouched) {
+      const rate = stoneRate.trim() === "" ? 0 : Number(stoneRate) || 0;
+      setStoneCharge(String(Number((rate * carat).toFixed(2))));
     }
+
+    // Stone Weight (g) has no unit toggle here (always grams, unlike a line
+    // item's stoneWeightUnit) — always converts carat -> grams using the
+    // same store-configurable resolveGramsPerCarat rate as everywhere else
+    // on this form, rather than leaving Stone Weight alone.
+    if (!stoneWeightTouched) {
+      const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
+      setStoneWeight(String(Number((carat * gramsPerCarat).toFixed(5))));
+    }
+  }
+
+  function handleStoneRateChange(value: string) {
+    setStoneRate(value);
+    if (stoneChargeTouched) return;
+
+    const rateNum = value.trim() === "" ? 0 : Number(value);
+    const caratNum = caratWeight.trim() === "" ? 0 : Number(caratWeight);
+    const rate = Number.isFinite(rateNum) ? rateNum : 0;
+    const carat = Number.isFinite(caratNum) ? caratNum : 0;
+    setStoneCharge(String(Number((rate * carat).toFixed(2))));
+  }
+
+  function handleStoneChargeChange(value: string) {
+    setStoneCharge(value);
+    setStoneChargeTouched(true);
+  }
+
+  function handleStoneWeightChange(value: string) {
+    setStoneWeight(value);
+    setStoneWeightTouched(true);
   }
 
   function handleNetWeightChange(value: string) {
@@ -429,19 +574,47 @@ export function ProductForm({
           <div>
             <Label>Category <RequiredMark /></Label>
 
-            <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
+            <div className="flex gap-1.5">
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
 
-              <SelectContent>
-                {categories.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <SelectContent>
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search categories..."
+                      value={categorySearch}
+                      onChange={(event) => setCategorySearch(event.target.value)}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    />
+                  </div>
+
+                  {filteredCategories.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      No categories found{categorySearch ? ` for "${categorySearch}"` : ""}
+                    </div>
+                  ) : (
+                    filteredCategories.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-11 w-9 shrink-0 px-0"
+                title="Add Category"
+                onClick={() => setAddCategoryOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
 
             <input type="hidden" name="categoryId" value={categoryId} />
 
@@ -450,35 +623,66 @@ export function ProductForm({
           <div>
             <Label>Type</Label>
 
-            <Select
-              value={categoryTypeId || "__none__"}
-              onValueChange={(value) =>
-                setCategoryTypeId(value === "__none__" ? "" : value)
-              }
-              disabled={!categoryId || loadingTypes}
-            >
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue
-                  placeholder={
-                    !categoryId
-                      ? "Select a category first"
-                      : loadingTypes
-                        ? "Loading types..."
-                        : "Select Type"
-                  }
-                />
-              </SelectTrigger>
+            <div className="flex gap-1.5">
+              <Select
+                value={categoryTypeId || "__none__"}
+                onValueChange={(value) =>
+                  setCategoryTypeId(value === "__none__" ? "" : value)
+                }
+                disabled={!categoryId || loadingTypes}
+              >
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue
+                    placeholder={
+                      !categoryId
+                        ? "Select a category first"
+                        : loadingTypes
+                          ? "Loading types..."
+                          : "Select Type"
+                    }
+                  />
+                </SelectTrigger>
 
-              <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
+                <SelectContent>
+                  {types.length > 3 && (
+                    <div className="p-2">
+                      <Input
+                        placeholder="Search types..."
+                        value={typeSearch}
+                        onChange={(event) => setTypeSearch(event.target.value)}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      />
+                    </div>
+                  )}
 
-                {types.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  <SelectItem value="__none__">None</SelectItem>
+
+                  {filteredTypes.length === 0 && typeSearch ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      No types found for "{typeSearch}"
+                    </div>
+                  ) : (
+                    filteredTypes.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-11 w-9 shrink-0 px-0"
+                title="Add Type"
+                disabled={!categoryId || loadingTypes}
+                onClick={() => setAddTypeOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
 
             <input
               type="hidden"
@@ -491,6 +695,28 @@ export function ProductForm({
         </div>
       </div>
 
+      <AddCategoryDialog
+        open={addCategoryOpen}
+        onOpenChange={setAddCategoryOpen}
+        onCreated={(category) => {
+          setCategories((prev) => [...prev, category]);
+          setCategoryId(category.id);
+        }}
+      />
+
+      {categoryId && (
+        <AddCategoryTypeDialog
+          open={addTypeOpen}
+          onOpenChange={setAddTypeOpen}
+          categoryId={categoryId}
+          categoryName={categories.find((item) => item.id === categoryId)?.name ?? ""}
+          onCreated={(type) => {
+            setTypes((prev) => [...prev, type]);
+            setCategoryTypeId(type.id);
+          }}
+        />
+      )}
+
       {/* ============================
           METAL DETAILS
       ============================= */}
@@ -502,20 +728,48 @@ export function ProductForm({
           <div>
             <Label>Metal Type <RequiredMark /></Label>
 
-            <Select value={metalTypeId} onValueChange={setMetalTypeId}>
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="Select metal type" />
-              </SelectTrigger>
+            <div className="flex gap-1.5">
+              <Select value={metalTypeId} onValueChange={setMetalTypeId}>
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue placeholder="Select metal type" />
+                </SelectTrigger>
 
-              <SelectContent>
-                {selectableMetals.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                    {!item.isActive ? " (Disabled)" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <SelectContent>
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search metal types..."
+                      value={metalSearch}
+                      onChange={(event) => setMetalSearch(event.target.value)}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    />
+                  </div>
+
+                  {filteredMetals.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      No metal types found{metalSearch ? ` for "${metalSearch}"` : ""}
+                    </div>
+                  ) : (
+                    filteredMetals.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                        {!item.isActive ? " (Disabled)" : ""}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-11 w-9 shrink-0 px-0"
+                title="Add Metal Type"
+                onClick={() => setAddMetalOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
 
             <input type="hidden" name="metalTypeId" value={metalTypeId} />
 
@@ -541,13 +795,30 @@ export function ProductForm({
               </SelectTrigger>
 
               <SelectContent>
+                {availablePurities.length > 5 && (
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search purities..."
+                      value={puritySearch}
+                      onChange={(event) => setPuritySearch(event.target.value)}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    />
+                  </div>
+                )}
+
                 <SelectItem value="__none__">None</SelectItem>
 
-                {availablePurities.map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item.replaceAll("_", " ")}
-                  </SelectItem>
-                ))}
+                {filteredPurities.length === 0 && puritySearch ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    No purities found for "{puritySearch}"
+                  </div>
+                ) : (
+                  filteredPurities.map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {item.replaceAll("_", " ")}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
 
@@ -627,6 +898,16 @@ export function ProductForm({
           )}
         </div>
       </div>
+
+      <AddMetalDialog
+        open={addMetalOpen}
+        onOpenChange={setAddMetalOpen}
+        onCreated={(metal) => {
+          setMetals((prev) => [...prev, metal]);
+          setMetalTypeId(metal.id);
+        }}
+      />
+
       {/* ============================
           WEIGHTS
       ============================= */}
@@ -658,22 +939,28 @@ export function ProductForm({
             <ErrorText error={state.errors.defaultGrossWeight} />
           </div>
 
-          <div>
-            <Label htmlFor="defaultStoneWeight">Stone Weight (g)</Label>
+          {/* Once this is a composite piece with "Includes a Stone" checked,
+              Stone Weight moves down into the Stone Pricing box below, next
+              to the Stone Carat Weight it mirrors — see there. It stays here
+              for a plain metal item or a genuinely carat-weighed one. */}
+          {!(hasStoneComponent && !isCaratFamily) && (
+            <div>
+              <Label htmlFor="defaultStoneWeight">Stone Weight (g)</Label>
 
-            <Input
-              id="defaultStoneWeight"
-              name="defaultStoneWeight"
-              type="number"
-              step="0.00001"
-              min="0"
-              value={stoneWeight}
-              onChange={(event) => setStoneWeight(event.target.value)}
-              placeholder="0.000"
-            />
+              <Input
+                id="defaultStoneWeight"
+                name="defaultStoneWeight"
+                type="number"
+                step="0.00001"
+                min="0"
+                value={stoneWeight}
+                onChange={(event) => handleStoneWeightChange(event.target.value)}
+                placeholder="0.000"
+              />
 
-            <ErrorText error={state.errors.defaultStoneWeight} />
-          </div>
+              <ErrorText error={state.errors.defaultStoneWeight} />
+            </div>
+          )}
 
           <div>
             <Label htmlFor="defaultNetWeight">Net Weight (g)</Label>
@@ -698,11 +985,13 @@ export function ProductForm({
             <ErrorText error={state.errors.defaultNetWeight} />
           </div>
 
-          {showCaratWeight && (
+          {/* Carat Weight for a genuinely carat-weighed item (a loose
+              Diamond/Stone product, its own entire weight) stays here.
+              The composite case (Carat Weight as an embedded stone's own
+              weight) moves into the Stone Pricing box below instead. */}
+          {isCaratFamily && (
             <div>
-              <Label htmlFor="defaultCaratWeight">
-                {isCaratFamily ? "Carat Weight (ct)" : "Stone Carat Weight (ct)"}
-              </Label>
+              <Label htmlFor="defaultCaratWeight">Carat Weight (ct)</Label>
 
               <Input
                 id="defaultCaratWeight"
@@ -718,38 +1007,74 @@ export function ProductForm({
               />
 
               <p className="mt-1 text-xs text-muted-foreground">
-                {isCaratFamily
-                  ? "1 ct = 0.2 g. Converts with Net Weight automatically."
-                  : "The embedded stone's weight — separate from the metal's Net Weight above."}
+                1 ct = 0.2 g. Converts with Net Weight automatically.
               </p>
 
               <ErrorText error={state.errors.defaultCaratWeight} />
             </div>
           )}
-
-          {hasStoneComponent && !isCaratFamily && (
-            <div>
-              <Label htmlFor="defaultStoneRate">Stone Rate (₹/ct)</Label>
-
-              <Input
-                id="defaultStoneRate"
-                name="defaultStoneRate"
-                type="number"
-                step="0.01"
-                min="0"
-                value={stoneRate}
-                onChange={(event) => setStoneRate(event.target.value)}
-                placeholder="0.00"
-              />
-
-              <p className="mt-1 text-xs text-muted-foreground">
-                Prefills Stone Charge as Stone Rate × Stone Carat Weight on stock/documents.
-              </p>
-
-              <ErrorText error={state.errors.defaultStoneRate} />
-            </div>
-          )}
         </div>
+
+        {/* Every stone-pricing field grouped together once "Includes a
+            Stone" is checked, mirroring the same grouping used for a
+            composite line item on Invoice/Purchase/Kacha/Quotation. */}
+        {hasStoneComponent && !isCaratFamily && (
+          <div className="mt-6 rounded-lg border border-dashed p-4">
+            <h4 className="mb-4 text-sm font-semibold">Stone Pricing</h4>
+
+            <StoneComponentFields
+              metals={metals}
+              origins={origins}
+              onMetalsChange={setMetals}
+              onOriginsChange={setOrigins}
+              stoneMetalTypeName={stoneMetalTypeName}
+              onStoneChange={(name, typeNames) => {
+                setStoneMetalTypeName(name);
+                setStoneTypeNames(typeNames);
+              }}
+              selectedTypeNames={stoneTypeNames}
+              onTypesChange={setStoneTypeNames}
+              caratWeight={Number(caratWeight) || 0}
+              onCaratWeightChange={handleCaratWeightChange}
+              stoneRate={Number(stoneRate) || 0}
+              onStoneRateChange={handleStoneRateChange}
+              stoneCharge={Number(stoneCharge) || 0}
+              onStoneChargeChange={handleStoneChargeChange}
+              stoneChargeTouched={stoneChargeTouched}
+              stoneWeightInput={
+                stoneWeightUnit === "CARAT"
+                  ? Number(
+                      (
+                        (Number(stoneWeight) || 0) /
+                        resolveGramsPerCarat(defaultPurity, caratConversionRates)
+                      ).toFixed(3),
+                    )
+                  : Number(stoneWeight) || 0
+              }
+              onStoneWeightInputChange={(value) => {
+                const typed = Number(value) || 0;
+                const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
+                const grams = stoneWeightUnit === "CARAT" ? typed * gramsPerCarat : typed;
+                handleStoneWeightChange(String(Number(grams.toFixed(5))));
+              }}
+              stoneWeightUnit={stoneWeightUnit}
+              onStoneWeightUnitChange={setStoneWeightUnit}
+              netStoneWeightTouched={stoneWeightTouched}
+            />
+
+            <input type="hidden" name="defaultStoneMetalTypeName" value={stoneMetalTypeName} />
+            <input type="hidden" name="defaultStoneTypeNames" value={stoneTypeNames.join(",")} />
+            <input type="hidden" name="defaultCaratWeight" value={caratWeight} />
+            <input type="hidden" name="defaultStoneRate" value={stoneRate} />
+            <input type="hidden" name="defaultStoneCharge" value={stoneCharge} />
+            <input type="hidden" name="defaultStoneWeight" value={stoneWeight} />
+
+            <ErrorText error={state.errors.defaultCaratWeight} />
+            <ErrorText error={state.errors.defaultStoneRate} />
+            <ErrorText error={state.errors.defaultStoneCharge} />
+            <ErrorText error={state.errors.defaultStoneWeight} />
+          </div>
+        )}
       </div>
 
       {/* ============================

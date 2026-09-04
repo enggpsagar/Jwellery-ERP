@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -73,6 +73,25 @@ export function MakingChargeInput({
     setPercent(p)
     onChange(Number(((p / 100) * metalValue).toFixed(2)))
   }
+
+  // In percent mode, `value` is only ever a snapshot of percent% of
+  // metalValue taken at the moment the percent was last typed — nothing
+  // re-derives it if Rate or Net Weight (and therefore metalValue) change
+  // afterward, e.g. correcting a mistyped rate. Without this, the field
+  // keeps showing the correct-looking "= ₹X" hint (computed live from the
+  // current percent/metalValue) while the actual stored `value` — what
+  // every real total, tax, and the invoice amount itself is computed
+  // from — silently stays frozen at the stale, wrong figure. Re-emit
+  // onChange whenever metalValue changes so the stored amount can never
+  // drift from what the hint is telling the user.
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  useEffect(() => {
+    if (mode !== "percent") return
+    const resolved = Number(((percent / 100) * metalValue).toFixed(2))
+    if (resolved !== value) onChangeRef.current(resolved)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, percent, metalValue])
 
   return (
     <div className={className}>

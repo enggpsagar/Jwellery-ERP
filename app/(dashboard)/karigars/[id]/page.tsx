@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { IssueMaterialDialog } from "@/components/karigars/issue-material-dialog";
 import { RecordKarigarPaymentDialog } from "@/components/karigars/record-karigar-payment-dialog";
-import { KarigarLedgerTable } from "@/components/karigars/karigar-ledger-table";
+import { KarigarLedgerTabs } from "@/components/karigars/karigar-ledger-tabs";
 import { KarigarStatusCard } from "@/components/karigars/karigar-status-card";
 
 type Props = {
@@ -161,7 +161,7 @@ export default async function KarigarDetailPage({ params }: Props) {
           <CardTitle>Karigar Ledger</CardTitle>
         </CardHeader>
         <CardContent>
-          <KarigarLedgerTable
+          <KarigarLedgerTabs
             rows={ledger.rows}
             finalFineGoldBalance={ledger.finalFineGoldBalance}
             finalCashBalance={ledger.finalCashBalance}

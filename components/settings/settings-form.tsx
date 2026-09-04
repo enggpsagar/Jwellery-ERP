@@ -336,6 +336,26 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               <p className="text-xs text-muted-foreground">Not used — Composition Scheme never charges GST.</p>
             ) : null}
           </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="hallmarkChargePerPiece">Hallmark Charge (per piece)</Label>
+            <Input
+              id="hallmarkChargePerPiece"
+              name="hallmarkChargePerPiece"
+              type="number"
+              step="0.01"
+              min="0"
+              defaultValue={settings.hallmarkChargePerPiece}
+            />
+            <p className="text-xs text-muted-foreground">
+              Applied automatically as the HM Charge on every Gold/Silver line item
+              when creating an Invoice, Kacha Slip, or Quotation — a flat ₹ amount
+              per piece, not a % or per-gram charge. Not used for Platinum, Diamond,
+              or Other purities. BIS hallmarking fees change periodically by
+              official notification — confirm this matches what your hallmarking
+              centre currently charges before relying on it.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

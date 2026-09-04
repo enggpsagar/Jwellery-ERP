@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
+import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { LocationSelect } from "@/components/shared/location-select"
 import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat } from "@/lib/purity"
 import { RequiredMark } from "@/components/shared/required-mark"
@@ -725,12 +726,10 @@ export function QuotationForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Discount</Label>
-          <Input
-            type="number"
-            step="0.01"
-            value={discount === 0 ? "" : discount}
-            onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+          <PercentOrFlatInput
+            base={subtotal + makingChargesTotal + stoneChargesTotal}
+            value={discount}
+            onChange={setDiscount}
           />
         </div>
 

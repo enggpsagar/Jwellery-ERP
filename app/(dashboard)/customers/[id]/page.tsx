@@ -134,7 +134,13 @@ export default async function CustomerDetailsPage({
           />
           <DetailField
             label="Current Balance"
-            value={customer.pendingAmount}
+            value={
+              customer.pendingAmount ? (
+                <span className="text-red-600">{customer.pendingAmount}</span>
+              ) : (
+                customer.pendingAmount
+              )
+            }
           />
           <DetailField label="Balance Type" value={customer.balanceType} />
           <DetailField

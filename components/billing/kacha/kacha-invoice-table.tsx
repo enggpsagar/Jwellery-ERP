@@ -158,9 +158,11 @@ export function KachaInvoiceTable({
                           {
                             label: "Balance",
                             value:
-                              kachaInvoice.balanceAmount > 0
-                                ? inr(kachaInvoice.balanceAmount)
-                                : "Settled",
+                              kachaInvoice.balanceAmount > 0 ? (
+                                <span className="text-red-600">{inr(kachaInvoice.balanceAmount)}</span>
+                              ) : (
+                                "Settled"
+                              ),
                           },
                           {
                             label: "Converted to",

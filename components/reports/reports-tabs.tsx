@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
+import { cn } from "@/lib/utils"
 
 import { useMemo, useState } from "react"
 
@@ -201,11 +202,27 @@ type TabKey = (typeof TABS)[number]["key"]
 // date range has no meaning for.
 const DATE_AWARE_TABS = new Set<TabKey>(["sales", "byUser", "vendorPurchase", "goldFlow", "metalWise"])
 
-function StatCard({ title, value }: { title: string; value: string | number }) {
+function StatCard({
+  title,
+  value,
+  tone,
+}: {
+  title: string
+  value: string | number
+  /** Colors the value red/blue for an outstanding-vs-deposited figure — omitted otherwise. */
+  tone?: "outstanding" | "deposited"
+}) {
   return (
     <div className="rounded-xl border bg-card p-5 shadow-sm">
       <p className="text-sm text-muted-foreground">{title}</p>
-      <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
+      <p
+        className={cn(
+          "mt-2 text-2xl font-semibold",
+          tone === "outstanding" ? "text-red-600" : tone === "deposited" ? "text-blue-600" : "text-foreground",
+        )}
+      >
+        {value}
+      </p>
     </div>
   )
 }
@@ -397,7 +414,7 @@ export function ReportsTabs({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <StatCard title="Invoices" value={sales.invoiceCount} />
             <StatCard title="Total Revenue" value={`₹${sales.totalRevenue.toFixed(2)}`} />
-            <StatCard title="Outstanding" value={`₹${sales.totalOutstanding.toFixed(2)}`} />
+            <StatCard title="Outstanding" value={`₹${sales.totalOutstanding.toFixed(2)}`} tone="outstanding" />
           </div>
 
           <ReportSearchBar
@@ -452,14 +469,18 @@ export function ReportsTabs({
                                 {
                                   label: "Balance",
                                   value:
-                                    invoice.balanceAmount > 0
-                                      ? reportInr(invoice.balanceAmount)
-                                      : "Settled",
+                                    invoice.balanceAmount > 0 ? (
+                                      <span className="text-red-600">{reportInr(invoice.balanceAmount)}</span>
+                                    ) : (
+                                      "Settled"
+                                    ),
                                 },
                                 {
                                   label: "Received",
-                                  value: reportInr(
-                                    invoice.totalAmount - invoice.balanceAmount,
+                                  value: (
+                                    <span className="text-blue-600">
+                                      {reportInr(invoice.totalAmount - invoice.balanceAmount)}
+                                    </span>
                                   ),
                                 },
                               ],
@@ -472,7 +493,9 @@ export function ReportsTabs({
                       </td>
                       <td className="px-4 py-3">{invoice.customerName}</td>
                       <td className="px-4 py-3">₹{invoice.totalAmount.toFixed(2)}</td>
-                      <td className="px-4 py-3">₹{invoice.balanceAmount.toFixed(2)}</td>
+                      <td className={cn("px-4 py-3", invoice.balanceAmount > 0 && "text-red-600 font-medium")}>
+                        ₹{invoice.balanceAmount.toFixed(2)}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -563,8 +586,14 @@ export function ReportsTabs({
                                 fields: [
                                   { label: "Invoices", value: row.invoiceCount },
                                   { label: "Revenue", value: reportInr(row.totalRevenue) },
-                                  { label: "Collected", value: reportInr(row.totalCollected) },
-                                  { label: "Outstanding", value: reportInr(row.totalOutstanding) },
+                                  {
+                                    label: "Collected",
+                                    value: <span className="text-blue-600">{reportInr(row.totalCollected)}</span>,
+                                  },
+                                  {
+                                    label: "Outstanding",
+                                    value: <span className="text-red-600">{reportInr(row.totalOutstanding)}</span>,
+                                  },
                                 ],
                               },
                               {
@@ -599,7 +628,7 @@ export function ReportsTabs({
                         <td className="px-4 py-3 text-right tabular-nums">
                           ₹{row.totalRevenue.toFixed(2)}
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums">
+                        <td className="px-4 py-3 text-right tabular-nums text-blue-600">
                           ₹{row.totalCollected.toFixed(2)}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums text-red-600">
@@ -688,8 +717,8 @@ export function ReportsTabs({
                                 fields: [
                                   { label: "Purchases", value: row.purchaseCount },
                                   { label: "Amount", value: reportInr(row.totalAmount) },
-                                  { label: "Paid", value: reportInr(row.paidAmount) },
-                                  { label: "Balance", value: reportInr(row.balanceAmount) },
+                                  { label: "Paid", value: <span className="text-blue-600">{reportInr(row.paidAmount)}</span> },
+                                  { label: "Balance", value: <span className="text-red-600">{reportInr(row.balanceAmount)}</span> },
                                 ],
                               },
                               {
@@ -723,7 +752,7 @@ export function ReportsTabs({
                         <td className="px-4 py-3 text-right tabular-nums">
                           ₹{row.totalAmount.toFixed(2)}
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums">
+                        <td className="px-4 py-3 text-right tabular-nums text-blue-600">
                           ₹{row.paidAmount.toFixed(2)}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums text-red-600">
@@ -914,7 +943,7 @@ export function ReportsTabs({
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <StatCard title="Customers with Dues" value={customerDues.customerCount} />
-            <StatCard title="Total Outstanding" value={`₹${customerDues.totalDue.toFixed(2)}`} />
+            <StatCard title="Total Outstanding" value={`₹${customerDues.totalDue.toFixed(2)}`} tone="outstanding" />
           </div>
 
           <ReportSearchBar
@@ -961,7 +990,7 @@ export function ReportsTabs({
                             },
                             {
                               fields: [
-                                { label: "Total due", value: reportInr(customer.totalDue) },
+                                { label: "Total due", value: <span className="text-red-600">{reportInr(customer.totalDue)}</span> },
                                 {
                                   label: "Average per invoice",
                                   value:

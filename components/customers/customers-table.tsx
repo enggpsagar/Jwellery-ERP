@@ -159,7 +159,14 @@ export function CustomersTable({
                         {
                           fields: [
                             { label: "Opening balance", value: inr(customer.openingBalance) },
-                            { label: "Outstanding", value: inr(customer.pendingAmount) },
+                            {
+                              label: "Outstanding",
+                              value: customer.pendingAmount ? (
+                                <span className="text-red-600">{customer.pendingAmount}</span>
+                              ) : (
+                                customer.pendingAmount
+                              ),
+                            },
                             { label: "Orders", value: customer.totalOrders },
                             { label: "Last purchase", value: customer.lastPurchaseDate },
                           ],

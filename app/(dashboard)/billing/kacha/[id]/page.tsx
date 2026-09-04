@@ -178,7 +178,7 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
           <span>Total</span>
           <span>₹{kachaInvoice.totalAmount.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-between text-blue-600 font-medium">
           <span>Paid</span>
           <span>₹{kachaInvoice.paidAmount.toFixed(2)}</span>
         </div>

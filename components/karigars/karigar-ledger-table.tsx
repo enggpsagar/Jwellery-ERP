@@ -73,7 +73,7 @@ export function KarigarLedgerTable({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">
+              <div className="text-2xl font-semibold text-red-600">
                 ₹ {finalCashBalance.toLocaleString("en-IN")}
               </div>
             </CardContent>

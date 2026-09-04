@@ -123,7 +123,7 @@ export function RecordPurchasePaymentDialog({
             <div className="text-red-600 text-sm">{state.message}</div>
           )}
 
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm text-red-600 font-medium">
             Balance: ₹{balanceAmount.toFixed(2)}
           </div>
 
@@ -165,7 +165,7 @@ export function RecordPurchasePaymentDialog({
 
           <div className="flex items-center justify-between text-sm font-medium border-t pt-3">
             <span>Total</span>
-            <span className={overBalance ? "text-red-600" : ""}>₹{total.toFixed(2)}</span>
+            <span className={overBalance ? "text-red-600" : "text-blue-600"}>₹{total.toFixed(2)}</span>
           </div>
           {overBalance && (
             <div className="text-xs text-red-600">

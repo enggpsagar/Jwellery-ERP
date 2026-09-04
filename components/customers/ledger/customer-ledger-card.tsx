@@ -8,6 +8,7 @@ import {
 } from "@/lib/actions/customer-ledger-actions"
 import { classifyMetalName } from "@/lib/business-units"
 import { getActiveBusinessUnits } from "@/lib/business-units.server"
+import { cn } from "@/lib/utils"
 import { AddCustomerSaleEntryDialog } from "@/components/customers/ledger/add-customer-sale-entry-dialog"
 import { AddCustomerRefundEntryDialog } from "@/components/customers/ledger/add-customer-refund-entry-dialog"
 import { EmailLedgerStatementButton } from "@/components/customers/ledger/email-ledger-statement-button"
@@ -134,7 +135,16 @@ export async function CustomerLedgerCard({
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Current Ledger Balance
                 </p>
-                <p className="mt-1 text-sm font-semibold text-foreground">
+                <p
+                  className={cn(
+                    "mt-1 text-sm font-semibold",
+                    summary.currentBalance > 0
+                      ? "text-red-600"
+                      : summary.currentBalance < 0
+                        ? "text-blue-600"
+                        : "text-foreground",
+                  )}
+                >
                   {formatAmount(summary.currentBalance)}
                 </p>
               </div>

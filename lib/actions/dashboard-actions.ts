@@ -47,6 +47,8 @@ export type DashboardStat = {
   trend: "up" | "down";
   sub: string;
   icon: "rupee" | "trending" | "wallet" | "metal" | "hammer" | "truck";
+  /** Colors the value red/blue for an outstanding-vs-deposited figure — omitted for stats that are neither (revenue, stock weight, etc). */
+  tone?: "outstanding" | "deposited";
 };
 
 export type MetalStockStat = {
@@ -164,6 +166,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
       trend: outstanding > 0 ? "down" : "up",
       sub: `across ${outstandingAccounts} account${outstandingAccounts === 1 ? "" : "s"}`,
       icon: "wallet",
+      tone: "outstanding",
     },
     {
       label: "Total Vendor Purchases",

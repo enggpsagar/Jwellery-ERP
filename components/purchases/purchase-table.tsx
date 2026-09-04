@@ -87,9 +87,11 @@ export function PurchaseTable({ purchases }: PurchaseTableProps) {
                           {
                             label: "Balance",
                             value:
-                              purchase.balanceAmount > 0
-                                ? inr(purchase.balanceAmount)
-                                : "Settled",
+                              purchase.balanceAmount > 0 ? (
+                                <span className="text-red-600">{inr(purchase.balanceAmount)}</span>
+                              ) : (
+                                "Settled"
+                              ),
                           },
                         ],
                       },

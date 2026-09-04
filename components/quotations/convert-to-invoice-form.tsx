@@ -184,7 +184,7 @@ export function ConvertToInvoiceForm({
           <span>Total</span>
           <span>₹{totalAmount.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-between text-blue-600 font-medium">
           <span>Paid Now</span>
           <span>₹{paidAmount.toFixed(2)}</span>
         </div>

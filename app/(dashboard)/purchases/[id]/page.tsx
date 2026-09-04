@@ -151,7 +151,7 @@ export default async function PurchaseDetailPage({ params }: Props) {
           <span>Total</span>
           <span>₹{purchase.totalAmount.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-between text-blue-600 font-medium">
           <span>Paid</span>
           <span>₹{purchase.paidAmount.toFixed(2)}</span>
         </div>

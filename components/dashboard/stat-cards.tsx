@@ -90,7 +90,13 @@ export function StatCards({ stats }: StatCardsProps) {
                 )}
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-2xl font-semibold tracking-tight tabular-nums">
+                <span
+                  className={cn(
+                    "text-2xl font-semibold tracking-tight tabular-nums",
+                    stat.tone === "outstanding" && "text-red-600",
+                    stat.tone === "deposited" && "text-blue-600",
+                  )}
+                >
                   {stat.value}
                 </span>
                 <span className="text-xs text-muted-foreground">

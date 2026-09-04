@@ -89,9 +89,11 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                           {
                             label: "Balance",
                             value:
-                              invoice.balanceAmount > 0
-                                ? inr(invoice.balanceAmount)
-                                : "Settled",
+                              invoice.balanceAmount > 0 ? (
+                                <span className="text-red-600">{inr(invoice.balanceAmount)}</span>
+                              ) : (
+                                "Settled"
+                              ),
                           },
                           {
                             label: "From slip",

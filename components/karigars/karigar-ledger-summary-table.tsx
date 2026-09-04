@@ -65,7 +65,7 @@ export function KarigarLedgerSummaryTable({ rows, totals }: KarigarLedgerSummary
             <CardTitle className="text-sm text-muted-foreground">Total Paid</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-semibold">₹ {totals.totalPaid.toLocaleString("en-IN")}</div>
+            <div className="text-xl font-semibold text-blue-600">₹ {totals.totalPaid.toLocaleString("en-IN")}</div>
           </CardContent>
         </Card>
 
@@ -74,7 +74,7 @@ export function KarigarLedgerSummaryTable({ rows, totals }: KarigarLedgerSummary
             <CardTitle className="text-sm text-muted-foreground">Total Cash Outstanding</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-semibold">
+            <div className="text-xl font-semibold text-red-600">
               ₹ {totals.outstandingCash.toLocaleString("en-IN")}
             </div>
           </CardContent>
@@ -129,8 +129,11 @@ export function KarigarLedgerSummaryTable({ rows, totals }: KarigarLedgerSummary
                           fields: [
                             { label: "Items delivered", value: row.itemsDelivered },
                             { label: "Earned", value: inr(row.totalEarned) },
-                            { label: "Paid", value: inr(row.totalPaid) },
-                            { label: "Cash outstanding", value: inr(row.outstandingCash) },
+                            { label: "Paid", value: <span className="text-blue-600">{inr(row.totalPaid)}</span> },
+                            {
+                              label: "Cash outstanding",
+                              value: <span className="text-red-600">{inr(row.outstandingCash)}</span>,
+                            },
                           ],
                         },
                       ]}
@@ -148,10 +151,10 @@ export function KarigarLedgerSummaryTable({ rows, totals }: KarigarLedgerSummary
                   <TableCell className="text-right">
                     ₹ {row.totalEarned.toLocaleString("en-IN")}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right text-blue-600">
                     ₹ {row.totalPaid.toLocaleString("en-IN")}
                   </TableCell>
-                  <TableCell className="text-right font-medium">
+                  <TableCell className="text-right font-medium text-red-600">
                     ₹ {row.outstandingCash.toLocaleString("en-IN")}
                   </TableCell>
                 </TableRow>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useActionState } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader } from "@/components/ui/loader"
 
 import {
   upsertStoreCategoryType,
@@ -100,7 +100,7 @@ export function AddCategoryTypeDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={pending || !name.trim()}>
-              {pending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              {pending && <Loader className="mr-1 h-4 w-4" />}
               Add Type
             </Button>
           </DialogFooter>

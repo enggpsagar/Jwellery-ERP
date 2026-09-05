@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useActionState } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader } from "@/components/ui/loader"
 
 import { upsertStoreCategory, type StoreCategoryRow, type TaxonomyFormState } from "@/lib/actions/taxonomy-actions"
 import { useToast } from "@/components/providers/toast-provider"
@@ -96,7 +96,7 @@ export function AddCategoryDialog({ open, onOpenChange, onCreated }: AddCategory
               Cancel
             </Button>
             <Button type="submit" disabled={pending || !name.trim()}>
-              {pending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              {pending && <Loader className="mr-1 h-4 w-4" />}
               Add Category
             </Button>
           </DialogFooter>

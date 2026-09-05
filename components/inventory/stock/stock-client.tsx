@@ -39,7 +39,7 @@ export function StockClient({ stockItems, pagination }: StockClientProps) {
 
   return (
     <main className="space-y-6 p-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <PageBackHeader
           title="Inventory Stock"
           description="Manage physical stock entries for jewellery inventory."

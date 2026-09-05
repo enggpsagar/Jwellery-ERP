@@ -45,6 +45,14 @@ export function StockToolbar({ selectedIds, bulkActions }: StockToolbarProps) {
         selectedIds={selectedIds}
         entityLabel="stock items"
         exportAction={exportInventoryStockToExcel}
+        typeOptions={[
+          { value: "GOLD", label: "Gold" },
+          { value: "SILVER", label: "Silver" },
+          { value: "PLATINUM", label: "Platinum" },
+          { value: "DIAMOND", label: "Diamond" },
+          { value: "STONE", label: "Stone" },
+          { value: "OTHER", label: "Other" },
+        ]}
         bulkActions={bulkActions}
       />
 

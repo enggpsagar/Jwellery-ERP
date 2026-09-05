@@ -11,7 +11,7 @@ import {
   getStoreMetalOrigins,
   type StoreMetalOriginRow,
 } from "@/lib/actions/taxonomy-actions";
-import { classifyMetalName } from "@/lib/business-units";
+import { classifyPurityFamily, type PurityFamily } from "@/lib/business-units";
 import { resolveGramsPerCarat } from "@/lib/purity";
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle";
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields";
@@ -19,18 +19,9 @@ import { AddCategoryDialog } from "@/components/inventory/shared/add-category-di
 import { AddCategoryTypeDialog } from "@/components/inventory/shared/add-category-type-dialog";
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog";
 
-// A metal classifies into one of these groups by its name — GOLD/SILVER/
-// DIAMOND/OTHER via classifyMetalName (the same name-substring heuristic
-// used for formatting historical records elsewhere), plus local PLATINUM
-// and STONE checks on top of it (classifyMetalName's own return type has
-// neither a Platinum nor a generic Stone bucket, so extending it there
-// would ripple into every other call site — out of scope here, this only
-// decides which purities to offer and whether to show the Carat Weight field).
-// STONE is a stand-alone loose-gemstone product line (a StoreMetal literally
-// named e.g. "Stone"), not the stone embedded in a metal piece — that's the
-// separate defaultStoneWeight field below, untouched by this.
-type PurityFamily = "GOLD" | "SILVER" | "PLATINUM" | "DIAMOND" | "STONE" | "OTHER";
-
+// classifyPurityFamily (lib/business-units.ts) decides which purities to
+// offer and whether to show the Carat Weight field — also reused by the
+// Stock list's Type filter, so both classify a metal exactly the same way.
 const PURITY_OPTIONS_BY_METAL: Record<PurityFamily, PurityType[]> = {
   GOLD: [PurityType.GOLD_24K, PurityType.GOLD_22K, PurityType.GOLD_20K, PurityType.GOLD_18K],
   SILVER: [PurityType.SILVER_999, PurityType.SILVER_925],
@@ -41,22 +32,6 @@ const PURITY_OPTIONS_BY_METAL: Record<PurityFamily, PurityType[]> = {
   STONE: [PurityType.OTHER],
   OTHER: [PurityType.OTHER],
 };
-
-// Checked ahead of the name-substring guess: `isGemstone` is the real,
-// store-set flag from Settings' Stones section (StoreMetal.isGemstone), so a
-// gemstone named e.g. "Ruby" or "Emerald" — no "diamond"/"stone" substring —
-// still correctly gets the STONE family (carat weight, no fixed purity)
-// instead of silently falling through to OTHER. A name containing "diamond"
-// still wins DIAMOND specifically (its own real PurityType), matching
-// existing Diamond products created before this flag existed.
-function classifyPurityFamily(metal: { name: string; isGemstone?: boolean }): PurityFamily {
-  const lower = metal.name.toLowerCase();
-  if (lower.includes("platinum")) return "PLATINUM";
-  if (lower.includes("diamond")) return "DIAMOND";
-  if (lower.includes("stone")) return "STONE";
-  if (metal.isGemstone) return "STONE";
-  return classifyMetalName(metal.name) as PurityFamily;
-}
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -216,9 +191,16 @@ export function ProductForm({
   // the picker so it can't be chosen for a NEW product — but if this
   // product already uses one (disabled after it was picked), that entry
   // stays visible here so editing doesn't silently drop/replace their
-  // existing selection.
+  // existing selection. Gemstones are excluded the same way: a product's
+  // stone is meant to be picked through "Includes a Stone" (its own Stone +
+  // Stone Type fields below) instead, not by choosing a gemstone here as the
+  // product's primary type — but a product that already has one saved (from
+  // before this changed) keeps it visible so its edit page doesn't silently
+  // lose the selection.
   const selectableMetals = metals.filter(
-    (item) => item.isActive || item.id === product?.metalTypeId,
+    (item) =>
+      (item.isActive || item.id === product?.metalTypeId) &&
+      (!item.isGemstone || item.id === product?.metalTypeId),
   );
 
   const [metalSearch, setMetalSearch] = useState("");
@@ -735,22 +717,22 @@ export function ProductForm({
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div>
-            {/* This list mixes real metals (Gold/Silver/Platinum) with
-                gemstones (StoreMetal rows with isGemstone: true, e.g.
-                Diamond/Ruby) — "Metal Type" alone read as metals-only and
-                confused anyone picking a gemstone product. */}
-            <Label>Metal / Stone Type <RequiredMark /></Label>
+            {/* Gemstones are deliberately excluded from this list (see
+                selectableMetals above) — a product's stone is picked via
+                "Includes a Stone" below instead, so this stays a plain
+                metal picker rather than mixing the two concepts. */}
+            <Label>Metal Type <RequiredMark /></Label>
 
             <div className="flex gap-1.5">
               <Select value={metalTypeId} onValueChange={setMetalTypeId}>
                 <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="Select metal or stone type" />
+                  <SelectValue placeholder="Select metal type" />
                 </SelectTrigger>
 
                 <SelectContent>
                   <div className="p-2">
                     <Input
-                      placeholder="Search metal or stone types..."
+                      placeholder="Search metal types..."
                       value={metalSearch}
                       onChange={(event) => setMetalSearch(event.target.value)}
                       onKeyDown={(event) => event.stopPropagation()}
@@ -759,7 +741,7 @@ export function ProductForm({
 
                   {filteredMetals.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No metal or stone types found{metalSearch ? ` for "${metalSearch}"` : ""}
+                      No metal types found{metalSearch ? ` for "${metalSearch}"` : ""}
                     </div>
                   ) : (
                     filteredMetals.map((item) => (
@@ -777,7 +759,7 @@ export function ProductForm({
                 variant="secondary"
                 size="icon"
                 className="h-11 w-9 shrink-0 px-0"
-                title="Add Metal or Stone Type"
+                title="Add Metal Type"
                 onClick={() => setAddMetalOpen(true)}
               >
                 <Plus className="h-4 w-4" />

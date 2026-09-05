@@ -15,6 +15,7 @@ export type DataTableExportParams = {
   sortBy?: string
   sortOrder?: "asc" | "desc"
   status?: string
+  type?: string
 }
 
 export type DataTableExportResult = {
@@ -32,6 +33,13 @@ type DataTableToolbarProps = {
   defaultSortBy: string
   defaultSortOrder?: "asc" | "desc"
   statusOptions?: Option[]
+  /** A second, independent filter dropdown next to Status — e.g. Stock/
+   * Karigar's Gold/Silver/Diamond/Stone/Other Type filter. Kept as its own
+   * prop/URL param ("type") rather than reusing statusOptions, since a table
+   * can have a real Status field (InventoryStockStatus) that's a genuinely
+   * different concept from this metal-family classification. */
+  typeOptions?: Option[]
+  typeLabel?: string
   /** Omit when this table has no row-select — the single Export button then always exports the filtered set. */
   selectedIds?: string[]
   entityLabel: string
@@ -57,6 +65,8 @@ export function DataTableToolbar({
   defaultSortBy,
   defaultSortOrder = "desc",
   statusOptions,
+  typeOptions,
+  typeLabel = "Type",
   selectedIds,
   entityLabel,
   exportAction,
@@ -72,6 +82,7 @@ export function DataTableToolbar({
   const currentSortOrder = (searchParams.get("sortOrder") ?? defaultSortOrder) as "asc" | "desc"
   const currentPageSize = searchParams.get("pageSize") ?? "10"
   const currentStatus = searchParams.get("status") ?? "ALL"
+  const currentType = searchParams.get("type") ?? "ALL"
 
   const [search, setSearch] = React.useState(currentSearch)
   const [isPending, startTransition] = React.useTransition()
@@ -135,6 +146,7 @@ export function DataTableToolbar({
               sortBy: currentSortBy,
               sortOrder: currentSortOrder,
               status: currentStatus !== "ALL" ? currentStatus : undefined,
+              type: currentType !== "ALL" ? currentType : undefined,
             },
       )
 
@@ -176,6 +188,22 @@ export function DataTableToolbar({
           >
             <option value="ALL">All Statuses</option>
             {statusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        ) : null}
+
+        {typeOptions ? (
+          <select
+            className="rounded-md border px-3 py-2 text-sm"
+            value={currentType}
+            onChange={(e) => updateParam("type", e.target.value)}
+            disabled={isPending}
+          >
+            <option value="ALL">All {typeLabel}s</option>
+            {typeOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

@@ -65,6 +65,34 @@ export function classifyMetalName(name: string | null | undefined): MetalFamily 
 }
 
 /**
+ * The Stock/Product "Type" filter's classification — GOLD/SILVER/PLATINUM/
+ * DIAMOND/STONE (any other gemstone) or OTHER. A superset of MetalFamily
+ * above (adds PLATINUM and a generic STONE bucket via StoreMetal.isGemstone)
+ * — kept as a separate type rather than widening MetalFamily itself, since
+ * classifyMetalName's call sites format an already-persisted record where no
+ * live isGemstone flag exists to check (see its own doc comment).
+ */
+export type PurityFamily = "GOLD" | "SILVER" | "PLATINUM" | "DIAMOND" | "STONE" | "OTHER"
+
+/**
+ * Same name-substring convention as classifyMetalName, extended with the
+ * live isGemstone flag (checked ahead of the name guess, so a gemstone named
+ * e.g. "Ruby" or "Emerald" — no "diamond"/"stone" substring — still
+ * correctly lands in STONE instead of falling through to OTHER). Shared
+ * between the product form (deciding which purities/fields to show) and the
+ * Stock list's Type filter (deciding which StoreMetal ids match a family) —
+ * kept in one place so both classify the exact same way.
+ */
+export function classifyPurityFamily(metal: { name: string; isGemstone?: boolean }): PurityFamily {
+  const lower = metal.name.toLowerCase()
+  if (lower.includes("platinum")) return "PLATINUM"
+  if (lower.includes("diamond")) return "DIAMOND"
+  if (lower.includes("stone")) return "STONE"
+  if (metal.isGemstone) return "STONE"
+  return classifyMetalName(metal.name) as PurityFamily
+}
+
+/**
  * Formats a quantity for a resolved unit: rupees for the "MONEY" sentinel,
  * carats for a gemstone unit (StoreMetal.isGemstone), grams for any other
  * (plain metal) unit. Pass the resolved `{ value, isGemstone }` from

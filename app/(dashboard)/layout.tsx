@@ -93,7 +93,7 @@ export default async function DashboardLayout({
           canSwitchStores={isSuperAdmin || stores.length > 1}
         />
 
-        <main className="flex flex-1 flex-col bg-slate-50 p-6">
+        <main className="flex min-w-0 flex-1 flex-col bg-slate-50 p-6">
           {children}
         </main>
       </SidebarInset>

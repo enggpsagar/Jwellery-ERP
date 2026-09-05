@@ -195,7 +195,7 @@ export function GlobalSearch() {
   );
 
   return (
-    <div ref={containerRef} className="flex flex-1 items-center lg:max-w-md">
+    <div ref={containerRef} className="flex min-w-0 flex-1 items-center lg:max-w-md">
       {/* Desktop/tablet (>=1024px, matching the sidebar's own mobile
           threshold in hooks/use-mobile.ts) — the full inline pill. Below
           that this used to just vanish with no way to search at all. */}

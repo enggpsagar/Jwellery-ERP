@@ -5,15 +5,9 @@ import { useEffect, useMemo, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import type { Karigar } from "@/lib/actions/karigar-actions"
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { getCitiesByStateId } from "@/lib/actions/location-actions"
 import { LocationSelect } from "@/components/shared/location-select"
 import { RequiredMark } from "@/components/shared/required-mark"
@@ -27,6 +21,7 @@ type Props = {
   errors?: Record<string, string[]>
   locations?: StoreLocationRow[]
   states?: StateItem[]
+  metals?: StoreMetalRow[]
 }
 
 export function KarigarForm({
@@ -35,6 +30,7 @@ export function KarigarForm({
   errors,
   locations = [],
   states = [],
+  metals = [],
 }: Props) {
   const [locationId, setLocationId] = useState(karigar?.locationId ?? "")
 
@@ -214,6 +210,29 @@ export function KarigarForm({
             placeholder="e.g. Chain making, Stone setting"
             defaultValue={karigar?.specialization}
           />
+        </div>
+
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <Label>Metal Type</Label>
+          <select
+            name="metalTypeId"
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            defaultValue={karigar?.metalTypeId ?? ""}
+          >
+            <option value="">Select metal (optional)</option>
+            {metals.map((metal) => (
+              <option key={metal.id} value={metal.id}>
+                {metal.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            What this karigar mainly works with — drives the Karigars list&apos;s
+            Type filter.
+          </p>
+          {errors?.metalTypeId?.[0] && (
+            <p className="text-xs text-red-600">{errors.metalTypeId[0]}</p>
+          )}
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">

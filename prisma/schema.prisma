@@ -244,6 +244,7 @@ model StoreMetal {
   purchaseItems       PurchaseItem[]
   karigarReceiptItems KarigarReceiptItem[]
   quotationItems      QuotationItem[]
+  karigars            Karigar[]
   // Only meaningful when isGemstone is true — the same one-to-many shape as
   // StoreCategory.types below. Replaces the old single nullable
   // StoreMetal.stoneOrigin column: a store dealing in BOTH natural and
@@ -396,9 +397,17 @@ model Karigar {
   loginUser      User?
   locationId     String?
   location       StoreLocation? @relation(fields: [locationId], references: [id])
+  // The metal this karigar mainly works with (Gold/Silver/Diamond/...) —
+  // distinct from `specialization`, which is a free-text craft description
+  // ("Chain making", "Stone setting"). Optional: only drives the Karigars
+  // page's Type filter, same classifyPurityFamily grouping the Stock page's
+  // Type filter already uses.
+  metalTypeId    String?
+  metalType      StoreMetal?    @relation(fields: [metalTypeId], references: [id])
 
   @@unique([storeId, code])
   @@index([name])
+  @@index([metalTypeId])
   @@index([mobile])
   @@index([code])
   @@index([locationId])

@@ -5,6 +5,7 @@ import { ChargeType, PurityType, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scope";
 import type { ProductFormState } from "@/lib/inventory/product-types";
 import { buildExcelExport } from "@/lib/excel-export";
 
@@ -634,6 +635,26 @@ export async function createProduct(
         };
       }
 
+      // See resolveWritableLocationId's own doc comment — without this, a
+      // location-restricted Staff user submitting no location at all saved
+      // the stock row with locationId: null, which then never matches their
+      // own location-scoped list afterward.
+      const rawLocationId = String(formData.get("locationId") ?? "").trim();
+      const locationScope = await getLocationScope();
+      const locationResolution = await resolveWritableLocationId(
+        storeId,
+        rawLocationId || null,
+        locationScope,
+      );
+      if (!locationResolution.ok) {
+        return {
+          success: false,
+          message: locationResolution.message,
+          errors: { locationId: [locationResolution.message] },
+        };
+      }
+      const resolvedLocationId = locationResolution.locationId;
+
       // Same max-based derivation as the product code above: a COUNT
       // regresses after a delete onto a code that already exists, and a
       // retry would recount to the identical value and collide again.
@@ -662,6 +683,7 @@ export async function createProduct(
               productId: createdProduct.id,
               stockCode: `STK-${year}-${String(highest + 1 + attempt).padStart(4, "0")}`,
               quantity: Math.trunc(quantity),
+              locationId: resolvedLocationId,
               metalTypeId: metalTypeId || null,
               purity: defaultPurity,
               makingCharge: defaultMakingCharge,

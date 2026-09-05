@@ -11,6 +11,7 @@ import { StockTable } from "@/components/inventory/stock/stock-table"
 import { StockToolbar } from "@/components/inventory/stock/stock-toolbar"
 import { WebcamQrScanner } from "@/components/shared/webcam-qr-scanner"
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
+import { StockImportDialog } from "@/components/inventory/stock/stock-import-dialog"
 import { bulkDeleteInventoryStock } from "@/lib/actions/inventory/stock-actions"
 
 type Pagination = {
@@ -58,6 +59,8 @@ export function StockClient({ stockItems, pagination }: StockClientProps) {
             <Camera className="mr-2 h-4 w-4" />
             {scanning ? "Close scanner" : "Scan tag"}
           </Button>
+
+          <StockImportDialog />
 
           <Link href="/inventory/stock/new">
             <Button>

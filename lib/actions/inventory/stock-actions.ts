@@ -15,9 +15,15 @@ import {
 import { prisma } from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth/auth"
 import { requireStoreScope } from "@/lib/store-context"
-import { getLocationScope, locationWhere, isLocationAllowed, type LocationScope } from "@/lib/location-scope"
+import {
+  getLocationScope,
+  locationWhere,
+  isLocationAllowed,
+  resolveWritableLocationId,
+  type LocationScope,
+} from "@/lib/location-scope"
 import type { StockFormState } from "@/lib/inventory/stock-types"
-import { buildExcelExport } from "@/lib/excel-export"
+import { buildExcelExport, buildMultiSheetExcelExport, parseExcelUpload } from "@/lib/excel-export"
 import { getFinenessMap, toFineWeight } from "@/lib/purity"
 import { classifyPurityFamily, type PurityFamily } from "@/lib/business-units"
 
@@ -1207,4 +1213,219 @@ export async function bulkDeleteInventoryStock(ids: string[]): Promise<BulkDelet
   }
 
   return { deletedCount, failures }
+}
+
+export type StockImportResult = {
+  success: boolean
+  message: string
+  createdCount?: number
+  /** Row-level problems. Populated only when nothing was created — mirrors
+   * importKachaInvoicesFromExcel's own contract: the file must be clean
+   * before anything is created, so a partial import never leaves the
+   * merchant guessing which rows actually landed. */
+  errors?: string[]
+}
+
+/**
+ * A downloadable .xlsx showing the expected columns and one filled-in
+ * example row. Only Product Code and Quantity are required — everything
+ * else a stock entry needs (metal, purity, making/stone charges) comes from
+ * the matched product, same as the single "Stock entry" checkbox on Product
+ * Create ("needs nothing but a quantity").
+ */
+export async function getStockImportTemplate(): Promise<{
+  fileName: string
+  fileBase64: string
+}> {
+  await requireStoreScope()
+
+  const example = {
+    "Product Code": "PRD-0001",
+    Quantity: 5,
+    Location: "",
+  }
+
+  return buildMultiSheetExcelExport(
+    [{ name: "Stock Import", rows: [example], columns: Object.keys(example) }],
+    "stock-import-template",
+  )
+}
+
+function stockImportCell(row: Record<string, unknown>, key: string): string {
+  return String(row[key] ?? "").trim()
+}
+
+/**
+ * Bulk-adds stock quantity across many products from one spreadsheet —
+ * the "multi-row form" alternative: one row per product, Product Code +
+ * Quantity (+ optional Location), instead of repeating the single Add Stock
+ * form by hand for every product. Each row becomes its own new
+ * InventoryStock row (a fresh stock code, quantity from the sheet) rather
+ * than incrementing an existing one, matching how "Add Stock" always
+ * creates a new row too.
+ */
+export async function importInventoryStockFromExcel(
+  formData: FormData,
+): Promise<StockImportResult> {
+  try {
+    const storeId = await requireStoreScope()
+    const currentUser = await getCurrentUser()
+    const file = formData.get("file")
+
+    if (!(file instanceof File) || file.size === 0) {
+      return { success: false, message: "Choose a .xlsx or .csv file to import." }
+    }
+
+    const rows = parseExcelUpload(await file.arrayBuffer())
+
+    if (!rows.length) {
+      return { success: false, message: "That file has no rows to import." }
+    }
+
+    const [products, locations, existingCodes] = await Promise.all([
+      prisma.product.findMany({
+        where: { storeId },
+        select: {
+          id: true,
+          productCode: true,
+          metalTypeId: true,
+          defaultPurity: true,
+          defaultMakingCharge: true,
+          defaultMakingChargeType: true,
+          defaultStoneCharge: true,
+          defaultStoneRate: true,
+          hasStoneComponent: true,
+          defaultStoneMetalTypeName: true,
+          defaultStoneTypeNames: true,
+        },
+      }),
+      prisma.storeLocation.findMany({ where: { storeId }, select: { id: true, name: true } }),
+      prisma.inventoryStock.findMany({
+        where: { storeId, stockCode: { startsWith: "STK-" } },
+        select: { stockCode: true },
+      }),
+    ])
+
+    const productByCode = new Map(
+      products.map((product) => [product.productCode.trim().toLowerCase(), product]),
+    )
+    const locationByName = new Map(
+      locations.map((location) => [location.name.trim().toLowerCase(), location.id]),
+    )
+    const locationScope = await getLocationScope()
+
+    let highestCode = existingCodes.reduce((max, row) => {
+      const match = /^STK-(?:\d{4}-)?(\d+)$/.exec(row.stockCode)
+      return match ? Math.max(max, Number(match[1])) : max
+    }, 0)
+    const year = new Date().getFullYear()
+
+    const errors: string[] = []
+    const toCreate: Prisma.InventoryStockCreateManyInput[] = []
+
+    for (const [index, row] of rows.entries()) {
+      // +2 = one for the header row, one for 1-based spreadsheet numbering.
+      const line = index + 2
+      const productCode = stockImportCell(row, "Product Code")
+
+      if (!productCode) {
+        errors.push(`Row ${line}: Product Code is required`)
+        continue
+      }
+
+      const product = productByCode.get(productCode.trim().toLowerCase())
+      if (!product) {
+        errors.push(`Row ${line}: No product found with code "${productCode}"`)
+        continue
+      }
+
+      if (!product.metalTypeId) {
+        errors.push(
+          `Row ${line}: "${productCode}" has no metal set — add one on the product first`,
+        )
+        continue
+      }
+
+      const rawQuantity = stockImportCell(row, "Quantity")
+      const quantity = rawQuantity === "" ? 0 : Number(rawQuantity)
+      if (!Number.isFinite(quantity) || quantity < 0) {
+        errors.push(`Row ${line}: Quantity must be 0 or more`)
+        continue
+      }
+
+      const locationName = stockImportCell(row, "Location")
+      let resolvedLocationId: string | null = null
+      if (locationName) {
+        const matchedLocationId = locationByName.get(locationName.trim().toLowerCase())
+        if (!matchedLocationId) {
+          errors.push(`Row ${line}: No location found named "${locationName}"`)
+          continue
+        }
+        const resolution = await resolveWritableLocationId(storeId, matchedLocationId, locationScope)
+        if (!resolution.ok) {
+          errors.push(`Row ${line}: ${resolution.message}`)
+          continue
+        }
+        resolvedLocationId = resolution.locationId
+      } else {
+        const resolution = await resolveWritableLocationId(storeId, null, locationScope)
+        if (!resolution.ok) {
+          errors.push(`Row ${line}: ${resolution.message}`)
+          continue
+        }
+        resolvedLocationId = resolution.locationId
+      }
+
+      highestCode += 1
+
+      toCreate.push({
+        storeId,
+        productId: product.id,
+        stockCode: `STK-${year}-${String(highestCode).padStart(4, "0")}`,
+        quantity: Math.trunc(quantity),
+        metalTypeId: product.metalTypeId,
+        purity: product.defaultPurity,
+        makingCharge: product.defaultMakingCharge ?? undefined,
+        makingChargeType: product.defaultMakingChargeType,
+        stoneCharge: product.hasStoneComponent ? product.defaultStoneCharge ?? undefined : undefined,
+        stoneRate: product.hasStoneComponent ? product.defaultStoneRate ?? undefined : undefined,
+        stoneMetalTypeName: product.hasStoneComponent
+          ? product.defaultStoneMetalTypeName ?? undefined
+          : undefined,
+        stoneTypeNames: product.hasStoneComponent
+          ? product.defaultStoneTypeNames ?? undefined
+          : undefined,
+        locationId: resolvedLocationId ?? undefined,
+        createdById: currentUser?.id ?? undefined,
+        createdByName: currentUser?.name ?? undefined,
+        createdByRole: currentUser?.role ?? undefined,
+      })
+    }
+
+    if (errors.length > 0) {
+      return {
+        success: false,
+        message: "Nothing was imported. Fix these rows and try again.",
+        errors,
+      }
+    }
+
+    if (!toCreate.length) {
+      return { success: false, message: "That file has no rows to import." }
+    }
+
+    await prisma.inventoryStock.createMany({ data: toCreate })
+
+    revalidatePath("/inventory")
+    revalidatePath("/inventory/stock")
+
+    return {
+      success: true,
+      message: `Added ${toCreate.length} stock ${toCreate.length === 1 ? "entry" : "entries"}.`,
+      createdCount: toCreate.length,
+    }
+  } catch (error) {
+    console.error("importInventoryStockFromExcel error:", error)
+    return { success: false, message: "Failed to import stock." }
+  }
 }

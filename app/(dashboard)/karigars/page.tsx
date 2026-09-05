@@ -4,10 +4,20 @@ import type { Metadata } from "next"
 
 import { getKarigars } from "@/lib/actions/karigar-actions"
 import { KarigarsClient } from "@/components/karigars/karigars-client"
+import type { PurityFamily } from "@/lib/business-units"
 
 export const metadata: Metadata = {
   title: "Karigars",
 }
+
+const VALID_METAL_FAMILIES: PurityFamily[] = [
+  "GOLD",
+  "SILVER",
+  "PLATINUM",
+  "DIAMOND",
+  "STONE",
+  "OTHER",
+]
 
 type KarigarsPageProps = {
   searchParams?: Promise<{
@@ -16,6 +26,7 @@ type KarigarsPageProps = {
     search?: string
     sortBy?: "name" | "code" | "createdAt"
     sortOrder?: "asc" | "desc"
+    type?: string
   }>
 }
 
@@ -29,6 +40,9 @@ export default async function KarigarsPage({ searchParams }: KarigarsPageProps) 
   const search = params.search || ""
   const sortBy = params.sortBy || "createdAt"
   const sortOrder = params.sortOrder || "desc"
+  const metalFamily = VALID_METAL_FAMILIES.includes(params.type as PurityFamily)
+    ? (params.type as PurityFamily)
+    : undefined
 
   const { karigars, pagination } = await getKarigars({
     page,
@@ -36,6 +50,7 @@ export default async function KarigarsPage({ searchParams }: KarigarsPageProps) 
     search,
     sortBy,
     sortOrder,
+    metalFamily,
   })
 
   return <KarigarsClient karigars={karigars} pagination={pagination} />

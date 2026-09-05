@@ -9,6 +9,7 @@ import { getLocationScope, locationWhere, type LocationScope } from "@/lib/locat
 import { UserRole, UserStatus } from "@prisma/client";
 import * as XLSX from "xlsx";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
+import { classifyPurityFamily, type PurityFamily } from "@/lib/business-units";
 
 export type Karigar = {
   id: string;
@@ -30,6 +31,11 @@ export type Karigar = {
   openingCash: number;
   isActive: boolean;
   locationId: string | null;
+  /** Gold/Silver/Diamond/... this karigar mainly works with — separate from
+   * the free-text `specialization` craft description. Drives the Karigars
+   * page's Type filter (classifyPurityFamily), same as Stock's. */
+  metalTypeId: string | null;
+  metalTypeName: string;
   createdAt?: string;
 };
 
@@ -52,6 +58,10 @@ export type GetKarigarsParams = {
    *  list. Pass false to list disabled ones instead (see /karigars/disabled),
    *  mirroring how getVendors()'s `archived` param works. */
   active?: boolean;
+  /** Gold/Silver/Platinum/Diamond/Stone/Other — derived from each karigar's
+   * metalType (name + isGemstone), same classification Stock's Type filter
+   * already uses. */
+  metalFamily?: PurityFamily;
 };
 
 export type KarigarListResponse = {
@@ -71,6 +81,7 @@ export type ExportKarigarsParams = {
   search?: string;
   sortBy?: KarigarSortBy;
   sortOrder?: SortOrder;
+  type?: string;
 };
 
 export type ExportResult = {
@@ -112,17 +123,41 @@ function mapKarigar(karigar: any): Karigar {
     openingCash: Number(karigar.openingCash),
     isActive: karigar.isActive,
     locationId: karigar.locationId ?? null,
+    metalTypeId: karigar.metalTypeId ?? null,
+    metalTypeName: karigar.metalType?.name ?? "",
     createdAt: karigar.createdAt?.toISOString?.() ?? undefined,
   };
 }
 
-function getWhere(storeId: string, search: string | undefined, scope: LocationScope, active = true) {
+/**
+ * StoreMetal is a free-text, store-managed list with no fixed FK for "the
+ * Gold row" — so filtering Karigars by Type first resolves which StoreMetal
+ * ids classify into the requested family (classifyPurityFamily, the same
+ * function Stock's own Type filter uses), then filters metalTypeId against
+ * that list.
+ */
+async function resolveMetalTypeIdsForFamily(storeId: string, family: PurityFamily) {
+  const metals = await prisma.storeMetal.findMany({
+    where: { storeId },
+    select: { id: true, name: true, isGemstone: true },
+  });
+  return metals.filter((metal) => classifyPurityFamily(metal) === family).map((metal) => metal.id);
+}
+
+function getWhere(
+  storeId: string,
+  search: string | undefined,
+  scope: LocationScope,
+  active = true,
+  metalTypeIds?: string[],
+) {
   const query = String(search || "").trim();
 
   return {
     storeId,
     isActive: active,
     ...locationWhere(scope),
+    ...(metalTypeIds ? { metalTypeId: { in: metalTypeIds } } : {}),
     ...(query
       ? {
           OR: [
@@ -156,7 +191,10 @@ export async function getKarigars(
   const sortOrder = params.sortOrder || "desc";
   const storeId = await requireStoreScope();
   const scope = await getLocationScope();
-  const where = getWhere(storeId, search, scope, params.active ?? true);
+  const metalTypeIds = params.metalFamily
+    ? await resolveMetalTypeIdsForFamily(storeId, params.metalFamily)
+    : undefined;
+  const where = getWhere(storeId, search, scope, params.active ?? true, metalTypeIds);
 
   const [totalCount, karigars] = await Promise.all([
     prisma.karigar.count({ where }),
@@ -165,6 +203,7 @@ export async function getKarigars(
       orderBy: getOrderBy(sortBy, sortOrder),
       skip: (page - 1) * pageSize,
       take: pageSize,
+      include: { metalType: { select: { name: true } } },
     }),
   ]);
 
@@ -188,6 +227,7 @@ export async function getKarigarById(id: string): Promise<Karigar | null> {
   const scope = await getLocationScope();
   const karigar = await prisma.karigar.findFirst({
     where: { id, storeId, ...locationWhere(scope) },
+    include: { metalType: { select: { name: true } } },
   });
   if (!karigar) return null;
   return mapKarigar(karigar);
@@ -213,6 +253,7 @@ function buildKarigarData(formData: FormData) {
     openingCash: toNumber(formData.get("openingCash")),
     isActive: formData.get("isActive") === "on" || formData.get("isActive") === "true",
     locationId: toOptionalString(formData.get("locationId")),
+    metalTypeId: toOptionalString(formData.get("metalTypeId")),
   };
 }
 
@@ -287,6 +328,20 @@ export async function createKarigar(
           success: false,
           message: "Selected location is invalid",
           errors: { locationId: ["Selected location could not be found"] },
+        };
+      }
+    }
+
+    if (data.metalTypeId) {
+      const metal = await prisma.storeMetal.findFirst({
+        where: { id: data.metalTypeId, storeId },
+        select: { id: true },
+      });
+      if (!metal) {
+        return {
+          success: false,
+          message: "Selected metal type is invalid",
+          errors: { metalTypeId: ["Selected metal type could not be found"] },
         };
       }
     }
@@ -377,6 +432,20 @@ export async function updateKarigar(
           success: false,
           message: "Selected location is invalid",
           errors: { locationId: ["Selected location could not be found"] },
+        };
+      }
+    }
+
+    if (data.metalTypeId) {
+      const metal = await prisma.storeMetal.findFirst({
+        where: { id: data.metalTypeId, storeId },
+        select: { id: true },
+      });
+      if (!metal) {
+        return {
+          success: false,
+          message: "Selected metal type is invalid",
+          errors: { metalTypeId: ["Selected metal type could not be found"] },
         };
       }
     }
@@ -640,13 +709,26 @@ export async function exportKarigarsToExcel(
 
     const storeId = await requireStoreScope();
     const scope = await getLocationScope();
+
+    const validFamilies: PurityFamily[] = ["GOLD", "SILVER", "PLATINUM", "DIAMOND", "STONE", "OTHER"];
+    const metalFamily = validFamilies.includes(params.type as PurityFamily)
+      ? (params.type as PurityFamily)
+      : undefined;
+
     const where = selectedIds?.length
       ? { id: { in: selectedIds }, storeId, ...locationWhere(scope) }
-      : getWhere(storeId, search, scope);
+      : getWhere(
+          storeId,
+          search,
+          scope,
+          true,
+          metalFamily ? await resolveMetalTypeIdsForFamily(storeId, metalFamily) : undefined,
+        );
 
     const karigars = await prisma.karigar.findMany({
       where,
       orderBy: getOrderBy(sortBy, sortOrder),
+      include: { metalType: { select: { name: true } } },
     });
 
     if (!karigars.length) {
@@ -664,6 +746,7 @@ export async function exportKarigarsToExcel(
       City: karigar.city ?? "",
       Pincode: karigar.pincode ?? "",
       Specialization: karigar.specialization ?? "",
+      "Metal Type": karigar.metalType?.name ?? "",
       GSTIN: karigar.gstNumber ?? "",
       "PAN Number": karigar.panNumber ?? "",
       "Aadhaar Number": karigar.aadhaarNumber ?? "",

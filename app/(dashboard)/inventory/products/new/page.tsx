@@ -8,6 +8,7 @@ import {
   getAllStoreMetalOrigins,
 } from "@/lib/actions/taxonomy-actions";
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions";
+import { getStoreLocations } from "@/lib/actions/store-location-actions";
 import { safeReturnTo } from "@/lib/safe-return-to";
 
 export const metadata: Metadata = {
@@ -24,11 +25,12 @@ export default async function NewProductPage({
   const params = (await searchParams) ?? {};
   const returnTo = safeReturnTo(params.returnTo);
 
-  const [metals, categories, caratConversionRates, origins] = await Promise.all([
+  const [metals, categories, caratConversionRates, origins, locations] = await Promise.all([
     getStoreMetals(),
     getStoreCategories(),
     getCaratConversionRateMap(),
     getAllStoreMetalOrigins(),
+    getStoreLocations(),
   ]);
 
   return (
@@ -45,6 +47,7 @@ export default async function NewProductPage({
         categories={categories}
         caratConversionRates={caratConversionRates}
         origins={origins}
+        locations={locations}
         returnTo={returnTo}
       />
     </main>

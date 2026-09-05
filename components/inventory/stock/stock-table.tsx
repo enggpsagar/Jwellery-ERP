@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { Eye, Pencil } from "lucide-react"
 
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import * as React from "react"
@@ -227,19 +228,21 @@ export function StockTable({
                   <td className="px-4 py-3">{formatDate(item.purchaseDate)}</td>
 
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
                       <Link
                         href={`/inventory/stock/${item.id}`}
-                        className="text-sm font-medium text-blue-600 hover:underline"
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
+                        title="View stock item"
                       >
-                        View
+                        <Eye className="h-4 w-4" />
                       </Link>
 
                       <Link
                         href={`/inventory/stock/${item.id}/edit`}
-                        className="text-sm font-medium text-blue-600 hover:underline"
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-amber-700 hover:bg-amber-50"
+                        title="Edit stock item"
                       >
-                        Edit
+                        <Pencil className="h-4 w-4" />
                       </Link>
                     </div>
                   </td>

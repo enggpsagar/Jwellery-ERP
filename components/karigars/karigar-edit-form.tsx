@@ -9,6 +9,7 @@ import {
 } from "@/lib/actions/karigar-actions"
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
 import type { StateOption } from "@/lib/actions/location-actions"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 
 import { KarigarForm } from "./karigar-form"
 
@@ -21,9 +22,10 @@ type Props = {
   karigar: Karigar
   locations?: StoreLocationRow[]
   states?: StateOption[]
+  metals?: StoreMetalRow[]
 }
 
-export function KarigarEditForm({ karigar, locations = [], states = [] }: Props) {
+export function KarigarEditForm({ karigar, locations = [], states = [], metals = [] }: Props) {
   const updateKarigarWithId = updateKarigar.bind(null, karigar.id)
 
   const [state, formAction, pending] = useActionState(
@@ -59,6 +61,7 @@ export function KarigarEditForm({ karigar, locations = [], states = [] }: Props)
         errors={state.errors}
         locations={locations}
         states={states}
+        metals={metals}
       />
     </form>
   )

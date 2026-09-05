@@ -82,6 +82,7 @@ export function KarigarTable({
               <SortableTableHead label="Name" sortKey="name" defaultSortBy="createdAt" />
               <th className="px-4 py-3 text-left font-medium">Mobile</th>
               <th className="px-4 py-3 text-left font-medium">Specialization</th>
+              <th className="px-4 py-3 text-left font-medium">Metal Type</th>
               <th className="px-4 py-3 text-left font-medium">City</th>
               <th className="px-4 py-3 text-left font-medium">Opening Gold</th>
               <th className="px-4 py-3 text-left font-medium">Opening Cash</th>
@@ -120,6 +121,7 @@ export function KarigarTable({
                           { label: "Mobile", value: karigar.mobile },
                           { label: "City", value: karigar.city },
                           { label: "Specialization", value: karigar.specialization },
+                          { label: "Metal Type", value: karigar.metalTypeName },
                         ],
                       },
                       {
@@ -134,6 +136,7 @@ export function KarigarTable({
                 </td>
                 <td className="px-4 py-3">{karigar.mobile || "-"}</td>
                 <td className="px-4 py-3">{karigar.specialization || "-"}</td>
+                <td className="px-4 py-3">{karigar.metalTypeName || "-"}</td>
                 <td className="px-4 py-3">{karigar.city || "-"}</td>
                 <td className="px-4 py-3">{karigar.openingGold.toFixed(3)} g</td>
                 <td className="px-4 py-3">₹{karigar.openingCash.toFixed(2)}</td>

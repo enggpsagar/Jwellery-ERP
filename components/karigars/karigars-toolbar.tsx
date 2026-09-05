@@ -57,6 +57,7 @@ export function KarigarsToolbar({ selectedKarigarIds, bulkActions }: KarigarsToo
     | "asc"
     | "desc"
   const currentPageSize = searchParams.get("pageSize") ?? "10"
+  const currentType = searchParams.get("type") ?? "ALL"
 
   const [search, setSearch] = React.useState(currentSearch)
   const [isPending, startTransition] = React.useTransition()
@@ -112,7 +113,12 @@ export function KarigarsToolbar({ selectedKarigarIds, bulkActions }: KarigarsToo
       const result = await exportKarigarsToExcel(
         hasSelection
           ? { selectedIds: selectedKarigarIds, sortBy: currentSortBy, sortOrder: currentSortOrder }
-          : { search: currentSearch, sortBy: currentSortBy, sortOrder: currentSortOrder },
+          : {
+              search: currentSearch,
+              sortBy: currentSortBy,
+              sortOrder: currentSortOrder,
+              type: currentType !== "ALL" ? currentType : undefined,
+            },
       )
 
       if (!result.success || !result.fileBase64 || !result.fileName) {
@@ -144,6 +150,21 @@ export function KarigarsToolbar({ selectedKarigarIds, bulkActions }: KarigarsToo
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+        <select
+          className="rounded-md border px-3 py-2 text-sm"
+          value={currentType}
+          onChange={(e) => updateParam("type", e.target.value)}
+          disabled={isPending}
+        >
+          <option value="ALL">All Types</option>
+          <option value="GOLD">Gold</option>
+          <option value="SILVER">Silver</option>
+          <option value="PLATINUM">Platinum</option>
+          <option value="DIAMOND">Diamond</option>
+          <option value="STONE">Stone</option>
+          <option value="OTHER">Other</option>
+        </select>
+
         <select
           className="rounded-md border px-3 py-2 text-sm"
           value={currentSortBy}

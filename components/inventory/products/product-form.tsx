@@ -13,6 +13,7 @@ import {
 } from "@/lib/actions/taxonomy-actions";
 import { classifyPurityFamily, type PurityFamily } from "@/lib/business-units";
 import { resolveGramsPerCarat } from "@/lib/purity";
+import { LocationSelect, type LocationOption } from "@/components/shared/location-select";
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle";
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields";
 import { AddCategoryDialog } from "@/components/inventory/shared/add-category-dialog";
@@ -105,6 +106,12 @@ type ProductFormProps = {
   /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
    * Conversion Rules) — see the same prop on InvoiceForm. */
   caratConversionRates: Record<PurityType, number>;
+  /** Create-only — the quick "Stock entry" section's Location picker.
+   * Blank/omitted is fine even for a location-restricted user: the server
+   * action resolves the same default a full Add Stock entry would (their
+   * one location auto-picked, or an explicit error if they hold more than
+   * one and didn't choose) — see resolveWritableLocationId. */
+  locations?: LocationOption[];
 };
 
 function ErrorText({ error }: { error?: string[] }) {
@@ -122,6 +129,7 @@ export function ProductForm({
   categories: initialCategories,
   origins: initialOrigins,
   caratConversionRates,
+  locations = [],
 }: ProductFormProps) {
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? "");
 
@@ -1197,21 +1205,37 @@ export function ProductForm({
           </label>
 
           {createStock && (
-            <div className="mt-4 max-w-xs">
-              <Label htmlFor="stockQuantity">Quantity</Label>
-              <Input
-                id="stockQuantity"
-                name="stockQuantity"
-                type="number"
-                min="0"
-                step="1"
-                placeholder="0"
-              />
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                Leave blank and the entry is created with a quantity of 0 —
-                the product is stockable, with none on hand yet.
-              </p>
-              <ErrorText error={state.errors.stockQuantity} />
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="stockQuantity">Quantity</Label>
+                <Input
+                  id="stockQuantity"
+                  name="stockQuantity"
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="0"
+                />
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Leave blank and the entry is created with a quantity of 0 —
+                  the product is stockable, with none on hand yet.
+                </p>
+                <ErrorText error={state.errors.stockQuantity} />
+              </div>
+
+              <div>
+                <Label htmlFor="locationId">Location</Label>
+                <LocationSelect
+                  locations={locations}
+                  name="locationId"
+                  placeholder="Select location (optional)"
+                />
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Optional — left blank, the same default a full Add Stock
+                  entry would use is applied automatically.
+                </p>
+                <ErrorText error={state.errors.locationId} />
+              </div>
             </div>
           )}
         </div>

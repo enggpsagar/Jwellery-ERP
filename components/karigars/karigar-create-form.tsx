@@ -10,6 +10,7 @@ import {
 } from "@/lib/actions/karigar-actions"
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
 import type { StateOption } from "@/lib/actions/location-actions"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { KarigarForm } from "./karigar-form"
@@ -27,9 +28,10 @@ const initialState: KarigarFormState = {
 type Props = {
   locations?: StoreLocationRow[]
   states?: StateOption[]
+  metals?: StoreMetalRow[]
 }
 
-export function KarigarCreateForm({ locations = [], states = [] }: Props){
+export function KarigarCreateForm({ locations = [], states = [], metals = [] }: Props){
 
   const router = useRouter()
   const toast = useToast()
@@ -97,6 +99,7 @@ export function KarigarCreateForm({ locations = [], states = [] }: Props){
         errors={state.errors}
         locations={locations}
         states={states}
+        metals={metals}
       />
 
 

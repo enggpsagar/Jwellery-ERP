@@ -7,7 +7,6 @@ type IncludesStoneToggleProps = {
   onChange: (checked: boolean) => void;
   label?: string;
   className?: string;
-  disabled?: boolean;
 };
 
 /**
@@ -22,20 +21,17 @@ export function IncludesStoneToggle({
   onChange,
   label = "Includes a Stone",
   className,
-  disabled = false,
 }: IncludesStoneToggleProps) {
   return (
     <label
       className={cn(
-        "inline-flex select-none items-center gap-2 text-sm font-semibold",
-        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+        "inline-flex cursor-pointer select-none items-center gap-2 text-sm font-semibold",
         className
       )}
     >
       <input
         type="checkbox"
         checked={checked}
-        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
         className="peer sr-only"
       />

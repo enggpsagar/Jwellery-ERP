@@ -301,20 +301,6 @@ export function ProductForm({
     product?.hasStoneComponent ?? false,
   );
 
-  // A loose Diamond/Stone product IS the stone (its whole weight is carat-
-  // based) — it can't also "include a stone" as a separate embedded
-  // component. Mirrors the defaultPurity auto-clear above: switching the
-  // metal into a carat family forces this off rather than silently keeping
-  // both flags set, which used to hide the entire Stone Pricing section
-  // (see the isCaratFamily/hasStoneComponent gates below) with no way to
-  // view or edit a product's already-saved Stone Rate/Charge/Type at all.
-  useEffect(() => {
-    if (isCaratFamily && hasStoneComponent) {
-      setHasStoneComponent(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCaratFamily]);
-
   const [stoneRate, setStoneRate] = useState(product?.defaultStoneRate ?? "");
 
   // Stone Charge — Stone Rate x Stone Carat Weight — had no input on this
@@ -858,14 +844,7 @@ export function ProductForm({
             <IncludesStoneToggle
               checked={hasStoneComponent}
               onChange={setHasStoneComponent}
-              disabled={isCaratFamily}
             />
-            {isCaratFamily && (
-              <p className="ml-3 text-xs text-muted-foreground">
-                Not applicable — {selectedMetal?.name ?? "this metal"} is
-                already carat-weighed as its own stone.
-              </p>
-            )}
             <input
               type="hidden"
               name="hasStoneComponent"
@@ -964,11 +943,12 @@ export function ProductForm({
             <ErrorText error={state.errors.defaultGrossWeight} />
           </div>
 
-          {/* Once this is a composite piece with "Includes a Stone" checked,
-              Stone Weight moves down into the Stone Pricing box below, next
-              to the Stone Carat Weight it mirrors — see there. It stays here
-              for a plain metal item or a genuinely carat-weighed one. */}
-          {!(hasStoneComponent && !isCaratFamily) && (
+          {/* Once "Includes a Stone" is checked, Stone Weight moves down
+              into the Stone Pricing box below, next to the Stone Carat
+              Weight it mirrors — see there, regardless of whether the
+              product's own metal happens to be carat-weighed too. It stays
+              here only for a plain metal item with no stone component. */}
+          {!hasStoneComponent && (
             <div>
               <Label htmlFor="defaultStoneWeight">Stone Weight (g)</Label>
 
@@ -1012,9 +992,11 @@ export function ProductForm({
 
           {/* Carat Weight for a genuinely carat-weighed item (a loose
               Diamond/Stone product, its own entire weight) stays here.
-              The composite case (Carat Weight as an embedded stone's own
-              weight) moves into the Stone Pricing box below instead. */}
-          {isCaratFamily && (
+              Once "Includes a Stone" is also checked on top of that, this
+              same field moves into the Stone Pricing box below instead
+              (as the embedded stone's own carat weight) so there is one
+              Carat Weight input, not two bound to the same value. */}
+          {isCaratFamily && !hasStoneComponent && (
             <div>
               <Label htmlFor="defaultCaratWeight">Carat Weight (ct)</Label>
 
@@ -1042,8 +1024,10 @@ export function ProductForm({
 
         {/* Every stone-pricing field grouped together once "Includes a
             Stone" is checked, mirroring the same grouping used for a
-            composite line item on Invoice/Purchase/Kacha/Quotation. */}
-        {hasStoneComponent && !isCaratFamily && (
+            composite line item on Invoice/Purchase/Kacha/Quotation —
+            regardless of the product's own metal family, so these fields
+            (and whatever was already saved in them) are never hidden. */}
+        {hasStoneComponent && (
           <div className="mt-6 rounded-lg border border-dashed p-4">
             <h4 className="mb-4 text-sm font-semibold">Stone Pricing</h4>
 

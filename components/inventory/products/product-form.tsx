@@ -340,41 +340,43 @@ export function ProductForm({
   function handleCaratWeightChange(value: string) {
     setCaratWeight(value);
 
-    // A genuinely carat-weighed item (Diamond/Stone as the product's own
-    // metal) converts Carat Weight into Net Weight.
-    if (isCaratFamily) {
+    // "Includes a Stone" checked means this Carat Weight input is the one
+    // living in the Stone Pricing box — the embedded stone's own weight —
+    // regardless of whether the product's own metal also happens to be
+    // carat-family. Checked first, ahead of isCaratFamily below: a Diamond-
+    // metal product with Includes a Stone also checked still edits this
+    // same field, and it must drive Stone Charge/Stone Weight, not silently
+    // fall into the loose-item branch and leave them uncalculated.
+    if (hasStoneComponent) {
       const caratNum = Number(value);
-      if (value.trim() !== "" && Number.isFinite(caratNum)) {
-        setNetTouched(true);
+      const carat = value.trim() !== "" && Number.isFinite(caratNum) ? caratNum : 0;
+
+      if (!stoneChargeTouched) {
+        const rate = stoneRate.trim() === "" ? 0 : Number(stoneRate) || 0;
+        setStoneCharge(String(Number((rate * carat).toFixed(2))));
+      }
+
+      // Stone Weight (g) has no unit toggle here (always grams, unlike a
+      // line item's stoneWeightUnit) — always converts carat -> grams using
+      // the same store-configurable resolveGramsPerCarat rate as everywhere
+      // else on this form, rather than leaving Stone Weight alone.
+      if (!stoneWeightTouched) {
         const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
-        setNetWeight(String(Number((caratNum * gramsPerCarat).toFixed(5))));
+        setStoneWeight(String(Number((carat * gramsPerCarat).toFixed(5))));
       }
       return;
     }
 
-    // For a composite piece, Carat Weight is the embedded stone's own
-    // weight, independent of the metal's Net Weight — no conversion into
-    // Net Weight applies. Instead it drives this stone's own pricing
-    // (Stone Charge) and its own physical weight (Stone Weight), mirroring
-    // the stoneChargeTouched/stoneWeightTouched pattern on every line-item
-    // form's Stone Charge/Net Stone Weight fields.
-    if (!hasStoneComponent) return;
+    // A genuinely carat-weighed item with no embedded stone (Diamond/Stone
+    // as the product's own metal, its whole weight) converts Carat Weight
+    // into Net Weight instead.
+    if (!isCaratFamily) return;
 
     const caratNum = Number(value);
-    const carat = value.trim() !== "" && Number.isFinite(caratNum) ? caratNum : 0;
-
-    if (!stoneChargeTouched) {
-      const rate = stoneRate.trim() === "" ? 0 : Number(stoneRate) || 0;
-      setStoneCharge(String(Number((rate * carat).toFixed(2))));
-    }
-
-    // Stone Weight (g) has no unit toggle here (always grams, unlike a line
-    // item's stoneWeightUnit) — always converts carat -> grams using the
-    // same store-configurable resolveGramsPerCarat rate as everywhere else
-    // on this form, rather than leaving Stone Weight alone.
-    if (!stoneWeightTouched) {
+    if (value.trim() !== "" && Number.isFinite(caratNum)) {
+      setNetTouched(true);
       const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
-      setStoneWeight(String(Number((carat * gramsPerCarat).toFixed(5))));
+      setNetWeight(String(Number((caratNum * gramsPerCarat).toFixed(5))));
     }
   }
 
@@ -403,7 +405,13 @@ export function ProductForm({
     setNetTouched(true);
     setNetWeight(value);
 
-    if (!isCaratFamily) return;
+    // Only reverse-syncs into Carat Weight for a genuinely carat-weighed
+    // item with no embedded stone — the same isCaratFamily && !hasStoneComponent
+    // condition the standalone Carat Weight field itself is shown under.
+    // Once "Includes a Stone" is checked, Carat Weight belongs to the
+    // embedded stone in the Stone Pricing box instead, and editing the
+    // metal's own Net Weight here must not silently overwrite it.
+    if (!isCaratFamily || hasStoneComponent) return;
 
     const netNum = Number(value);
     if (value.trim() !== "" && Number.isFinite(netNum)) {
@@ -727,18 +735,22 @@ export function ProductForm({
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div>
-            <Label>Metal Type <RequiredMark /></Label>
+            {/* This list mixes real metals (Gold/Silver/Platinum) with
+                gemstones (StoreMetal rows with isGemstone: true, e.g.
+                Diamond/Ruby) — "Metal Type" alone read as metals-only and
+                confused anyone picking a gemstone product. */}
+            <Label>Metal / Stone Type <RequiredMark /></Label>
 
             <div className="flex gap-1.5">
               <Select value={metalTypeId} onValueChange={setMetalTypeId}>
                 <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="Select metal type" />
+                  <SelectValue placeholder="Select metal or stone type" />
                 </SelectTrigger>
 
                 <SelectContent>
                   <div className="p-2">
                     <Input
-                      placeholder="Search metal types..."
+                      placeholder="Search metal or stone types..."
                       value={metalSearch}
                       onChange={(event) => setMetalSearch(event.target.value)}
                       onKeyDown={(event) => event.stopPropagation()}
@@ -747,7 +759,7 @@ export function ProductForm({
 
                   {filteredMetals.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No metal types found{metalSearch ? ` for "${metalSearch}"` : ""}
+                      No metal or stone types found{metalSearch ? ` for "${metalSearch}"` : ""}
                     </div>
                   ) : (
                     filteredMetals.map((item) => (
@@ -765,7 +777,7 @@ export function ProductForm({
                 variant="secondary"
                 size="icon"
                 className="h-11 w-9 shrink-0 px-0"
-                title="Add Metal Type"
+                title="Add Metal or Stone Type"
                 onClick={() => setAddMetalOpen(true)}
               >
                 <Plus className="h-4 w-4" />

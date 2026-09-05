@@ -10,6 +10,8 @@ import { PageBackHeader } from "@/components/shared/page-back-header"
 import { StockTable } from "@/components/inventory/stock/stock-table"
 import { StockToolbar } from "@/components/inventory/stock/stock-toolbar"
 import { WebcamQrScanner } from "@/components/shared/webcam-qr-scanner"
+import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
+import { bulkDeleteInventoryStock } from "@/lib/actions/inventory/stock-actions"
 
 type Pagination = {
   page: number
@@ -79,7 +81,19 @@ export function StockClient({ stockItems, pagination }: StockClientProps) {
         />
       ) : null}
 
-      <StockToolbar selectedIds={selectedIds} />
+      <div className="flex flex-wrap items-center gap-2">
+        <StockToolbar selectedIds={selectedIds} />
+        <BulkDeleteButton
+          selectedIds={selectedIds}
+          itemLabelSingular="stock item"
+          itemLabelPlural="stock items"
+          getDisplayName={(id) =>
+            stockItems.find((item) => item.id === id)?.stockCode ?? id
+          }
+          onDelete={bulkDeleteInventoryStock}
+          onDone={() => setSelectedIds([])}
+        />
+      </div>
 
       <StockTable
         stockItems={stockItems}

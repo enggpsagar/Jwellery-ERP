@@ -81,19 +81,21 @@ export function StockClient({ stockItems, pagination }: StockClientProps) {
         />
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <StockToolbar selectedIds={selectedIds} />
-        <BulkDeleteButton
-          selectedIds={selectedIds}
-          itemLabelSingular="stock item"
-          itemLabelPlural="stock items"
-          getDisplayName={(id) =>
-            stockItems.find((item) => item.id === id)?.stockCode ?? id
-          }
-          onDelete={bulkDeleteInventoryStock}
-          onDone={() => setSelectedIds([])}
-        />
-      </div>
+      <StockToolbar
+        selectedIds={selectedIds}
+        bulkActions={
+          <BulkDeleteButton
+            selectedIds={selectedIds}
+            itemLabelSingular="stock item"
+            itemLabelPlural="stock items"
+            getDisplayName={(id) =>
+              stockItems.find((item) => item.id === id)?.stockCode ?? id
+            }
+            onDelete={bulkDeleteInventoryStock}
+            onDone={() => setSelectedIds([])}
+          />
+        }
+      />
 
       <StockTable
         stockItems={stockItems}

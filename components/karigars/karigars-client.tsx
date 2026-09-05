@@ -54,17 +54,19 @@ export function KarigarsClient({ karigars, pagination }: KarigarsClientProps) {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <KarigarsToolbar selectedKarigarIds={selectedKarigarIds} />
-        <BulkDeleteButton
-          selectedIds={selectedKarigarIds}
-          itemLabelSingular="karigar"
-          itemLabelPlural="karigars"
-          getDisplayName={(id) => karigars.find((karigar) => karigar.id === id)?.name ?? id}
-          onDelete={bulkDeleteKarigars}
-          onDone={() => setSelectedKarigarIds([])}
-        />
-      </div>
+      <KarigarsToolbar
+        selectedKarigarIds={selectedKarigarIds}
+        bulkActions={
+          <BulkDeleteButton
+            selectedIds={selectedKarigarIds}
+            itemLabelSingular="karigar"
+            itemLabelPlural="karigars"
+            getDisplayName={(id) => karigars.find((karigar) => karigar.id === id)?.name ?? id}
+            onDelete={bulkDeleteKarigars}
+            onDone={() => setSelectedKarigarIds([])}
+          />
+        }
+      />
 
       <KarigarTable
         karigars={karigars}

@@ -11,6 +11,11 @@ import { useToast } from "@/components/providers/toast-provider"
 
 type CustomersToolbarProps = {
   selectedCustomerIds: string[]
+  /** BulkDeleteButton, rendered inside this same bordered bar (next to
+   * Export) instead of as a separate floating box beside it — it already
+   * renders nothing when nothing is selected, so this slot is simply empty
+   * until a row is ticked. */
+  bulkActions?: React.ReactNode
 }
 
 function downloadBase64File(base64: string, fileName: string) {
@@ -38,6 +43,7 @@ function downloadBase64File(base64: string, fileName: string) {
 
 export function CustomersToolbar({
   selectedCustomerIds,
+  bulkActions,
 }: CustomersToolbarProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -190,6 +196,8 @@ export function CustomersToolbar({
             </>
           )}
         </Button>
+
+        {bulkActions}
       </div>
     </div>
   )

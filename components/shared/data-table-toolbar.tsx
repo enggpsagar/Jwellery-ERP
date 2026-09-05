@@ -36,6 +36,11 @@ type DataTableToolbarProps = {
   selectedIds?: string[]
   entityLabel: string
   exportAction: (params: DataTableExportParams) => Promise<DataTableExportResult>
+  /** BulkDeleteButton, rendered inside this same bordered bar (next to
+   * Export) instead of as a separate floating box beside it — it already
+   * renders nothing when nothing is selected, so this slot is simply empty
+   * until a row is ticked. */
+  bulkActions?: React.ReactNode
 }
 
 /**
@@ -55,6 +60,7 @@ export function DataTableToolbar({
   selectedIds,
   entityLabel,
   exportAction,
+  bulkActions,
 }: DataTableToolbarProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -230,6 +236,8 @@ export function DataTableToolbar({
             </>
           )}
         </Button>
+
+        {bulkActions}
       </div>
     </div>
   )

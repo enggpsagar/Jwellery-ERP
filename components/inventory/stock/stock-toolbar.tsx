@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { Printer } from "lucide-react"
 
@@ -9,9 +10,12 @@ import { exportInventoryStockToExcel } from "@/lib/actions/inventory/stock-actio
 
 type StockToolbarProps = {
   selectedIds: string[]
+  /** BulkDeleteButton, rendered inside DataTableToolbar's own bordered bar
+   * (next to Export) instead of as a separate floating box beside it. */
+  bulkActions?: ReactNode
 }
 
-export function StockToolbar({ selectedIds }: StockToolbarProps) {
+export function StockToolbar({ selectedIds, bulkActions }: StockToolbarProps) {
   const router = useRouter()
 
   const handlePrintQr = () => {
@@ -41,6 +45,7 @@ export function StockToolbar({ selectedIds }: StockToolbarProps) {
         selectedIds={selectedIds}
         entityLabel="stock items"
         exportAction={exportInventoryStockToExcel}
+        bulkActions={bulkActions}
       />
 
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">

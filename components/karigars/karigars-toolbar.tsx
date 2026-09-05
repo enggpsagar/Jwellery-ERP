@@ -12,6 +12,11 @@ import { useToast } from "@/components/providers/toast-provider"
 
 type KarigarsToolbarProps = {
   selectedKarigarIds: string[]
+  /** BulkDeleteButton, rendered inside this same bordered bar (next to
+   * Export) instead of as a separate floating box beside it — it already
+   * renders nothing when nothing is selected, so this slot is simply empty
+   * until a row is ticked. */
+  bulkActions?: React.ReactNode
 }
 
 function downloadBase64File(base64: string, fileName: string) {
@@ -37,7 +42,7 @@ function downloadBase64File(base64: string, fileName: string) {
   window.URL.revokeObjectURL(url)
 }
 
-export function KarigarsToolbar({ selectedKarigarIds }: KarigarsToolbarProps) {
+export function KarigarsToolbar({ selectedKarigarIds, bulkActions }: KarigarsToolbarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -190,6 +195,8 @@ export function KarigarsToolbar({ selectedKarigarIds }: KarigarsToolbarProps) {
             </>
           )}
         </Button>
+
+        {bulkActions}
       </div>
     </div>
   )

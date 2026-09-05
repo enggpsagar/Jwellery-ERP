@@ -58,34 +58,34 @@ export function ProductsClient({
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <DataTableToolbar
-          searchPlaceholder="Search by name, product code, design code..."
-          sortOptions={[
-            { value: "name", label: "Sort by Name" },
-            { value: "productCode", label: "Sort by Product Code" },
-            { value: "createdAt", label: "Sort by Created Date" },
-            { value: "category", label: "Sort by Category" },
-            { value: "categoryType", label: "Sort by Type" },
-            { value: "metalType", label: "Sort by Metal" },
-            { value: "defaultPurity", label: "Sort by Purity" },
-            { value: "defaultNetWeight", label: "Sort by Net Weight" },
-            { value: "isActive", label: "Sort by Status" },
-          ]}
-          defaultSortBy="createdAt"
-          selectedIds={selectedIds}
-          entityLabel="products"
-          exportAction={exportProductsToExcel}
-        />
-        <BulkDeleteButton
-          selectedIds={selectedIds}
-          itemLabelSingular="product"
-          itemLabelPlural="products"
-          getDisplayName={(id) => products.find((product) => product.id === id)?.name ?? id}
-          onDelete={bulkDeleteProducts}
-          onDone={() => setSelectedIds([])}
-        />
-      </div>
+      <DataTableToolbar
+        searchPlaceholder="Search by name, product code, design code..."
+        sortOptions={[
+          { value: "name", label: "Sort by Name" },
+          { value: "productCode", label: "Sort by Product Code" },
+          { value: "createdAt", label: "Sort by Created Date" },
+          { value: "category", label: "Sort by Category" },
+          { value: "categoryType", label: "Sort by Type" },
+          { value: "metalType", label: "Sort by Metal" },
+          { value: "defaultPurity", label: "Sort by Purity" },
+          { value: "defaultNetWeight", label: "Sort by Net Weight" },
+          { value: "isActive", label: "Sort by Status" },
+        ]}
+        defaultSortBy="createdAt"
+        selectedIds={selectedIds}
+        entityLabel="products"
+        exportAction={exportProductsToExcel}
+        bulkActions={
+          <BulkDeleteButton
+            selectedIds={selectedIds}
+            itemLabelSingular="product"
+            itemLabelPlural="products"
+            getDisplayName={(id) => products.find((product) => product.id === id)?.name ?? id}
+            onDelete={bulkDeleteProducts}
+            onDone={() => setSelectedIds([])}
+          />
+        }
+      />
 
       <ProductsTable
         canEdit={canEdit}

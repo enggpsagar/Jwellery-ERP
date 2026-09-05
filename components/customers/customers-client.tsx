@@ -61,17 +61,19 @@ export function CustomersClient({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <CustomersToolbar selectedCustomerIds={selectedCustomerIds} />
-        <BulkDeleteButton
-          selectedIds={selectedCustomerIds}
-          itemLabelSingular="customer"
-          itemLabelPlural="customers"
-          getDisplayName={(id) => customers.find((customer) => customer.id === id)?.name ?? id}
-          onDelete={bulkDeleteCustomers}
-          onDone={() => setSelectedCustomerIds([])}
-        />
-      </div>
+      <CustomersToolbar
+        selectedCustomerIds={selectedCustomerIds}
+        bulkActions={
+          <BulkDeleteButton
+            selectedIds={selectedCustomerIds}
+            itemLabelSingular="customer"
+            itemLabelPlural="customers"
+            getDisplayName={(id) => customers.find((customer) => customer.id === id)?.name ?? id}
+            onDelete={bulkDeleteCustomers}
+            onDone={() => setSelectedCustomerIds([])}
+          />
+        }
+      />
 
       <CustomersTable
         customers={customers}

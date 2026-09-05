@@ -58,17 +58,19 @@ export function VendorsClient({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <VendorsToolbar selectedVendorIds={selectedVendorIds} />
-        <BulkDeleteButton
-          selectedIds={selectedVendorIds}
-          itemLabelSingular="vendor"
-          itemLabelPlural="vendors"
-          getDisplayName={(id) => vendors.find((vendor) => vendor.id === id)?.name ?? id}
-          onDelete={bulkDeleteVendors}
-          onDone={() => setSelectedVendorIds([])}
-        />
-      </div>
+      <VendorsToolbar
+        selectedVendorIds={selectedVendorIds}
+        bulkActions={
+          <BulkDeleteButton
+            selectedIds={selectedVendorIds}
+            itemLabelSingular="vendor"
+            itemLabelPlural="vendors"
+            getDisplayName={(id) => vendors.find((vendor) => vendor.id === id)?.name ?? id}
+            onDelete={bulkDeleteVendors}
+            onDone={() => setSelectedVendorIds([])}
+          />
+        }
+      />
 
       <VendorsTable
         vendors={vendors}

@@ -15,6 +15,15 @@
 export const MONEY_UNIT = "MONEY" as const
 
 /**
+ * Sentinel for the Stock/Karigars/Products "Type" filter's "no metal set"
+ * option — those tables' metalTypeId columns are nullable. Shared here
+ * (not exported from the `"use server"` action files, which may only
+ * export async functions) so both the server-side filter resolution and
+ * the client-side toolbar dropdowns use the same literal.
+ */
+export const UNASSIGNED_METAL_TYPE = "UNASSIGNED" as const
+
+/**
  * The sentinel is never carat-based, so `formatUnitValue` needs to know
  * whether a resolved (non-money) unit is a gemstone (carats) or a plain
  * metal (grams) — this is StoreMetal.isGemstone, not a name guess, wherever

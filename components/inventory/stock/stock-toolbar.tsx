@@ -7,15 +7,21 @@ import { Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DataTableToolbar } from "@/components/shared/data-table-toolbar"
 import { exportInventoryStockToExcel } from "@/lib/actions/inventory/stock-actions"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 
 type StockToolbarProps = {
   selectedIds: string[]
+  /** The store's own configured metals/stones (Settings > Taxonomy) — the
+   * Type filter's options come directly from this list, so a metal added
+   * there shows up here with no code change. */
+  metals: StoreMetalRow[]
   /** BulkDeleteButton, rendered inside DataTableToolbar's own bordered bar
    * (next to Export) instead of as a separate floating box beside it. */
   bulkActions?: ReactNode
 }
 
-export function StockToolbar({ selectedIds, bulkActions }: StockToolbarProps) {
+export function StockToolbar({ selectedIds, metals, bulkActions }: StockToolbarProps) {
   const router = useRouter()
 
   const handlePrintQr = () => {
@@ -46,12 +52,10 @@ export function StockToolbar({ selectedIds, bulkActions }: StockToolbarProps) {
         entityLabel="stock items"
         exportAction={exportInventoryStockToExcel}
         typeOptions={[
-          { value: "GOLD", label: "Gold" },
-          { value: "SILVER", label: "Silver" },
-          { value: "PLATINUM", label: "Platinum" },
-          { value: "DIAMOND", label: "Diamond" },
-          { value: "STONE", label: "Stone" },
-          { value: "OTHER", label: "Other" },
+          ...metals
+            .filter((metal) => metal.isActive)
+            .map((metal) => ({ value: metal.id, label: metal.name })),
+          { value: UNASSIGNED_METAL_TYPE, label: "Unassigned" },
         ]}
         bulkActions={bulkActions}
       />

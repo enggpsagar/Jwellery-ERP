@@ -10,6 +10,7 @@ import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
 import { bulkDeleteKarigars, type Karigar } from "@/lib/actions/karigar-actions"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 
 type PaginationInfo = {
   page: number
@@ -23,9 +24,10 @@ type PaginationInfo = {
 type KarigarsClientProps = {
   karigars: Karigar[]
   pagination: PaginationInfo
+  metals: StoreMetalRow[]
 }
 
-export function KarigarsClient({ karigars, pagination }: KarigarsClientProps) {
+export function KarigarsClient({ karigars, pagination, metals }: KarigarsClientProps) {
   const [selectedKarigarIds, setSelectedKarigarIds] = React.useState<string[]>([])
 
   React.useEffect(() => {
@@ -56,6 +58,7 @@ export function KarigarsClient({ karigars, pagination }: KarigarsClientProps) {
 
       <KarigarsToolbar
         selectedKarigarIds={selectedKarigarIds}
+        metals={metals}
         bulkActions={
           <BulkDeleteButton
             selectedIds={selectedKarigarIds}

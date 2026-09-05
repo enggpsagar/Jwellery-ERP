@@ -24,8 +24,8 @@ import {
 } from "@/lib/location-scope"
 import type { StockFormState } from "@/lib/inventory/stock-types"
 import { buildExcelExport, buildMultiSheetExcelExport, parseExcelUpload } from "@/lib/excel-export"
+import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 import { getFinenessMap, toFineWeight } from "@/lib/purity"
-import { classifyPurityFamily, type PurityFamily } from "@/lib/business-units"
 
 function parseNullableString(value: FormDataEntryValue | null) {
   const parsed = String(value || "").trim()
@@ -97,10 +97,10 @@ export type GetInventoryStockParams = {
   search?: string
   sortBy?: StockSortBy
   sortOrder?: StockSortOrder
-  /** Gold/Silver/Platinum/Diamond/Stone/Other — derived from each stock
-   * item's metalType (name + isGemstone), same classification the product
-   * form already uses, not a stored column of its own. */
-  metalFamily?: PurityFamily
+  /** Filters by the store's own StoreMetal id (Settings > Taxonomy) — or
+   * "UNASSIGNED" for stock with no metal set. Dynamic: whatever the store
+   * has configured, not a fixed set of categories. */
+  metalTypeId?: string
 }
 
 type ExportInventoryStockParams = {
@@ -132,36 +132,30 @@ const STOCK_INCLUDE = {
 } as const
 
 /**
- * StoreMetal is a free-text, store-managed list with no fixed FK for "the
- * Gold row" — so filtering Stock by Type first resolves which StoreMetal
- * ids classify into the requested family (classifyPurityFamily, the same
- * function the product form uses), then filters metalTypeId against that
- * list. Store-scoped and read once per request rather than N+1 per stock
- * row.
+ * "Type" filters directly by the store's own configured StoreMetal id —
+ * whatever metals/stones this store has set up in Settings > Taxonomy, not
+ * a fixed set of hardcoded categories. A store adding a new metal or stone
+ * there needs no code change for it to show up as its own filter option
+ * (see getStoreMetals, used by the Stock/Karigars toolbars to build the
+ * dropdown). The sentinel "UNASSIGNED" filters to rows with no metal set at
+ * all, since InventoryStock.metalTypeId is nullable.
  */
-async function resolveMetalTypeIdsForFamily(storeId: string, family: PurityFamily) {
-  const metals = await prisma.storeMetal.findMany({
-    where: { storeId },
-    select: { id: true, name: true, isGemstone: true },
-  })
-
-  return metals
-    .filter((metal) => classifyPurityFamily(metal) === family)
-    .map((metal) => metal.id)
-}
-
 function getStockWhere(
   storeId: string,
   search: string | undefined,
   scope: LocationScope,
-  metalTypeIds?: string[],
+  metalTypeId?: string,
 ) {
   const query = String(search || "").trim()
 
   return {
     storeId,
     ...locationWhere(scope),
-    ...(metalTypeIds ? { metalTypeId: { in: metalTypeIds } } : {}),
+    ...(metalTypeId === UNASSIGNED_METAL_TYPE
+      ? { metalTypeId: null }
+      : metalTypeId
+        ? { metalTypeId }
+        : {}),
     ...(query
       ? {
           OR: [
@@ -228,10 +222,7 @@ export async function getInventoryStock(params: GetInventoryStockParams = {}) {
 
   const storeId = await requireStoreScope()
   const scope = await getLocationScope()
-  const metalTypeIds = params.metalFamily
-    ? await resolveMetalTypeIdsForFamily(storeId, params.metalFamily)
-    : undefined
-  const where = getStockWhere(storeId, search, scope, metalTypeIds)
+  const where = getStockWhere(storeId, search, scope, params.metalTypeId)
   const orderBy = getStockOrderBy(sortBy, sortOrder)
 
   const [totalCount, rows] = await Promise.all([
@@ -286,21 +277,13 @@ async function getAllInventoryStockForExport(
   const storeId = await requireStoreScope()
   const scope = await getLocationScope()
 
-  const validFamilies: PurityFamily[] = ["GOLD", "SILVER", "PLATINUM", "DIAMOND", "STONE", "OTHER"]
-  const metalFamily = validFamilies.includes(params.type as PurityFamily)
-    ? (params.type as PurityFamily)
-    : undefined
-  const metalTypeIds = metalFamily
-    ? await resolveMetalTypeIdsForFamily(storeId, metalFamily)
-    : undefined
-
   const where = params.selectedIds?.length
     ? {
         id: { in: params.selectedIds },
         storeId,
         ...locationWhere(scope),
       }
-    : getStockWhere(storeId, params.search, scope, metalTypeIds)
+    : getStockWhere(storeId, params.search, scope, params.type)
 
   const rows = await prisma.inventoryStock.findMany({
     where,

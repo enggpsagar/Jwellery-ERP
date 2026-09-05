@@ -13,6 +13,7 @@ import { WebcamQrScanner } from "@/components/shared/webcam-qr-scanner"
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
 import { StockImportDialog } from "@/components/inventory/stock/stock-import-dialog"
 import { bulkDeleteInventoryStock } from "@/lib/actions/inventory/stock-actions"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 
 type Pagination = {
   page: number
@@ -26,9 +27,10 @@ type Pagination = {
 type StockClientProps = {
   stockItems: React.ComponentProps<typeof StockTable>["stockItems"]
   pagination: Pagination
+  metals: StoreMetalRow[]
 }
 
-export function StockClient({ stockItems, pagination }: StockClientProps) {
+export function StockClient({ stockItems, pagination, metals }: StockClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
 
   React.useEffect(() => {
@@ -86,6 +88,7 @@ export function StockClient({ stockItems, pagination }: StockClientProps) {
 
       <StockToolbar
         selectedIds={selectedIds}
+        metals={metals}
         bulkActions={
           <BulkDeleteButton
             selectedIds={selectedIds}

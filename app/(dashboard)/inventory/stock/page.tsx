@@ -1,22 +1,17 @@
 import type { Metadata } from "next";
 
-import { getInventoryStock, type StockSortBy } from "@/lib/actions/inventory/stock-actions";
-import type { PurityFamily } from "@/lib/business-units";
+import {
+  getInventoryStock,
+  type StockSortBy,
+} from "@/lib/actions/inventory/stock-actions";
+import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
+import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 
 import { StockClient } from "@/components/inventory/stock/stock-client";
 
 export const metadata: Metadata = {
   title: "Stock",
 };
-
-const VALID_METAL_FAMILIES: PurityFamily[] = [
-  "GOLD",
-  "SILVER",
-  "PLATINUM",
-  "DIAMOND",
-  "STONE",
-  "OTHER",
-];
 
 type InventoryStockPageProps = {
   searchParams?: Promise<{
@@ -41,9 +36,10 @@ export default async function InventoryStockPage({
   const search = params.search || ""
   const sortBy = params.sortBy || "createdAt"
   const sortOrder = params.sortOrder || "desc"
-  const metalFamily = VALID_METAL_FAMILIES.includes(params.type as PurityFamily)
-    ? (params.type as PurityFamily)
-    : undefined
+
+  const metals = await getStoreMetals()
+  const validMetalTypeIds = new Set([...metals.map((m) => m.id), UNASSIGNED_METAL_TYPE])
+  const metalTypeId = params.type && validMetalTypeIds.has(params.type) ? params.type : undefined
 
   const { stockItems, pagination } = await getInventoryStock({
     page,
@@ -51,8 +47,8 @@ export default async function InventoryStockPage({
     search,
     sortBy,
     sortOrder,
-    metalFamily,
+    metalTypeId,
   })
 
-  return <StockClient stockItems={stockItems} pagination={pagination} />;
+  return <StockClient stockItems={stockItems} pagination={pagination} metals={metals} />;
 }

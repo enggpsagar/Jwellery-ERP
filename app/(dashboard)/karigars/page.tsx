@@ -4,20 +4,12 @@ import type { Metadata } from "next"
 
 import { getKarigars } from "@/lib/actions/karigar-actions"
 import { KarigarsClient } from "@/components/karigars/karigars-client"
-import type { PurityFamily } from "@/lib/business-units"
+import { getStoreMetals } from "@/lib/actions/taxonomy-actions"
+import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 
 export const metadata: Metadata = {
   title: "Karigars",
 }
-
-const VALID_METAL_FAMILIES: PurityFamily[] = [
-  "GOLD",
-  "SILVER",
-  "PLATINUM",
-  "DIAMOND",
-  "STONE",
-  "OTHER",
-]
 
 type KarigarsPageProps = {
   searchParams?: Promise<{
@@ -40,9 +32,10 @@ export default async function KarigarsPage({ searchParams }: KarigarsPageProps) 
   const search = params.search || ""
   const sortBy = params.sortBy || "createdAt"
   const sortOrder = params.sortOrder || "desc"
-  const metalFamily = VALID_METAL_FAMILIES.includes(params.type as PurityFamily)
-    ? (params.type as PurityFamily)
-    : undefined
+
+  const metals = await getStoreMetals()
+  const validMetalTypeIds = new Set([...metals.map((m) => m.id), UNASSIGNED_METAL_TYPE])
+  const metalTypeId = params.type && validMetalTypeIds.has(params.type) ? params.type : undefined
 
   const { karigars, pagination } = await getKarigars({
     page,
@@ -50,8 +43,8 @@ export default async function KarigarsPage({ searchParams }: KarigarsPageProps) 
     search,
     sortBy,
     sortOrder,
-    metalFamily,
+    metalTypeId,
   })
 
-  return <KarigarsClient karigars={karigars} pagination={pagination} />
+  return <KarigarsClient karigars={karigars} pagination={pagination} metals={metals} />
 }

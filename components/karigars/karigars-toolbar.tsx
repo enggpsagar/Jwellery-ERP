@@ -9,9 +9,15 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { exportKarigarsToExcel } from "@/lib/actions/karigar-actions"
 import { useToast } from "@/components/providers/toast-provider"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 
 type KarigarsToolbarProps = {
   selectedKarigarIds: string[]
+  /** The store's own configured metals/stones (Settings > Taxonomy) — the
+   * Type filter's options come directly from this list, so a metal added
+   * there shows up here with no code change. */
+  metals: StoreMetalRow[]
   /** BulkDeleteButton, rendered inside this same bordered bar (next to
    * Export) instead of as a separate floating box beside it — it already
    * renders nothing when nothing is selected, so this slot is simply empty
@@ -42,7 +48,7 @@ function downloadBase64File(base64: string, fileName: string) {
   window.URL.revokeObjectURL(url)
 }
 
-export function KarigarsToolbar({ selectedKarigarIds, bulkActions }: KarigarsToolbarProps) {
+export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: KarigarsToolbarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -157,12 +163,14 @@ export function KarigarsToolbar({ selectedKarigarIds, bulkActions }: KarigarsToo
           disabled={isPending}
         >
           <option value="ALL">All Types</option>
-          <option value="GOLD">Gold</option>
-          <option value="SILVER">Silver</option>
-          <option value="PLATINUM">Platinum</option>
-          <option value="DIAMOND">Diamond</option>
-          <option value="STONE">Stone</option>
-          <option value="OTHER">Other</option>
+          {metals
+            .filter((metal) => metal.isActive)
+            .map((metal) => (
+              <option key={metal.id} value={metal.id}>
+                {metal.name}
+              </option>
+            ))}
+          <option value={UNASSIGNED_METAL_TYPE}>Unassigned</option>
         </select>
 
         <select

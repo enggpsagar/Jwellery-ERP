@@ -130,7 +130,6 @@ export function StockTable({
               <SortableTableHead label="Qty" sortKey="quantity" defaultSortBy="createdAt" />
               <th className="px-4 py-3 text-left font-medium">Gross Wt.</th>
               <SortableTableHead label="Net Wt." sortKey="netWeight" defaultSortBy="createdAt" />
-              <th className="px-4 py-3 text-left font-medium">Making</th>
               <SortableTableHead label="Sale Amt." sortKey="saleAmount" defaultSortBy="createdAt" />
               <SortableTableHead label="Status" sortKey="status" defaultSortBy="createdAt" />
               <SortableTableHead label="Finish" sortKey="finish" defaultSortBy="createdAt" />
@@ -210,7 +209,6 @@ export function StockTable({
                   <td className="px-4 py-3">{item.quantity}</td>
                   <td className="px-4 py-3">{formatNumber(item.grossWeight)}</td>
                   <td className="px-4 py-3">{formatNumber(item.netWeight)}</td>
-                  <td className="px-4 py-3">{formatAmount(item.makingCharge)}</td>
                   <td className="px-4 py-3">{formatAmount(item.saleAmount)}</td>
 
                   <td className="px-4 py-3">

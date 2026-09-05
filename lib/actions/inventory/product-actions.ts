@@ -6,6 +6,7 @@ import { ChargeType, PurityType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scope";
+import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import type { ProductFormState } from "@/lib/inventory/product-types";
 import { buildExcelExport } from "@/lib/excel-export";
 
@@ -144,6 +145,10 @@ export type GetProductsParams = {
   search?: string;
   sortBy?: ProductSortBy;
   sortOrder?: ProductSortOrder;
+  /** Filters by the store's own StoreMetal id (Settings > Taxonomy) — or
+   * "UNASSIGNED" for products with no metal set. Dynamic: whatever the
+   * store has configured, not a fixed set of categories. */
+  metalTypeId?: string;
 };
 
 type ExportProductsParams = {
@@ -151,13 +156,19 @@ type ExportProductsParams = {
   search?: string;
   sortBy?: string;
   sortOrder?: ProductSortOrder;
+  type?: string;
 };
 
-function getProductWhere(storeId: string, search?: string) {
+function getProductWhere(storeId: string, search?: string, metalTypeId?: string) {
   const query = String(search || "").trim();
 
   return {
     storeId,
+    ...(metalTypeId === UNASSIGNED_METAL_TYPE
+      ? { metalTypeId: null }
+      : metalTypeId
+        ? { metalTypeId }
+        : {}),
     ...(query
       ? {
           OR: [
@@ -258,7 +269,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   const sortOrder: ProductSortOrder = params.sortOrder || "desc";
 
   const storeId = await requireStoreScope();
-  const where = getProductWhere(storeId, search);
+  const where = getProductWhere(storeId, search, params.metalTypeId);
   const orderBy = getProductOrderBy(sortBy, sortOrder);
 
   const [totalCount, rows] = await Promise.all([
@@ -311,7 +322,7 @@ async function getAllProductsForExport(params: ExportProductsParams = {}) {
         id: { in: params.selectedIds },
         storeId,
       }
-    : getProductWhere(storeId, params.search);
+    : getProductWhere(storeId, params.search, params.type);
 
   const rows = await prisma.product.findMany({
     where,

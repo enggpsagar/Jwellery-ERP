@@ -9,7 +9,7 @@ import { getLocationScope, locationWhere, type LocationScope } from "@/lib/locat
 import { UserRole, UserStatus } from "@prisma/client";
 import * as XLSX from "xlsx";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
-import { classifyPurityFamily, type PurityFamily } from "@/lib/business-units";
+import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 
 export type Karigar = {
   id: string;
@@ -31,9 +31,9 @@ export type Karigar = {
   openingCash: number;
   isActive: boolean;
   locationId: string | null;
-  /** Gold/Silver/Diamond/... this karigar mainly works with — separate from
+  /** This karigar's main StoreMetal (Settings > Taxonomy) — separate from
    * the free-text `specialization` craft description. Drives the Karigars
-   * page's Type filter (classifyPurityFamily), same as Stock's. */
+   * page's Type filter, same as Stock's. */
   metalTypeId: string | null;
   metalTypeName: string;
   createdAt?: string;
@@ -58,10 +58,10 @@ export type GetKarigarsParams = {
    *  list. Pass false to list disabled ones instead (see /karigars/disabled),
    *  mirroring how getVendors()'s `archived` param works. */
   active?: boolean;
-  /** Gold/Silver/Platinum/Diamond/Stone/Other — derived from each karigar's
-   * metalType (name + isGemstone), same classification Stock's Type filter
-   * already uses. */
-  metalFamily?: PurityFamily;
+  /** Filters by the store's own StoreMetal id (Settings > Taxonomy) — or
+   * "UNASSIGNED" for karigars with no metal set. Dynamic: whatever the
+   * store has configured, not a fixed set of categories. */
+  metalTypeId?: string;
 };
 
 export type KarigarListResponse = {
@@ -130,26 +130,19 @@ function mapKarigar(karigar: any): Karigar {
 }
 
 /**
- * StoreMetal is a free-text, store-managed list with no fixed FK for "the
- * Gold row" — so filtering Karigars by Type first resolves which StoreMetal
- * ids classify into the requested family (classifyPurityFamily, the same
- * function Stock's own Type filter uses), then filters metalTypeId against
- * that list.
+ * "Type" filters directly by the store's own configured StoreMetal id —
+ * whatever metals/stones this store has set up in Settings > Taxonomy, not
+ * a fixed set of hardcoded categories. A store adding a new metal or stone
+ * there needs no code change for it to show up as its own filter option.
+ * The sentinel "UNASSIGNED" (lib/business-units.ts) filters to karigars
+ * with no metal set at all.
  */
-async function resolveMetalTypeIdsForFamily(storeId: string, family: PurityFamily) {
-  const metals = await prisma.storeMetal.findMany({
-    where: { storeId },
-    select: { id: true, name: true, isGemstone: true },
-  });
-  return metals.filter((metal) => classifyPurityFamily(metal) === family).map((metal) => metal.id);
-}
-
 function getWhere(
   storeId: string,
   search: string | undefined,
   scope: LocationScope,
   active = true,
-  metalTypeIds?: string[],
+  metalTypeId?: string,
 ) {
   const query = String(search || "").trim();
 
@@ -157,7 +150,11 @@ function getWhere(
     storeId,
     isActive: active,
     ...locationWhere(scope),
-    ...(metalTypeIds ? { metalTypeId: { in: metalTypeIds } } : {}),
+    ...(metalTypeId === UNASSIGNED_METAL_TYPE
+      ? { metalTypeId: null }
+      : metalTypeId
+        ? { metalTypeId }
+        : {}),
     ...(query
       ? {
           OR: [
@@ -191,10 +188,7 @@ export async function getKarigars(
   const sortOrder = params.sortOrder || "desc";
   const storeId = await requireStoreScope();
   const scope = await getLocationScope();
-  const metalTypeIds = params.metalFamily
-    ? await resolveMetalTypeIdsForFamily(storeId, params.metalFamily)
-    : undefined;
-  const where = getWhere(storeId, search, scope, params.active ?? true, metalTypeIds);
+  const where = getWhere(storeId, search, scope, params.active ?? true, params.metalTypeId);
 
   const [totalCount, karigars] = await Promise.all([
     prisma.karigar.count({ where }),
@@ -710,20 +704,9 @@ export async function exportKarigarsToExcel(
     const storeId = await requireStoreScope();
     const scope = await getLocationScope();
 
-    const validFamilies: PurityFamily[] = ["GOLD", "SILVER", "PLATINUM", "DIAMOND", "STONE", "OTHER"];
-    const metalFamily = validFamilies.includes(params.type as PurityFamily)
-      ? (params.type as PurityFamily)
-      : undefined;
-
     const where = selectedIds?.length
       ? { id: { in: selectedIds }, storeId, ...locationWhere(scope) }
-      : getWhere(
-          storeId,
-          search,
-          scope,
-          true,
-          metalFamily ? await resolveMetalTypeIdsForFamily(storeId, metalFamily) : undefined,
-        );
+      : getWhere(storeId, search, scope, true, params.type);
 
     const karigars = await prisma.karigar.findMany({
       where,

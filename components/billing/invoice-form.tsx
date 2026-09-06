@@ -30,7 +30,7 @@ import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
 import { PaidNowFields } from "@/components/shared/paid-now-fields"
 import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
-import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat } from "@/lib/purity"
+import { PURITY_SELECT_OPTIONS, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
@@ -70,7 +70,13 @@ export type LineItem = {
   purity: string
   quantity: number
   grossWeight: number
+  /** Always in grams internally, regardless of grossWeightUnit — that unit
+   * only picks what's displayed/typed (converted via toPrimaryUnit on the
+   * way in and out) and what unit this line's weights are persisted in at
+   * submit. Same convention for netWeight/dmoWeight/stoneWeightInput below. */
+  grossWeightUnit: "GRAM" | "CARAT"
   netWeight: number
+  netWeightUnit: "GRAM" | "CARAT"
   caratWeight: number
   rate: number
   makingCharge: number
@@ -100,6 +106,8 @@ export type LineItem = {
   stoneMetalTypeName: string
   stoneTypeNames: string[]
   dmoWeight: number
+  dmoWeightUnit: "GRAM" | "CARAT"
+  /** Always in grams internally — see grossWeightUnit's doc comment above. */
   stoneWeightInput: number
   stoneWeightUnit: "GRAM" | "CARAT"
   hmCharge: number
@@ -130,7 +138,9 @@ function emptyLineItem(): LineItem {
     purity: "",
     quantity: 1,
     grossWeight: 0,
+    grossWeightUnit: "GRAM",
     netWeight: 0,
+    netWeightUnit: "GRAM",
     caratWeight: 0,
     rate: 0,
     makingCharge: 0,
@@ -143,6 +153,7 @@ function emptyLineItem(): LineItem {
     stoneMetalTypeName: "",
     stoneTypeNames: [],
     dmoWeight: 0,
+    dmoWeightUnit: "GRAM",
     stoneWeightInput: 0,
     stoneWeightUnit: "GRAM",
     hmCharge: 0,
@@ -322,6 +333,9 @@ export function InvoiceForm({
     }
 
     const available = availableForStock(stockId, key)
+    // Already stored in the metal's own configured primary unit — this just
+    // picks which unit the toggle starts on, not a value conversion.
+    const linkedUnit = metalById.get(stock.metalType?.id ?? "")?.primaryUnit ?? "GRAM"
 
     updateItem(key, {
       inventoryStockId: stockId,
@@ -329,9 +343,12 @@ export function InvoiceForm({
       metalTypeId: stock.metalType?.id ?? "",
       purity: stock.purity ?? "",
       grossWeight: stock.grossWeight ?? 0,
+      grossWeightUnit: linkedUnit,
       netWeight: stock.netWeight ?? 0,
+      netWeightUnit: linkedUnit,
+      dmoWeightUnit: linkedUnit,
       stoneWeightInput: stock.stoneWeight ?? 0,
-      stoneWeightUnit: "GRAM",
+      stoneWeightUnit: linkedUnit,
       rate: stock.saleRate ?? 0,
       hsnCode: stock.hsnCode ?? "",
       caratWeight: stock.caratWeight ?? 0,
@@ -435,6 +452,10 @@ export function InvoiceForm({
           return prev
         }
 
+        // Already stored in the metal's own configured primary unit — this
+        // just picks which unit the toggle starts on, not a value conversion.
+        const linkedUnit = metalById.get(stock.metalType?.id ?? "")?.primaryUnit ?? "GRAM"
+
         const scanned: LineItem = {
           ...emptyLineItem(),
           inventoryStockId: stock.id,
@@ -442,9 +463,12 @@ export function InvoiceForm({
           metalTypeId: stock.metalType?.id ?? "",
           purity: stock.purity ?? "",
           grossWeight: stock.grossWeight ?? 0,
+          grossWeightUnit: linkedUnit,
           netWeight: stock.netWeight ?? 0,
+          netWeightUnit: linkedUnit,
+          dmoWeightUnit: linkedUnit,
           stoneWeightInput: stock.stoneWeight ?? 0,
-          stoneWeightUnit: "GRAM",
+          stoneWeightUnit: linkedUnit,
           rate: stock.saleRate ?? 0,
           hsnCode: stock.hsnCode ?? "",
           caratWeight: stock.caratWeight ?? 0,
@@ -518,6 +542,12 @@ export function InvoiceForm({
     return map
   }, [stockItems])
 
+  // The line's own metal's configured Primary Unit (Settings > Taxonomy) —
+  // what Gross/Net/Dmo/Stone Weight are actually persisted in at submit,
+  // regardless of what unit is currently toggled for display/entry.
+  const metalById = useMemo(() => new Map(metals.map((m) => [m.id, m])), [metals])
+  const primaryUnitFor = (item: LineItem) => metalById.get(item.metalTypeId)?.primaryUnit ?? "GRAM"
+
   // Whether this line's Carat Weight field should show/convert: an explicit
   // Diamond purity (today's existing signal), or a metal name that reads as
   // Diamond/Stone (the only way to catch a Stone line — there's no PurityType
@@ -543,23 +573,19 @@ export function InvoiceForm({
 
       // Net Stone Weight mirrors Stone Carat Weight until the user edits Net
       // Stone Weight directly (netStoneWeightTouched — same override escape
-      // hatch as stoneChargeTouched). Converted to grams when the Net Stone
-      // Weight unit is set to grams (via the same resolveGramsPerCarat rate
-      // this line already uses elsewhere), so the mirrored value is always
-      // correct regardless of which unit is displayed — this also then feeds
-      // the metal's own Net Weight via the same gross/stone/dmo calc used
-      // elsewhere, unless that has separately been taken over (netTouched).
+      // hatch as stoneChargeTouched). stoneWeightInput is always grams
+      // internally (see LineItem's own doc comment) — caratWeight is always
+      // carats, so this conversion doesn't depend on stoneWeightUnit at all;
+      // this also then feeds the metal's own Net Weight via the same
+      // gross/stone/dmo calc used elsewhere, unless that has separately been
+      // taken over (netTouched).
       if (!item.netStoneWeightTouched) {
         const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
-        const stoneWeightInput =
-          item.stoneWeightUnit === "CARAT"
-            ? caratWeight
-            : Number((caratWeight * gramsPerCarat).toFixed(5))
+        const stoneWeightInput = Number((caratWeight * gramsPerCarat).toFixed(5))
         patch.stoneWeightInput = stoneWeightInput
 
         if (!item.netTouched) {
-          const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit, gramsPerCarat)
-          const derived = deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+          const derived = deriveNetWeight(item.grossWeight, stoneWeightInput, item.dmoWeight)
           if (derived !== null) patch.netWeight = derived
         }
       }
@@ -589,12 +615,14 @@ export function InvoiceForm({
 
   // Editing Net Stone Weight directly is the escape hatch out of the Stone
   // Carat Weight auto-fill above — same override pattern as Stone Charge.
+  // `value` is typed in item.stoneWeightUnit; stoneWeightInput itself always
+  // stays grams internally (see LineItem's doc comment).
   const handleStoneWeightInputChange = (item: LineItem, value: string) => {
-    const stoneWeightInput = Number(value) || 0
-    const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
+    const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+    const stoneWeightInput = toPrimaryUnit(Number(value) || 0, item.stoneWeightUnit, "GRAM", gramsPerCarat)
     const derived = item.netTouched
       ? null
-      : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+      : deriveNetWeight(item.grossWeight, stoneWeightInput, item.dmoWeight)
     updateItem(item.key, {
       stoneWeightInput,
       netStoneWeightTouched: true,
@@ -602,28 +630,21 @@ export function InvoiceForm({
     })
   }
 
+  // Purely a display/entry-unit switch — stoneWeightInput is already grams
+  // internally, so the physical value never changes here, only what's shown.
   const handleStoneWeightUnitChange = (item: LineItem, unit: "GRAM" | "CARAT") => {
-    const grams = stoneWeightToGrams(item.stoneWeightInput, unit, resolveGramsPerCarat(item.purity, caratConversionRates))
-    const derived = item.netTouched
-      ? null
-      : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
-    updateItem(item.key, {
-      stoneWeightUnit: unit,
-      ...(derived !== null ? { netWeight: derived } : {}),
-    })
+    updateItem(item.key, { stoneWeightUnit: unit })
   }
 
+  // `value` is typed in item.netWeightUnit; netWeight itself always stays
+  // grams internally (see LineItem's doc comment).
   const handleNetWeightChange = (item: LineItem, value: string) => {
-    const netWeight = Number(value) || 0
+    const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+    const netWeight = toPrimaryUnit(Number(value) || 0, item.netWeightUnit, "GRAM", gramsPerCarat)
     const patch: Partial<LineItem> = { netWeight, netTouched: true }
 
     if (isCaratLine(item)) {
-      const netNum = Number(value)
-      const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
-      patch.caratWeight =
-        value.trim() !== "" && Number.isFinite(netNum)
-          ? Number((netNum / gramsPerCarat).toFixed(3))
-          : 0
+      patch.caratWeight = Number((netWeight / gramsPerCarat).toFixed(3))
     }
 
     updateItem(item.key, patch)
@@ -704,13 +725,19 @@ export function InvoiceForm({
   const itemsJson = JSON.stringify(
     items.map((item) => {
       const { sgst, cgst, igst } = lineGst(item)
+      // Every weight below is tracked internally in grams (see LineItem's
+      // doc comment) — converted here, once, to this line's own metal's
+      // configured Primary Unit, which is what actually gets persisted.
+      const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+      const unit = primaryUnitFor(item)
+      const toUnit = (grams: number) => toPrimaryUnit(grams, "GRAM", unit, gramsPerCarat)
       return {
         itemName: item.itemName || "Item",
         metalTypeId: item.metalTypeId || null,
         purity: item.purity || null,
         quantity: item.quantity || 1,
-        grossWeight: item.grossWeight || null,
-        netWeight: item.netWeight || null,
+        grossWeight: toUnit(item.grossWeight) || null,
+        netWeight: toUnit(item.netWeight) || null,
         caratWeight: item.caratWeight || null,
         rate: item.rate || null,
         makingCharge: item.makingCharge,
@@ -722,8 +749,8 @@ export function InvoiceForm({
           item.hasStoneComponent && item.stoneTypeNames.length
             ? item.stoneTypeNames.join(", ")
             : null,
-        dmoWeight: item.dmoWeight || null,
-        stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates)) || null,
+        dmoWeight: toUnit(item.dmoWeight) || null,
+        stoneWeight: toUnit(item.stoneWeightInput) || null,
         hmCharge: item.hmCharge,
         schemeDiscount: item.schemeDiscount,
         sgstAmount: sgst,
@@ -997,37 +1024,85 @@ export function InvoiceForm({
                 </div>
 
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Gross Weight (g)</Label>
-                  <Input
-                    type="number"
-                    step="0.00001"
-                    value={item.grossWeight === 0 ? "" : item.grossWeight}
-                    readOnly={isLinked}
-                    className={isLinked ? "bg-muted" : undefined}
-                    onChange={(e) => {
-                      const grossWeight = Number(e.target.value) || 0
-                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
-                      const derived = item.netTouched
-                        ? null
-                        : deriveNetWeight(grossWeight, stoneWeightGrams, item.dmoWeight)
-                      updateItem(item.key, {
-                        grossWeight,
-                        ...(derived !== null ? { netWeight: derived } : {}),
-                      })
-                    }}
-                  />
+                  <Label className="text-xs">Gross Weight</Label>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      step="0.00001"
+                      className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                      value={
+                        item.grossWeight === 0
+                          ? ""
+                          : toPrimaryUnit(
+                              item.grossWeight,
+                              "GRAM",
+                              item.grossWeightUnit,
+                              resolveGramsPerCarat(item.purity, caratConversionRates),
+                            )
+                      }
+                      readOnly={isLinked}
+                      onChange={(e) => {
+                        const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+                        const grossWeight = toPrimaryUnit(Number(e.target.value) || 0, item.grossWeightUnit, "GRAM", gramsPerCarat)
+                        const derived = item.netTouched
+                          ? null
+                          : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight)
+                        updateItem(item.key, {
+                          grossWeight,
+                          ...(derived !== null ? { netWeight: derived } : {}),
+                        })
+                      }}
+                    />
+                    <Select
+                      value={item.grossWeightUnit}
+                      onValueChange={(unit) => updateItem(item.key, { grossWeightUnit: unit as "GRAM" | "CARAT" })}
+                      disabled={isLinked}
+                    >
+                      <SelectTrigger className="w-16">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GRAM">g</SelectItem>
+                        <SelectItem value="CARAT">ct</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Net Weight (g)</Label>
-                  <Input
-                    type="number"
-                    step="0.00001"
-                    value={item.netWeight === 0 ? "" : item.netWeight}
-                    readOnly={isLinked}
-                    className={isLinked ? "bg-muted" : undefined}
-                    onChange={(e) => handleNetWeightChange(item, e.target.value)}
-                  />
+                  <Label className="text-xs">Net Weight</Label>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      step="0.00001"
+                      className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                      value={
+                        item.netWeight === 0
+                          ? ""
+                          : toPrimaryUnit(
+                              item.netWeight,
+                              "GRAM",
+                              item.netWeightUnit,
+                              resolveGramsPerCarat(item.purity, caratConversionRates),
+                            )
+                      }
+                      readOnly={isLinked}
+                      onChange={(e) => handleNetWeightChange(item, e.target.value)}
+                    />
+                    <Select
+                      value={item.netWeightUnit}
+                      onValueChange={(unit) => updateItem(item.key, { netWeightUnit: unit as "GRAM" | "CARAT" })}
+                      disabled={isLinked}
+                    >
+                      <SelectTrigger className="w-16">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GRAM">g</SelectItem>
+                        <SelectItem value="CARAT">ct</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   {!item.netTouched && (
                     <p className="text-xs text-muted-foreground">Gross − stone − dust/other</p>
                   )}
@@ -1053,25 +1128,49 @@ export function InvoiceForm({
                 )}
 
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Dust/Making/Other Wt (g)</Label>
-                  <Input
-                    type="number"
-                    step="0.00001"
-                    value={item.dmoWeight === 0 ? "" : item.dmoWeight}
-                    readOnly={isLinked}
-                    className={isLinked ? "bg-muted" : undefined}
-                    onChange={(e) => {
-                      const dmoWeight = Number(e.target.value) || 0
-                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
-                      const derived = item.netTouched
-                        ? null
-                        : deriveNetWeight(item.grossWeight, stoneWeightGrams, dmoWeight)
-                      updateItem(item.key, {
-                        dmoWeight,
-                        ...(derived !== null ? { netWeight: derived } : {}),
-                      })
-                    }}
-                  />
+                  <Label className="text-xs">Dust/Making/Other Wt</Label>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      step="0.00001"
+                      className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                      value={
+                        item.dmoWeight === 0
+                          ? ""
+                          : toPrimaryUnit(
+                              item.dmoWeight,
+                              "GRAM",
+                              item.dmoWeightUnit,
+                              resolveGramsPerCarat(item.purity, caratConversionRates),
+                            )
+                      }
+                      readOnly={isLinked}
+                      onChange={(e) => {
+                        const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+                        const dmoWeight = toPrimaryUnit(Number(e.target.value) || 0, item.dmoWeightUnit, "GRAM", gramsPerCarat)
+                        const derived = item.netTouched
+                          ? null
+                          : deriveNetWeight(item.grossWeight, item.stoneWeightInput, dmoWeight)
+                        updateItem(item.key, {
+                          dmoWeight,
+                          ...(derived !== null ? { netWeight: derived } : {}),
+                        })
+                      }}
+                    />
+                    <Select
+                      value={item.dmoWeightUnit}
+                      onValueChange={(unit) => updateItem(item.key, { dmoWeightUnit: unit as "GRAM" | "CARAT" })}
+                      disabled={isLinked}
+                    >
+                      <SelectTrigger className="w-16">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GRAM">g</SelectItem>
+                        <SelectItem value="CARAT">ct</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -1160,7 +1259,12 @@ export function InvoiceForm({
                       stoneCharge={item.stoneCharge}
                       onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
                       stoneChargeTouched={item.stoneChargeTouched}
-                      stoneWeightInput={item.stoneWeightInput}
+                      stoneWeightInput={toPrimaryUnit(
+                        item.stoneWeightInput,
+                        "GRAM",
+                        item.stoneWeightUnit,
+                        resolveGramsPerCarat(item.purity, caratConversionRates),
+                      )}
                       onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
                       stoneWeightUnit={item.stoneWeightUnit}
                       onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
@@ -1193,7 +1297,16 @@ export function InvoiceForm({
                         type="number"
                         step="0.00001"
                         className={isLinked ? "flex-1 bg-muted" : "flex-1"}
-                        value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
+                        value={
+                          item.stoneWeightInput === 0
+                            ? ""
+                            : toPrimaryUnit(
+                                item.stoneWeightInput,
+                                "GRAM",
+                                item.stoneWeightUnit,
+                                resolveGramsPerCarat(item.purity, caratConversionRates),
+                              )
+                        }
                         readOnly={isLinked}
                         onChange={(e) => handleStoneWeightInputChange(item, e.target.value)}
                       />

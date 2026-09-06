@@ -11,6 +11,7 @@ import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
+import { resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 
 import { InvoiceForm, type LineItem } from "@/components/billing/invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
@@ -56,14 +57,29 @@ export default async function EditInvoicePage({ params }: Props) {
       getCaratConversionRateMap(),
     ])
 
-  const initialItems: LineItem[] = invoice.items.map((item) => ({
+  // Weight fields on a saved invoice item are persisted in that line's own
+  // metal's configured Primary Unit (Settings > Taxonomy), not always
+  // grams — convert back to grams here since LineItem's own fields are
+  // always-grams internally (see invoice-form.tsx's own doc comment), and
+  // default each unit toggle to match what's actually stored.
+  const metalById = new Map(metals.map((m) => [m.id, m]))
+
+  const initialItems: LineItem[] = invoice.items.map((item) => {
+    const unit = metalById.get(item.metalTypeId ?? "")?.primaryUnit ?? "GRAM"
+    const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+    const toGrams = (value: number | null | undefined) =>
+      toPrimaryUnit(value ?? 0, unit, "GRAM", gramsPerCarat)
+
+    return {
     key: crypto.randomUUID(),
     itemName: item.itemName,
     metalTypeId: item.metalTypeId ?? "",
     purity: item.purity ?? "",
     quantity: item.quantity,
-    grossWeight: item.grossWeight ?? 0,
-    netWeight: item.netWeight ?? 0,
+    grossWeight: toGrams(item.grossWeight),
+    grossWeightUnit: unit,
+    netWeight: toGrams(item.netWeight),
+    netWeightUnit: unit,
     caratWeight: item.caratWeight ?? 0,
     rate: item.rate ?? 0,
     makingCharge: item.makingCharge,
@@ -80,9 +96,10 @@ export default async function EditInvoicePage({ params }: Props) {
     stoneTypeNames: item.stoneTypeNames
       ? item.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
       : [],
-    dmoWeight: item.dmoWeight ?? 0,
-    stoneWeightInput: item.stoneWeight ?? 0,
-    stoneWeightUnit: "GRAM",
+    dmoWeight: toGrams(item.dmoWeight),
+    dmoWeightUnit: unit,
+    stoneWeightInput: toGrams(item.stoneWeight),
+    stoneWeightUnit: unit,
     hmCharge: item.hmCharge,
     // This invoice's own saved HM Charge is authoritative — must not be
     // silently recomputed from Purity the moment this line is reopened
@@ -92,7 +109,8 @@ export default async function EditInvoicePage({ params }: Props) {
     hsnCode: item.hsnCode ?? "",
     inventoryStockId: item.inventoryStockId ?? "",
     netTouched: true,
-  }))
+  }
+  })
 
   return (
     <main className="space-y-6 p-6">

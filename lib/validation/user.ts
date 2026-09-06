@@ -39,6 +39,14 @@ export const createUserSchema = z.object({
       message: AADHAAR_INVALID_MESSAGE,
     }),
 
+  // Optional KYC id — no format check, matching Customer/Vendor's own
+  // freely-typed panNumber field.
+  panNumber: z.string().optional().or(z.literal("")),
+
+  // Set via the Profile Photo uploader (Vercel Blob URL) — see
+  // app/api/users/photo/route.ts. Never typed by hand.
+  image: z.string().optional().or(z.literal("")),
+
   // Only meaningful when role is KARIGAR — links the login to a Karigar record.
   karigarId: z.string().cuid().optional().or(z.literal("")),
 

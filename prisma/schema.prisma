@@ -1573,6 +1573,7 @@ model User {
   email                 String?                @unique
   phone                 String?                @unique
   image                 String?
+  panNumber             String?
   role                  UserRole               @default(STAFF)
   status                UserStatus             @default(INVITED)
   isActive              Boolean                @default(true)

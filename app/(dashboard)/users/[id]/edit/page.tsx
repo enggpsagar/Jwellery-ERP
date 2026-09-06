@@ -34,6 +34,8 @@ const getUser = cache(async (id: string, storeId: string | null) => {
       karigarId: true,
       permissions: true,
       aadhaarNumber: true,
+      panNumber: true,
+      image: true,
       locationAccess: { select: { locationId: true } },
     },
   });

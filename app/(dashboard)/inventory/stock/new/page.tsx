@@ -8,6 +8,7 @@ import {
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
+import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper";
 import { StockCreateForm } from "@/components/inventory/stock/stock-create-form";
 
 export const metadata: Metadata = {
@@ -33,12 +34,14 @@ export default async function NewStockPage() {
         backLabel="Back to Stock"
       />
 
-      <StockCreateForm
-        products={products}
-        locations={locations}
-        caratConversionRates={caratConversionRates}
-        defaultLocationId={defaultLocationId ?? undefined}
-      />
+      <ResetFormWrapper>
+        <StockCreateForm
+          products={products}
+          locations={locations}
+          caratConversionRates={caratConversionRates}
+          defaultLocationId={defaultLocationId ?? undefined}
+        />
+      </ResetFormWrapper>
 
     </main>
   );

@@ -6,6 +6,7 @@ import { getBusinessSettings } from "@/lib/actions/settings-actions"
 
 import { CustomerCreateForm } from "@/components/customers/customer-create-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 
 export const metadata: Metadata = {
   title: "Add Customer",
@@ -32,13 +33,15 @@ export default async function NewCustomerPage({
         backLabel={returnTo ? "Back without saving" : "Back to Customers"}
       />
 
-      <CustomerCreateForm
-        states={states}
-        returnTo={returnTo}
-        gstScheme={settings.gstScheme}
-        defaultState={settings.state}
-        defaultCity={settings.city}
-      />
+      <ResetFormWrapper>
+        <CustomerCreateForm
+          states={states}
+          returnTo={returnTo}
+          gstScheme={settings.gstScheme}
+          defaultState={settings.state}
+          defaultCity={settings.city}
+        />
+      </ResetFormWrapper>
     </main>
   )
 }

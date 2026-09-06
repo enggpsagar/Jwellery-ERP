@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { ProductCreateForm } from "@/components/inventory/products/product-create-form";
 import { PageBackHeader } from "@/components/shared/page-back-header";
+import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper";
 import {
   getStoreCategories,
   getStoreMetals,
@@ -47,15 +48,17 @@ export default async function NewProductPage({
         backLabel={returnTo ? "Back without saving" : "Back to Products"}
       />
 
-      <ProductCreateForm
-        metals={metals}
-        categories={categories}
-        caratConversionRates={caratConversionRates}
-        origins={origins}
-        locations={locations}
-        defaultLocationId={defaultLocationId ?? undefined}
-        returnTo={returnTo}
-      />
+      <ResetFormWrapper>
+        <ProductCreateForm
+          metals={metals}
+          categories={categories}
+          caratConversionRates={caratConversionRates}
+          origins={origins}
+          locations={locations}
+          defaultLocationId={defaultLocationId ?? undefined}
+          returnTo={returnTo}
+        />
+      </ResetFormWrapper>
     </main>
   );
 }

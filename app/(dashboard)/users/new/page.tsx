@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { getEffectiveStoreId } from "@/lib/store-context";
 import { PageBackHeader } from "@/components/shared/page-back-header";
+import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper";
 import { UserFormDialog } from "@/components/users/user-form-dialog";
 
 export const metadata: Metadata = {
@@ -57,13 +58,15 @@ export default async function NewUserPage() {
         backLabel="Back to Users"
       />
 
-      <UserFormDialog
-        asPage
-        mode="create"
-        karigars={karigars}
-        locations={locations}
-        allowSuperAdmin={isSuperAdmin}
-      />
+      <ResetFormWrapper>
+        <UserFormDialog
+          asPage
+          mode="create"
+          karigars={karigars}
+          locations={locations}
+          allowSuperAdmin={isSuperAdmin}
+        />
+      </ResetFormWrapper>
     </main>
   );
 }

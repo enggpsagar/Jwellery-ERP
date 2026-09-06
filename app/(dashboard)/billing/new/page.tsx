@@ -12,6 +12,7 @@ import { resolveBackLink } from "@/lib/safe-return-to"
 
 import { InvoiceForm } from "@/components/billing/invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 
 export const metadata: Metadata = {
   title: "New Invoice",
@@ -56,21 +57,23 @@ export default async function NewInvoicePage({ searchParams }: Props) {
         backLabel={backTo.label}
       />
 
-      <InvoiceForm
-        customers={customers}
-        stockItems={stockItems}
-        locations={locations}
-        metals={metals}
-        origins={origins}
-        caratConversionRates={caratConversionRates}
-        initialLocationId={defaultLocationId ?? undefined}
-        initialCustomerId={initialCustomerId}
-        defaultGstRate={businessSettings.defaultGstRate}
-        hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
-        gstScheme={businessSettings.gstScheme}
-        storeState={businessSettings.state}
-        defaultNotes={businessSettings.invoiceNotes || undefined}
-      />
+      <ResetFormWrapper requireConfirm>
+        <InvoiceForm
+          customers={customers}
+          stockItems={stockItems}
+          locations={locations}
+          metals={metals}
+          origins={origins}
+          caratConversionRates={caratConversionRates}
+          initialLocationId={defaultLocationId ?? undefined}
+          initialCustomerId={initialCustomerId}
+          defaultGstRate={businessSettings.defaultGstRate}
+          hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
+          gstScheme={businessSettings.gstScheme}
+          storeState={businessSettings.state}
+          defaultNotes={businessSettings.invoiceNotes || undefined}
+        />
+      </ResetFormWrapper>
     </main>
   )
 }

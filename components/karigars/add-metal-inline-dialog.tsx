@@ -26,6 +26,7 @@ type NewMetal = {
   hasPurity: boolean
   isActive: boolean
   isGemstone: boolean
+  primaryUnit: "GRAM" | "CARAT"
 }
 
 /**
@@ -48,7 +49,16 @@ export function AddMetalInlineDialog({ onCreated }: { onCreated: (metal: NewMeta
 
   useEffect(() => {
     if (state.success && state.id) {
-      onCreated({ id: state.id, name, hasPurity, isActive: true, isGemstone })
+      onCreated({
+        id: state.id,
+        name,
+        hasPurity,
+        isActive: true,
+        isGemstone,
+        // Matches upsertStoreMetal's own default when this dialog doesn't
+        // send a primaryUnit field at all.
+        primaryUnit: isGemstone ? "CARAT" : "GRAM",
+      })
       toast.success(state.message || "Added")
       setOpen(false)
       setName("")

@@ -245,6 +245,12 @@ model StoreMetal {
   // work with (historical ledger entries, purchase/invoice line items) —
   // see the comments on those functions for the reconciliation reasoning.
   isGemstone          Boolean              @default(false)
+  // The unit this metal/stone's weight fields are always persisted in
+  // (Settings > Taxonomy) — see the WeightUnit enum's own doc comment.
+  // Defaults to GRAM; existing gemstone rows are backfilled to CARAT by the
+  // migration that introduced this column, matching how they were already
+  // implicitly treated everywhere carat-weighed math applied.
+  primaryUnit         WeightUnit           @default(GRAM)
   isActive            Boolean              @default(true)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -1902,6 +1908,17 @@ enum PurityType {
   PLATINUM_950
   DIAMOND
   OTHER
+}
+
+// The unit a StoreMetal's weight fields are persisted in (Settings >
+// Taxonomy's Primary Unit). Entry forms may still accept the other unit for
+// convenience, but every value is converted to this unit before it's saved —
+// see lib/purity.ts's toPrimaryUnit(). Deliberately just these two: every
+// material in this trade is weighed in either grams or carats, never a third
+// unit.
+enum WeightUnit {
+  GRAM
+  CARAT
 }
 
 enum InventoryStockStatus {

@@ -152,6 +152,11 @@ type KachaInvoiceFormProps = {
   metals: StoreMetalRow[]
   origins: StoreMetalOriginRow[]
   caratConversionRates: Record<PurityType, number>
+  /** Store-configured selling price per Gold/Silver/Platinum purity
+   * (Settings > Purity > Metal Selling Rates) — resolved by a line's own
+   * `purity` and consulted before falling back to the linked metal's flat
+   * StoreMetal.sellingPrice when prefilling a stock-linked line's Rate. */
+  metalSellingRates: Partial<Record<PurityType, number>>
   /** Store's configured per-piece BIS hallmark charge (Settings > Hallmark
    * Charge) — auto-filled into a line's HM Charge the moment its Purity is
    * set to a Gold/Silver value (isHallmarkablePurity), while hmChargeTouched
@@ -171,12 +176,20 @@ export function KachaInvoiceForm({
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
+  metalSellingRates,
   hallmarkChargePerPiece = 0,
   initialLocationId,
 }: KachaInvoiceFormProps) {
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
   const metalById = useMemo(() => new Map(metals.map((m) => [m.id, m])), [metals])
+  // Stone components are tracked by name (stoneMetalTypeName), not id — no
+  // stoneMetalTypeId field exists — so the stone-rate fallback needs its
+  // own name-keyed lookup instead of reusing metalById.
+  const metalByName = useMemo(
+    () => new Map(metals.map((m) => [m.name.toLowerCase(), m])),
+    [metals],
+  )
   // The line's own metal's configured Primary Unit (Settings > Taxonomy) —
   // what Gross/Net/Dmo/Stone Weight are actually persisted in at submit,
   // regardless of what unit is currently toggled for display/entry.
@@ -269,10 +282,17 @@ export function KachaInvoiceForm({
       netWeightUnit: linkedUnit,
       dmoWeightUnit: linkedUnit,
       stoneWeightUnit: linkedUnit,
-      rate: stock.saleRate ?? metalById.get(stock.metalType?.id ?? "")?.sellingPrice ?? 0,
+      rate:
+        stock.saleRate ??
+        metalSellingRates[stock.purity as PurityType] ??
+        metalById.get(stock.metalType?.id ?? "")?.sellingPrice ??
+        0,
       quantity: available > 0 ? 1 : 0,
       caratWeight: stock.caratWeight ?? 0,
-      stoneRate: stock.stoneRate ?? 0,
+      stoneRate:
+        stock.stoneRate ??
+        metalByName.get((stock.stoneMetalTypeName ?? "").toLowerCase())?.sellingPrice ??
+        0,
       hasStoneComponent: stock.stoneRate != null,
       stoneCharge: stock.stoneRate != null && stock.caratWeight != null
         ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))

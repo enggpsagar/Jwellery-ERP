@@ -10,7 +10,7 @@ import {
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
-import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
+import { getCaratConversionRateMap, getMetalSellingRateMap } from "@/lib/actions/purity-actions"
 import { resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 
 import { InvoiceForm, type LineItem } from "@/components/billing/invoice-form"
@@ -45,7 +45,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     redirect(`/billing/${id}`)
   }
 
-  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates, defaultLocationId] =
+  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates, metalSellingRates, defaultLocationId] =
     await Promise.all([
       getInvoiceFormCustomers(),
       getInvoiceFormStockItems(),
@@ -54,6 +54,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
       getStoreMetals(),
       getAllStoreMetalOrigins(),
       getCaratConversionRateMap(),
+      getMetalSellingRateMap(),
       getDefaultLocationId(),
     ])
 
@@ -137,6 +138,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
         metals={metals}
         origins={origins}
         caratConversionRates={caratConversionRates}
+        metalSellingRates={metalSellingRates}
         defaultGstRate={businessSettings.defaultGstRate}
         hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
         gstScheme={businessSettings.gstScheme}

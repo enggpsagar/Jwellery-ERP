@@ -135,15 +135,23 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
     // and whatever lands in `businessName` is what every invoice and email
     // then calls the business — a placeholder here meant real stores sent
     // mail signed "My Jewellery Store".
+    //
+    // City/state also carry over from here: registration required both
+    // (the store code is derived from them, see store-registration-actions.ts)
+    // and stored them on Store.city/Store.state — without this, that same
+    // owner would land on a blank Settings page and have to type the exact
+    // same city/state right back in.
     const store = await prisma.store.findUnique({
       where: { id: storeId },
-      select: { name: true },
+      select: { name: true, city: true, state: true },
     });
 
     settings = await prisma.businessSettings.create({
       data: {
         storeId,
         businessName: store?.name?.trim() || LEGACY_PLACEHOLDER_BUSINESS_NAME,
+        city: store?.city ?? null,
+        state: store?.state ?? null,
       },
     });
   }

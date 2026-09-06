@@ -80,7 +80,7 @@ export function ProductDetailPanel({ productId, canEdit = false }: ProductDetail
         />
       </div>
 
-      <ProductDetailContent product={product} />
+      <ProductDetailContent product={product} canEdit={canEdit} />
     </div>
   )
 }

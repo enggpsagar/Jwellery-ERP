@@ -1035,6 +1035,55 @@ export async function deleteProduct(id: string): Promise<ProductFormState> {
   }
 }
 
+/** Flips a product's Active/Inactive status — same immediate, no-confirm
+ * toggle as enableKarigar/disableKarigar, used by the Status switch on the
+ * product detail view instead of a separate confirm dialog. */
+export async function disableProduct(id: string): Promise<ProductFormState> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const { count } = await prisma.product.updateMany({
+      where: { id, storeId },
+      data: { isActive: false },
+    });
+
+    if (count === 0) {
+      return { success: false, message: "Product not found", errors: {} };
+    }
+
+    revalidatePath("/inventory/products");
+    revalidatePath(`/inventory/products/${id}`);
+
+    return { success: true, message: "Product marked inactive", errors: {} };
+  } catch (error) {
+    console.error("disableProduct error:", error);
+    return { success: false, message: "Failed to update product", errors: {} };
+  }
+}
+
+export async function enableProduct(id: string): Promise<ProductFormState> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const { count } = await prisma.product.updateMany({
+      where: { id, storeId },
+      data: { isActive: true },
+    });
+
+    if (count === 0) {
+      return { success: false, message: "Product not found", errors: {} };
+    }
+
+    revalidatePath("/inventory/products");
+    revalidatePath(`/inventory/products/${id}`);
+
+    return { success: true, message: "Product marked active", errors: {} };
+  } catch (error) {
+    console.error("enableProduct error:", error);
+    return { success: false, message: "Failed to update product", errors: {} };
+  }
+}
+
 export type BulkDeleteResult = {
   deletedCount: number;
   failures: { id: string; message: string }[];

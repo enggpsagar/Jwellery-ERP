@@ -7,7 +7,7 @@ import type { getInventoryStock } from "@/lib/actions/inventory/stock-actions"
 
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
-import { Badge } from "@/components/ui/badge"
+import { ActiveBadge } from "@/components/shared/active-badge"
 import { cn } from "@/lib/utils"
 
 // Derived from the actual server action's return shape (rather than
@@ -187,9 +187,7 @@ export function StockTable({
                     {formatWeightCell(item.netWeight)}
                   </td>
                   <td className="px-4 py-3">
-                    <Badge variant={item.isActive ? "default" : "secondary"}>
-                      {item.isActive ? "Active" : "Inactive"}
-                    </Badge>
+                    <ActiveBadge isActive={item.isActive} />
                   </td>
                 </tr>
               )

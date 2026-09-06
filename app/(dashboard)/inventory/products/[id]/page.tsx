@@ -75,7 +75,7 @@ export default async function ProductDetailsPage({ params, searchParams }: Props
         </p>
       )}
 
-      <ProductDetailContent product={product} />
+      <ProductDetailContent product={product} canEdit={canEdit} />
     </main>
   )
 }

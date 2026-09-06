@@ -12,6 +12,7 @@ import {
 } from "@/lib/actions/inventory-stock-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { classifyMetalName } from "@/lib/business-units"
+import { GRAMS_PER_CARAT, toPrimaryUnit } from "@/lib/purity"
 import { todayForDateInput } from "@/lib/date-input"
 import { LocationSelect } from "@/components/shared/location-select"
 import { useToast } from "@/components/providers/toast-provider"
@@ -112,6 +113,39 @@ export function IssueMaterialDialog({
   const selectedMetal = activeMetals.find((m) => m.id === metalTypeId)
   const isPreciousMetal = selectedMetal?.hasPurity ?? false
 
+  // The selected metal's configured Primary Unit (Settings > Taxonomy) —
+  // what Issue Weight is actually persisted in, regardless of which unit
+  // the toggle is currently showing for entry convenience. No store-
+  // specific gram/carat rate is threaded into this dialog (would mean
+  // plumbing it through every caller for a rare case), so this uses the
+  // universal 1 ct = 0.2 g constant, same fallback lib/purity.ts's own
+  // helpers use when a caller hasn't threaded a store rate through.
+  const primaryUnit = selectedMetal?.primaryUnit ?? "GRAM"
+  const [weightUnit, setWeightUnit] = useState<"GRAM" | "CARAT">(primaryUnit)
+  // Always grams internally, regardless of weightUnit — that only picks
+  // what's displayed/typed (converted via toPrimaryUnit on the way in and
+  // out) and what unit gets submitted (converted to the metal's actual
+  // Primary Unit at submit, not necessarily this toggle).
+  const [issueWeightGrams, setIssueWeightGrams] = useState("")
+
+  useEffect(() => {
+    setWeightUnit(primaryUnit)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metalTypeId])
+
+  function displayIssueWeight() {
+    if (issueWeightGrams.trim() === "" || !Number.isFinite(Number(issueWeightGrams))) return ""
+    return String(toPrimaryUnit(Number(issueWeightGrams), "GRAM", weightUnit, GRAMS_PER_CARAT))
+  }
+
+  function handleIssueWeightChange(typed: string) {
+    if (typed.trim() === "" || !Number.isFinite(Number(typed))) {
+      setIssueWeightGrams("")
+      return
+    }
+    setIssueWeightGrams(String(toPrimaryUnit(Number(typed), weightUnit, "GRAM", GRAMS_PER_CARAT)))
+  }
+
   // Purity options depend on which metal is selected — Silver should never
   // offer Gold purities and vice versa. classifyMetalName's own return type
   // (GOLD | SILVER | DIAMOND | OTHER) has no Platinum bucket, so Platinum is
@@ -143,6 +177,7 @@ export function IssueMaterialDialog({
     if (state.success) {
       toast.success(state.message || "Material issued")
       setOpen(false)
+      setIssueWeightGrams("")
       router.refresh()
     } else if (!state.success && state.message) {
       toast.error(state.message)
@@ -194,6 +229,15 @@ export function IssueMaterialDialog({
           className="space-y-4"
         >
           <input type="hidden" name="metalTypeId" value={metalTypeId} />
+          <input
+            type="hidden"
+            name="issueWeight"
+            value={
+              issueWeightGrams.trim() === ""
+                ? ""
+                : String(toPrimaryUnit(Number(issueWeightGrams), "GRAM", primaryUnit, GRAMS_PER_CARAT))
+            }
+          />
           {isPreciousMetal && <input type="hidden" name="issuePurity" value={issuePurity} />}
 
           {!state.success && state.message && (
@@ -237,8 +281,27 @@ export function IssueMaterialDialog({
           </div>
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <Label>Issue Weight (g) <RequiredMark /></Label>
-            <Input name="issueWeight" type="number" step="0.001" min="0" required />
+            <Label>Issue Weight <RequiredMark /></Label>
+            <div className="flex gap-1">
+              <Input
+                type="number"
+                step="0.001"
+                min="0"
+                required
+                className="flex-1"
+                value={displayIssueWeight()}
+                onChange={(event) => handleIssueWeightChange(event.target.value)}
+              />
+              <Select value={weightUnit} onValueChange={(unit) => setWeightUnit(unit as "GRAM" | "CARAT")}>
+                <SelectTrigger className="w-16">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GRAM">g</SelectItem>
+                  <SelectItem value="CARAT">ct</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">

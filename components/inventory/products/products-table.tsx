@@ -5,6 +5,7 @@ import * as React from "react"
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
+import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
 type ProductRow = {
@@ -110,6 +111,7 @@ export function ProductsTable({
               </th>
               <SortableTableHead label="Product Code" sortKey="productCode" defaultSortBy="createdAt" />
               <SortableTableHead label="Title" sortKey="name" defaultSortBy="createdAt" />
+              <SortableTableHead label="Active" sortKey="isActive" defaultSortBy="createdAt" />
             </tr>
           </thead>
 
@@ -181,16 +183,14 @@ export function ProductsTable({
                             },
                           ],
                         },
-                        {
-                          fields: [
-                            {
-                              label: "Status",
-                              value: product.isActive ? "Active" : "Inactive",
-                            },
-                          ],
-                        },
                       ]}
                     />
+                  </td>
+
+                  <td className="px-4 py-3">
+                    <Badge variant={product.isActive ? "default" : "secondary"}>
+                      {product.isActive ? "Active" : "Inactive"}
+                    </Badge>
                   </td>
                 </tr>
               )

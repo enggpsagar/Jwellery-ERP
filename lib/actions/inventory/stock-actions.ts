@@ -90,6 +90,7 @@ export type StockSortBy =
   | "finish"
   | "location"
   | "purchaseDate"
+  | "isActive"
 export type StockSortOrder = "asc" | "desc"
 
 export type GetInventoryStockParams = {
@@ -173,22 +174,30 @@ function getStockWhere(
   }
 }
 
+// Active items always sort ahead of inactive ones, regardless of which
+// column the user picked — that column only decides ordering *within* each
+// of those two groups.
 function getStockOrderBy(
   sortBy: StockSortBy = "createdAt",
   sortOrder: StockSortOrder = "desc"
 ) {
-  if (sortBy === "stockCode") return { stockCode: sortOrder }
-  if (sortBy === "netWeight") return { netWeight: sortOrder }
-  if (sortBy === "saleAmount") return { saleAmount: sortOrder }
-  if (sortBy === "product") return { product: { name: sortOrder } }
-  if (sortBy === "metalType") return { metalType: { name: sortOrder } }
-  if (sortBy === "purity") return { purity: sortOrder }
-  if (sortBy === "quantity") return { quantity: sortOrder }
-  if (sortBy === "status") return { status: sortOrder }
-  if (sortBy === "finish") return { finish: sortOrder }
-  if (sortBy === "location") return { location: { name: sortOrder } }
-  if (sortBy === "purchaseDate") return { purchaseDate: sortOrder }
-  return { createdAt: sortOrder }
+  const primary =
+    sortBy === "stockCode" ? { stockCode: sortOrder }
+    : sortBy === "netWeight" ? { netWeight: sortOrder }
+    : sortBy === "saleAmount" ? { saleAmount: sortOrder }
+    : sortBy === "product" ? { product: { name: sortOrder } }
+    : sortBy === "metalType" ? { metalType: { name: sortOrder } }
+    : sortBy === "purity" ? { purity: sortOrder }
+    : sortBy === "quantity" ? { quantity: sortOrder }
+    : sortBy === "status" ? { status: sortOrder }
+    : sortBy === "finish" ? { finish: sortOrder }
+    : sortBy === "location" ? { location: { name: sortOrder } }
+    : sortBy === "purchaseDate" ? { purchaseDate: sortOrder }
+    : sortBy === "isActive" ? { isActive: sortOrder }
+    : { createdAt: sortOrder }
+
+  if (sortBy === "isActive") return [primary]
+  return [{ isActive: "desc" as const }, primary]
 }
 
 function mapStockRow(row: any) {
@@ -269,6 +278,7 @@ async function getAllInventoryStockForExport(
     "finish",
     "location",
     "purchaseDate",
+    "isActive",
   ]
   const sortBy: StockSortBy = validSortBy.includes(params.sortBy as StockSortBy)
     ? (params.sortBy as StockSortBy)

@@ -1814,6 +1814,15 @@ enum LedgerSourceType {
   KARIGAR_ISSUE
   KARIGAR_RECEIPT
   ADJUSTMENT
+  // Money actually received/paid — distinct from SALE/PURCHASE's own
+  // balance-due accrual entries (still tagged SALE/PURCHASE) so the
+  // Payment In / Payment Out pages can filter to real cash movement with a
+  // plain sourceType match, not a heuristic. Used by every "record a
+  // payment" action regardless of whether it's tied to a specific
+  // invoice/purchase or standalone/on-account — see getPaymentsIn/Out in
+  // lib/actions/payments-actions.ts.
+  PAYMENT_IN
+  PAYMENT_OUT
 }
 
 enum InvoiceStatus {

@@ -771,7 +771,7 @@ export async function createPurchase(
           data: {
             storeId,
             type: LedgerEntryType.DEBIT,
-            sourceType: LedgerSourceType.PURCHASE,
+            sourceType: LedgerSourceType.PAYMENT_OUT,
             vendorId,
             purchaseId: created.id,
             amount: payment.amount,
@@ -855,7 +855,7 @@ export async function recordPurchasePayment(
           data: {
             storeId,
             type: LedgerEntryType.DEBIT,
-            sourceType: LedgerSourceType.PURCHASE,
+            sourceType: LedgerSourceType.PAYMENT_OUT,
             vendorId: purchase.vendorId,
             purchaseId,
             amount: payment.amount,

@@ -1009,7 +1009,7 @@ export async function createInvoice(
           data: {
             storeId,
             type: LedgerEntryType.CREDIT,
-            sourceType: LedgerSourceType.SALE,
+            sourceType: LedgerSourceType.PAYMENT_IN,
             customerId,
             invoiceId: created.id,
             amount: payment.amount,
@@ -1094,7 +1094,7 @@ export async function recordInvoicePayment(
           data: {
             storeId,
             type: LedgerEntryType.CREDIT,
-            sourceType: LedgerSourceType.SALE,
+            sourceType: LedgerSourceType.PAYMENT_IN,
             customerId: invoice.customerId,
             invoiceId,
             amount: payment.amount,

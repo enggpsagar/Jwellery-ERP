@@ -658,7 +658,7 @@ export async function createKachaInvoice(
           data: {
             storeId,
             type: LedgerEntryType.CREDIT,
-            sourceType: LedgerSourceType.SALE,
+            sourceType: LedgerSourceType.PAYMENT_IN,
             customerId,
             amount: payment.amount,
             paymentMethod: payment.method as PaymentMethod,
@@ -728,7 +728,7 @@ export async function recordKachaInvoicePayment(
         data: {
           storeId,
           type: LedgerEntryType.CREDIT,
-          sourceType: LedgerSourceType.SALE,
+          sourceType: LedgerSourceType.PAYMENT_IN,
           customerId: kachaInvoice.customerId,
           amount,
           description: notes ?? `Payment received for ${kachaInvoice.slipNumber}`,

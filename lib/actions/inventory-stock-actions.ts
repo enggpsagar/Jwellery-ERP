@@ -901,7 +901,7 @@ export async function recordKarigarPayment(
           data: {
             storeId,
             type: LedgerEntryType.CREDIT,
-            sourceType: LedgerSourceType.MANUAL,
+            sourceType: LedgerSourceType.PAYMENT_OUT,
             karigarId,
             amount: payment.amount,
             paymentMethod: payment.method as PaymentMethod,
@@ -916,6 +916,7 @@ export async function recordKarigarPayment(
     );
 
     revalidatePath(`/karigars/${karigarId}`);
+    revalidatePath("/payments/out");
 
     return { success: true, message: "Payment recorded" };
   } catch (error) {

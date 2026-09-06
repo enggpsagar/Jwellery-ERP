@@ -1,6 +1,6 @@
 "use client"
 
-import { Printer, QrCode } from "lucide-react"
+import { Printer } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
@@ -28,7 +28,7 @@ export function InvoiceQrCard({
   totalAmount,
 }: InvoiceQrCardProps) {
   return (
-    <section className="rounded-xl border bg-card p-5">
+    <section className="rounded-xl border bg-card p-3">
       <style>{`
         @media print {
           body * {
@@ -47,40 +47,34 @@ export function InvoiceQrCard({
         }
       `}</style>
 
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <QrCode className="h-5 w-5" />
-          QR Code
-        </h2>
-
-        <Button type="button" size="sm" className="gap-2" onClick={() => window.print()}>
-          <Printer className="h-4 w-4" />
-          Print
-        </Button>
-      </div>
-
-      <div id="invoice-qr-print" className="flex flex-col items-center gap-3 text-center">
+      <div id="invoice-qr-print" className="flex items-center gap-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={dataUrl}
           alt={`QR code for invoice ${invoiceNumber}`}
-          className="h-40 w-40"
-          width={160}
-          height={160}
+          className="h-20 w-20 shrink-0"
+          width={80}
+          height={80}
         />
-        <div>
+
+        <div className="min-w-0 flex-1 space-y-0.5 text-sm">
           <p className="font-semibold">{invoiceNumber}</p>
-          {customerName && <p className="text-sm text-muted-foreground">{customerName}</p>}
+          {customerName && <p className="text-muted-foreground">{customerName}</p>}
+          <p className="text-xs text-muted-foreground">
+            {invoiceDate} · {totalAmount}
+          </p>
         </div>
 
-        <div className="w-full max-w-[220px] space-y-0.5 text-left text-xs text-muted-foreground">
-          <p>
-            <span className="font-medium text-foreground">Date:</span> {invoiceDate}
-          </p>
-          <p>
-            <span className="font-medium text-foreground">Total:</span> {totalAmount}
-          </p>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          title="Print QR code"
+          aria-label="Print QR code"
+          onClick={() => window.print()}
+        >
+          <Printer className="h-4 w-4" />
+        </Button>
       </div>
     </section>
   )

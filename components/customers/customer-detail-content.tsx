@@ -90,6 +90,12 @@ export function CustomerDetailContent({
         </DetailGrid>
       </DetailSection>
 
+      {/* Hidden when there's nothing to summarize — a customer with zero
+          orders and no opening balance has no business activity to show;
+          totalPurchaseValue/pendingAmount are both derived from the same
+          invoices totalOrders counts, so they can't be nonzero on their
+          own once that's zero. */}
+      {(customer.totalOrders ?? 0) > 0 || customer.openingBalance !== 0 ? (
       <DetailSection
         title="Business Summary"
         description="Order and financial summary for this customer."
@@ -118,6 +124,7 @@ export function CustomerDetailContent({
           <DetailField label="Last Payment" value={customer.lastPaymentDate} />
         </DetailGrid>
       </DetailSection>
+      ) : null}
     </div>
   )
 }

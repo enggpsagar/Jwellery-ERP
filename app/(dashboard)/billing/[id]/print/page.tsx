@@ -1,10 +1,10 @@
 import type { Metadata } from "next"
 import { cache } from "react"
 import { notFound } from "next/navigation"
+import { Phone, Mail, MapPin } from "lucide-react"
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
-import { getLatestMetalRates } from "@/lib/actions/metal-rate-actions"
 import { amountInWords } from "@/lib/number-to-words"
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button"
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst"
@@ -26,22 +26,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  CASH: "Cash",
-  UPI: "UPI",
-  NET_BANKING: "Net Banking",
-  CHEQUE: "Cheque",
-  CARD: "Card",
-  OTHER: "Other",
-}
-
-const TRANSPORT_MODE_LABELS: Record<string, string> = {
-  ROAD: "Road",
-  RAIL: "Rail",
-  AIR: "Air",
-  SHIP: "Ship",
-}
-
 function fmt(value: number) {
   return value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -57,20 +41,61 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Cancelled",
 }
 
+const TRANSPORT_MODE_LABELS: Record<string, string> = {
+  ROAD: "Road",
+  RAIL: "Rail",
+  AIR: "Air",
+  SHIP: "Ship",
+}
+
+type InvoiceItem = Awaited<ReturnType<typeof getInvoiceById>> extends infer T
+  ? T extends { items: (infer Item)[] }
+    ? Item
+    : never
+  : never
+
+/**
+ * Quantity/unit/price-per-unit for one print row. A diamond line prices per
+ * carat, a weighed metal line prices per gram, and anything else (a flat
+ * service/certification charge with no weight, e.g. a hallmarking or HUID
+ * fee) prices per piece off Invoice.quantity — the same three cases
+ * lib/gst.ts's computeGst callers already distinguish, just for display
+ * instead of tax math.
+ */
+function lineQuantity(item: InvoiceItem) {
+  if (item.purity === "DIAMOND" && item.caratWeight) {
+    return { qty: Number(item.caratWeight), unit: "Ct", pricePerUnit: Number(item.rate ?? 0), isWeighed: true }
+  }
+  if (item.netWeight && Number(item.netWeight) > 0) {
+    return { qty: Number(item.netWeight), unit: "Gm", pricePerUnit: Number(item.rate ?? 0), isWeighed: true }
+  }
+  const qty = item.quantity || 1
+  return { qty, unit: "Pcs", pricePerUnit: Number(item.rate ?? (item.lineTotal / qty)), isWeighed: false }
+}
+
+/** GST amount + effective rate for one line, derived from what's already
+ * persisted (lineTotal already includes tax) rather than re-deriving the
+ * invoice's single gstRate — works the same whether the line is intra-state
+ * (split sgst+cgst) or inter-state (igst only), since the combined amount is
+ * identical either way. */
+function lineGst(item: InvoiceItem) {
+  const amount = item.sgstAmount + item.cgstAmount + item.igstAmount
+  const taxable = item.lineTotal - amount
+  const percent = taxable > 0 ? Math.round((amount / taxable) * 10000) / 100 : 0
+  return { amount, percent }
+}
+
 export default async function InvoicePrintPage({ params }: Props) {
   const { id } = await params
 
-  const [invoice, settings, metalRates] = await Promise.all([
-    getInvoice(id),
-    getBusinessSettings(),
-    getLatestMetalRates(),
-  ])
+  const [invoice, settings] = await Promise.all([getInvoice(id), getBusinessSettings()])
 
   if (!invoice) notFound()
 
-  const rate = metalRates.latest
-  const businessAddressLines = [settings.address, [settings.city, settings.state].filter(Boolean).join(", "), settings.pincode ? `PINCODE: ${settings.pincode}` : null]
-    .filter(Boolean)
+  const businessAddressLines = [
+    settings.address,
+    [settings.city, settings.state].filter(Boolean).join(", "),
+  ].filter(Boolean)
 
   const customerAddressLines = [
     invoice.customer?.addressLine1,
@@ -79,310 +104,229 @@ export default async function InvoicePrintPage({ params }: Props) {
     invoice.customer?.pincode,
   ].filter(Boolean)
 
-  const totalQty = invoice.items.reduce((sum, item) => sum + item.quantity, 0)
-  const totalGrossWeight = invoice.items.reduce((sum, item) => sum + (item.grossWeight ?? 0), 0)
-  const totalStoneWeight = invoice.items.reduce((sum, item) => sum + (item.stoneWeight ?? 0), 0)
-  const totalNetWeight = invoice.items.reduce((sum, item) => sum + (item.netWeight ?? 0), 0)
-  const totalGrossPrice = invoice.items.reduce(
-    (sum, item) => sum + (item.rate ?? 0) * (item.netWeight ?? 0),
-    0,
-  )
-  const totalMaking = invoice.items.reduce((sum, item) => sum + item.makingCharge, 0)
-  const totalHm = invoice.items.reduce((sum, item) => sum + item.hmCharge, 0)
-  const totalStoneCharge = invoice.items.reduce((sum, item) => sum + item.stoneCharge, 0)
-  const totalSchemeDiscount = invoice.items.reduce((sum, item) => sum + item.schemeDiscount, 0)
-  const totalSgst = invoice.items.reduce((sum, item) => sum + item.sgstAmount, 0)
-  const totalCgst = invoice.items.reduce((sum, item) => sum + item.cgstAmount, 0)
-  const totalIgst = invoice.items.reduce((sum, item) => sum + item.igstAmount, 0)
-  // An invoice is either wholly intra-state or wholly inter-state — one
-  // customer, one shipping state — so the presence of any IGST at all is
-  // enough to pick the column layout for the whole document.
-  const isInterState = totalIgst > 0
   const heading = documentHeading(settings.gstScheme)
+  const hasBankDetails = Boolean(settings.bankName)
 
-  const payments = invoice.ledgerEntries.filter((entry) => entry.amount > 0)
-  const totalPaid = payments.reduce((sum, entry) => sum + entry.amount, 0)
+  // One row per distinct GST rate found across the invoice's lines, split
+  // into SGST+CGST (intra-state) or shown as IGST (inter-state) — matches
+  // how a real GST tax invoice groups its rate-wise summary, rather than
+  // dumping every line's tax into one undifferentiated total.
+  const rateGroups = new Map<number, { percent: number; sgst: number; cgst: number; igst: number }>()
+  for (const item of invoice.items) {
+    const { percent } = lineGst(item)
+    if (percent <= 0) continue
+    const group = rateGroups.get(percent) ?? { percent, sgst: 0, cgst: 0, igst: 0 }
+    group.sgst += item.sgstAmount
+    group.cgst += item.cgstAmount
+    group.igst += item.igstAmount
+    rateGroups.set(percent, group)
+  }
+  const sortedRateGroups = Array.from(rateGroups.values()).sort((a, b) => a.percent - b.percent)
+  const isInterState = invoice.items.some((item) => item.igstAmount > 0)
+
+  const subtotal = invoice.totalAmount - invoice.taxAmount
 
   return (
-    <main className="mx-auto max-w-5xl space-y-4 p-6 text-xs text-black print:max-w-none print:w-full print:p-0 print:text-[8px]">
-      {/* Portrait A4, tight margins — the line-item table's own column
-          widths/headers are sized to fit this, not the other way around. */}
-      <style>{"@page { size: A4 portrait; margin: 8mm; }"}</style>
+    <main className="mx-auto max-w-3xl space-y-4 p-6 text-xs text-black print:max-w-none print:w-full print:p-0 print:text-[9px]">
+      <style>{"@page { size: A4 portrait; margin: 10mm; }"}</style>
 
       <div className="flex justify-end print:hidden">
         <InvoicePrintButton />
       </div>
 
-      <div className="border border-black">
-        {/* A Composition dealer legally cannot print "Tax Invoice" — it
-            must say "Bill of Supply", with the disclaimer below it. See
-            documentHeading()/COMPOSITION_DISCLAIMER in lib/gst.ts. */}
-        <div className="border-b border-black p-2 text-center">
-          <p className="text-sm font-bold uppercase tracking-wide">{heading}</p>
-          {settings.gstScheme === "COMPOSITION" && (
-            <p className="text-[10px] italic">{COMPOSITION_DISCLAIMER}</p>
-          )}
-        </div>
-
-        {/* Invoice No/Date is the one thing a tax invoice can never omit —
-            previously this only ever reached the browser tab title, never
-            the printed page itself. */}
-        <div className="flex flex-wrap justify-between gap-2 border-b border-black p-2 font-medium">
-          <span>Invoice No : {invoice.invoiceNumber}</span>
-          <span>Invoice Date : {fmtDate(invoice.invoiceDate)}</span>
-          {invoice.dueDate && <span>Due Date : {fmtDate(invoice.dueDate)}</span>}
-          {invoice.locationName && <span>Location : {invoice.locationName}</span>}
-          {invoice.status !== "PAID" && (
-            <span>Status : {STATUS_LABELS[invoice.status] ?? invoice.status}</span>
-          )}
-        </div>
-
-        {/* Header: business (left) / customer (right) */}
-        <div className="grid grid-cols-2 border-b border-black">
-          <div className="border-r border-black p-2 space-y-0.5">
-            <div className="flex items-center gap-2">
-              {settings.logoUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={settings.logoUrl}
-                  alt={settings.businessName}
-                  className="h-8 w-8 shrink-0 rounded object-cover print:h-6 print:w-6"
-                />
-              )}
-              <p className="font-semibold">{settings.businessName}</p>
-            </div>
-            {businessAddressLines.map((line, index) => (
-              <p key={index}>{line}</p>
-            ))}
-            {settings.phone && <p>Phone Number : {settings.phone}</p>}
-            {settings.gstNumber && <p>GSTIN : {settings.gstNumber}</p>}
-            {settings.stateCode && <p>State Code : {settings.stateCode}</p>}
-            {settings.cin && <p>CIN : {settings.cin}</p>}
+      <div className="overflow-hidden rounded-lg border print:rounded-none">
+        {/* Contact bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 px-4 py-2 text-white">
+          <div className="flex flex-wrap items-center gap-4">
+            {settings.phone && (
+              <span className="flex items-center gap-1.5">
+                <Phone className="h-3 w-3" /> {settings.phone}
+              </span>
+            )}
+            {settings.email && (
+              <span className="flex items-center gap-1.5">
+                <Mail className="h-3 w-3" /> {settings.email}
+              </span>
+            )}
           </div>
-          <div className="p-2 space-y-0.5">
-            <p className="font-semibold">{invoice.customer?.name ?? "-"}</p>
+          {businessAddressLines.length > 0 && (
+            <span className="flex items-center gap-1.5 text-right">
+              <MapPin className="h-3 w-3 shrink-0" /> {businessAddressLines.join(", ")}
+            </span>
+          )}
+        </div>
+
+        {/* Business identity + document heading */}
+        <div className="flex flex-wrap items-start justify-between gap-4 bg-slate-800 px-4 py-3 text-white">
+          <div className="space-y-0.5">
+            <p className="text-base font-bold uppercase tracking-wide">{settings.businessName}</p>
+            {settings.gstNumber && <p className="text-[10px] text-slate-300">GSTIN: {settings.gstNumber}</p>}
+            {settings.state && (
+              <p className="text-[10px] text-slate-300">
+                State: {settings.stateCode ? `${settings.stateCode}-` : ""}
+                {settings.state}
+              </p>
+            )}
+          </div>
+          <div className="text-right">
+            <p className="text-lg font-semibold">{heading}</p>
+            {settings.gstScheme === "COMPOSITION" && (
+              <p className="max-w-[220px] text-[9px] italic text-slate-300">{COMPOSITION_DISCLAIMER}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Bill To / invoice meta */}
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b p-4">
+          <div className="space-y-0.5">
+            <p className="font-medium text-indigo-700">Bill To:</p>
+            <p className="text-sm font-bold">{invoice.customer?.name ?? "-"}</p>
             {customerAddressLines.map((line, index) => (
               <p key={index}>{line}</p>
             ))}
-            {invoice.customer?.phone && <p>Phone Number : {invoice.customer.phone}</p>}
-            {invoice.customer?.registrationId && (
-              <p>Encircle Id : {invoice.customer.registrationId}</p>
+            {invoice.customer?.phone && <p>Contact No.: {invoice.customer.phone}</p>}
+          </div>
+          <div className="space-y-0.5 text-right">
+            <p>
+              <span className="font-semibold">Invoice No.:</span> {invoice.invoiceNumber}
+            </p>
+            <p>
+              <span className="font-semibold">Date:</span> {fmtDate(invoice.invoiceDate)}
+            </p>
+            {invoice.dueDate && (
+              <p>
+                <span className="font-semibold">Due Date:</span> {fmtDate(invoice.dueDate)}
+              </p>
             )}
-            {invoice.customer?.panNumber && <p>PAN : {invoice.customer.panNumber}</p>}
+            {invoice.status !== "PAID" && (
+              <p>
+                <span className="font-semibold">Status:</span> {STATUS_LABELS[invoice.status] ?? invoice.status}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Standard rate banner */}
-        {rate && (
-          <div className="border-b border-black p-2 text-center font-medium">
-            Standard Rate of 24 Karat/22 Karat/18 Karat{rate.gold14k ? "/14 Karat" : ""} Gold Rs:{" "}
-            {fmt(Number(rate.gold24k))}/{fmt(Number(rate.gold22k))}/{fmt(Number(rate.gold18k))}
-            {rate.gold14k ? `/${fmt(Number(rate.gold14k))}` : ""} Rs/g
-            {rate.platinum95 ? (
-              <> · Standard Rate of 95.00% Purity Platinum: Rs {fmt(Number(rate.platinum95))}</>
-            ) : null}
-          </div>
-        )}
-
         {/* Line items */}
-        <table className="w-full table-fixed border-collapse">
-          {/* table-fixed + explicit widths, not auto layout — auto layout
-              sizes every column to its widest cell on one line, which made
-              this 12-13 column table wider than a printed page. */}
-          <colgroup>
-            <col style={{ width: isInterState ? "16%" : "14%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "4%" }} />
-            <col style={{ width: "7%" }} />
-            <col style={{ width: "7%" }} />
-            <col style={{ width: "7%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "7%" }} />
-            <col style={{ width: "7%" }} />
-            <col style={{ width: "7%" }} />
-            {isInterState ? (
-              <col style={{ width: "12%" }} />
-            ) : (
-              <>
-                <col style={{ width: "7%" }} />
-                <col style={{ width: "7%" }} />
-              </>
-            )}
-            <col style={{ width: "9%" }} />
-          </colgroup>
+        <table className="w-full border-collapse">
           <thead>
-            {/* The site-wide `table thead th` rule (globals.css) forces
-                small-caps, nowrap, muted-gray headers meant for the app's
-                data-table cards — on this narrow, fixed-width, 12+ column
-                table that nowrap is exactly what forced every header onto
-                one overflowing line, visually overlapping its neighbors.
-                Overridden here (a class targeting the element itself always
-                outranks that bare-element selector) so headers wrap onto
-                their own 2-3 lines and fit their column instead. */}
-            <tr className="border-b border-black [&>th]:border-r [&>th]:border-black [&>th]:p-1 print:[&>th]:p-0.5 [&>th:last-child]:border-r-0 [&>th]:whitespace-normal [&>th]:normal-case [&>th]:tracking-normal [&>th]:text-black [&>th]:font-semibold [&>th]:text-[8px] print:[&>th]:text-[6.5px] [&>th]:leading-tight [&>th]:align-bottom">
-              <th className="text-left">Item Description</th>
-              <th>Purity/HSN</th>
-              <th>Qty</th>
-              <th>Gross Wt (g)</th>
-              <th>Stone Wt (g)</th>
-              <th>Net Wt (g)</th>
-              <th>Gross Price (Rs.)</th>
-              <th>Making (Rs.)</th>
-              <th>Stone (Rs.)</th>
-              <th>Discount (Rs.)</th>
-              {/* One customer, one shipping state — an invoice is either
-                  wholly intra-state or wholly inter-state, never a mix, so
-                  the column choice is made once for the whole table. */}
-              {isInterState ? (
-                <th>IGST</th>
-              ) : (
-                <>
-                  <th>SGST</th>
-                  <th>CGST</th>
-                </>
-              )}
-              <th>Value (Rs.)</th>
+            <tr className="bg-indigo-600 text-white [&>th]:p-2 [&>th]:text-left [&>th]:font-semibold">
+              <th className="w-6">#</th>
+              <th>Item name</th>
+              <th>HSN/ SAC</th>
+              <th className="text-right">Quantity</th>
+              <th>Unit</th>
+              <th className="text-right">Price/ Unit</th>
+              <th className="text-right">GST</th>
+              <th className="text-right">Amount</th>
             </tr>
           </thead>
           <tbody>
-            {invoice.items.map((item) => (
-              <tr key={item.id} className="border-b border-black [&>td]:border-r [&>td]:border-black [&>td]:p-1 print:[&>td]:p-0.5 [&>td:last-child]:border-r-0 align-top">
-                <td>
-                  {item.itemName}
-                  {item.stoneMetalTypeName ? (
-                    <span className="block">
-                      Stone: {item.stoneMetalTypeName}
-                      {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
-                    </span>
-                  ) : null}
-                </td>
-                <td>
-                  {item.purity ?? "-"}
-                  {item.hsnCode ? <span className="block">{item.hsnCode}</span> : null}
-                </td>
-                <td className="text-center">{item.quantity}N</td>
-                <td className="text-right whitespace-nowrap">{(item.grossWeight ?? 0).toFixed(3)}</td>
-                <td className="text-right whitespace-nowrap">{(item.stoneWeight ?? 0).toFixed(3)}</td>
-                <td className="text-right whitespace-nowrap">{(item.netWeight ?? 0).toFixed(3)}</td>
-                <td className="text-right whitespace-nowrap">{fmt((item.rate ?? 0) * (item.netWeight ?? 0))}</td>
-                <td className="text-right whitespace-nowrap">
-                  {fmt(item.makingCharge)}
-                  {item.hmCharge > 0 ? <span className="block">HM {fmt(item.hmCharge)}</span> : null}
-                </td>
-                <td className="text-right whitespace-nowrap">{fmt(item.stoneCharge)}</td>
-                <td className="text-right whitespace-nowrap">{fmt(item.schemeDiscount)}</td>
-                {isInterState ? (
-                  <td className="text-right whitespace-nowrap">{fmt(item.igstAmount)}</td>
-                ) : (
-                  <>
-                    <td className="text-right whitespace-nowrap">{fmt(item.sgstAmount)}</td>
-                    <td className="text-right whitespace-nowrap">{fmt(item.cgstAmount)}</td>
-                  </>
-                )}
-                <td className="text-right whitespace-nowrap font-medium">{fmt(item.lineTotal)}</td>
-              </tr>
-            ))}
-            <tr className="border-b border-black font-semibold [&>td]:border-r [&>td]:border-black [&>td]:p-1 print:[&>td]:p-0.5 [&>td:last-child]:border-r-0">
-              <td className="text-right whitespace-nowrap" colSpan={2}>Total</td>
-              <td className="text-center">{totalQty}N</td>
-              <td className="text-right whitespace-nowrap">{totalGrossWeight.toFixed(3)}</td>
-              <td className="text-right whitespace-nowrap">{totalStoneWeight.toFixed(3)}</td>
-              <td className="text-right whitespace-nowrap">{totalNetWeight.toFixed(3)}</td>
-              <td className="text-right whitespace-nowrap">{fmt(totalGrossPrice)}</td>
-              <td className="text-right whitespace-nowrap">
-                {fmt(totalMaking)}
-                {totalHm > 0 ? <span className="block">HM {fmt(totalHm)}</span> : null}
+            {invoice.items.map((item, index) => {
+              const { qty, unit, pricePerUnit } = lineQuantity(item)
+              const { amount: gstAmount, percent: gstPercent } = lineGst(item)
+              return (
+                <tr key={item.id} className="border-b [&>td]:p-2 align-top">
+                  <td>{index + 1}</td>
+                  <td className="font-medium">{item.itemName}</td>
+                  <td>{item.hsnCode ?? "-"}</td>
+                  <td className="text-right whitespace-nowrap">
+                    {unit === "Pcs" ? qty : qty.toFixed(3)}
+                  </td>
+                  <td>{unit}</td>
+                  <td className="text-right whitespace-nowrap">₹{fmt(pricePerUnit)}</td>
+                  <td className="text-right whitespace-nowrap">
+                    ₹{fmt(gstAmount)} {gstPercent > 0 && `(${gstPercent}%)`}
+                  </td>
+                  <td className="text-right whitespace-nowrap font-medium">₹{fmt(item.lineTotal)}</td>
+                </tr>
+              )
+            })}
+            <tr className="bg-indigo-50 font-semibold [&>td]:p-2">
+              <td colSpan={3} className="text-right">
+                Total
               </td>
-              <td className="text-right whitespace-nowrap">{fmt(totalStoneCharge)}</td>
-              <td className="text-right whitespace-nowrap">{fmt(totalSchemeDiscount)}</td>
-              {isInterState ? (
-                <td className="text-right whitespace-nowrap">{fmt(totalIgst)}</td>
-              ) : (
-                <>
-                  <td className="text-right whitespace-nowrap">{fmt(totalSgst)}</td>
-                  <td className="text-right whitespace-nowrap">{fmt(totalCgst)}</td>
-                </>
-              )}
-              <td className="text-right whitespace-nowrap">{fmt(invoice.totalAmount)}</td>
+              <td className="text-right whitespace-nowrap">
+                {invoice.items
+                  .map(lineQuantity)
+                  .filter((line) => line.isWeighed)
+                  .reduce((sum, line) => sum + line.qty, 0)
+                  .toFixed(3)}
+              </td>
+              <td />
+              <td />
+              <td className="text-right whitespace-nowrap">
+                ₹{fmt(invoice.items.reduce((sum, item) => sum + lineGst(item).amount, 0))}
+              </td>
+              <td className="text-right whitespace-nowrap">₹{fmt(invoice.totalAmount)}</td>
             </tr>
           </tbody>
         </table>
 
-        <div className="flex justify-between border-b border-black p-1 font-medium">
-          <span>Total Qty Purchased: {totalQty}N</span>
-          <span>Product Total Value: {fmt(invoice.totalAmount)}</span>
-        </div>
-
-        {/* Payment details / other charges */}
-        <div className="grid grid-cols-2">
-          <div className="border-r border-black">
-            <p className="border-b border-black p-1 font-semibold">Payment Details</p>
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-black [&>th]:p-1 [&>th]:text-left">
-                  <th>Payment Mode</th>
-                  <th>Doc No</th>
-                  <th className="text-right whitespace-nowrap">Amount (Rs.)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.length === 0 ? (
-                  <tr>
-                    <td className="p-1 text-muted-foreground" colSpan={3}>
-                      No payments recorded
-                    </td>
-                  </tr>
-                ) : (
-                  payments.map((entry) => (
-                    <tr key={entry.id} className="[&>td]:p-1">
-                      <td>{entry.paymentMethod ? PAYMENT_METHOD_LABELS[entry.paymentMethod] ?? entry.paymentMethod : "-"}</td>
-                      <td>{entry.paymentReference || entry.bankName || "-"}</td>
-                      <td className="text-right whitespace-nowrap">{fmt(entry.amount)}</td>
-                    </tr>
-                  ))
+        {/* Pay To (left) / totals (right) */}
+        <div className="grid grid-cols-2 gap-6 p-4">
+          <div className="space-y-4">
+            {hasBankDetails && (
+              <div>
+                <p className="font-medium text-indigo-700">Pay To:</p>
+                {settings.bankName && <p>Bank Name : {settings.bankName}</p>}
+                {settings.bankAccountNumber && <p>Bank Account No. : {settings.bankAccountNumber}</p>}
+                {settings.bankIfscCode && <p>Bank IFSC code : {settings.bankIfscCode}</p>}
+                {settings.bankAccountHolderName && (
+                  <p>Account holder&apos;s name : {settings.bankAccountHolderName}</p>
                 )}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-black font-semibold [&>td]:p-1">
-                  <td colSpan={2}>Total Amount Paid</td>
-                  <td className="text-right whitespace-nowrap">{fmt(totalPaid)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+              </div>
+            )}
 
-          <div>
-            <p className="border-b border-black p-1 font-semibold">Additional Other Charges</p>
-            <div className="space-y-1 p-1">
-              <div className="flex justify-between">
-                <span>Other charges:</span>
-                <span>0.00</span>
-              </div>
-              <div className="flex justify-between font-medium">
-                <span>Net invoice values</span>
-                <span>{fmt(invoice.totalAmount)}</span>
-              </div>
-              <div className="border-t border-black pt-1">
-                <p>Discount Details:</p>
-                <div className="flex justify-between">
-                  <span>Product/Scheme discount</span>
-                  <span>{fmt(totalSchemeDiscount)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Invoice-level discount</span>
-                  <span>{fmt(invoice.discount - totalSchemeDiscount)}</span>
-                </div>
-              </div>
-              <div className="flex justify-between border-t border-black pt-1 font-semibold">
-                <span>Total Amount to be paid</span>
-                <span>{fmt(invoice.totalAmount)}</span>
+            <div>
+              <p className="font-medium text-indigo-700">Invoice Amount In Words</p>
+              <p>{amountInWords(invoice.totalAmount)}</p>
+            </div>
+
+            <div className="pt-6">
+              <p>For : {settings.businessName}</p>
+              <div className="mt-10 w-40 border-t border-black pt-1 text-[10px] font-medium">
+                Authorized Signatory
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="border-t border-black p-2">
-          <p>Value in words :- {amountInWords(invoice.totalAmount)}</p>
+          <div className="justify-self-end w-full max-w-[260px] overflow-hidden rounded-md border">
+            <div className="flex justify-between border-b p-1.5">
+              <span>Sub Total</span>
+              <span>₹{fmt(subtotal)}</span>
+            </div>
+            {sortedRateGroups.map((group) =>
+              isInterState ? (
+                <div key={group.percent} className="flex justify-between border-b p-1.5">
+                  <span>IGST@{group.percent}%</span>
+                  <span>₹{fmt(group.igst)}</span>
+                </div>
+              ) : (
+                <div key={group.percent} className="flex flex-col border-b">
+                  <div className="flex justify-between p-1.5">
+                    <span>SGST@{(group.percent / 2).toFixed(2)}%</span>
+                    <span>₹{fmt(group.sgst)}</span>
+                  </div>
+                  <div className="flex justify-between border-t p-1.5">
+                    <span>CGST@{(group.percent / 2).toFixed(2)}%</span>
+                    <span>₹{fmt(group.cgst)}</span>
+                  </div>
+                </div>
+              ),
+            )}
+            <div className="flex justify-between bg-indigo-600 p-1.5 font-semibold text-white">
+              <span>Total</span>
+              <span>₹{fmt(invoice.totalAmount)}</span>
+            </div>
+            <div className="flex justify-between border-b p-1.5">
+              <span>Received</span>
+              <span>₹{fmt(invoice.paidAmount)}</span>
+            </div>
+            <div className="flex justify-between p-1.5 font-medium text-red-600">
+              <span>Balance</span>
+              <span>₹{fmt(invoice.balanceAmount)}</span>
+            </div>
+          </div>
         </div>
 
         {(invoice.ewayBillNumber ||
@@ -390,19 +334,17 @@ export default async function InvoicePrintPage({ params }: Props) {
           invoice.vehicleNumber ||
           invoice.transportMode ||
           invoice.distanceKm) && (
-          <div className="border-t border-black p-2">
+          <div className="border-t p-4">
             <p className="font-semibold">E-way Bill</p>
             <div className="grid grid-cols-3 gap-x-4">
               {invoice.ewayBillNumber && <span>E-way Bill No: {invoice.ewayBillNumber}</span>}
               {invoice.ewayBillDate && (
-                <span>
-                  Date: {new Date(invoice.ewayBillDate).toLocaleDateString("en-IN")}
-                </span>
+                <span>Date: {new Date(invoice.ewayBillDate).toLocaleDateString("en-IN")}</span>
               )}
               {invoice.transporterName && <span>Transporter: {invoice.transporterName}</span>}
               {invoice.vehicleNumber && <span>Vehicle No: {invoice.vehicleNumber}</span>}
               {invoice.transportMode && (
-                <span>Mode: {TRANSPORT_MODE_LABELS[invoice.transportMode]}</span>
+                <span>Mode: {TRANSPORT_MODE_LABELS[invoice.transportMode] ?? invoice.transportMode}</span>
               )}
               {invoice.distanceKm != null && <span>Distance: {invoice.distanceKm} km</span>}
             </div>
@@ -410,23 +352,23 @@ export default async function InvoicePrintPage({ params }: Props) {
         )}
 
         {invoice.notes && (
-          <div className="border-t border-black p-2">
+          <div className="border-t p-4">
             <p className="font-semibold">Notes</p>
             <p className="whitespace-pre-wrap">{invoice.notes}</p>
           </div>
         )}
 
         {settings.invoiceTerms && (
-          <div className="border-t border-black p-2">
+          <div className="border-t p-4">
             <p className="font-semibold">Terms & Conditions</p>
             <p className="whitespace-pre-wrap">{settings.invoiceTerms}</p>
           </div>
         )}
+
+        <div className="h-2 bg-gradient-to-r from-indigo-600 to-slate-900" />
       </div>
 
-      <p className="text-center text-[9px] text-gray-500 print:text-[7px]">
-        Generated with {APP_NAME}
-      </p>
+      <p className="text-center text-[9px] text-gray-500 print:text-[7px]">Generated with {APP_NAME}</p>
     </main>
   )
 }

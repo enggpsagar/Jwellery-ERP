@@ -56,6 +56,10 @@ export function TopBar({
     role: session?.user?.role,
     permissions: session?.user?.permissions,
   });
+  const canAccessPurchases = hasModuleAccess("purchases", {
+    role: session?.user?.role,
+    permissions: session?.user?.permissions,
+  });
   const userName = session?.user?.name ?? "User";
   const userInitials = initialsOf(userName);
   // Same colour for the same person everywhere, derived from the name.
@@ -116,6 +120,15 @@ export function TopBar({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        )}
+
+        {canAccessPurchases && (
+          <Link href="/purchases/new">
+            <Button size="sm" variant="outline">
+              <Plus className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Add Purchase</span>
+            </Button>
+          </Link>
         )}
 
         <NotificationBell />

@@ -128,6 +128,12 @@ type QuotationFormProps = {
   customers: CustomerOption[]
   stockItems: StockOption[]
   locations?: LocationOption[]
+  /** Store's default location (Settings > Locations), pre-filled into the
+   * Location field on this create form only — never overrides a value
+   * already resolved some other way (there is none today for Quotation's
+   * Location field, unlike e.g. a restricted single-location Staff auto-pick
+   * elsewhere in the app). */
+  defaultLocationId?: string | null
   metals: StoreMetalRow[]
   origins: StoreMetalOriginRow[]
   caratConversionRates: Record<PurityType, number>
@@ -152,6 +158,7 @@ export function QuotationForm({
   customers,
   stockItems,
   locations = [],
+  defaultLocationId = null,
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
@@ -166,7 +173,11 @@ export function QuotationForm({
   const [origins, setOrigins] = useState(initialOrigins)
 
   const [customerId, setCustomerId] = useState("")
-  const [locationId, setLocationId] = useState("")
+  // Seeded from the store's default location (create form only) — matches
+  // LocationSelect's own useState(defaultValue)-on-first-render init, so
+  // this must already be resolved by the time this component first renders,
+  // not set later via an effect.
+  const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
   // A Composition-scheme store can never charge GST — its rate starts (and

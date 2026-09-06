@@ -16,9 +16,14 @@ type StockCreateFormProps = {
   products: any[];
   locations: any[];
   caratConversionRates: Record<PurityType, number>;
+  /** The store's configured default location (Settings > Locations),
+   * pre-selected in the Location picker below so a new stock entry doesn't
+   * start blank. Not threaded into edit mode: an existing stock entry's
+   * saved location is untouched by this. */
+  defaultLocationId?: string;
 };
 
-export function StockCreateForm({ products, locations, caratConversionRates }: StockCreateFormProps) {
+export function StockCreateForm({ products, locations, caratConversionRates, defaultLocationId }: StockCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
 
@@ -64,6 +69,7 @@ export function StockCreateForm({ products, locations, caratConversionRates }: S
         products={products}
         locations={locations}
         caratConversionRates={caratConversionRates}
+        defaultLocationId={defaultLocationId}
         state={state}
         pending={pending}
       />

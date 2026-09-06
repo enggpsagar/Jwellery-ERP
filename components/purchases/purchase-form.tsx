@@ -161,6 +161,12 @@ type PurchaseFormProps = {
   /** The store's own state, compared against the selected vendor's state to
    * tell an inter-state purchase (IGST) from an intra-state one (SGST+CGST). */
   storeState?: string | null
+  /** Store's default location (Settings > Locations), pre-filled on this
+   * create-only form — see Store.defaultLocationId's own doc comment in
+   * schema.prisma. Server-side validation on submit (resolveWritableLocationId
+   * in purchase-actions.ts) is the actual source of truth for what a
+   * restricted user may write; this only seeds the initial UI selection. */
+  initialLocationId?: string | null
 }
 
 /**
@@ -197,6 +203,7 @@ export function PurchaseForm({
   defaultGstRate = 0,
   gstScheme,
   storeState,
+  initialLocationId,
 }: PurchaseFormProps) {
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
@@ -224,7 +231,7 @@ export function PurchaseForm({
   }))
 
   const [vendorId, setVendorId] = useState("")
-  const [locationId, setLocationId] = useState("")
+  const [locationId, setLocationId] = useState(initialLocationId ?? "")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
   // A Composition-scheme store can never charge/record GST — its rate

@@ -22,6 +22,10 @@ type Props = {
   locations?: StoreLocationRow[]
   states?: StateItem[]
   metals?: StoreMetalRow[]
+  /** Store's default location — only ever used to pre-fill the Location
+   * field on the create path (`karigar` null). The edit path always keeps
+   * showing the karigar's own saved `locationId`, untouched. */
+  defaultLocationId?: string | null
 }
 
 export function KarigarForm({
@@ -31,8 +35,9 @@ export function KarigarForm({
   locations = [],
   states = [],
   metals = [],
+  defaultLocationId = null,
 }: Props) {
-  const [locationId, setLocationId] = useState(karigar?.locationId ?? "")
+  const [locationId, setLocationId] = useState(karigar?.locationId ?? defaultLocationId ?? "")
 
   // Selected/keyed by id (to drive the city fetch below), but the form
   // field itself submits the state's name — Karigar.state is a plain text

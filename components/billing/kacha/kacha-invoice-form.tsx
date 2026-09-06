@@ -147,6 +147,10 @@ type KachaInvoiceFormProps = {
    * is false. See BusinessSettings.hallmarkChargePerPiece's own doc comment
    * for why this is a store-verified figure, not a guaranteed-current rate. */
   hallmarkChargePerPiece?: number
+  /** Store's default location (Store.defaultLocationId), used to pre-select
+   * Location on this create-only form — same convention as invoice-form.tsx's
+   * own initialLocationId. */
+  initialLocationId?: string | null
 }
 
 export function KachaInvoiceForm({
@@ -157,6 +161,7 @@ export function KachaInvoiceForm({
   origins: initialOrigins,
   caratConversionRates,
   hallmarkChargePerPiece = 0,
+  initialLocationId,
 }: KachaInvoiceFormProps) {
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
@@ -164,7 +169,7 @@ export function KachaInvoiceForm({
   const toast = useToast()
 
   const [customerId, setCustomerId] = useState("")
-  const [locationId, setLocationId] = useState("")
+  const [locationId, setLocationId] = useState(initialLocationId ?? "")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
   // "Paid Now" collects a method (Cash/UPI/etc.) per row, same PaymentMethodFields

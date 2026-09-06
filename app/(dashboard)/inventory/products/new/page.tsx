@@ -8,7 +8,10 @@ import {
   getAllStoreMetalOrigins,
 } from "@/lib/actions/taxonomy-actions";
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions";
-import { getStoreLocations } from "@/lib/actions/store-location-actions";
+import {
+  getDefaultLocationId,
+  getStoreLocations,
+} from "@/lib/actions/store-location-actions";
 import { safeReturnTo } from "@/lib/safe-return-to";
 
 export const metadata: Metadata = {
@@ -25,13 +28,15 @@ export default async function NewProductPage({
   const params = (await searchParams) ?? {};
   const returnTo = safeReturnTo(params.returnTo);
 
-  const [metals, categories, caratConversionRates, origins, locations] = await Promise.all([
-    getStoreMetals(),
-    getStoreCategories(),
-    getCaratConversionRateMap(),
-    getAllStoreMetalOrigins(),
-    getStoreLocations(),
-  ]);
+  const [metals, categories, caratConversionRates, origins, locations, defaultLocationId] =
+    await Promise.all([
+      getStoreMetals(),
+      getStoreCategories(),
+      getCaratConversionRateMap(),
+      getAllStoreMetalOrigins(),
+      getStoreLocations(),
+      getDefaultLocationId(),
+    ]);
 
   return (
     <main className="space-y-6 p-6">
@@ -48,6 +53,7 @@ export default async function NewProductPage({
         caratConversionRates={caratConversionRates}
         origins={origins}
         locations={locations}
+        defaultLocationId={defaultLocationId ?? undefined}
         returnTo={returnTo}
       />
     </main>

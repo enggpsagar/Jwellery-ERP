@@ -8,7 +8,7 @@ import Link from "next/link";
 import { getKarigarById } from "@/lib/actions/karigar-actions";
 import { getKarigarLedger } from "@/lib/actions/ledger-actions";
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
-import { getStoreLocations } from "@/lib/actions/store-location-actions";
+import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -58,10 +58,11 @@ export default async function KarigarDetailPage({ params }: Props) {
 
   const scope = await getLocationScope();
 
-  const [ledger, metals, locations, openJobs] = await Promise.all([
+  const [ledger, metals, locations, defaultLocationId, openJobs] = await Promise.all([
     getKarigarLedger(id),
     getStoreMetals(),
     getStoreLocations(),
+    getDefaultLocationId(),
     prisma.karigarJob.findMany({
       where: { storeId, karigarId: id, status: "issued", ...locationWhere(scope) },
       orderBy: { issueDate: "desc" },
@@ -77,7 +78,12 @@ export default async function KarigarDetailPage({ params }: Props) {
         backLabel="Back to Karigars"
         action={
           <div className="flex flex-wrap gap-2">
-            <IssueMaterialDialog karigarId={id} metals={metals} locations={locations} />
+            <IssueMaterialDialog
+              karigarId={id}
+              metals={metals}
+              locations={locations}
+              defaultLocationId={defaultLocationId}
+            />
             <RecordKarigarPaymentDialog karigarId={id} />
           </div>
         }

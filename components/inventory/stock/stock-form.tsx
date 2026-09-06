@@ -122,6 +122,12 @@ type StockFormProps = {
 
   locations: LocationOption[];
 
+  /** Create-only — the store's configured default location (Settings >
+   * Locations), pre-selected in the Location picker so a new stock entry
+   * doesn't start blank. Not used in edit mode: an existing stock entry's
+   * saved location is untouched by this. */
+  defaultLocationId?: string | null;
+
   /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
    * Conversion Rules) — see the same prop on InvoiceForm. */
   caratConversionRates: Record<PurityType, number>;
@@ -142,6 +148,7 @@ export function StockForm({
   stock,
   products,
   locations,
+  defaultLocationId,
   caratConversionRates,
   state,
   pending,
@@ -150,7 +157,13 @@ export function StockForm({
     stock?.status ?? InventoryStockStatus.IN_STOCK,
   );
 
-  const [locationId, setLocationId] = useState(stock?.locationId ?? "");
+  // Edit mode always keeps the stock entry's own saved location. Create
+  // mode falls back to the store's configured default only when nothing
+  // else has already resolved a value (there's no other auto-pick logic in
+  // this form today — see stock-create-form.tsx / new/page.tsx).
+  const [locationId, setLocationId] = useState(
+    stock?.locationId ?? defaultLocationId ?? "",
+  );
 
   const [finish, setFinish] = useState(
     stock?.finish ?? InventoryFinish.KACHA,

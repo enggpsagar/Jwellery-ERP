@@ -2,12 +2,13 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, Star } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 
 import {
   upsertStoreLocation,
   toggleStoreLocationActive,
+  setDefaultStoreLocation,
   type StoreLocationRow,
   type LocationFormState,
 } from "@/lib/actions/store-location-actions";
@@ -41,6 +42,7 @@ export function LocationSettingsForm({ locations, states, canEdit }: LocationSet
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
 
   async function handleToggle(id: string, isActive: boolean) {
     try {
@@ -57,6 +59,24 @@ export function LocationSettingsForm({ locations, states, canEdit }: LocationSet
       toast.error("Failed to update location");
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function handleSetDefault(id: string) {
+    try {
+      setSettingDefaultId(id);
+      const result = await setDefaultStoreLocation(id);
+      if (result.success) {
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update default location");
+    } finally {
+      setSettingDefaultId(null);
     }
   }
 
@@ -89,7 +109,15 @@ export function LocationSettingsForm({ locations, states, canEdit }: LocationSet
               className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
             >
               <div className={location.isActive ? "" : "text-muted-foreground line-through"}>
-                <div>{location.name}</div>
+                <div className="flex items-center gap-2">
+                  {location.name}
+                  {location.isDefault && (
+                    <Badge variant="outline" className="gap-1 font-normal">
+                      <Star className="h-3 w-3 fill-current" />
+                      Default
+                    </Badge>
+                  )}
+                </div>
                 {(location.city || location.state) && (
                   <div className="text-xs text-muted-foreground">
                     {[location.city, location.state].filter(Boolean).join(", ")}
@@ -99,6 +127,22 @@ export function LocationSettingsForm({ locations, states, canEdit }: LocationSet
 
               {canEdit ? (
                 <div className="flex items-center gap-3">
+                  {!location.isDefault && location.isActive && (
+                    <button
+                      type="button"
+                      onClick={() => handleSetDefault(location.id)}
+                      disabled={settingDefaultId === location.id}
+                      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+                      title="Set as default location"
+                    >
+                      {settingDefaultId === location.id ? (
+                        <Loader className="h-3 w-3" />
+                      ) : (
+                        <Star className="h-3 w-3" />
+                      )}
+                      Set as Default
+                    </button>
+                  )}
                   <Switch
                     checked={location.isActive}
                     disabled={togglingId === location.id}

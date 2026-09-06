@@ -8,7 +8,7 @@ import {
   getInvoiceFormStockItems,
 } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
-import { getStoreLocations } from "@/lib/actions/store-location-actions"
+import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 
@@ -44,7 +44,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     redirect(`/billing/${id}`)
   }
 
-  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates] =
+  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates, defaultLocationId] =
     await Promise.all([
       getInvoiceFormCustomers(),
       getInvoiceFormStockItems(),
@@ -53,6 +53,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
       getStoreMetals(),
       getAllStoreMetalOrigins(),
       getCaratConversionRateMap(),
+      getDefaultLocationId(),
     ])
 
   // Every field the form actually tracks, carried over from the cancelled
@@ -120,7 +121,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
         gstScheme={businessSettings.gstScheme}
         storeState={businessSettings.state}
         initialCustomerId={cancelledInvoice.customer?.id}
-        initialLocationId={cancelledInvoice.locationId ?? undefined}
+        initialLocationId={cancelledInvoice.locationId ?? defaultLocationId ?? undefined}
         initialItems={initialItems}
         replacesId={cancelledInvoice.id}
         replacesInvoiceNumber={cancelledInvoice.invoiceNumber}

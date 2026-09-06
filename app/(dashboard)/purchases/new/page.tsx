@@ -6,7 +6,7 @@ import {
   getPurchaseFormProducts,
 } from "@/lib/actions/purchase-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
-import { getStoreLocations } from "@/lib/actions/store-location-actions"
+import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 
@@ -18,11 +18,12 @@ export const metadata: Metadata = {
 }
 
 export default async function NewPurchasePage() {
-  const [vendors, products, locations, businessSettings, metals, origins, caratConversionRates] =
+  const [vendors, products, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates] =
     await Promise.all([
       getPurchaseFormVendors(),
       getPurchaseFormProducts(),
       getStoreLocations(),
+      getDefaultLocationId(),
       getBusinessSettings(),
       getStoreMetals(),
       getAllStoreMetalOrigins(),
@@ -52,6 +53,7 @@ export default async function NewPurchasePage() {
           defaultGstRate={businessSettings.defaultGstRate}
           gstScheme={businessSettings.gstScheme}
           storeState={businessSettings.state}
+          initialLocationId={defaultLocationId}
         />
       </Suspense>
     </main>

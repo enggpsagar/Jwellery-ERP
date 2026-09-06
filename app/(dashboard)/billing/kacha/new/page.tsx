@@ -5,7 +5,7 @@ import {
   getKachaInvoiceFormStockItems,
 } from "@/lib/actions/kacha-invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
-import { getStoreLocations } from "@/lib/actions/store-location-actions"
+import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 
@@ -17,11 +17,12 @@ export const metadata: Metadata = {
 }
 
 export default async function NewKachaInvoicePage() {
-  const [customers, stockItems, locations, businessSettings, metals, origins, caratConversionRates] =
+  const [customers, stockItems, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates] =
     await Promise.all([
       getKachaInvoiceFormCustomers(),
       getKachaInvoiceFormStockItems(),
       getStoreLocations(),
+      getDefaultLocationId(),
       getBusinessSettings(),
       getStoreMetals(),
       getAllStoreMetalOrigins(),
@@ -45,6 +46,7 @@ export default async function NewKachaInvoicePage() {
         origins={origins}
         caratConversionRates={caratConversionRates}
         hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
+        initialLocationId={defaultLocationId}
       />
     </main>
   )

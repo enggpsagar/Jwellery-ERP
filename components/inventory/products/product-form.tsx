@@ -112,6 +112,11 @@ type ProductFormProps = {
    * one location auto-picked, or an explicit error if they hold more than
    * one and didn't choose) — see resolveWritableLocationId. */
   locations?: LocationOption[];
+  /** Create-only — the store's configured default location (Settings >
+   * Locations), pre-selected in the Stock entry Location picker above so a
+   * new product doesn't start with it blank. Not used in edit mode: an
+   * existing stock entry's saved location is untouched by this. */
+  defaultLocationId?: string;
 };
 
 function ErrorText({ error }: { error?: string[] }) {
@@ -130,6 +135,7 @@ export function ProductForm({
   origins: initialOrigins,
   caratConversionRates,
   locations = [],
+  defaultLocationId,
 }: ProductFormProps) {
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? "");
 
@@ -1228,6 +1234,7 @@ export function ProductForm({
                 <LocationSelect
                   locations={locations}
                   name="locationId"
+                  defaultValue={defaultLocationId}
                   placeholder="Select location (optional)"
                 />
                 <p className="mt-1.5 text-xs text-muted-foreground">

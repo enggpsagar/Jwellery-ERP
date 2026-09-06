@@ -5,7 +5,7 @@ import {
   getInvoiceFormStockItems,
 } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
-import { getStoreLocations } from "@/lib/actions/store-location-actions"
+import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 }
 
 export default async function NewInvoicePage() {
-  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates] =
+  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates, defaultLocationId] =
     await Promise.all([
       getInvoiceFormCustomers(),
       getInvoiceFormStockItems(),
@@ -26,6 +26,7 @@ export default async function NewInvoicePage() {
       getStoreMetals(),
       getAllStoreMetalOrigins(),
       getCaratConversionRateMap(),
+      getDefaultLocationId(),
     ])
 
   return (
@@ -44,6 +45,7 @@ export default async function NewInvoicePage() {
         metals={metals}
         origins={origins}
         caratConversionRates={caratConversionRates}
+        initialLocationId={defaultLocationId ?? undefined}
         defaultGstRate={businessSettings.defaultGstRate}
         hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
         gstScheme={businessSettings.gstScheme}

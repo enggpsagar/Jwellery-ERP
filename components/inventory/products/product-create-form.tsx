@@ -22,6 +22,9 @@ type ProductCreateFormProps = {
   caratConversionRates: Record<PurityType, number>;
   origins: StoreMetalOriginRow[];
   locations: LocationOption[];
+  /** The store's configured default location, pre-selected in the Stock
+   * entry Location picker — see the same prop on ProductForm. */
+  defaultLocationId?: string;
   /** Where to go after saving; the new product's id is appended so the
    * calling screen can select it. */
   returnTo?: string
@@ -33,6 +36,7 @@ export function ProductCreateForm({
   caratConversionRates,
   origins,
   locations,
+  defaultLocationId,
   returnTo,
 }: ProductCreateFormProps) {
   const router = useRouter();
@@ -93,6 +97,7 @@ export function ProductCreateForm({
         caratConversionRates={caratConversionRates}
         origins={origins}
         locations={locations}
+        defaultLocationId={defaultLocationId}
       />
     </form>
   );

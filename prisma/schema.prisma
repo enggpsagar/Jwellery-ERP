@@ -46,6 +46,17 @@ model Store {
   reminderEmailEnabled    Boolean @default(true)
   reminderWhatsappEnabled Boolean @default(false)
 
+  /**
+   * Pre-fills the Location field wherever one is picked while creating a
+   * record (Stock, Products, Invoices, Purchases, ...), so a single-location
+   * store never has to pick the same one every time. Set to the "Main
+   * Counter" location created at registration; changeable afterward from
+   * Settings > Locations. Named relation since StoreLocation.store (the
+   * ownership FK) is a second, separate relation between these two models.
+   */
+  defaultLocationId String?
+  defaultLocation   StoreLocation? @relation("StoreDefaultLocation", fields: [defaultLocationId], references: [id])
+
   users                User[]
   userMemberships      UserStoreMembership[]
   planHistory          StorePlanHistory[]
@@ -144,6 +155,9 @@ model StoreLocation {
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   store           Store                @relation(fields: [storeId], references: [id])
+  // Back-relation for Store.defaultLocationId — practically ever at most one
+  // Store (the one this location itself belongs to), never a real list.
+  defaultForStores Store[]             @relation("StoreDefaultLocation")
   inventoryStocks InventoryStock[]
   karigars        Karigar[]
   purchases       Purchase[]

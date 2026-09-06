@@ -29,9 +29,10 @@ type Props = {
   locations?: StoreLocationRow[]
   states?: StateOption[]
   metals?: StoreMetalRow[]
+  defaultLocationId?: string | null
 }
 
-export function KarigarCreateForm({ locations = [], states = [], metals = [] }: Props){
+export function KarigarCreateForm({ locations = [], states = [], metals = [], defaultLocationId = null }: Props){
 
   const router = useRouter()
   const toast = useToast()
@@ -100,6 +101,7 @@ export function KarigarCreateForm({ locations = [], states = [], metals = [] }: 
         locations={locations}
         states={states}
         metals={metals}
+        defaultLocationId={defaultLocationId}
       />
 
 

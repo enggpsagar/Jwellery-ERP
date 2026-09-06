@@ -57,12 +57,17 @@ type IssueMaterialDialogProps = {
   karigarId: string
   metals: StoreMetalRow[]
   locations?: LocationOption[]
+  /** Store's default location — pre-fills the Location field, since issuing
+   * material creates a brand-new issue record (a create, not an edit
+   * against something with a fixed location). */
+  defaultLocationId?: string | null
 }
 
 export function IssueMaterialDialog({
   karigarId,
   metals,
   locations = [],
+  defaultLocationId = null,
 }: IssueMaterialDialogProps) {
   const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
   // Mirrors the old hardcoded default of "GOLD": prefer a hasPurity metal if
@@ -75,7 +80,7 @@ export function IssueMaterialDialog({
   const [open, setOpen] = useState(false)
   const [metalTypeId, setMetalTypeId] = useState(defaultMetalId)
   const [issuePurity, setIssuePurity] = useState("GOLD_22K")
-  const [locationId, setLocationId] = useState("")
+  const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const router = useRouter()
   const toast = useToast()
 

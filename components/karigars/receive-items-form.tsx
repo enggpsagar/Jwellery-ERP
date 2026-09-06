@@ -96,7 +96,7 @@ function deriveNetWeight(
 // the Add Stock form, so it carries the same field set as StockForm
 // (components/inventory/stock/stock-form.tsx), not just the weight fields
 // needed for the karigar fine-gold ledger calc.
-function emptyReceiptItem(defaultMetal?: StoreMetalRow): ReceiptItem {
+function emptyReceiptItem(defaultMetal?: StoreMetalRow, defaultLocationId?: string | null): ReceiptItem {
   return {
     key: crypto.randomUUID(),
     itemName: "",
@@ -128,7 +128,7 @@ function emptyReceiptItem(defaultMetal?: StoreMetalRow): ReceiptItem {
     saleAmount: 0,
     purchaseDate: "",
     manufactureDate: "",
-    locationId: "",
+    locationId: defaultLocationId ?? "",
     remarks: "",
     netTouched: false,
   }
@@ -155,6 +155,10 @@ type ReceiveItemsFormProps = {
    * free-choice behavior rather than locking to nothing. */
   jobMetalTypeId?: string | null
   jobMetalTypeName?: string | null
+  /** Store's default location — pre-fills each returned item's Location
+   * field, since every returned item becomes a brand-new InventoryStock row
+   * (a create, not an edit against something with a fixed location). */
+  defaultLocationId?: string | null
 }
 
 export function ReceiveItemsForm({
@@ -166,6 +170,7 @@ export function ReceiveItemsForm({
   locations,
   jobMetalTypeId,
   jobMetalTypeName,
+  defaultLocationId,
 }: ReceiveItemsFormProps) {
   const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
   // The job's own issued metal always wins when set — a karigar job can only
@@ -184,7 +189,9 @@ export function ReceiveItemsForm({
     [metals],
   )
 
-  const [items, setItems] = useState<ReceiptItem[]>([emptyReceiptItem(defaultMetal)])
+  const [items, setItems] = useState<ReceiptItem[]>([
+    emptyReceiptItem(defaultMetal, defaultLocationId),
+  ])
   const [labourCharge, setLabourCharge] = useState(0)
   const router = useRouter()
   const toast = useToast()
@@ -377,7 +384,9 @@ export function ReceiveItemsForm({
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => setItems((prev) => [...prev, emptyReceiptItem(defaultMetal)])}
+          onClick={() =>
+            setItems((prev) => [...prev, emptyReceiptItem(defaultMetal, defaultLocationId)])
+          }
         >
           <Plus className="h-4 w-4 mr-1" /> Add Item
         </Button>

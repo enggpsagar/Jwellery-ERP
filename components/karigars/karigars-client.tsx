@@ -78,7 +78,7 @@ export function KarigarsClient({
           City/Opening Gold); the right panel's Material Ledger table has far
           more (date/type/metal/debit/credit/balance) and needs the room —
           give it the larger share instead of the list. */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] xl:items-start">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(280px,1fr)_minmax(0,1.6fr)] xl:items-start">
         <div className="space-y-4">
           <KarigarsToolbar
             selectedKarigarIds={selectedKarigarIds}

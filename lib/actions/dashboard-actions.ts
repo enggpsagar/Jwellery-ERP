@@ -149,14 +149,21 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   const totalPurchases = Number(totalPurchasesAgg._sum.totalAmount ?? 0);
   const totalPurchaseCount = totalPurchasesAgg._count;
 
-  const metalStats: MetalStockStat[] = activeMetals.map((metal, index) => ({
-    metalId: metal.id,
-    metalName: metal.name,
-    grams: metalStockAggs[index].reduce(
-      (sum, row) => sum + Number(row.netWeight ?? 0) * row.quantity,
-      0
-    ),
-  }));
+  // Only metals actually on hand get their own KPI card — a store's
+  // configured Taxonomy can list metals it doesn't currently stock (or
+  // hasn't yet), and a "Diamond Stock: 0.0 g" card for one never on hand
+  // is clutter, not information (same reasoning as the Customer Ledger's
+  // per-metal cards).
+  const metalStats: MetalStockStat[] = activeMetals
+    .map((metal, index) => ({
+      metalId: metal.id,
+      metalName: metal.name,
+      grams: metalStockAggs[index].reduce(
+        (sum, row) => sum + Number(row.netWeight ?? 0) * row.quantity,
+        0
+      ),
+    }))
+    .filter((metal) => metal.grams > 0);
 
   return [
     {

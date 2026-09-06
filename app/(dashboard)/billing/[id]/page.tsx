@@ -78,8 +78,12 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
 
   // Returns only ever apply to an invoice the customer actually paid for
   // and took delivery of — DRAFT (never billed) and CANCELLED (already
-  // reversed) invoices have nothing to return.
-  const isReturnable = invoice.status === "PAID" || invoice.status === "PARTIAL"
+  // reversed) invoices have nothing to return. A returnWindowDays of 0
+  // means the store has returns turned off entirely (Settings) — that's
+  // not the same as "expired," so the whole section is hidden rather than
+  // showing a confusing "Expired {invoice date}" for every invoice.
+  const isReturnable =
+    (invoice.status === "PAID" || invoice.status === "PARTIAL") && settings.returnWindowDays > 0
   const returnEligibility = getReturnEligibility(
     new Date(invoice.invoiceDate),
     settings.returnWindowDays,

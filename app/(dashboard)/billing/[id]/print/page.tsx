@@ -35,6 +35,13 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   OTHER: "Other",
 }
 
+const TRANSPORT_MODE_LABELS: Record<string, string> = {
+  ROAD: "Road",
+  RAIL: "Rail",
+  AIR: "Air",
+  SHIP: "Ship",
+}
+
 function fmt(value: number) {
   return value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -377,6 +384,30 @@ export default async function InvoicePrintPage({ params }: Props) {
         <div className="border-t border-black p-2">
           <p>Value in words :- {amountInWords(invoice.totalAmount)}</p>
         </div>
+
+        {(invoice.ewayBillNumber ||
+          invoice.transporterName ||
+          invoice.vehicleNumber ||
+          invoice.transportMode ||
+          invoice.distanceKm) && (
+          <div className="border-t border-black p-2">
+            <p className="font-semibold">E-way Bill</p>
+            <div className="grid grid-cols-3 gap-x-4">
+              {invoice.ewayBillNumber && <span>E-way Bill No: {invoice.ewayBillNumber}</span>}
+              {invoice.ewayBillDate && (
+                <span>
+                  Date: {new Date(invoice.ewayBillDate).toLocaleDateString("en-IN")}
+                </span>
+              )}
+              {invoice.transporterName && <span>Transporter: {invoice.transporterName}</span>}
+              {invoice.vehicleNumber && <span>Vehicle No: {invoice.vehicleNumber}</span>}
+              {invoice.transportMode && (
+                <span>Mode: {TRANSPORT_MODE_LABELS[invoice.transportMode]}</span>
+              )}
+              {invoice.distanceKm != null && <span>Distance: {invoice.distanceKm} km</span>}
+            </div>
+          </div>
+        )}
 
         {invoice.notes && (
           <div className="border-t border-black p-2">

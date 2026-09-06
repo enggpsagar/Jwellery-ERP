@@ -11,6 +11,7 @@ import {
   PaymentMethod,
   PurityType,
   ChargeType,
+  TransportMode,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -245,6 +246,12 @@ function mapInvoice(invoice: any) {
     notes: invoice.notes,
     locationId: invoice.locationId ?? null,
     locationName: invoice.location?.name ?? null,
+    ewayBillNumber: invoice.ewayBillNumber ?? null,
+    ewayBillDate: invoice.ewayBillDate?.toISOString() ?? null,
+    transporterName: invoice.transporterName ?? null,
+    vehicleNumber: invoice.vehicleNumber ?? null,
+    transportMode: (invoice.transportMode ?? null) as TransportMode | null,
+    distanceKm: invoice.distanceKm ?? null,
     createdByName: invoice.createdByName ?? invoice.createdBy?.name ?? null,
     cancelledAt: invoice.cancelledAt?.toISOString() ?? null,
     cancelledByName: invoice.cancelledByName ?? invoice.cancelledBy?.name ?? null,
@@ -1170,6 +1177,21 @@ export async function updateInvoice(
     const notes = String(formData.get("notes") || "").trim() || null;
     const locationId = String(formData.get("locationId") || "").trim() || null;
 
+    // E-way Bill — record-keeping only, no government API call. See the
+    // schema's own doc comment on Invoice.ewayBillNumber.
+    const ewayBillNumber = String(formData.get("ewayBillNumber") || "").trim() || null;
+    const ewayBillDateRaw = String(formData.get("ewayBillDate") || "");
+    const transporterName = String(formData.get("transporterName") || "").trim() || null;
+    const vehicleNumber = String(formData.get("vehicleNumber") || "").trim() || null;
+    const transportModeRaw = String(formData.get("transportMode") || "").trim();
+    const transportMode = (
+      Object.values(TransportMode) as string[]
+    ).includes(transportModeRaw)
+      ? (transportModeRaw as TransportMode)
+      : null;
+    const distanceKmRaw = String(formData.get("distanceKm") || "").trim();
+    const distanceKm = distanceKmRaw ? Math.trunc(Number(distanceKmRaw)) || null : null;
+
     const locationScope = await getLocationScope();
     const locationResolution = await resolveWritableLocationId(storeId, locationId, locationScope);
     if (!locationResolution.ok) {
@@ -1187,6 +1209,12 @@ export async function updateInvoice(
           dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
           notes,
           locationId: resolvedLocationId ?? null,
+          ewayBillNumber,
+          ewayBillDate: ewayBillDateRaw ? new Date(ewayBillDateRaw) : null,
+          transporterName,
+          vehicleNumber,
+          transportMode,
+          distanceKm,
         },
       });
 

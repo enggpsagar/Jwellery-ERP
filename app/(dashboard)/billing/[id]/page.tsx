@@ -26,6 +26,13 @@ type Props = {
   searchParams?: Promise<{ from?: string }>
 }
 
+const TRANSPORT_MODE_LABELS: Record<string, string> = {
+  ROAD: "Road",
+  RAIL: "Rail",
+  AIR: "Air",
+  SHIP: "Ship",
+}
+
 // Shared with generateMetadata below so the invoice is only fetched once
 // per request rather than once for the tab title and again for the page.
 const getInvoice = cache(getInvoiceById)
@@ -102,7 +109,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               invoiceNumber={invoice.invoiceNumber}
             />
             <EmailInvoiceButton invoiceId={invoice.id} />
-            {isPaid && (
+            {!isCancelled && (
               <EditInvoiceDialog
                 invoiceId={invoice.id}
                 invoiceDate={invoice.invoiceDate}
@@ -110,6 +117,12 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                 notes={invoice.notes}
                 locationId={invoice.locationId ?? null}
                 locations={locations}
+                ewayBillNumber={invoice.ewayBillNumber}
+                ewayBillDate={invoice.ewayBillDate}
+                transporterName={invoice.transporterName}
+                vehicleNumber={invoice.vehicleNumber}
+                transportMode={invoice.transportMode}
+                distanceKm={invoice.distanceKm}
               />
             )}
             {canFullyEdit && (
@@ -380,6 +393,56 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           <span>₹{invoice.balanceAmount.toFixed(2)}</span>
         </div>
       </div>
+
+      {(invoice.ewayBillNumber ||
+        invoice.transporterName ||
+        invoice.vehicleNumber ||
+        invoice.transportMode ||
+        invoice.distanceKm) && (
+        <div className="rounded-xl border bg-card p-6">
+          <p className="mb-3 text-sm font-medium">E-way Bill</p>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {invoice.ewayBillNumber && (
+              <div>
+                <p className="text-xs text-muted-foreground">E-way Bill Number</p>
+                <p className="font-medium">{invoice.ewayBillNumber}</p>
+              </div>
+            )}
+            {invoice.ewayBillDate && (
+              <div>
+                <p className="text-xs text-muted-foreground">E-way Bill Date</p>
+                <p className="font-medium">
+                  {new Date(invoice.ewayBillDate).toLocaleDateString("en-IN")}
+                </p>
+              </div>
+            )}
+            {invoice.transporterName && (
+              <div>
+                <p className="text-xs text-muted-foreground">Transporter</p>
+                <p className="font-medium">{invoice.transporterName}</p>
+              </div>
+            )}
+            {invoice.vehicleNumber && (
+              <div>
+                <p className="text-xs text-muted-foreground">Vehicle Number</p>
+                <p className="font-medium">{invoice.vehicleNumber}</p>
+              </div>
+            )}
+            {invoice.transportMode && (
+              <div>
+                <p className="text-xs text-muted-foreground">Transport Mode</p>
+                <p className="font-medium">{TRANSPORT_MODE_LABELS[invoice.transportMode]}</p>
+              </div>
+            )}
+            {invoice.distanceKm != null && (
+              <div>
+                <p className="text-xs text-muted-foreground">Distance</p>
+                <p className="font-medium">{invoice.distanceKm} km</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {invoice.notes && (
         <div className="rounded-xl border bg-card p-6">

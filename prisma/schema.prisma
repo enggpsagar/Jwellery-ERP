@@ -642,6 +642,19 @@ model Invoice {
   cancelledById          String?
   cancelledByName        String?
   cancellationReason     String?
+  // E-way Bill — record-keeping only. This app never calls the government's
+  // E-way Bill API (no GSP/NIC credentials involved); the store still
+  // generates the actual bill on ewaybillgst.gov.in and enters its number
+  // back here, purely so it prints on the invoice and travels with the
+  // shipment's paperwork. See EditInvoiceDialog, available on every
+  // non-cancelled invoice regardless of payment status — E-way Bills are
+  // usually generated at dispatch, not necessarily at billing time.
+  ewayBillNumber         String?
+  ewayBillDate           DateTime?
+  transporterName        String?
+  vehicleNumber          String?
+  transportMode          TransportMode?
+  distanceKm             Int?
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
   store                  Store          @relation(fields: [storeId], references: [id])
@@ -1773,6 +1786,14 @@ enum InvoiceStatus {
   PAID
   PARTIAL
   CANCELLED
+}
+
+/** The four transport modes the E-way Bill portal itself offers. */
+enum TransportMode {
+  ROAD
+  RAIL
+  AIR
+  SHIP
 }
 
 enum ChargeType {

@@ -1,4 +1,6 @@
 import { Badge } from "@/components/ui/badge"
+import { ActiveBadge } from "@/components/shared/active-badge"
+import { ProductStatusToggle } from "@/components/inventory/products/product-status-toggle"
 import { formatShortDate } from "@/lib/utils"
 import type { getProductById } from "@/lib/actions/inventory/product-actions"
 
@@ -12,7 +14,16 @@ type Product = NonNullable<Awaited<ReturnType<typeof getProductById>>>
  * the two can never drift apart. Every field captured on Add Product
  * appears here, grouped the same way the create/edit form groups them.
  */
-export function ProductDetailContent({ product }: { product: Product }) {
+export function ProductDetailContent({
+  product,
+  canEdit = false,
+}: {
+  product: Product
+  /** Gates the Status field between a plain read-only badge and the
+   * editable Active/Inactive switch (mirrors ProductRowActions' own
+   * canEdit gate for Edit/Delete). */
+  canEdit?: boolean
+}) {
   const makingCharge = formatCharge(
     product.defaultMakingCharge,
     product.defaultMakingChargeType,
@@ -51,9 +62,11 @@ export function ProductDetailContent({ product }: { product: Product }) {
         <Field
           label="Status"
           value={
-            <Badge variant={product.isActive ? "default" : "secondary"}>
-              {product.isActive ? "Active" : "Inactive"}
-            </Badge>
+            canEdit ? (
+              <ProductStatusToggle productId={product.id} isActive={product.isActive} />
+            ) : (
+              <ActiveBadge isActive={product.isActive} />
+            )
           }
         />
       </Section>

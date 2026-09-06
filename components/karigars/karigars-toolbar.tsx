@@ -186,27 +186,6 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
 
         <select
           className="rounded-md border px-3 py-2 text-sm"
-          value={currentSortBy}
-          onChange={(e) => updateParam("sortBy", e.target.value)}
-          disabled={isPending}
-        >
-          <option value="createdAt">Sort by Created Date</option>
-          <option value="name">Sort by Name</option>
-          <option value="code">Sort by Code</option>
-        </select>
-
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
-          value={currentSortOrder}
-          onChange={(e) => updateParam("sortOrder", e.target.value)}
-          disabled={isPending}
-        >
-          <option value="desc">Descending</option>
-          <option value="asc">Ascending</option>
-        </select>
-
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
           value={currentPageSize}
           onChange={(e) => updateParam("pageSize", e.target.value)}
           disabled={isPending}

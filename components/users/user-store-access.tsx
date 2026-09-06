@@ -159,6 +159,7 @@ export function UserStoreAccess({ userId, rows }: UserStoreAccessProps) {
                       disabled={busy}
                       onClick={() => remove(row)}
                       aria-label={`Remove access to ${row.storeName}`}
+                      title="Remove store access"
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>

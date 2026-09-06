@@ -55,6 +55,8 @@ export function DeleteProductButton({
         size="icon"
         onClick={() => setOpen(true)}
         className="text-red-600 hover:text-red-700"
+        title="Delete product"
+        aria-label={`Delete ${productName}`}
       >
         <Trash2 className="h-4 w-4" />
       </Button>

@@ -42,6 +42,7 @@ type UserFormDialogUser = {
   karigarId?: string | null
   permissions?: string[] | null
   locationAccess?: { locationId: string }[] | null
+  aadhaarNumber?: string | null
 }
 
 type KarigarOption = {
@@ -228,6 +229,15 @@ export function UserFormDialog({
               name="phone"
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+            <Label>Aadhaar Number</Label>
+            <Input
+              name="aadhaarNumber"
+              defaultValue={user?.aadhaarNumber ?? ""}
+              placeholder="Optional — 12 digits"
             />
           </div>
 

@@ -4,6 +4,7 @@
 
 import { revalidatePath } from "next/cache";
 import { Prisma, UserRole } from "@prisma/client";
+import { ZodError } from "zod";
 
 import {
   createUserSchema,
@@ -70,6 +71,13 @@ function assertNoPrivilegeEscalation(
  * than allowed to bubble up as a thrown Error.
  */
 function friendlyUserErrorMessage(error: unknown, fallback: string): string {
+  // ZodError's own `.message` is a raw JSON dump of every issue — this
+  // surfaces just the first field's message instead, e.g. "Enter a valid
+  // 12-digit Aadhaar number" rather than a stringified array.
+  if (error instanceof ZodError) {
+    return error.issues[0]?.message || fallback;
+  }
+
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
     const target = Array.isArray(error.meta?.target)
       ? (error.meta!.target as string[]).join(", ")

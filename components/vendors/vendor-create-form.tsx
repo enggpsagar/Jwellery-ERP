@@ -268,6 +268,17 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
 
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
+              <Hash className="h-4 w-4 text-muted-foreground" />
+              Aadhaar Number
+            </label>
+            <input name="aadhaarNumber" className={FIELD} placeholder="Optional — 12 digits" />
+            {state.errors?.aadhaarNumber?.[0] && (
+              <p className="text-sm text-destructive">{state.errors.aadhaarNumber[0]}</p>
+            )}
+          </div>
+
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+            <label className="flex items-center gap-2 text-sm font-medium">
               <IndianRupee className="h-4 w-4 text-muted-foreground" />
               Opening Balance
             </label>

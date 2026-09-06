@@ -3,6 +3,8 @@
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
 
+import { isValidAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
+
 export const createUserSchema = z.object({
   name: z
     .string()
@@ -26,6 +28,16 @@ export const createUserSchema = z.object({
   role: z.nativeEnum(UserRole),
 
   isActive: z.boolean().default(true),
+
+  // Optional KYC id — validated (12 digits + Verhoeff checksum) only when
+  // actually entered. See lib/aadhaar.ts.
+  aadhaarNumber: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine((value) => !value || isValidAadhaarNumber(value), {
+      message: AADHAAR_INVALID_MESSAGE,
+    }),
 
   // Only meaningful when role is KARIGAR — links the login to a Karigar record.
   karigarId: z.string().cuid().optional().or(z.literal("")),

@@ -13,6 +13,7 @@
 
 import { prisma } from "@/lib/prisma";
 import type { PartyGstType } from "@prisma/client";
+import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
 
 export type CustomerRecord = {
   id: string;
@@ -37,6 +38,7 @@ export type CustomerRecord = {
    *  store's own gstScheme. See gstinRequired() in lib/gst.ts. */
   gstType?: PartyGstType;
   panNumber?: string;
+  aadhaarNumber?: string;
   registrationId?: string;
   createdByName?: string | null;
   totalOrders?: number;
@@ -100,6 +102,7 @@ export type CustomerInput = {
   gstNumber?: string;
   gstType?: PartyGstType;
   panNumber?: string;
+  aadhaarNumber?: string;
   registrationId?: string;
   notes?: string;
   openingBalance?: number;
@@ -217,6 +220,7 @@ export function mapCustomer(customer: any): CustomerRecord {
     gstNumber: customer.gstin ?? "",
     gstType: customer.gstType ?? "UNREGISTERED",
     panNumber: customer.panNumber ?? "",
+    aadhaarNumber: customer.aadhaarNumber ?? "",
     registrationId: customer.registrationId ?? "",
     createdByName: customer.createdByName ?? null,
     totalOrders,
@@ -283,6 +287,9 @@ export async function getCustomerByIdCore(
 function validateCustomerInput(input: CustomerInput) {
   const errors: Record<string, string[]> = {};
   if (!input.name?.trim()) errors.name = ["Customer name is required"];
+  if (input.aadhaarNumber?.trim() && !isValidAadhaarNumber(input.aadhaarNumber)) {
+    errors.aadhaarNumber = [AADHAAR_INVALID_MESSAGE];
+  }
   return errors;
 }
 
@@ -332,6 +339,9 @@ export async function createCustomerCore(
         gstin: input.gstNumber?.trim() || null,
         gstType: input.gstType ?? "UNREGISTERED",
         panNumber: input.panNumber?.trim() || null,
+        aadhaarNumber: input.aadhaarNumber?.trim()
+          ? normalizeAadhaarNumber(input.aadhaarNumber)
+          : null,
         registrationId: input.registrationId?.trim() || null,
         notes: input.notes?.trim() || null,
         openingBalance: input.openingBalance ?? 0,
@@ -398,6 +408,9 @@ export async function updateCustomerCore(
         gstin: input.gstNumber?.trim() || null,
         gstType: input.gstType ?? "UNREGISTERED",
         panNumber: input.panNumber?.trim() || null,
+        aadhaarNumber: input.aadhaarNumber?.trim()
+          ? normalizeAadhaarNumber(input.aadhaarNumber)
+          : null,
         registrationId: input.registrationId?.trim() || null,
         notes: input.notes?.trim() || null,
         openingBalance: input.openingBalance ?? 0,

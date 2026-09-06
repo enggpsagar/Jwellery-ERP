@@ -71,6 +71,7 @@ function formDataToCustomerInput(formData: FormData): CustomerInput {
     gstNumber: String(formData.get("gstNumber") || "").trim(),
     gstType: toPartyGstType(formData.get("gstType")),
     panNumber: String(formData.get("panNumber") || "").trim(),
+    aadhaarNumber: String(formData.get("aadhaarNumber") || "").trim(),
     registrationId: String(formData.get("registrationId") || "").trim(),
     notes: String(formData.get("notes") || "").trim(),
     openingBalance: toNumber(formData.get("openingBalance"), 0),

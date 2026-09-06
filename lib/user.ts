@@ -2,6 +2,7 @@
 
 import { UserRole, UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { normalizeAadhaarNumber } from "@/lib/aadhaar";
 import type {
   CreateUserInput,
   UpdateUserInput,
@@ -258,6 +259,7 @@ export async function createUser(
         karigarId,
         status: UserStatus.ACTIVE,
         permissions: data.role === UserRole.STAFF ? data.permissions : [],
+        aadhaarNumber: data.aadhaarNumber ? normalizeAadhaarNumber(data.aadhaarNumber) : null,
         locationAccess: {
           deleteMany: {},
           create: locationIds.map((locationId) => ({ locationId })),
@@ -281,6 +283,7 @@ export async function createUser(
       storeId,
       karigarId,
       permissions: data.role === UserRole.STAFF ? data.permissions : [],
+      aadhaarNumber: data.aadhaarNumber ? normalizeAadhaarNumber(data.aadhaarNumber) : null,
       locationAccess: { create: locationIds.map((locationId) => ({ locationId })) },
     },
   });
@@ -311,6 +314,7 @@ export async function updateUser(data: UpdateUserInput, storeId: string) {
       isActive: payload.isActive,
       karigarId,
       permissions: payload.role === UserRole.STAFF ? payload.permissions : [],
+      aadhaarNumber: payload.aadhaarNumber ? normalizeAadhaarNumber(payload.aadhaarNumber) : null,
     },
   });
 

@@ -337,6 +337,9 @@ model Customer {
   // gstinRequired() in lib/gst.ts.
   gstType        PartyGstType   @default(UNREGISTERED)
   panNumber      String?
+  // Optional KYC id — validated (12 digits + Verhoeff checksum, see
+  // lib/aadhaar.ts) only when actually entered.
+  aadhaarNumber  String?
   // A customer-facing loyalty/scheme reference number some stores print on
   // the invoice (e.g. "Encircle Id") — opaque to the app, shown as-is.
   registrationId String?
@@ -997,6 +1000,9 @@ model Vendor {
   // gstScheme - see isVendorGstApplicable() in lib/gst.ts, used by the
   // Purchases form/action instead of the store's own scheme.
   gstType        PartyGstType     @default(UNREGISTERED)
+  // Optional KYC id — validated (12 digits + Verhoeff checksum, see
+  // lib/aadhaar.ts) only when actually entered.
+  aadhaarNumber  String?
   notes          String?
   openingBalance Decimal          @default(0) @db.Decimal(12, 2)
   isActive       Boolean          @default(true)
@@ -1570,6 +1576,9 @@ model User {
   country               String?                @default("India")
   pincode               String?
   state                 String?
+  // Optional KYC id — validated (12 digits + Verhoeff checksum, see
+  // lib/aadhaar.ts) only when actually entered.
+  aadhaarNumber         String?
   accounts              Account[]
   employee              Employee?
   store                 Store?                 @relation(fields: [storeId], references: [id])

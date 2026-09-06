@@ -316,6 +316,20 @@ export function CustomerEditForm({
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
+              Aadhaar Number
+            </label>
+            <input
+              name="aadhaarNumber"
+              className={FIELD}
+              defaultValue={customer.aadhaarNumber ?? ""}
+              placeholder="Optional — 12 digits"
+            />
+            <FieldError errors={state.errors?.aadhaarNumber} />
+          </div>
+
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <Hash className="h-4 w-4 text-muted-foreground" />
               Registration / Encircle Id
             </label>
             <input

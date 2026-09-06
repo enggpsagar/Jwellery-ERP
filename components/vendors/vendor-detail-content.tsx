@@ -28,6 +28,12 @@ export function VendorDetailContent({
 }) {
   const money = (value: unknown) => `₹ ${Number(value || 0).toLocaleString("en-IN")}`
 
+  // Hidden entirely when there's nothing to show — an "Address" card with
+  // every field blank is an empty box, not information.
+  const hasAddress = Boolean(
+    vendor.city || vendor.state || vendor.pincode || vendor.address || vendor.notes,
+  )
+
   return (
     <div className="space-y-6">
       <DetailSection
@@ -45,36 +51,38 @@ export function VendorDetailContent({
         </DetailGrid>
       </DetailSection>
 
-      <DetailSection
-        title="Address"
-        description="Where this vendor is based."
-        icon={MapPin}
-        tint="var(--chart-3)"
-      >
-        <DetailGrid>
-          <DetailField label="City" value={vendor.city} />
-          <DetailField label="State" value={vendor.state} />
-          <DetailField label="Pincode" value={vendor.pincode} />
-          <DetailField
-            label="Full Address"
-            span
-            value={
-              vendor.address ? (
-                <span className="whitespace-pre-line">{vendor.address}</span>
-              ) : null
-            }
-          />
-          <DetailField
-            label="Notes"
-            span
-            value={
-              vendor.notes ? (
-                <span className="whitespace-pre-line">{vendor.notes}</span>
-              ) : null
-            }
-          />
-        </DetailGrid>
-      </DetailSection>
+      {hasAddress ? (
+        <DetailSection
+          title="Address"
+          description="Where this vendor is based."
+          icon={MapPin}
+          tint="var(--chart-3)"
+        >
+          <DetailGrid>
+            <DetailField label="City" value={vendor.city} />
+            <DetailField label="State" value={vendor.state} />
+            <DetailField label="Pincode" value={vendor.pincode} />
+            <DetailField
+              label="Full Address"
+              span
+              value={
+                vendor.address ? (
+                  <span className="whitespace-pre-line">{vendor.address}</span>
+                ) : null
+              }
+            />
+            <DetailField
+              label="Notes"
+              span
+              value={
+                vendor.notes ? (
+                  <span className="whitespace-pre-line">{vendor.notes}</span>
+                ) : null
+              }
+            />
+          </DetailGrid>
+        </DetailSection>
+      ) : null}
 
       <DetailSection
         title="Business Summary"

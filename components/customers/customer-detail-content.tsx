@@ -35,6 +35,12 @@ export function CustomerDetailContent({
 }) {
   const money = (value: unknown) => `₹ ${Number(value || 0).toLocaleString("en-IN")}`
 
+  // Hidden entirely when there's nothing to show — an "Address" card with
+  // every field blank is an empty box, not information.
+  const hasAddress = Boolean(
+    customer.city || customer.state || customer.pincode || customer.address || customer.notes,
+  )
+
   return (
     <div className="space-y-6">
       {/* Ledger first — it's the primary reason this page gets opened day
@@ -59,36 +65,38 @@ export function CustomerDetailContent({
         </DetailGrid>
       </DetailSection>
 
-      <DetailSection
-        title="Address"
-        description="Where this customer is based."
-        icon={MapPin}
-        tint="var(--chart-3)"
-      >
-        <DetailGrid>
-          <DetailField label="City" value={customer.city} />
-          <DetailField label="State" value={customer.state} />
-          <DetailField label="Pincode" value={customer.pincode} />
-          <DetailField
-            label="Full Address"
-            span
-            value={
-              customer.address ? (
-                <span className="whitespace-pre-line">{customer.address}</span>
-              ) : null
-            }
-          />
-          <DetailField
-            label="Notes"
-            span
-            value={
-              customer.notes ? (
-                <span className="whitespace-pre-line">{customer.notes}</span>
-              ) : null
-            }
-          />
-        </DetailGrid>
-      </DetailSection>
+      {hasAddress ? (
+        <DetailSection
+          title="Address"
+          description="Where this customer is based."
+          icon={MapPin}
+          tint="var(--chart-3)"
+        >
+          <DetailGrid>
+            <DetailField label="City" value={customer.city} />
+            <DetailField label="State" value={customer.state} />
+            <DetailField label="Pincode" value={customer.pincode} />
+            <DetailField
+              label="Full Address"
+              span
+              value={
+                customer.address ? (
+                  <span className="whitespace-pre-line">{customer.address}</span>
+                ) : null
+              }
+            />
+            <DetailField
+              label="Notes"
+              span
+              value={
+                customer.notes ? (
+                  <span className="whitespace-pre-line">{customer.notes}</span>
+                ) : null
+              }
+            />
+          </DetailGrid>
+        </DetailSection>
+      ) : null}
 
       {/* Hidden when there's nothing to summarize — a customer with zero
           orders and no opening balance has no business activity to show;

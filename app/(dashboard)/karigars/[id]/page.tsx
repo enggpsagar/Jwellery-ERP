@@ -169,9 +169,8 @@ export default async function KarigarDetailPage({ params }: Props) {
         <CardContent>
           <KarigarLedgerTabs
             rows={ledger.rows}
-            finalFineGoldBalance={ledger.finalFineGoldBalance}
             finalCashBalance={ledger.finalCashBalance}
-            metalLabel={ledger.metalLabel}
+            materialGroups={ledger.materialGroups}
           />
         </CardContent>
       </Card>

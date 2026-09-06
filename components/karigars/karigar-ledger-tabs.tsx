@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 
-import type { KarigarLedgerRow } from "@/lib/actions/ledger-actions"
+import type { KarigarLedgerRow, KarigarLedgerMetalGroup } from "@/lib/actions/ledger-actions"
 import { KarigarLedgerTable } from "@/components/karigars/karigar-ledger-table"
 
 const TABS = [
@@ -14,16 +14,14 @@ type TabKey = (typeof TABS)[number]["key"]
 
 type KarigarLedgerTabsProps = {
   rows: KarigarLedgerRow[]
-  finalFineGoldBalance: number
   finalCashBalance: number
-  metalLabel: string
+  materialGroups: KarigarLedgerMetalGroup[]
 }
 
 export function KarigarLedgerTabs({
   rows,
-  finalFineGoldBalance,
   finalCashBalance,
-  metalLabel,
+  materialGroups,
 }: KarigarLedgerTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("financial")
 
@@ -47,9 +45,8 @@ export function KarigarLedgerTabs({
 
       <KarigarLedgerTable
         rows={rows}
-        finalFineGoldBalance={finalFineGoldBalance}
         finalCashBalance={finalCashBalance}
-        metalLabel={metalLabel}
+        materialGroups={materialGroups}
         variant={activeTab}
       />
     </div>

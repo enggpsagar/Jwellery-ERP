@@ -114,21 +114,39 @@ export type KarigarLedgerRow = {
   runningCashBalance: number
 }
 
-export type KarigarLedgerResult = {
-  rows: KarigarLedgerRow[]
-  finalFineGoldBalance: number
-  finalCashBalance: number
-  /** The metal name to use in "Fine X Balance"/"Running X Balance" labels —
-   *  whichever metal this karigar's entries actually carry, so a
-   *  silver-only karigar's ledger doesn't read "gold" throughout. Falls
-   *  back to "Metal" when entries mix more than one, or carry none. */
+/**
+ * One metal's own slice of the material ledger — grams of Gold and grams
+ * of Silver (or Diamond carats, or whatever else this store has configured
+ * under Settings > Taxonomy) are never interchangeable, so each StoreMetal
+ * actually used in this karigar's entries gets its own running balance and
+ * its own row list, never summed into one misleading combined number.
+ */
+export type KarigarLedgerMetalGroup = {
+  /** Null groups the small number of legacy/adjustment entries that carry
+   *  a fine weight but no metalTypeId — kept visible rather than silently
+   *  dropped or merged into a metal they don't actually belong to. */
+  metalTypeId: string | null
   metalLabel: string
+  rows: KarigarLedgerRow[]
+  finalFineBalance: number
+}
+
+export type KarigarLedgerResult = {
+  /** Financial (cash) rows — every entry, unfiltered; the Financial Ledger
+   *  tab filters to `amount !== null` itself, same as before. */
+  rows: KarigarLedgerRow[]
+  finalCashBalance: number
+  /** Material rows, split one group per metal — see KarigarLedgerMetalGroup.
+   *  Ordered by total activity (most-used metal first) so a karigar who
+   *  mostly works Gold with the occasional Silver job sees Gold first. */
+  materialGroups: KarigarLedgerMetalGroup[]
 }
 
 /**
- * A single karigar's ledger, oldest first, with a running fine-metal balance
- * (metal currently out with the karigar) and running cash balance (labour
- * charges owed to the karigar) computed by walking the entries once.
+ * A single karigar's ledger, oldest first, with a running cash balance
+ * (labour charges owed to the karigar) and — per metal actually used —
+ * a running fine-metal balance (that metal currently out with the karigar),
+ * computed by walking the entries once.
  */
 export async function getKarigarLedger(karigarId: string): Promise<KarigarLedgerResult> {
   const storeId = await requireStoreScope()
@@ -139,21 +157,26 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
     include: { metalType: { select: { name: true } } },
   })
 
-  let fineGoldBalance = 0
   let cashBalance = 0
-  const metalNames = new Set<string>()
+  // Running fine-weight balance kept per metalTypeId (or the "no metal
+  // recorded" bucket), so interleaved Gold/Silver entries each accumulate
+  // against their own total rather than a shared one.
+  const fineBalanceByMetal = new Map<string | null, number>()
+  const groupsByMetal = new Map<string | null, { metalLabel: string; rows: KarigarLedgerRow[] }>()
 
   const rows: KarigarLedgerRow[] = entries.map((entry) => {
     const isDebit = entry.type === "DEBIT"
     const metalWeightFine = entry.metalWeightFine ? Number(entry.metalWeightFine) : null
     const amount = Number(entry.amount ?? 0)
+    const metalTypeId = entry.metalTypeId ?? null
     const metalType = entry.metalType?.name ?? null
-    if (metalType) metalNames.add(metalType)
 
-    fineGoldBalance += (isDebit ? 1 : -1) * (metalWeightFine ?? 0)
     cashBalance += (isDebit ? 1 : -1) * amount
 
-    return {
+    const runningFineForMetal = fineBalanceByMetal.get(metalTypeId) ?? 0
+    const nextFineForMetal = runningFineForMetal + (isDebit ? 1 : -1) * (metalWeightFine ?? 0)
+
+    const row: KarigarLedgerRow = {
       id: entry.id,
       date: formatDate(entry.entryDate),
       type: entry.type as "CREDIT" | "DEBIT",
@@ -163,18 +186,43 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
       metalType,
       paymentMethod: entry.paymentMethod ?? null,
       amount,
-      runningFineGoldBalance: fineGoldBalance,
+      // Kept per-metal below, not the sum across every metal — the field
+      // name is unchanged so callers reading a row in isolation (the hover
+      // card) still see the balance for that row's own metal.
+      runningFineGoldBalance: metalWeightFine !== null ? nextFineForMetal : runningFineForMetal,
       runningCashBalance: cashBalance,
     }
+
+    if (metalWeightFine !== null) {
+      fineBalanceByMetal.set(metalTypeId, nextFineForMetal)
+
+      const group = groupsByMetal.get(metalTypeId)
+      if (group) {
+        group.rows.push(row)
+      } else {
+        groupsByMetal.set(metalTypeId, {
+          metalLabel: metalType ?? "Unassigned",
+          rows: [row],
+        })
+      }
+    }
+
+    return row
   })
 
-  const metalLabel = metalNames.size === 1 ? [...metalNames][0] : "Metal"
+  const materialGroups: KarigarLedgerMetalGroup[] = [...groupsByMetal.entries()]
+    .map(([metalTypeId, group]) => ({
+      metalTypeId,
+      metalLabel: group.metalLabel,
+      rows: group.rows,
+      finalFineBalance: fineBalanceByMetal.get(metalTypeId) ?? 0,
+    }))
+    .sort((a, b) => b.rows.length - a.rows.length)
 
   return {
     rows,
-    finalFineGoldBalance: fineGoldBalance,
     finalCashBalance: cashBalance,
-    metalLabel,
+    materialGroups,
   }
 }
 

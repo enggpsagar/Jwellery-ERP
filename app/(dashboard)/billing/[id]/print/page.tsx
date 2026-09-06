@@ -163,15 +163,18 @@ export default async function InvoicePrintPage({ params }: Props) {
           )}
         </div>
 
-        {/* Business identity (navy, curved bottom-right) + document heading
-            on plain white to its right — the decorative violet disc bridges
-            the two, echoing the contact bar's color above it. */}
+        {/* Business identity (navy, curved top-right) + document heading on
+            plain white to its right. The decorative violet disc sits fully
+            inside this band's own box (no negative offset reaching up into
+            the contact bar above) — an earlier version poked up into that
+            bar and silently painted over the address text sitting there,
+            since it's later in DOM order and stacks on top. */}
         <div className="flex items-stretch">
           <div
-            className="relative w-[58%] bg-slate-900 px-5 py-4 text-white"
+            className="relative w-[58%] overflow-hidden bg-slate-900 px-5 py-4 text-white"
             style={{ borderTopRightRadius: "70px" }}
           >
-            <div className="pointer-events-none absolute -top-9 right-6 h-20 w-20 rounded-full bg-violet-400" />
+            <div className="pointer-events-none absolute -top-4 right-4 h-16 w-16 rounded-full bg-violet-400" />
             <div className="relative space-y-0.5">
               <p className="text-xl font-bold uppercase tracking-wide">{settings.businessName}</p>
               {settings.gstNumber && <p className="text-[11px] text-slate-300">GSTIN: {settings.gstNumber}</p>}

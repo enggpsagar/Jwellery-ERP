@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
 import type { Customer } from "@/lib/actions/customer-actions"
+import { toTitleCase } from "@/lib/utils"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Input } from "@/components/ui/input"
 import { CustomersPagination } from "@/components/customers/customers-pagination"
@@ -77,7 +78,7 @@ export function ArchivedCustomersClient({
                 {customers.map((customer) => (
                   <tr key={customer.id} className="border-t">
                     <td className="px-4 py-3 font-medium text-foreground">
-                      {customer.name}
+                      {toTitleCase(customer.name)}
                     </td>
                     <td className="px-4 py-3 text-foreground">{customer.phone || "-"}</td>
                     <td className="px-4 py-3 text-foreground">{customer.city || "-"}</td>
@@ -85,7 +86,7 @@ export function ArchivedCustomersClient({
                     <td className="px-4 py-3 text-right">
                       <ArchivedCustomerRestoreButton
                         customerId={customer.id}
-                        customerName={customer.name}
+                        customerName={toTitleCase(customer.name)}
                       />
                     </td>
                   </tr>

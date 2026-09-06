@@ -10,7 +10,7 @@ import {
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
-import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
+import { getCaratConversionRateMap, getMetalSellingRateMap } from "@/lib/actions/purity-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
 import { resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 
@@ -47,7 +47,7 @@ export default async function EditInvoicePage({ params }: Props) {
     redirect(`/billing/${id}`)
   }
 
-  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates, gstRates] =
+  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates, metalSellingRates, gstRates] =
     await Promise.all([
       getInvoiceFormCustomers(),
       getInvoiceFormStockItems(id),
@@ -56,6 +56,7 @@ export default async function EditInvoicePage({ params }: Props) {
       getStoreMetals(),
       getAllStoreMetalOrigins(),
       getCaratConversionRateMap(),
+      getMetalSellingRateMap(),
       getGstRates(),
     ])
 
@@ -130,6 +131,7 @@ export default async function EditInvoicePage({ params }: Props) {
         metals={metals}
         origins={origins}
         caratConversionRates={caratConversionRates}
+        metalSellingRates={metalSellingRates}
         gstRates={gstRates}
         initialGstRateId={invoice.gstRateId ?? undefined}
         defaultGstRate={businessSettings.defaultGstRate}

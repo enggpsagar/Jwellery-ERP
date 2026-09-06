@@ -76,6 +76,7 @@ model Store {
   purchases            Purchase[]
   purityFinenesses     PurityFineness[]
   caratConversionRates CaratConversionRate[]
+  metalSellingRates    MetalSellingRate[]
   quotations           Quotation[]
   storeMetals          StoreMetal[]
   storeCategories      StoreCategory[]
@@ -1241,6 +1242,26 @@ model CaratConversionRate {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   store         Store      @relation(fields: [storeId], references: [id])
+
+  @@unique([storeId, purity])
+}
+
+// A store-configured selling price per metal karat/fineness — Settings >
+// Purity's "Metal Selling Rates" grid. Unlike CaratConversionRate/
+// PurityFineness above, this is NOT lazily seeded with a default on first
+// read: an unconfigured purity has no meaningful universal price, so it
+// stays absent (no row) and callers fall back to StoreMetal.sellingPrice
+// instead. Only covers the karat/fineness purities (Gold/Silver/Platinum
+// variants) — Diamond and other gemstones are priced per stone type via
+// StoreMetal.sellingPrice directly, since they have no karat concept.
+model MetalSellingRate {
+  id           String     @id @default(cuid())
+  storeId      String
+  purity       PurityType
+  sellingPrice Decimal    @db.Decimal(12, 2)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  store        Store      @relation(fields: [storeId], references: [id])
 
   @@unique([storeId, purity])
 }

@@ -102,17 +102,6 @@ export function ReportDateFilter({ applies, financialYears }: ReportDateFilterPr
             onChange={(e) => setRange({ from, to: e.target.value })}
           />
         </label>
-        {(from || to) && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={!applies}
-            onClick={() => setRange({})}
-          >
-            Clear
-          </Button>
-        )}
       </div>
 
       {financialYears.length > 0 && (
@@ -141,6 +130,19 @@ export function ReportDateFilter({ applies, financialYears }: ReportDateFilterPr
         <p className="text-xs text-muted-foreground">
           This report always shows current, all-time data — date range doesn&apos;t apply here.
         </p>
+      )}
+
+      {(from || to) && (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={!applies}
+          onClick={() => setRange({})}
+          className="ml-auto"
+        >
+          Clear
+        </Button>
       )}
     </div>
   )

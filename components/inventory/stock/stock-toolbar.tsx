@@ -48,6 +48,7 @@ export function StockToolbar({ selectedIds, metals, bulkActions }: StockToolbarP
           { value: "purchaseDate", label: "Sort by Purchase Date" },
         ]}
         defaultSortBy="createdAt"
+        hideSort
         selectedIds={selectedIds}
         entityLabel="stock items"
         exportAction={exportInventoryStockToExcel}

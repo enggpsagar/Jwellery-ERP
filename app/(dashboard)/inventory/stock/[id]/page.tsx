@@ -10,9 +10,8 @@ import QRCode from "qrcode"
 import { getInventoryStockById } from "@/lib/actions/inventory/stock-actions"
 import { formatShortDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { StockStatusBadge } from "@/components/inventory/shared/stock-status-badge"
-import { FinishBadge } from "@/components/inventory/shared/finish-badge"
 import { StockQrCard } from "@/components/inventory/stock/stock-qr-card"
+import { StockDetailContent } from "@/components/inventory/stock/stock-detail-content"
 
 type InventoryStockDetailsPageProps = {
   params: Promise<{
@@ -36,11 +35,6 @@ export async function generateMetadata({
 
 function formatDate(value: Date | string | null | undefined) {
   return formatShortDate(value)
-}
-
-function formatNumber(value: unknown) {
-  if (value === null || value === undefined || value === "") return "-"
-  return String(value)
 }
 
 export default async function InventoryStockDetailsPage({
@@ -100,185 +94,31 @@ export default async function InventoryStockDetailsPage({
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border bg-card p-5">
-          <h2 className="mb-4 text-lg font-semibold">Basic Information</h2>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs text-muted-foreground">Stock Code</p>
-              <p className="font-medium">{stock.stockCode}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Tag Number</p>
-              <p className="font-medium">{stock.tagNumber || "-"}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Product</p>
-              <p className="font-medium">
-                {stock.product?.productCode} — {stock.product?.name}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Status</p>
-              <p className="font-medium">
-                <StockStatusBadge status={stock.status} />
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Finish</p>
-              <p className="font-medium">
-                <FinishBadge finish={stock.finish} />
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Metal Type</p>
-              <p className="font-medium">{stock.metalType?.name ?? "-"}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Purity</p>
-              <p className="font-medium">{stock.purity || "-"}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Quantity</p>
-              <p className="font-medium">{stock.quantity}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Active</p>
-              <p className="font-medium">{stock.isActive ? "Yes" : "No"}</p>
-            </div>
-          </div>
-        </section>
-
-        <StockQrCard
-          dataUrl={qrDataUrl}
-          stockCode={stock.stockCode}
-          productCode={stock.product?.productCode ?? null}
-          productName={stock.product?.name ?? "-"}
-          tagNumber={stock.tagNumber || null}
-          metalName={stock.metalType?.name ?? null}
-          purity={stock.purity || null}
-          netWeight={
-            stock.netWeight ? `${Number(stock.netWeight).toFixed(3)}g` : null
-          }
-          grossWeight={
-            stock.grossWeight
-              ? `${Number(stock.grossWeight).toFixed(3)}g`
-              : null
-          }
-          manufactureDate={
-            stock.manufactureDate ? formatDate(stock.manufactureDate) : null
-          }
-        />
-
-        <section className="rounded-xl border bg-card p-5">
-          <h2 className="mb-4 text-lg font-semibold">Weight Details</h2>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs text-muted-foreground">Gross Weight</p>
-              <p className="font-medium">{formatNumber(stock.grossWeight)}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Less Weight</p>
-              <p className="font-medium">{formatNumber(stock.lessWeight)}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Net Weight</p>
-              <p className="font-medium">{formatNumber(stock.netWeight)}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Stone Weight</p>
-              <p className="font-medium">{formatNumber(stock.stoneWeight)}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Wastage %</p>
-              <p className="font-medium">{formatNumber(stock.wastagePercent)}</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-xl border bg-card p-5">
-          <h2 className="mb-4 text-lg font-semibold">Pricing Details</h2>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs text-muted-foreground">Purchase Rate</p>
-              <p className="font-medium">{formatNumber(stock.purchaseRate)}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Sale Rate</p>
-              <p className="font-medium">{formatNumber(stock.saleRate)}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Making Charge</p>
-              <p className="font-medium">{formatNumber(stock.makingCharge)}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Stone Charge</p>
-              <p className="font-medium">{formatNumber(stock.stoneCharge)}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Other Charge</p>
-              <p className="font-medium">{formatNumber(stock.otherCharge)}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Purchase Amount</p>
-              <p className="font-medium">{formatNumber(stock.purchaseAmount)}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Sale Amount</p>
-              <p className="font-medium">{formatNumber(stock.saleAmount)}</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-xl border bg-card p-5">
-          <h2 className="mb-4 text-lg font-semibold">Source / Extra Details</h2>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs text-muted-foreground">Vendor Name</p>
-              <p className="font-medium">{stock.vendorName || "-"}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Purchase Date</p>
-              <p className="font-medium">{formatDate(stock.purchaseDate)}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Location</p>
-              <p className="font-medium">{stock.location?.name || "-"}</p>
-            </div>
-
-            <div className="sm:col-span-2">
-              <p className="text-xs text-muted-foreground">Remarks</p>
-              <p className="font-medium whitespace-pre-wrap">
-                {stock.remarks || "-"}
-              </p>
-            </div>
-          </div>
-        </section>
-      </div>
+      <StockDetailContent
+        stock={stock}
+        qrCard={
+          <StockQrCard
+            dataUrl={qrDataUrl}
+            stockCode={stock.stockCode}
+            productCode={stock.product?.productCode ?? null}
+            productName={stock.product?.name ?? "-"}
+            tagNumber={stock.tagNumber || null}
+            metalName={stock.metalType?.name ?? null}
+            purity={stock.purity || null}
+            netWeight={
+              stock.netWeight ? `${Number(stock.netWeight).toFixed(3)}g` : null
+            }
+            grossWeight={
+              stock.grossWeight
+                ? `${Number(stock.grossWeight).toFixed(3)}g`
+                : null
+            }
+            manufactureDate={
+              stock.manufactureDate ? formatDate(stock.manufactureDate) : null
+            }
+          />
+        }
+      />
     </main>
   )
 }

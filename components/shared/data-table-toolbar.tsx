@@ -40,6 +40,12 @@ type DataTableToolbarProps = {
    * different concept from this metal-family classification. */
   typeOptions?: Option[]
   typeLabel?: string
+  /** Hides the "Sort by …" and Ascending/Descending dropdowns — for a table
+   * (Products, Stock) that sorts only via its own per-column
+   * SortableTableHead clicks and doesn't want a second, redundant sort
+   * control in the toolbar. Defaults to false so every existing caller keeps
+   * both dropdowns exactly as before. */
+  hideSort?: boolean
   /** Omit when this table has no row-select — the single Export button then always exports the filtered set. */
   selectedIds?: string[]
   entityLabel: string
@@ -67,6 +73,7 @@ export function DataTableToolbar({
   statusOptions,
   typeOptions,
   typeLabel = "Type",
+  hideSort = false,
   selectedIds,
   entityLabel,
   exportAction,
@@ -247,28 +254,32 @@ export function DataTableToolbar({
           </select>
         ) : null}
 
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
-          value={currentSortBy}
-          onChange={(e) => updateParam("sortBy", e.target.value)}
-          disabled={isPending}
-        >
-          {sortOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        {hideSort ? null : (
+          <>
+            <select
+              className="rounded-md border px-3 py-2 text-sm"
+              value={currentSortBy}
+              onChange={(e) => updateParam("sortBy", e.target.value)}
+              disabled={isPending}
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
 
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
-          value={currentSortOrder}
-          onChange={(e) => updateParam("sortOrder", e.target.value)}
-          disabled={isPending}
-        >
-          <option value="desc">Descending</option>
-          <option value="asc">Ascending</option>
-        </select>
+            <select
+              className="rounded-md border px-3 py-2 text-sm"
+              value={currentSortOrder}
+              onChange={(e) => updateParam("sortOrder", e.target.value)}
+              disabled={isPending}
+            >
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+          </>
+        )}
 
         <select
           className="rounded-md border px-3 py-2 text-sm"

@@ -134,52 +134,69 @@ export default async function InvoicePrintPage({ params }: Props) {
         <InvoicePrintButton />
       </div>
 
-      <div className="overflow-hidden rounded-lg border-2 border-slate-800 bg-white print:rounded-none">
-        {/* Contact bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 px-4 py-2 text-white">
-          <div className="flex flex-wrap items-center gap-4">
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl print:rounded-none print:border-slate-400 print:shadow-none">
+        {/* Contact bar — a light violet strip with a dark "address" pill
+            floating on its right edge, matching the reference layout. */}
+        <div className="flex flex-wrap items-center gap-3 bg-violet-400 py-2.5 pl-5 pr-1.5 text-white">
+          <div className="flex flex-1 flex-wrap items-center gap-5">
             {settings.phone && (
-              <span className="flex items-center gap-1.5">
-                <Phone className="h-3.5 w-3.5" /> {settings.phone}
+              <span className="flex items-center gap-2">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/25">
+                  <Phone className="h-3 w-3" />
+                </span>
+                {settings.phone}
               </span>
             )}
             {settings.email && (
-              <span className="flex items-center gap-1.5">
-                <Mail className="h-3.5 w-3.5" /> {settings.email}
+              <span className="flex items-center gap-2">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/25">
+                  <Mail className="h-3 w-3" />
+                </span>
+                {settings.email}
               </span>
             )}
           </div>
           {businessAddressLines.length > 0 && (
-            <span className="flex items-center gap-1.5 text-right">
+            <span className="flex items-center gap-2 rounded-full bg-slate-900 px-4 py-1.5 text-right text-[11px]">
               <MapPin className="h-3.5 w-3.5 shrink-0" /> {businessAddressLines.join(", ")}
             </span>
           )}
         </div>
 
-        {/* Business identity + document heading */}
-        <div className="flex flex-wrap items-start justify-between gap-4 bg-slate-800 px-4 py-3 text-white">
-          <div className="space-y-0.5">
-            <p className="text-lg font-bold uppercase tracking-wide">{settings.businessName}</p>
-            {settings.gstNumber && <p className="text-[11px] text-slate-200">GSTIN: {settings.gstNumber}</p>}
-            {settings.state && (
-              <p className="text-[11px] text-slate-200">
-                State: {settings.stateCode ? `${settings.stateCode}-` : ""}
-                {settings.state}
-              </p>
-            )}
+        {/* Business identity (navy, curved bottom-right) + document heading
+            on plain white to its right — the decorative violet disc bridges
+            the two, echoing the contact bar's color above it. */}
+        <div className="flex items-stretch">
+          <div
+            className="relative w-[58%] bg-slate-900 px-5 py-4 text-white"
+            style={{ borderTopRightRadius: "70px" }}
+          >
+            <div className="pointer-events-none absolute -top-9 right-6 h-20 w-20 rounded-full bg-violet-400" />
+            <div className="relative space-y-0.5">
+              <p className="text-xl font-bold uppercase tracking-wide">{settings.businessName}</p>
+              {settings.gstNumber && <p className="text-[11px] text-slate-300">GSTIN: {settings.gstNumber}</p>}
+              {settings.state && (
+                <p className="text-[11px] text-slate-300">
+                  State: {settings.stateCode ? `${settings.stateCode}-` : ""}
+                  {settings.state}
+                </p>
+              )}
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-xl font-bold">{heading}</p>
-            {settings.gstScheme === "COMPOSITION" && (
-              <p className="max-w-[220px] text-[10px] italic text-slate-200">{COMPOSITION_DISCLAIMER}</p>
-            )}
+          <div className="flex flex-1 items-center justify-end px-5 py-4 text-right">
+            <div>
+              <p className="font-serif text-2xl font-bold text-slate-900">{heading}</p>
+              {settings.gstScheme === "COMPOSITION" && (
+                <p className="max-w-[220px] text-[10px] italic text-slate-600">{COMPOSITION_DISCLAIMER}</p>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Bill To / invoice meta */}
         <div className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-slate-300 p-4">
           <div className="space-y-0.5">
-            <p className="font-semibold text-indigo-700">Bill To:</p>
+            <p className="font-semibold text-violet-600">Bill To:</p>
             <p className="text-base font-bold">{invoice.customer?.name ?? "-"}</p>
             {customerAddressLines.map((line, index) => (
               <p key={index}>{line}</p>
@@ -211,10 +228,10 @@ export default async function InvoicePrintPage({ params }: Props) {
             rule sets `color` directly on every `th`, which always wins over
             an inherited color from a parent's `text-white` class, so it has
             to be beaten explicitly or the header reads as barely-visible
-            gray-on-indigo. */}
+            gray-on-violet. */}
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-indigo-600 [&>th]:border [&>th]:border-indigo-400 [&>th]:p-2 [&>th]:text-left [&>th]:align-middle [&>th]:text-[11px] [&>th]:font-semibold [&>th]:normal-case [&>th]:tracking-normal [&>th]:whitespace-normal [&>th]:text-white">
+            <tr className="bg-violet-400 [&>th]:border [&>th]:border-white/30 [&>th]:p-2 [&>th]:text-left [&>th]:align-middle [&>th]:text-[11px] [&>th]:font-semibold [&>th]:normal-case [&>th]:tracking-normal [&>th]:whitespace-normal [&>th]:text-white">
               <th className="w-6">#</th>
               <th>Item name</th>
               <th>HSN/ SAC</th>
@@ -249,7 +266,7 @@ export default async function InvoicePrintPage({ params }: Props) {
                 </tr>
               )
             })}
-            <tr className="bg-indigo-100 font-semibold [&>td]:border [&>td]:border-slate-300 [&>td]:p-2">
+            <tr className="bg-violet-400 font-semibold text-white [&>td]:border [&>td]:border-white/30 [&>td]:p-2">
               <td colSpan={3} className="text-right">
                 Total
               </td>
@@ -275,7 +292,7 @@ export default async function InvoicePrintPage({ params }: Props) {
           <div className="space-y-4">
             {hasBankDetails && (
               <div>
-                <p className="font-medium text-indigo-700">Pay To:</p>
+                <p className="font-medium text-violet-600">Pay To:</p>
                 {settings.bankName && <p>Bank Name : {settings.bankName}</p>}
                 {settings.bankAccountNumber && <p>Bank Account No. : {settings.bankAccountNumber}</p>}
                 {settings.bankIfscCode && <p>Bank IFSC code : {settings.bankIfscCode}</p>}
@@ -286,7 +303,7 @@ export default async function InvoicePrintPage({ params }: Props) {
             )}
 
             <div>
-              <p className="font-medium text-indigo-700">Invoice Amount In Words</p>
+              <p className="font-medium text-violet-600">Invoice Amount In Words</p>
               <p>{amountInWords(invoice.totalAmount)}</p>
             </div>
 
@@ -322,7 +339,7 @@ export default async function InvoicePrintPage({ params }: Props) {
                 </div>
               ),
             )}
-            <div className="flex justify-between bg-indigo-600 p-1.5 font-semibold text-white">
+            <div className="flex justify-between bg-violet-400 p-1.5 font-semibold text-white">
               <span>Total</span>
               <span>₹{fmt(invoice.totalAmount)}</span>
             </div>

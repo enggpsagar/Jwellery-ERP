@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useActionState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Plus } from "lucide-react"
 
 import { recordCustomerPayment, type PaymentFormState } from "@/lib/actions/payments-actions"
@@ -38,7 +38,11 @@ type PaymentInDialogProps = {
  * ledger sourceType, so both show up together on the /payments/in list).
  */
 export function PaymentInDialog({ customers }: PaymentInDialogProps) {
-  const [open, setOpen] = useState(false)
+  const searchParams = useSearchParams()
+  // Lets the sidebar's own "+" quick-add (?new=1) open this straight away,
+  // same as every other section's quick-add landing on a real /new page —
+  // this dialog is the closest equivalent Payment In has to one.
+  const [open, setOpen] = useState(() => searchParams.get("new") === "1")
   const [customerId, setCustomerId] = useState("")
   const router = useRouter()
   const toast = useToast()

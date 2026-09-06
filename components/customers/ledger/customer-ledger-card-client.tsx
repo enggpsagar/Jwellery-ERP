@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 type CustomerLedgerCardClientProps = {
   customerId: string
+  hasEmail: boolean
 }
 
 type LedgerData = {
@@ -29,7 +30,7 @@ type LedgerData = {
  * since this renders inside the client-side master-detail panel, where a
  * server component can't be reached by import.
  */
-export function CustomerLedgerCardClient({ customerId }: CustomerLedgerCardClientProps) {
+export function CustomerLedgerCardClient({ customerId, hasEmail }: CustomerLedgerCardClientProps) {
   const [data, setData] = useState<LedgerData | null>(null)
 
   useEffect(() => {
@@ -59,6 +60,7 @@ export function CustomerLedgerCardClient({ customerId }: CustomerLedgerCardClien
   return (
     <CustomerLedgerBody
       customerId={customerId}
+      hasEmail={hasEmail}
       entries={data.entries}
       summary={data.summary}
       activeUnits={data.activeUnits}

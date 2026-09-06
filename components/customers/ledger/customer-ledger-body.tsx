@@ -66,6 +66,7 @@ function formatEntryAmount(entry: {
 
 type CustomerLedgerBodyProps = {
   customerId: string
+  hasEmail: boolean
   entries: CustomerLedgerEntryItem[]
   summary: CustomerLedgerSummary | null
   activeUnits: BusinessUnitOption[]
@@ -79,6 +80,7 @@ type CustomerLedgerBodyProps = {
  */
 export function CustomerLedgerBody({
   customerId,
+  hasEmail,
   entries,
   summary,
   activeUnits,
@@ -90,27 +92,21 @@ export function CustomerLedgerBody({
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">
-            Ledger
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Add sale and refund/payment entries.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <EmailLedgerStatementButton customerId={customerId} />
-          <AddCustomerSaleEntryDialog
-            customerId={customerId}
-            activeUnits={activeUnits}
-          />
-          <AddCustomerRefundEntryDialog
-            customerId={customerId}
-            activeUnits={activeUnits}
-          />
-        </div>
+      {/* Just the actions, no bordered header card around them — a "Ledger"
+          heading and a description restating what the buttons already say
+          isn't information, and this bar is the first thing on the page,
+          so it's already positioned for easy access. Email Ledger only
+          appears when there's actually an address to send it to. */}
+      <div className="flex flex-wrap gap-3">
+        {hasEmail ? <EmailLedgerStatementButton customerId={customerId} /> : null}
+        <AddCustomerSaleEntryDialog
+          customerId={customerId}
+          activeUnits={activeUnits}
+        />
+        <AddCustomerRefundEntryDialog
+          customerId={customerId}
+          activeUnits={activeUnits}
+        />
       </div>
 
       {summary && (

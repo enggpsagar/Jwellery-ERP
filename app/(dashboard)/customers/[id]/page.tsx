@@ -65,7 +65,12 @@ export default async function CustomerDetailsPage({
       <CustomerDetailContent
         customer={customer}
         states={states}
-        ledger={<CustomerLedgerCard customerId={customer.id} />}
+        ledger={
+          <CustomerLedgerCard
+            customerId={customer.id}
+            hasEmail={Boolean(customer.email)}
+          />
+        }
       />
     </main>
   )

@@ -8,10 +8,11 @@ import { CustomerLedgerBody } from "@/components/customers/ledger/customer-ledge
 
 type CustomerLedgerCardProps = {
   customerId: string
+  hasEmail: boolean
 }
 
 /** Server-fetched — used by the standalone /customers/[id] page. */
-export async function CustomerLedgerCard({ customerId }: CustomerLedgerCardProps) {
+export async function CustomerLedgerCard({ customerId, hasEmail }: CustomerLedgerCardProps) {
   const [entries, summary, activeUnits] = await Promise.all([
     getCustomerLedgerEntries(customerId),
     getCustomerLedgerSummary(customerId),
@@ -21,6 +22,7 @@ export async function CustomerLedgerCard({ customerId }: CustomerLedgerCardProps
   return (
     <CustomerLedgerBody
       customerId={customerId}
+      hasEmail={hasEmail}
       entries={entries}
       summary={summary}
       activeUnits={activeUnits}

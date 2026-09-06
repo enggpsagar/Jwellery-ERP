@@ -88,7 +88,12 @@ export function CustomerDetailPanel({ customerId, states }: CustomerDetailPanelP
       <CustomerDetailContent
         customer={customer}
         states={states}
-        ledger={<CustomerLedgerCardClient customerId={customer.id} />}
+        ledger={
+          <CustomerLedgerCardClient
+            customerId={customer.id}
+            hasEmail={Boolean(customer.email)}
+          />
+        }
       />
     </div>
   )

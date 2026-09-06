@@ -13,6 +13,26 @@ type Product = NonNullable<Awaited<ReturnType<typeof getProductById>>>
  * appears here, grouped the same way the create/edit form groups them.
  */
 export function ProductDetailContent({ product }: { product: Product }) {
+  const makingCharge = formatCharge(
+    product.defaultMakingCharge,
+    product.defaultMakingChargeType,
+  )
+  const stoneCharge = formatCharge(
+    product.defaultStoneCharge,
+    product.defaultStoneChargeType,
+  )
+  const grossWeight = formatWeight(product.defaultGrossWeight)
+  const stoneWeight = formatWeight(product.defaultStoneWeight)
+  const netWeight = formatWeight(product.defaultNetWeight)
+
+  const hasMetalDetails =
+    Boolean(product.metalType?.name) ||
+    Boolean(product.defaultPurity) ||
+    Boolean(product.metalType?.isGemstone)
+  const hasCharges = Boolean(makingCharge) || Boolean(stoneCharge)
+  const hasWeights = Boolean(grossWeight) || Boolean(stoneWeight) || Boolean(netWeight)
+  const hasAdditionalInfo = Boolean(product.description) || Boolean(product.notes)
+
   return (
     <div className="space-y-6">
       <Section title="Basic Information">
@@ -30,71 +50,60 @@ export function ProductDetailContent({ product }: { product: Product }) {
         />
       </Section>
 
-      <Section title="Metal Details">
-        <Field label="Metal Type" value={product.metalType?.name} />
-        <Field
-          label="Default Purity"
-          value={product.defaultPurity?.replaceAll("_", " ")}
-        />
-        {product.metalType?.isGemstone ? (
+      {hasMetalDetails ? (
+        <Section title="Metal Details">
+          <Field label="Metal Type" value={product.metalType?.name} />
           <Field
-            label="Stone Type"
-            value={
-              <Badge variant="secondary">
-                {product.stoneOriginOption?.name ?? "Not set"}
-              </Badge>
-            }
+            label="Default Purity"
+            value={product.defaultPurity?.replaceAll("_", " ")}
           />
-        ) : null}
-      </Section>
+          {product.metalType?.isGemstone ? (
+            <Field
+              label="Stone Type"
+              value={
+                <Badge variant="secondary">
+                  {product.stoneOriginOption?.name ?? "Not set"}
+                </Badge>
+              }
+            />
+          ) : null}
+        </Section>
+      ) : null}
 
-      <Section title="Default Charges">
-        <Field
-          label="Making Charge"
-          value={formatCharge(
-            product.defaultMakingCharge,
-            product.defaultMakingChargeType,
-          )}
-        />
-        <Field
-          label="Making Charge Type"
-          value={
-            product.defaultMakingChargeType === "PERCENTAGE"
-              ? "Percentage"
-              : "Fixed"
-          }
-        />
-        <Field
-          label="Stone Charge"
-          value={formatCharge(
-            product.defaultStoneCharge,
-            product.defaultStoneChargeType,
-          )}
-        />
-        <Field
-          label="Stone Charge Type"
-          value={
-            product.defaultStoneChargeType === "PERCENTAGE"
-              ? "Percentage"
-              : "Fixed"
-          }
-        />
-      </Section>
+      {hasCharges ? (
+        <Section title="Default Charges">
+          <Field label="Making Charge" value={makingCharge} />
+          {makingCharge ? (
+            <Field
+              label="Making Charge Type"
+              value={
+                product.defaultMakingChargeType === "PERCENTAGE"
+                  ? "Percentage"
+                  : "Fixed"
+              }
+            />
+          ) : null}
+          <Field label="Stone Charge" value={stoneCharge} />
+          {stoneCharge ? (
+            <Field
+              label="Stone Charge Type"
+              value={
+                product.defaultStoneChargeType === "PERCENTAGE"
+                  ? "Percentage"
+                  : "Fixed"
+              }
+            />
+          ) : null}
+        </Section>
+      ) : null}
 
-      <Section title="Weights">
-        <Field
-          label="Gross Weight"
-          value={formatWeight(product.defaultGrossWeight)}
-        />
-        <Field
-          label="Stone Weight"
-          value={formatWeight(product.defaultStoneWeight)}
-        />
-        <Field
-          label="Net Weight"
-          value={formatWeight(product.defaultNetWeight)}
-        />
-      </Section>
+      {hasWeights ? (
+        <Section title="Weights">
+          <Field label="Gross Weight" value={grossWeight} />
+          <Field label="Stone Weight" value={stoneWeight} />
+          <Field label="Net Weight" value={netWeight} />
+        </Section>
+      ) : null}
 
       <Section title="Product Details">
         <Field label="Design Code" value={product.designCode} />
@@ -103,26 +112,28 @@ export function ProductDetailContent({ product }: { product: Product }) {
         <Field label="Last Updated" value={formatShortDate(product.updatedAt)} />
       </Section>
 
-      <Section title="Additional Information">
-        <Field
-          label="Description"
-          value={
-            product.description ? (
-              <span className="whitespace-pre-wrap">{product.description}</span>
-            ) : null
-          }
-          className="sm:col-span-2 lg:col-span-3"
-        />
-        <Field
-          label="Internal Notes"
-          value={
-            product.notes ? (
-              <span className="whitespace-pre-wrap">{product.notes}</span>
-            ) : null
-          }
-          className="sm:col-span-2 lg:col-span-3"
-        />
-      </Section>
+      {hasAdditionalInfo ? (
+        <Section title="Additional Information">
+          <Field
+            label="Description"
+            value={
+              product.description ? (
+                <span className="whitespace-pre-wrap">{product.description}</span>
+              ) : null
+            }
+            className="sm:col-span-2 lg:col-span-3"
+          />
+          <Field
+            label="Internal Notes"
+            value={
+              product.notes ? (
+                <span className="whitespace-pre-wrap">{product.notes}</span>
+              ) : null
+            }
+            className="sm:col-span-2 lg:col-span-3"
+          />
+        </Section>
+      ) : null}
     </div>
   )
 }
@@ -136,12 +147,15 @@ function Field({
   value: React.ReactNode
   className?: string
 }) {
+  const empty = value === undefined || value === null || value === ""
+  if (empty) return null
+
   return (
     <div className={className}>
       <p className="text-xs uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <div className="mt-1 font-medium break-words">{value || "—"}</div>
+      <div className="mt-1 font-medium break-words">{value}</div>
     </div>
   )
 }

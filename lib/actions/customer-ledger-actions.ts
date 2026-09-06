@@ -2,7 +2,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { LedgerEntryType, LedgerSourceType } from "@prisma/client"
+import { LedgerEntryType } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
@@ -11,12 +11,7 @@ import { sendMail } from "@/lib/mailer"
 import { ledgerStatementEmail } from "@/lib/email-templates"
 import { resolveStoreName } from "@/lib/invite-email"
 import { MONEY_UNIT } from "@/lib/business-units"
-import { getActiveBusinessUnits, type BusinessUnitOption } from "@/lib/business-units.server"
-
-/** Thin "use server" re-export so client components (e.g. the master-detail ledger panel) can call this without importing the server-only business-units.server module directly. */
-export async function getCustomerLedgerBusinessUnits(): Promise<BusinessUnitOption[]> {
-  return getActiveBusinessUnits()
-}
+import { getActiveBusinessUnits } from "@/lib/business-units.server"
 
 export type CustomerLedgerFormState = {
   success: boolean
@@ -213,191 +208,6 @@ export async function getCustomerLedgerSummary(
     currentBalance: openingBalance + ledgerDebitTotal - ledgerCreditTotal,
     moneyActive: activeUnits.some((unit) => unit.value === MONEY_UNIT),
     unitSummaries,
-  }
-}
-
-type ManualEntryFields = {
-  amount: number
-  metalTypeId: string | null
-  metalWeight: number | null
-  metalWeightFine: number | null
-  caratWeight: number | null
-}
-
-/**
- * A manual ledger entry can be denominated in money (a ₹ amount) or, for a
- * business that also deals in a configured metal/gemstone unit, in a
- * quantity of that unit instead — the unit picked in the dialog decides
- * which fields formData actually carries. `unit` is now either "MONEY" or a
- * live StoreMetal.id directly (see business-units.server.ts's
- * BusinessUnitOption) — there's no separate "type within the unit" field
- * any more, since each configured business unit already *is* one specific
- * StoreMetal row. The unit's own `isGemstone` flag (resolved server-side
- * against the store's currently active units, not trusted from the form)
- * decides carat vs. gram, same as formatUnitValue.
- */
-function parseManualEntryFields(
-  formData: FormData,
-  activeUnits: BusinessUnitOption[],
-): { ok: true; fields: ManualEntryFields } | { ok: false; errors: Record<string, string[]> } {
-  const unitValue = String(formData.get("unit") || MONEY_UNIT)
-  const errors: Record<string, string[]> = {}
-
-  if (unitValue !== MONEY_UNIT) {
-    const unit = activeUnits.find((option) => option.value === unitValue)
-    const weight = toNumber(formData.get("weight"), 0)
-
-    if (!unit) {
-      errors.unit = ["Select a valid unit"]
-    }
-
-    if (!weight || weight <= 0) {
-      errors.weight = ["Weight must be greater than 0"]
-    }
-
-    if (!unit || Object.keys(errors).length > 0) return { ok: false, errors }
-
-    if (unit.isGemstone) {
-      return {
-        ok: true,
-        fields: { amount: 0, metalTypeId: unit.value, metalWeight: null, metalWeightFine: null, caratWeight: weight },
-      }
-    }
-
-    return {
-      ok: true,
-      fields: { amount: 0, metalTypeId: unit.value, metalWeight: weight, metalWeightFine: weight, caratWeight: null },
-    }
-  }
-
-  const amount = toNumber(formData.get("amount"), 0)
-
-  if (!amount || amount <= 0) {
-    errors.amount = ["Amount must be greater than 0"]
-    return { ok: false, errors }
-  }
-
-  return {
-    ok: true,
-    fields: { amount, metalTypeId: null, metalWeight: null, metalWeightFine: null, caratWeight: null },
-  }
-}
-
-export async function addCustomerSaleEntry(
-  customerId: string,
-  prevState: CustomerLedgerFormState,
-  formData: FormData
-): Promise<CustomerLedgerFormState> {
-  try {
-    const storeId = await requireStoreScope()
-    const activeUnits = await getActiveBusinessUnits()
-    const parsed = parseManualEntryFields(formData, activeUnits)
-    const description = String(formData.get("description") || "").trim()
-
-    if (!parsed.ok) {
-      return {
-        success: false,
-        message: "Please fix the form errors",
-        errors: parsed.errors,
-      }
-    }
-
-    const customer = await prisma.customer.findFirst({
-      where: { id: customerId, storeId },
-      select: { id: true },
-    })
-
-    if (!customer) {
-      return {
-        success: false,
-        message: "Customer not found",
-      }
-    }
-
-    await prisma.ledgerEntry.create({
-      data: {
-        storeId,
-        customerId,
-        type: LedgerEntryType.DEBIT,
-        sourceType: LedgerSourceType.MANUAL,
-        ...parsed.fields,
-        description: description || "Manual sale entry",
-        entryDate: new Date(),
-      },
-    })
-
-    revalidatePath("/customers")
-    revalidatePath(`/customers/${customerId}`)
-
-    return {
-      success: true,
-      message: "Sale entry added successfully",
-    }
-  } catch (error) {
-    console.error("addCustomerSaleEntry error:", error)
-    return {
-      success: false,
-      message: "Failed to add sale entry",
-    }
-  }
-}
-
-export async function addCustomerRefundEntry(
-  customerId: string,
-  prevState: CustomerLedgerFormState,
-  formData: FormData
-): Promise<CustomerLedgerFormState> {
-  try {
-    const storeId = await requireStoreScope()
-    const activeUnits = await getActiveBusinessUnits()
-    const parsed = parseManualEntryFields(formData, activeUnits)
-    const description = String(formData.get("description") || "").trim()
-
-    if (!parsed.ok) {
-      return {
-        success: false,
-        message: "Please fix the form errors",
-        errors: parsed.errors,
-      }
-    }
-
-    const customer = await prisma.customer.findFirst({
-      where: { id: customerId, storeId },
-      select: { id: true },
-    })
-
-    if (!customer) {
-      return {
-        success: false,
-        message: "Customer not found",
-      }
-    }
-
-    await prisma.ledgerEntry.create({
-      data: {
-        storeId,
-        customerId,
-        type: LedgerEntryType.CREDIT,
-        sourceType: LedgerSourceType.MANUAL,
-        ...parsed.fields,
-        description: description || "Manual refund / payment received entry",
-        entryDate: new Date(),
-      },
-    })
-
-    revalidatePath("/customers")
-    revalidatePath(`/customers/${customerId}`)
-
-    return {
-      success: true,
-      message: "Refund entry added successfully",
-    }
-  } catch (error) {
-    console.error("addCustomerRefundEntry error:", error)
-    return {
-      success: false,
-      message: "Failed to add refund entry",
-    }
   }
 }
 

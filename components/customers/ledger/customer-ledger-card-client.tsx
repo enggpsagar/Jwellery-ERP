@@ -5,11 +5,9 @@ import { useEffect, useState } from "react"
 import {
   getCustomerLedgerEntries,
   getCustomerLedgerSummary,
-  getCustomerLedgerBusinessUnits,
   type CustomerLedgerEntryItem,
   type CustomerLedgerSummary,
 } from "@/lib/actions/customer-ledger-actions"
-import type { BusinessUnitOption } from "@/lib/business-units.server"
 import { CustomerLedgerBody } from "@/components/customers/ledger/customer-ledger-body"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -21,7 +19,6 @@ type CustomerLedgerCardClientProps = {
 type LedgerData = {
   entries: CustomerLedgerEntryItem[]
   summary: CustomerLedgerSummary | null
-  activeUnits: BusinessUnitOption[]
 }
 
 /**
@@ -39,9 +36,8 @@ export function CustomerLedgerCardClient({ customerId, hasEmail }: CustomerLedge
     Promise.all([
       getCustomerLedgerEntries(customerId),
       getCustomerLedgerSummary(customerId),
-      getCustomerLedgerBusinessUnits(),
-    ]).then(([entries, summary, activeUnits]) => {
-      if (!cancelled) setData({ entries, summary, activeUnits })
+    ]).then(([entries, summary]) => {
+      if (!cancelled) setData({ entries, summary })
     })
     return () => {
       cancelled = true
@@ -63,7 +59,6 @@ export function CustomerLedgerCardClient({ customerId, hasEmail }: CustomerLedge
       hasEmail={hasEmail}
       entries={data.entries}
       summary={data.summary}
-      activeUnits={data.activeUnits}
     />
   )
 }

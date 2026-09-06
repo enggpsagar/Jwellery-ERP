@@ -28,6 +28,7 @@ import {
 import { sendMail } from "@/lib/mailer";
 import { invoiceEmail } from "@/lib/email-templates";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
+import { getReturnEligibility } from "@/lib/return-window";
 import { amountInWords } from "@/lib/number-to-words";
 import { resolveStoreName } from "@/lib/invite-email";
 import { buildExcelExport } from "@/lib/excel-export";
@@ -519,6 +520,83 @@ export async function getInvoiceById(id: string) {
 
   if (!invoice) return null;
   return mapInvoice(invoice);
+}
+
+export type CustomerSaleInvoiceOption = {
+  id: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  totalAmount: number;
+  balanceAmount: number;
+};
+
+export type CustomerReturnableInvoices = {
+  /** Any non-cancelled sale invoice at all — gates whether Refund/Replace
+   * show up on the customer's ledger at all, regardless of whether one
+   * currently qualifies for either specific action below. */
+  hasAnyInvoice: boolean;
+  /** Eligible for Return Items (ReturnItemsDialog) — same rule as the
+   * invoice detail page's own isReturnable && returnEligibility.eligible. */
+  refundable: CustomerSaleInvoiceOption[];
+  /** Eligible for Return & Exchange (CancelInvoiceDialog) — same rule as
+   * the invoice detail page's own isCancellable. */
+  replaceable: CustomerSaleInvoiceOption[];
+};
+
+/**
+ * Feeds the customer ledger's Refund/Replace invoice pickers — same
+ * eligibility rules the invoice detail page already uses to decide whether
+ * to show its own "Return Items" / "Return & Exchange" actions, just
+ * evaluated across every one of this customer's invoices at once instead
+ * of the one currently open.
+ */
+export async function getCustomerReturnableInvoices(
+  customerId: string,
+): Promise<CustomerReturnableInvoices> {
+  const storeId = await requireStoreScope();
+
+  const [invoices, settings] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { customerId, storeId, status: { not: InvoiceStatus.CANCELLED } },
+      orderBy: { invoiceDate: "desc" },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        invoiceDate: true,
+        totalAmount: true,
+        balanceAmount: true,
+        status: true,
+      },
+    }),
+    getBusinessSettings(),
+  ]);
+
+  const toOption = (invoice: (typeof invoices)[number]): CustomerSaleInvoiceOption => ({
+    id: invoice.id,
+    invoiceNumber: invoice.invoiceNumber,
+    invoiceDate: invoice.invoiceDate.toLocaleDateString("en-IN"),
+    totalAmount: Number(invoice.totalAmount),
+    balanceAmount: Number(invoice.balanceAmount),
+  });
+
+  const refundable =
+    settings.returnWindowDays > 0
+      ? invoices
+          .filter(
+            (invoice) =>
+              (invoice.status === InvoiceStatus.PAID || invoice.status === InvoiceStatus.PARTIAL) &&
+              getReturnEligibility(invoice.invoiceDate, settings.returnWindowDays).eligible,
+          )
+          .map(toOption)
+      : [];
+
+  const replaceable = invoices
+    .filter(
+      (invoice) => invoice.status === InvoiceStatus.DRAFT || invoice.status === InvoiceStatus.PARTIAL,
+    )
+    .map(toOption);
+
+  return { hasAnyInvoice: invoices.length > 0, refundable, replaceable };
 }
 
 /** Lightweight customer list for the invoice form's customer picker. */

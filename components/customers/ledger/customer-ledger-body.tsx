@@ -2,17 +2,16 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronUp } from "lucide-react"
+import Link from "next/link"
+import { ChevronDown, ChevronUp, Receipt } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
 import type { CustomerLedgerEntryItem, CustomerLedgerSummary } from "@/lib/actions/customer-ledger-actions"
-import type { BusinessUnitOption } from "@/lib/business-units.server"
 import { cn } from "@/lib/utils"
-import { AddCustomerSaleEntryDialog } from "@/components/customers/ledger/add-customer-sale-entry-dialog"
-import { AddCustomerRefundEntryDialog } from "@/components/customers/ledger/add-customer-refund-entry-dialog"
 import { EmailLedgerStatementButton } from "@/components/customers/ledger/email-ledger-statement-button"
 import { CustomerLedgerHistoryTable } from "@/components/customers/ledger/customer-ledger-history-table"
+import { CustomerReturnActions } from "@/components/customers/ledger/customer-return-actions"
 
 function formatAmount(value: number) {
   return `₹ ${Number(value || 0).toLocaleString("en-IN", {
@@ -40,7 +39,6 @@ type CustomerLedgerBodyProps = {
   hasEmail: boolean
   entries: CustomerLedgerEntryItem[]
   summary: CustomerLedgerSummary | null
-  activeUnits: BusinessUnitOption[]
 }
 
 /**
@@ -54,7 +52,6 @@ export function CustomerLedgerBody({
   hasEmail,
   entries,
   summary,
-  activeUnits,
 }: CustomerLedgerBodyProps) {
   // Collapsed by default — the summary cards above already answer "where do
   // things stand," so the full transaction-by-transaction history (which
@@ -67,17 +64,25 @@ export function CustomerLedgerBody({
           heading and a description restating what the buttons already say
           isn't information, and this bar is the first thing on the page,
           so it's already positioned for easy access. Email Ledger only
-          appears when there's actually an address to send it to. */}
+          appears when there's actually an address to send it to. Sale
+          jumps straight to a real invoice with this customer already
+          selected — no more separate lightweight "just note a sale
+          happened" entry unlinked to any actual invoice. Refund/Replace
+          route into the existing invoice-level Return Items / Return &
+          Exchange mechanisms (see CustomerReturnActions), and hide
+          themselves entirely when this customer has no prior sale to act
+          against. */}
       <div className="flex flex-wrap gap-3">
         {hasEmail ? <EmailLedgerStatementButton customerId={customerId} /> : null}
-        <AddCustomerSaleEntryDialog
-          customerId={customerId}
-          activeUnits={activeUnits}
-        />
-        <AddCustomerRefundEntryDialog
-          customerId={customerId}
-          activeUnits={activeUnits}
-        />
+        <Button asChild className="gap-2">
+          <Link
+            href={`/billing/new?customerId=${customerId}&from=${encodeURIComponent(`/customers/${customerId}`)}`}
+          >
+            <Receipt className="h-4 w-4" />
+            Sale
+          </Link>
+        </Button>
+        <CustomerReturnActions customerId={customerId} />
       </div>
 
       {summary && (
@@ -91,14 +96,16 @@ export function CustomerLedgerBody({
               summary.ledgerDebitTotal !== 0 ||
               summary.ledgerCreditTotal !== 0) && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-lg border bg-card p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Opening Balance
-                </p>
-                <p className="mt-1 text-sm font-semibold text-foreground">
-                  {formatAmount(summary.openingBalance)}
-                </p>
-              </div>
+              {summary.openingBalance !== 0 && (
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Opening Balance
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-foreground">
+                    {formatAmount(summary.openingBalance)}
+                  </p>
+                </div>
+              )}
 
               <div className="rounded-lg border bg-card p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -175,38 +182,45 @@ export function CustomerLedgerBody({
         </div>
       )}
 
-      <div className="rounded-xl border bg-card shadow-sm">
-        <div className="flex w-full items-center justify-between gap-2 px-4 py-4">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Ledger History</h3>
-            <p className="text-xs text-muted-foreground">
-              {entries.length} entr{entries.length === 1 ? "y" : "ies"}
-              {!showDetails && entries.length > 0 ? " — click to view details" : ""}
-            </p>
+      {/* No entries at all means nothing for "Ledger History" to summarize
+          or expand into — the heading plus a permanently-disabled toggle
+          isn't information either. */}
+      {entries.length > 0 && (
+        <>
+          <div className="rounded-xl border bg-card shadow-sm">
+            <div className="flex w-full items-center justify-between gap-2 px-4 py-4">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Ledger History</h3>
+                <p className="text-xs text-muted-foreground">
+                  {entries.length} entr{entries.length === 1 ? "y" : "ies"}
+                  {!showDetails ? " — click to view details" : ""}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setShowDetails((prev) => !prev)}
+              >
+                {showDetails ? (
+                  <>
+                    Hide Details
+                    <ChevronUp className="h-4 w-4" />
+                  </>
+                ) : (
+                  <>
+                    View Details
+                    <ChevronDown className="h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => setShowDetails((prev) => !prev)}
-          >
-            {showDetails ? (
-              <>
-                Hide Details
-                <ChevronUp className="h-4 w-4" />
-              </>
-            ) : (
-              <>
-                View Details
-                <ChevronDown className="h-4 w-4" />
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
 
-      {showDetails && <CustomerLedgerHistoryTable entries={entries} />}
+          {showDetails && <CustomerLedgerHistoryTable entries={entries} />}
+        </>
+      )}
     </section>
   )
 }

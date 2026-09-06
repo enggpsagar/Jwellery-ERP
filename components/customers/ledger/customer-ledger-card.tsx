@@ -3,7 +3,6 @@ import {
   getCustomerLedgerEntries,
   getCustomerLedgerSummary,
 } from "@/lib/actions/customer-ledger-actions"
-import { getActiveBusinessUnits } from "@/lib/business-units.server"
 import { CustomerLedgerBody } from "@/components/customers/ledger/customer-ledger-body"
 
 type CustomerLedgerCardProps = {
@@ -13,10 +12,9 @@ type CustomerLedgerCardProps = {
 
 /** Server-fetched — used by the standalone /customers/[id] page. */
 export async function CustomerLedgerCard({ customerId, hasEmail }: CustomerLedgerCardProps) {
-  const [entries, summary, activeUnits] = await Promise.all([
+  const [entries, summary] = await Promise.all([
     getCustomerLedgerEntries(customerId),
     getCustomerLedgerSummary(customerId),
-    getActiveBusinessUnits(),
   ])
 
   return (
@@ -25,7 +23,6 @@ export async function CustomerLedgerCard({ customerId, hasEmail }: CustomerLedge
       hasEmail={hasEmail}
       entries={entries}
       summary={summary}
-      activeUnits={activeUnits}
     />
   )
 }

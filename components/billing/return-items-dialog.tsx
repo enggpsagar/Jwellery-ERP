@@ -37,6 +37,17 @@ type SelectableItem = ReturnableInvoiceItem & {
 type ReturnItemsDialogProps = {
   invoiceId: string
   invoiceNumber: string
+  /** Controlled open state — set by CustomerReturnLauncher, which already
+   * ran its own "pick a sale invoice" step before this ever mounts, so
+   * there's no separate trigger click needed here. Left undefined for the
+   * invoice detail page's own usage, which still self-manages via its own
+   * "Return Items" trigger button below. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Suppresses the built-in "Return Items" trigger button — set together
+   * with `open`/`onOpenChange` by an external launcher that supplies its
+   * own trigger instead. */
+  hideTrigger?: boolean
 }
 
 /**
@@ -46,8 +57,17 @@ type ReturnItemsDialogProps = {
  * returnable items lazily on open rather than at page load, since a
  * merchant may never open this for most invoices.
  */
-export function ReturnItemsDialog({ invoiceId, invoiceNumber }: ReturnItemsDialogProps) {
-  const [open, setOpen] = useState(false)
+export function ReturnItemsDialog({
+  invoiceId,
+  invoiceNumber,
+  open: openProp,
+  onOpenChange,
+  hideTrigger,
+}: ReturnItemsDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
+  const isControlled = openProp !== undefined
+  const open = isControlled ? openProp : internalOpen
+  const setOpen = isControlled ? (onOpenChange ?? (() => {})) : setInternalOpen
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<SelectableItem[]>([])
   const [reason, setReason] = useState("")
@@ -105,12 +125,14 @@ export function ReturnItemsDialog({ invoiceId, invoiceNumber }: ReturnItemsDialo
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <Undo2 className="h-4 w-4" />
-          Return Items
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button variant="outline" className="gap-2">
+            <Undo2 className="h-4 w-4" />
+            Return Items
+          </Button>
+        </DialogTrigger>
+      )}
 
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>

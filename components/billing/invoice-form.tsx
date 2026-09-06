@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useActionState } from "react"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react"
 import type { GstScheme, PurityType } from "@prisma/client"
 
 import { createInvoice, updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
@@ -268,6 +268,29 @@ export function InvoiceForm({
   const [items, setItems] = useState<LineItem[]>(
     initialItems && initialItems.length ? initialItems : [emptyLineItem()],
   )
+  // Which lines' Details region (every field beyond the compact row) is
+  // open. Heuristic — a judgment call, not a hard requirement: a line
+  // present when the form first loaded (edit/replace's initialItems) starts
+  // expanded, since it's real data more likely being reviewed/corrected than
+  // typed fresh; a freshly-added blank row ("Add Item") starts collapsed,
+  // matching the dense, compact-by-default spreadsheet look. A line that
+  // becomes stock-linked afterwards (StockItemSelect's dropdown, or a
+  // ScanToAddPanel scan) is also expanded at that point, in applyStockToItem
+  // / addScannedStock below, for the same reason.
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(
+    () =>
+      new Set(
+        (initialItems && initialItems.length ? initialItems : []).map((item) => item.key),
+      ),
+  )
+  const toggleExpanded = (key: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
   const [discount, setDiscount] = useState(0)
   // A Composition-scheme store can never charge GST — see GstScheme's doc
   // comment in schema.prisma — so no rate is selected at all regardless of
@@ -441,6 +464,10 @@ export function InvoiceForm({
       // the previous stock item.
       quantity: available > 0 ? 1 : 0,
     })
+    // Real data just landed on this line via the stock picker — start it
+    // expanded rather than making the user hunt for the chevron to see what
+    // got filled in. See expandedKeys' own doc comment above.
+    setExpandedKeys((prev) => new Set(prev).add(key))
   }
 
   /**
@@ -473,6 +500,10 @@ export function InvoiceForm({
       // setItems returns, since an updater function isn't a safe place for
       // side effects (React may invoke it more than once).
       let rejected = false
+      // Key of the line a scan just filled/bumped, captured inside the
+      // updater below so it can be expanded afterwards — see
+      // expandedKeys' own doc comment above.
+      let touchedKey: string | null = null
 
       setItems((prev) => {
         const existingIndex = prev.findIndex((item) => item.inventoryStockId === stock.id)
@@ -495,6 +526,7 @@ export function InvoiceForm({
 
           const next = [...prev]
           next[existingIndex] = { ...existing, quantity: existing.quantity + 1 }
+          touchedKey = existing.key
           return next
         }
 
@@ -555,6 +587,8 @@ export function InvoiceForm({
           netTouched: true,
         }
 
+        touchedKey = scanned.key
+
         const blank = prev.findIndex((item) => !item.inventoryStockId && !item.itemName)
         if (blank === -1) return [...prev, scanned]
 
@@ -566,6 +600,11 @@ export function InvoiceForm({
       if (rejected) {
         toast.error(`Only ${stock.quantity} of ${stock.productName} in stock — all of it is already on this bill.`)
         return
+      }
+
+      if (touchedKey) {
+        const key = touchedKey
+        setExpandedKeys((prev) => new Set(prev).add(key))
       }
 
       setConfirmingClear(false)
@@ -853,6 +892,16 @@ export function InvoiceForm({
   )
   const paidOverTotal = !editInvoiceId && paidAmount > totalAmount
 
+  // Shared column layout for the compact line-item row and its header, so
+  // labels stay pixel-aligned with the inputs underneath them. Deliberately
+  // a fixed, non-stacking grid (unlike the rest of this form's 1-col-on-
+  // mobile pattern) — this section is meant to read as a dense spreadsheet-
+  // style table (per the reference screenshot), so on a narrow viewport it
+  // scrolls horizontally inside its own container instead of restacking
+  // into a card.
+  const compactRowGridCols =
+    "grid-cols-[28px_minmax(160px,2fr)_76px_168px_112px_104px_116px_28px]"
+
   return (
     <form
       onSubmit={(event) => {
@@ -1002,8 +1051,26 @@ export function InvoiceForm({
         {/* Above the lines, because it is how the lines get created. */}
         <ScanToAddPanel onScanned={addScannedStock} />
 
-        <div className="space-y-3">
-          {items.map((item) => {
+        <div className="overflow-x-auto">
+          <div className="min-w-[900px] space-y-2">
+            {/* Table header for the compact rows below — labels only,
+                same column widths as each row via compactRowGridCols. The
+                leading/trailing blank spans line up with each row's own
+                chevron and remove-item cells. */}
+            <div
+              className={`grid ${compactRowGridCols} items-center gap-2 px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground`}
+            >
+              <span />
+              <span>Item</span>
+              <span>Qty</span>
+              <span>Net Wt</span>
+              <span>Rate / g</span>
+              <span>GST</span>
+              <span>Amount</span>
+              <span />
+            </div>
+
+            {items.map((item) => {
             // Once a line is linked to a Stock Item, the physical facts
             // about that piece (weight, purity, HSN, stone details) come
             // from Inventory and are shown read-only here — the invoice
@@ -1014,43 +1081,42 @@ export function InvoiceForm({
             // to the day's metal rate independent of what the stock was
             // priced at when it was entered.
             const isLinked = Boolean(item.inventoryStockId)
+            const isExpanded = expandedKeys.has(item.key)
+            // Compact-row GST summary: the two intra-state components
+            // combined into one figure, or the single inter-state one — the
+            // full three-way SGST/CGST/IGST breakdown still renders in full
+            // below, in the Details region; this is only a summary.
+            const gst = lineGst(item)
+            const gstTotal = gst.isInterState ? gst.igst : gst.sgst + gst.cgst
 
             return (
-            <div key={item.key} className="rounded-lg border p-4 space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="md:col-span-2 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Link Stock Item (optional)</Label>
-                  <StockItemSelect
-                    stockItems={stockItems}
-                    value={item.inventoryStockId}
-                    onValueChange={(value) => applyStockToItem(item.key, value)}
-                    // A plain applyStockToItem(key, "") only clears
-                    // inventoryStockId — Item Name/weights/rate etc. from
-                    // whatever stock was previously linked stayed put, so
-                    // picking "Create New Line Item" on an already-linked
-                    // row looked like it did nothing. This resets the whole
-                    // row to a blank manual-entry line instead, keeping only
-                    // its identity (key) so it doesn't jump position.
-                    onCreateNew={() => updateItem(item.key, { ...emptyLineItem(), key: item.key })}
-                    isDisabled={(stock) => availableForStock(stock.id, item.key) <= 0}
-                    renderLabel={(stock) =>
-                      `${stock.stockCode} — ${stock.productName} (${availableForStock(stock.id, item.key)} available)`
-                    }
-                  />
-                </div>
+            <div key={item.key} className="rounded-lg border">
+              {/* Always-visible compact row — one dense line per item, the
+                  spreadsheet-style summary from the reference screenshot.
+                  Every input here is the exact same state/handler as the
+                  Details region below, just relocated. */}
+              <div className={`grid ${compactRowGridCols} items-start gap-2 p-2`}>
+                <button
+                  type="button"
+                  onClick={() => toggleExpanded(item.key)}
+                  className="mt-1.5 text-muted-foreground hover:text-foreground"
+                  aria-label={isExpanded ? "Collapse line item details" : "Expand line item details"}
+                  aria-expanded={isExpanded}
+                >
+                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
 
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Item Name</Label>
+                <div className="space-y-1">
                   <Input
                     value={item.itemName}
                     readOnly={isLinked}
+                    placeholder="Item name"
                     className={isLinked ? "bg-muted" : undefined}
                     onChange={(e) => updateItem(item.key, { itemName: e.target.value })}
                   />
                 </div>
 
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Quantity</Label>
+                <div className="space-y-1">
                   <Input
                     type="number"
                     min={1}
@@ -1065,82 +1131,13 @@ export function InvoiceForm({
                     }}
                   />
                   {item.inventoryStockId && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] leading-tight text-muted-foreground">
                       {availableForStock(item.inventoryStockId, item.key)} in stock
                     </p>
                   )}
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Purity</Label>
-                  <Select
-                    value={item.purity}
-                    onValueChange={(value) => handlePurityChange(item, value)}
-                    disabled={isLinked}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select purity" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PURITY_SELECT_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Gross Weight</Label>
-                  <div className="flex gap-1">
-                    <Input
-                      type="number"
-                      step="0.00001"
-                      className={isLinked ? "flex-1 bg-muted" : "flex-1"}
-                      value={
-                        item.grossWeight === 0
-                          ? ""
-                          : toPrimaryUnit(
-                              item.grossWeight,
-                              "GRAM",
-                              item.grossWeightUnit,
-                              resolveGramsPerCarat(item.purity, caratConversionRates),
-                            )
-                      }
-                      readOnly={isLinked}
-                      onChange={(e) => {
-                        const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
-                        const grossWeight = toPrimaryUnit(Number(e.target.value) || 0, item.grossWeightUnit, "GRAM", gramsPerCarat)
-                        const derived = item.netTouched
-                          ? null
-                          : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight)
-                        updateItem(item.key, {
-                          grossWeight,
-                          ...(derived !== null ? { netWeight: derived } : {}),
-                        })
-                      }}
-                    />
-                    <Select
-                      value={item.grossWeightUnit}
-                      onValueChange={(unit) => updateItem(item.key, { grossWeightUnit: unit as "GRAM" | "CARAT" })}
-                      disabled={isLinked}
-                    >
-                      <SelectTrigger className="w-16">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="GRAM">g</SelectItem>
-                        <SelectItem value="CARAT">ct</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Net Weight</Label>
+                <div className="space-y-1">
                   <div className="flex gap-1">
                     <Input
                       type="number"
@@ -1164,7 +1161,7 @@ export function InvoiceForm({
                       onValueChange={(unit) => updateItem(item.key, { netWeightUnit: unit as "GRAM" | "CARAT" })}
                       disabled={isLinked}
                     >
-                      <SelectTrigger className="w-16">
+                      <SelectTrigger className="w-14" size="sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1174,79 +1171,11 @@ export function InvoiceForm({
                     </Select>
                   </div>
                   {!item.netTouched && (
-                    <p className="text-xs text-muted-foreground">Gross − stone − dust/other</p>
+                    <p className="text-[10px] leading-tight text-muted-foreground">Gross − stone − dust/other</p>
                   )}
                 </div>
 
-                {isCaratLine(item) && (
-                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                    <Label className="text-xs">Carat Weight (ct)</Label>
-                    <Input
-                      type="number"
-                      step="0.001"
-                      value={item.caratWeight === 0 ? "" : item.caratWeight}
-                      readOnly={isLinked}
-                      className={isLinked ? "bg-muted" : undefined}
-                      onChange={(e) => handleCaratWeightChange(item, e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {item.purity === "DIAMOND"
-                        ? "Priced per carat, not per gram"
-                        : "1 ct = 0.2 g — converts with Net Weight"}
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Dust/Making/Other Wt</Label>
-                  <div className="flex gap-1">
-                    <Input
-                      type="number"
-                      step="0.00001"
-                      className={isLinked ? "flex-1 bg-muted" : "flex-1"}
-                      value={
-                        item.dmoWeight === 0
-                          ? ""
-                          : toPrimaryUnit(
-                              item.dmoWeight,
-                              "GRAM",
-                              item.dmoWeightUnit,
-                              resolveGramsPerCarat(item.purity, caratConversionRates),
-                            )
-                      }
-                      readOnly={isLinked}
-                      onChange={(e) => {
-                        const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
-                        const dmoWeight = toPrimaryUnit(Number(e.target.value) || 0, item.dmoWeightUnit, "GRAM", gramsPerCarat)
-                        const derived = item.netTouched
-                          ? null
-                          : deriveNetWeight(item.grossWeight, item.stoneWeightInput, dmoWeight)
-                        updateItem(item.key, {
-                          dmoWeight,
-                          ...(derived !== null ? { netWeight: derived } : {}),
-                        })
-                      }}
-                    />
-                    <Select
-                      value={item.dmoWeightUnit}
-                      onValueChange={(unit) => updateItem(item.key, { dmoWeightUnit: unit as "GRAM" | "CARAT" })}
-                      disabled={isLinked}
-                    >
-                      <SelectTrigger className="w-16">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="GRAM">g</SelectItem>
-                        <SelectItem value="CARAT">ct</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">
-                    Rate / g (Selling Price) <RequiredMark />
-                  </Label>
+                <div className="space-y-1">
                   <Input
                     type="number"
                     step="0.01"
@@ -1256,223 +1185,397 @@ export function InvoiceForm({
                     }
                   />
                   {!(item.rate > 0) && (
-                    <p className="text-xs text-destructive">Selling price is required</p>
+                    <p className="text-[10px] leading-tight text-destructive">Selling price is required</p>
                   )}
                 </div>
 
-                <MakingChargeInput
-                  rate={item.rate}
-                  netWeight={item.netWeight}
-                  value={item.makingCharge}
-                  onChange={(v) => updateItem(item.key, { makingCharge: v })}
-                  chargeType={item.makingChargeType}
-                  onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
-                />
-              </div>
-
-              {/* Its own row, sized to its own two fields, rather than
-                  wrapping onto a mostly-empty line of the 6-column grid
-                  above (2 of 6 columns filled, 4 columns of dead space). */}
-              <div className="grid grid-cols-2 gap-3 sm:max-w-md">
-                {/* Once this is a composite line with "Includes a Stone"
-                    checked, Stone Charge moves down into that box, next to
-                    the Carat Weight/Rate it's computed from — see below. */}
-                {(isCaratLine(item) || !item.hasStoneComponent) && (
-                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                    <Label className="text-xs">Stone Charge</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={item.stoneCharge === 0 ? "" : item.stoneCharge}
-                      onChange={(e) => handleStoneChargeChange(item, e.target.value)}
-                    />
-                  </div>
-                )}
-
-                <div className="space-y-1">
-                  <Label className="text-xs">Line Total</Label>
-                  <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-medium">
-                    ₹{lineTotal(item).toFixed(2)}
-                  </div>
+                <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-xs text-muted-foreground">
+                  ₹{gstTotal.toFixed(2)}
                 </div>
-              </div>
 
-              {/* A composite piece (metal + an embedded stone) is the
-                  exception, not the rule, for a line whose own metal isn't
-                  Diamond/Stone — kept as its own toggled strip rather than
-                  wedged into the grid above, so a plain Gold line's fields
-                  don't reflow every time this gets checked/unchecked. */}
-              {!isCaratLine(item) && (
-                <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
-                  <IncludesStoneToggle
-                    checked={item.hasStoneComponent}
-                    onChange={(checked) =>
-                      updateItem(item.key, {
-                        hasStoneComponent: checked,
-                        // Net Stone Weight is now hidden once the toggle is
-                        // off — clear it so a hidden field can't silently
-                        // keep submitting whatever was last entered.
-                        ...(checked ? {} : { stoneWeightInput: 0, netStoneWeightTouched: false }),
-                      })
-                    }
-                    disabled={isLinked}
-                  />
+                <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-sm font-medium">
+                  ₹{lineTotal(item).toFixed(2)}
+                </div>
 
-                  {item.hasStoneComponent && (
-                    <StoneComponentFields
-                      metals={metals}
-                      origins={origins}
-                      onMetalsChange={setMetals}
-                      onOriginsChange={setOrigins}
-                      stoneMetalTypeName={item.stoneMetalTypeName}
-                      onStoneChange={(name, typeNames) =>
-                        updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
-                      }
-                      selectedTypeNames={item.stoneTypeNames}
-                      onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
-                      caratWeight={item.caratWeight}
-                      onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
-                      stoneRate={item.stoneRate}
-                      onStoneRateChange={(value) => handleStoneRateChange(item, value)}
-                      stoneCharge={item.stoneCharge}
-                      onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
-                      stoneChargeTouched={item.stoneChargeTouched}
-                      stoneWeightInput={toPrimaryUnit(
-                        item.stoneWeightInput,
-                        "GRAM",
-                        item.stoneWeightUnit,
-                        resolveGramsPerCarat(item.purity, caratConversionRates),
-                      )}
-                      onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
-                      stoneWeightUnit={item.stoneWeightUnit}
-                      onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
-                      netStoneWeightTouched={item.netStoneWeightTouched}
-                      lockPhysicalFields={isLinked}
-                    />
+                <div className="flex justify-center pt-1">
+                  {items.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeItem(item.key)}
+                      className="text-red-600 hover:text-red-700"
+                      aria-label="Remove item"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   )}
                 </div>
-              )}
+              </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">HSN Code</Label>
-                  <Input
-                    value={item.hsnCode}
-                    readOnly={isLinked}
-                    className={isLinked ? "bg-muted" : undefined}
-                    onChange={(e) => updateItem(item.key, { hsnCode: e.target.value })}
-                  />
-                </div>
-
-                {/* For a carat-weighed line (no "Includes a Stone" toggle
-                    applies there at all — see above), Net Stone Weight has
-                    no gating concept and always shows here. For every other
-                    line, this field is only ever visible once "Includes a
-                    Stone" is checked, inside that toggle's own box above —
-                    while off, it stays fully hidden (not shown here) rather
-                    than relocated, per the toggle's on/off gating. */}
-                {isCaratLine(item) && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Net Stone Weight</Label>
-                    <div className="flex gap-1">
-                      <Input
-                        type="number"
-                        step="0.00001"
-                        className={isLinked ? "flex-1 bg-muted" : "flex-1"}
-                        value={
-                          item.stoneWeightInput === 0
-                            ? ""
-                            : toPrimaryUnit(
-                                item.stoneWeightInput,
-                                "GRAM",
-                                item.stoneWeightUnit,
-                                resolveGramsPerCarat(item.purity, caratConversionRates),
-                              )
+              {/* Details region — every other field for this line, unchanged
+                  from before, just moved below the compact row and only
+                  rendered while expanded. */}
+              {isExpanded && (
+                <div className="space-y-3 border-t p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">Link Stock Item (optional)</Label>
+                      <StockItemSelect
+                        stockItems={stockItems}
+                        value={item.inventoryStockId}
+                        onValueChange={(value) => applyStockToItem(item.key, value)}
+                        // A plain applyStockToItem(key, "") only clears
+                        // inventoryStockId — Item Name/weights/rate etc. from
+                        // whatever stock was previously linked stayed put, so
+                        // picking "Create New Line Item" on an already-linked
+                        // row looked like it did nothing. This resets the whole
+                        // row to a blank manual-entry line instead, keeping only
+                        // its identity (key) so it doesn't jump position.
+                        onCreateNew={() => {
+                          updateItem(item.key, { ...emptyLineItem(), key: item.key })
+                          // Back to a blank manual-entry row — collapse it too,
+                          // matching a freshly-added line's default state.
+                          setExpandedKeys((prev) => {
+                            const next = new Set(prev)
+                            next.delete(item.key)
+                            return next
+                          })
+                        }}
+                        isDisabled={(stock) => availableForStock(stock.id, item.key) <= 0}
+                        renderLabel={(stock) =>
+                          `${stock.stockCode} — ${stock.productName} (${availableForStock(stock.id, item.key)} available)`
                         }
-                        readOnly={isLinked}
-                        onChange={(e) => handleStoneWeightInputChange(item, e.target.value)}
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">Purity</Label>
                       <Select
-                        value={item.stoneWeightUnit}
-                        onValueChange={(unit) => handleStoneWeightUnitChange(item, unit as "GRAM" | "CARAT")}
+                        value={item.purity}
+                        onValueChange={(value) => handlePurityChange(item, value)}
                         disabled={isLinked}
                       >
-                        <SelectTrigger className="w-16">
-                          <SelectValue />
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select purity" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="GRAM">g</SelectItem>
-                          <SelectItem value="CARAT">ct</SelectItem>
+                          {PURITY_SELECT_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
-                )}
 
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">HM Charge</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={item.hmCharge === 0 ? "" : item.hmCharge}
-                    onChange={(e) => handleHmChargeChange(item, e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Scheme / Discount</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={item.schemeDiscount === 0 ? "" : item.schemeDiscount}
-                    onChange={(e) =>
-                      updateItem(item.key, { schemeDiscount: Number(e.target.value) || 0 })
-                    }
-                  />
-                </div>
-
-                {/* SGST+CGST for an intra-state sale, a single IGST column
-                    for inter-state instead — never both, see computeGst()
-                    in lib/gst.ts. Composition always lands here at ₹0.00,
-                    since computeGst zeroes every component for it. */}
-                {lineGst(item).isInterState ? (
-                  <div className="space-y-1">
-                    <Label className="text-xs">IGST ({gstRate.toFixed(2)}%)</Label>
-                    <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                      ₹{lineGst(item).igst.toFixed(2)}
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-1">
-                      <Label className="text-xs">SGST ({(gstRate / 2).toFixed(2)}%)</Label>
-                      <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                        ₹{lineGst(item).sgst.toFixed(2)}
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">Gross Weight</Label>
+                      <div className="flex gap-1">
+                        <Input
+                          type="number"
+                          step="0.00001"
+                          className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                          value={
+                            item.grossWeight === 0
+                              ? ""
+                              : toPrimaryUnit(
+                                  item.grossWeight,
+                                  "GRAM",
+                                  item.grossWeightUnit,
+                                  resolveGramsPerCarat(item.purity, caratConversionRates),
+                                )
+                          }
+                          readOnly={isLinked}
+                          onChange={(e) => {
+                            const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+                            const grossWeight = toPrimaryUnit(Number(e.target.value) || 0, item.grossWeightUnit, "GRAM", gramsPerCarat)
+                            const derived = item.netTouched
+                              ? null
+                              : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight)
+                            updateItem(item.key, {
+                              grossWeight,
+                              ...(derived !== null ? { netWeight: derived } : {}),
+                            })
+                          }}
+                        />
+                        <Select
+                          value={item.grossWeightUnit}
+                          onValueChange={(unit) => updateItem(item.key, { grossWeightUnit: unit as "GRAM" | "CARAT" })}
+                          disabled={isLinked}
+                        >
+                          <SelectTrigger className="w-16">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="GRAM">g</SelectItem>
+                            <SelectItem value="CARAT">ct</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs">CGST ({(gstRate / 2).toFixed(2)}%)</Label>
-                      <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                        ₹{lineGst(item).cgst.toFixed(2)}
+                    {isCaratLine(item) && (
+                      <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                        <Label className="text-xs">Carat Weight (ct)</Label>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={item.caratWeight === 0 ? "" : item.caratWeight}
+                          readOnly={isLinked}
+                          className={isLinked ? "bg-muted" : undefined}
+                          onChange={(e) => handleCaratWeightChange(item, e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {item.purity === "DIAMOND"
+                            ? "Priced per carat, not per gram"
+                            : "1 ct = 0.2 g — converts with Net Weight"}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">Dust/Making/Other Wt</Label>
+                      <div className="flex gap-1">
+                        <Input
+                          type="number"
+                          step="0.00001"
+                          className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                          value={
+                            item.dmoWeight === 0
+                              ? ""
+                              : toPrimaryUnit(
+                                  item.dmoWeight,
+                                  "GRAM",
+                                  item.dmoWeightUnit,
+                                  resolveGramsPerCarat(item.purity, caratConversionRates),
+                                )
+                          }
+                          readOnly={isLinked}
+                          onChange={(e) => {
+                            const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+                            const dmoWeight = toPrimaryUnit(Number(e.target.value) || 0, item.dmoWeightUnit, "GRAM", gramsPerCarat)
+                            const derived = item.netTouched
+                              ? null
+                              : deriveNetWeight(item.grossWeight, item.stoneWeightInput, dmoWeight)
+                            updateItem(item.key, {
+                              dmoWeight,
+                              ...(derived !== null ? { netWeight: derived } : {}),
+                            })
+                          }}
+                        />
+                        <Select
+                          value={item.dmoWeightUnit}
+                          onValueChange={(unit) => updateItem(item.key, { dmoWeightUnit: unit as "GRAM" | "CARAT" })}
+                          disabled={isLinked}
+                        >
+                          <SelectTrigger className="w-16">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="GRAM">g</SelectItem>
+                            <SelectItem value="CARAT">ct</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                  </>
-                )}
-              </div>
 
-              {items.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeItem(item.key)}
-                  className="inline-flex items-center gap-1 text-xs text-red-600 hover:underline"
-                >
-                  <Trash2 className="h-3 w-3" /> Remove item
-                </button>
+                    <MakingChargeInput
+                      rate={item.rate}
+                      netWeight={item.netWeight}
+                      value={item.makingCharge}
+                      onChange={(v) => updateItem(item.key, { makingCharge: v })}
+                      chargeType={item.makingChargeType}
+                      onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
+                    />
+                  </div>
+
+                  {/* Once this is a composite line with "Includes a Stone"
+                      checked, Stone Charge moves down into that box, next to
+                      the Carat Weight/Rate it's computed from — see below. */}
+                  {(isCaratLine(item) || !item.hasStoneComponent) && (
+                    <div className="max-w-[200px] space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">Stone Charge</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={item.stoneCharge === 0 ? "" : item.stoneCharge}
+                        onChange={(e) => handleStoneChargeChange(item, e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  {/* A composite piece (metal + an embedded stone) is the
+                      exception, not the rule, for a line whose own metal isn't
+                      Diamond/Stone — kept as its own toggled strip rather than
+                      wedged into the grid above, so a plain Gold line's fields
+                      don't reflow every time this gets checked/unchecked. */}
+                  {!isCaratLine(item) && (
+                    <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
+                      <IncludesStoneToggle
+                        checked={item.hasStoneComponent}
+                        onChange={(checked) =>
+                          updateItem(item.key, {
+                            hasStoneComponent: checked,
+                            // Net Stone Weight is now hidden once the toggle is
+                            // off — clear it so a hidden field can't silently
+                            // keep submitting whatever was last entered.
+                            ...(checked ? {} : { stoneWeightInput: 0, netStoneWeightTouched: false }),
+                          })
+                        }
+                        disabled={isLinked}
+                      />
+
+                      {item.hasStoneComponent && (
+                        <StoneComponentFields
+                          metals={metals}
+                          origins={origins}
+                          onMetalsChange={setMetals}
+                          onOriginsChange={setOrigins}
+                          stoneMetalTypeName={item.stoneMetalTypeName}
+                          onStoneChange={(name, typeNames) =>
+                            updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
+                          }
+                          selectedTypeNames={item.stoneTypeNames}
+                          onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
+                          caratWeight={item.caratWeight}
+                          onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
+                          stoneRate={item.stoneRate}
+                          onStoneRateChange={(value) => handleStoneRateChange(item, value)}
+                          stoneCharge={item.stoneCharge}
+                          onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
+                          stoneChargeTouched={item.stoneChargeTouched}
+                          stoneWeightInput={toPrimaryUnit(
+                            item.stoneWeightInput,
+                            "GRAM",
+                            item.stoneWeightUnit,
+                            resolveGramsPerCarat(item.purity, caratConversionRates),
+                          )}
+                          onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
+                          stoneWeightUnit={item.stoneWeightUnit}
+                          onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
+                          netStoneWeightTouched={item.netStoneWeightTouched}
+                          lockPhysicalFields={isLinked}
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">HSN Code</Label>
+                      <Input
+                        value={item.hsnCode}
+                        readOnly={isLinked}
+                        className={isLinked ? "bg-muted" : undefined}
+                        onChange={(e) => updateItem(item.key, { hsnCode: e.target.value })}
+                      />
+                    </div>
+
+                    {/* For a carat-weighed line (no "Includes a Stone" toggle
+                        applies there at all — see above), Net Stone Weight has
+                        no gating concept and always shows here. For every other
+                        line, this field is only ever visible once "Includes a
+                        Stone" is checked, inside that toggle's own box above —
+                        while off, it stays fully hidden (not shown here) rather
+                        than relocated, per the toggle's on/off gating. */}
+                    {isCaratLine(item) && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Net Stone Weight</Label>
+                        <div className="flex gap-1">
+                          <Input
+                            type="number"
+                            step="0.00001"
+                            className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                            value={
+                              item.stoneWeightInput === 0
+                                ? ""
+                                : toPrimaryUnit(
+                                    item.stoneWeightInput,
+                                    "GRAM",
+                                    item.stoneWeightUnit,
+                                    resolveGramsPerCarat(item.purity, caratConversionRates),
+                                  )
+                            }
+                            readOnly={isLinked}
+                            onChange={(e) => handleStoneWeightInputChange(item, e.target.value)}
+                          />
+                          <Select
+                            value={item.stoneWeightUnit}
+                            onValueChange={(unit) => handleStoneWeightUnitChange(item, unit as "GRAM" | "CARAT")}
+                            disabled={isLinked}
+                          >
+                            <SelectTrigger className="w-16">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="GRAM">g</SelectItem>
+                              <SelectItem value="CARAT">ct</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">HM Charge</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={item.hmCharge === 0 ? "" : item.hmCharge}
+                        onChange={(e) => handleHmChargeChange(item, e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">Scheme / Discount</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={item.schemeDiscount === 0 ? "" : item.schemeDiscount}
+                        onChange={(e) =>
+                          updateItem(item.key, { schemeDiscount: Number(e.target.value) || 0 })
+                        }
+                      />
+                    </div>
+
+                    {/* SGST+CGST for an intra-state sale, a single IGST column
+                        for inter-state instead — never both, see computeGst()
+                        in lib/gst.ts. Composition always lands here at ₹0.00,
+                        since computeGst zeroes every component for it. This is
+                        the full breakdown — the compact row above shows only
+                        the combined total, as a quick summary. */}
+                    {lineGst(item).isInterState ? (
+                      <div className="space-y-1">
+                        <Label className="text-xs">IGST ({gstRate.toFixed(2)}%)</Label>
+                        <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                          ₹{lineGst(item).igst.toFixed(2)}
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-1">
+                          <Label className="text-xs">SGST ({(gstRate / 2).toFixed(2)}%)</Label>
+                          <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                            ₹{lineGst(item).sgst.toFixed(2)}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">CGST ({(gstRate / 2).toFixed(2)}%)</Label>
+                          <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                            ₹{lineGst(item).cgst.toFixed(2)}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
             )
           })}
+          </div>
         </div>
       </div>
 

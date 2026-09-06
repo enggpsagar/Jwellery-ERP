@@ -23,6 +23,11 @@ export type StoreMetalRow = {
   // see the WeightUnit enum's doc comment in schema.prisma and
   // lib/purity.ts's toPrimaryUnit().
   primaryUnit: WeightUnit;
+  // Configured default selling price per primaryUnit (per gram, or per
+  // carat for a gemstone) — Settings > Taxonomy. Null when not configured:
+  // Invoice creation then falls back to the linked stock item's own
+  // saleRate, and failing that, manual entry.
+  sellingPrice: number | null;
 };
 
 export type StoreMetalOriginRow = {
@@ -76,6 +81,7 @@ export async function getStoreMetals(): Promise<StoreMetalRow[]> {
     isActive: metal.isActive,
     isGemstone: metal.isGemstone,
     primaryUnit: metal.primaryUnit,
+    sellingPrice: metal.sellingPrice ? Number(metal.sellingPrice) : null,
   }));
 }
 
@@ -115,8 +121,16 @@ export async function upsertStoreMetal(
             ? WeightUnit.CARAT
             : WeightUnit.GRAM;
 
+    // Blank means "not configured" (null) — never coerced to 0, which would
+    // wrongly read as "this metal sells for free" instead of "no default set".
+    const sellingPriceRaw = String(formData.get("sellingPrice") || "").trim();
+    const sellingPrice = sellingPriceRaw ? Number(sellingPriceRaw) : null;
+
     const errors: Record<string, string[]> = {};
     if (!name) errors.name = ["Name is required"];
+    if (sellingPriceRaw && (!Number.isFinite(sellingPrice) || (sellingPrice ?? 0) < 0)) {
+      errors.sellingPrice = ["Enter a valid selling price"];
+    }
 
     if (Object.keys(errors).length > 0) {
       return { success: false, message: "Please fix the form errors", errors };
@@ -141,7 +155,7 @@ export async function upsertStoreMetal(
     if (id) {
       const { count } = await prisma.storeMetal.updateMany({
         where: { id, storeId },
-        data: { name, hasPurity, isGemstone, primaryUnit },
+        data: { name, hasPurity, isGemstone, primaryUnit, sellingPrice },
       });
 
       if (count === 0) {
@@ -149,7 +163,7 @@ export async function upsertStoreMetal(
       }
     } else {
       const created = await prisma.storeMetal.create({
-        data: { storeId, name, hasPurity, isGemstone, primaryUnit },
+        data: { storeId, name, hasPurity, isGemstone, primaryUnit, sellingPrice },
         select: { id: true },
       });
       savedId = created.id;

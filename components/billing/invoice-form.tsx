@@ -349,7 +349,11 @@ export function InvoiceForm({
       dmoWeightUnit: linkedUnit,
       stoneWeightInput: stock.stoneWeight ?? 0,
       stoneWeightUnit: linkedUnit,
-      rate: stock.saleRate ?? 0,
+      // A specific piece's own recorded sale rate wins when it has one;
+      // otherwise fall back to the metal's configured default Selling Price
+      // (Settings > Taxonomy) so the field isn't just silently 0 — still
+      // fully editable either way, and plain manual entry when neither is set.
+      rate: stock.saleRate ?? metalById.get(stock.metalType?.id ?? "")?.sellingPrice ?? 0,
       hsnCode: stock.hsnCode ?? "",
       caratWeight: stock.caratWeight ?? 0,
       stoneRate: stock.stoneRate ?? 0,
@@ -469,7 +473,7 @@ export function InvoiceForm({
           dmoWeightUnit: linkedUnit,
           stoneWeightInput: stock.stoneWeight ?? 0,
           stoneWeightUnit: linkedUnit,
-          rate: stock.saleRate ?? 0,
+          rate: stock.saleRate ?? metalById.get(stock.metalType?.id ?? "")?.sellingPrice ?? 0,
           hsnCode: stock.hsnCode ?? "",
           caratWeight: stock.caratWeight ?? 0,
           stoneRate: stock.stoneRate ?? 0,

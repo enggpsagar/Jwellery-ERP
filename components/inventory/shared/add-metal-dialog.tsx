@@ -81,6 +81,9 @@ export function AddMetalDialog({ open, onOpenChange, onCreated, isGemstone = fal
         // Matches upsertStoreMetal's own default when this dialog doesn't
         // send a primaryUnit field at all.
         primaryUnit: isGemstone ? "CARAT" : "GRAM",
+        // This dialog doesn't ask for a Selling Price — that's set later,
+        // per metal, in Settings > Taxonomy.
+        sellingPrice: null,
       })
       onOpenChange(false)
     } else if (!state.success && state.message) {

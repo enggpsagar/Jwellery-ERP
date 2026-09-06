@@ -313,7 +313,6 @@ function MaterialSideTable({
             <TableRow>
               <SortableHead label="Date" sortKey="date" activeSortKey={sortKey} sortDir={sortDir} onSort={onSort} />
               <TableHead>Source</TableHead>
-              <TableHead>Description</TableHead>
               <SortableHead
                 label="Fine Weight"
                 sortKey="weight"
@@ -328,7 +327,7 @@ function MaterialSideTable({
           <TableBody>
             {paginated.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
                   {rows.length === 0 ? "No entries yet." : "No entries match your search."}
                 </TableCell>
               </TableRow>
@@ -345,9 +344,6 @@ function MaterialSideTable({
                         {PAYMENT_METHOD_LABELS[row.paymentMethod] ?? row.paymentMethod}
                       </span>
                     ) : null}
-                  </TableCell>
-                  <TableCell className="max-w-xs truncate" title={row.description}>
-                    {row.description}
                   </TableCell>
                   <TableCell className="text-right">
                     {row.metalWeightFine ? `${row.metalWeightFine.toFixed(3)}g` : "-"}
@@ -584,18 +580,16 @@ export function KarigarLedgerTable({
 
   return (
     <div className="space-y-4">
-      <Card size="sm" className="md:max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-sm text-muted-foreground">
-            Cash Balance (owed to karigar)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-semibold text-red-600">
+      {/* A single line, not a card — one number doesn't need a box, and
+          hidden entirely when settled (0) since there's nothing to report. */}
+      {finalCashBalance !== 0 && (
+        <p className="text-sm">
+          <span className="text-muted-foreground">Cash Balance (owed to karigar): </span>
+          <span className="font-semibold text-red-700">
             ₹ {finalCashBalance.toLocaleString("en-IN")}
-          </div>
-        </CardContent>
-      </Card>
+          </span>
+        </p>
+      )}
 
       <SearchInput
         value={financialSearch}
@@ -622,7 +616,6 @@ export function KarigarLedgerTable({
                 onSort={handleFinancialSort}
               />
               <TableHead>Source</TableHead>
-              <TableHead>Description</TableHead>
               <SortableHead
                 label="Cash Amount"
                 sortKey="amount"
@@ -638,7 +631,7 @@ export function KarigarLedgerTable({
           <TableBody>
             {financialPaginated.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                   {visibleRows.length === 0
                     ? "No financial ledger entries yet."
                     : "No entries match your search."}
@@ -662,9 +655,6 @@ export function KarigarLedgerTable({
                           {PAYMENT_METHOD_LABELS[row.paymentMethod] ?? row.paymentMethod}
                         </span>
                       ) : null}
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate" title={row.description}>
-                      {row.description}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {row.amount

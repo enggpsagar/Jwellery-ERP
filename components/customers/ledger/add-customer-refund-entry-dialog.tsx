@@ -2,7 +2,7 @@
 "use client"
 
 import { useActionState, useEffect, useState } from "react"
-import { IndianRupee, NotebookText, RotateCcw, Scale } from "lucide-react"
+import { IndianRupee, NotebookText, Plus, Scale } from "lucide-react"
 
 import {
   addCustomerRefundEntry,
@@ -68,8 +68,8 @@ export function AddCustomerRefundEntryDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground">
-        <RotateCcw className="h-4 w-4" />
-        Add Refund Entry
+        <Plus className="h-4 w-4" />
+        Refund
       </DialogTrigger>
 
       <DialogContent className="max-w-lg">

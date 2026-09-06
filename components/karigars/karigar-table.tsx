@@ -101,7 +101,6 @@ export function KarigarTable({
               <th className="px-4 py-3 text-left font-medium">Metal Type</th>
               <th className="px-4 py-3 text-left font-medium">City</th>
               <th className="px-4 py-3 text-left font-medium">Opening Gold</th>
-              <th className="px-4 py-3 text-left font-medium">Opening Cash</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <th className="px-4 py-3 text-left font-medium">Actions</th>
             </tr>
@@ -163,7 +162,6 @@ export function KarigarTable({
                 <td className="px-4 py-3">{karigar.metalTypeName || "-"}</td>
                 <td className="px-4 py-3">{karigar.city || "-"}</td>
                 <td className="px-4 py-3">{karigar.openingGold.toFixed(3)} g</td>
-                <td className="px-4 py-3">₹{karigar.openingCash.toFixed(2)}</td>
                 <td className="px-4 py-3">
                   <span
                     className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${

@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, locationWhere, type LocationScope } from "@/lib/location-scope";
-import { UserRole, UserStatus } from "@prisma/client";
+import { UserRole, UserStatus, type PartyGstType } from "@prisma/client";
 import * as XLSX from "xlsx";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
@@ -25,6 +25,9 @@ export type Karigar = {
   state: string;
   pincode: string;
   gstNumber: string;
+  /** This karigar's own GST registration status — same PartyGstType/
+   * gstinRequired rule used for Customer/Vendor's gstNumber field. */
+  gstType: PartyGstType;
   panNumber: string;
   aadhaarNumber: string;
   specialization: string;
@@ -38,6 +41,10 @@ export type Karigar = {
    * page's Type filter, same as Stock's. */
   metalTypeId: string | null;
   metalTypeName: string;
+  /** Metals/stones this karigar is assigned to work with (KarigarMetal) —
+   * Issue/Receive Material only ever offers metals in this list. Separate
+   * from the single metalTypeId/metalTypeName above. */
+  assignedMetalTypeIds: string[];
   createdAt?: string;
 };
 
@@ -117,6 +124,7 @@ function mapKarigar(karigar: any): Karigar {
     state: karigar.state ?? "",
     pincode: karigar.pincode ?? "",
     gstNumber: karigar.gstNumber ?? "",
+    gstType: karigar.gstType ?? "UNREGISTERED",
     panNumber: karigar.panNumber ?? "",
     aadhaarNumber: karigar.aadhaarNumber ?? "",
     specialization: karigar.specialization ?? "",
@@ -127,6 +135,7 @@ function mapKarigar(karigar: any): Karigar {
     locationId: karigar.locationId ?? null,
     metalTypeId: karigar.metalTypeId ?? null,
     metalTypeName: karigar.metalType?.name ?? "",
+    assignedMetalTypeIds: (karigar.assignedMetals ?? []).map((row: { metalTypeId: string }) => row.metalTypeId),
     createdAt: karigar.createdAt?.toISOString?.() ?? undefined,
   };
 }
@@ -199,7 +208,10 @@ export async function getKarigars(
       orderBy: getOrderBy(sortBy, sortOrder),
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: { metalType: { select: { name: true } } },
+      include: {
+        metalType: { select: { name: true } },
+        assignedMetals: { select: { metalTypeId: true } },
+      },
     }),
   ]);
 
@@ -223,15 +235,20 @@ export async function getKarigarById(id: string): Promise<Karigar | null> {
   const scope = await getLocationScope();
   const karigar = await prisma.karigar.findFirst({
     where: { id, storeId, ...locationWhere(scope) },
-    include: { metalType: { select: { name: true } } },
+    include: {
+      metalType: { select: { name: true } },
+      assignedMetals: { select: { metalTypeId: true } },
+    },
   });
   if (!karigar) return null;
   return mapKarigar(karigar);
 }
 
+/** Karigar.code is system-generated (generateKarigarCode) and immutable —
+ * never read from the form, on create or edit, so there's nothing here for
+ * a submitted "code" field to override even if one were somehow present. */
 function buildKarigarData(formData: FormData) {
   return {
-    code: toOptionalString(formData.get("code")),
     name: String(formData.get("name") || "").trim(),
     mobile: toOptionalString(formData.get("mobile")),
     whatsapp: toOptionalString(formData.get("whatsapp")),
@@ -241,6 +258,11 @@ function buildKarigarData(formData: FormData) {
     state: toOptionalString(formData.get("state")),
     pincode: toOptionalString(formData.get("pincode")),
     gstNumber: toOptionalString(formData.get("gstNumber")),
+    gstType: (() => {
+      const raw = String(formData.get("gstType") || "");
+      const valid: PartyGstType[] = ["UNREGISTERED", "REGULAR", "COMPOSITION"];
+      return (valid as string[]).includes(raw) ? (raw as PartyGstType) : "UNREGISTERED";
+    })(),
     panNumber: (() => {
       const raw = toOptionalString(formData.get("panNumber"));
       return raw ? normalizePanNumber(raw) : null;
@@ -257,6 +279,46 @@ function buildKarigarData(formData: FormData) {
     locationId: toOptionalString(formData.get("locationId")),
     metalTypeId: toOptionalString(formData.get("metalTypeId")),
   };
+}
+
+/** Deduped ids of every "Assigned Metals/Stones" checkbox the form
+ * submitted — separate from buildKarigarData since KarigarMetal is its own
+ * table, not a scalar column on Karigar. */
+function extractAssignedMetalTypeIds(formData: FormData): string[] {
+  return [...new Set(formData.getAll("assignedMetalTypeIds").map((value) => String(value).trim()).filter(Boolean))];
+}
+
+/** Every submitted id has to actually be one of this store's own
+ * StoreMetal rows — otherwise Issue/Receive Material could end up gated
+ * against an id belonging to nothing (or, worse, another store). */
+async function validateAssignedMetalTypeIds(
+  storeId: string,
+  metalTypeIds: string[],
+): Promise<Record<string, string[]> | null> {
+  if (metalTypeIds.length === 0) return null;
+
+  const found = await prisma.storeMetal.findMany({
+    where: { id: { in: metalTypeIds }, storeId },
+    select: { id: true },
+  });
+
+  if (found.length !== metalTypeIds.length) {
+    return { assignedMetalTypeIds: ["One or more selected metals/stones could not be found"] };
+  }
+
+  return null;
+}
+
+/** Karigar.code is always system-generated, never typed — mirrors
+ * generateJobNumber's own count-based scheme (lib/actions/inventory-stock-actions.ts)
+ * for the same reason: one predictable, unique-per-store, human-readable id. */
+async function generateKarigarCode(storeId: string) {
+  const year = new Date().getFullYear();
+  const count = await prisma.karigar.count({
+    where: { storeId, code: { startsWith: `KAR-${year}-` } },
+  });
+
+  return `KAR-${year}-${String(count + 1).padStart(4, "0")}`;
 }
 
 /**
@@ -373,11 +435,25 @@ export async function createKarigar(
       }
     }
 
+    const assignedMetalTypeIds = extractAssignedMetalTypeIds(formData);
+    const assignedMetalErrors = await validateAssignedMetalTypeIds(storeId, assignedMetalTypeIds);
+    if (assignedMetalErrors) {
+      return { success: false, message: "Please fix the form errors", errors: assignedMetalErrors };
+    }
+
+    const code = await generateKarigarCode(storeId);
+
     // A mobile or email doubles as the karigar's login — create their User
     // account in the same step, matching how a Store's initial Admin is
     // created alongside the Store itself.
     await prisma.$transaction(async (tx) => {
-      const karigar = await tx.karigar.create({ data: { ...data, storeId } });
+      const karigar = await tx.karigar.create({ data: { ...data, code, storeId } });
+
+      if (assignedMetalTypeIds.length > 0) {
+        await tx.karigarMetal.createMany({
+          data: assignedMetalTypeIds.map((metalTypeId) => ({ karigarId: karigar.id, metalTypeId })),
+        });
+      }
 
       if (data.mobile || data.email) {
         await tx.user.create({
@@ -487,6 +563,12 @@ export async function updateKarigar(
       }
     }
 
+    const assignedMetalTypeIds = extractAssignedMetalTypeIds(formData);
+    const assignedMetalErrors = await validateAssignedMetalTypeIds(storeId, assignedMetalTypeIds);
+    if (assignedMetalErrors) {
+      return { success: false, message: "Please fix the form errors", errors: assignedMetalErrors };
+    }
+
     const existing = await prisma.karigar.findFirst({
       where: { id, storeId },
       include: { loginUser: { select: { id: true } } },
@@ -515,6 +597,16 @@ export async function updateKarigar(
     let loginJustCreated = false;
     await prisma.$transaction(async (tx) => {
       await tx.karigar.update({ where: { id }, data });
+
+      // Replace-the-whole-set: simplest correct way to reconcile "every
+      // checkbox the form just submitted" against whatever was assigned
+      // before, without diffing adds/removes by hand.
+      await tx.karigarMetal.deleteMany({ where: { karigarId: id } });
+      if (assignedMetalTypeIds.length > 0) {
+        await tx.karigarMetal.createMany({
+          data: assignedMetalTypeIds.map((metalTypeId) => ({ karigarId: id, metalTypeId })),
+        });
+      }
 
       if (existing.loginUser) {
         await tx.user.update({

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 import {
   recordMaterialReceiptFromKarigar,
@@ -54,8 +55,14 @@ type LocationOption = {
 type ReceiveMaterialDialogProps = {
   karigarId: string
   metals: StoreMetalRow[]
+  /** Which metals/stones this karigar is actually assigned to work with —
+   * same gate as IssueMaterialDialog's own assignedMetalTypeIds prop. */
+  assignedMetalTypeIds: string[]
   locations?: LocationOption[]
   defaultLocationId?: string | null
+  /** Total Receive Material entries recorded for this karigar so far —
+   * shown as a "(n)" suffix on the trigger button. */
+  count?: number
 }
 
 /**
@@ -68,10 +75,15 @@ type ReceiveMaterialDialogProps = {
 export function ReceiveMaterialDialog({
   karigarId,
   metals,
+  assignedMetalTypeIds,
   locations = [],
   defaultLocationId = null,
+  count,
 }: ReceiveMaterialDialogProps) {
-  const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
+  const activeMetals = useMemo(
+    () => metals.filter((m) => m.isActive && assignedMetalTypeIds.includes(m.id)),
+    [metals, assignedMetalTypeIds],
+  )
   const defaultMetalId = useMemo(
     () => activeMetals.find((m) => m.hasPurity)?.id ?? activeMetals[0]?.id ?? "",
     [activeMetals],
@@ -132,7 +144,7 @@ export function ReceiveMaterialDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Button type="button" variant="outline" onClick={() => setOpen(true)}>
-        Receive Material
+        Receive Material{typeof count === "number" ? ` (${count})` : ""}
       </Button>
 
       <DialogContent>
@@ -140,6 +152,23 @@ export function ReceiveMaterialDialog({
           <DialogTitle>Receive Material from Karigar</DialogTitle>
         </DialogHeader>
 
+        {activeMetals.length === 0 ? (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This karigar has no metals/stones assigned yet. Assign at least one
+              before receiving material.
+            </p>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                Close
+              </Button>
+              <Link href={`/karigars/${karigarId}/edit`}>
+                <Button type="button">Edit Karigar</Button>
+              </Link>
+            </DialogFooter>
+          </div>
+        ) : (
+        <>
         <p className="text-sm text-muted-foreground">
           Use this to record material handed back against an outstanding balance
           — no open job needed. It only adjusts the karigar's metal ledger; it
@@ -245,6 +274,8 @@ export function ReceiveMaterialDialog({
             </Button>
           </DialogFooter>
         </form>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   )

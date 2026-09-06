@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation"
 import { Eye, Pencil, Ban } from "lucide-react"
 
 import { disableKarigar } from "@/lib/actions/karigar-actions"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { DeleteKarigarButton } from "@/components/karigars/delete-karigar-button"
+import { IssueMaterialDialog } from "@/components/karigars/issue-material-dialog"
 import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/loader"
 import {
@@ -19,14 +21,27 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/providers/toast-provider"
 
+type LocationOption = {
+  id: string
+  name: string
+}
+
 type KarigarRowActionsProps = {
   karigarId: string
   karigarName: string
+  metals: StoreMetalRow[]
+  assignedMetalTypeIds: string[]
+  locations?: LocationOption[]
+  defaultLocationId?: string | null
 }
 
 export function KarigarRowActions({
   karigarId,
   karigarName,
+  metals,
+  assignedMetalTypeIds,
+  locations = [],
+  defaultLocationId = null,
 }: KarigarRowActionsProps) {
   const router = useRouter()
   const toast = useToast()
@@ -72,6 +87,15 @@ export function KarigarRowActions({
         >
           <Pencil className="h-4 w-4" />
         </Link>
+
+        <IssueMaterialDialog
+          trigger="icon"
+          karigarId={karigarId}
+          metals={metals}
+          assignedMetalTypeIds={assignedMetalTypeIds}
+          locations={locations}
+          defaultLocationId={defaultLocationId}
+        />
 
         <button
           type="button"

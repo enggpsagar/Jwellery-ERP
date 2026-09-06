@@ -5,6 +5,7 @@ import type { Metadata } from "next"
 import { getKarigars } from "@/lib/actions/karigar-actions"
 import { KarigarsClient } from "@/components/karigars/karigars-client"
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions"
+import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 
 export const metadata: Metadata = {
@@ -37,14 +38,19 @@ export default async function KarigarsPage({ searchParams }: KarigarsPageProps) 
   const validMetalTypeIds = new Set([...metals.map((m) => m.id), UNASSIGNED_METAL_TYPE])
   const metalTypeId = params.type && validMetalTypeIds.has(params.type) ? params.type : undefined
 
-  const { karigars, pagination } = await getKarigars({
-    page,
-    pageSize,
-    search,
-    sortBy,
-    sortOrder,
-    metalTypeId,
-  })
+  const [{ karigars, pagination }, locations, defaultLocationId] = await Promise.all([
+    getKarigars({ page, pageSize, search, sortBy, sortOrder, metalTypeId }),
+    getStoreLocations(),
+    getDefaultLocationId(),
+  ])
 
-  return <KarigarsClient karigars={karigars} pagination={pagination} metals={metals} />
+  return (
+    <KarigarsClient
+      karigars={karigars}
+      pagination={pagination}
+      metals={metals}
+      locations={locations}
+      defaultLocationId={defaultLocationId}
+    />
+  )
 }

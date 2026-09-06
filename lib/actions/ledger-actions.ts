@@ -255,6 +255,36 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
   }
 }
 
+export type KarigarMaterialCounts = {
+  /** Number of Issue Material actions recorded for this karigar (one DEBIT/
+   *  KARIGAR_ISSUE ledger entry per issue, regardless of metal). */
+  issuedCount: number
+  /** Number of Receive Material entries — both the job-bound
+   *  receiveItemsFromKarigar flow and the standalone
+   *  recordMaterialReceiptFromKarigar one log a CREDIT/KARIGAR_RECEIPT
+   *  entry, so both count here. Excludes the separate DEBIT/KARIGAR_RECEIPT
+   *  labour-charge entry a job receipt can also create alongside it. */
+  receivedCount: number
+}
+
+/** Powers the "Issue Material (n)" / "Receive Material (n)" counts shown
+ *  directly on those buttons — a quick sense of activity without opening
+ *  the ledger below. */
+export async function getKarigarMaterialCounts(karigarId: string): Promise<KarigarMaterialCounts> {
+  const storeId = await requireStoreScope()
+
+  const [issuedCount, receivedCount] = await Promise.all([
+    prisma.ledgerEntry.count({
+      where: { storeId, karigarId, type: "DEBIT", sourceType: "KARIGAR_ISSUE" },
+    }),
+    prisma.ledgerEntry.count({
+      where: { storeId, karigarId, type: "CREDIT", sourceType: "KARIGAR_RECEIPT" },
+    }),
+  ])
+
+  return { issuedCount, receivedCount }
+}
+
 export type KarigarLedgerSummaryRow = {
   id: string
   name: string

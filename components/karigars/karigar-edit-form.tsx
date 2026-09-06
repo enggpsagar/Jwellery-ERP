@@ -10,6 +10,7 @@ import {
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
 import type { StateOption } from "@/lib/actions/location-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import type { GstScheme } from "@prisma/client"
 
 import { KarigarForm } from "./karigar-form"
 
@@ -23,9 +24,16 @@ type Props = {
   locations?: StoreLocationRow[]
   states?: StateOption[]
   metals?: StoreMetalRow[]
+  gstScheme: GstScheme
 }
 
-export function KarigarEditForm({ karigar, locations = [], states = [], metals = [] }: Props) {
+export function KarigarEditForm({
+  karigar,
+  locations = [],
+  states = [],
+  metals = [],
+  gstScheme,
+}: Props) {
   const updateKarigarWithId = updateKarigar.bind(null, karigar.id)
 
   const [state, formAction, pending] = useActionState(
@@ -62,6 +70,7 @@ export function KarigarEditForm({ karigar, locations = [], states = [], metals =
         locations={locations}
         states={states}
         metals={metals}
+        gstScheme={gstScheme}
       />
     </form>
   )

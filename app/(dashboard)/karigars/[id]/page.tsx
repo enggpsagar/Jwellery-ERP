@@ -3,19 +3,14 @@
 import type { Metadata } from "next";
 import { cache } from "react";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 
 import { getKarigarById } from "@/lib/actions/karigar-actions";
-import { getKarigarLedger } from "@/lib/actions/ledger-actions";
+import { getKarigarLedger, getKarigarMaterialCounts } from "@/lib/actions/ledger-actions";
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions";
-import { getLocationScope, locationWhere } from "@/lib/location-scope";
-import { prisma } from "@/lib/prisma";
-import { requireStoreScope } from "@/lib/store-context";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { IssueMaterialDialog } from "@/components/karigars/issue-material-dialog";
 import { ReceiveMaterialDialog } from "@/components/karigars/receive-material-dialog";
 import { RecordKarigarPaymentDialog } from "@/components/karigars/record-karigar-payment-dialog";
@@ -40,15 +35,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-function formatDate(date: Date | null) {
-  if (!date) return "-";
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
-
 export default async function KarigarDetailPage({ params }: Props) {
   const { id } = await params;
 
@@ -57,19 +43,12 @@ export default async function KarigarDetailPage({ params }: Props) {
     notFound();
   }
 
-  const storeId = await requireStoreScope();
-
-  const scope = await getLocationScope();
-
-  const [ledger, metals, locations, defaultLocationId, openJobs] = await Promise.all([
+  const [ledger, metals, locations, defaultLocationId, materialCounts] = await Promise.all([
     getKarigarLedger(id),
     getStoreMetals(),
     getStoreLocations(),
     getDefaultLocationId(),
-    prisma.karigarJob.findMany({
-      where: { storeId, karigarId: id, status: "issued", ...locationWhere(scope) },
-      orderBy: { issueDate: "desc" },
-    }),
+    getKarigarMaterialCounts(id),
   ]);
 
   return (
@@ -84,14 +63,18 @@ export default async function KarigarDetailPage({ params }: Props) {
             <IssueMaterialDialog
               karigarId={id}
               metals={metals}
+              assignedMetalTypeIds={karigar.assignedMetalTypeIds}
               locations={locations}
               defaultLocationId={defaultLocationId}
+              count={materialCounts.issuedCount}
             />
             <ReceiveMaterialDialog
               karigarId={id}
               metals={metals}
+              assignedMetalTypeIds={karigar.assignedMetalTypeIds}
               locations={locations}
               defaultLocationId={defaultLocationId}
+              count={materialCounts.receivedCount}
             />
             <RecordKarigarPaymentDialog karigarId={id} />
           </div>
@@ -135,7 +118,7 @@ export default async function KarigarDetailPage({ params }: Props) {
           point; these are the current running totals from every ledger
           entry since, one glance answering "where do things stand right
           now" before anyone opens the full ledger below. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <Card
           size="sm"
           className={
@@ -197,46 +180,6 @@ export default async function KarigarDetailPage({ params }: Props) {
           </Card>
         ))}
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Open Jobs</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {openJobs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No open jobs — issue material to start a new job.
-            </p>
-          ) : (
-            openJobs.map((job) => (
-              <div
-                key={job.id}
-                className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
-              >
-                <div className="space-y-1">
-                  <div className="font-medium">{job.jobNumber ?? job.id}</div>
-                  <div className="text-sm text-muted-foreground">
-                    Issued {formatDate(job.issueDate)} · {job.issueWeight ? Number(job.issueWeight) : 0}g{" "}
-                    {job.issuePurity ?? ""} ({job.issueFineWeight ? Number(job.issueFineWeight).toFixed(3) : "0.000"}g fine)
-                    {job.expectedDate ? ` · Expected ${formatDate(job.expectedDate)}` : ""}
-                  </div>
-                  {job.issueWeight && Number(job.receiveWeight ?? 0) > 0 && (
-                    <div className="text-sm font-medium text-amber-700">
-                      {Number(job.receiveWeight).toFixed(3)}g received so far ·{" "}
-                      {Math.max(0, Number(job.issueWeight) - Number(job.receiveWeight)).toFixed(3)}g remaining
-                    </div>
-                  )}
-                </div>
-                <Link href={`/karigars/${id}/receive-items/${job.id}`}>
-                  <Button type="button" size="sm">
-                    Receive Items
-                  </Button>
-                </Link>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2">

@@ -259,6 +259,7 @@ model StoreMetal {
   karigarReceiptItems KarigarReceiptItem[]
   quotationItems      QuotationItem[]
   karigars            Karigar[]
+  karigarAssignments  KarigarMetal[]
   // Only meaningful when isGemstone is true — the same one-to-many shape as
   // StoreCategory.types below. Replaces the old single nullable
   // StoreMetal.stoneOrigin column: a store dealing in BOTH natural and
@@ -399,6 +400,13 @@ model Karigar {
   state          String?
   pincode        String?
   gstNumber      String?
+  // This karigar's own GST registration status — same PartyGstType used by
+  // Customer/Vendor, same gstinRequired(storeGstScheme, gstType) rule
+  // deciding whether gstNumber above is mandatory. Not tied to any tax
+  // calculation of our own (a karigar is never invoiced), just kept
+  // consistent with how the rest of the app records a party's own GST
+  // registration.
+  gstType        PartyGstType   @default(UNREGISTERED)
   panNumber      String?
   aadhaarNumber  String?
   specialization String?
@@ -421,6 +429,12 @@ model Karigar {
   // Type filter already uses.
   metalTypeId    String?
   metalType      StoreMetal?    @relation(fields: [metalTypeId], references: [id])
+  // Which metals/stones this karigar is actually assigned to work with —
+  // unlike metalTypeId above (a single "mainly works with" label for the
+  // Type filter), this is the list Issue/Receive Material actually gate
+  // against: a job can only be raised in a metal this karigar is assigned
+  // to. See KarigarMetal.
+  assignedMetals KarigarMetal[]
 
   @@unique([storeId, code])
   @@index([name])
@@ -429,6 +443,27 @@ model Karigar {
   @@index([code])
   @@index([locationId])
   @@index([storeId])
+}
+
+/**
+ * One row per metal/stone a karigar is assigned to work with — a karigar
+ * can be assigned several (e.g. Gold and Silver but not Diamond), and
+ * Issue/Receive Material only ever offers metals present here for that
+ * karigar. Deliberately separate from Karigar.metalTypeId, which is just a
+ * single "mainly works with" label driving the Karigars list's Type filter
+ * and carries no such restriction.
+ */
+model KarigarMetal {
+  id          String     @id @default(cuid())
+  karigarId   String
+  metalTypeId String
+  createdAt   DateTime   @default(now())
+  karigar     Karigar    @relation(fields: [karigarId], references: [id], onDelete: Cascade)
+  metalType   StoreMetal @relation(fields: [metalTypeId], references: [id])
+
+  @@unique([karigarId, metalTypeId])
+  @@index([karigarId])
+  @@index([metalTypeId])
 }
 
 model Product {

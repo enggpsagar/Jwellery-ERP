@@ -93,10 +93,10 @@ export function CustomerLedgerBody({
       <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-foreground">
-            Customer Ledger
+            Ledger
           </h2>
           <p className="text-sm text-muted-foreground">
-            Add sale and refund/payment entries for this customer.
+            Add sale and refund/payment entries.
           </p>
         </div>
 

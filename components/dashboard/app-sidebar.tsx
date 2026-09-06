@@ -24,6 +24,7 @@ import {
   CreditCard,
   Plus,
   Wallet,
+  Phone,
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
@@ -135,6 +136,12 @@ const mainNav: NavItem[] = [
     icon: FileText,
     countKey: "quotations",
     quickAddHref: "/quotations/new",
+  },
+  {
+    title: "Draft Orders",
+    href: "/orders",
+    icon: Phone,
+    quickAddHref: "/orders/new",
   },
   {
     title: "Billing",

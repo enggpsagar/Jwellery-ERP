@@ -87,6 +87,21 @@ type ReceiptItem = {
   /** Once Net Weight is edited directly, the gross/less/stone/dmo auto-calc
    * stops overwriting it — same override rule as the Add Stock form. */
   netTouched: boolean
+  /** Which Draft Order item (if any) this returned piece fulfils — see
+   * DraftOrderItemOption's own doc comment below. Empty when this job has
+   * no linked Draft Order, or the staff hasn't matched this row to one. */
+  draftOrderItemId: string
+}
+
+/** An unfulfilled item on the Draft Order this job is fulfilling (empty when
+ * the job has no linked order) — lets the staff say "this returned piece is
+ * the Ring the customer ordered," which stamps that order's item as received
+ * once submitted (see receiveItemsFromKarigar's draftOrderItemId handling). */
+export type DraftOrderItemOption = {
+  id: string
+  itemName: string
+  quantity: number
+  estimatedWeight: number | null
 }
 
 function deriveNetWeight(
@@ -141,6 +156,7 @@ function emptyReceiptItem(defaultMetal?: StoreMetalRow, defaultLocationId?: stri
     locationId: defaultLocationId ?? "",
     remarks: "",
     netTouched: false,
+    draftOrderItemId: "",
   }
 }
 
@@ -169,6 +185,10 @@ type ReceiveItemsFormProps = {
    * field, since every returned item becomes a brand-new InventoryStock row
    * (a create, not an edit against something with a fixed location). */
   defaultLocationId?: string | null
+  /** This job's Draft Order items not yet matched to a returned piece —
+   * empty when the job has no linked Draft Order. See DraftOrderItemOption's
+   * own doc comment. */
+  draftOrderItems?: DraftOrderItemOption[]
 }
 
 export function ReceiveItemsForm({
@@ -181,6 +201,7 @@ export function ReceiveItemsForm({
   jobMetalTypeId,
   jobMetalTypeName,
   defaultLocationId,
+  draftOrderItems = [],
 }: ReceiveItemsFormProps) {
   const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
   // The job's own issued metal always wins when set — a karigar job can only
@@ -378,6 +399,7 @@ export function ReceiveItemsForm({
       manufactureDate: item.manufactureDate || null,
       locationId: item.locationId || null,
       remarks: item.remarks || null,
+      draftOrderItemId: item.draftOrderItemId || null,
       }
     }),
   )
@@ -406,6 +428,24 @@ export function ReceiveItemsForm({
       {!state.success && state.message && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {state.message}
+        </div>
+      )}
+
+      {draftOrderItems.length > 0 && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <p className="font-medium">This job is fulfilling a Draft Order — expected items:</p>
+          <ul className="mt-1 list-disc pl-5">
+            {draftOrderItems.map((orderItem) => (
+              <li key={orderItem.id}>
+                {orderItem.itemName} x{orderItem.quantity}
+                {orderItem.estimatedWeight ? ` (~${orderItem.estimatedWeight}g)` : ""}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-blue-700">
+            Use each item card&apos;s &quot;Matches Draft Order Item&quot; picker below to mark which
+            returned piece fulfils which one.
+          </p>
         </div>
       )}
 
@@ -462,6 +502,36 @@ export function ReceiveItemsForm({
                       }
                     />
                   </div>
+
+                  {draftOrderItems.length > 0 && (
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">Matches Draft Order Item</Label>
+                      <Select
+                        value={item.draftOrderItemId}
+                        onValueChange={(value) => updateItem(item.key, { draftOrderItemId: value })}
+                      >
+                        <SelectTrigger className="h-11 w-full">
+                          <SelectValue placeholder="Optional — none" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {draftOrderItems
+                            .filter(
+                              (orderItem) =>
+                                orderItem.id === item.draftOrderItemId ||
+                                !items.some(
+                                  (other) =>
+                                    other.key !== item.key && other.draftOrderItemId === orderItem.id,
+                                ),
+                            )
+                            .map((orderItem) => (
+                              <SelectItem key={orderItem.id} value={orderItem.id}>
+                                {orderItem.itemName} x{orderItem.quantity}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Item Name</Label>

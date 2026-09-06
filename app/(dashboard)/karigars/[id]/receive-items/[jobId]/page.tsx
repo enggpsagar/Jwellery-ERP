@@ -9,6 +9,7 @@ import { getPurityFineness } from "@/lib/actions/purity-actions";
 import { getInventoryStockFormProducts } from "@/lib/actions/inventory/stock-actions";
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions";
+import { getUnfulfilledDraftOrderItemsForJob } from "@/lib/actions/draft-order-actions";
 import { formatShortDate } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -60,12 +61,13 @@ export default async function ReceiveItemsPage({ params }: Props) {
     notFound();
   }
 
-  const [finenessRows, products, metals, locations, defaultLocationId] = await Promise.all([
+  const [finenessRows, products, metals, locations, defaultLocationId, draftOrderItems] = await Promise.all([
     getPurityFineness(),
     getInventoryStockFormProducts(),
     getStoreMetals(),
     getStoreLocations(),
     getDefaultLocationId(),
+    getUnfulfilledDraftOrderItemsForJob(job.id),
   ]);
 
   const fineness = Object.fromEntries(
@@ -116,6 +118,7 @@ export default async function ReceiveItemsPage({ params }: Props) {
         jobMetalTypeId={job.metalTypeId}
         jobMetalTypeName={job.metalType?.name ?? null}
         defaultLocationId={defaultLocationId}
+        draftOrderItems={draftOrderItems}
       />
     </main>
   );

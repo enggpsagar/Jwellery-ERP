@@ -277,6 +277,12 @@ export type KarigarReceiptItemInput = {
   manufactureDate?: string | null;
   locationId?: string | null;
   remarks?: string | null;
+  /** Set when this receipt row fulfils a specific item on a Draft Order
+   * (Settings-free — see lib/actions/draft-order-actions.ts) — stamps that
+   * DraftOrderItem's karigarReceiptItemId once this row's KarigarReceiptItem
+   * is created, so the order can tell which of its items have actually been
+   * returned. */
+  draftOrderItemId?: string | null;
 };
 
 /**
@@ -286,7 +292,7 @@ export type KarigarReceiptItemInput = {
  * treated as "no restriction", so a freshly-created-but-never-assigned
  * karigar can't silently slip through.
  */
-async function assertKarigarAssignedMetal(karigarId: string, metalTypeId: string): Promise<string | null> {
+export async function assertKarigarAssignedMetal(karigarId: string, metalTypeId: string): Promise<string | null> {
   const assignments = await prisma.karigarMetal.findMany({
     where: { karigarId },
     select: { metalTypeId: true },
@@ -305,7 +311,7 @@ async function assertKarigarAssignedMetal(karigarId: string, metalTypeId: string
 
 /** JOB-${year}-0001, incrementing per store per year — matches the numbering
  * convention already used elsewhere in this codebase (e.g. invoice numbers). */
-async function generateJobNumber(storeId: string) {
+export async function generateJobNumber(storeId: string) {
   const year = new Date().getFullYear();
   const count = await prisma.karigarJob.count({
     where: { storeId, jobNumber: { startsWith: `JOB-${year}-` } },
@@ -770,7 +776,7 @@ export async function receiveItemsFromKarigar(
           },
         });
 
-        await tx.karigarReceiptItem.create({
+        const receiptItem = await tx.karigarReceiptItem.create({
           data: {
             karigarJobId: jobId,
             itemName: item.itemName || "Item",
@@ -787,6 +793,15 @@ export async function receiveItemsFromKarigar(
             inventoryStockId: stock.id,
           },
         });
+
+        // Stamps the matching Draft Order item as fulfilled — see
+        // KarigarReceiptItemInput.draftOrderItemId's own doc comment.
+        if (item.draftOrderItemId) {
+          await tx.draftOrderItem.update({
+            where: { id: item.draftOrderItemId },
+            data: { karigarReceiptItemId: receiptItem.id },
+          });
+        }
       }
 
       // Partial receiving: a karigar can return an issued job's material across
@@ -822,6 +837,26 @@ export async function receiveItemsFromKarigar(
           labourCharge: Number(job.labourCharge) + labourCharge,
         },
       });
+
+      // If this job is fulfilling a Draft Order, the order only flips to
+      // RECEIVED once every one of its items — not just this receipt's —
+      // has been matched to a KarigarReceiptItem (a customer's order may
+      // span several visits just like the job's own weight can).
+      const draftOrder = await tx.draftOrder.findFirst({
+        where: { karigarJobId: jobId },
+        include: { items: true },
+      });
+      if (draftOrder && draftOrder.status !== "RECEIVED") {
+        const allItemsFulfilled = draftOrder.items.every(
+          (orderItem) => orderItem.karigarReceiptItemId != null,
+        );
+        if (allItemsFulfilled) {
+          await tx.draftOrder.update({
+            where: { id: draftOrder.id },
+            data: { status: "RECEIVED" },
+          });
+        }
+      }
 
       const wastageFineWeight = receiveFineWeight - plainFineWeightTotal;
 

@@ -169,14 +169,19 @@ export default async function InvoicePrintPage({ params }: Props) {
             inside this band's own box (no negative offset reaching up into
             the contact bar above) — an earlier version poked up into that
             bar and silently painted over the address text sitting there,
-            since it's later in DOM order and stacks on top. */}
+            since it's later in DOM order and stacks on top. It's also only
+            shown when there's no logo — once a real logo fills this space,
+            the abstract accent has nothing left to usefully occupy and
+            would just risk sitting behind/against it. */}
         <div className="flex items-stretch">
           <div
-            className="relative w-[58%] overflow-hidden bg-slate-900 px-5 py-4 text-white"
+            className="relative flex w-[58%] items-center gap-3 overflow-hidden bg-slate-900 px-5 py-4 text-white"
             style={{ borderTopRightRadius: "70px" }}
           >
-            <div className="pointer-events-none absolute -top-4 right-4 h-16 w-16 rounded-full bg-violet-400" />
-            <div className="relative space-y-0.5">
+            {!settings.logoUrl && (
+              <div className="pointer-events-none absolute -top-4 right-4 h-16 w-16 rounded-full bg-violet-400" />
+            )}
+            <div className="relative flex-1 space-y-0.5">
               <p className="text-xl font-bold uppercase tracking-wide">{settings.businessName}</p>
               {settings.gstNumber && <p className="text-[11px] text-slate-300">GSTIN: {settings.gstNumber}</p>}
               {settings.state && (
@@ -186,6 +191,17 @@ export default async function InvoicePrintPage({ params }: Props) {
                 </p>
               )}
             </div>
+            {settings.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={settings.logoUrl}
+                alt={settings.businessName}
+                // Self-aligned to the bottom (not vertically centered) and
+                // pulled in from the right, clear of the band's curved
+                // top-right corner so overflow-hidden never clips it.
+                className="relative mr-6 h-14 w-14 shrink-0 self-end rounded-full object-cover ring-2 ring-white/30"
+              />
+            )}
           </div>
           <div className="flex flex-1 items-center justify-end px-5 py-4 text-right">
             <div>

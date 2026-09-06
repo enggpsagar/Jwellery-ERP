@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Download, Search } from "lucide-react"
+import { Download, Search, X } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -85,6 +85,11 @@ export function DataTableToolbar({
   const currentType = searchParams.get("type") ?? "ALL"
 
   const [search, setSearch] = React.useState(currentSearch)
+  // Collapsed to an icon by default, expanding into the input on click —
+  // starts expanded when a search is already active (from a URL/back-nav),
+  // so an in-progress filter is never hidden behind an icon the user has to
+  // know to click first.
+  const [searchOpen, setSearchOpen] = React.useState(!!currentSearch)
   const [isPending, startTransition] = React.useTransition()
   const [isExporting, setIsExporting] = React.useState(false)
 
@@ -167,16 +172,47 @@ export function DataTableToolbar({
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm xl:flex-row xl:items-center xl:justify-between">
-      <div className="relative w-full xl:max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={searchPlaceholder}
-          className="pl-9"
-          disabled={isPending}
-        />
-      </div>
+      {searchOpen ? (
+        <div className="relative w-full xl:max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onBlur={() => {
+              // Collapses back to just the icon once empty and unfocused —
+              // an active search stays expanded (visible + editable), so
+              // this never hides a filter that's actually doing something.
+              if (!search.trim()) setSearchOpen(false)
+            }}
+            placeholder={searchPlaceholder}
+            className="pl-9 pr-8"
+            disabled={isPending}
+          />
+          {search ? (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              title="Clear search"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={() => setSearchOpen(true)}
+          title="Search"
+          aria-label="Search"
+        >
+          <Search className="h-4 w-4" />
+        </Button>
+      )}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
         {statusOptions ? (
@@ -248,21 +284,13 @@ export function DataTableToolbar({
         <Button
           type="button"
           variant="outline"
+          size="icon"
           onClick={handleExport}
           disabled={isExporting}
-          className="gap-2"
+          title={hasSelection ? `Export selected ${entityLabel} (${selectedIds!.length})` : `Export ${entityLabel}`}
+          aria-label={hasSelection ? `Export selected ${entityLabel} (${selectedIds!.length})` : `Export ${entityLabel}`}
         >
-          {isExporting ? (
-            <>
-              <Loader className="h-4 w-4" />
-              Exporting...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4" />
-              {hasSelection ? `Export Selected (${selectedIds!.length})` : "Export"}
-            </>
-          )}
+          {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}
         </Button>
 
         {bulkActions}

@@ -3,7 +3,7 @@
 
 import * as React from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Download, Search } from "lucide-react"
+import { Download, Search, X } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -66,6 +66,10 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
   const currentType = searchParams.get("type") ?? "ALL"
 
   const [search, setSearch] = React.useState(currentSearch)
+  // Collapsed to an icon by default, expanding into the input on click —
+  // starts expanded when a search is already active (URL/back-nav), so an
+  // in-progress filter is never hidden behind an icon.
+  const [searchOpen, setSearchOpen] = React.useState(!!currentSearch)
   const [isPending, startTransition] = React.useTransition()
   const [isExporting, setIsExporting] = React.useState(false)
 
@@ -144,16 +148,44 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm xl:flex-row xl:items-center xl:justify-between">
-      <div className="relative w-full xl:max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name, code, mobile..."
-          className="pl-9"
-          disabled={isPending}
-        />
-      </div>
+      {searchOpen ? (
+        <div className="relative w-full xl:max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onBlur={() => {
+              if (!search.trim()) setSearchOpen(false)
+            }}
+            placeholder="Search by name, code, mobile..."
+            className="pl-9 pr-8"
+            disabled={isPending}
+          />
+          {search ? (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              title="Clear search"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={() => setSearchOpen(true)}
+          title="Search"
+          aria-label="Search"
+        >
+          <Search className="h-4 w-4" />
+        </Button>
+      )}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
         <select
@@ -208,21 +240,13 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
         <Button
           type="button"
           variant="outline"
+          size="icon"
           onClick={handleExport}
           disabled={isExporting}
-          className="gap-2"
+          title={hasSelection ? `Export selected karigars (${selectedKarigarIds.length})` : "Export karigars"}
+          aria-label={hasSelection ? `Export selected karigars (${selectedKarigarIds.length})` : "Export karigars"}
         >
-          {isExporting ? (
-            <>
-              <Loader className="h-4 w-4" />
-              Exporting...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4" />
-              {hasSelection ? `Export Selected (${selectedKarigarIds.length})` : "Export"}
-            </>
-          )}
+          {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}
         </Button>
 
         {bulkActions}

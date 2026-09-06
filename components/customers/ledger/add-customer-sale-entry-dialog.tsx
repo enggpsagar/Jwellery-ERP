@@ -2,7 +2,7 @@
 "use client"
 
 import { useActionState, useEffect, useState } from "react"
-import { IndianRupee, NotebookText, ShoppingBag, Scale } from "lucide-react"
+import { IndianRupee, NotebookText, Plus, Scale } from "lucide-react"
 
 import {
   addCustomerSaleEntry,
@@ -68,8 +68,8 @@ export function AddCustomerSaleEntryDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90">
-        <ShoppingBag className="h-4 w-4" />
-        Add Sale Entry
+        <Plus className="h-4 w-4" />
+        Sale
       </DialogTrigger>
 
       <DialogContent className="max-w-lg">

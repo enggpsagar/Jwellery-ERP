@@ -105,7 +105,14 @@ export function CustomerLedgerBody({
 
       {summary && (
         <div className="space-y-4">
-          {summary.moneyActive && (
+          {/* Hidden when the customer has no actual activity — an opening
+              balance and a running ₹0.00 debit/credit/balance on every card
+              is clutter, not information, for a customer nothing has ever
+              been recorded against. */}
+          {summary.moneyActive &&
+            (summary.openingBalance !== 0 ||
+              summary.ledgerDebitTotal !== 0 ||
+              summary.ledgerCreditTotal !== 0) && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-lg border bg-card p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

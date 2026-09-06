@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
-import { Ban } from "lucide-react"
+import { Ban, RotateCcw } from "lucide-react"
 
 import { cancelInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
@@ -27,6 +27,15 @@ type CancelInvoiceDialogProps = {
   invoiceId: string
   invoiceNumber: string
   balanceAmount: number
+  /** "returnExchange" reframes this same cancellation for the case where
+   * the customer is returning everything for something different — same
+   * underlying cancelInvoice action either way (nothing about cancelling
+   * itself differs), but on success it jumps straight into the pre-filled
+   * replacement invoice form instead of just refreshing this page, so
+   * there's no separate "now go click Create Replacement Invoice" step
+   * to remember. A plain mistake-cancellation (no exchange intended) still
+   * gets its own unchanged "Cancel Invoice" trigger alongside this one. */
+  mode?: "cancel" | "returnExchange"
 }
 
 /**
@@ -39,10 +48,12 @@ export function CancelInvoiceDialog({
   invoiceId,
   invoiceNumber,
   balanceAmount,
+  mode = "cancel",
 }: CancelInvoiceDialogProps) {
   const [open, setOpen] = useState(false)
   const router = useRouter()
   const toast = useToast()
+  const isReturnExchange = mode === "returnExchange"
 
   const cancelInvoiceWithId = cancelInvoice.bind(null, invoiceId)
   const [state, formAction, pending] = useActionState(cancelInvoiceWithId, initialState)
@@ -51,7 +62,11 @@ export function CancelInvoiceDialog({
     if (state.success) {
       toast.success(state.message || "Invoice cancelled")
       setOpen(false)
-      router.refresh()
+      if (isReturnExchange) {
+        router.push(`/billing/${invoiceId}/replace`)
+      } else {
+        router.refresh()
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
@@ -59,22 +74,33 @@ export function CancelInvoiceDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2 text-red-600 hover:text-red-700">
-          <Ban className="h-4 w-4" />
-          Cancel Invoice
-        </Button>
+        {isReturnExchange ? (
+          <Button variant="outline" className="gap-2">
+            <RotateCcw className="h-4 w-4" />
+            Return &amp; Exchange
+          </Button>
+        ) : (
+          <Button variant="outline" className="gap-2 text-red-600 hover:text-red-700">
+            <Ban className="h-4 w-4" />
+            Cancel Invoice
+          </Button>
+        )}
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Cancel {invoiceNumber}?</DialogTitle>
+          <DialogTitle>
+            {isReturnExchange ? `Return & Exchange ${invoiceNumber}?` : `Cancel ${invoiceNumber}?`}
+          </DialogTitle>
           <DialogDescription>
             Stock this invoice sold will be restored to inventory
             {balanceAmount > 0
               ? `, and the outstanding balance of ₹${balanceAmount.toFixed(2)} will be written off`
               : ""}
-            . This can't be undone — to correct the invoice afterward, create a replacement
-            referencing it.
+            . This can't be undone.
+            {isReturnExchange
+              ? " This invoice will be marked cancelled, and you'll go straight to creating its replacement — same customer, ready to fill in with the exchanged item(s)."
+              : " To correct the invoice afterward, create a replacement referencing it."}
           </DialogDescription>
         </DialogHeader>
 
@@ -90,11 +116,15 @@ export function CancelInvoiceDialog({
           )}
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <Label>Cancellation Reason</Label>
+            <Label>{isReturnExchange ? "Return / Exchange Reason" : "Cancellation Reason"}</Label>
             <Textarea
               name="cancellationReason"
               rows={2}
-              placeholder="Optional — why is this invoice being cancelled?"
+              placeholder={
+                isReturnExchange
+                  ? "Optional — what's being returned/exchanged?"
+                  : "Optional — why is this invoice being cancelled?"
+              }
             />
           </div>
 
@@ -103,7 +133,13 @@ export function CancelInvoiceDialog({
               Keep Invoice
             </Button>
             <Button type="submit" variant="destructive" disabled={pending}>
-              {pending ? "Cancelling..." : "Cancel Invoice"}
+              {pending
+                ? isReturnExchange
+                  ? "Processing..."
+                  : "Cancelling..."
+                : isReturnExchange
+                  ? "Return & Exchange"
+                  : "Cancel Invoice"}
             </Button>
           </DialogFooter>
         </form>

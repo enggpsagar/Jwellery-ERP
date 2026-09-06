@@ -32,6 +32,12 @@ export type BusinessSettings = {
   invoiceStartingNo: number;
   invoiceTerms: string;
   invoiceNotes: string;
+  // Bank account the store gets paid into — printed as the invoice's "Pay
+  // To" block, shown only once bankName is set.
+  bankName: string;
+  bankAccountNumber: string;
+  bankIfscCode: string;
+  bankAccountHolderName: string;
   defaultGstRate: number;
   // BIS hallmarking fee, per hallmarked piece — see the schema field's own
   // doc comment (BusinessSettings.hallmarkChargePerPiece) for why the
@@ -89,6 +95,10 @@ function mapSettings(settings: any): BusinessSettings {
     invoiceStartingNo: settings.invoiceStartingNo ?? 1,
     invoiceTerms: settings.invoiceTerms ?? "",
     invoiceNotes: settings.invoiceNotes ?? "",
+    bankName: settings.bankName ?? "",
+    bankAccountNumber: settings.bankAccountNumber ?? "",
+    bankIfscCode: settings.bankIfscCode ?? "",
+    bankAccountHolderName: settings.bankAccountHolderName ?? "",
     defaultGstRate: Number(settings.defaultGstRate ?? 3.0),
     hallmarkChargePerPiece: Number(settings.hallmarkChargePerPiece ?? 45),
     returnWindowDays: settings.returnWindowDays ?? 30,
@@ -238,6 +248,10 @@ export async function updateBusinessSettings(
         invoiceStartingNo: toNumber(formData.get("invoiceStartingNo"), 1),
         invoiceTerms: toOptionalString(formData.get("invoiceTerms")),
         invoiceNotes: toOptionalString(formData.get("invoiceNotes")),
+        bankName: toOptionalString(formData.get("bankName")),
+        bankAccountNumber: toOptionalString(formData.get("bankAccountNumber")),
+        bankIfscCode: toOptionalString(formData.get("bankIfscCode")),
+        bankAccountHolderName: toOptionalString(formData.get("bankAccountHolderName")),
         defaultGstRate: toNumber(formData.get("defaultGstRate"), 3.0),
         hallmarkChargePerPiece: toNumber(
           formData.get("hallmarkChargePerPiece"),
@@ -271,6 +285,10 @@ export async function updateBusinessSettings(
         invoiceStartingNo: toNumber(formData.get("invoiceStartingNo"), 1),
         invoiceTerms: toOptionalString(formData.get("invoiceTerms")),
         invoiceNotes: toOptionalString(formData.get("invoiceNotes")),
+        bankName: toOptionalString(formData.get("bankName")),
+        bankAccountNumber: toOptionalString(formData.get("bankAccountNumber")),
+        bankIfscCode: toOptionalString(formData.get("bankIfscCode")),
+        bankAccountHolderName: toOptionalString(formData.get("bankAccountHolderName")),
         defaultGstRate: toNumber(formData.get("defaultGstRate"), 3.0),
         hallmarkChargePerPiece: toNumber(
           formData.get("hallmarkChargePerPiece"),

@@ -85,7 +85,12 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     netWeight: toGrams(item.netWeight),
     netWeightUnit: unit,
     caratWeight: item.caratWeight ?? 0,
-    rate: item.rate ?? 0,
+    // Deliberately not carried over from the cancelled invoice — an
+    // exchanged item is frequently a different piece at a different
+    // price, and metal rates move day to day regardless. Left blank so
+    // the Store Owner enters the applicable price manually rather than
+    // risk resubmitting a stale figure unnoticed.
+    rate: 0,
     makingCharge: item.makingCharge,
     makingChargeType: item.makingChargeType,
     stoneCharge: item.stoneCharge,

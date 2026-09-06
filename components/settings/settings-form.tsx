@@ -455,6 +455,43 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
 
       <Card>
         <CardHeader>
+          <CardTitle>Bank Details</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          {/* The invoice's "Pay To" block shows this section only once
+              bankName is set — see the print page's own check. */}
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+            <Label htmlFor="bankName">Bank Name</Label>
+            <Input id="bankName" name="bankName" defaultValue={settings.bankName} />
+          </div>
+
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+            <Label htmlFor="bankAccountHolderName">Account Holder&apos;s Name</Label>
+            <Input
+              id="bankAccountHolderName"
+              name="bankAccountHolderName"
+              defaultValue={settings.bankAccountHolderName}
+            />
+          </div>
+
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+            <Label htmlFor="bankAccountNumber">Account Number</Label>
+            <Input
+              id="bankAccountNumber"
+              name="bankAccountNumber"
+              defaultValue={settings.bankAccountNumber}
+            />
+          </div>
+
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+            <Label htmlFor="bankIfscCode">IFSC Code</Label>
+            <Input id="bankIfscCode" name="bankIfscCode" defaultValue={settings.bankIfscCode} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Business Model</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">

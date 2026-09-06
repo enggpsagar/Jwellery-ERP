@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Gem, Plus } from "lucide-react"
 
 import { StoreTable } from "@/components/stores/store-table"
+import { StoreDetailPanel } from "@/components/stores/store-detail-panel"
 import { DataTableToolbar } from "@/components/shared/data-table-toolbar"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { BulkArchiveButton } from "@/components/shared/bulk-archive-button"
@@ -66,9 +67,20 @@ export function StoresClient({
   planOverviews,
 }: StoresClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
+  // Which row's full detail shows in the right-hand panel — defaults to
+  // the first row on this page/search result so the panel is never empty
+  // on load, matching the Customers/Vendors/Karigars/Users layout this
+  // mirrors.
+  const [activeStoreId, setActiveStoreId] = React.useState<string | null>(
+    stores[0]?.id ?? null,
+  )
 
   React.useEffect(() => {
     setSelectedIds([])
+    setActiveStoreId((current) => {
+      if (current && stores.some((store) => store.id === current)) return current
+      return stores[0]?.id ?? null
+    })
   }, [stores])
 
   return (
@@ -148,24 +160,30 @@ export function StoresClient({
         }
       />
 
-      <div className="space-y-3">
-        <StoreTable
-          stores={stores}
-          plans={plans}
-          planOverviews={planOverviews}
-          selectedIds={selectedIds}
-          onSelectionChange={setSelectedIds}
-        />
-
-        <div className="rounded-xl border">
-          <DataTablePagination
-            page={pagination.page}
-            totalPages={pagination.totalPages}
-            totalCount={pagination.totalCount}
-            pageSize={pagination.pageSize}
-            itemLabel="stores"
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
+        <div className="space-y-3">
+          <StoreTable
+            stores={stores}
+            plans={plans}
+            planOverviews={planOverviews}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            activeStoreId={activeStoreId}
+            onActivate={setActiveStoreId}
           />
+
+          <div className="rounded-xl border">
+            <DataTablePagination
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              totalCount={pagination.totalCount}
+              pageSize={pagination.pageSize}
+              itemLabel="stores"
+            />
+          </div>
         </div>
+
+        <StoreDetailPanel storeId={activeStoreId} />
       </div>
     </div>
   )

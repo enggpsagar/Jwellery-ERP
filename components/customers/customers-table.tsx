@@ -1,13 +1,12 @@
 "use client"
 
-import Link from "next/link"
-
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import * as React from "react"
 import type { Customer } from "@/lib/actions/customer-actions"
 import { CustomerRowActions } from "@/components/customers/customer-row-actions"
 import { CustomersPagination } from "@/components/customers/customers-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
+import { cn } from "@/lib/utils"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -39,6 +38,9 @@ type CustomersTableProps = {
   }
   selectedCustomerIds: string[]
   onSelectionChange: (ids: string[]) => void
+  /** Which row's detail is showing in the panel alongside this table — distinct from selectedCustomerIds, which is the bulk-action checkbox selection. */
+  activeCustomerId?: string | null
+  onActivate?: (id: string) => void
 }
 
 export function CustomersTable({
@@ -47,6 +49,8 @@ export function CustomersTable({
   pagination,
   selectedCustomerIds,
   onSelectionChange,
+  activeCustomerId,
+  onActivate,
 }: CustomersTableProps) {
   const allIds = React.useMemo(() => customers.map((customer) => customer.id), [customers])
 
@@ -121,10 +125,19 @@ export function CustomersTable({
           <tbody>
             {customers.map((customer) => {
               const checked = selectedCustomerIds.includes(customer.id)
+              const isActive = activeCustomerId === customer.id
 
               return (
-                <tr key={customer.id} className="border-t">
-                  <td className="px-4 py-3">
+                <tr
+                  key={customer.id}
+                  onClick={() => onActivate?.(customer.id)}
+                  className={cn(
+                    "border-t",
+                    onActivate && "cursor-pointer hover:bg-accent/50",
+                    isActive && "bg-accent",
+                  )}
+                >
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={checked}
@@ -137,7 +150,7 @@ export function CustomersTable({
                   <td className="px-4 py-3 font-medium text-foreground">
                     <RecordHoverCard
                       label={customer.name}
-                      href={`/customers/${customer.id}`}
+                      href={onActivate ? undefined : `/customers/${customer.id}`}
                       title={customer.name}
                       subtitle={customer.customerType ?? undefined}
                       footerLabel="View customer"
@@ -191,7 +204,7 @@ export function CustomersTable({
                     ₹ {Number(customer.openingBalance || 0).toLocaleString("en-IN")}
                   </td>
 
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <CustomerRowActions customer={customer} states={states} />
                   </td>
                 </tr>

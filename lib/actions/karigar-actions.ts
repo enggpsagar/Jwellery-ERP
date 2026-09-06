@@ -12,6 +12,11 @@ import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
 import { isValidPanNumber, normalizePanNumber, PAN_INVALID_MESSAGE } from "@/lib/pan";
+import { getKarigarLedger, type KarigarLedgerResult } from "@/lib/actions/ledger-actions";
+import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
+import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions";
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions";
+import type { StoreLocationRow } from "@/lib/actions/store-location-actions";
 
 export type Karigar = {
   id: string;
@@ -227,6 +232,68 @@ export async function getKarigarById(id: string): Promise<Karigar | null> {
   });
   if (!karigar) return null;
   return mapKarigar(karigar);
+}
+
+export type KarigarOpenJob = {
+  id: string;
+  jobNumber: string | null;
+  issueDate: string;
+  expectedDate: string | null;
+  issueWeight: number;
+  issuePurity: string | null;
+  issueFineWeight: number;
+  receiveWeight: number;
+};
+
+export type KarigarDetailBundle = {
+  karigar: Karigar;
+  ledger: KarigarLedgerResult;
+  metals: StoreMetalRow[];
+  locations: StoreLocationRow[];
+  defaultLocationId: string | null;
+  openJobs: KarigarOpenJob[];
+};
+
+function formatKarigarDate(date: Date | null) {
+  if (!date) return null;
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+/** Everything the karigar detail view needs, bundled into one call — reused by the standalone /karigars/[id] page and the inline detail panel on the Karigars list. */
+export async function getKarigarDetailBundle(id: string): Promise<KarigarDetailBundle | null> {
+  const karigar = await getKarigarById(id);
+  if (!karigar) return null;
+
+  const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
+
+  const [ledger, metals, locations, defaultLocationId, openJobsRaw] = await Promise.all([
+    getKarigarLedger(id),
+    getStoreMetals(),
+    getStoreLocations(),
+    getDefaultLocationId(),
+    prisma.karigarJob.findMany({
+      where: { storeId, karigarId: id, status: "issued", ...locationWhere(scope) },
+      orderBy: { issueDate: "desc" },
+    }),
+  ]);
+
+  const openJobs: KarigarOpenJob[] = openJobsRaw.map((job) => ({
+    id: job.id,
+    jobNumber: job.jobNumber,
+    issueDate: formatKarigarDate(job.issueDate) ?? "-",
+    expectedDate: formatKarigarDate(job.expectedDate),
+    issueWeight: job.issueWeight ? Number(job.issueWeight) : 0,
+    issuePurity: job.issuePurity,
+    issueFineWeight: job.issueFineWeight ? Number(job.issueFineWeight) : 0,
+    receiveWeight: job.receiveWeight ? Number(job.receiveWeight) : 0,
+  }));
+
+  return { karigar, ledger, metals, locations, defaultLocationId, openJobs };
 }
 
 function buildKarigarData(formData: FormData) {

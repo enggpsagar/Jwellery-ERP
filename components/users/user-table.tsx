@@ -3,12 +3,7 @@
 
 "use client";
 
-import Link from "next/link";
-import { Pencil, Ban, CircleCheck, Trash2 } from "lucide-react";
-
 import { RecordHoverCard } from "@/components/shared/record-hover-card";
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
 
 import {
   Table,
@@ -20,16 +15,10 @@ import {
 } from "@/components/ui/table";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/users/status-badge";
-import { useToast } from "@/components/providers/toast-provider";
+import { UserRowActions } from "@/components/users/user-row-actions";
 import { SortableTableHead } from "@/components/shared/sortable-table-head";
-
-import {
-  disableUserAction,
-  enableUserAction,
-  deleteUserAction,
-} from "@/app/(dashboard)/users/actions";
+import { cn } from "@/lib/utils";
 
 import { ROLE_LABELS } from "@/lib/roles";
 
@@ -66,6 +55,9 @@ interface Props {
   karigars?: KarigarOption[];
   locations?: LocationOption[];
   allowSuperAdmin?: boolean;
+  /** Which row's detail is showing in the panel alongside this table — a separate concern from any future bulk selection. */
+  activeUserId?: string | null;
+  onActivate?: (id: string) => void;
 }
 
 export function UserTable({
@@ -73,58 +65,9 @@ export function UserTable({
   karigars = [],
   locations = [],
   allowSuperAdmin = false,
+  activeUserId,
+  onActivate,
 }: Props) {
-  const [isPending, startTransition] = useTransition();
-  const router = useRouter();
-  const toast = useToast();
-
-  const handleToggleStatus = (user: User) => {
-    startTransition(async () => {
-      try {
-        const result =
-          user.status === "DISABLED"
-            ? await enableUserAction(user.id)
-            : await disableUserAction(user.id);
-
-        if (!result.success) {
-          toast.error(result.message);
-          return;
-        }
-
-        toast.success(result.message);
-        router.refresh();
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Something went wrong",
-        );
-      }
-    });
-  };
-
-  const handleDelete = (user: User) => {
-    if (!confirm(`Delete ${user.name ?? "this user"}? This cannot be undone.`)) {
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        const result = await deleteUserAction(user.id);
-
-        if (!result.success) {
-          toast.error(result.message);
-          return;
-        }
-
-        toast.success(result.message);
-        router.refresh();
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Something went wrong",
-        );
-      }
-    });
-  };
-
   return (
     <div className="rounded-lg border">
       <Table>
@@ -166,11 +109,18 @@ export function UserTable({
             </TableRow>
           ) : (
             users.map((user) => (
-              <TableRow key={user.id}>
+              <TableRow
+                key={user.id}
+                onClick={() => onActivate?.(user.id)}
+                className={cn(
+                  onActivate && "cursor-pointer hover:bg-accent/50",
+                  activeUserId === user.id && "bg-accent",
+                )}
+              >
                 <TableCell>
                   <RecordHoverCard
                     label={user.name ?? "-"}
-                    href={`/users/${user.id}/edit`}
+                    href={onActivate ? undefined : `/users/${user.id}/edit`}
                     title={user.name ?? "Unnamed user"}
                     subtitle={ROLE_LABELS[user.role]}
                     footerLabel="Edit user"
@@ -215,41 +165,8 @@ export function UserTable({
                   <StatusBadge status={user.status} />
                 </TableCell>
 
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1">
-                    {/* Editing is a full page now, not a popup — the form
-                        carries role, module access and location grants, which
-                        is more than a dialog should hold. */}
-                    <Button variant="outline" size="icon" title="Edit user" asChild>
-                      <Link href={`/users/${user.id}/edit`}>
-                        <Pencil className="h-4 w-4" />
-                      </Link>
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      disabled={isPending}
-                      onClick={() => handleToggleStatus(user)}
-                      title={user.status === "DISABLED" ? "Enable user" : "Disable user"}
-                    >
-                      {user.status === "DISABLED" ? (
-                        <CircleCheck className="h-4 w-4" />
-                      ) : (
-                        <Ban className="h-4 w-4" />
-                      )}
-                    </Button>
-
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      disabled={isPending}
-                      onClick={() => handleDelete(user)}
-                      title="Delete user"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                  <UserRowActions user={user} />
                 </TableCell>
               </TableRow>
             ))

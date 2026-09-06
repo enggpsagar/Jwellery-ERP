@@ -2,14 +2,13 @@
 // REPLACES the existing file at this path
 "use client"
 
-import Link from "next/link"
-
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 
 import { KarigarRowActions } from "@/components/karigars/karigar-row-actions"
 import { KarigarsPagination } from "@/components/karigars/karigars-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import type { Karigar } from "@/lib/actions/karigar-actions"
+import { cn } from "@/lib/utils"
 
 type PaginationInfo = {
   page: number
@@ -25,6 +24,9 @@ type KarigarTableProps = {
   pagination: PaginationInfo
   selectedKarigarIds: string[]
   onSelectionChange: (ids: string[]) => void
+  /** Which row's detail is showing in the panel alongside this table — distinct from selectedKarigarIds, which is the bulk-action checkbox selection. */
+  activeKarigarId?: string | null
+  onActivate?: (id: string) => void
 }
 
 export function KarigarTable({
@@ -32,6 +34,8 @@ export function KarigarTable({
   pagination,
   selectedKarigarIds,
   onSelectionChange,
+  activeKarigarId,
+  onActivate,
 }: KarigarTableProps) {
   const allSelected =
     karigars.length > 0 && karigars.every((k) => selectedKarigarIds.includes(k.id))
@@ -92,9 +96,19 @@ export function KarigarTable({
           </thead>
 
           <tbody>
-            {karigars.map((karigar) => (
-              <tr key={karigar.id} className="border-b last:border-0">
-                <td className="px-4 py-3">
+            {karigars.map((karigar) => {
+              const isActive = activeKarigarId === karigar.id
+              return (
+              <tr
+                key={karigar.id}
+                onClick={() => onActivate?.(karigar.id)}
+                className={cn(
+                  "border-b last:border-0",
+                  onActivate && "cursor-pointer hover:bg-accent/50",
+                  isActive && "bg-accent",
+                )}
+              >
+                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selectedKarigarIds.includes(karigar.id)}
@@ -104,14 +118,12 @@ export function KarigarTable({
                   />
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/karigars/${karigar.id}`} className="hover:underline">
-                    {karigar.code || "-"}
-                  </Link>
+                  {karigar.code || "-"}
                 </td>
                 <td className="px-4 py-3 font-medium">
                   <RecordHoverCard
                     label={karigar.name}
-                    href={`/karigars/${karigar.id}`}
+                    href={onActivate ? undefined : `/karigars/${karigar.id}`}
                     title={karigar.name}
                     subtitle={karigar.code || undefined}
                     footerLabel="View karigar"
@@ -151,14 +163,15 @@ export function KarigarTable({
                     {karigar.isActive ? "Active" : "Inactive"}
                   </span>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                   <KarigarRowActions
                     karigarId={karigar.id}
                     karigarName={karigar.name}
                   />
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>

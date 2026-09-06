@@ -8,11 +8,15 @@ import { DeleteProductButton } from "@/components/inventory/products/delete-prod
 type ProductRowActionsProps = {
   productId: string
   productName: string
+  /** PRODUCT_UPDATE. Edit and delete are hidden without it; View stays, so a
+   * view-only user still reaches the full read-only detail page. */
+  canEdit?: boolean
 }
 
 export function ProductRowActions({
   productId,
   productName,
+  canEdit = false,
 }: ProductRowActionsProps) {
   return (
     <div className="flex items-center gap-2">
@@ -24,15 +28,19 @@ export function ProductRowActions({
         <Eye className="h-4 w-4" />
       </Link>
 
-      <Link
-        href={`/inventory/products/${productId}/edit`}
-        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-indigo-600 hover:bg-indigo-50"
-        title="Edit product"
-      >
-        <Pencil className="h-4 w-4" />
-      </Link>
+      {canEdit && (
+        <>
+          <Link
+            href={`/inventory/products/${productId}/edit`}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-indigo-600 hover:bg-indigo-50"
+            title="Edit product"
+          >
+            <Pencil className="h-4 w-4" />
+          </Link>
 
-      <DeleteProductButton productId={productId} productName={productName} />
+          <DeleteProductButton productId={productId} productName={productName} />
+        </>
+      )}
     </div>
   )
 }

@@ -1,14 +1,11 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
-import { Eye, Pencil } from "lucide-react"
-
-import { DeleteProductButton } from "@/components/inventory/products/delete-product-button"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
+import { cn } from "@/lib/utils"
 
 type ProductRow = {
   id: string
@@ -39,9 +36,9 @@ type ProductsTableProps = {
   pagination: Pagination
   selectedIds: string[]
   onSelectionChange: (ids: string[]) => void
-  /** PRODUCT_UPDATE. Edit and delete are hidden without it; View stays, so a
-   * view-only user still reaches the full read-only detail page. */
-  canEdit?: boolean
+  /** Which row's detail is showing in the panel alongside this table — distinct from selectedIds, which is the bulk-action checkbox selection. */
+  activeProductId?: string | null
+  onActivate?: (id: string) => void
 }
 
 export function ProductsTable({
@@ -49,7 +46,8 @@ export function ProductsTable({
   pagination,
   selectedIds,
   onSelectionChange,
-  canEdit = false,
+  activeProductId,
+  onActivate,
 }: ProductsTableProps) {
   const allIds = React.useMemo(() => products.map((product) => product.id), [products])
 
@@ -111,29 +109,26 @@ export function ProductsTable({
                 />
               </th>
               <SortableTableHead label="Product Code" sortKey="productCode" defaultSortBy="createdAt" />
-              <SortableTableHead label="Name" sortKey="name" defaultSortBy="createdAt" />
-              <SortableTableHead label="Category" sortKey="category" defaultSortBy="createdAt" />
-              <SortableTableHead label="Type" sortKey="categoryType" defaultSortBy="createdAt" />
-              <SortableTableHead label="Metal" sortKey="metalType" defaultSortBy="createdAt" />
-              <SortableTableHead label="Purity" sortKey="defaultPurity" defaultSortBy="createdAt" />
-              <SortableTableHead
-                label="Net Wt (g)"
-                sortKey="defaultNetWeight"
-                defaultSortBy="createdAt"
-                align="right"
-              />
-              <SortableTableHead label="Status" sortKey="isActive" defaultSortBy="createdAt" />
-              <th className="px-4 py-3 text-left font-medium">Actions</th>
+              <SortableTableHead label="Title" sortKey="name" defaultSortBy="createdAt" />
             </tr>
           </thead>
 
           <tbody>
             {products.map((product) => {
               const checked = selectedIds.includes(product.id)
+              const isActive = activeProductId === product.id
 
               return (
-                <tr key={product.id} className="border-b last:border-0">
-                  <td className="px-4 py-3">
+                <tr
+                  key={product.id}
+                  onClick={() => onActivate?.(product.id)}
+                  className={cn(
+                    "border-b last:border-0",
+                    onActivate && "cursor-pointer hover:bg-accent/50",
+                    isActive && "bg-accent",
+                  )}
+                >
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={checked}
@@ -142,10 +137,13 @@ export function ProductsTable({
                       className="h-4 w-4 rounded border-input"
                     />
                   </td>
-                  <td className="px-4 py-3">
+
+                  <td className="px-4 py-3 text-foreground">{product.productCode}</td>
+
+                  <td className="px-4 py-3 font-medium text-foreground">
                     <RecordHoverCard
-                      label={product.productCode}
-                      href={`/inventory/products/${product.id}`}
+                      label={product.name}
+                      href={onActivate ? undefined : `/inventory/products/${product.id}`}
                       title={product.name}
                       subtitle={product.productCode}
                       footerLabel="View product"
@@ -183,57 +181,16 @@ export function ProductsTable({
                             },
                           ],
                         },
+                        {
+                          fields: [
+                            {
+                              label: "Status",
+                              value: product.isActive ? "Active" : "Inactive",
+                            },
+                          ],
+                        },
                       ]}
                     />
-                  </td>
-                  <td className="px-4 py-3 font-medium">{product.name}</td>
-                  <td className="px-4 py-3">{product.category}</td>
-                  <td className="px-4 py-3">{product.ornamentType ?? "-"}</td>
-                  <td className="px-4 py-3">{product.metalType}</td>
-                  <td className="px-4 py-3">{product.defaultPurity ?? "-"}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {product.defaultNetWeight != null
-                      ? product.defaultNetWeight.toFixed(3)
-                      : "-"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                        product.isActive
-                          ? "bg-green-100 text-green-700"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {product.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={`/inventory/products/${product.id}`}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
-                        title="View product"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Link>
-
-                      {canEdit && (
-                        <>
-                          <Link
-                            href={`/inventory/products/${product.id}/edit`}
-                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-indigo-600 hover:bg-indigo-50"
-                            title="Edit product"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-
-                          <DeleteProductButton
-                            productId={product.id}
-                            productName={product.name}
-                          />
-                        </>
-                      )}
-                    </div>
                   </td>
                 </tr>
               )

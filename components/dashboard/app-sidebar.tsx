@@ -60,6 +60,11 @@ type NavItem = {
    * omitted for items with no single "count of records" meaning
    * (Dashboard, Ledger, Reports, Plans, and any parent with sub-items). */
   countKey?: CountKey;
+  /** quickAddHref, when set, renders a persistent "+" beside this item — a
+   * direct link to its Create/New page, skipping the list-then-Add-button
+   * detour. Only meaningful on a top-level item with no sub-items; a parent
+   * with `items` gets its "+" per sub-item instead (see below). */
+  quickAddHref?: string;
   /** quickAddHref, when set, renders a persistent "+" beside that sub-item —
    * a direct link to its Create/New page, skipping the list-then-Add-button
    * detour. Omitted for sub-items with no single obvious "new" page. */
@@ -77,12 +82,14 @@ const mainNav: NavItem[] = [
     href: "/customers",
     icon: Users,
     countKey: "customers",
+    quickAddHref: "/customers/new",
   },
   {
     title: "Vendors",
     href: "/vendors",
     icon: Truck,
     countKey: "vendors",
+    quickAddHref: "/vendors/new",
   },
   {
     title: "Ledger",
@@ -109,6 +116,7 @@ const mainNav: NavItem[] = [
     href: "/karigars",
     icon: Hammer,
     countKey: "karigars",
+    quickAddHref: "/karigars/new",
   },
   {
     title: "Quotations",
@@ -216,6 +224,15 @@ type OpenMenu = string | null | undefined;
 // "+" — every small sidebar control shares one look, not a look per section.
 const NAV_CONTROL_CLASS = "text-white/70 hover:bg-card/10 hover:text-white";
 
+// A top-level item's own quick-add "+" (Customers/Vendors/Karigar) sits with
+// no section chevron beside it competing for attention, so — unlike
+// NAV_CONTROL_CLASS above — it stays tinted gold at rest, not just on hover,
+// using the same --chart-2 accent the active-item highlight and NavCount
+// already use for "meant to be noticed." Keep this identical across every
+// item that gets one; it's one control, not a look per item.
+const QUICK_ADD_HIGHLIGHT_CLASS =
+  "text-[color-mix(in_oklab,var(--chart-2)_70%,white)] hover:bg-[color-mix(in_oklab,var(--chart-2)_16%,transparent)] hover:text-[var(--chart-2)]";
+
 /**
  * "Customers (3)" — inline right after the label, not a right-aligned
  * badge. Plain text rather than a pill: it sits in the same flex row as the
@@ -284,6 +301,17 @@ function SidebarNavItem({
             </span>
           </Link>
         </SidebarMenuButton>
+
+        {/* Slightly highlighted (not just on hover, see
+            QUICK_ADD_HIGHLIGHT_CLASS) so the quick-add action is easy to
+            notice — this item has no section chevron to share the row with. */}
+        {item.quickAddHref && (
+          <SidebarMenuAction asChild className={QUICK_ADD_HIGHLIGHT_CLASS}>
+            <Link href={item.quickAddHref} aria-label={`Add new ${item.title}`}>
+              <Plus className="h-4 w-4" />
+            </Link>
+          </SidebarMenuAction>
+        )}
       </SidebarMenuItem>
     );
   }

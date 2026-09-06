@@ -65,7 +65,7 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
     )
   }
 
-  const { karigar, metals, locations, defaultLocationId } = bundle
+  const { karigar, metals, locations, defaultLocationId, materialCounts } = bundle
 
   return (
     <div className="space-y-4 rounded-xl border bg-card p-6">
@@ -80,14 +80,18 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
           <IssueMaterialDialog
             karigarId={karigar.id}
             metals={metals}
+            assignedMetalTypeIds={karigar.assignedMetalTypeIds}
             locations={locations}
             defaultLocationId={defaultLocationId}
+            count={materialCounts.issuedCount}
           />
           <ReceiveMaterialDialog
             karigarId={karigar.id}
             metals={metals}
+            assignedMetalTypeIds={karigar.assignedMetalTypeIds}
             locations={locations}
             defaultLocationId={defaultLocationId}
+            count={materialCounts.receivedCount}
           />
           <RecordKarigarPaymentDialog karigarId={karigar.id} />
         </div>

@@ -278,6 +278,30 @@ export type KarigarReceiptItemInput = {
   remarks?: string | null;
 };
 
+/**
+ * A karigar can only be issued/receive material in a metal they're actually
+ * assigned to (KarigarMetal — see Karigar Metal & Stone Assignment). A
+ * karigar with zero assignments at all is rejected outright rather than
+ * treated as "no restriction", so a freshly-created-but-never-assigned
+ * karigar can't silently slip through.
+ */
+async function assertKarigarAssignedMetal(karigarId: string, metalTypeId: string): Promise<string | null> {
+  const assignments = await prisma.karigarMetal.findMany({
+    where: { karigarId },
+    select: { metalTypeId: true },
+  });
+
+  if (assignments.length === 0) {
+    return "This karigar has no metals/stones assigned — edit their profile to assign at least one before issuing or receiving material.";
+  }
+
+  if (!assignments.some((assignment) => assignment.metalTypeId === metalTypeId)) {
+    return "This karigar is not assigned to work with the selected metal/stone.";
+  }
+
+  return null;
+}
+
 /** JOB-${year}-0001, incrementing per store per year — matches the numbering
  * convention already used elsewhere in this codebase (e.g. invoice numbers). */
 async function generateJobNumber(storeId: string) {
@@ -353,6 +377,11 @@ export async function issueMaterialToKarigar(
 
     if (!storeMetal) {
       return { success: false, message: "Select a valid metal type" };
+    }
+
+    const assignmentError = await assertKarigarAssignedMetal(karigarId, storeMetal.id);
+    if (assignmentError) {
+      return { success: false, message: assignmentError };
     }
 
     const isPreciousMetal = storeMetal.hasPurity;
@@ -482,6 +511,11 @@ export async function recordMaterialReceiptFromKarigar(
 
     if (!storeMetal) {
       return { success: false, message: "Select a valid metal type" };
+    }
+
+    const assignmentError = await assertKarigarAssignedMetal(karigarId, storeMetal.id);
+    if (assignmentError) {
+      return { success: false, message: assignmentError };
     }
 
     const isPreciousMetal = storeMetal.hasPurity;

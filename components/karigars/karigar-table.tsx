@@ -8,6 +8,7 @@ import { KarigarRowActions } from "@/components/karigars/karigar-row-actions"
 import { KarigarsPagination } from "@/components/karigars/karigars-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import type { Karigar } from "@/lib/actions/karigar-actions"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { cn } from "@/lib/utils"
 
 type PaginationInfo = {
@@ -19,11 +20,19 @@ type PaginationInfo = {
   hasPrevPage: boolean
 }
 
+type LocationOption = {
+  id: string
+  name: string
+}
+
 type KarigarTableProps = {
   karigars: Karigar[]
   pagination: PaginationInfo
   selectedKarigarIds: string[]
   onSelectionChange: (ids: string[]) => void
+  metals: StoreMetalRow[]
+  locations?: LocationOption[]
+  defaultLocationId?: string | null
   /** Which row's detail is showing in the panel alongside this table — distinct from selectedKarigarIds, which is the bulk-action checkbox selection. */
   activeKarigarId?: string | null
   onActivate?: (id: string) => void
@@ -34,6 +43,9 @@ export function KarigarTable({
   pagination,
   selectedKarigarIds,
   onSelectionChange,
+  metals,
+  locations = [],
+  defaultLocationId = null,
   activeKarigarId,
   onActivate,
 }: KarigarTableProps) {
@@ -167,6 +179,10 @@ export function KarigarTable({
                   <KarigarRowActions
                     karigarId={karigar.id}
                     karigarName={karigar.name}
+                    metals={metals}
+                    assignedMetalTypeIds={karigar.assignedMetalTypeIds}
+                    locations={locations}
+                    defaultLocationId={defaultLocationId}
                   />
                 </td>
               </tr>

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Plus } from "lucide-react"
 
 import {
@@ -56,20 +57,40 @@ type LocationOption = {
 type IssueMaterialDialogProps = {
   karigarId: string
   metals: StoreMetalRow[]
+  /** Which metals/stones this karigar is actually assigned to work with
+   * (Karigar.assignedMetalTypeIds) — the picker below only ever offers
+   * these, matching issueMaterialToKarigar's own server-side gate. */
+  assignedMetalTypeIds: string[]
   locations?: LocationOption[]
   /** Store's default location — pre-fills the Location field, since issuing
    * material creates a brand-new issue record (a create, not an edit
    * against something with a fixed location). */
   defaultLocationId?: string | null
+  /** Total Issue Material entries recorded for this karigar so far — shown
+   * as a "(n)" suffix on the trigger button. Omitted entirely (no "(0)")
+   * when not passed, so call sites that don't have the count handy still
+   * render a normal button. Ignored for the "icon" trigger. */
+  count?: number
+  /** "button" (default) is the full labeled trigger used on the Karigar
+   * Detail page's header. "icon" is a compact icon-only trigger for the
+   * Karigars list's row actions, matching that row's other icon buttons
+   * (KarigarRowActions) — same dialog and form either way. */
+  trigger?: "button" | "icon"
 }
 
 export function IssueMaterialDialog({
   karigarId,
   metals,
+  assignedMetalTypeIds,
   locations = [],
   defaultLocationId = null,
+  count,
+  trigger = "button",
 }: IssueMaterialDialogProps) {
-  const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
+  const activeMetals = useMemo(
+    () => metals.filter((m) => m.isActive && assignedMetalTypeIds.includes(m.id)),
+    [metals, assignedMetalTypeIds],
+  )
   // Mirrors the old hardcoded default of "GOLD": prefer a hasPurity metal if
   // one exists, otherwise just fall back to whatever is first in the list.
   const defaultMetalId = useMemo(
@@ -133,7 +154,7 @@ export function IssueMaterialDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <Button type="button" className="gap-2" onClick={() => setOpen(true)}>
         <Plus className="h-4 w-4" />
-        Issue Material
+        Issue Material{typeof count === "number" ? ` (${count})` : ""}
       </Button>
 
       <DialogContent>
@@ -141,6 +162,22 @@ export function IssueMaterialDialog({
           <DialogTitle>Issue Material to Karigar</DialogTitle>
         </DialogHeader>
 
+        {activeMetals.length === 0 ? (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This karigar has no metals/stones assigned yet. Assign at least one
+              before issuing material.
+            </p>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                Close
+              </Button>
+              <Link href={`/karigars/${karigarId}/edit`}>
+                <Button type="button">Edit Karigar</Button>
+              </Link>
+            </DialogFooter>
+          </div>
+        ) : (
         <form
           onSubmit={(event) => {
             // Deliberately not `action={formAction}` directly on the form:
@@ -253,6 +290,7 @@ export function IssueMaterialDialog({
             </Button>
           </DialogFooter>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   )

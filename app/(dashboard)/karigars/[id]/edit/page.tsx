@@ -8,6 +8,7 @@ import { getKarigarById } from "@/lib/actions/karigar-actions";
 import { getStoreLocations } from "@/lib/actions/store-location-actions";
 import { getStates } from "@/lib/actions/location-actions";
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
+import { getBusinessSettings } from "@/lib/actions/settings-actions";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { KarigarEditForm } from "@/components/karigars/karigar-edit-form";
@@ -30,11 +31,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function EditKarigarPage({ params }: Props) {
   const { id } = await params;
-  const [karigar, locations, states, metals] = await Promise.all([
+  const [karigar, locations, states, metals, settings] = await Promise.all([
     getKarigar(id),
     getStoreLocations(),
     getStates(),
     getStoreMetals(),
+    getBusinessSettings(),
   ]);
 
   if (!karigar) {
@@ -50,7 +52,13 @@ export default async function EditKarigarPage({ params }: Props) {
         backLabel="Back to Karigars"
       />
 
-      <KarigarEditForm karigar={karigar} locations={locations} states={states} metals={metals} />
+      <KarigarEditForm
+        karigar={karigar}
+        locations={locations}
+        states={states}
+        metals={metals}
+        gstScheme={settings.gstScheme}
+      />
     </main>
   );
 }

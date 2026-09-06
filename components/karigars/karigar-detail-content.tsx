@@ -1,19 +1,18 @@
-import Link from "next/link"
-
 import type { KarigarDetailBundle } from "@/lib/actions/karigar-actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { KarigarLedgerTabs } from "@/components/karigars/karigar-ledger-tabs"
 import { KarigarStatusCard } from "@/components/karigars/karigar-status-card"
 import { ExportMenu } from "@/components/shared/export-menu"
 
 /**
- * The body of a karigar's detail view — balance cards, open jobs, and
- * ledger. Shared between the standalone /karigars/[id] page and the inline
- * detail pane on the Karigars list itself, so the two can never drift apart.
+ * The body of a karigar's detail view — balance cards and ledger. Shared
+ * between the standalone /karigars/[id] page and the inline detail pane on
+ * the Karigars list itself, so the two can never drift apart. No separate
+ * "Open Jobs" section — Issue/Receive Material's own counts and the ledger
+ * below already cover that.
  */
 export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }) {
-  const { karigar, ledger, openJobs } = bundle
+  const { karigar, ledger } = bundle
 
   return (
     <div className="space-y-6">
@@ -54,7 +53,7 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
           point; these are the current running totals from every ledger
           entry since, one glance answering "where do things stand right
           now" before anyone opens the full ledger below. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <Card
           size="sm"
           className={ledger.finalCashBalance > 0 ? "border-red-200 bg-red-50" : undefined}
@@ -114,46 +113,6 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
           </Card>
         ))}
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Open Jobs</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {openJobs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No open jobs — issue material to start a new job.
-            </p>
-          ) : (
-            openJobs.map((job) => (
-              <div
-                key={job.id}
-                className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
-              >
-                <div className="space-y-1">
-                  <div className="font-medium">{job.jobNumber ?? job.id}</div>
-                  <div className="text-sm text-muted-foreground">
-                    Issued {job.issueDate} · {job.issueWeight}g {job.issuePurity ?? ""} (
-                    {job.issueFineWeight.toFixed(3)}g fine)
-                    {job.expectedDate ? ` · Expected ${job.expectedDate}` : ""}
-                  </div>
-                  {job.issueWeight && job.receiveWeight > 0 && (
-                    <div className="text-sm font-medium text-amber-700">
-                      {job.receiveWeight.toFixed(3)}g received so far ·{" "}
-                      {Math.max(0, job.issueWeight - job.receiveWeight).toFixed(3)}g remaining
-                    </div>
-                  )}
-                </div>
-                <Link href={`/karigars/${karigar.id}/receive-items/${job.id}`}>
-                  <Button type="button" size="sm">
-                    Receive Items
-                  </Button>
-                </Link>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2">

@@ -39,6 +39,7 @@ export default async function NewKarigarPage() {
         defaultLocationId={defaultLocationId}
         defaultState={settings.state}
         defaultCity={settings.city}
+        gstScheme={settings.gstScheme}
       />
     </main>
   );

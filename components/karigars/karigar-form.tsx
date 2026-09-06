@@ -11,6 +11,11 @@ import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { getCitiesByStateId } from "@/lib/actions/location-actions"
 import { LocationSelect } from "@/components/shared/location-select"
 import { RequiredMark } from "@/components/shared/required-mark"
+import { gstinRequired, defaultPartyGstType } from "@/lib/gst"
+import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
+import { PartyGstTypeSelect } from "@/components/shared/party-gst-type-select"
+import { AddMetalInlineDialog } from "@/components/karigars/add-metal-inline-dialog"
+import type { GstScheme } from "@prisma/client"
 
 type StateItem = { id: string; name: string }
 type CityItem = { id: string; name: string }
@@ -30,6 +35,10 @@ type Props = {
    * create-only pre-fill rule as defaultLocationId above. */
   defaultState?: string
   defaultCity?: string
+  /** The store's own GST scheme (Settings > Business Profile) — same prop
+   * Customer/Vendor forms take, driving gstinRequired/defaultPartyGstType
+   * for this karigar's own GST registration below. */
+  gstScheme: GstScheme
 }
 
 export function KarigarForm({
@@ -42,8 +51,36 @@ export function KarigarForm({
   defaultLocationId = null,
   defaultState,
   defaultCity,
+  gstScheme,
 }: Props) {
   const [locationId, setLocationId] = useState(karigar?.locationId ?? defaultLocationId ?? "")
+  const [assignedMetalTypeIds, setAssignedMetalTypeIds] = useState<string[]>(
+    karigar?.assignedMetalTypeIds ?? [],
+  )
+  // Local copy so a metal/stone created on the spot via AddMetalInlineDialog
+  // shows up in the checkbox list immediately, without waiting on a
+  // server round-trip/page refresh to re-fetch the store's full list.
+  const [metalOptions, setMetalOptions] = useState<StoreMetalRow[]>(metals)
+  const activeMetalOptions = useMemo(
+    () => metalOptions.filter((m) => m.isActive),
+    [metalOptions],
+  )
+  const allMetalsAssigned =
+    activeMetalOptions.length > 0 &&
+    activeMetalOptions.every((m) => assignedMetalTypeIds.includes(m.id))
+
+  function toggleSelectAllMetals() {
+    setAssignedMetalTypeIds(allMetalsAssigned ? [] : activeMetalOptions.map((m) => m.id))
+  }
+
+  const [gstType, setGstType] = useState(karigar?.gstType ?? defaultPartyGstType(gstScheme))
+  const gstinRequiredNow = gstinRequired(gstScheme, gstType)
+
+  function toggleAssignedMetal(metalId: string, checked: boolean) {
+    setAssignedMetalTypeIds((current) =>
+      checked ? [...current, metalId] : current.filter((id) => id !== metalId),
+    )
+  }
 
   // Selected/keyed by id (to drive the city fetch below), but the form
   // field itself submits the state's name — Karigar.state is a plain text
@@ -97,11 +134,16 @@ export function KarigarForm({
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Karigar Code</Label>
-          <Input
-            name="code"
-            placeholder="KAR001"
-            defaultValue={karigar?.code}
-          />
+          {karigar ? (
+            <Input value={karigar.code} disabled readOnly />
+          ) : (
+            <p className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+              Auto-generated on save
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            System-generated and unique — cannot be edited.
+          </p>
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -121,7 +163,7 @@ export function KarigarForm({
             placeholder="Mobile number"
             defaultValue={karigar?.mobile}
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs font-medium text-red-600">
             Doubles as this karigar&apos;s login — must be unique.
           </p>
           {errors?.mobile?.[0] && (
@@ -231,7 +273,7 @@ export function KarigarForm({
             defaultValue={karigar?.metalTypeId ?? ""}
           >
             <option value="">Select metal (optional)</option>
-            {metals.map((metal) => (
+            {metalOptions.map((metal) => (
               <option key={metal.id} value={metal.id}>
                 {metal.name}
               </option>
@@ -243,6 +285,58 @@ export function KarigarForm({
           </p>
           {errors?.metalTypeId?.[0] && (
             <p className="text-xs text-red-600">{errors.metalTypeId[0]}</p>
+          )}
+        </div>
+
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40 md:col-span-2">
+          <div className="flex items-center justify-between">
+            <Label>Assigned Metals/Stones</Label>
+            <AddMetalInlineDialog
+              onCreated={(metal) => {
+                setMetalOptions((current) => [...current, metal])
+                setAssignedMetalTypeIds((current) => [...current, metal.id])
+              }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Which metals or stones this karigar can be issued material in — Issue
+            Material and Receive Material only ever offer these.
+          </p>
+          {activeMetalOptions.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No active metals/stones configured yet — add one above, or under
+              Settings &gt; Taxonomy.
+            </p>
+          ) : (
+            <div className="space-y-2 rounded-md border p-3">
+              <label className="flex items-center gap-2 border-b pb-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={allMetalsAssigned}
+                  onChange={toggleSelectAllMetals}
+                  className="h-4 w-4"
+                />
+                Select All
+              </label>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {activeMetalOptions.map((metal) => (
+                  <label key={metal.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="assignedMetalTypeIds"
+                      value={metal.id}
+                      checked={assignedMetalTypeIds.includes(metal.id)}
+                      onChange={(e) => toggleAssignedMetal(metal.id, e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    {metal.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          {errors?.assignedMetalTypeIds?.[0] && (
+            <p className="text-xs text-red-600">{errors.assignedMetalTypeIds[0]}</p>
           )}
         </div>
 
@@ -259,12 +353,23 @@ export function KarigarForm({
           )}
         </div>
 
-        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <Label>GST Number</Label>
+        <div className="space-y-2 rounded-lg border bg-muted/20 p-4 transition-colors focus-within:bg-accent/40 md:col-span-2">
+          <Label>GST Number {gstinRequiredNow ? <RequiredMark /> : null}</Label>
+          <GstSchemeBadge scheme={gstScheme} />
+          {gstScheme !== "COMPOSITION" ? (
+            <PartyGstTypeSelect value={gstType} onChange={setGstType} name="gstType" />
+          ) : null}
           <Input
             name="gstNumber"
             defaultValue={karigar?.gstNumber}
+            placeholder={gstinRequiredNow ? "Required for this registration type" : "Optional"}
+            required={gstinRequiredNow}
           />
+          {gstinRequiredNow ? (
+            <p className="text-xs text-muted-foreground">
+              GSTIN is required for a Regular/Composition-registered karigar.
+            </p>
+          ) : null}
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">

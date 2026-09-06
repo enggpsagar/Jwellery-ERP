@@ -11,6 +11,7 @@ import {
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
 import type { StateOption } from "@/lib/actions/location-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import type { GstScheme } from "@prisma/client"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { KarigarForm } from "./karigar-form"
@@ -32,6 +33,7 @@ type Props = {
   defaultLocationId?: string | null
   defaultState?: string
   defaultCity?: string
+  gstScheme: GstScheme
 }
 
 export function KarigarCreateForm({
@@ -41,6 +43,7 @@ export function KarigarCreateForm({
   defaultLocationId = null,
   defaultState,
   defaultCity,
+  gstScheme,
 }: Props){
 
   const router = useRouter()
@@ -113,6 +116,7 @@ export function KarigarCreateForm({
         defaultLocationId={defaultLocationId}
         defaultState={defaultState}
         defaultCity={defaultCity}
+        gstScheme={gstScheme}
       />
 
 

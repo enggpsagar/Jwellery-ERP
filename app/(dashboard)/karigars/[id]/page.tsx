@@ -34,7 +34,7 @@ export default async function KarigarDetailPage({ params }: Props) {
     notFound();
   }
 
-  const { karigar, metals, locations, defaultLocationId } = bundle;
+  const { karigar, metals, locations, defaultLocationId, materialCounts } = bundle;
 
   return (
     <main className="space-y-6 p-6">
@@ -48,14 +48,18 @@ export default async function KarigarDetailPage({ params }: Props) {
             <IssueMaterialDialog
               karigarId={id}
               metals={metals}
+              assignedMetalTypeIds={karigar.assignedMetalTypeIds}
               locations={locations}
               defaultLocationId={defaultLocationId}
+              count={materialCounts.issuedCount}
             />
             <ReceiveMaterialDialog
               karigarId={id}
               metals={metals}
+              assignedMetalTypeIds={karigar.assignedMetalTypeIds}
               locations={locations}
               defaultLocationId={defaultLocationId}
+              count={materialCounts.receivedCount}
             />
             <RecordKarigarPaymentDialog karigarId={id} />
           </div>

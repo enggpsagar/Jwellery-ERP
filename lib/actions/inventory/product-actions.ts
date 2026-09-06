@@ -181,19 +181,27 @@ function getProductWhere(storeId: string, search?: string, metalTypeId?: string)
   };
 }
 
+// Active products always sort ahead of inactive ones, regardless of which
+// column the user picked — that column only decides ordering *within* each
+// of those two groups (skipped when the user explicitly sorted by Status
+// itself, since prepending it there would be redundant).
 function getProductOrderBy(
   sortBy: ProductSortBy = "createdAt",
   sortOrder: ProductSortOrder = "desc",
 ) {
-  if (sortBy === "name") return { name: sortOrder };
-  if (sortBy === "productCode") return { productCode: sortOrder };
-  if (sortBy === "category") return { category: { name: sortOrder } };
-  if (sortBy === "categoryType") return { categoryType: { name: sortOrder } };
-  if (sortBy === "metalType") return { metalType: { name: sortOrder } };
-  if (sortBy === "defaultPurity") return { defaultPurity: sortOrder };
-  if (sortBy === "defaultNetWeight") return { defaultNetWeight: sortOrder };
-  if (sortBy === "isActive") return { isActive: sortOrder };
-  return { createdAt: sortOrder };
+  const primary =
+    sortBy === "name" ? { name: sortOrder }
+    : sortBy === "productCode" ? { productCode: sortOrder }
+    : sortBy === "category" ? { category: { name: sortOrder } }
+    : sortBy === "categoryType" ? { categoryType: { name: sortOrder } }
+    : sortBy === "metalType" ? { metalType: { name: sortOrder } }
+    : sortBy === "defaultPurity" ? { defaultPurity: sortOrder }
+    : sortBy === "defaultNetWeight" ? { defaultNetWeight: sortOrder }
+    : sortBy === "isActive" ? { isActive: sortOrder }
+    : { createdAt: sortOrder };
+
+  if (sortBy === "isActive") return [primary];
+  return [{ isActive: "desc" as const }, primary];
 }
 
 function mapProductRow(row: {

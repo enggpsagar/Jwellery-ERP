@@ -7,6 +7,7 @@ import type { getInventoryStock } from "@/lib/actions/inventory/stock-actions"
 
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
+import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
 // Derived from the actual server action's return shape (rather than
@@ -123,6 +124,7 @@ export function StockTable({
                 defaultSortBy="createdAt"
                 align="right"
               />
+              <SortableTableHead label="Active" sortKey="isActive" defaultSortBy="createdAt" />
             </tr>
           </thead>
 
@@ -183,6 +185,11 @@ export function StockTable({
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {formatWeightCell(item.netWeight)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant={item.isActive ? "default" : "secondary"}>
+                      {item.isActive ? "Active" : "Inactive"}
+                    </Badge>
                   </td>
                 </tr>
               )

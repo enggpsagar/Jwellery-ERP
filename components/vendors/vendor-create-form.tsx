@@ -121,6 +121,28 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
           }}
           className="grid grid-cols-1 gap-4 md:grid-cols-2"
         >
+          <div className="space-y-1 md:col-span-2 rounded-lg border bg-muted/20 p-4 transition-colors focus-within:bg-accent/40">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <Hash className="h-4 w-4 text-muted-foreground" />
+              GSTIN {gstinRequiredNow ? <RequiredMark /> : null}
+            </label>
+            <GstSchemeBadge scheme={gstScheme} />
+            {gstScheme !== "COMPOSITION" ? (
+              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
+            ) : null}
+            <input
+              name="gstNumber"
+              className={FIELD}
+              placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : "Enter GSTIN"}
+              required={gstinRequiredNow}
+            />
+            {gstinRequiredNow ? (
+              <p className="text-xs text-muted-foreground">
+                GSTIN is required for a valid purchase entry from this vendor.
+              </p>
+            ) : null}
+          </div>
+
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4 text-muted-foreground" />
@@ -141,14 +163,13 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
-              Phone <RequiredMark />
+              Phone
             </label>
             <input
               name="phone"
               type="tel"
               className={FIELD}
               placeholder="Enter phone number"
-              required
             />
             {state.errors?.phone?.[0] && (
               <p className="text-sm text-destructive">{state.errors.phone[0]}</p>
@@ -259,29 +280,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <Hash className="h-4 w-4 text-muted-foreground" />
-              GSTIN {gstinRequiredNow ? <RequiredMark /> : null}
-            </label>
-            <GstSchemeBadge scheme={gstScheme} />
-            {gstScheme !== "COMPOSITION" ? (
-              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
-            ) : null}
-            <input
-              name="gstNumber"
-              className={FIELD}
-              placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : "Enter GSTIN"}
-              required={gstinRequiredNow}
-            />
-            {gstinRequiredNow ? (
-              <p className="text-xs text-muted-foreground">
-                GSTIN is required for a valid purchase entry from this vendor.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">Notes</label>
             <textarea
               name="notes"

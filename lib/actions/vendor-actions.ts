@@ -466,7 +466,6 @@ export async function addVendor(
     const errors: Record<string, string[]> = {}
 
     if (!name) errors.name = ["Vendor name is required"]
-    if (!phone) errors.phone = ["Phone number is required"]
 
     if (Object.keys(errors).length > 0) {
       return {
@@ -535,7 +534,6 @@ export async function updateVendor(
     const errors: Record<string, string[]> = {}
 
     if (!name) errors.name = ["Vendor name is required"]
-    if (!phone) errors.phone = ["Phone number is required"]
 
     if (Object.keys(errors).length > 0) {
       return {

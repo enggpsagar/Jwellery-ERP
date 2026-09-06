@@ -283,7 +283,6 @@ export async function getCustomerByIdCore(
 function validateCustomerInput(input: CustomerInput) {
   const errors: Record<string, string[]> = {};
   if (!input.name?.trim()) errors.name = ["Customer name is required"];
-  if (!input.phone?.trim()) errors.phone = ["Phone number is required"];
   return errors;
 }
 
@@ -300,17 +299,23 @@ export async function createCustomerCore(
       return { success: false, message: "Please fix the form errors", errors };
     }
 
-    const existing = await prisma.customer.findFirst({
-      where: { phone, storeId: ctx.storeId },
-      select: { id: true },
-    });
+    // Phone is optional now — an empty value is stored as null below, and
+    // Postgres never treats two nulls as colliding under the unique index,
+    // so this check (and the constraint itself) only ever matters once a
+    // phone number is actually entered.
+    if (phone) {
+      const existing = await prisma.customer.findFirst({
+        where: { phone, storeId: ctx.storeId },
+        select: { id: true },
+      });
 
-    if (existing) {
-      return {
-        success: false,
-        message: "Phone number already exists",
-        errors: { phone: ["A customer with this phone number already exists"] },
-      };
+      if (existing) {
+        return {
+          success: false,
+          message: "Phone number already exists",
+          errors: { phone: ["A customer with this phone number already exists"] },
+        };
+      }
     }
 
     const customer = await prisma.customer.create({
@@ -364,17 +369,19 @@ export async function updateCustomerCore(
       return { success: false, message: "Please fix the form errors", errors };
     }
 
-    const existing = await prisma.customer.findFirst({
-      where: { phone, storeId, NOT: { id } },
-      select: { id: true },
-    });
+    if (phone) {
+      const existing = await prisma.customer.findFirst({
+        where: { phone, storeId, NOT: { id } },
+        select: { id: true },
+      });
 
-    if (existing) {
-      return {
-        success: false,
-        message: "Phone number already exists",
-        errors: { phone: ["A customer with this phone number already exists"] },
-      };
+      if (existing) {
+        return {
+          success: false,
+          message: "Phone number already exists",
+          errors: { phone: ["A customer with this phone number already exists"] },
+        };
+      }
     }
 
     const { count } = await prisma.customer.updateMany({

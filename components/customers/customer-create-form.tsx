@@ -133,6 +133,28 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
           }}
           className="grid gap-5 md:grid-cols-2"
         >
+          <div className="space-y-1 md:col-span-2 rounded-lg border bg-muted/20 p-4 transition-colors focus-within:bg-accent/40">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <Hash className="h-4 w-4 text-muted-foreground" />
+              GST Number {gstinRequiredNow ? <RequiredMark /> : null}
+            </label>
+            <GstSchemeBadge scheme={gstScheme} />
+            {gstScheme !== "COMPOSITION" ? (
+              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
+            ) : null}
+            <input
+              name="gstNumber"
+              className={FIELD}
+              placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : "Optional"}
+              required={gstinRequiredNow}
+            />
+            {gstinRequiredNow ? (
+              <p className="text-xs text-muted-foreground">
+                GSTIN is required for a valid B2B tax invoice to this customer.
+              </p>
+            ) : null}
+          </div>
+
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4 text-muted-foreground" />
@@ -145,9 +167,9 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
-              Phone <RequiredMark />
+              Phone
             </label>
-            <input name="phone" type="tel" className={FIELD} placeholder="9876543210" required />
+            <input name="phone" type="tel" className={FIELD} placeholder="9876543210" />
             <FieldError errors={state.errors?.phone} />
           </div>
 
@@ -266,29 +288,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <Hash className="h-4 w-4 text-muted-foreground" />
-              GST Number {gstinRequiredNow ? <RequiredMark /> : null}
-            </label>
-            <GstSchemeBadge scheme={gstScheme} />
-            {gstScheme !== "COMPOSITION" ? (
-              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
-            ) : null}
-            <input
-              name="gstNumber"
-              className={FIELD}
-              placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : "Optional"}
-              required={gstinRequiredNow}
-            />
-            {gstinRequiredNow ? (
-              <p className="text-xs text-muted-foreground">
-                GSTIN is required for a valid B2B tax invoice to this customer.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">Notes</label>
             <textarea
               name="notes"

@@ -1,13 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import * as React from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
 import type { Karigar } from "@/lib/actions/karigar-actions"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Input } from "@/components/ui/input"
-import { KarigarsPagination } from "@/components/karigars/karigars-pagination"
-import { DisabledKarigarRestoreButton } from "@/components/karigars/disabled-karigar-restore-button"
+import { KarigarTable } from "@/components/karigars/karigar-table"
+import { DisabledKarigarDetailPanel } from "@/components/karigars/disabled-karigar-detail-panel"
 
 type DisabledKarigarsClientProps = {
   karigars: Karigar[]
@@ -21,6 +21,12 @@ type DisabledKarigarsClientProps = {
   }
 }
 
+/**
+ * Same master-detail layout as the active Artisans page (search/sort/
+ * paginated list on the left, full detail — including balance cards and
+ * ledger — on the right), matching the same treatment already given to
+ * Archived Customers/Vendors.
+ */
 export function DisabledKarigarsClient({
   karigars,
   pagination,
@@ -28,7 +34,19 @@ export function DisabledKarigarsClient({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get("search") ?? "")
+  const [search, setSearch] = React.useState(searchParams.get("search") ?? "")
+  const [selectedKarigarIds, setSelectedKarigarIds] = React.useState<string[]>([])
+  const [activeKarigarId, setActiveKarigarId] = React.useState<string | null>(
+    karigars[0]?.id ?? null,
+  )
+
+  React.useEffect(() => {
+    setSelectedKarigarIds([])
+    setActiveKarigarId((current) => {
+      if (current && karigars.some((karigar) => karigar.id === current)) return current
+      return karigars[0]?.id ?? null
+    })
+  }, [karigars])
 
   function updateSearch(value: string) {
     setSearch(value)
@@ -48,59 +66,27 @@ export function DisabledKarigarsClient({
         backLabel="Back to Artisans"
       />
 
-      <div className="max-w-sm">
-        <Input
-          placeholder="Search disabled artisans..."
-          value={search}
-          onChange={(e) => updateSearch(e.target.value)}
-        />
-      </div>
-
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        {karigars.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            No disabled artisans.
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
+        <div className="space-y-4">
+          <div className="max-w-sm">
+            <Input
+              placeholder="Search disabled artisans..."
+              value={search}
+              onChange={(e) => updateSearch(e.target.value)}
+            />
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead className="bg-muted/40">
-                <tr className="text-left text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Artisan Name</th>
-                  <th className="px-4 py-3 font-medium">Code</th>
-                  <th className="px-4 py-3 font-medium">Mobile</th>
-                  <th className="px-4 py-3 font-medium">Specialization</th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {karigars.map((karigar) => (
-                  <tr key={karigar.id} className="border-t">
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      {karigar.name}
-                    </td>
-                    <td className="px-4 py-3 text-foreground">{karigar.code || "-"}</td>
-                    <td className="px-4 py-3 text-foreground">{karigar.mobile || "-"}</td>
-                    <td className="px-4 py-3 text-foreground">{karigar.specialization || "-"}</td>
-                    <td className="px-4 py-3 text-right">
-                      <DisabledKarigarRestoreButton
-                        karigarId={karigar.id}
-                        karigarName={karigar.name}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
 
-        <KarigarsPagination
-          page={pagination.page}
-          pageSize={pagination.pageSize}
-          totalCount={pagination.totalCount}
-          totalPages={pagination.totalPages}
-        />
+          <KarigarTable
+            karigars={karigars}
+            pagination={pagination}
+            selectedKarigarIds={selectedKarigarIds}
+            onSelectionChange={setSelectedKarigarIds}
+            activeKarigarId={activeKarigarId}
+            onActivate={setActiveKarigarId}
+          />
+        </div>
+
+        <DisabledKarigarDetailPanel karigarId={activeKarigarId} />
       </div>
     </main>
   )

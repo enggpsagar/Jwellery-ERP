@@ -164,6 +164,7 @@ type ReportsTabsProps = {
   salesByUser: SalesByUser
   vendorPurchase: VendorPurchase
   itemLedger: ItemLedger
+  financialYears: number[]
 }
 
 function reportDate(value: string | null) {
@@ -237,6 +238,7 @@ export function ReportsTabs({
   salesByUser,
   vendorPurchase,
   itemLedger,
+  financialYears,
 }: ReportsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("sales")
   const searchParams = useSearchParams()
@@ -407,7 +409,7 @@ export function ReportsTabs({
         </div>
       </div>
 
-      <ReportDateFilter applies={DATE_AWARE_TABS.has(activeTab)} />
+      <ReportDateFilter applies={DATE_AWARE_TABS.has(activeTab)} financialYears={financialYears} />
 
       {activeTab === "sales" && (
         <div className="space-y-6">

@@ -10,6 +10,7 @@ import {
   getSalesByUserReport,
   getVendorPurchaseReport,
   getItemLedgerReport,
+  getAvailableFinancialYears,
 } from "@/lib/actions/report-actions"
 
 import { ReportsTabs } from "@/components/reports/reports-tabs"
@@ -37,6 +38,7 @@ export default async function ReportsPage({ searchParams }: Props) {
     salesByUser,
     vendorPurchase,
     itemLedger,
+    financialYears,
   ] = await Promise.all([
       getSalesReport(range),
       getInventoryValuationReport(),
@@ -47,6 +49,7 @@ export default async function ReportsPage({ searchParams }: Props) {
       getSalesByUserReport(range),
       getVendorPurchaseReport(range),
       getItemLedgerReport(),
+      getAvailableFinancialYears(),
     ])
 
   return (
@@ -68,6 +71,7 @@ export default async function ReportsPage({ searchParams }: Props) {
         salesByUser={salesByUser}
         vendorPurchase={vendorPurchase}
         itemLedger={itemLedger}
+        financialYears={financialYears}
       />
     </main>
   )

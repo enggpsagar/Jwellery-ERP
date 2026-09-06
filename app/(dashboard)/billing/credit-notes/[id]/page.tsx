@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import { Printer } from "lucide-react"
 
 import { getCreditNoteById } from "@/lib/actions/credit-note-actions"
+import { formatShortDate } from "@/lib/utils"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 type Props = {
@@ -51,7 +52,7 @@ export default async function CreditNoteDetailPage({ params }: Props) {
           <div>
             <p className="text-sm text-muted-foreground">Credit Note Date</p>
             <p className="font-medium">
-              {new Date(creditNote.creditNoteDate).toLocaleDateString("en-IN")}
+              {formatShortDate(creditNote.creditNoteDate)}
             </p>
           </div>
 

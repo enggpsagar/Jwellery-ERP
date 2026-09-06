@@ -15,6 +15,7 @@ import {
   type DateRange,
 } from "@/lib/actions/report-actions"
 import { buildCsvExport, buildExcelExport } from "@/lib/excel-export"
+import { formatShortDate } from "@/lib/utils"
 
 type ReportType =
   | "sales"
@@ -46,7 +47,7 @@ async function buildRows(type: ReportType, range: DateRange) {
       const report = await getSalesReport(range)
       return report.invoices.map((invoice) => ({
         "Invoice #": invoice.invoiceNumber,
-        Date: new Date(invoice.invoiceDate).toLocaleDateString("en-IN"),
+        Date: formatShortDate(invoice.invoiceDate),
         Customer: invoice.customerName,
         Status: invoice.status,
         "Total (₹)": invoice.totalAmount,
@@ -61,12 +62,8 @@ async function buildRows(type: ReportType, range: DateRange) {
         "Revenue (₹)": row.totalRevenue,
         "Collected (₹)": row.totalCollected,
         "Outstanding (₹)": row.totalOutstanding,
-        "First Sale": row.firstSale
-          ? new Date(row.firstSale).toLocaleDateString("en-IN")
-          : "",
-        "Last Sale": row.lastSale
-          ? new Date(row.lastSale).toLocaleDateString("en-IN")
-          : "",
+        "First Sale": row.firstSale ? formatShortDate(row.firstSale) : "",
+        "Last Sale": row.lastSale ? formatShortDate(row.lastSale) : "",
       }))
     }
     case "vendorPurchase": {
@@ -79,12 +76,8 @@ async function buildRows(type: ReportType, range: DateRange) {
         "Amount (₹)": row.totalAmount,
         "Paid (₹)": row.paidAmount,
         "Balance (₹)": row.balanceAmount,
-        "First Purchase": row.firstPurchase
-          ? new Date(row.firstPurchase).toLocaleDateString("en-IN")
-          : "",
-        "Last Purchase": row.lastPurchase
-          ? new Date(row.lastPurchase).toLocaleDateString("en-IN")
-          : "",
+        "First Purchase": row.firstPurchase ? formatShortDate(row.firstPurchase) : "",
+        "Last Purchase": row.lastPurchase ? formatShortDate(row.lastPurchase) : "",
       }))
     }
     case "inventory": {
@@ -101,10 +94,8 @@ async function buildRows(type: ReportType, range: DateRange) {
       return report.jobs.map((job) => ({
         "Job #": job.jobNumber ?? "",
         Karigar: job.karigarName,
-        "Issue Date": new Date(job.issueDate).toLocaleDateString("en-IN"),
-        "Expected Date": job.expectedDate
-          ? new Date(job.expectedDate).toLocaleDateString("en-IN")
-          : "",
+        "Issue Date": formatShortDate(job.issueDate),
+        "Expected Date": job.expectedDate ? formatShortDate(job.expectedDate) : "",
         Metal: job.metalType ?? "",
         "Issue Weight (g)": job.issueWeight ?? "",
       }))
@@ -158,23 +149,16 @@ async function buildRows(type: ReportType, range: DateRange) {
         Status: row.status,
         "Qty On Hand": row.quantityRemaining,
         "Net Weight (g)": row.netWeight,
-        "Purchase Date": row.purchaseDate
-          ? new Date(row.purchaseDate).toLocaleDateString("en-IN")
-          : "",
+        "Purchase Date": row.purchaseDate ? formatShortDate(row.purchaseDate) : "",
         "Purchase Qty": row.purchaseQuantity ?? "",
         Vendor: row.vendorName ?? "",
         "Added By": row.addedBy,
-        "Last Sale Date": row.lastSaleDate
-          ? new Date(row.lastSaleDate).toLocaleDateString("en-IN")
-          : "",
+        "Last Sale Date": row.lastSaleDate ? formatShortDate(row.lastSaleDate) : "",
         "Sold Qty": row.totalSoldQuantity,
         "Sold To": row.soldTo,
         "Sold By": row.soldBy,
         "Transaction History": row.history
-          .map(
-            (event) =>
-              `${new Date(event.date).toLocaleDateString("en-IN")}: ${event.label}`,
-          )
+          .map((event) => `${formatShortDate(event.date)}: ${event.label}`)
           .join(" | "),
       }))
     }

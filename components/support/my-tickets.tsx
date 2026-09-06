@@ -13,13 +13,10 @@ import { TicketStatusBadge } from "@/components/support/ticket-status-badge"
 import { TicketMessageBubbles } from "@/components/support/ticket-message-bubbles"
 import { TicketReplyForm } from "@/components/support/ticket-reply-form"
 import { Loader } from "@/components/ui/loader"
+import { formatShortDateTime } from "@/lib/utils"
 
 function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(iso))
+  return formatShortDateTime(iso)
 }
 
 type MyTicketsProps = {

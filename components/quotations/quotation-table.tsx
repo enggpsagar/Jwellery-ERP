@@ -7,6 +7,7 @@ import { Eye, ArrowRightCircle } from "lucide-react"
 
 import { QuotationStatusBadge } from "@/components/quotations/quotation-status-badge"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
+import { formatShortDate } from "@/lib/utils"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -76,12 +77,12 @@ export function QuotationTable({ quotations }: QuotationTableProps) {
                         fields: [
                           {
                             label: "Date",
-                            value: new Date(quotation.quotationDate).toLocaleDateString("en-IN"),
+                            value: formatShortDate(quotation.quotationDate),
                           },
                           {
                             label: "Valid until",
                             value: quotation.validUntil
-                              ? new Date(quotation.validUntil).toLocaleDateString("en-IN")
+                              ? formatShortDate(quotation.validUntil)
                               : null,
                           },
                           { label: "Customer", value: quotation.customer?.name },
@@ -101,11 +102,11 @@ export function QuotationTable({ quotations }: QuotationTableProps) {
                   />
                 </td>
                 <td className="px-4 py-3">
-                  {new Date(quotation.quotationDate).toLocaleDateString("en-IN")}
+                  {formatShortDate(quotation.quotationDate)}
                 </td>
                 <td className="px-4 py-3">
                   {quotation.validUntil
-                    ? new Date(quotation.validUntil).toLocaleDateString("en-IN")
+                    ? formatShortDate(quotation.validUntil)
                     : "-"}
                 </td>
                 <td className="px-4 py-3">
@@ -122,12 +123,12 @@ export function QuotationTable({ quotations }: QuotationTableProps) {
                             { label: "Quotation", value: quotation.quotationNumber },
                             {
                               label: "Date",
-                              value: new Date(quotation.quotationDate).toLocaleDateString("en-IN"),
+                              value: formatShortDate(quotation.quotationDate),
                             },
                             {
                               label: "Valid until",
                               value: quotation.validUntil
-                                ? new Date(quotation.validUntil).toLocaleDateString("en-IN")
+                                ? formatShortDate(quotation.validUntil)
                                 : null,
                             },
                             { label: "Status", value: quotation.status },

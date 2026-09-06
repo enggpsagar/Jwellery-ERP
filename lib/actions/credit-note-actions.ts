@@ -16,6 +16,7 @@ import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope } from "@/lib/store-context";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { getReturnEligibility, type ReturnEligibility } from "@/lib/return-window";
+import { formatShortDate } from "@/lib/utils";
 
 export type CreditNoteFormState = {
   success: boolean;
@@ -276,7 +277,7 @@ export async function createCreditNote(
     if (!eligibility.eligible) {
       return {
         success: false,
-        message: `The ${settings.returnWindowDays}-day return window for this invoice expired on ${eligibility.windowExpiresAt.toLocaleDateString("en-IN")}.`,
+        message: `The ${settings.returnWindowDays}-day return window for this invoice expired on ${formatShortDate(eligibility.windowExpiresAt)}.`,
       };
     }
 

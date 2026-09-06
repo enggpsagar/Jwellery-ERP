@@ -4,6 +4,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { getPurchaseById } from "@/lib/actions/purchase-actions"
+import { formatShortDate } from "@/lib/utils"
 import { PurchaseStatusBadge } from "@/components/purchases/purchase-status-badge"
 import { RecordPurchasePaymentDialog } from "@/components/purchases/record-purchase-payment-dialog"
 import { PageBackHeader } from "@/components/shared/page-back-header"
@@ -55,7 +56,7 @@ export default async function PurchaseDetailPage({ params }: Props) {
           <div>
             <p className="text-sm text-muted-foreground">Purchase Date</p>
             <p className="font-medium">
-              {new Date(purchase.purchaseDate).toLocaleDateString("en-IN")}
+              {formatShortDate(purchase.purchaseDate)}
             </p>
           </div>
 

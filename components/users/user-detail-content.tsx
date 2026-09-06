@@ -7,7 +7,7 @@ import {
 } from "@/components/shared/detail-section"
 import { StatusBadge } from "@/components/users/status-badge"
 import { ROLE_LABELS } from "@/lib/roles"
-import { toTitleCase } from "@/lib/utils"
+import { toTitleCase, formatShortDate } from "@/lib/utils"
 
 import type { UserRole, UserStatus } from "@prisma/client"
 
@@ -77,7 +77,7 @@ export function UserDetailContent({
           <DetailField label="Account" value={user.isActive ? "Active" : "Deactivated"} />
           <DetailField
             label="Added"
-            value={new Date(user.createdAt).toLocaleDateString("en-IN")}
+            value={formatShortDate(user.createdAt)}
           />
         </DetailGrid>
       </DetailSection>

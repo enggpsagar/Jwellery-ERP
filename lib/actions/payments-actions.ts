@@ -8,6 +8,7 @@ import { requireStoreScope } from "@/lib/store-context"
 import { getLocationScope, locationWhere } from "@/lib/location-scope"
 import { requirePermission } from "@/lib/auth/auth"
 import { PERMISSIONS } from "@/lib/permissions"
+import { formatShortDate } from "@/lib/utils"
 
 export type PaymentFormState = {
   success: boolean
@@ -52,11 +53,7 @@ function parsePayments(raw: string): PaymentEntryInput[] | null {
 }
 
 function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date)
+  return formatShortDate(date)
 }
 
 export type PaymentInRow = {

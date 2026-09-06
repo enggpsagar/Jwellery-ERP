@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { formatLedgerSource } from "@/lib/ledger-format"
 import { partyGstTypeLabel } from "@/lib/gst"
+import { formatShortDate } from "@/lib/utils"
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar"
 import * as XLSX from "xlsx"
 
@@ -117,12 +118,7 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(date?: Date | null) {
-  if (!date) return "-"
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date)
+  return formatShortDate(date)
 }
 
 function getVendorWhere(storeId: string, search?: string, archived = false) {

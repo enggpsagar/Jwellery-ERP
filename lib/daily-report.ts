@@ -2,6 +2,7 @@ import { LedgerEntryType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { buildMultiSheetExcelExport } from "@/lib/excel-export";
+import { formatShortDate } from "@/lib/utils";
 
 /**
  * The previous day's transactions for one store: credits, debits, sales and
@@ -82,14 +83,7 @@ function formatMoney(value: number) {
 }
 
 function formatTime(value: Date) {
-  return value.toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatShortDate(value);
 }
 
 export type ReportSection = {

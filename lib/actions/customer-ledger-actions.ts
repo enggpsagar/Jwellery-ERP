@@ -10,6 +10,7 @@ import { formatLedgerSource } from "@/lib/ledger-format"
 import { sendMail } from "@/lib/mailer"
 import { ledgerStatementEmail } from "@/lib/email-templates"
 import { resolveStoreName } from "@/lib/invite-email"
+import { formatShortDate } from "@/lib/utils"
 import { MONEY_UNIT } from "@/lib/business-units"
 import { getActiveBusinessUnits } from "@/lib/business-units.server"
 
@@ -68,12 +69,7 @@ function toNumber(value: FormDataEntryValue | null, fallback = 0) {
 }
 
 function formatDate(date?: Date | null) {
-  if (!date) return "-"
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date)
+  return formatShortDate(date)
 }
 
 export async function getCustomerLedgerEntries(

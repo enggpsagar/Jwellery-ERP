@@ -12,7 +12,7 @@ import { resolveBackLink } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getReturnEligibility } from "@/lib/return-window"
 import { APP_NAME } from "@/lib/constants/app"
-import { toTitleCase } from "@/lib/utils"
+import { toTitleCase, formatShortDate } from "@/lib/utils"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog"
 import { EmailInvoiceButton } from "@/components/billing/email-invoice-button"
@@ -213,7 +213,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           <div>
             <p className="text-sm text-muted-foreground">Invoice Date</p>
             <p className="font-medium">
-              {new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}
+              {formatShortDate(invoice.invoiceDate)}
             </p>
           </div>
 
@@ -221,7 +221,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             <div>
               <p className="text-sm text-muted-foreground">Due Date</p>
               <p className="font-medium">
-                {new Date(invoice.dueDate).toLocaleDateString("en-IN")}
+                {formatShortDate(invoice.dueDate)}
               </p>
             </div>
           )}
@@ -231,14 +231,14 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               <p className="text-sm text-muted-foreground">Return Window</p>
               {returnEligibility.eligible ? (
                 <p className="font-medium text-green-700">
-                  Eligible until {returnEligibility.windowExpiresAt.toLocaleDateString("en-IN")}
+                  Eligible until {formatShortDate(returnEligibility.windowExpiresAt)}
                   <span className="block text-xs font-normal text-muted-foreground">
                     {returnEligibility.daysRemaining} day{returnEligibility.daysRemaining === 1 ? "" : "s"} left
                   </span>
                 </p>
               ) : (
                 <p className="font-medium text-red-600">
-                  Expired {returnEligibility.windowExpiresAt.toLocaleDateString("en-IN")}
+                  Expired {formatShortDate(returnEligibility.windowExpiresAt)}
                 </p>
               )}
             </div>
@@ -321,7 +321,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                   <Receipt className="h-4 w-4" />
                   {creditNote.creditNoteNumber}
                   <span className="text-xs font-normal text-muted-foreground">
-                    {new Date(creditNote.creditNoteDate).toLocaleDateString("en-IN")}
+                    {formatShortDate(creditNote.creditNoteDate)}
                   </span>
                 </span>
                 <span className="font-medium text-red-600">
@@ -388,7 +388,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               <div>
                 <p className="text-xs text-muted-foreground">E-way Bill Date</p>
                 <p className="font-medium">
-                  {new Date(invoice.ewayBillDate).toLocaleDateString("en-IN")}
+                  {formatShortDate(invoice.ewayBillDate)}
                 </p>
               </div>
             )}

@@ -7,6 +7,7 @@ import { Pencil } from "lucide-react"
 import { getProductById } from "@/lib/actions/inventory/product-actions"
 import { hasPermission } from "@/lib/auth/auth"
 import { resolveBackLink } from "@/lib/safe-return-to"
+import { formatShortDate } from "@/lib/utils"
 import { PERMISSIONS } from "@/lib/permissions"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
@@ -93,11 +94,7 @@ function formatWeight(value: unknown) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value))
+  return formatShortDate(value)
 }
 
 export default async function ProductDetailsPage({ params, searchParams }: Props) {

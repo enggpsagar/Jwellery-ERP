@@ -17,6 +17,7 @@ import autoTable from "jspdf-autotable";
 import { getInvoiceById } from "@/lib/actions/invoice-actions";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { amountInWords } from "@/lib/number-to-words";
+import { formatShortDate } from "@/lib/utils";
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst";
 import { APP_NAME } from "@/lib/constants/app";
 
@@ -25,7 +26,7 @@ function fmt(value: number) {
 }
 
 function fmtDate(value: string) {
-  return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return formatShortDate(value);
 }
 
 export async function GET(

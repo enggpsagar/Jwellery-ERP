@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { PrintAllQrButton } from "@/components/inventory/stock/print-all-qr-button"
+import { formatShortDate } from "@/lib/utils"
 
 export const metadata: Metadata = {
   title: "Print QR Codes",
@@ -20,11 +21,7 @@ type PrintQrPageProps = {
 
 function formatDate(value: Date | string | null | undefined) {
   if (!value) return null
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value))
+  return formatShortDate(value)
 }
 
 function formatWeight(value: unknown) {

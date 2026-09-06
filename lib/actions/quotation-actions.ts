@@ -25,6 +25,7 @@ import {
   type LocationScope,
 } from "@/lib/location-scope";
 import { buildExcelExport } from "@/lib/excel-export";
+import { formatShortDate } from "@/lib/utils";
 import type {
   DataTableExportParams,
   DataTableExportResult,
@@ -301,10 +302,8 @@ export async function exportQuotationsToExcel(
     const rows = quotations.map(mapQuotation).map((quotation, index) => ({
       "Sr. No.": index + 1,
       "Quotation Number": quotation.quotationNumber,
-      Date: new Date(quotation.quotationDate).toLocaleDateString("en-IN"),
-      "Valid Until": quotation.validUntil
-        ? new Date(quotation.validUntil).toLocaleDateString("en-IN")
-        : "",
+      Date: formatShortDate(quotation.quotationDate),
+      "Valid Until": quotation.validUntil ? formatShortDate(quotation.validUntil) : "",
       Customer: quotation.customer?.name || "",
       Status: quotation.status,
       Subtotal: quotation.subtotal,

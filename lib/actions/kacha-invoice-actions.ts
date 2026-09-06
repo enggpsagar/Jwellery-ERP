@@ -26,6 +26,7 @@ import {
 import { requireAuth, requireRole } from "@/lib/auth/auth";
 import { sendMail } from "@/lib/mailer";
 import { kachaSlipEmail, dataBackupEmail } from "@/lib/email-templates";
+import { formatShortDate } from "@/lib/utils";
 import { resolveStoreName } from "@/lib/invite-email";
 import { APP_NAME } from "@/lib/constants/app";
 import {
@@ -348,7 +349,7 @@ export async function exportKachaInvoicesToExcel(
     const rows = kachaInvoices.map(mapKachaInvoice).map((kachaInvoice, index) => ({
       "Sr. No.": index + 1,
       "Slip #": kachaInvoice.slipNumber,
-      Date: new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN"),
+      Date: formatShortDate(kachaInvoice.invoiceDate),
       Customer: kachaInvoice.customer?.name || "",
       Status: kachaInvoice.status,
       Subtotal: kachaInvoice.subtotal,

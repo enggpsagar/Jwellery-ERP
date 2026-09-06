@@ -7,6 +7,7 @@ import { Eye, Pencil, Printer, ArrowLeftCircle } from "lucide-react"
 
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
+import { formatShortDate } from "@/lib/utils"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -76,7 +77,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                         fields: [
                           {
                             label: "Date",
-                            value: new Date(invoice.invoiceDate).toLocaleDateString("en-IN"),
+                            value: formatShortDate(invoice.invoiceDate),
                           },
                           { label: "Customer", value: invoice.customer?.name },
                           { label: "Phone", value: invoice.customer?.phone },
@@ -105,7 +106,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                   />
                 </td>
                 <td className="px-4 py-3">
-                  {new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}
+                  {formatShortDate(invoice.invoiceDate)}
                 </td>
                 <td className="px-4 py-3">
                   {invoice.customer ? (

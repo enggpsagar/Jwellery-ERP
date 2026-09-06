@@ -6,6 +6,7 @@ import { Phone, Mail, MapPin } from "lucide-react"
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { amountInWords } from "@/lib/number-to-words"
+import { formatShortDate } from "@/lib/utils"
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button"
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst"
 import { APP_NAME } from "@/lib/constants/app"
@@ -31,7 +32,7 @@ function fmt(value: number) {
 }
 
 function fmtDate(value: string) {
-  return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+  return formatShortDate(value)
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -364,7 +365,7 @@ export default async function InvoicePrintPage({ params }: Props) {
             <div className="grid grid-cols-3 gap-x-4">
               {invoice.ewayBillNumber && <span>E-way Bill No: {invoice.ewayBillNumber}</span>}
               {invoice.ewayBillDate && (
-                <span>Date: {new Date(invoice.ewayBillDate).toLocaleDateString("en-IN")}</span>
+                <span>Date: {formatShortDate(invoice.ewayBillDate)}</span>
               )}
               {invoice.transporterName && <span>Transporter: {invoice.transporterName}</span>}
               {invoice.vehicleNumber && <span>Vehicle No: {invoice.vehicleNumber}</span>}

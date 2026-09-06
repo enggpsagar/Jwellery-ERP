@@ -28,6 +28,7 @@ import {
   type LocationScope,
 } from "@/lib/location-scope";
 import { buildExcelExport } from "@/lib/excel-export";
+import { formatShortDate } from "@/lib/utils";
 import type {
   DataTableExportParams,
   DataTableExportResult,
@@ -372,7 +373,7 @@ export async function exportPurchasesToExcel(
     const rows = purchases.map(mapPurchase).map((purchase, index) => ({
       "Sr. No.": index + 1,
       "Purchase Number": purchase.purchaseNumber,
-      Date: new Date(purchase.purchaseDate).toLocaleDateString("en-IN"),
+      Date: formatShortDate(purchase.purchaseDate),
       Vendor: purchase.vendor?.name || "",
       Status: purchase.status,
       Subtotal: purchase.subtotal,

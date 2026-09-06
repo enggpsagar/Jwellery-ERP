@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
-import { cn } from "@/lib/utils"
+import { cn, formatShortDate } from "@/lib/utils"
 
 import { useMemo, useState } from "react"
 
@@ -168,7 +168,7 @@ type ReportsTabsProps = {
 }
 
 function reportDate(value: string | null) {
-  return value ? new Date(value).toLocaleDateString("en-IN") : "-"
+  return formatShortDate(value)
 }
 
 /** Money for the report cards; the columns print raw rupees themselves. */
@@ -460,7 +460,7 @@ export function ReportsTabs({
                               fields: [
                                 {
                                   label: "Date",
-                                  value: new Date(invoice.invoiceDate).toLocaleDateString("en-IN"),
+                                  value: formatShortDate(invoice.invoiceDate),
                                 },
                                 { label: "Customer", value: invoice.customerName },
                               ],
@@ -491,7 +491,7 @@ export function ReportsTabs({
                         />
                       </td>
                       <td className="px-4 py-3">
-                        {new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}
+                        {formatShortDate(invoice.invoiceDate)}
                       </td>
                       <td className="px-4 py-3">{invoice.customerName}</td>
                       <td className="px-4 py-3">₹{invoice.totalAmount.toFixed(2)}</td>
@@ -609,15 +609,11 @@ export function ReportsTabs({
                                   },
                                   {
                                     label: "First sale",
-                                    value: row.firstSale
-                                      ? new Date(row.firstSale).toLocaleDateString("en-IN")
-                                      : null,
+                                    value: row.firstSale ? formatShortDate(row.firstSale) : null,
                                   },
                                   {
                                     label: "Last sale",
-                                    value: row.lastSale
-                                      ? new Date(row.lastSale).toLocaleDateString("en-IN")
-                                      : null,
+                                    value: row.lastSale ? formatShortDate(row.lastSale) : null,
                                   },
                                 ],
                               },
@@ -644,9 +640,7 @@ export function ReportsTabs({
                             : "—"}
                         </td>
                         <td className="px-4 py-3">
-                          {row.lastSale
-                            ? new Date(row.lastSale).toLocaleDateString("en-IN")
-                            : "—"}
+                          {row.lastSale ? formatShortDate(row.lastSale) : "—"}
                         </td>
                       </tr>
                     ))
@@ -727,15 +721,11 @@ export function ReportsTabs({
                                 fields: [
                                   {
                                     label: "First purchase",
-                                    value: row.firstPurchase
-                                      ? new Date(row.firstPurchase).toLocaleDateString("en-IN")
-                                      : null,
+                                    value: row.firstPurchase ? formatShortDate(row.firstPurchase) : null,
                                   },
                                   {
                                     label: "Last purchase",
-                                    value: row.lastPurchase
-                                      ? new Date(row.lastPurchase).toLocaleDateString("en-IN")
-                                      : null,
+                                    value: row.lastPurchase ? formatShortDate(row.lastPurchase) : null,
                                   },
                                 ],
                               },
@@ -763,9 +753,7 @@ export function ReportsTabs({
                             : "—"}
                         </td>
                         <td className="px-4 py-3">
-                          {row.lastPurchase
-                            ? new Date(row.lastPurchase).toLocaleDateString("en-IN")
-                            : "—"}
+                          {row.lastPurchase ? formatShortDate(row.lastPurchase) : "—"}
                         </td>
                       </tr>
                     ))

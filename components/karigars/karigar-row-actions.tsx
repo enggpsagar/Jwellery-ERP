@@ -33,6 +33,15 @@ type KarigarRowActionsProps = {
   assignedMetalTypeIds: string[]
   locations?: LocationOption[]
   defaultLocationId?: string | null
+  /** Off inside the detail panel — a "View karigar" link back to the
+   * page you're already looking at (inline, via this same panel) isn't
+   * an action. Defaults on for the list table, where it's the only way
+   * to get there. */
+  showView?: boolean
+  /** Off inside the detail panel, which already has its own full Issue
+   * Material button — this icon-only trigger next to it would just be a
+   * second way to open the same dialog. Defaults on for the list table. */
+  showIssueMaterial?: boolean
 }
 
 export function KarigarRowActions({
@@ -42,6 +51,8 @@ export function KarigarRowActions({
   assignedMetalTypeIds,
   locations = [],
   defaultLocationId = null,
+  showView = true,
+  showIssueMaterial = true,
 }: KarigarRowActionsProps) {
   const router = useRouter()
   const toast = useToast()
@@ -63,7 +74,7 @@ export function KarigarRowActions({
       }
     } catch (error) {
       console.error(error)
-      toast.error("Failed to disable karigar")
+      toast.error("Failed to disable artisan")
     } finally {
       setLoading(false)
     }
@@ -72,36 +83,40 @@ export function KarigarRowActions({
   return (
     <>
       <div className="flex items-center gap-2">
-        <Link
-          href={`/karigars/${karigarId}`}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
-          title="View karigar"
-        >
-          <Eye className="h-4 w-4" />
-        </Link>
+        {showView && (
+          <Link
+            href={`/karigars/${karigarId}`}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
+            title="View artisan"
+          >
+            <Eye className="h-4 w-4" />
+          </Link>
+        )}
 
         <Link
           href={`/karigars/${karigarId}/edit`}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-muted"
-          title="Edit karigar"
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-indigo-600 hover:bg-indigo-50"
+          title="Edit artisan"
         >
           <Pencil className="h-4 w-4" />
         </Link>
 
-        <IssueMaterialDialog
-          trigger="icon"
-          karigarId={karigarId}
-          metals={metals}
-          assignedMetalTypeIds={assignedMetalTypeIds}
-          locations={locations}
-          defaultLocationId={defaultLocationId}
-        />
+        {showIssueMaterial && (
+          <IssueMaterialDialog
+            trigger="icon"
+            karigarId={karigarId}
+            metals={metals}
+            assignedMetalTypeIds={assignedMetalTypeIds}
+            locations={locations}
+            defaultLocationId={defaultLocationId}
+          />
+        )}
 
         <button
           type="button"
           onClick={() => setConfirmDisable(true)}
           className="inline-flex items-center gap-1 rounded-md border border-amber-200 px-2 py-1 text-sm text-amber-700 hover:bg-amber-50"
-          title="Disable karigar"
+          title="Disable artisan"
         >
           <Ban className="h-4 w-4" />
         </button>
@@ -117,15 +132,15 @@ export function KarigarRowActions({
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Disable Karigar</DialogTitle>
+            <DialogTitle>Disable Artisan</DialogTitle>
             <DialogDescription>
               Are you sure you want to disable{" "}
               <span className="font-medium text-foreground">{karigarName}</span>?
               <br />
               <br />
-              Disabled karigars are removed from the active Karigars list, but their job
+              Disabled artisans are removed from the active Artisans list, but their job
               and ledger history remains in the system. You can re-enable them any time
-              from Disabled Karigars.
+              from Disabled Artisans.
             </DialogDescription>
           </DialogHeader>
 
@@ -146,7 +161,7 @@ export function KarigarRowActions({
                   Disabling...
                 </>
               ) : (
-                "Disable Karigar"
+                "Disable Artisan"
               )}
             </Button>
           </DialogFooter>

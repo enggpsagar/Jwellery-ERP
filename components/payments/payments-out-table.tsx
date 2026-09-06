@@ -80,7 +80,7 @@ export function PaymentsOutTable({ rows }: { rows: PaymentOutRow[] }) {
           <div className="relative sm:max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search vendor, karigar, notes..."
+              placeholder="Search vendor, artisan, notes..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value)
@@ -126,7 +126,7 @@ export function PaymentsOutTable({ rows }: { rows: PaymentOutRow[] }) {
                           {row.partyName}
                         </Link>
                         <Badge variant="outline" className="font-normal">
-                          {row.partyType === "VENDOR" ? "Vendor" : "Karigar"}
+                          {row.partyType === "VENDOR" ? "Vendor" : "Artisan"}
                         </Badge>
                       </div>
                     </TableCell>

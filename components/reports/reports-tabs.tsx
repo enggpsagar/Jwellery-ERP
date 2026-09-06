@@ -188,7 +188,7 @@ const TABS = [
   { key: "byUser", label: "Sales by User" },
   { key: "vendorPurchase", label: "Vendor Purchase" },
   { key: "inventory", label: "Inventory Valuation" },
-  { key: "karigar", label: "Karigar Outstanding" },
+  { key: "karigar", label: "Artisan Outstanding" },
   { key: "dues", label: "Customer Dues" },
   { key: "goldFlow", label: "Gold Flow" },
   { key: "metalWise", label: "By Metal" },
@@ -875,7 +875,7 @@ export function ReportsTabs({
           <ReportSearchBar
             value={karigarTable.search}
             onChange={karigarTable.setSearch}
-            placeholder="Search karigar..."
+            placeholder="Search artisan..."
             resultSummary={`${karigarTable.totalCount} of ${karigarTable.rawCount}`}
           />
 
@@ -883,7 +883,7 @@ export function ReportsTabs({
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="border-b">
-                  <SortableTh label="Karigar" sortKey="name" activeSortKey={karigarTable.sortKey} sortDir={karigarTable.sortDir} onSort={karigarTable.toggleSort} />
+                  <SortableTh label="Artisan" sortKey="name" activeSortKey={karigarTable.sortKey} sortDir={karigarTable.sortDir} onSort={karigarTable.toggleSort} />
                   <SortableTh label="Open Jobs" sortKey="jobs" activeSortKey={karigarTable.sortKey} sortDir={karigarTable.sortDir} onSort={karigarTable.toggleSort} />
                   <SortableTh label="Weight Out (g)" sortKey="weightOut" activeSortKey={karigarTable.sortKey} sortDir={karigarTable.sortDir} onSort={karigarTable.toggleSort} />
                 </tr>
@@ -902,7 +902,7 @@ export function ReportsTabs({
                         <RecordHoverCard
                           label={row.name}
                           title={row.name}
-                          subtitle="Outstanding with karigar"
+                          subtitle="Outstanding with artisan"
                           sections={[
                             {
                               fields: [
@@ -1031,11 +1031,11 @@ export function ReportsTabs({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4">
             <StatCard title="Purchased (fine)" value={`${goldFlow.purchasedFine.toFixed(3)}g`} />
             <StatCard
-              title="Issued to Karigar (fine)"
+              title="Issued to Artisan (fine)"
               value={`${goldFlow.issuedToKarigarFine.toFixed(3)}g`}
             />
             <StatCard
-              title="Received from Karigar (fine)"
+              title="Received from Artisan (fine)"
               value={`${goldFlow.receivedFromKarigarFine.toFixed(3)}g`}
             />
             <StatCard title="Wastage (fine)" value={`${goldFlow.wastageFine.toFixed(3)}g`} />
@@ -1045,7 +1045,7 @@ export function ReportsTabs({
               value={`${goldFlow.remainingStockFine.toFixed(3)}g`}
             />
             <StatCard
-              title="Still with Karigar (fine)"
+              title="Still with Artisan (fine)"
               value={`${goldFlow.withKarigarFine.toFixed(3)}g`}
             />
           </div>
@@ -1079,8 +1079,8 @@ export function ReportsTabs({
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               {Math.abs(goldFlow.reconciliationGap) > 0.01
-                ? "Purchased fine weight does not fully reconcile against sold, wastage, remaining stock, and karigar work-in-progress — investigate the shortfall."
-                : "Everything purchased is accounted for across sales, wastage, remaining stock, and karigar work-in-progress."}
+                ? "Purchased fine weight does not fully reconcile against sold, wastage, remaining stock, and artisan work-in-progress — investigate the shortfall."
+                : "Everything purchased is accounted for across sales, wastage, remaining stock, and artisan work-in-progress."}
             </p>
           </div>
         </div>
@@ -1108,7 +1108,7 @@ export function ReportsTabs({
                   <SortableTh label="Purchased" sortKey="purchasedWeight" activeSortKey={metalWiseTable.sortKey} sortDir={metalWiseTable.sortDir} onSort={metalWiseTable.toggleSort} />
                   <SortableTh label="Sold" sortKey="soldWeight" activeSortKey={metalWiseTable.sortKey} sortDir={metalWiseTable.sortDir} onSort={metalWiseTable.toggleSort} />
                   <SortableTh label="In Stock" sortKey="inStockWeight" activeSortKey={metalWiseTable.sortKey} sortDir={metalWiseTable.sortDir} onSort={metalWiseTable.toggleSort} />
-                  <SortableTh label="With Karigar" sortKey="withKarigarWeight" activeSortKey={metalWiseTable.sortKey} sortDir={metalWiseTable.sortDir} onSort={metalWiseTable.toggleSort} />
+                  <SortableTh label="With Artisan" sortKey="withKarigarWeight" activeSortKey={metalWiseTable.sortKey} sortDir={metalWiseTable.sortDir} onSort={metalWiseTable.toggleSort} />
                   <SortableTh label="Status" sortKey="reconciliationGap" activeSortKey={metalWiseTable.sortKey} sortDir={metalWiseTable.sortDir} onSort={metalWiseTable.toggleSort} />
                 </tr>
               </thead>

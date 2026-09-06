@@ -100,13 +100,13 @@ export function UserDetailContent({
 
       {karigar ? (
         <DetailSection
-          title="Linked Karigar"
-          description="This user account is tied to a karigar profile."
+          title="Linked Artisan"
+          description="This user account is tied to an artisan profile."
           icon={Hammer}
           tint="var(--chart-2)"
         >
           <DetailGrid>
-            <DetailField label="Karigar Name" value={toTitleCase(karigar.name)} />
+            <DetailField label="Artisan Name" value={toTitleCase(karigar.name)} />
             <DetailField label="Mobile" value={karigar.mobile} />
             <DetailField label="Email" value={karigar.email} />
           </DetailGrid>

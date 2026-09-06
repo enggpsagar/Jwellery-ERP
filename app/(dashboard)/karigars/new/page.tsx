@@ -8,10 +8,11 @@ import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
+import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper";
 import { KarigarCreateForm } from "@/components/karigars/karigar-create-form";
 
 export const metadata: Metadata = {
-  title: "Add Karigar",
+  title: "Add Artisan",
 };
 
 export default async function NewKarigarPage() {
@@ -29,18 +30,20 @@ export default async function NewKarigarPage() {
         title="Add Karigar"
         description="Register a new jewellery artisan."
         backHref="/karigars"
-        backLabel="Back to Karigars"
+        backLabel="Back to Artisans"
       />
 
-      <KarigarCreateForm
-        locations={locations}
-        states={states}
-        metals={metals}
-        defaultLocationId={defaultLocationId}
-        defaultState={settings.state}
-        defaultCity={settings.city}
-        gstScheme={settings.gstScheme}
-      />
+      <ResetFormWrapper>
+        <KarigarCreateForm
+          locations={locations}
+          states={states}
+          metals={metals}
+          defaultLocationId={defaultLocationId}
+          defaultState={settings.state}
+          defaultCity={settings.city}
+          gstScheme={settings.gstScheme}
+        />
+      </ResetFormWrapper>
     </main>
   );
 }

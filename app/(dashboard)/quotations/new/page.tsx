@@ -11,6 +11,7 @@ import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 
 import { QuotationForm } from "@/components/quotations/quotation-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 
 export const metadata: Metadata = {
   title: "New Quotation",
@@ -38,19 +39,21 @@ export default async function NewQuotationPage() {
         backLabel="Back to Quotations"
       />
 
-      <QuotationForm
-        customers={customers}
-        stockItems={stockItems}
-        locations={locations}
-        defaultLocationId={defaultLocationId}
-        metals={metals}
-        origins={origins}
-        caratConversionRates={caratConversionRates}
-        defaultGstRate={businessSettings.defaultGstRate}
-        hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
-        gstScheme={businessSettings.gstScheme}
-        storeState={businessSettings.state}
-      />
+      <ResetFormWrapper requireConfirm>
+        <QuotationForm
+          customers={customers}
+          stockItems={stockItems}
+          locations={locations}
+          defaultLocationId={defaultLocationId}
+          metals={metals}
+          origins={origins}
+          caratConversionRates={caratConversionRates}
+          defaultGstRate={businessSettings.defaultGstRate}
+          hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
+          gstScheme={businessSettings.gstScheme}
+          storeState={businessSettings.state}
+        />
+      </ResetFormWrapper>
     </main>
   )
 }

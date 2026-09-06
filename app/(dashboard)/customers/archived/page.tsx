@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 
 import { getCustomers } from "@/lib/actions/customer-actions"
+import { getStates } from "@/lib/actions/location-actions"
 import { ArchivedCustomersClient } from "@/components/customers/archived-customers-client"
 
 export const metadata: Metadata = {
@@ -12,6 +13,8 @@ type ArchivedCustomersPageProps = {
     page?: string
     pageSize?: string
     search?: string
+    sortBy?: "name" | "createdAt" | "openingBalance"
+    sortOrder?: "asc" | "desc"
   }>
 }
 
@@ -25,13 +28,15 @@ export default async function ArchivedCustomersPage({
   const page = Number(params.page || 1)
   const pageSize = Number(params.pageSize || 10)
   const search = params.search || ""
+  const sortBy = params.sortBy || "createdAt"
+  const sortOrder = params.sortOrder || "desc"
 
-  const { customers, pagination } = await getCustomers({
-    page,
-    pageSize,
-    search,
-    archived: true,
-  })
+  const [{ customers, pagination }, states] = await Promise.all([
+    getCustomers({ page, pageSize, search, sortBy, sortOrder, archived: true }),
+    getStates(),
+  ])
 
-  return <ArchivedCustomersClient customers={customers} pagination={pagination} />
+  return (
+    <ArchivedCustomersClient customers={customers} states={states} pagination={pagination} />
+  )
 }

@@ -5,22 +5,20 @@ import { useEffect, useState } from "react"
 import {
   getCustomerLedgerEntries,
   getCustomerLedgerSummary,
-  getCustomerLedgerBusinessUnits,
   type CustomerLedgerEntryItem,
   type CustomerLedgerSummary,
 } from "@/lib/actions/customer-ledger-actions"
-import type { BusinessUnitOption } from "@/lib/business-units.server"
 import { CustomerLedgerBody } from "@/components/customers/ledger/customer-ledger-body"
 import { Skeleton } from "@/components/ui/skeleton"
 
 type CustomerLedgerCardClientProps = {
   customerId: string
+  hasEmail: boolean
 }
 
 type LedgerData = {
   entries: CustomerLedgerEntryItem[]
   summary: CustomerLedgerSummary | null
-  activeUnits: BusinessUnitOption[]
 }
 
 /**
@@ -29,7 +27,7 @@ type LedgerData = {
  * since this renders inside the client-side master-detail panel, where a
  * server component can't be reached by import.
  */
-export function CustomerLedgerCardClient({ customerId }: CustomerLedgerCardClientProps) {
+export function CustomerLedgerCardClient({ customerId, hasEmail }: CustomerLedgerCardClientProps) {
   const [data, setData] = useState<LedgerData | null>(null)
 
   useEffect(() => {
@@ -38,9 +36,8 @@ export function CustomerLedgerCardClient({ customerId }: CustomerLedgerCardClien
     Promise.all([
       getCustomerLedgerEntries(customerId),
       getCustomerLedgerSummary(customerId),
-      getCustomerLedgerBusinessUnits(),
-    ]).then(([entries, summary, activeUnits]) => {
-      if (!cancelled) setData({ entries, summary, activeUnits })
+    ]).then(([entries, summary]) => {
+      if (!cancelled) setData({ entries, summary })
     })
     return () => {
       cancelled = true
@@ -59,9 +56,9 @@ export function CustomerLedgerCardClient({ customerId }: CustomerLedgerCardClien
   return (
     <CustomerLedgerBody
       customerId={customerId}
+      hasEmail={hasEmail}
       entries={data.entries}
       summary={data.summary}
-      activeUnits={data.activeUnits}
     />
   )
 }

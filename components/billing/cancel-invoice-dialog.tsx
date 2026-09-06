@@ -36,6 +36,16 @@ type CancelInvoiceDialogProps = {
    * to remember. A plain mistake-cancellation (no exchange intended) still
    * gets its own unchanged "Cancel Invoice" trigger alongside this one. */
   mode?: "cancel" | "returnExchange"
+  /** Controlled open state — set by CustomerReturnLauncher, which already
+   * ran its own "pick a sale invoice" step before this ever mounts. Left
+   * undefined for the invoice detail page's own usage, which still
+   * self-manages via its own trigger button below. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Suppresses the built-in trigger button — set together with
+   * `open`/`onOpenChange` by an external launcher that supplies its own
+   * trigger instead. */
+  hideTrigger?: boolean
 }
 
 /**
@@ -49,8 +59,14 @@ export function CancelInvoiceDialog({
   invoiceNumber,
   balanceAmount,
   mode = "cancel",
+  open: openProp,
+  onOpenChange,
+  hideTrigger,
 }: CancelInvoiceDialogProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const isControlled = openProp !== undefined
+  const open = isControlled ? openProp : internalOpen
+  const setOpen = isControlled ? (onOpenChange ?? (() => {})) : setInternalOpen
   const router = useRouter()
   const toast = useToast()
   const isReturnExchange = mode === "returnExchange"
@@ -73,19 +89,21 @@ export function CancelInvoiceDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {isReturnExchange ? (
-          <Button variant="outline" className="gap-2">
-            <RotateCcw className="h-4 w-4" />
-            Return &amp; Exchange
-          </Button>
-        ) : (
-          <Button variant="outline" className="gap-2 text-red-600 hover:text-red-700">
-            <Ban className="h-4 w-4" />
-            Cancel Invoice
-          </Button>
-        )}
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          {isReturnExchange ? (
+            <Button variant="outline" className="gap-2">
+              <RotateCcw className="h-4 w-4" />
+              Return &amp; Exchange
+            </Button>
+          ) : (
+            <Button variant="outline" className="gap-2 text-red-600 hover:text-red-700">
+              <Ban className="h-4 w-4" />
+              Cancel Invoice
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
 
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>

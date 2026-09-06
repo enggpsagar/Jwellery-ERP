@@ -6,6 +6,7 @@ import { safeReturnTo } from "@/lib/safe-return-to"
 
 import { VendorCreateForm } from "@/components/vendors/vendor-create-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 
 export const metadata: Metadata = {
   title: "Add Vendor",
@@ -30,13 +31,15 @@ export default async function NewVendorPage({ searchParams }: NewVendorPageProps
         backLabel={returnTo ? "Back without saving" : "Back to Vendors"}
       />
 
-      <VendorCreateForm
-        states={states}
-        returnTo={returnTo}
-        gstScheme={businessSettings.gstScheme}
-        defaultState={businessSettings.state}
-        defaultCity={businessSettings.city}
-      />
+      <ResetFormWrapper>
+        <VendorCreateForm
+          states={states}
+          returnTo={returnTo}
+          gstScheme={businessSettings.gstScheme}
+          defaultState={businessSettings.state}
+          defaultCity={businessSettings.city}
+        />
+      </ResetFormWrapper>
     </main>
   )
 }

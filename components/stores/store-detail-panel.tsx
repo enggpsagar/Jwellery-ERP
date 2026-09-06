@@ -12,6 +12,8 @@ import {
 } from "@/lib/actions/store-plan-actions"
 import { PlanStatusPill } from "@/components/stores/plan-presentation"
 import { StoreDetailContent } from "@/components/stores/store-detail-content"
+import { StoreRowActions } from "@/components/stores/store-row-actions"
+import { StoreDeleteDialog } from "@/components/stores/store-delete-dialog"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -85,12 +87,20 @@ export function StoreDetailPanel({ storeId }: StoreDetailPanelProps) {
           <p className="font-mono text-sm text-muted-foreground">{overview.code}</p>
         </div>
 
-        <Button asChild variant="outline" size="sm" className="gap-2">
-          <Link href={`/stores/${overview.storeId}/edit`}>
-            <Pencil className="size-4" />
-            Edit store
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm" className="gap-2">
+            <Link href={`/stores/${overview.storeId}/edit`}>
+              <Pencil className="size-4" />
+              Edit store
+            </Link>
+          </Button>
+          <StoreRowActions
+            storeId={overview.storeId}
+            storeName={overview.name}
+            isActive={overview.isActive}
+          />
+          <StoreDeleteDialog storeId={overview.storeId} storeName={overview.name} />
+        </div>
       </div>
 
       <StoreDetailContent overview={overview} history={history} />

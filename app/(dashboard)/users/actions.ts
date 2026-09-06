@@ -85,7 +85,7 @@ function friendlyUserErrorMessage(error: unknown, fallback: string): string {
 
     if (target.includes("email")) return "A user with this email already exists.";
     if (target.includes("phone")) return "A user with this phone number already exists.";
-    if (target.includes("karigarId")) return "This karigar is already linked to another user.";
+    if (target.includes("karigarId")) return "This artisan is already linked to another user.";
     return "A user with these details already exists.";
   }
 

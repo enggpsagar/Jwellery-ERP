@@ -118,7 +118,7 @@ export async function globalSearch(
       type: "karigar" as const,
       id: k.id,
       title: k.name,
-      subtitle: [k.code, k.mobile].filter(Boolean).join(" · ") || "Karigar",
+      subtitle: [k.code, k.mobile].filter(Boolean).join(" · ") || "Artisan",
       href: `/karigars/${k.id}/edit`,
     })),
   ];

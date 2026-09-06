@@ -133,7 +133,7 @@ export function KarigarForm({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <Label>Karigar Code</Label>
+          <Label>Artisan Code</Label>
           {karigar ? (
             <Input value={karigar.code} disabled readOnly />
           ) : (
@@ -150,7 +150,7 @@ export function KarigarForm({
           <Label>Name <RequiredMark /></Label>
           <Input
             name="name"
-            placeholder="Karigar name"
+            placeholder="Artisan name"
             defaultValue={karigar?.name}
             required
           />
@@ -459,7 +459,7 @@ export function KarigarForm({
           disabled={pending}
           className="px-5 py-2 rounded-md bg-primary text-primary-foreground"
         >
-          {pending ? "Saving..." : karigar ? "Update Karigar" : "Save Karigar"}
+          {pending ? "Saving..." : karigar ? "Update Artisan" : "Save Artisan"}
         </button>
       </div>
 

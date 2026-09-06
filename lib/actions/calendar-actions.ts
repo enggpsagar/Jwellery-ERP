@@ -158,7 +158,7 @@ export async function getCalendarEvents(year: number, month: number): Promise<Ca
         id: `karigar-job-${job.id}`,
         type: "KARIGAR_RETURN",
         date: job.expectedDate!.toISOString(),
-        title: job.jobNumber ? `Job ${job.jobNumber} expected back` : "Karigar item expected back",
+        title: job.jobNumber ? `Job ${job.jobNumber} expected back` : "Artisan item expected back",
         description: job.karigar.name,
         href: `/karigars`,
         isOverdue: job.expectedDate! < now,

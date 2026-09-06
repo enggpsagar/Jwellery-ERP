@@ -1,16 +1,22 @@
 "use client"
 
-import { useState } from "react"
+import * as React from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
 import type { Customer } from "@/lib/actions/customer-actions"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Input } from "@/components/ui/input"
-import { CustomersPagination } from "@/components/customers/customers-pagination"
-import { ArchivedCustomerRestoreButton } from "@/components/customers/archived-customer-restore-button"
+import { CustomersTable } from "@/components/customers/customers-table"
+import { ArchivedCustomerDetailPanel } from "@/components/customers/archived-customer-detail-panel"
+
+type StateItem = {
+  id: string
+  name: string
+}
 
 type ArchivedCustomersClientProps = {
   customers: Customer[]
+  states: StateItem[]
   pagination: {
     page: number
     pageSize: number
@@ -21,14 +27,34 @@ type ArchivedCustomersClientProps = {
   }
 }
 
+/**
+ * Same master-detail layout as the active Customers page (search/sort/
+ * paginated list on the left, full detail — including the ledger — on
+ * the right) rather than a bare table, so an archived customer's history
+ * is just as reachable as an active one's, not a step down to "flat list
+ * with one button."
+ */
 export function ArchivedCustomersClient({
   customers,
+  states,
   pagination,
 }: ArchivedCustomersClientProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get("search") ?? "")
+  const [search, setSearch] = React.useState(searchParams.get("search") ?? "")
+  const [selectedCustomerIds, setSelectedCustomerIds] = React.useState<string[]>([])
+  const [activeCustomerId, setActiveCustomerId] = React.useState<string | null>(
+    customers[0]?.id ?? null,
+  )
+
+  React.useEffect(() => {
+    setSelectedCustomerIds([])
+    setActiveCustomerId((current) => {
+      if (current && customers.some((customer) => customer.id === current)) return current
+      return customers[0]?.id ?? null
+    })
+  }, [customers])
 
   function updateSearch(value: string) {
     setSearch(value)
@@ -48,59 +74,27 @@ export function ArchivedCustomersClient({
         backLabel="Back to Customers"
       />
 
-      <div className="max-w-sm">
-        <Input
-          placeholder="Search archived customers..."
-          value={search}
-          onChange={(e) => updateSearch(e.target.value)}
-        />
-      </div>
-
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        {customers.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            No archived customers.
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
+        <div className="space-y-4">
+          <div className="max-w-sm">
+            <Input
+              placeholder="Search archived customers..."
+              value={search}
+              onChange={(e) => updateSearch(e.target.value)}
+            />
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead className="bg-muted/40">
-                <tr className="text-left text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Customer Name</th>
-                  <th className="px-4 py-3 font-medium">Phone</th>
-                  <th className="px-4 py-3 font-medium">City</th>
-                  <th className="px-4 py-3 font-medium">State</th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map((customer) => (
-                  <tr key={customer.id} className="border-t">
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      {customer.name}
-                    </td>
-                    <td className="px-4 py-3 text-foreground">{customer.phone || "-"}</td>
-                    <td className="px-4 py-3 text-foreground">{customer.city || "-"}</td>
-                    <td className="px-4 py-3 text-foreground">{customer.state || "-"}</td>
-                    <td className="px-4 py-3 text-right">
-                      <ArchivedCustomerRestoreButton
-                        customerId={customer.id}
-                        customerName={customer.name}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
 
-        <CustomersPagination
-          page={pagination.page}
-          pageSize={pagination.pageSize}
-          totalCount={pagination.totalCount}
-          totalPages={pagination.totalPages}
-        />
+          <CustomersTable
+            customers={customers}
+            pagination={pagination}
+            selectedCustomerIds={selectedCustomerIds}
+            onSelectionChange={setSelectedCustomerIds}
+            activeCustomerId={activeCustomerId}
+            onActivate={setActiveCustomerId}
+          />
+        </div>
+
+        <ArchivedCustomerDetailPanel customerId={activeCustomerId} states={states} />
       </div>
     </main>
   )

@@ -61,7 +61,7 @@ export function KarigarCreateForm({
 
   useEffect(() => {
     if (state.success) {
-      toast.success(state.message || "Karigar added successfully")
+      toast.success(state.message || "Artisan added successfully")
       router.push("/karigars")
       router.refresh()
     }

@@ -8,7 +8,7 @@ import { PageBackHeader } from "@/components/shared/page-back-header"
 import { KarigarLedgerSummaryTable } from "@/components/karigars/karigar-ledger-summary-table"
 
 export const metadata: Metadata = {
-  title: "Karigar Ledger",
+  title: "Artisan Ledger",
 }
 
 export const dynamic = "force-dynamic"
@@ -19,10 +19,10 @@ export default async function KarigarLedgerPage() {
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
-        title="Karigar Ledger"
-        description="Gold and payment balance across every karigar."
+        title="Artisan Ledger"
+        description="Gold and payment balance across every artisan."
         backHref="/karigars"
-        backLabel="Back to Karigars"
+        backLabel="Back to Artisans"
       />
 
       <KarigarLedgerSummaryTable rows={summary.rows} totals={summary.totals} />

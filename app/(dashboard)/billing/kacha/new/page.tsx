@@ -11,6 +11,7 @@ import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 
 import { KachaInvoiceForm } from "@/components/billing/kacha/kacha-invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 
 export const metadata: Metadata = {
   title: "New Kacha Invoice",
@@ -38,16 +39,18 @@ export default async function NewKachaInvoicePage() {
         backLabel="Back to Kacha Slips"
       />
 
-      <KachaInvoiceForm
-        customers={customers}
-        stockItems={stockItems}
-        locations={locations}
-        metals={metals}
-        origins={origins}
-        caratConversionRates={caratConversionRates}
-        hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
-        initialLocationId={defaultLocationId}
-      />
+      <ResetFormWrapper requireConfirm>
+        <KachaInvoiceForm
+          customers={customers}
+          stockItems={stockItems}
+          locations={locations}
+          metals={metals}
+          origins={origins}
+          caratConversionRates={caratConversionRates}
+          hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
+          initialLocationId={defaultLocationId}
+        />
+      </ResetFormWrapper>
     </main>
   )
 }

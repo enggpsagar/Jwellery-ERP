@@ -8,6 +8,7 @@ import { IssueMaterialDialog } from "@/components/karigars/issue-material-dialog
 import { ReceiveMaterialDialog } from "@/components/karigars/receive-material-dialog"
 import { RecordKarigarPaymentDialog } from "@/components/karigars/record-karigar-payment-dialog"
 import { KarigarDetailContent } from "@/components/karigars/karigar-detail-content"
+import { KarigarRowActions } from "@/components/karigars/karigar-row-actions"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toTitleCase } from "@/lib/utils"
 
@@ -50,7 +51,7 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
     return (
       <div className="flex h-full min-h-[24rem] flex-col items-center justify-center gap-2 rounded-xl border bg-card p-6 text-center text-muted-foreground">
         <Hammer className="h-8 w-8" />
-        <p className="text-sm">Select a karigar to view their details.</p>
+        <p className="text-sm">Select an artisan to view their details.</p>
       </div>
     )
   }
@@ -94,6 +95,16 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
             count={materialCounts.receivedCount}
           />
           <RecordKarigarPaymentDialog karigarId={karigar.id} />
+          <KarigarRowActions
+            karigarId={karigar.id}
+            karigarName={karigar.name}
+            metals={metals}
+            assignedMetalTypeIds={karigar.assignedMetalTypeIds}
+            locations={locations}
+            defaultLocationId={defaultLocationId}
+            showView={false}
+            showIssueMaterial={false}
+          />
         </div>
       </div>
 

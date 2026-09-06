@@ -137,9 +137,9 @@ export function CustomersToolbar({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm xl:flex-row xl:items-center xl:justify-between">
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 shadow-sm">
       {searchOpen ? (
-        <div className="relative w-full xl:max-w-sm">
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             autoFocus
@@ -176,7 +176,7 @@ export function CustomersToolbar({
         </Button>
       )}
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+      <div className="flex flex-wrap items-center gap-3">
         <select
           className="rounded-md border px-3 py-2 text-sm"
           value={currentSortBy}

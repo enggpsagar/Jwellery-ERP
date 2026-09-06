@@ -93,7 +93,7 @@ export function RecordKarigarPaymentDialog({
 
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Record Payment to Karigar</DialogTitle>
+          <DialogTitle>Record Payment to Artisan</DialogTitle>
         </DialogHeader>
 
         <form

@@ -192,7 +192,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
       icon: "metal" as const,
     })),
     {
-      label: "Pending Karigar Orders",
+      label: "Pending Artisan Orders",
       value: `${pendingJobs}`,
       change: "",
       trend: overdueJobs > 0 ? "down" : "up",
@@ -667,9 +667,9 @@ export async function getRecentActivity(
     if (entry.sourceType === "SALE") {
       action = isCredit ? "Payment received" : "Completed a purchase";
     } else if (entry.sourceType === "KARIGAR_ISSUE") {
-      action = "Material issued to karigar";
+      action = "Material issued to artisan";
     } else if (entry.sourceType === "KARIGAR_RECEIPT") {
-      action = "Received goods from karigar";
+      action = "Received goods from artisan";
     }
 
     const detail =

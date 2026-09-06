@@ -12,6 +12,7 @@ import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 
 import { PurchaseForm } from "@/components/purchases/purchase-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 
 export const metadata: Metadata = {
   title: "New Purchase",
@@ -42,20 +43,22 @@ export default async function NewPurchasePage() {
       {/* PurchaseForm reads ?newVendorId / ?newProductId via useSearchParams,
           which needs a Suspense boundary to avoid opting the whole route out
           of static optimisation. */}
-      <Suspense fallback={null}>
-        <PurchaseForm
-          vendors={vendors}
-          products={products}
-          locations={locations}
-          metals={metals}
-          origins={origins}
-          caratConversionRates={caratConversionRates}
-          defaultGstRate={businessSettings.defaultGstRate}
-          gstScheme={businessSettings.gstScheme}
-          storeState={businessSettings.state}
-          initialLocationId={defaultLocationId}
-        />
-      </Suspense>
+      <ResetFormWrapper requireConfirm>
+        <Suspense fallback={null}>
+          <PurchaseForm
+            vendors={vendors}
+            products={products}
+            locations={locations}
+            metals={metals}
+            origins={origins}
+            caratConversionRates={caratConversionRates}
+            defaultGstRate={businessSettings.defaultGstRate}
+            gstScheme={businessSettings.gstScheme}
+            storeState={businessSettings.state}
+            initialLocationId={defaultLocationId}
+          />
+        </Suspense>
+      </ResetFormWrapper>
     </main>
   )
 }

@@ -59,7 +59,7 @@ export function ArchivedCustomerRestoreButton({
         type="button"
         variant="outline"
         size="sm"
-        className="gap-2"
+        className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
         onClick={() => setOpen(true)}
       >
         <RotateCcw className="h-4 w-4" />

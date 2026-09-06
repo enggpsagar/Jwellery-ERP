@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 
 import { CreateStoreForm } from "@/components/stores/create-store-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 import { getPlans } from "@/lib/actions/plan-actions"
 
 export const metadata: Metadata = {
@@ -20,7 +21,9 @@ export default async function NewStorePage() {
         backLabel="Back to Stores"
       />
 
-      <CreateStoreForm plans={plans} />
+      <ResetFormWrapper>
+        <CreateStoreForm plans={plans} />
+      </ResetFormWrapper>
     </main>
   )
 }

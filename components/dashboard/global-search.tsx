@@ -25,7 +25,7 @@ const TYPE_LABEL: Record<GlobalSearchResultType, string> = {
   customer: "Customer",
   product: "Product",
   invoice: "Invoice",
-  karigar: "Karigar",
+  karigar: "Artisan",
 };
 
 export function GlobalSearch() {

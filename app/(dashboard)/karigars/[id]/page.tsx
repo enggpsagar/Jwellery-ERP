@@ -20,9 +20,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { id } = await params;
     const bundle = await getKarigarDetailBundle(id);
-    return { title: bundle?.karigar.name ?? "Karigar" };
+    return { title: bundle?.karigar.name ?? "Artisan" };
   } catch {
-    return { title: "Karigar" };
+    return { title: "Artisan" };
   }
 }
 
@@ -40,9 +40,9 @@ export default async function KarigarDetailPage({ params }: Props) {
     <main className="space-y-6 p-6">
       <PageBackHeader
         title={toTitleCase(karigar.name)}
-        description={`Karigar code: ${karigar.code || "-"} · Mobile: ${karigar.mobile || "-"}`}
+        description={`Artisan code: ${karigar.code || "-"} · Mobile: ${karigar.mobile || "-"}`}
         backHref="/karigars"
-        backLabel="Back to Karigars"
+        backLabel="Back to Artisans"
         action={
           <div className="flex flex-wrap gap-2">
             <IssueMaterialDialog

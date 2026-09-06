@@ -96,6 +96,7 @@ export type VendorLedgerEntryItem = {
   description: string
   amount: number
   entryDate: string
+  entryDateISO: string
 }
 
 function toNumber(value: FormDataEntryValue | null, fallback = 0) {
@@ -320,6 +321,7 @@ export async function getVendorLedger(
     description: entry.description ?? "",
     amount: Number(entry.amount ?? 0),
     entryDate: formatDate(entry.entryDate),
+    entryDateISO: entry.entryDate.toISOString(),
   }))
 }
 

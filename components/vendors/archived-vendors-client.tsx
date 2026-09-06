@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
 import type { Vendor } from "@/lib/actions/vendor-actions"
+import { toTitleCase } from "@/lib/utils"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Input } from "@/components/ui/input"
 import { VendorsPagination } from "@/components/vendors/vendors-pagination"
@@ -77,7 +78,7 @@ export function ArchivedVendorsClient({
                 {vendors.map((vendor) => (
                   <tr key={vendor.id} className="border-t">
                     <td className="px-4 py-3 font-medium text-foreground">
-                      {vendor.name}
+                      {toTitleCase(vendor.name)}
                     </td>
                     <td className="px-4 py-3 text-foreground">{vendor.phone || "-"}</td>
                     <td className="px-4 py-3 text-foreground">{vendor.city || "-"}</td>
@@ -85,7 +86,7 @@ export function ArchivedVendorsClient({
                     <td className="px-4 py-3 text-right">
                       <ArchivedVendorRestoreButton
                         vendorId={vendor.id}
-                        vendorName={vendor.name}
+                        vendorName={toTitleCase(vendor.name)}
                       />
                     </td>
                   </tr>

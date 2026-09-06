@@ -22,25 +22,16 @@ type PaginationInfo = {
   hasPrevPage: boolean
 }
 
-type LocationOption = {
-  id: string
-  name: string
-}
-
 type KarigarsClientProps = {
   karigars: Karigar[]
   pagination: PaginationInfo
   metals: StoreMetalRow[]
-  locations?: LocationOption[]
-  defaultLocationId?: string | null
 }
 
 export function KarigarsClient({
   karigars,
   pagination,
   metals,
-  locations = [],
-  defaultLocationId = null,
 }: KarigarsClientProps) {
   const [selectedKarigarIds, setSelectedKarigarIds] = React.useState<string[]>([])
   // Which row's full detail shows in the right-hand panel — defaults to
@@ -61,20 +52,20 @@ export function KarigarsClient({
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
-        title="Karigars"
+        title="Artisans"
         description="Manage jewellery artisans and their job records."
         backHref="/dashboard"
         backLabel="Back to Dashboard"
         action={
           <div className="flex flex-wrap gap-2">
             <Link href="/karigars/disabled">
-              <Button variant="outline">Disabled Karigars</Button>
+              <Button variant="outline">Disabled Artisans</Button>
             </Link>
             <Link href="/karigars/ledger">
-              <Button variant="outline">Karigar Ledger</Button>
+              <Button variant="outline">Artisan Ledger</Button>
             </Link>
             <Link href="/karigars/new">
-              <Button>Add Karigar</Button>
+              <Button>Add Artisan</Button>
             </Link>
           </div>
         }
@@ -91,8 +82,8 @@ export function KarigarsClient({
             bulkActions={
               <BulkDeleteButton
                 selectedIds={selectedKarigarIds}
-                itemLabelSingular="karigar"
-                itemLabelPlural="karigars"
+                itemLabelSingular="artisan"
+                itemLabelPlural="artisans"
                 getDisplayName={(id) => karigars.find((karigar) => karigar.id === id)?.name ?? id}
                 onDelete={bulkDeleteKarigars}
                 onDone={() => setSelectedKarigarIds([])}
@@ -105,9 +96,6 @@ export function KarigarsClient({
             pagination={pagination}
             selectedKarigarIds={selectedKarigarIds}
             onSelectionChange={setSelectedKarigarIds}
-            metals={metals}
-            locations={locations}
-            defaultLocationId={defaultLocationId}
             activeKarigarId={activeKarigarId}
             onActivate={setActiveKarigarId}
           />

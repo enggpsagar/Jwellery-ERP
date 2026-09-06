@@ -332,13 +332,13 @@ export async function recordPaymentOut(
     }
 
     const karigarId = String(formData.get("karigarId") || "").trim()
-    if (!karigarId) return { success: false, message: "Select a karigar" }
+    if (!karigarId) return { success: false, message: "Select an artisan" }
 
     const karigar = await prisma.karigar.findFirst({
       where: { id: karigarId, storeId },
       select: { id: true, name: true, locationId: true },
     })
-    if (!karigar) return { success: false, message: "Karigar not found" }
+    if (!karigar) return { success: false, message: "Artisan not found" }
 
     await prisma.$transaction(
       payments.map((payment, index) =>

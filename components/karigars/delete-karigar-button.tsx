@@ -36,11 +36,11 @@ export function DeleteKarigarButton({
       const result = await deleteKarigar(karigarId);
 
       if (!result.success) {
-        toast.error(result.message || "Unable to delete karigar");
+        toast.error(result.message || "Unable to delete artisan");
         return;
       }
 
-      toast.success(result.message || "Karigar deleted successfully");
+      toast.success(result.message || "Artisan deleted successfully");
 
       setOpen(false);
       router.refresh();
@@ -51,12 +51,12 @@ export function DeleteKarigarButton({
     <>
       <Button
         type="button"
-        variant="ghost"
+        variant="outline"
         size="icon"
         onClick={() => setOpen(true)}
-        className="text-red-600 hover:text-red-700"
+        className="border-red-200 text-red-600 hover:bg-red-50"
         aria-label={`Delete ${karigarName}`}
-        title="Delete karigar"
+        title="Delete artisan"
       >
         <Trash2 className="h-4 w-4" />
       </Button>
@@ -64,14 +64,14 @@ export function DeleteKarigarButton({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Karigar</DialogTitle>
+            <DialogTitle>Delete Artisan</DialogTitle>
           </DialogHeader>
 
           <p className="text-sm text-muted-foreground">
             Are you sure you want to delete <strong>{karigarName}</strong>?
             <br />
             <br />
-            This action cannot be undone. The karigar can only be deleted if
+            This action cannot be undone. The artisan can only be deleted if
             they have no jobs linked to them.
           </p>
 

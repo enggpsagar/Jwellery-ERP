@@ -12,6 +12,7 @@ import { resolveBackLink } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getReturnEligibility } from "@/lib/return-window"
 import { APP_NAME } from "@/lib/constants/app"
+import { toTitleCase } from "@/lib/utils"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog"
 import { EmailInvoiceButton } from "@/components/billing/email-invoice-button"
@@ -20,6 +21,7 @@ import { EditInvoiceDialog } from "@/components/billing/edit-invoice-dialog"
 import { CancelInvoiceDialog } from "@/components/billing/cancel-invoice-dialog"
 import { ReturnItemsDialog } from "@/components/billing/return-items-dialog"
 import { InvoiceQrCard } from "@/components/billing/invoice-qr-card"
+import { InvoiceItemsTable } from "@/components/billing/invoice-items-table"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
 
@@ -101,7 +103,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
     <main className="space-y-6 p-6">
       <PageBackHeader
         title={invoice.invoiceNumber}
-        description={invoice.customer?.name ?? ""}
+        description={invoice.customer?.name ? toTitleCase(invoice.customer.name) : ""}
         backHref={backTo.href}
         backLabel={backTo.label}
         action={
@@ -261,7 +263,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                 href={`/customers/${invoice.customer.id}?from=${encodeURIComponent(`/billing/${invoice.id}`)}`}
                 className="font-medium text-primary underline-offset-4 hover:underline"
               >
-                {invoice.customer.name}
+                {toTitleCase(invoice.customer.name)}
                 {invoice.customer.phone ? ` (${invoice.customer.phone})` : ""}
               </Link>
             ) : (
@@ -271,16 +273,13 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               <p className="font-medium">—</p>
             )}
           </div>
+
+          <div>
+            <p className="text-sm text-muted-foreground">QR Code</p>
+            <InvoiceQrCard dataUrl={qrDataUrl} invoiceNumber={invoice.invoiceNumber} />
+          </div>
         </div>
       </div>
-
-      <InvoiceQrCard
-        dataUrl={qrDataUrl}
-        invoiceNumber={invoice.invoiceNumber}
-        customerName={invoice.customer?.name ?? null}
-        invoiceDate={new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}
-        totalAmount={`₹${invoice.totalAmount.toFixed(2)}`}
-      />
 
       {isCancelled && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 space-y-3">
@@ -334,57 +333,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border bg-card">
-        <table className="min-w-full text-sm">
-          <thead className="bg-muted/40">
-            <tr className="border-b">
-              <th className="px-4 py-3 text-left font-medium">Item</th>
-              <th className="px-4 py-3 text-left font-medium">Qty</th>
-              <th className="px-4 py-3 text-left font-medium">Weight</th>
-              <th className="px-4 py-3 text-left font-medium">Rate</th>
-              <th className="px-4 py-3 text-left font-medium">Making</th>
-              <th className="px-4 py-3 text-left font-medium">Stone</th>
-              <th className="px-4 py-3 text-left font-medium">Line Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoice.items.map((item) => {
-              // Diamonds price and display by carat, not gram weight — same
-              // unit toLineQuantity used to save this line's own total.
-              const isDiamond = item.purity === "DIAMOND"
-              const quantity = isDiamond ? item.caratWeight : item.netWeight
-              return (
-              <tr key={item.id} className="border-b last:border-0">
-                <td className="px-4 py-3">
-                  {item.itemName}
-                  {item.stoneMetalTypeName ? (
-                    <span className="block text-xs text-muted-foreground">
-                      Stone: {item.stoneMetalTypeName}
-                      {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="px-4 py-3">{item.quantity}</td>
-                <td className="px-4 py-3">
-                  {quantity != null ? `${quantity.toFixed(3)} ${isDiamond ? "ct" : "g"}` : "-"}
-                </td>
-                <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
-                <td className="px-4 py-3">
-                  ₹{item.makingCharge.toFixed(2)}
-                  {item.makingChargeType === "PERCENTAGE" && item.rate && quantity ? (
-                    <span className="block text-xs text-muted-foreground">
-                      ({((item.makingCharge / (item.rate * quantity)) * 100).toFixed(2)}% of metal value)
-                    </span>
-                  ) : null}
-                </td>
-                <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
-                <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
-              </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      <InvoiceItemsTable invoiceId={invoice.id} items={invoice.items} canEdit={canFullyEdit} />
 
       <div className="rounded-xl border bg-card p-6 max-w-sm ml-auto space-y-1 text-sm">
         <div className="flex justify-between">

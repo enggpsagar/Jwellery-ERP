@@ -31,7 +31,7 @@ type StoreDeleteDialogProps = {
 const COUNT_LABELS: { key: keyof Omit<StoreRecordCounts, "total">; label: string }[] = [
   { key: "customers", label: "customers" },
   { key: "vendors", label: "vendors" },
-  { key: "karigars", label: "karigars" },
+  { key: "karigars", label: "artisans" },
   { key: "products", label: "products" },
   { key: "invoices", label: "invoices" },
   { key: "kachaInvoices", label: "kacha slips" },

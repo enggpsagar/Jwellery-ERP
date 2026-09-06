@@ -3,6 +3,28 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { KarigarLedgerTabs } from "@/components/karigars/karigar-ledger-tabs"
 import { KarigarStatusCard } from "@/components/karigars/karigar-status-card"
 import { ExportMenu } from "@/components/shared/export-menu"
+import { classifyMetalName } from "@/lib/business-units"
+import { cn } from "@/lib/utils"
+
+/** A ribbon-colored accent per metal family, so Gold/Silver/Diamond balance
+ *  cards are tellable apart at a glance without reading the label — GOLD
+ *  reuses the app's own established gold hue (--chart-2, see globals.css);
+ *  the others are reasonable, distinct proxies (cool grey for silver, blue
+ *  for diamond) since there's no equivalent established token for them.
+ *  Any other store-defined metal falls back to a neutral chart hue rather
+ *  than guessing a color that might clash with what it actually is. */
+function metalRibbonColor(metalLabel: string): string {
+  switch (classifyMetalName(metalLabel)) {
+    case "GOLD":
+      return "var(--chart-2)"
+    case "SILVER":
+      return "#94a3b8"
+    case "DIAMOND":
+      return "var(--chart-1)"
+    default:
+      return "var(--chart-4)"
+  }
+}
 
 /**
  * The body of a karigar's detail view — balance cards and ledger. Shared
@@ -58,7 +80,7 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
             </Card>
           )}
 
-        <KarigarStatusCard karigarId={karigar.id} karigarName={karigar.name} isActive={karigar.isActive} />
+        <KarigarStatusCard karigarId={karigar.id} isActive={karigar.isActive} />
       </div>
 
       {/* Live balances — Opening Gold/Cash above are this karigar's starting
@@ -71,7 +93,7 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
           line on the page. */}
       {ledger.finalCashBalance !== 0 && (
         <p className="text-sm">
-          <span className="text-muted-foreground">Cash Balance (owed to karigar): </span>
+          <span className="text-muted-foreground">Cash Balance (owed to artisan): </span>
           <span
             className={ledger.finalCashBalance > 0 ? "font-semibold text-red-700" : "font-semibold"}
           >
@@ -80,48 +102,53 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
         </p>
       )}
 
+      {/* Ribbon-style: a colored accent stripe per metal (so Gold vs Silver
+          reads at a glance) over the weight itself, made prominent — the
+          number is the thing anyone glancing at this card actually wants,
+          not a full sentence restating it. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {ledger.materialGroups.map((group) => (
-          <Card
-            key={group.metalTypeId ?? "unassigned"}
-            size="sm"
-            className={
-              group.finalFineBalance > 0
-                ? "border-red-200 bg-red-50"
-                : group.finalFineBalance < 0
-                  ? "border-emerald-200 bg-emerald-50"
-                  : undefined
-            }
-          >
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">
-                {group.metalLabel} Balance
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+        {ledger.materialGroups.map((group) => {
+          const isOwed = group.finalFineBalance > 0
+          const isCredit = group.finalFineBalance < 0
+
+          return (
+            <div
+              key={group.metalTypeId ?? "unassigned"}
+              className="overflow-hidden rounded-xl border bg-card shadow-sm"
+            >
               <div
-                className={
-                  group.finalFineBalance > 0
-                    ? "text-xl font-semibold text-red-700"
-                    : group.finalFineBalance < 0
-                      ? "text-xl font-semibold text-emerald-700"
-                      : "text-xl font-semibold"
-                }
-              >
-                {group.finalFineBalance > 0
-                  ? `Karigar owes ${group.finalFineBalance.toFixed(3)}g`
-                  : group.finalFineBalance < 0
-                    ? `You owe ${Math.abs(group.finalFineBalance).toFixed(3)}g`
-                    : "Settled"}
+                className="h-1.5 w-full"
+                style={{ backgroundColor: metalRibbonColor(group.metalLabel) }}
+              />
+              <div className="p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {group.metalLabel} Balance
+                </p>
+                <p
+                  className={cn(
+                    "mt-1 text-2xl font-bold tabular-nums",
+                    isOwed ? "text-red-700" : isCredit ? "text-emerald-700" : "text-foreground",
+                  )}
+                >
+                  {Math.abs(group.finalFineBalance).toFixed(3)}g
+                </p>
+                <p
+                  className={cn(
+                    "mt-1 text-xs font-medium",
+                    isOwed ? "text-red-600" : isCredit ? "text-emerald-600" : "text-muted-foreground",
+                  )}
+                >
+                  {isOwed ? "Artisan owes you" : isCredit ? "You owe the artisan" : "Settled"}
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+            </div>
+          )
+        })}
       </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <CardTitle>Karigar Ledger</CardTitle>
+          <CardTitle>Artisan Ledger</CardTitle>
           <ExportMenu href={`/karigars/${karigar.id}/ledger-export`} label="Export Ledger" />
         </CardHeader>
         <CardContent>

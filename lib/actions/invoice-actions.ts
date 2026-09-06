@@ -28,6 +28,7 @@ import {
 import { sendMail } from "@/lib/mailer";
 import { invoiceEmail } from "@/lib/email-templates";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
+import { getReturnEligibility } from "@/lib/return-window";
 import { amountInWords } from "@/lib/number-to-words";
 import { resolveStoreName } from "@/lib/invite-email";
 import { buildExcelExport } from "@/lib/excel-export";
@@ -519,6 +520,83 @@ export async function getInvoiceById(id: string) {
 
   if (!invoice) return null;
   return mapInvoice(invoice);
+}
+
+export type CustomerSaleInvoiceOption = {
+  id: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  totalAmount: number;
+  balanceAmount: number;
+};
+
+export type CustomerReturnableInvoices = {
+  /** Any non-cancelled sale invoice at all — gates whether Refund/Replace
+   * show up on the customer's ledger at all, regardless of whether one
+   * currently qualifies for either specific action below. */
+  hasAnyInvoice: boolean;
+  /** Eligible for Return Items (ReturnItemsDialog) — same rule as the
+   * invoice detail page's own isReturnable && returnEligibility.eligible. */
+  refundable: CustomerSaleInvoiceOption[];
+  /** Eligible for Return & Exchange (CancelInvoiceDialog) — same rule as
+   * the invoice detail page's own isCancellable. */
+  replaceable: CustomerSaleInvoiceOption[];
+};
+
+/**
+ * Feeds the customer ledger's Refund/Replace invoice pickers — same
+ * eligibility rules the invoice detail page already uses to decide whether
+ * to show its own "Return Items" / "Return & Exchange" actions, just
+ * evaluated across every one of this customer's invoices at once instead
+ * of the one currently open.
+ */
+export async function getCustomerReturnableInvoices(
+  customerId: string,
+): Promise<CustomerReturnableInvoices> {
+  const storeId = await requireStoreScope();
+
+  const [invoices, settings] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { customerId, storeId, status: { not: InvoiceStatus.CANCELLED } },
+      orderBy: { invoiceDate: "desc" },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        invoiceDate: true,
+        totalAmount: true,
+        balanceAmount: true,
+        status: true,
+      },
+    }),
+    getBusinessSettings(),
+  ]);
+
+  const toOption = (invoice: (typeof invoices)[number]): CustomerSaleInvoiceOption => ({
+    id: invoice.id,
+    invoiceNumber: invoice.invoiceNumber,
+    invoiceDate: invoice.invoiceDate.toLocaleDateString("en-IN"),
+    totalAmount: Number(invoice.totalAmount),
+    balanceAmount: Number(invoice.balanceAmount),
+  });
+
+  const refundable =
+    settings.returnWindowDays > 0
+      ? invoices
+          .filter(
+            (invoice) =>
+              (invoice.status === InvoiceStatus.PAID || invoice.status === InvoiceStatus.PARTIAL) &&
+              getReturnEligibility(invoice.invoiceDate, settings.returnWindowDays).eligible,
+          )
+          .map(toOption)
+      : [];
+
+  const replaceable = invoices
+    .filter(
+      (invoice) => invoice.status === InvoiceStatus.DRAFT || invoice.status === InvoiceStatus.PARTIAL,
+    )
+    .map(toOption);
+
+  return { hasAnyInvoice: invoices.length > 0, refundable, replaceable };
 }
 
 /** Lightweight customer list for the invoice form's customer picker. */
@@ -1492,6 +1570,171 @@ export async function updateInvoice(
     }
     console.error("updateInvoice error:", error);
     return { success: false, message: "Failed to update invoice" };
+  }
+}
+
+/**
+ * Inline Rate/Weight edit for a single line, from the invoice detail
+ * page's own item table — a lighter-weight sibling of updateInvoice's
+ * full line-item edit, for the common case of just correcting a rate or
+ * weight without reopening the whole Edit Items form.
+ *
+ * Deliberately narrower than the full edit: rate/weight are the only
+ * things that can change here, so making/HM/stone charges and this
+ * line's schemeDiscount carry over untouched, and — since neither the
+ * piece count nor which stock row this line points at ever changes —
+ * there's no stock to restore/reapply, unlike updateInvoice's full path.
+ *
+ * GST is still recomputed, not just left alone: every line on one
+ * invoice shares the same GST% (set once, at creation — see
+ * invoice-form.tsx's single `gstRate` state), so that % is derived from
+ * this line's own pre-edit tax/taxable-value ratio and reapplied to the
+ * new taxable value, the same intra-/inter-state split (SGST+CGST vs
+ * IGST) as before. That keeps this action independent of business
+ * settings/customer state lookups — it only ever needs numbers already
+ * sitting on the line being edited.
+ */
+export async function updateInvoiceLineItem(
+  invoiceId: string,
+  itemId: string,
+  prevState: InvoiceFormState = initialState,
+  formData: FormData,
+): Promise<InvoiceFormState> {
+  try {
+    try {
+      await requirePermission(PERMISSIONS.BILLING_UPDATE);
+    } catch {
+      return { success: false, message: "You do not have permission to edit invoices." };
+    }
+
+    const storeId = await requireStoreScope();
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: invoiceId, storeId },
+      include: { items: true },
+    });
+    if (!invoice) return { success: false, message: "Invoice not found" };
+
+    if (invoice.status !== InvoiceStatus.DRAFT && invoice.status !== InvoiceStatus.PARTIAL) {
+      return {
+        success: false,
+        message: "Only draft or partially-paid invoices can have their line items edited.",
+      };
+    }
+
+    const item = invoice.items.find((existing) => existing.id === itemId);
+    if (!item) return { success: false, message: "Line item not found on this invoice" };
+
+    const rate = toNumber(formData.get("rate"));
+    const weight = toNumber(formData.get("weight"));
+    if (!(rate > 0)) {
+      return { success: false, message: "Enter a selling price greater than 0." };
+    }
+    if (!(weight > 0)) {
+      return { success: false, message: "Enter a weight greater than 0." };
+    }
+
+    const isDiamond = item.purity === PurityType.DIAMOND;
+    const round = (value: number) => Math.round(value * 100) / 100;
+
+    const oldQuantity = isDiamond ? toNumber(item.caratWeight) : toNumber(item.netWeight);
+    const oldTaxable =
+      toNumber(item.rate) * oldQuantity +
+      toNumber(item.makingCharge) +
+      toNumber(item.hmCharge) +
+      toNumber(item.stoneCharge) -
+      toNumber(item.schemeDiscount);
+    const oldTax = toNumber(item.sgstAmount) + toNumber(item.cgstAmount) + toNumber(item.igstAmount);
+    const isInterState = toNumber(item.igstAmount) > 0;
+    const ratePercent = oldTaxable > 0 ? (oldTax / oldTaxable) * 100 : 0;
+
+    const newTaxable =
+      rate * weight +
+      toNumber(item.makingCharge) +
+      toNumber(item.hmCharge) +
+      toNumber(item.stoneCharge) -
+      toNumber(item.schemeDiscount);
+    const newTax = (newTaxable * ratePercent) / 100;
+    const newSgst = isInterState ? 0 : round(newTax / 2);
+    const newCgst = isInterState ? 0 : round(newTax / 2);
+    const newIgst = isInterState ? round(newTax) : 0;
+    const newLineTotal = newTaxable + newSgst + newCgst + newIgst;
+
+    // Only this line's metal value and tax moved — making/HM/stone charges
+    // and every other line are untouched, so the invoice-level totals shift
+    // by exactly that line's own delta rather than needing a full re-sum
+    // across every item.
+    const oldLineMetalValue = toNumber(item.rate) * oldQuantity;
+    const newLineMetalValue = rate * weight;
+    const subtotal = Number(invoice.subtotal) - oldLineMetalValue + newLineMetalValue;
+    const taxAmount = Number(invoice.taxAmount) - oldTax + (newSgst + newCgst + newIgst);
+    const totalAmount =
+      subtotal + Number(invoice.makingCharges) + Number(invoice.stoneCharges) - Number(invoice.discount) + taxAmount;
+
+    const paidAmount = Number(invoice.paidAmount);
+    if (totalAmount < paidAmount) {
+      return {
+        success: false,
+        message: `New total (₹${totalAmount.toFixed(2)}) can't be less than the ₹${paidAmount.toFixed(2)} already paid — record a refund or adjust payments first.`,
+      };
+    }
+    const newBalanceAmount = Math.max(0, totalAmount - paidAmount);
+
+    let newStatus: InvoiceStatus = InvoiceStatus.PAID;
+    if (newBalanceAmount > 0 && paidAmount > 0) newStatus = InvoiceStatus.PARTIAL;
+    else if (newBalanceAmount > 0 && paidAmount === 0) newStatus = InvoiceStatus.DRAFT;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.invoiceItem.update({
+        where: { id: itemId },
+        data: {
+          rate,
+          netWeight: isDiamond ? undefined : weight,
+          caratWeight: isDiamond ? weight : undefined,
+          sgstAmount: newSgst,
+          cgstAmount: newCgst,
+          igstAmount: newIgst,
+          lineTotal: newLineTotal,
+        },
+      });
+
+      await tx.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          subtotal,
+          taxAmount,
+          totalAmount,
+          balanceAmount: newBalanceAmount,
+          status: newStatus,
+        },
+      });
+
+      // Same offsetting-entry convention as updateInvoice's full edit —
+      // one CREDIT/DEBIT ledger entry sized to the actual balance change,
+      // payments already recorded stay exactly as they are.
+      const delta = newBalanceAmount - Number(invoice.balanceAmount);
+      if (delta !== 0) {
+        await tx.ledgerEntry.create({
+          data: {
+            storeId,
+            type: delta > 0 ? LedgerEntryType.DEBIT : LedgerEntryType.CREDIT,
+            sourceType: LedgerSourceType.SALE,
+            customerId: invoice.customerId,
+            invoiceId: invoice.id,
+            amount: Math.abs(delta),
+            description: `Invoice ${invoice.invoiceNumber} revised — balance ${delta > 0 ? "increased" : "decreased"}`,
+            locationId: invoice.locationId ?? undefined,
+          },
+        });
+      }
+    });
+
+    revalidatePath("/billing");
+    revalidatePath(`/billing/${invoiceId}`);
+
+    return { success: true, message: "Line item updated" };
+  } catch (error) {
+    console.error("updateInvoiceLineItem error:", error);
+    return { success: false, message: "Failed to update line item" };
   }
 }
 

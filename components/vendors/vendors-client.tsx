@@ -90,7 +90,6 @@ export function VendorsClient({
 
           <VendorsTable
             vendors={vendors}
-            states={states}
             pagination={pagination}
             selectedVendorIds={selectedVendorIds}
             onSelectionChange={setSelectedVendorIds}

@@ -15,9 +15,9 @@ export function formatLedgerSource(
     case LedgerSourceType.PURCHASE:
       return "Purchase"
     case LedgerSourceType.KARIGAR_ISSUE:
-      return "Karigar Issue"
+      return "Artisan Issue"
     case LedgerSourceType.KARIGAR_RECEIPT:
-      return "Karigar Receipt"
+      return "Artisan Receipt"
     case LedgerSourceType.ADJUSTMENT:
       return "Adjustment"
     case LedgerSourceType.PAYMENT_IN:

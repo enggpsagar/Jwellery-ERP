@@ -132,24 +132,24 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
       )
 
       if (!result.success || !result.fileBase64 || !result.fileName) {
-        toast.error(result.message || "Failed to export karigars.")
+        toast.error(result.message || "Failed to export artisans.")
         return
       }
 
       downloadBase64File(result.fileBase64, result.fileName)
-      toast.success(result.message || "Karigars exported successfully.")
+      toast.success(result.message || "Artisans exported successfully.")
     } catch (error) {
       console.error(error)
-      toast.error("Failed to export karigars.")
+      toast.error("Failed to export artisans.")
     } finally {
       setIsExporting(false)
     }
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm xl:flex-row xl:items-center xl:justify-between">
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 shadow-sm">
       {searchOpen ? (
-        <div className="relative w-full xl:max-w-sm">
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             autoFocus
@@ -187,7 +187,7 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
         </Button>
       )}
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+      <div className="flex flex-wrap items-center gap-3">
         <select
           className="rounded-md border px-3 py-2 text-sm"
           value={currentType}
@@ -243,8 +243,8 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
           size="icon"
           onClick={handleExport}
           disabled={isExporting}
-          title={hasSelection ? `Export selected karigars (${selectedKarigarIds.length})` : "Export karigars"}
-          aria-label={hasSelection ? `Export selected karigars (${selectedKarigarIds.length})` : "Export karigars"}
+          title={hasSelection ? `Export selected artisans (${selectedKarigarIds.length})` : "Export artisans"}
+          aria-label={hasSelection ? `Export selected artisans (${selectedKarigarIds.length})` : "Export artisans"}
         >
           {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}
         </Button>

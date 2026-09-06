@@ -35,7 +35,7 @@ export function KarigarSelect({
   karigars,
   name = "karigarId",
   defaultValue,
-  placeholder = "Select a karigar",
+  placeholder = "Select an artisan",
   onChange,
 }: KarigarSelectProps) {
   const [search, setSearch] = useState("")

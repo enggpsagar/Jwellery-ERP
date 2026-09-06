@@ -91,7 +91,7 @@ export function VendorRowActions({
         {/* A page, not a dialog — same reasoning as customers. */}
         <Link
           href={`/vendors/${vendor.id}/edit?returnTo=${encodeURIComponent("/vendors")}`}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-accent"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-indigo-200 text-indigo-600 transition hover:bg-indigo-50"
           aria-label={`Edit ${vendor.name}`}
           title="Edit vendor"
         >

@@ -60,7 +60,7 @@ export async function GET(
 
     if (!karigar) {
       return NextResponse.json(
-        { success: false, message: "Karigar not found" },
+        { success: false, message: "Artisan not found" },
         { status: 404 },
       )
     }
@@ -108,7 +108,7 @@ export async function GET(
   } catch (error) {
     console.error("Karigar ledger export failed:", error)
     return NextResponse.json(
-      { success: false, message: "Failed to export karigar ledger" },
+      { success: false, message: "Failed to export artisan ledger" },
       { status: 500 },
     )
   }

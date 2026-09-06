@@ -3,7 +3,7 @@
 import Link from "next/link"
 
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
-import { Eye, ArrowLeftCircle } from "lucide-react"
+import { Eye, Pencil, Printer, ArrowLeftCircle } from "lucide-react"
 
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
@@ -174,13 +174,31 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <Link
-                    href={`/billing/${invoice.id}`}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
-                    title="View invoice"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Link>
+                  <div className="flex items-center gap-1">
+                    <Link
+                      href={`/billing/${invoice.id}`}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
+                      title="View invoice"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Link>
+
+                    <Link
+                      href={`/billing/${invoice.id}/edit`}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-amber-700 hover:bg-amber-50"
+                      title="Edit invoice"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Link>
+
+                    <Link
+                      href={`/billing/${invoice.id}/print`}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-muted"
+                      title="Print invoice"
+                    >
+                      <Printer className="h-4 w-4" />
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}

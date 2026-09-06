@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import { getCreditNoteById } from "@/lib/actions/credit-note-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button"
+import { formatShortDate } from "@/lib/utils"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 function fmtDate(value: string) {
-  return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+  return formatShortDate(value)
 }
 
 /**

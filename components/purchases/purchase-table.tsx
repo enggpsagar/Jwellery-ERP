@@ -7,6 +7,7 @@ import { Eye } from "lucide-react"
 
 import { PurchaseStatusBadge } from "@/components/purchases/purchase-status-badge"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
+import { formatShortDate } from "@/lib/utils"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -74,7 +75,7 @@ export function PurchaseTable({ purchases }: PurchaseTableProps) {
                         fields: [
                           {
                             label: "Date",
-                            value: new Date(purchase.purchaseDate).toLocaleDateString("en-IN"),
+                            value: formatShortDate(purchase.purchaseDate),
                           },
                           { label: "Vendor", value: purchase.vendor?.name },
                           { label: "Phone", value: purchase.vendor?.phone },
@@ -99,7 +100,7 @@ export function PurchaseTable({ purchases }: PurchaseTableProps) {
                   />
                 </td>
                 <td className="px-4 py-3">
-                  {new Date(purchase.purchaseDate).toLocaleDateString("en-IN")}
+                  {formatShortDate(purchase.purchaseDate)}
                 </td>
                 <td className="px-4 py-3">
                   {purchase.vendor ? (
@@ -115,7 +116,7 @@ export function PurchaseTable({ purchases }: PurchaseTableProps) {
                             { label: "Purchase", value: purchase.purchaseNumber },
                             {
                               label: "Date",
-                              value: new Date(purchase.purchaseDate).toLocaleDateString("en-IN"),
+                              value: formatShortDate(purchase.purchaseDate),
                             },
                             { label: "Status", value: purchase.status },
                           ],

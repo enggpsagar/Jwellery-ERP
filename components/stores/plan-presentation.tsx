@@ -1,5 +1,6 @@
 import type { PlanStatus } from "@/lib/plan-status"
 import { Badge } from "@/components/ui/badge"
+import { formatShortDate } from "@/lib/utils"
 
 /**
  * Presentation shared by the plan views.
@@ -36,12 +37,7 @@ export function PlanStatusPill({ status }: { status: PlanStatus }) {
 }
 
 export function formatDay(value: Date | string | null | undefined) {
-  if (!value) return "—"
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })
+  return formatShortDate(value)
 }
 
 export function formatMoney(value: number) {

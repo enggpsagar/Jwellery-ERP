@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import { ArrowRightCircle } from "lucide-react"
 
 import { getKachaInvoiceById } from "@/lib/actions/kacha-invoice-actions"
+import { formatShortDate } from "@/lib/utils"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordKachaPaymentDialog } from "@/components/billing/kacha/record-kacha-payment-dialog"
 import { EmailKachaInvoiceButton } from "@/components/billing/kacha/email-kacha-invoice-button"
@@ -86,7 +87,7 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
           <div>
             <p className="text-sm text-muted-foreground">Slip Date</p>
             <p className="font-medium">
-              {new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN")}
+              {formatShortDate(kachaInvoice.invoiceDate)}
             </p>
           </div>
 

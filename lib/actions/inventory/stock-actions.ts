@@ -26,6 +26,7 @@ import type { StockFormState } from "@/lib/inventory/stock-types"
 import { buildExcelExport, buildMultiSheetExcelExport, parseExcelUpload } from "@/lib/excel-export"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 import { getFinenessMap, toFineWeight } from "@/lib/purity"
+import { formatShortDate, formatShortDateTime } from "@/lib/utils"
 
 function parseNullableString(value: FormDataEntryValue | null) {
   const parsed = String(value || "").trim()
@@ -334,12 +335,8 @@ export async function exportInventoryStockToExcel(
       Finish: item.finish || "-",
       Location: item.location?.name || "-",
       "Vendor Name": item.vendorName || "-",
-      "Purchase Date": item.purchaseDate
-        ? new Date(item.purchaseDate).toLocaleDateString("en-IN")
-        : "-",
-      "Created At": item.createdAt
-        ? new Date(item.createdAt).toLocaleString("en-IN")
-        : "-",
+      "Purchase Date": item.purchaseDate ? formatShortDate(item.purchaseDate) : "-",
+      "Created At": item.createdAt ? formatShortDateTime(item.createdAt) : "-",
     }))
 
     const { fileName, fileBase64 } = buildExcelExport(

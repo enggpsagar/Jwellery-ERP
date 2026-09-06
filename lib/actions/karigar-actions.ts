@@ -12,6 +12,7 @@ import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
 import { isValidPanNumber, normalizePanNumber, PAN_INVALID_MESSAGE } from "@/lib/pan";
+import { formatShortDate } from "@/lib/utils";
 import {
   getKarigarLedger,
   getKarigarMaterialCounts,
@@ -277,11 +278,7 @@ export type KarigarDetailBundle = {
 
 function formatKarigarDate(date: Date | null) {
   if (!date) return null;
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return formatShortDate(date);
 }
 
 /** Everything the karigar detail view needs, bundled into one call — reused by the standalone /karigars/[id] page and the inline detail panel on the Karigars list. */
@@ -884,12 +881,7 @@ function formatCurrencyINR(value: number) {
 }
 
 function formatDateIST(date?: Date | null) {
-  if (!date) return "-";
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return formatShortDate(date);
 }
 
 function getKarigarExportFileName() {

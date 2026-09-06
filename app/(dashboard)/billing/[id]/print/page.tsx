@@ -6,6 +6,7 @@ import { Phone, Mail, MapPin } from "lucide-react"
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { amountInWords } from "@/lib/number-to-words"
+import { formatShortDate } from "@/lib/utils"
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button"
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst"
 import { APP_NAME } from "@/lib/constants/app"
@@ -31,7 +32,7 @@ function fmt(value: number) {
 }
 
 function fmtDate(value: string) {
-  return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+  return formatShortDate(value)
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -163,15 +164,18 @@ export default async function InvoicePrintPage({ params }: Props) {
           )}
         </div>
 
-        {/* Business identity (navy, curved bottom-right) + document heading
-            on plain white to its right — the decorative violet disc bridges
-            the two, echoing the contact bar's color above it. */}
+        {/* Business identity (navy, curved top-right) + document heading on
+            plain white to its right. The decorative violet disc sits fully
+            inside this band's own box (no negative offset reaching up into
+            the contact bar above) — an earlier version poked up into that
+            bar and silently painted over the address text sitting there,
+            since it's later in DOM order and stacks on top. */}
         <div className="flex items-stretch">
           <div
-            className="relative w-[58%] bg-slate-900 px-5 py-4 text-white"
+            className="relative w-[58%] overflow-hidden bg-slate-900 px-5 py-4 text-white"
             style={{ borderTopRightRadius: "70px" }}
           >
-            <div className="pointer-events-none absolute -top-9 right-6 h-20 w-20 rounded-full bg-violet-400" />
+            <div className="pointer-events-none absolute -top-4 right-4 h-16 w-16 rounded-full bg-violet-400" />
             <div className="relative space-y-0.5">
               <p className="text-xl font-bold uppercase tracking-wide">{settings.businessName}</p>
               {settings.gstNumber && <p className="text-[11px] text-slate-300">GSTIN: {settings.gstNumber}</p>}
@@ -364,7 +368,7 @@ export default async function InvoicePrintPage({ params }: Props) {
             <div className="grid grid-cols-3 gap-x-4">
               {invoice.ewayBillNumber && <span>E-way Bill No: {invoice.ewayBillNumber}</span>}
               {invoice.ewayBillDate && (
-                <span>Date: {new Date(invoice.ewayBillDate).toLocaleDateString("en-IN")}</span>
+                <span>Date: {formatShortDate(invoice.ewayBillDate)}</span>
               )}
               {invoice.transporterName && <span>Transporter: {invoice.transporterName}</span>}
               {invoice.vehicleNumber && <span>Vehicle No: {invoice.vehicleNumber}</span>}

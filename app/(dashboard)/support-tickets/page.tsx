@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { cn } from "@/lib/utils"
+import { cn, formatShortDateTime } from "@/lib/utils"
 
 export const metadata: Metadata = {
   title: "Support Tickets",
@@ -30,13 +30,7 @@ const STATUS_FILTERS: { label: string; value: TicketStatus | "ALL" }[] = [
 ]
 
 function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(iso))
+  return formatShortDateTime(iso)
 }
 
 type SupportTicketsPageProps = {

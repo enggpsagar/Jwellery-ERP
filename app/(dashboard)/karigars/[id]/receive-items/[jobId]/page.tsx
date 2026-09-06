@@ -9,6 +9,7 @@ import { getPurityFineness } from "@/lib/actions/purity-actions";
 import { getInventoryStockFormProducts } from "@/lib/actions/inventory/stock-actions";
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions";
+import { formatShortDate } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 
@@ -37,12 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 function formatDate(date: Date | null) {
-  if (!date) return "-";
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return formatShortDate(date);
 }
 
 export default async function ReceiveItemsPage({ params }: Props) {

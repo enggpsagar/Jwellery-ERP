@@ -33,6 +33,7 @@ import { amountInWords } from "@/lib/number-to-words";
 import { resolveStoreName } from "@/lib/invite-email";
 import { buildExcelExport } from "@/lib/excel-export";
 import { OversellError } from "@/lib/inventory/oversell-error";
+import { formatShortDate } from "@/lib/utils";
 
 export type InvoiceLineItemInput = {
   itemName: string;
@@ -464,7 +465,7 @@ export async function exportInvoicesToExcel(
     const rows = invoices.map(mapInvoice).map((invoice, index) => ({
       "Sr. No.": index + 1,
       "Invoice #": invoice.invoiceNumber,
-      Date: new Date(invoice.invoiceDate).toLocaleDateString("en-IN"),
+      Date: formatShortDate(invoice.invoiceDate),
       Customer: invoice.customer?.name || "",
       Status: invoice.status,
       Subtotal: invoice.subtotal,
@@ -574,7 +575,7 @@ export async function getCustomerReturnableInvoices(
   const toOption = (invoice: (typeof invoices)[number]): CustomerSaleInvoiceOption => ({
     id: invoice.id,
     invoiceNumber: invoice.invoiceNumber,
-    invoiceDate: invoice.invoiceDate.toLocaleDateString("en-IN"),
+    invoiceDate: formatShortDate(invoice.invoiceDate),
     totalAmount: Number(invoice.totalAmount),
     balanceAmount: Number(invoice.balanceAmount),
   });

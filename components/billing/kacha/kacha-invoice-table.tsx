@@ -8,6 +8,7 @@ import { Eye, ArrowRightCircle } from "lucide-react"
 
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
+import { formatShortDate } from "@/lib/utils"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -145,7 +146,7 @@ export function KachaInvoiceTable({
                         fields: [
                           {
                             label: "Date",
-                            value: new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN"),
+                            value: formatShortDate(kachaInvoice.invoiceDate),
                           },
                           { label: "Customer", value: kachaInvoice.customer?.name },
                           { label: "Phone", value: kachaInvoice.customer?.phone },
@@ -174,7 +175,7 @@ export function KachaInvoiceTable({
                   />
                 </td>
                 <td className="px-4 py-3">
-                  {new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN")}
+                  {formatShortDate(kachaInvoice.invoiceDate)}
                 </td>
                 <td className="px-4 py-3">
                   {kachaInvoice.customer ? (
@@ -191,7 +192,7 @@ export function KachaInvoiceTable({
                             { label: "Slip", value: kachaInvoice.slipNumber },
                             {
                               label: "Date",
-                              value: new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN"),
+                              value: formatShortDate(kachaInvoice.invoiceDate),
                             },
                             { label: "Status", value: kachaInvoice.status },
                           ],

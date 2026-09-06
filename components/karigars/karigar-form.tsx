@@ -26,6 +26,10 @@ type Props = {
    * field on the create path (`karigar` null). The edit path always keeps
    * showing the karigar's own saved `locationId`, untouched. */
   defaultLocationId?: string | null
+  /** The store's own State/City (Settings > Business Profile) — same
+   * create-only pre-fill rule as defaultLocationId above. */
+  defaultState?: string
+  defaultCity?: string
 }
 
 export function KarigarForm({
@@ -36,6 +40,8 @@ export function KarigarForm({
   states = [],
   metals = [],
   defaultLocationId = null,
+  defaultState,
+  defaultCity,
 }: Props) {
   const [locationId, setLocationId] = useState(karigar?.locationId ?? defaultLocationId ?? "")
 
@@ -44,10 +50,10 @@ export function KarigarForm({
   // column, same convention as Vendor/Customer's own state field.
   const initialStateId = useMemo(() => {
     const match = states.find(
-      (item) => item.name.toLowerCase() === (karigar?.state ?? "").toLowerCase(),
+      (item) => item.name.toLowerCase() === (karigar?.state ?? defaultState ?? "").toLowerCase(),
     )
     return match?.id ?? ""
-  }, [states, karigar?.state])
+  }, [states, karigar?.state, defaultState])
 
   const [selectedStateId, setSelectedStateId] = useState(initialStateId)
   const [cities, setCities] = useState<CityItem[]>([])
@@ -178,7 +184,7 @@ export function KarigarForm({
             name="city"
             className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             disabled={!selectedStateId || loadingCities}
-            defaultValue={karigar?.city ?? ""}
+            defaultValue={karigar?.city ?? defaultCity ?? ""}
             key={cities.length}
           >
             <option value="">
@@ -266,7 +272,11 @@ export function KarigarForm({
           <Input
             name="panNumber"
             defaultValue={karigar?.panNumber}
+            placeholder="Optional"
           />
+          {errors?.panNumber?.[0] && (
+            <p className="text-xs text-red-600">{errors.panNumber[0]}</p>
+          )}
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -274,7 +284,11 @@ export function KarigarForm({
           <Input
             name="aadhaarNumber"
             defaultValue={karigar?.aadhaarNumber}
+            placeholder="Optional — 12 digits"
           />
+          {errors?.aadhaarNumber?.[0] && (
+            <p className="text-xs text-red-600">{errors.aadhaarNumber[0]}</p>
+          )}
         </div>
 
       </div>

@@ -14,6 +14,7 @@
 import { prisma } from "@/lib/prisma";
 import type { PartyGstType } from "@prisma/client";
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
+import { isValidPanNumber, normalizePanNumber, PAN_INVALID_MESSAGE } from "@/lib/pan";
 
 export type CustomerRecord = {
   id: string;
@@ -290,6 +291,9 @@ function validateCustomerInput(input: CustomerInput) {
   if (input.aadhaarNumber?.trim() && !isValidAadhaarNumber(input.aadhaarNumber)) {
     errors.aadhaarNumber = [AADHAAR_INVALID_MESSAGE];
   }
+  if (input.panNumber?.trim() && !isValidPanNumber(input.panNumber)) {
+    errors.panNumber = [PAN_INVALID_MESSAGE];
+  }
   return errors;
 }
 
@@ -338,7 +342,7 @@ export async function createCustomerCore(
         pincode: input.pincode?.trim() || null,
         gstin: input.gstNumber?.trim() || null,
         gstType: input.gstType ?? "UNREGISTERED",
-        panNumber: input.panNumber?.trim() || null,
+        panNumber: input.panNumber?.trim() ? normalizePanNumber(input.panNumber) : null,
         aadhaarNumber: input.aadhaarNumber?.trim()
           ? normalizeAadhaarNumber(input.aadhaarNumber)
           : null,
@@ -407,7 +411,7 @@ export async function updateCustomerCore(
         pincode: input.pincode?.trim() || null,
         gstin: input.gstNumber?.trim() || null,
         gstType: input.gstType ?? "UNREGISTERED",
-        panNumber: input.panNumber?.trim() || null,
+        panNumber: input.panNumber?.trim() ? normalizePanNumber(input.panNumber) : null,
         aadhaarNumber: input.aadhaarNumber?.trim()
           ? normalizeAadhaarNumber(input.aadhaarNumber)
           : null,

@@ -34,6 +34,11 @@ type CustomerCreateFormProps = {
    *  doc comment in lib/gst.ts. Freely editable per customer afterward, not
    *  a store-wide restriction. */
   gstScheme: GstScheme
+  /** The store's own State/City (Settings > Business Profile), pre-selected
+   * here so a customer at the same location doesn't require re-entering
+   * them — freely changeable per customer afterward. */
+  defaultState?: string
+  defaultCity?: string
 }
 
 function FieldError({ errors }: { errors?: string[] }) {
@@ -49,7 +54,13 @@ function FieldError({ errors }: { errors?: string[] }) {
  * modal opened from inside one is fragile on touch. A page also survives the
  * keyboard opening, which a small dialog does not.
  */
-export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCreateFormProps) {
+export function CustomerCreateForm({
+  states,
+  returnTo,
+  gstScheme,
+  defaultState,
+  defaultCity,
+}: CustomerCreateFormProps) {
   // Starting point only — a Wholesaler & Manufacturer store still routinely
   // has individual, non-registered buyers, so this stays freely editable
   // per customer rather than being forced by the store's own scheme.
@@ -59,7 +70,9 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
   const router = useRouter()
   const toast = useToast()
 
-  const [selectedStateId, setSelectedStateId] = useState("")
+  const [selectedStateId, setSelectedStateId] = useState(
+    () => states.find((item) => item.name.toLowerCase() === (defaultState ?? "").toLowerCase())?.id ?? "",
+  )
   const [cities, setCities] = useState<CityItem[]>([])
   const [loadingCities, setLoadingCities] = useState(false)
 
@@ -237,7 +250,8 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
               name="city"
               className={FIELD}
               disabled={!selectedStateId || loadingCities}
-              defaultValue=""
+              defaultValue={defaultCity ?? ""}
+              key={cities.length}
             >
               <option value="">
                 {loadingCities ? "Loading cities..." : "Select city"}
@@ -264,6 +278,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
               PAN Number
             </label>
             <input name="panNumber" className={FIELD} placeholder="Optional" />
+            <FieldError errors={state.errors?.panNumber} />
           </div>
 
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">

@@ -311,6 +311,7 @@ export function CustomerEditForm({
               className={FIELD}
               defaultValue={customer.panNumber ?? ""}
             />
+            <FieldError errors={state.errors?.panNumber} />
           </div>
 
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">

@@ -347,7 +347,7 @@ export function UserFormDialog({
         {role === UserRole.STAFF && (
           <div className="space-y-2 md:col-span-2">
             <Label>Module Access</Label>
-            <div className="grid grid-cols-2 gap-2 rounded-md border p-3">
+            <div className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2 md:grid-cols-3">
               {MODULE_DEFINITIONS.map((module) => (
                 <label
                   key={module.key}

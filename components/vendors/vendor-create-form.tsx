@@ -34,6 +34,11 @@ type VendorCreateFormProps = {
    * doc comment in lib/gst.ts. Freely editable per vendor afterward, not a
    * store-wide restriction. */
   gstScheme: GstScheme
+  /** The store's own State/City (Settings > Business Profile), pre-selected
+   * here so a vendor at the same location doesn't require re-entering them
+   * — freely changeable per vendor afterward. */
+  defaultState?: string
+  defaultCity?: string
 }
 
 /**
@@ -42,14 +47,22 @@ type VendorCreateFormProps = {
  * dialog is gone, this page is linked to directly instead). Also reused
  * mid-flow by other forms' "Add New Vendor" option via a `returnTo`.
  */
-export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFormProps) {
+export function VendorCreateForm({
+  states,
+  returnTo,
+  gstScheme,
+  defaultState,
+  defaultCity,
+}: VendorCreateFormProps) {
   const [gstType, setGstType] = useState(defaultPartyGstType(gstScheme))
   const gstinRequiredNow = gstinRequired(gstScheme, gstType)
 
   const router = useRouter()
   const toast = useToast()
 
-  const [selectedStateId, setSelectedStateId] = useState("")
+  const [selectedStateId, setSelectedStateId] = useState(
+    () => states.find((item) => item.name.toLowerCase() === (defaultState ?? "").toLowerCase())?.id ?? "",
+  )
   const [cities, setCities] = useState<CityItem[]>([])
   const [loadingCities, setLoadingCities] = useState(false)
 
@@ -245,6 +258,8 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
               name="city"
               className={FIELD}
               disabled={!selectedStateId || loadingCities}
+              defaultValue={defaultCity ?? ""}
+              key={cities.length}
             >
               <option value="">
                 {loadingCities

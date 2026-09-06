@@ -3,6 +3,7 @@
 import { UserRole, UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizeAadhaarNumber } from "@/lib/aadhaar";
+import { normalizePanNumber } from "@/lib/pan";
 import type {
   CreateUserInput,
   UpdateUserInput,
@@ -260,7 +261,7 @@ export async function createUser(
         status: UserStatus.ACTIVE,
         permissions: data.role === UserRole.STAFF ? data.permissions : [],
         aadhaarNumber: data.aadhaarNumber ? normalizeAadhaarNumber(data.aadhaarNumber) : null,
-        panNumber: data.panNumber?.trim() || null,
+        panNumber: data.panNumber?.trim() ? normalizePanNumber(data.panNumber) : null,
         image: data.image?.trim() || null,
         locationAccess: {
           deleteMany: {},
@@ -286,7 +287,7 @@ export async function createUser(
       karigarId,
       permissions: data.role === UserRole.STAFF ? data.permissions : [],
       aadhaarNumber: data.aadhaarNumber ? normalizeAadhaarNumber(data.aadhaarNumber) : null,
-      panNumber: data.panNumber?.trim() || null,
+      panNumber: data.panNumber?.trim() ? normalizePanNumber(data.panNumber) : null,
       image: data.image?.trim() || null,
       locationAccess: { create: locationIds.map((locationId) => ({ locationId })) },
     },
@@ -319,7 +320,7 @@ export async function updateUser(data: UpdateUserInput, storeId: string) {
       karigarId,
       permissions: payload.role === UserRole.STAFF ? payload.permissions : [],
       aadhaarNumber: payload.aadhaarNumber ? normalizeAadhaarNumber(payload.aadhaarNumber) : null,
-      panNumber: payload.panNumber?.trim() || null,
+      panNumber: payload.panNumber?.trim() ? normalizePanNumber(payload.panNumber) : null,
       image: payload.image?.trim() || null,
     },
   });

@@ -10,6 +10,8 @@ import { UserRole, UserStatus } from "@prisma/client";
 import * as XLSX from "xlsx";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
+import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
+import { isValidPanNumber, normalizePanNumber, PAN_INVALID_MESSAGE } from "@/lib/pan";
 
 export type Karigar = {
   id: string;
@@ -239,8 +241,14 @@ function buildKarigarData(formData: FormData) {
     state: toOptionalString(formData.get("state")),
     pincode: toOptionalString(formData.get("pincode")),
     gstNumber: toOptionalString(formData.get("gstNumber")),
-    panNumber: toOptionalString(formData.get("panNumber")),
-    aadhaarNumber: toOptionalString(formData.get("aadhaarNumber")),
+    panNumber: (() => {
+      const raw = toOptionalString(formData.get("panNumber"));
+      return raw ? normalizePanNumber(raw) : null;
+    })(),
+    aadhaarNumber: (() => {
+      const raw = toOptionalString(formData.get("aadhaarNumber"));
+      return raw ? normalizeAadhaarNumber(raw) : null;
+    })(),
     specialization: toOptionalString(formData.get("specialization")),
     notes: toOptionalString(formData.get("notes")),
     openingGold: toNumber(formData.get("openingGold")),
@@ -282,6 +290,22 @@ async function checkContactUniqueness(
   return errors;
 }
 
+/** Both KYC ids are optional, so only checked (checksum for Aadhaar,
+ * structure for PAN) when the karigar actually entered one. */
+function validateKarigarKycFields(aadhaarNumber: string | null, panNumber: string | null) {
+  const errors: Record<string, string[]> = {};
+
+  if (aadhaarNumber && !isValidAadhaarNumber(aadhaarNumber)) {
+    errors.aadhaarNumber = [AADHAAR_INVALID_MESSAGE];
+  }
+
+  if (panNumber && !isValidPanNumber(panNumber)) {
+    errors.panNumber = [PAN_INVALID_MESSAGE];
+  }
+
+  return errors;
+}
+
 export async function createKarigar(
   prevState: KarigarFormState,
   formData: FormData,
@@ -300,6 +324,15 @@ export async function createKarigar(
     const data = buildKarigarData(formData);
     // isActive should default to true on create, not depend on a checkbox being present
     if (formData.get("isActive") === null) data.isActive = true;
+
+    const kycErrors = validateKarigarKycFields(data.aadhaarNumber, data.panNumber);
+    if (Object.keys(kycErrors).length > 0) {
+      return {
+        success: false,
+        message: "Please fix the form errors",
+        errors: kycErrors,
+      };
+    }
 
     const contactErrors = await checkContactUniqueness(data.mobile, data.email);
     if (Object.keys(contactErrors).length > 0) {
@@ -414,6 +447,16 @@ export async function updateKarigar(
     }
 
     const data = buildKarigarData(formData);
+
+    const kycErrors = validateKarigarKycFields(data.aadhaarNumber, data.panNumber);
+    if (Object.keys(kycErrors).length > 0) {
+      return {
+        success: false,
+        message: "Please fix the form errors",
+        errors: kycErrors,
+      };
+    }
+
     const storeId = await requireStoreScope();
 
     if (data.locationId) {

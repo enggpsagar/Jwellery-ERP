@@ -123,6 +123,15 @@ export type LineItem = {
   /** Once Net Weight is edited directly, the gross/stone/dmo auto-calc
    * stops overwriting it. */
   netTouched: boolean
+  /** Which configured GstRate (Settings > GST Rates) THIS line uses — GST
+   * is now picked per line, not once for the whole document, so a single
+   * invoice can mix e.g. a 3% metal line with an 18% service line. Starts
+   * as the document-level "default for new items" selection (see
+   * emptyLineItem's own doc comment) but is independent from then on —
+   * changing the document-level default never retroactively changes an
+   * already-set line. Falls back to the document-level rate in lineGst()
+   * below when blank/unresolved, so an empty string here is always safe. */
+  gstRateId: string
 }
 
 function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: number) {
@@ -131,7 +140,7 @@ function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: nu
   return net >= 0 ? Number(net.toFixed(3)) : null
 }
 
-function emptyLineItem(): LineItem {
+function emptyLineItem(defaultGstRateId?: string): LineItem {
   return {
     key: crypto.randomUUID(),
     itemName: "",
@@ -163,6 +172,7 @@ function emptyLineItem(): LineItem {
     hsnCode: "",
     inventoryStockId: "",
     netTouched: false,
+    gstRateId: defaultGstRateId ?? "",
   }
 }
 
@@ -265,8 +275,27 @@ export function InvoiceForm({
 
   const [customerId, setCustomerId] = useState(initialCustomerId ?? "")
   const [locationId, setLocationId] = useState(initialLocationId ?? "")
+  // Shared by both the `items` initial state below and `gstRateId` itself
+  // (declared further down) — a plain function, not a hook, so it can be
+  // called from either initializer regardless of declaration order. A
+  // Composition-scheme store can never charge GST — see GstScheme's doc
+  // comment in schema.prisma — so no rate is selected at all regardless of
+  // the store's configured GST Rates or default.
+  const resolveDefaultGstRateId = () => {
+    if (gstScheme === "COMPOSITION") return ""
+    if (initialGstRateId && gstRates.some((r) => r.id === initialGstRateId)) {
+      return initialGstRateId
+    }
+    return (
+      gstRates.find((r) => r.isDefault && r.isActive)?.id ??
+      gstRates.find((r) => r.isActive)?.id ??
+      ""
+    )
+  }
   const [items, setItems] = useState<LineItem[]>(
-    initialItems && initialItems.length ? initialItems : [emptyLineItem()],
+    initialItems && initialItems.length
+      ? initialItems
+      : [emptyLineItem(resolveDefaultGstRateId())],
   )
   // Which lines' Details region (every field beyond the compact row) is
   // open. Heuristic — a judgment call, not a hard requirement: a line
@@ -292,20 +321,11 @@ export function InvoiceForm({
     })
   }
   const [discount, setDiscount] = useState(0)
-  // A Composition-scheme store can never charge GST — see GstScheme's doc
-  // comment in schema.prisma — so no rate is selected at all regardless of
-  // the store's configured GST Rates or default.
-  const [gstRateId, setGstRateId] = useState<string>(() => {
-    if (gstScheme === "COMPOSITION") return ""
-    if (initialGstRateId && gstRates.some((r) => r.id === initialGstRateId)) {
-      return initialGstRateId
-    }
-    return (
-      gstRates.find((r) => r.isDefault && r.isActive)?.id ??
-      gstRates.find((r) => r.isActive)?.id ??
-      ""
-    )
-  })
+  // This is now framed as "default for new line items" only — each line
+  // tracks its own gstRateId independently once set (see LineItem's own doc
+  // comment), so changing this later never retroactively changes an
+  // already-set line, only what a freshly-added one starts on.
+  const [gstRateId, setGstRateId] = useState<string>(resolveDefaultGstRateId)
   // GST Rate options: active rows, plus this invoice's already-selected rate
   // even if it's since been deactivated (edit/replace) — see gstRates' own
   // doc comment above.
@@ -463,6 +483,10 @@ export function InvoiceForm({
       // lines) rather than carrying over a quantity that made sense for
       // the previous stock item.
       quantity: available > 0 ? 1 : 0,
+      // InventoryStock carries no GST rate of its own — same reasoning as
+      // hmCharge above, so this line starts on the document's current
+      // "default for new items" selection rather than blank.
+      gstRateId,
     })
     // Real data just landed on this line via the stock picker — start it
     // expanded rather than making the user hunt for the chevron to see what
@@ -544,7 +568,7 @@ export function InvoiceForm({
         const linkedUnit = metalById.get(stock.metalType?.id ?? "")?.primaryUnit ?? "GRAM"
 
         const scanned: LineItem = {
-          ...emptyLineItem(),
+          ...emptyLineItem(gstRateId),
           inventoryStockId: stock.id,
           itemName: stock.productName,
           metalTypeId: stock.metalType?.id ?? "",
@@ -610,8 +634,11 @@ export function InvoiceForm({
       setConfirmingClear(false)
       toast.success(`Added ${stock.productName}`)
     },
+    // gstRateId included so a freshly-scanned line always starts on the
+    // document's CURRENT default rather than whatever was default when
+    // this callback was first created.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [stockItems],
+    [stockItems, gstRateId],
   )
 
   // Rows that actually hold something. The form always keeps one blank line
@@ -624,7 +651,7 @@ export function InvoiceForm({
   const [confirmingClear, setConfirmingClear] = useState(false)
 
   const clearAllItems = () => {
-    setItems([emptyLineItem()])
+    setItems([emptyLineItem(gstRateId)])
     setConfirmingClear(false)
   }
 
@@ -776,11 +803,22 @@ export function InvoiceForm({
     item.stoneCharge -
     item.schemeDiscount
 
+  // This line's own GST %, resolved from its own gstRateId against the
+  // full `gstRates` prop — falls back to the document-level default
+  // (`gstRate` above) when blank or unresolved (e.g. a since-deleted rate,
+  // or an older-shaped payload with no gstRateId at all yet), never throws.
+  // Composition override stays identical regardless of which rate this
+  // resolves to, same reasoning as `gstRate` itself above.
+  const lineGstRatePercent = (item: LineItem) => {
+    if (gstScheme === "COMPOSITION") return 0
+    return gstRates.find((r) => r.id === item.gstRateId)?.ratePercent ?? gstRate
+  }
+
   // Scheme- and inter-state-aware: zero on a Composition store regardless
   // of rate, IGST-only on an inter-state sale, SGST+CGST split otherwise —
   // see computeGst()'s own doc comment in lib/gst.ts.
   const lineGst = (item: LineItem) => {
-    const breakdown = computeGst(taxableValue(item), gstRate, gstScheme, storeState, selectedCustomer?.state)
+    const breakdown = computeGst(taxableValue(item), lineGstRatePercent(item), gstScheme, storeState, selectedCustomer?.state)
     const round = (value: number) => Math.round(value * 100) / 100
     return {
       sgst: round(breakdown.sgst),
@@ -866,6 +904,7 @@ export function InvoiceForm({
         igstAmount: igst,
         hsnCode: item.hsnCode || null,
         inventoryStockId: item.inventoryStockId || null,
+        gstRateId: item.gstRateId || null,
       }
     }),
   )
@@ -937,8 +976,8 @@ export function InvoiceForm({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-2 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Customer {!editInvoiceId && <RequiredMark />}</Label>
           {editInvoiceId ? (
             // The customer isn't editable here — this changes line items
@@ -1041,7 +1080,7 @@ export function InvoiceForm({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setItems((prev) => [...prev, emptyLineItem()])}
+              onClick={() => setItems((prev) => [...prev, emptyLineItem(gstRateId)])}
             >
               <Plus className="h-4 w-4 mr-1" /> Add Item
             </Button>
@@ -1231,7 +1270,7 @@ export function InvoiceForm({
                         // row to a blank manual-entry line instead, keeping only
                         // its identity (key) so it doesn't jump position.
                         onCreateNew={() => {
-                          updateItem(item.key, { ...emptyLineItem(), key: item.key })
+                          updateItem(item.key, { ...emptyLineItem(gstRateId), key: item.key })
                           // Back to a blank manual-entry row — collapse it too,
                           // matching a freshly-added line's default state.
                           setExpandedKeys((prev) => {
@@ -1504,15 +1543,45 @@ export function InvoiceForm({
                       />
                     </div>
 
+                    {/* Per-line GST Rate — this line's own selection, independent
+                        of the document-level "default for new items" picker
+                        below. Options: active rows, plus this line's own
+                        already-selected rate even if it's since been
+                        deactivated — same pattern as the document-level
+                        picker's own availableGstRates. */}
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">GST Rate</Label>
+                      <Select
+                        value={item.gstRateId || undefined}
+                        disabled={gstScheme === "COMPOSITION"}
+                        onValueChange={(value) => updateItem(item.key, { gstRateId: value })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select GST rate" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {gstRates
+                            .filter((r) => r.isActive || r.id === item.gstRateId)
+                            .map((rate) => (
+                              <SelectItem key={rate.id} value={rate.id}>
+                                {rate.name} ({rate.ratePercent}%)
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     {/* SGST+CGST for an intra-state sale, a single IGST column
                         for inter-state instead — never both, see computeGst()
                         in lib/gst.ts. Composition always lands here at ₹0.00,
                         since computeGst zeroes every component for it. This is
                         the full breakdown — the compact row above shows only
-                        the combined total, as a quick summary. */}
+                        the combined total, as a quick summary. Percent shown
+                        is THIS line's own resolved rate, not the document
+                        default. */}
                     {lineGst(item).isInterState ? (
                       <div className="space-y-1">
-                        <Label className="text-xs">IGST ({gstRate.toFixed(2)}%)</Label>
+                        <Label className="text-xs">IGST ({lineGstRatePercent(item).toFixed(2)}%)</Label>
                         <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
                           ₹{lineGst(item).igst.toFixed(2)}
                         </div>
@@ -1520,14 +1589,14 @@ export function InvoiceForm({
                     ) : (
                       <>
                         <div className="space-y-1">
-                          <Label className="text-xs">SGST ({(gstRate / 2).toFixed(2)}%)</Label>
+                          <Label className="text-xs">SGST ({(lineGstRatePercent(item) / 2).toFixed(2)}%)</Label>
                           <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
                             ₹{lineGst(item).sgst.toFixed(2)}
                           </div>
                         </div>
 
                         <div className="space-y-1">
-                          <Label className="text-xs">CGST ({(gstRate / 2).toFixed(2)}%)</Label>
+                          <Label className="text-xs">CGST ({(lineGstRatePercent(item) / 2).toFixed(2)}%)</Label>
                           <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
                             ₹{lineGst(item).cgst.toFixed(2)}
                           </div>
@@ -1555,7 +1624,7 @@ export function InvoiceForm({
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <div className="flex items-center justify-between">
-            <Label>GST Rate</Label>
+            <Label>GST Rate (default for new items)</Label>
             <GstSchemeBadge scheme={gstScheme} />
           </div>
           <Select
@@ -1577,7 +1646,7 @@ export function InvoiceForm({
           <p className="text-xs text-muted-foreground">
             {gstScheme === "COMPOSITION"
               ? "Not used — Composition Scheme never charges GST."
-              : `Split into SGST+CGST (or IGST for an inter-state customer) per line — total tax ₹${taxAmount.toFixed(2)}`}
+              : `Applied to newly-added line items only — each line can use its own rate (see its Details). Split into SGST+CGST (or IGST for an inter-state customer) per line — total tax ₹${taxAmount.toFixed(2)}`}
           </p>
         </div>
       </div>

@@ -120,6 +120,10 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     schemeDiscount: item.schemeDiscount,
     hsnCode: item.hsnCode ?? "",
     inventoryStockId: item.inventoryStockId ?? "",
+    // Deliberately not carried over from the cancelled invoice — GST isn't
+    // carried line-by-line here (see the note above), the form resolves
+    // this to its own current default-for-new-lines rate instead.
+    gstRateId: "",
     netTouched: true,
   }
   })

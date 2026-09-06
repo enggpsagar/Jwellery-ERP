@@ -28,7 +28,7 @@ import {
 import { sendMail } from "@/lib/mailer";
 import { invoiceEmail } from "@/lib/email-templates";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
-import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
+import { resolveGstRateSnapshot, type GstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import { getReturnEligibility } from "@/lib/return-window";
 import { amountInWords } from "@/lib/number-to-words";
 import { resolveStoreName } from "@/lib/invite-email";
@@ -64,6 +64,13 @@ export type InvoiceLineItemInput = {
   igstAmount?: number;
   hsnCode?: string | null;
   inventoryStockId?: string | null;
+  // Which configured GstRate THIS line uses — see InvoiceItem.gstRateId's
+  // own doc comment in schema.prisma. Optional so an older-shaped payload
+  // (or a caller like quick-sale-actions.ts that never sets a per-line
+  // rate) still parses; resolved into a snapshot the same way Invoice's own
+  // (legacy) gstRateId is, just per-distinct-id rather than once per
+  // document — see resolvePerLineGstRateSnapshots below.
+  gstRateId?: string | null;
 };
 
 export type InvoiceFormState = {
@@ -149,6 +156,36 @@ function toChargeType(value: unknown): ChargeType {
 }
 
 /**
+ * Resolves each line's own gstRateId into a verified snapshot — GST is
+ * picked per line now, not once for the whole document (see
+ * InvoiceItem.gstRateId's doc comment in schema.prisma), but a single
+ * invoice commonly has far fewer DISTINCT rates in use than it has lines
+ * (e.g. two lines both on the store's one 3% metal rate). Deduping first
+ * means at most one `resolveGstRateSnapshot` DB call per distinct id
+ * actually used, not one per line item. Must run to completion BEFORE the
+ * `prisma.$transaction` callback that builds the nested `items.create`
+ * array — that array has to be plain, already-resolved objects, not
+ * promises, so this can't be inlined inside the `items.map(...)` below it.
+ */
+async function resolvePerLineGstRateSnapshots(
+  storeId: string,
+  items: InvoiceLineItemInput[],
+): Promise<Map<string, GstRateSnapshot>> {
+  const distinctIds = [
+    ...new Set(items.map((item) => item.gstRateId).filter((id): id is string => !!id)),
+  ];
+  const snapshots = await Promise.all(
+    distinctIds.map((id) => resolveGstRateSnapshot(storeId, id)),
+  );
+  const map = new Map<string, GstRateSnapshot>();
+  distinctIds.forEach((id, index) => {
+    const snapshot = snapshots[index];
+    if (snapshot) map.set(id, snapshot);
+  });
+  return map;
+}
+
+/**
  * Diamond items price per carat, not per gram — every other purity still
  * prices off netWeight. Duplicated per action file (same convention as the
  * generateXNumber helpers in this codebase) rather than a shared import.
@@ -226,6 +263,9 @@ export type InvoiceItemView = {
   sgstAmount: number;
   cgstAmount: number;
   igstAmount: number;
+  gstRateId: string | null;
+  gstRateName: string | null;
+  gstRatePercent: number | null;
   hsnCode: string | null;
   lineTotal: number;
   inventoryStockId: string | null;
@@ -309,6 +349,9 @@ function mapInvoice(invoice: any) {
       sgstAmount: Number(item.sgstAmount ?? 0),
       cgstAmount: Number(item.cgstAmount ?? 0),
       igstAmount: Number(item.igstAmount ?? 0),
+      gstRateId: item.gstRateId ?? null,
+      gstRateName: item.gstRateName ?? null,
+      gstRatePercent: item.gstRatePercent ? Number(item.gstRatePercent) : null,
       hsnCode: item.hsnCode ?? null,
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
@@ -956,6 +999,12 @@ export async function createInvoice(
 
     const invoiceNumber = await generateInvoiceNumber(storeId);
 
+    // Resolved once, up front, for every DISTINCT rate any line actually
+    // uses — see resolvePerLineGstRateSnapshots' own doc comment. Must
+    // happen before the transaction below since a nested Prisma `create`
+    // array has to be plain objects, not promises.
+    const perLineGstRateSnapshots = await resolvePerLineGstRateSnapshots(storeId, items);
+
     const invoice = await prisma.$transaction(async (tx) => {
       const created = await tx.invoice.create({
         data: {
@@ -1006,6 +1055,19 @@ export async function createInvoice(
               sgstAmount: item.sgstAmount ?? 0,
               cgstAmount: item.cgstAmount ?? 0,
               igstAmount: item.igstAmount ?? 0,
+              // This LINE's own resolved snapshot, distinct from the
+              // invoice-level gstRateSnapshot above — see InvoiceItem's
+              // gstRateId doc comment. `undefined` (not `null`) to match
+              // this function's existing optional-relation convention.
+              gstRateId: item.gstRateId
+                ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRateId ?? undefined
+                : undefined,
+              gstRateName: item.gstRateId
+                ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRateName ?? undefined
+                : undefined,
+              gstRatePercent: item.gstRateId
+                ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRatePercent ?? undefined
+                : undefined,
               hsnCode: item.hsnCode ?? undefined,
               lineTotal: lineTotal(item),
               inventoryStockId:
@@ -1425,6 +1487,12 @@ export async function updateInvoice(
       : [];
     const validStockIds = new Set(validStock.map((s) => s.id));
 
+    // Resolved once, up front, for every DISTINCT rate any line actually
+    // uses — see resolvePerLineGstRateSnapshots' own doc comment. Must
+    // happen before the transaction below since a nested Prisma `create`
+    // array has to be plain objects, not promises.
+    const perLineGstRateSnapshots = await resolvePerLineGstRateSnapshots(storeId, items);
+
     await prisma.$transaction(async (tx) => {
       // 1. Restore every old line's stock first — same as cancelInvoice.
       for (const item of invoice.items) {
@@ -1508,6 +1576,19 @@ export async function updateInvoice(
               sgstAmount: item.sgstAmount ?? 0,
               cgstAmount: item.cgstAmount ?? 0,
               igstAmount: item.igstAmount ?? 0,
+              // This LINE's own resolved snapshot, distinct from the
+              // invoice-level gstRateSnapshot above — see InvoiceItem's
+              // gstRateId doc comment. `null` (not `undefined`) to match
+              // this function's existing optional-relation convention.
+              gstRateId: item.gstRateId
+                ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRateId ?? null
+                : null,
+              gstRateName: item.gstRateId
+                ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRateName ?? null
+                : null,
+              gstRatePercent: item.gstRateId
+                ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRatePercent ?? null
+                : null,
               hsnCode: item.hsnCode ?? undefined,
               lineTotal: lineTotal(item),
               inventoryStockId:

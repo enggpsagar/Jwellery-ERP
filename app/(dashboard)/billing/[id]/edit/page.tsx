@@ -111,6 +111,10 @@ export default async function EditInvoicePage({ params }: Props) {
     schemeDiscount: item.schemeDiscount,
     hsnCode: item.hsnCode ?? "",
     inventoryStockId: item.inventoryStockId ?? "",
+    // This line's own saved GST rate — falls back to blank (resolved to
+    // the invoice's own default-for-new-lines rate by the form) only for
+    // a row saved before per-line GST rates existed.
+    gstRateId: item.gstRateId ?? "",
     netTouched: true,
   }
   })

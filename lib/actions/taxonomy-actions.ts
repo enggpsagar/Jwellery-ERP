@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { UserRole } from "@prisma/client";
+import { UserRole, WeightUnit } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -19,6 +19,10 @@ export type StoreMetalRow = {
   // child table — see getStoreMetalOrigins below, mirroring how a
   // StoreCategory's Types live on StoreCategoryType.
   isGemstone: boolean;
+  // The unit every weight field for this metal/stone is persisted in —
+  // see the WeightUnit enum's doc comment in schema.prisma and
+  // lib/purity.ts's toPrimaryUnit().
+  primaryUnit: WeightUnit;
 };
 
 export type StoreMetalOriginRow = {
@@ -71,6 +75,7 @@ export async function getStoreMetals(): Promise<StoreMetalRow[]> {
     hasPurity: metal.hasPurity,
     isActive: metal.isActive,
     isGemstone: metal.isGemstone,
+    primaryUnit: metal.primaryUnit,
   }));
 }
 
@@ -96,6 +101,19 @@ export async function upsertStoreMetal(
     // a fixed hidden "on" — the two forms post to this same action, and this
     // is how it tells which section's row it's saving.
     const isGemstone = formData.get("isGemstone") === "on";
+    // Explicit "GRAM"/"CARAT" from the full Settings form is respected as-is;
+    // a caller that never sends this field at all (e.g. the quick "Add
+    // Metal"/"Add Stone" dialog opened mid-form elsewhere) falls back to the
+    // same isGemstone-based default Settings itself uses for a brand-new row.
+    const primaryUnitRaw = String(formData.get("primaryUnit") || "");
+    const primaryUnit: WeightUnit =
+      primaryUnitRaw === "CARAT"
+        ? WeightUnit.CARAT
+        : primaryUnitRaw === "GRAM"
+          ? WeightUnit.GRAM
+          : isGemstone
+            ? WeightUnit.CARAT
+            : WeightUnit.GRAM;
 
     const errors: Record<string, string[]> = {};
     if (!name) errors.name = ["Name is required"];
@@ -123,7 +141,7 @@ export async function upsertStoreMetal(
     if (id) {
       const { count } = await prisma.storeMetal.updateMany({
         where: { id, storeId },
-        data: { name, hasPurity, isGemstone },
+        data: { name, hasPurity, isGemstone, primaryUnit },
       });
 
       if (count === 0) {
@@ -131,7 +149,7 @@ export async function upsertStoreMetal(
       }
     } else {
       const created = await prisma.storeMetal.create({
-        data: { storeId, name, hasPurity, isGemstone },
+        data: { storeId, name, hasPurity, isGemstone, primaryUnit },
         select: { id: true },
       });
       savedId = created.id;

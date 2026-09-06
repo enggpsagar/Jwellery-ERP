@@ -167,6 +167,9 @@ function MetalsSection({
                 {metal.hasPurity ? (
                   <Badge variant="secondary">Has Purity</Badge>
                 ) : null}
+                <Badge variant="outline">
+                  {metal.primaryUnit === "CARAT" ? "Carat" : "Gram"}
+                </Badge>
               </div>
 
               {canEdit ? (
@@ -235,6 +238,7 @@ function MetalFormRow({
   const router = useRouter();
   const toast = useToast();
   const [state, formAction, pending] = useActionState(upsertStoreMetal, initialState);
+  const [primaryUnit, setPrimaryUnit] = useState(metal?.primaryUnit ?? "GRAM");
 
   useEffect(() => {
     if (state.success) {
@@ -288,6 +292,20 @@ function MetalFormRow({
           className="h-4 w-4"
         />
         <Label htmlFor="metal-hasPurity">Has Purity</Label>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="metal-primaryUnit">Primary Unit</Label>
+        <input type="hidden" name="primaryUnit" value={primaryUnit} />
+        <Select value={primaryUnit} onValueChange={(value) => setPrimaryUnit(value as "GRAM" | "CARAT")}>
+          <SelectTrigger id="metal-primaryUnit" className="w-28">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="GRAM">Gram</SelectItem>
+            <SelectItem value="CARAT">Carat</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="flex justify-end gap-2 pb-0.5">
@@ -400,6 +418,9 @@ function StonesSection({
                 <span className={stone.isActive ? "" : "text-muted-foreground line-through"}>
                   {stone.name}
                 </span>
+                <Badge variant="outline">
+                  {stone.primaryUnit === "CARAT" ? "Carat" : "Gram"}
+                </Badge>
               </div>
 
               {canEdit ? (
@@ -468,6 +489,9 @@ function StoneFormRow({
   const router = useRouter();
   const toast = useToast();
   const [state, formAction, pending] = useActionState(upsertStoreMetal, initialState);
+  // Defaults to Carat for a new stone — every gemstone in this trade is
+  // conventionally valued/weighed per carat, unlike Metals which default Gram.
+  const [primaryUnit, setPrimaryUnit] = useState(stone?.primaryUnit ?? "CARAT");
 
   useEffect(() => {
     if (state.success) {
@@ -492,6 +516,7 @@ function StoneFormRow({
     >
       <input type="hidden" name="id" value={stone?.id ?? ""} />
       <input type="hidden" name="isGemstone" value="on" />
+      <input type="hidden" name="primaryUnit" value={primaryUnit} />
 
       <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="stone-name" required>Name</Label>
@@ -505,6 +530,19 @@ function StoneFormRow({
         {state.errors?.name?.[0] ? (
           <p className="text-sm text-red-600">{state.errors.name[0]}</p>
         ) : null}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="stone-primaryUnit">Primary Unit</Label>
+        <Select value={primaryUnit} onValueChange={(value) => setPrimaryUnit(value as "GRAM" | "CARAT")}>
+          <SelectTrigger id="stone-primaryUnit" className="w-28">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="GRAM">Gram</SelectItem>
+            <SelectItem value="CARAT">Carat</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="flex justify-end gap-2 pb-0.5">

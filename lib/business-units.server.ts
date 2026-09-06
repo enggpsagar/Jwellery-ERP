@@ -16,12 +16,17 @@ export type BusinessUnitOption = {
   value: string
   label: string
   isGemstone: boolean
+  // The unit this metal/stone's weight fields are persisted in (Settings >
+  // Taxonomy) — see the WeightUnit enum's doc comment in schema.prisma.
+  // Unused/irrelevant for the MONEY option, kept only so the type is total.
+  primaryUnit: "GRAM" | "CARAT"
 }
 
 const MONEY_OPTION: BusinessUnitOption = {
   value: MONEY_UNIT,
   label: "Money",
   isGemstone: false,
+  primaryUnit: "GRAM",
 }
 
 /**
@@ -41,7 +46,7 @@ export async function getAvailableBusinessUnitOptions(): Promise<BusinessUnitOpt
   const metals = await prisma.storeMetal.findMany({
     where: { storeId, isActive: true },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, isGemstone: true },
+    select: { id: true, name: true, isGemstone: true, primaryUnit: true },
   })
 
   return [
@@ -50,6 +55,7 @@ export async function getAvailableBusinessUnitOptions(): Promise<BusinessUnitOpt
       value: metal.id,
       label: metal.name,
       isGemstone: metal.isGemstone,
+      primaryUnit: metal.primaryUnit,
     })),
   ]
 }

@@ -10,6 +10,7 @@ import { getStates } from "@/lib/actions/location-actions"
 import { CustomerRowActions } from "@/components/customers/customer-row-actions"
 import { CustomerDetailContent } from "@/components/customers/customer-detail-content"
 import { CustomerLedgerCard } from "@/components/customers/ledger/customer-ledger-card"
+import { toTitleCase } from "@/lib/utils"
 
 type CustomerDetailsPageProps = {
   params: Promise<{
@@ -54,7 +55,7 @@ export default async function CustomerDetailsPage({
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
-        title={customer.name}
+        title={toTitleCase(customer.name)}
         description="Customer details and account information"
         backHref={backTo.href}
         backLabel={backTo.label}

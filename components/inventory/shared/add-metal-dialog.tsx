@@ -78,6 +78,9 @@ export function AddMetalDialog({ open, onOpenChange, onCreated, isGemstone = fal
         hasPurity: isGemstone ? false : hasPurity,
         isActive: true,
         isGemstone,
+        // Matches upsertStoreMetal's own default when this dialog doesn't
+        // send a primaryUnit field at all.
+        primaryUnit: isGemstone ? "CARAT" : "GRAM",
       })
       onOpenChange(false)
     } else if (!state.success && state.message) {

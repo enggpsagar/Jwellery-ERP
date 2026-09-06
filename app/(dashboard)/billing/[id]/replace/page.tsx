@@ -11,6 +11,7 @@ import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
+import { resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 
 import { InvoiceForm, type LineItem } from "@/components/billing/invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
@@ -57,19 +58,32 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     ])
 
   // Every field the form actually tracks, carried over from the cancelled
-  // invoice's items. Stored weights are always grams, so the unit toggle
-  // starts at GRAM — the raw value round-trips correctly either way.
+  // invoice's items. Stored weights are in that line's own metal's
+  // configured Primary Unit, not always grams — convert back to grams here
+  // since LineItem's own fields are always-grams internally (see
+  // invoice-form.tsx's own doc comment), and default each unit toggle to
+  // match what's actually stored.
   // GST isn't carried line-by-line: the form recomputes it from the
   // store's current default rate rather than replaying stale per-line
   // sgst/cgst amounts.
-  const initialItems: LineItem[] = cancelledInvoice.items.map((item) => ({
+  const metalById = new Map(metals.map((m) => [m.id, m]))
+
+  const initialItems: LineItem[] = cancelledInvoice.items.map((item) => {
+    const unit = metalById.get(item.metalTypeId ?? "")?.primaryUnit ?? "GRAM"
+    const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+    const toGrams = (value: number | null | undefined) =>
+      toPrimaryUnit(value ?? 0, unit, "GRAM", gramsPerCarat)
+
+    return {
     key: crypto.randomUUID(),
     itemName: item.itemName,
     metalTypeId: item.metalTypeId ?? "",
     purity: item.purity ?? "",
     quantity: item.quantity,
-    grossWeight: item.grossWeight ?? 0,
-    netWeight: item.netWeight ?? 0,
+    grossWeight: toGrams(item.grossWeight),
+    grossWeightUnit: unit,
+    netWeight: toGrams(item.netWeight),
+    netWeightUnit: unit,
     caratWeight: item.caratWeight ?? 0,
     rate: item.rate ?? 0,
     makingCharge: item.makingCharge,
@@ -86,9 +100,10 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     stoneTypeNames: item.stoneTypeNames
       ? item.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
       : [],
-    dmoWeight: item.dmoWeight ?? 0,
-    stoneWeightInput: item.stoneWeight ?? 0,
-    stoneWeightUnit: "GRAM",
+    dmoWeight: toGrams(item.dmoWeight),
+    dmoWeightUnit: unit,
+    stoneWeightInput: toGrams(item.stoneWeight),
+    stoneWeightUnit: unit,
     hmCharge: item.hmCharge,
     // Carried over as-is, same as stoneChargeTouched/netStoneWeightTouched
     // above — not recomputed from the store's current per-piece rate the
@@ -98,7 +113,8 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     hsnCode: item.hsnCode ?? "",
     inventoryStockId: item.inventoryStockId ?? "",
     netTouched: true,
-  }))
+  }
+  })
 
   return (
     <main className="space-y-6 p-6">

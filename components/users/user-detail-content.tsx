@@ -7,6 +7,7 @@ import {
 } from "@/components/shared/detail-section"
 import { StatusBadge } from "@/components/users/status-badge"
 import { ROLE_LABELS } from "@/lib/roles"
+import { toTitleCase } from "@/lib/utils"
 
 import type { UserRole, UserStatus } from "@prisma/client"
 
@@ -68,7 +69,7 @@ export function UserDetailContent({
         tint="var(--chart-1)"
       >
         <DetailGrid>
-          <DetailField label="Name" value={user.name ?? "-"} />
+          <DetailField label="Name" value={user.name ? toTitleCase(user.name) : "-"} />
           <DetailField label="Email" value={user.email} />
           <DetailField label="Phone" value={user.phone} />
           <DetailField label="Role" value={ROLE_LABELS[user.role]} />
@@ -105,7 +106,7 @@ export function UserDetailContent({
           tint="var(--chart-2)"
         >
           <DetailGrid>
-            <DetailField label="Karigar Name" value={karigar.name} />
+            <DetailField label="Karigar Name" value={toTitleCase(karigar.name)} />
             <DetailField label="Mobile" value={karigar.mobile} />
             <DetailField label="Email" value={karigar.email} />
           </DetailGrid>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Truck } from "lucide-react"
 
 import { getVendorById, type Vendor } from "@/lib/actions/vendor-actions"
+import { toTitleCase } from "@/lib/utils"
 import { VendorRowActions } from "@/components/vendors/vendor-row-actions"
 import { VendorDetailContent } from "@/components/vendors/vendor-detail-content"
 import { VendorLedgerCardClient } from "@/components/vendors/ledger/vendor-ledger-card-client"
@@ -73,7 +74,7 @@ export function VendorDetailPanel({ vendorId, states }: VendorDetailPanelProps) 
     <div className="space-y-4 rounded-xl border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">{vendor.name}</h2>
+          <h2 className="text-lg font-semibold">{toTitleCase(vendor.name)}</h2>
           <p className="text-sm text-muted-foreground">
             {vendor.vendorType || "Vendor"}
           </p>

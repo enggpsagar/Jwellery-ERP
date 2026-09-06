@@ -175,6 +175,29 @@ export function stoneWeightToGrams(
 }
 
 /**
+ * Converts a value typed in `inputUnit` into a metal's own configured
+ * `primaryUnit` (Settings > Taxonomy) — the unit a weight field must be
+ * persisted in. Generalizes stoneWeightToGrams (which always targets grams)
+ * to target whichever unit the metal is actually configured for.
+ *
+ * Symmetric: calling it with `inputUnit`/`primaryUnit` swapped is its own
+ * inverse, so it also serves as the "display" direction — re-deriving a
+ * value already stored in `primaryUnit` for display under a different unit
+ * toggle (pass the stored unit as `inputUnit` and the toggle's unit as
+ * `primaryUnit`).
+ */
+export function toPrimaryUnit(
+  value: number,
+  inputUnit: "GRAM" | "CARAT",
+  primaryUnit: "GRAM" | "CARAT",
+  gramsPerCarat: number = GRAMS_PER_CARAT,
+): number {
+  if (inputUnit === primaryUnit) return value;
+  const grams = inputUnit === "CARAT" ? value * gramsPerCarat : value;
+  return primaryUnit === "CARAT" ? grams / gramsPerCarat : grams;
+}
+
+/**
  * True for a metal weighed and priced by carat rather than by gram —
  * Diamond, and a loose Stone product line (a stand-alone gemstone
  * `StoreMetal`, not the stone embedded in a metal piece — that's the

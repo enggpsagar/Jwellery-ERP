@@ -251,6 +251,13 @@ model StoreMetal {
   // migration that introduced this column, matching how they were already
   // implicitly treated everywhere carat-weighed math applied.
   primaryUnit         WeightUnit           @default(GRAM)
+  // The store's configured default selling price per unit (per gram, or
+  // per carat for a gemstone — whichever primaryUnit above says) for this
+  // metal/stone — Settings > Taxonomy. Null means "not configured": Invoice
+  // creation falls back to the linked stock item's own saleRate, and
+  // failing that, plain manual entry — this is a default to save re-typing
+  // the same rate on every sale, never a requirement.
+  sellingPrice        Decimal?             @db.Decimal(12, 2)
   isActive            Boolean              @default(true)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt

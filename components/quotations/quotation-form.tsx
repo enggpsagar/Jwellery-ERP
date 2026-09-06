@@ -171,6 +171,7 @@ export function QuotationForm({
   const toast = useToast()
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
+  const metalById = useMemo(() => new Map(metals.map((m) => [m.id, m])), [metals])
 
   const [customerId, setCustomerId] = useState("")
   // Seeded from the store's default location (create form only) — matches
@@ -240,7 +241,7 @@ export function QuotationForm({
       purity: stock.purity ?? "",
       grossWeight: stock.grossWeight ?? 0,
       netWeight: stock.netWeight ?? 0,
-      rate: stock.saleRate ?? 0,
+      rate: stock.saleRate ?? metalById.get(stock.metalType?.id ?? "")?.sellingPrice ?? 0,
       caratWeight: stock.caratWeight ?? 0,
       stoneRate: stock.stoneRate ?? 0,
       hasStoneComponent: stock.stoneRate != null,

@@ -170,6 +170,11 @@ function MetalsSection({
                 <Badge variant="outline">
                   {metal.primaryUnit === "CARAT" ? "Carat" : "Gram"}
                 </Badge>
+                {metal.sellingPrice ? (
+                  <Badge variant="outline" className="text-emerald-700">
+                    ₹{metal.sellingPrice.toLocaleString("en-IN")}/{metal.primaryUnit === "CARAT" ? "ct" : "g"}
+                  </Badge>
+                ) : null}
               </div>
 
               {canEdit ? (
@@ -308,6 +313,25 @@ function MetalFormRow({
         </Select>
       </div>
 
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+        <Label htmlFor="metal-sellingPrice">
+          Selling Price / {primaryUnit === "CARAT" ? "ct" : "g"}
+        </Label>
+        <Input
+          id="metal-sellingPrice"
+          name="sellingPrice"
+          type="number"
+          step="0.01"
+          min="0"
+          defaultValue={metal?.sellingPrice ?? ""}
+          placeholder="Optional"
+          className="w-36"
+        />
+        {state.errors?.sellingPrice?.[0] ? (
+          <p className="text-sm text-red-600">{state.errors.sellingPrice[0]}</p>
+        ) : null}
+      </div>
+
       <div className="flex justify-end gap-2 pb-0.5">
         <Button type="button" size="sm" variant="outline" onClick={onDone}>
           Cancel
@@ -421,6 +445,11 @@ function StonesSection({
                 <Badge variant="outline">
                   {stone.primaryUnit === "CARAT" ? "Carat" : "Gram"}
                 </Badge>
+                {stone.sellingPrice ? (
+                  <Badge variant="outline" className="text-emerald-700">
+                    ₹{stone.sellingPrice.toLocaleString("en-IN")}/{stone.primaryUnit === "CARAT" ? "ct" : "g"}
+                  </Badge>
+                ) : null}
               </div>
 
               {canEdit ? (
@@ -543,6 +572,25 @@ function StoneFormRow({
             <SelectItem value="CARAT">Carat</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+        <Label htmlFor="stone-sellingPrice">
+          Selling Price / {primaryUnit === "CARAT" ? "ct" : "g"}
+        </Label>
+        <Input
+          id="stone-sellingPrice"
+          name="sellingPrice"
+          type="number"
+          step="0.01"
+          min="0"
+          defaultValue={stone?.sellingPrice ?? ""}
+          placeholder="Optional"
+          className="w-36"
+        />
+        {state.errors?.sellingPrice?.[0] ? (
+          <p className="text-sm text-red-600">{state.errors.sellingPrice[0]}</p>
+        ) : null}
       </div>
 
       <div className="flex justify-end gap-2 pb-0.5">

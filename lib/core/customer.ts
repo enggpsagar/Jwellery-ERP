@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma";
 import type { PartyGstType } from "@prisma/client";
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
 import { isValidPanNumber, normalizePanNumber, PAN_INVALID_MESSAGE } from "@/lib/pan";
+import { formatShortDate } from "@/lib/utils";
 
 export type CustomerRecord = {
   id: string;
@@ -124,12 +125,7 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(date?: Date | null) {
-  if (!date) return "-";
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return formatShortDate(date);
 }
 
 export function getCustomerWhere(storeId: string, search?: string, archived = false) {

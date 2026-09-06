@@ -17,7 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/users/status-badge";
 import { SortableTableHead } from "@/components/shared/sortable-table-head";
-import { cn } from "@/lib/utils";
+import { cn, formatShortDate } from "@/lib/utils";
 
 import { ROLE_LABELS } from "@/lib/roles";
 
@@ -135,7 +135,7 @@ export function UserTable({
                           { label: "Account", value: user.isActive ? "Active" : "Deactivated" },
                           {
                             label: "Added",
-                            value: new Date(user.createdAt).toLocaleDateString("en-IN"),
+                            value: formatShortDate(user.createdAt),
                           },
                           {
                             // Empty means unrestricted, which is not the same

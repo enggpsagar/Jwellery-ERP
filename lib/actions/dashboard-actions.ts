@@ -6,6 +6,7 @@ import { InventoryStockStatus, InvoiceStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
+import { formatShortDateTime } from "@/lib/utils";
 
 /**
  * What counts as metal still on hand.
@@ -601,12 +602,7 @@ export async function getRecentTransactions(
       weight: totalWeight > 0 ? `${totalWeight.toFixed(1)} g` : "—",
       amount: `₹${Number(inv.totalAmount).toLocaleString("en-IN")}`,
       status: STATUS_MAP[inv.status] ?? "Pending",
-      date: inv.invoiceDate.toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      date: formatShortDateTime(inv.invoiceDate),
     };
   });
 }

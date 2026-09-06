@@ -1,17 +1,13 @@
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst";
 import { APP_NAME } from "@/lib/constants/app";
+import { formatShortDate } from "@/lib/utils";
 
 function formatCurrency(value: number) {
   return `₹${Number(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }
 
 function formatDate(value: string | Date) {
-  const date = typeof value === "string" ? new Date(value) : value;
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return formatShortDate(value);
 }
 
 function wrapEmail(storeName: string, title: string, bodyHtml: string, logoUrl?: string | null) {

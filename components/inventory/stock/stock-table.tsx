@@ -11,6 +11,7 @@ import type { getInventoryStock } from "@/lib/actions/inventory/stock-actions"
 
 import { StockStatusBadge } from "@/components/inventory/shared/stock-status-badge"
 import { FinishBadge } from "@/components/inventory/shared/finish-badge"
+import { formatShortDate } from "@/lib/utils"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 
@@ -49,10 +50,7 @@ function formatAmount(value: number | string | null | undefined) {
 }
 
 function formatDate(value: Date | string | null | undefined) {
-  if (!value) return "-"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return date.toLocaleDateString("en-IN")
+  return formatShortDate(value)
 }
 
 export function StockTable({

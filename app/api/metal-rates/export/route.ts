@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { formatShortDate } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
     });
 
     const rows = rates.map((rate) => ({
-      Date: new Date(rate.createdAt).toLocaleDateString("en-IN"),
+      Date: formatShortDate(rate.createdAt),
       "24K Gold": Number(rate.gold24k),
       "22K Gold": Number(rate.gold22k),
       "18K Gold": Number(rate.gold18k),

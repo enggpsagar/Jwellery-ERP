@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { RecordHoverCard } from "@/components/shared/record-hover-card";
+import { formatShortDate } from "@/lib/utils";
 
 import {
   Card,
@@ -61,10 +62,7 @@ export function MetalRatesTable({ data }: Props) {
 
   const filteredData = useMemo(() => {
     return data.filter((item) =>
-      new Date(item.date)
-        .toLocaleDateString("en-IN")
-        .toLowerCase()
-        .includes(search.toLowerCase()),
+      formatShortDate(item.date).toLowerCase().includes(search.toLowerCase()),
     );
   }, [data, search]);
 
@@ -240,11 +238,7 @@ export function MetalRatesTable({ data }: Props) {
                           day beside it so a move is readable without
                           comparing two rows by eye. */}
                       <RecordHoverCard
-                        label={new Date(rate.date).toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        label={formatShortDate(rate.date)}
                         title={new Date(rate.date).toLocaleDateString("en-IN", {
                           day: "numeric",
                           month: "long",

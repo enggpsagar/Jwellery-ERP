@@ -11,6 +11,7 @@ import {
   type ApiKeySummary,
 } from "@/lib/actions/api-key-actions"
 import { PERMISSIONS } from "@/lib/permissions"
+import { formatShortDateTime } from "@/lib/utils"
 import { useToast } from "@/components/providers/toast-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -34,13 +35,7 @@ function permissionLabel(permission: string) {
 
 function formatDate(value: string | null) {
   if (!value) return "Never"
-  return new Date(value).toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+  return formatShortDateTime(value)
 }
 
 export function ApiKeySettingsForm({

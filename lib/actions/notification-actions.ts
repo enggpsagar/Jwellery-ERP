@@ -8,6 +8,7 @@ import { getEffectiveStoreId } from "@/lib/store-context";
 import { hasPermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
+import { formatShortDate } from "@/lib/utils";
 
 export type NotificationItem = {
   id: string;
@@ -143,7 +144,7 @@ export async function getNotifications(): Promise<NotificationsResponse> {
       items: overdueJobs.map((job) => ({
         id: job.id,
         title: job.jobNumber ? `Job ${job.jobNumber}` : "Artisan job",
-        description: `${job.karigar.name} — expected ${job.expectedDate?.toLocaleDateString("en-IN")}`,
+        description: `${job.karigar.name} — expected ${formatShortDate(job.expectedDate)}`,
         href: `/karigars`,
       })),
     });

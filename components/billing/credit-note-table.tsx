@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Eye } from "lucide-react"
 
 import type { CreditNoteView } from "@/lib/actions/credit-note-actions"
+import { formatShortDate } from "@/lib/utils"
 
 type CreditNoteTableProps = {
   creditNotes: CreditNoteView[]
@@ -36,7 +37,7 @@ export function CreditNoteTable({ creditNotes }: CreditNoteTableProps) {
               <tr key={creditNote.id} className="border-b last:border-0">
                 <td className="px-4 py-3 font-medium">{creditNote.creditNoteNumber}</td>
                 <td className="px-4 py-3">
-                  {new Date(creditNote.creditNoteDate).toLocaleDateString("en-IN")}
+                  {formatShortDate(creditNote.creditNoteDate)}
                 </td>
                 <td className="px-4 py-3">
                   {creditNote.customer ? (

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import { ArrowRightCircle } from "lucide-react"
 
 import { getQuotationById } from "@/lib/actions/quotation-actions"
+import { formatShortDate } from "@/lib/utils"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { QuotationStatusBadge } from "@/components/quotations/quotation-status-badge"
 import { DeleteQuotationButton } from "@/components/quotations/delete-quotation-button"
@@ -57,9 +58,9 @@ export default async function QuotationDetailPage({ params }: Props) {
   const whatsappMessage = [
     businessSettings.businessName,
     `Quotation ${quotation.quotationNumber}`,
-    `Date: ${new Date(quotation.quotationDate).toLocaleDateString("en-IN")}`,
+    `Date: ${formatShortDate(quotation.quotationDate)}`,
     quotation.validUntil
-      ? `Valid until: ${new Date(quotation.validUntil).toLocaleDateString("en-IN")}`
+      ? `Valid until: ${formatShortDate(quotation.validUntil)}`
       : null,
     `Total: ₹${quotation.totalAmount.toFixed(2)}`,
   ]
@@ -115,7 +116,7 @@ export default async function QuotationDetailPage({ params }: Props) {
           <div>
             <p className="text-sm text-muted-foreground">Quotation Date</p>
             <p className="font-medium">
-              {new Date(quotation.quotationDate).toLocaleDateString("en-IN")}
+              {formatShortDate(quotation.quotationDate)}
             </p>
           </div>
 
@@ -123,7 +124,7 @@ export default async function QuotationDetailPage({ params }: Props) {
             <div>
               <p className="text-sm text-muted-foreground">Valid Until</p>
               <p className="font-medium">
-                {new Date(quotation.validUntil).toLocaleDateString("en-IN")}
+                {formatShortDate(quotation.validUntil)}
               </p>
             </div>
           )}

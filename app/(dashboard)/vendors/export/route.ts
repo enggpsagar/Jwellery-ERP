@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server"
 import * as XLSX from "xlsx"
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
+import { formatShortDate } from "@/lib/utils"
 
 type VendorSortBy = "name" | "createdAt" | "openingBalance"
 type SortOrder = "asc" | "desc"
@@ -14,12 +15,7 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(date?: Date | null) {
-  if (!date) return "-"
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date)
+  return formatShortDate(date)
 }
 
 function getTimestampedFileName() {

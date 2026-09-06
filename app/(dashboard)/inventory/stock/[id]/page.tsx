@@ -8,6 +8,7 @@ import { Pencil, ScanLine } from "lucide-react"
 import QRCode from "qrcode"
 
 import { getInventoryStockById } from "@/lib/actions/inventory/stock-actions"
+import { formatShortDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { StockStatusBadge } from "@/components/inventory/shared/stock-status-badge"
 import { FinishBadge } from "@/components/inventory/shared/finish-badge"
@@ -34,8 +35,7 @@ export async function generateMetadata({
 }
 
 function formatDate(value: Date | string | null | undefined) {
-  if (!value) return "-"
-  return new Date(value).toLocaleDateString("en-IN")
+  return formatShortDate(value)
 }
 
 function formatNumber(value: unknown) {

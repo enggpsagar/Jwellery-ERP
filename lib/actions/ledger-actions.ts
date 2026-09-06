@@ -9,6 +9,7 @@ import { getLocationScope, locationWhere } from "@/lib/location-scope"
 import { formatLedgerSource } from "@/lib/ledger-format"
 import { MONEY_UNIT } from "@/lib/business-units"
 import { getActiveBusinessUnits, type BusinessUnitOption } from "@/lib/business-units.server"
+import { formatShortDate } from "@/lib/utils"
 
 export type LedgerEntryRow = {
   id: string
@@ -33,11 +34,7 @@ export type LedgerEntryRow = {
 }
 
 function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date)
+  return formatShortDate(date)
 }
 
 function initials(name: string) {

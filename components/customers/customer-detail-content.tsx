@@ -116,7 +116,10 @@ export function CustomerDetailContent({
             label="Total Purchase Value"
             value={customer.totalPurchaseValue ?? money(0)}
           />
-          <DetailField label="Opening Balance" value={money(customer.openingBalance)} />
+          <DetailField
+            label="Opening Balance"
+            value={customer.openingBalance !== 0 ? money(customer.openingBalance) : undefined}
+          />
           <DetailField
             label="Current Balance"
             value={

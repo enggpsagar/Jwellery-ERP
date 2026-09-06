@@ -195,7 +195,6 @@ export function CustomerLedgerHistoryTable({ entries }: { entries: CustomerLedge
               <SortableHead label="Entry Type" sortKey="type" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
               <SortableHead label="Unit" sortKey="unit" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
               <TableHead>Source</TableHead>
-              <TableHead>Description</TableHead>
               <TableHead>Invoice</TableHead>
               <SortableHead
                 label="Amount"
@@ -211,7 +210,7 @@ export function CustomerLedgerHistoryTable({ entries }: { entries: CustomerLedge
           <TableBody>
             {paginated.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   {entries.length === 0
                     ? "No ledger entries found for this customer."
                     : "No entries match your search."}
@@ -244,7 +243,6 @@ export function CustomerLedgerHistoryTable({ entries }: { entries: CustomerLedge
                       </span>
                     ) : null}
                   </TableCell>
-                  <TableCell className="text-foreground">{entry.description || "-"}</TableCell>
                   <TableCell>
                     {entry.creditNoteId && entry.creditNoteNumber ? (
                       <Link

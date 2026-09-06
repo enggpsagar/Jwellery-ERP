@@ -96,7 +96,7 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
   const storeAccess = isSuperAdmin ? await getUserStoreAccess(id) : [];
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-4xl space-y-6 p-6">
       <PageBackHeader
         title={`Edit ${user.name}`}
         description="Update this user's role, access and login details."

@@ -29,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StoreLogoUpload } from "@/components/settings/store-logo-upload";
 import { cn } from "@/lib/utils";
 import { RequiredMark } from "@/components/shared/required-mark"
+import { useToast } from "@/components/providers/toast-provider";
 
 type CityItem = { id: string; name: string }
 
@@ -72,6 +73,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
     updateBusinessSettings,
     initialState,
   );
+  const toast = useToast();
 
   const [activeSection, setActiveSection] = useState<SettingsSection>("general");
 
@@ -136,9 +138,11 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
 
   useEffect(() => {
     if (state.message && state.success) {
-      // Hook into your toast provider here if desired
-      console.log(state.message);
+      toast.success(state.message);
+    } else if (state.message && !state.success) {
+      toast.error(state.message);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
   return (
@@ -160,18 +164,6 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
       {!canEdit ? (
         <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
           Only the Store Owner can edit these settings. You have view-only access.
-        </div>
-      ) : null}
-
-      {state.message ? (
-        <div
-          className={`rounded-lg px-4 py-3 text-sm ${
-            state.success
-              ? "bg-green-50 text-green-700"
-              : "bg-red-50 text-red-700"
-          }`}
-        >
-          {state.message}
         </div>
       ) : null}
 

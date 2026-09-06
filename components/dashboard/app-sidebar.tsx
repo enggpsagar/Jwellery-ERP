@@ -146,6 +146,7 @@ const mainNav: NavItem[] = [
     href: "/users",
     icon: UserCog,
     countKey: "users",
+    quickAddHref: "/users/new",
   },
   {
     title: "Stores",

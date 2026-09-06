@@ -152,8 +152,8 @@ export async function getCustomerLedgerSummary(
   let ledgerDebitTotal = 0
   let ledgerCreditTotal = 0
 
-  const weightTotals = new Map<string, { debit: number; credit: number }>(
-    nonMoneyUnits.map((unit) => [unit.value, { debit: 0, credit: 0 }]),
+  const weightTotals = new Map<string, { debit: number; credit: number; hasEntry: boolean }>(
+    nonMoneyUnits.map((unit) => [unit.value, { debit: 0, credit: 0, hasEntry: false }]),
   )
 
   for (const entry of entries) {
@@ -178,21 +178,29 @@ export async function getCustomerLedgerSummary(
 
     const bucket = weightTotals.get(unit.value)!
     bucket[isDebit ? "debit" : "credit"] += value
+    bucket.hasEntry = true
   }
 
-  const unitSummaries: CustomerLedgerUnitSummary[] = nonMoneyUnits.map((unit) => {
-    const debitTotal = weightTotals.get(unit.value)?.debit ?? 0
-    const creditTotal = weightTotals.get(unit.value)?.credit ?? 0
+  // Only units this customer has an actual ledger entry in — a store might
+  // deal in Diamond/Silver/Gold generally, but a customer who's only ever
+  // bought Gold has nothing meaningful to show for the other two; a
+  // "0.000 g" card for something they've never transacted in just reads as
+  // clutter, not information.
+  const unitSummaries: CustomerLedgerUnitSummary[] = nonMoneyUnits
+    .filter((unit) => weightTotals.get(unit.value)?.hasEntry)
+    .map((unit) => {
+      const debitTotal = weightTotals.get(unit.value)?.debit ?? 0
+      const creditTotal = weightTotals.get(unit.value)?.credit ?? 0
 
-    return {
-      unit: unit.value,
-      label: unit.label,
-      isGemstone: unit.isGemstone,
-      debitTotal,
-      creditTotal,
-      currentBalance: debitTotal - creditTotal,
-    }
-  })
+      return {
+        unit: unit.value,
+        label: unit.label,
+        isGemstone: unit.isGemstone,
+        debitTotal,
+        creditTotal,
+        currentBalance: debitTotal - creditTotal,
+      }
+    })
 
   return {
     openingBalance,

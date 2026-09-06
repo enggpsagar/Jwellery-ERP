@@ -6,7 +6,7 @@ import type { Customer } from "@/lib/actions/customer-actions"
 import { CustomerRowActions } from "@/components/customers/customer-row-actions"
 import { CustomersPagination } from "@/components/customers/customers-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
-import { cn } from "@/lib/utils"
+import { cn, toTitleCase } from "@/lib/utils"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -149,9 +149,9 @@ export function CustomersTable({
 
                   <td className="px-4 py-3 font-medium text-foreground">
                     <RecordHoverCard
-                      label={customer.name}
+                      label={toTitleCase(customer.name)}
                       href={onActivate ? undefined : `/customers/${customer.id}`}
-                      title={customer.name}
+                      title={toTitleCase(customer.name)}
                       subtitle={customer.customerType ?? undefined}
                       footerLabel="View customer"
                       sections={[

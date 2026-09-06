@@ -2,6 +2,14 @@
 
 import { useActionState } from "react";
 import { useEffect, useMemo, useState } from "react";
+import {
+  Building2,
+  Landmark,
+  MapPinned,
+  Receipt,
+  ScrollText,
+  Wallet,
+} from "lucide-react";
 
 import {
   updateBusinessSettings,
@@ -24,6 +32,29 @@ import { RequiredMark } from "@/components/shared/required-mark"
 
 type CityItem = { id: string; name: string }
 
+// This one form covers a lot of unrelated ground (branding, tax IDs,
+// address, bank details, ...) — stacked as one long scroll it was hard to
+// navigate. Split into the same tab-bar pattern as the top-level Settings
+// nav (components/settings/settings-tabs.tsx), just scoped to sections of
+// this one form/submit instead of separate pages: every field stays
+// mounted (so nothing typed is lost switching tabs), only the active
+// section's tab panel is visible — same reasoning StockForm's own
+// multi-card layout already uses, one Card per concern.
+type SettingsSection = "general" | "tax" | "address" | "bank" | "model" | "invoice";
+
+const SECTIONS: {
+  id: SettingsSection;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  { id: "general", label: "General", icon: Building2 },
+  { id: "tax", label: "Tax & Compliance", icon: Receipt },
+  { id: "address", label: "Address", icon: MapPinned },
+  { id: "bank", label: "Bank Details", icon: Landmark },
+  { id: "model", label: "Business Model", icon: Wallet },
+  { id: "invoice", label: "Invoice Preferences", icon: ScrollText },
+];
+
 type SettingsFormProps = {
   settings: BusinessSettings;
   canEdit: boolean;
@@ -41,6 +72,8 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
     updateBusinessSettings,
     initialState,
   );
+
+  const [activeSection, setActiveSection] = useState<SettingsSection>("general");
 
   const [gstScheme, setGstScheme] = useState<GstScheme>(settings.gstScheme);
 
@@ -143,6 +176,30 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
       ) : null}
 
       <fieldset disabled={!canEdit} className="space-y-6">
+      <div className="flex flex-wrap gap-1 border-b">
+        {SECTIONS.map((section) => {
+          const Icon = section.icon;
+          const isActive = section.id === activeSection;
+          return (
+            <button
+              key={section.id}
+              type="button"
+              onClick={() => setActiveSection(section.id)}
+              className={cn(
+                "flex items-center gap-2 border-b-2 px-3 pb-2.5 pt-1 text-sm transition-colors",
+                isActive
+                  ? "border-primary font-medium text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {section.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className={activeSection === "general" ? "space-y-6" : "hidden"}>
       <Card>
         <CardHeader>
           <CardTitle>Branding</CardTitle>
@@ -164,7 +221,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
           <CardTitle>Business Details</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="businessName">Business Name <RequiredMark /></Label>
             <Input
               id="businessName"
@@ -179,7 +236,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             ) : null}
           </div>
 
-          <div className="space-y-1.5 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="legalName">Legal / Registered Name</Label>
             <Input
               id="legalName"
@@ -208,7 +265,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             <Input id="website" name="website" defaultValue={settings.website} />
           </div>
 
-          <div className="space-y-1.5 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="backupEmail">Backup email</Label>
             <Input
               id="backupEmail"
@@ -225,7 +282,9 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
           </div>
         </CardContent>
       </Card>
+      </div>
 
+      <div className={activeSection === "tax" ? "space-y-6" : "hidden"}>
       <Card>
         <CardHeader>
           <CardTitle>Tax & Compliance</CardTitle>
@@ -377,7 +436,9 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
           </div>
         </CardContent>
       </Card>
+      </div>
 
+      <div className={activeSection === "address" ? "space-y-6" : "hidden"}>
       <Card>
         <CardHeader>
           <CardTitle>Address</CardTitle>
@@ -452,7 +513,9 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
           </div>
         </CardContent>
       </Card>
+      </div>
 
+      <div className={activeSection === "bank" ? "space-y-6" : "hidden"}>
       <Card>
         <CardHeader>
           <CardTitle>Bank Details</CardTitle>
@@ -489,7 +552,9 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
           </div>
         </CardContent>
       </Card>
+      </div>
 
+      <div className={activeSection === "model" ? "space-y-6" : "hidden"}>
       <Card>
         <CardHeader>
           <CardTitle>Business Model</CardTitle>
@@ -557,7 +622,9 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
           ) : null}
         </CardContent>
       </Card>
+      </div>
 
+      <div className={activeSection === "invoice" ? "space-y-6" : "hidden"}>
       <Card>
         <CardHeader>
           <CardTitle>Invoice Preferences</CardTitle>
@@ -615,6 +682,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
           </div>
         </CardContent>
       </Card>
+      </div>
 
       {canEdit && (
         <div className="flex justify-end">

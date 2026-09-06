@@ -2,9 +2,24 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 
-import { QUICK_RANGE_OPTIONS, matchQuickRange, getQuickRange, type QuickRangeKey } from "@/lib/date-range"
+import {
+  QUICK_RANGE_OPTIONS,
+  matchQuickRange,
+  getQuickRange,
+  matchFinancialYear,
+  getFinancialYearRange,
+  financialYearLabel,
+  type QuickRangeKey,
+} from "@/lib/date-range"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 type ReportDateFilterProps = {
   /** False when the active report tab is a point-in-time snapshot (current
@@ -12,9 +27,13 @@ type ReportDateFilterProps = {
    * a period — the range wouldn't change anything for it, so the controls
    * are disabled rather than left silently inert. */
   applies: boolean
+  /** Financial years (start year, Apr-Mar) that actually have data behind
+   * them — see getAvailableFinancialYears(). The FY dropdown only offers
+   * these, and is omitted entirely when this is empty. */
+  financialYears: number[]
 }
 
-export function ReportDateFilter({ applies }: ReportDateFilterProps) {
+export function ReportDateFilter({ applies, financialYears }: ReportDateFilterProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -22,6 +41,7 @@ export function ReportDateFilter({ applies }: ReportDateFilterProps) {
   const from = searchParams.get("from") ?? ""
   const to = searchParams.get("to") ?? ""
   const activePreset = from && to ? matchQuickRange(from, to) : undefined
+  const activeFinancialYear = from && to ? matchFinancialYear(from, to) : undefined
 
   function setRange(next: { from?: string; to?: string }) {
     const params = new URLSearchParams(searchParams.toString())
@@ -34,6 +54,10 @@ export function ReportDateFilter({ applies }: ReportDateFilterProps) {
 
   function applyPreset(key: QuickRangeKey) {
     setRange(getQuickRange(key))
+  }
+
+  function applyFinancialYear(value: string) {
+    setRange(getFinancialYearRange(Number(value)))
   }
 
   return (
@@ -90,6 +114,28 @@ export function ReportDateFilter({ applies }: ReportDateFilterProps) {
           </Button>
         )}
       </div>
+
+      {financialYears.length > 0 && (
+        <>
+          <div className="mx-1 h-6 w-px bg-border" />
+          <Select
+            value={activeFinancialYear !== undefined ? String(activeFinancialYear) : ""}
+            onValueChange={applyFinancialYear}
+            disabled={!applies}
+          >
+            <SelectTrigger size="sm" className="h-8 w-36">
+              <SelectValue placeholder="Financial year" />
+            </SelectTrigger>
+            <SelectContent>
+              {financialYears.map((year) => (
+                <SelectItem key={year} value={String(year)}>
+                  {financialYearLabel(year)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </>
+      )}
 
       {!applies && (
         <p className="text-xs text-muted-foreground">

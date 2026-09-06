@@ -8,8 +8,42 @@ import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
 import { getFinenessMap, toFineWeight } from "@/lib/purity";
 import { ROLE_LABELS } from "@/lib/roles";
+import { financialYearStartOf } from "@/lib/date-range";
 
 export type DateRange = { from?: string; to?: string };
+
+/**
+ * Financial years (startYear, Apr-Mar) that actually have data behind the
+ * date-aware reports — sales, purchases, and karigar jobs. Drives the
+ * Reports page's FY filter so it only ever offers years with something to
+ * show, instead of a fixed list that's mostly empty for a new store.
+ */
+export async function getAvailableFinancialYears(): Promise<number[]> {
+  const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
+
+  const [invoices, purchases, karigarJobs] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { storeId, ...locationWhere(scope) },
+      select: { invoiceDate: true },
+    }),
+    prisma.purchase.findMany({
+      where: { storeId, ...locationWhere(scope) },
+      select: { purchaseDate: true },
+    }),
+    prisma.karigarJob.findMany({
+      where: { storeId, ...locationWhere(scope) },
+      select: { issueDate: true },
+    }),
+  ]);
+
+  const years = new Set<number>();
+  for (const { invoiceDate } of invoices) years.add(financialYearStartOf(invoiceDate));
+  for (const { purchaseDate } of purchases) years.add(financialYearStartOf(purchaseDate));
+  for (const { issueDate } of karigarJobs) years.add(financialYearStartOf(issueDate));
+
+  return Array.from(years).sort((a, b) => b - a);
+}
 
 function toDateRangeWhere(range: DateRange, field: string) {
   if (!range.from && !range.to) return {};

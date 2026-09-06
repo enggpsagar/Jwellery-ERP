@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import {
   InventoryStockStatus,
@@ -140,6 +141,12 @@ type StockFormProps = {
   state: StockFormState;
 
   pending: boolean;
+
+  /** The enclosing <form> element, owned by the parent (StockCreateForm) —
+   * threaded down so this component can read/restore its own uncontrolled
+   * fields (tagNumber, saleRate, purchaseDate, etc.) around a detour to
+   * "Add New Product". Create-only; edit mode has no such detour. */
+  formRef?: React.RefObject<HTMLFormElement | null>;
 };
 
 function ErrorText({ error }: { error?: string[] }) {
@@ -158,6 +165,7 @@ export function StockForm({
   metals,
   state,
   pending,
+  formRef,
 }: StockFormProps) {
   const [status, setStatus] = useState(
     stock?.status ?? InventoryStockStatus.IN_STOCK,
@@ -288,6 +296,11 @@ export function StockForm({
     stock?.productId ?? "",
   );
 
+  // Re-mount key for ProductSelect after a restore — it only seeds its own
+  // internal selection from `defaultValue` on first mount, same reason
+  // purchase-form.tsx bumps its own productSelectKeys after restoring.
+  const [productSelectKey, setProductSelectKey] = useState(0);
+
   const selectedProduct = products.find((item) => item.id === selectedProductId);
 
   // Same Diamond/Stone signal as product-form.tsx's classifyPurityFamily —
@@ -342,6 +355,138 @@ export function StockForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProduct, weightsTouched]);
 
+  const searchParams = useSearchParams();
+
+  /**
+   * Parks the whole in-progress new stock entry before navigating off to
+   * "Add New Product" — without this, that detour would silently throw
+   * away every field already typed. Same technique as purchase-form.tsx's
+   * own saveDraft: controlled fields come from React state, the handful of
+   * plain uncontrolled inputs (tagNumber, saleRate, purchaseDate, ...) are
+   * read directly off the form element via formRef.
+   */
+  function saveDraft() {
+    if (mode !== "create") return;
+
+    const form = formRef?.current;
+    const field = (name: string) =>
+      form ? String((form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | null)?.value ?? "") : "";
+
+    const draft = {
+      selectedProductId,
+      status,
+      finish,
+      isActive,
+      locationId,
+      weightUnit,
+      weightsTouched,
+      netTouched,
+      grossWeight,
+      lessWeight,
+      netWeight,
+      stoneWeight,
+      dmoWeight,
+      caratWeight,
+      purchaseRate,
+      stockCode: field("stockCode"),
+      tagNumber: field("tagNumber"),
+      quantity: field("quantity"),
+      saleRate: field("saleRate"),
+      otherCharge: field("otherCharge"),
+      purchaseAmount: field("purchaseAmount"),
+      saleAmount: field("saleAmount"),
+      vendorName: field("vendorName"),
+      purchaseDate: field("purchaseDate"),
+      manufactureDate: field("manufactureDate"),
+      remarks: field("remarks"),
+    };
+
+    try {
+      sessionStorage.setItem("stock-form-draft", JSON.stringify(draft));
+    } catch {
+      // A full/blocked sessionStorage shouldn't stop the user getting to
+      // the create page — they just lose the draft, same as before.
+    }
+  }
+
+  // Restore-on-return. Runs once: reads any parked draft, applies the
+  // newly-created product, and refills every field.
+  const restoredRef = useRef(false);
+
+  useEffect(() => {
+    if (mode !== "create" || restoredRef.current) return;
+    restoredRef.current = true;
+
+    const newProductId = searchParams.get("newProductId");
+    if (!newProductId) return;
+
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem("stock-form-draft");
+      if (raw) sessionStorage.removeItem("stock-form-draft");
+    } catch {
+      raw = null;
+    }
+    if (!raw) return;
+
+    let draft: Record<string, string | boolean> | null = null;
+    try {
+      draft = JSON.parse(raw);
+    } catch {
+      draft = null;
+    }
+    if (!draft) return;
+
+    const str = (key: string, fallback = "") => (typeof draft?.[key] === "string" ? (draft[key] as string) : fallback);
+    const bool = (key: string, fallback = false) => (typeof draft?.[key] === "boolean" ? (draft[key] as boolean) : fallback);
+
+    setSelectedProductId(newProductId);
+    setStatus(str("status", InventoryStockStatus.IN_STOCK) as InventoryStockStatus);
+    setFinish(str("finish", InventoryFinish.KACHA) as InventoryFinish);
+    setIsActive(str("isActive", "true"));
+    setLocationId(str("locationId"));
+    setWeightUnit(str("weightUnit", "GRAM") as "GRAM" | "CARAT");
+    setWeightsTouched(bool("weightsTouched", true));
+    setNetTouched(bool("netTouched"));
+    setGrossWeight(str("grossWeight"));
+    setLessWeight(str("lessWeight"));
+    setNetWeight(str("netWeight"));
+    setStoneWeight(str("stoneWeight"));
+    setDmoWeight(str("dmoWeight"));
+    setCaratWeight(str("caratWeight"));
+    setPurchaseRate(str("purchaseRate"));
+
+    if (formRef?.current) {
+      const restoreField = (name: string, value: string) => {
+        const el = formRef.current?.elements.namedItem(name) as
+          | HTMLInputElement
+          | HTMLTextAreaElement
+          | null;
+        if (el && value) el.value = value;
+      };
+      restoreField("stockCode", str("stockCode"));
+      restoreField("tagNumber", str("tagNumber"));
+      restoreField("quantity", str("quantity"));
+      restoreField("saleRate", str("saleRate"));
+      restoreField("otherCharge", str("otherCharge"));
+      restoreField("purchaseAmount", str("purchaseAmount"));
+      restoreField("saleAmount", str("saleAmount"));
+      restoreField("vendorName", str("vendorName"));
+      restoreField("purchaseDate", str("purchaseDate"));
+      restoreField("manufactureDate", str("manufactureDate"));
+      restoreField("remarks", str("remarks"));
+    }
+
+    // ProductSelect only seeds its own selection from `defaultValue` on
+    // first mount — remount it so the restored pick actually shows.
+    setProductSelectKey((key) => key + 1);
+
+    // Strip the one-shot param via history rather than router.replace, so
+    // Next doesn't re-render the route and undo what was just restored.
+    window.history.replaceState({}, "", "/inventory/stock/new");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // `ProductSelect` is a shared component whose `ProductOption` type
   // expects `category`/`ornamentType`/`metalType` as display strings, not
   // the relation objects this form works with — flatten to names for it,
@@ -372,11 +517,18 @@ export function StockForm({
             <Label>Product <RequiredMark /></Label>
 
             <ProductSelect
+              key={productSelectKey}
               products={productSelectOptions}
               name="productId"
-              defaultValue={stock?.productId}
+              defaultValue={mode === "create" ? selectedProductId : stock?.productId}
               placeholder="Select Product"
               onChange={(productId) => setSelectedProductId(productId)}
+              {...(mode === "create"
+                ? {
+                    addNewHref: `/inventory/products/new?returnTo=${encodeURIComponent("/inventory/stock/new")}`,
+                    onBeforeAddNew: saveDraft,
+                  }
+                : {})}
             />
 
             <ErrorText error={state.errors.productId} />

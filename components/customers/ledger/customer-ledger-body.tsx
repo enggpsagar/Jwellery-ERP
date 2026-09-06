@@ -1,6 +1,11 @@
 // components/customers/ledger/customer-ledger-body.tsx
+"use client"
+
+import { useState } from "react"
 import Link from "next/link"
-import { Receipt } from "lucide-react"
+import { ChevronDown, ChevronUp, Receipt } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
 
 import type { CustomerLedgerEntryItem, CustomerLedgerSummary } from "@/lib/actions/customer-ledger-actions"
 import type { BusinessUnitOption } from "@/lib/business-units.server"
@@ -78,6 +83,11 @@ export function CustomerLedgerBody({
   summary,
   activeUnits,
 }: CustomerLedgerBodyProps) {
+  // Collapsed by default — the summary cards above already answer "where do
+  // things stand," so the full transaction-by-transaction history (which
+  // can run long) stays out of the way until someone actually asks for it.
+  const [showDetails, setShowDetails] = useState(false)
+
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between">
@@ -199,11 +209,36 @@ export function CustomerLedgerBody({
       )}
 
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        <div className="border-b px-4 py-4">
-          <h3 className="text-sm font-semibold text-foreground">Ledger History</h3>
+        <div className="flex w-full items-center justify-between gap-2 border-b px-4 py-4">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Ledger History</h3>
+            <p className="text-xs text-muted-foreground">
+              {entries.length} entr{entries.length === 1 ? "y" : "ies"}
+              {!showDetails && entries.length > 0 ? " — click to view details" : ""}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setShowDetails((prev) => !prev)}
+          >
+            {showDetails ? (
+              <>
+                Hide Details
+                <ChevronUp className="h-4 w-4" />
+              </>
+            ) : (
+              <>
+                View Details
+                <ChevronDown className="h-4 w-4" />
+              </>
+            )}
+          </Button>
         </div>
 
-        {entries.length === 0 ? (
+        {!showDetails ? null : entries.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
             No ledger entries found for this customer.
           </div>

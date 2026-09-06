@@ -71,11 +71,16 @@ export function ProductsClient({
         backHref="/inventory"
         backLabel="Back to Inventory"
         action={
-          canCreate ? (
-            <Link href="/inventory/products/new">
-              <Button>Add Product</Button>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/inventory/products/archived">
+              <Button variant="outline">Archived Products</Button>
             </Link>
-          ) : undefined
+            {canCreate ? (
+              <Link href="/inventory/products/new">
+                <Button>Add Product</Button>
+              </Link>
+            ) : null}
+          </div>
         }
       />
 

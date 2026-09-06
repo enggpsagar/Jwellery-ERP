@@ -82,7 +82,13 @@ export function UserRowActions({ user }: { user: ActionableUser }) {
       {/* Editing is a full page now, not a popup — the form carries role,
           module access and location grants, which is more than a dialog
           should hold. */}
-      <Button variant="outline" size="icon" title="Edit user" asChild>
+      <Button
+        variant="outline"
+        size="icon"
+        title="Edit user"
+        className="border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+        asChild
+      >
         <Link href={`/users/${user.id}/edit`}>
           <Pencil className="h-4 w-4" />
         </Link>
@@ -94,6 +100,11 @@ export function UserRowActions({ user }: { user: ActionableUser }) {
         disabled={isPending}
         onClick={handleToggleStatus}
         title={user.status === "DISABLED" ? "Enable user" : "Disable user"}
+        className={
+          user.status === "DISABLED"
+            ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+            : "border-amber-200 text-amber-700 hover:bg-amber-50"
+        }
       >
         {user.status === "DISABLED" ? (
           <CircleCheck className="h-4 w-4" />
@@ -103,11 +114,12 @@ export function UserRowActions({ user }: { user: ActionableUser }) {
       </Button>
 
       <Button
-        variant="destructive"
+        variant="outline"
         size="icon"
         disabled={isPending}
         onClick={handleDelete}
         title="Delete user"
+        className="border-red-200 text-red-600 hover:bg-red-50"
       >
         <Trash2 className="h-4 w-4" />
       </Button>

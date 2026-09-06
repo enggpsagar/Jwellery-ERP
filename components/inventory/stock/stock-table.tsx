@@ -237,7 +237,7 @@ export function StockTable({
 
                       <Link
                         href={`/inventory/stock/${item.id}/edit`}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-amber-700 hover:bg-amber-50"
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-indigo-600 hover:bg-indigo-50"
                         title="Edit stock item"
                       >
                         <Pencil className="h-4 w-4" />

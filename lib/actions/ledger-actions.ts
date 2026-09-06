@@ -103,6 +103,10 @@ export type KarigarLedgerRow = {
   date: string
   type: "CREDIT" | "DEBIT"
   sourceLabel: string
+  /** Who recorded this entry — null for anything created before this field
+   *  existed, or where the acting session had no user (shouldn't normally
+   *  happen, kept nullable rather than assumed). */
+  createdByName: string | null
   description: string
   metalWeightFine: number | null
   /** This entry's own metal, e.g. "Gold" or "Silver" — a karigar can work
@@ -165,7 +169,7 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
   const entries = await prisma.ledgerEntry.findMany({
     where: { storeId, karigarId },
     orderBy: [{ entryDate: "asc" }, { createdAt: "asc" }],
-    include: { metalType: { select: { name: true } } },
+    include: { metalType: { select: { name: true } }, createdBy: { select: { name: true } } },
   })
 
   let cashBalance = 0
@@ -197,6 +201,7 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
       date: formatDate(entry.entryDate),
       type: entry.type as "CREDIT" | "DEBIT",
       sourceLabel: formatLedgerSource(entry.sourceType),
+      createdByName: entry.createdBy?.name ?? null,
       description: entry.description ?? "",
       metalWeightFine,
       metalType,

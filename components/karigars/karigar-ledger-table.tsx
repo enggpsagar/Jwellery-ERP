@@ -49,7 +49,7 @@ function inr(value: number | string | null | undefined) {
 
 function matchesSearch(row: KarigarLedgerRow, query: string) {
   if (!query) return true
-  const haystack = `${row.description} ${row.sourceLabel} ${row.date} ${row.metalType ?? ""} ${
+  const haystack = `${row.description} ${row.sourceLabel} ${row.createdByName ?? ""} ${row.date} ${row.metalType ?? ""} ${
     row.paymentMethod ?? ""
   }`.toLowerCase()
   return haystack.includes(query)
@@ -237,6 +237,7 @@ function DateCell({ row, metalLabel }: { row: KarigarLedgerRow; metalLabel: stri
         {
           fields: [
             { label: "Type", value: row.type },
+            { label: "Issued By", value: row.createdByName },
             { label: "Payment Method", value: PAYMENT_METHOD_LABELS[row.paymentMethod ?? ""] ?? row.paymentMethod },
             { label: "Description", value: row.description },
           ],
@@ -312,7 +313,7 @@ function MaterialSideTable({
           <TableHeader>
             <TableRow>
               <SortableHead label="Date" sortKey="date" activeSortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-              <TableHead>Source</TableHead>
+              <TableHead>Issued By</TableHead>
               <SortableHead
                 label="Fine Weight"
                 sortKey="weight"
@@ -338,7 +339,7 @@ function MaterialSideTable({
                     <DateCell row={row} metalLabel={metalLabel} />
                   </TableCell>
                   <TableCell>
-                    {row.sourceLabel}
+                    {row.createdByName ?? row.sourceLabel}
                     {row.paymentMethod ? (
                       <span className="block text-xs text-muted-foreground">
                         {PAYMENT_METHOD_LABELS[row.paymentMethod] ?? row.paymentMethod}
@@ -615,7 +616,7 @@ export function KarigarLedgerTable({
                 sortDir={financialSortDir}
                 onSort={handleFinancialSort}
               />
-              <TableHead>Source</TableHead>
+              <TableHead>Issued By</TableHead>
               <SortableHead
                 label="Cash Amount"
                 sortKey="amount"
@@ -649,7 +650,7 @@ export function KarigarLedgerTable({
                       <Badge variant={isDebit ? "destructive" : "secondary"}>{row.type}</Badge>
                     </TableCell>
                     <TableCell>
-                      {row.sourceLabel}
+                      {row.createdByName ?? row.sourceLabel}
                       {row.paymentMethod ? (
                         <span className="block text-xs text-muted-foreground">
                           {PAYMENT_METHOD_LABELS[row.paymentMethod] ?? row.paymentMethod}

@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
 import { getFinenessMap, toFineWeight } from "@/lib/purity";
+import { getCurrentUser } from "@/lib/auth/auth";
 
 /**
  * This file covers STOCK MOVEMENTS (reserve, damage, karigar issue/receipt,
@@ -337,6 +338,7 @@ export async function issueMaterialToKarigar(
 ): Promise<StockActionState> {
   try {
     const storeId = await requireStoreScope();
+    const currentUser = await getCurrentUser();
 
     const karigar = await prisma.karigar.findFirst({
       where: { id: karigarId, storeId },
@@ -435,6 +437,7 @@ export async function issueMaterialToKarigar(
           description: isPreciousMetal
             ? `${issueWeight}g ${issuePurity} issued (${(issueFineWeight ?? 0).toFixed(3)}g fine) — Job ${jobNumber}`
             : `${issueWeight}g ${notes ? notes : storeMetal.name} issued — Job ${jobNumber}`,
+          createdByUserId: currentUser?.id,
           locationId: locationId ?? undefined,
         },
       });
@@ -469,6 +472,7 @@ export async function recordMaterialReceiptFromKarigar(
 ): Promise<StockActionState> {
   try {
     const storeId = await requireStoreScope();
+    const currentUser = await getCurrentUser();
 
     const karigar = await prisma.karigar.findFirst({
       where: { id: karigarId, storeId },
@@ -550,6 +554,7 @@ export async function recordMaterialReceiptFromKarigar(
         description: isPreciousMetal
           ? `${receiveWeight}g ${receivePurity} received against outstanding balance (${(receiveFineWeight ?? 0).toFixed(3)}g fine)${notes ? ` — ${notes}` : ""}`
           : `${receiveWeight}g ${notes ? notes : storeMetal.name} received against outstanding balance`,
+        createdByUserId: currentUser?.id,
         locationId: locationId ?? undefined,
       },
     });
@@ -581,6 +586,7 @@ export async function receiveItemsFromKarigar(
 ): Promise<StockActionState> {
   try {
     const storeId = await requireStoreScope();
+    const currentUser = await getCurrentUser();
 
     const job = await prisma.karigarJob.findFirst({
       where: { id: jobId, storeId },
@@ -829,6 +835,7 @@ export async function receiveItemsFromKarigar(
           metalWeightFine: receiveFineWeight,
           amount: 0,
           description: `Received ${items.length} item(s) — ${receiveFineWeight.toFixed(3)}g fine (incl. ${wastageFineWeight.toFixed(3)}g wastage) — Job ${job.jobNumber ?? jobId}`,
+          createdByUserId: currentUser?.id,
           locationId: job.locationId ?? undefined,
         },
       });
@@ -845,6 +852,7 @@ export async function receiveItemsFromKarigar(
             karigarId: job.karigarId,
             amount: labourCharge,
             description: `Labour charge for Job ${job.jobNumber ?? jobId}`,
+            createdByUserId: currentUser?.id,
             locationId: job.locationId ?? undefined,
           },
         });
@@ -887,6 +895,7 @@ export async function recordKarigarPayment(
     }
 
     const storeId = await requireStoreScope();
+    const currentUser = await getCurrentUser();
 
     const karigar = await prisma.karigar.findFirst({
       where: { id: karigarId, storeId },
@@ -908,6 +917,7 @@ export async function recordKarigarPayment(
             paymentReference: payment.reference ?? undefined,
             bankName: payment.bankName ?? undefined,
             attachmentUrl: payment.attachmentUrl ?? undefined,
+            createdByUserId: currentUser?.id,
             locationId: karigar.locationId ?? undefined,
             description: notes ?? (index === 0 ? `Payment made to ${karigar.name}` : undefined),
           },

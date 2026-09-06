@@ -38,6 +38,11 @@ function formatNumber(value: number | string | null | undefined, digits = 3) {
   return Number(value).toFixed(digits)
 }
 
+function formatWeightCell(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") return "-"
+  return `${Number(value).toFixed(3)} g`
+}
+
 export function StockTable({
   stockItems,
   pagination,
@@ -110,6 +115,14 @@ export function StockTable({
               </th>
               <SortableTableHead label="Stock Code" sortKey="stockCode" defaultSortBy="createdAt" />
               <SortableTableHead label="Title" sortKey="product" defaultSortBy="createdAt" />
+              <th className="px-4 py-3 text-right font-medium">Gross Weight</th>
+              {/* Only Net Weight has a server-side sort option (getStockOrderBy) — Gross Weight isn't sortable there, so it stays a plain header. */}
+              <SortableTableHead
+                label="Net Weight"
+                sortKey="netWeight"
+                defaultSortBy="createdAt"
+                align="right"
+              />
             </tr>
           </thead>
 
@@ -157,18 +170,19 @@ export function StockTable({
                         },
                         {
                           fields: [
-                            { label: "Gross", value: formatNumber(item.grossWeight) },
-                            { label: "Net", value: formatNumber(item.netWeight) },
-                          ],
-                        },
-                        {
-                          fields: [
                             { label: "Quantity", value: item.quantity },
                             { label: "Location", value: item.location?.name },
                           ],
                         },
                       ]}
                     />
+                  </td>
+
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {formatWeightCell(item.grossWeight)}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {formatWeightCell(item.netWeight)}
                   </td>
                 </tr>
               )

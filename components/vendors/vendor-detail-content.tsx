@@ -40,6 +40,12 @@ export function VendorDetailContent({
 
   return (
     <div className="space-y-6">
+      {/* Ledger first — same reasoning as the Customer detail page: the
+          financial history is why this page gets opened day to day, not
+          the contact-card details below it. Renders nothing when this
+          vendor has no ledger activity yet (see VendorLedgerBody). */}
+      {ledger}
+
       <DetailSection
         title="Vendor Information"
         description="Contact details and identifiers."
@@ -121,8 +127,6 @@ export function VendorDetailContent({
           </DetailGrid>
         </DetailSection>
       ) : null}
-
-      {ledger}
     </div>
   )
 }

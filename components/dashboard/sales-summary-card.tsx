@@ -75,7 +75,7 @@ export function SalesSummaryCard({ initialData, initialPeriod }: SalesSummaryCar
 
   return (
     <Card className="gap-0 py-0">
-      <CardContent className="flex flex-col gap-4 p-5">
+      <CardContent className="flex flex-col gap-3 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
             <span className="text-sm font-medium text-muted-foreground">Sales</span>

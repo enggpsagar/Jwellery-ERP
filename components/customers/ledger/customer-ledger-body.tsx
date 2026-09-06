@@ -2,18 +2,17 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
-import { ChevronDown, ChevronUp, Receipt } from "lucide-react"
+import { ChevronDown, ChevronUp } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
 import type { CustomerLedgerEntryItem, CustomerLedgerSummary } from "@/lib/actions/customer-ledger-actions"
 import type { BusinessUnitOption } from "@/lib/business-units.server"
-import { classifyMetalName } from "@/lib/business-units"
 import { cn } from "@/lib/utils"
 import { AddCustomerSaleEntryDialog } from "@/components/customers/ledger/add-customer-sale-entry-dialog"
 import { AddCustomerRefundEntryDialog } from "@/components/customers/ledger/add-customer-refund-entry-dialog"
 import { EmailLedgerStatementButton } from "@/components/customers/ledger/email-ledger-statement-button"
+import { CustomerLedgerHistoryTable } from "@/components/customers/ledger/customer-ledger-history-table"
 
 function formatAmount(value: number) {
   return `₹ ${Number(value || 0).toLocaleString("en-IN", {
@@ -34,34 +33,6 @@ function formatCarat(value: number) {
     minimumFractionDigits: 3,
     maximumFractionDigits: 3,
   })} ct`
-}
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  CASH: "Cash",
-  UPI: "UPI",
-  NET_BANKING: "Net Banking",
-  CHEQUE: "Cheque",
-  CARD: "Card",
-  OTHER: "Other",
-}
-
-function formatEntryAmount(entry: {
-  metalType: string | null
-  metalWeight: number | null
-  caratWeight: number | null
-  amount: number
-}) {
-  const family = classifyMetalName(entry.metalType)
-
-  if ((family === "GOLD" || family === "SILVER") && entry.metalWeight != null) {
-    return formatWeight(entry.metalWeight)
-  }
-
-  if (family === "DIAMOND" && entry.caratWeight != null) {
-    return formatCarat(entry.caratWeight)
-  }
-
-  return formatAmount(entry.amount)
 }
 
 type CustomerLedgerBodyProps = {
@@ -204,8 +175,8 @@ export function CustomerLedgerBody({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        <div className="flex w-full items-center justify-between gap-2 border-b px-4 py-4">
+      <div className="rounded-xl border bg-card shadow-sm">
+        <div className="flex w-full items-center justify-between gap-2 px-4 py-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Ledger History</h3>
             <p className="text-xs text-muted-foreground">
@@ -233,90 +204,9 @@ export function CustomerLedgerBody({
             )}
           </Button>
         </div>
-
-        {!showDetails ? null : entries.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            No ledger entries found for this customer.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead className="bg-muted/40">
-                <tr className="text-left text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Date</th>
-                  <th className="px-4 py-3 font-medium">Entry Type</th>
-                  <th className="px-4 py-3 font-medium">Unit</th>
-                  <th className="px-4 py-3 font-medium">Source</th>
-                  <th className="px-4 py-3 font-medium">Description</th>
-                  <th className="px-4 py-3 font-medium">Invoice</th>
-                  <th className="px-4 py-3 font-medium text-right">Amount</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {entries.map((entry) => (
-                  <tr key={entry.id} className="border-t">
-                    <td className="px-4 py-3 text-foreground">{entry.entryDate}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                          entry.type === "DEBIT"
-                            ? "bg-red-50 text-red-700"
-                            : "bg-green-50 text-green-700"
-                        }`}
-                      >
-                        {entry.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-foreground">
-                      {entry.metalType ?? "Money"}
-                    </td>
-                    <td className="px-4 py-3 text-foreground">
-                      {entry.sourceType}
-                      {entry.paymentMethod ? (
-                        <span className="block text-xs text-muted-foreground">
-                          {PAYMENT_METHOD_LABELS[entry.paymentMethod] ?? entry.paymentMethod}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3 text-foreground">
-                      {entry.description || "-"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {entry.creditNoteId && entry.creditNoteNumber ? (
-                        <Link
-                          href={`/billing/credit-notes/${entry.creditNoteId}`}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
-                        >
-                          <Receipt className="h-3.5 w-3.5" />
-                          {entry.creditNoteNumber}
-                        </Link>
-                      ) : entry.invoiceId && entry.invoiceNumber ? (
-                        <Link
-                          href={`/billing/${entry.invoiceId}`}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
-                        >
-                          <Receipt className="h-3.5 w-3.5" />
-                          {entry.invoiceNumber}
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right font-medium ${
-                        entry.type === "DEBIT" ? "text-red-600" : "text-green-600"
-                      }`}
-                    >
-                      {formatEntryAmount(entry)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
+
+      {showDetails && <CustomerLedgerHistoryTable entries={entries} />}
     </section>
   )
 }

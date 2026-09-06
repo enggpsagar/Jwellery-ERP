@@ -37,6 +37,9 @@ export type CustomerLedgerEntryItem = {
   caratWeight: number | null
   paymentMethod: string | null
   entryDate: string
+  /** Raw ISO timestamp — entryDate above is pre-formatted for the emailed
+   * statement, this is what the on-screen ledger table sorts by. */
+  entryDateISO: string
   invoiceId: string | null
   invoiceNumber: string | null
   creditNoteId: string | null
@@ -104,6 +107,7 @@ export async function getCustomerLedgerEntries(
     caratWeight: entry.caratWeight ? Number(entry.caratWeight) : null,
     paymentMethod: entry.paymentMethod ?? null,
     entryDate: formatDate(entry.entryDate),
+    entryDateISO: entry.entryDate.toISOString(),
     invoiceId: entry.invoice?.id ?? null,
     invoiceNumber: entry.invoice?.invoiceNumber ?? null,
     creditNoteId: entry.creditNote?.id ?? null,

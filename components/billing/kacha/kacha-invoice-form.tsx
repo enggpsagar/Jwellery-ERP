@@ -710,10 +710,14 @@ export function KachaInvoiceForm({
                   )}
                 </div>
 
-                {/* Once this is a composite line with "Includes a Stone"
-                    checked, Net Stone Weight moves down into that box, next
-                    to the Stone Carat Weight it mirrors — see below. */}
-                {(isCaratLine(item) || !item.hasStoneComponent) && (
+                {/* For a carat-weighed line (no "Includes a Stone" toggle
+                    applies there at all — see below), Net Stone Weight has
+                    no gating concept and always shows here. For every other
+                    line, this field is only ever visible once "Includes a
+                    Stone" is checked, inside that toggle's own box below —
+                    while off, it stays fully hidden (not shown here) rather
+                    than relocated, per the toggle's on/off gating. */}
+                {isCaratLine(item) && (
                   <div className="space-y-1">
                     <Label className="text-xs">Net Stone Weight</Label>
                     <div className="flex gap-1">
@@ -878,7 +882,15 @@ export function KachaInvoiceForm({
                 <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
                   <IncludesStoneToggle
                     checked={item.hasStoneComponent}
-                    onChange={(checked) => updateItem(item.key, { hasStoneComponent: checked })}
+                    onChange={(checked) =>
+                      updateItem(item.key, {
+                        hasStoneComponent: checked,
+                        // Net Stone Weight is now hidden once the toggle is
+                        // off — clear it so a hidden field can't silently
+                        // keep submitting whatever was last entered.
+                        ...(checked ? {} : { stoneWeightInput: 0, netStoneWeightTouched: false }),
+                      })
+                    }
                   />
 
                   {item.hasStoneComponent && (

@@ -885,7 +885,16 @@ export function ProductForm({
           <div className="flex items-end pb-2">
             <IncludesStoneToggle
               checked={hasStoneComponent}
-              onChange={setHasStoneComponent}
+              onChange={(checked) => {
+                setHasStoneComponent(checked)
+                // Stone Weight is now hidden once the toggle is off (see
+                // below) — clear it so a hidden field can't silently keep
+                // submitting whatever was last typed while it was visible.
+                if (!checked) {
+                  setStoneWeight("")
+                  setStoneWeightTouched(false)
+                }
+              }}
             />
             <input
               type="hidden"
@@ -1002,28 +1011,17 @@ export function ProductForm({
             <ErrorText error={state.errors.defaultGrossWeight} />
           </div>
 
-          {/* Once "Includes a Stone" is checked, Stone Weight moves down
-              into the Stone Pricing box below, next to the Stone Carat
-              Weight it mirrors — see there, regardless of whether the
-              product's own metal happens to be carat-weighed too. It stays
-              here only for a plain metal item with no stone component. */}
+          {/* Stone Weight is only ever visibly editable once "Includes a
+              Stone" is checked — it then lives in the Stone Pricing box
+              below, as "Net Stone Weight" next to the Stone Carat Weight it
+              mirrors. While the toggle is off, the field stays fully
+              hidden (its value is cleared when the toggle turns off — see
+              the toggle's own onChange below) rather than shown here for a
+              plain metal item; this hidden input is only what keeps
+              defaultStoneWeight in the submitted form shape (as an empty/
+              null value) for that off case. */}
           {!hasStoneComponent && (
-            <div>
-              <Label htmlFor="defaultStoneWeight">Stone Weight</Label>
-
-              <input type="hidden" name="defaultStoneWeight" value={submittedWeight(stoneWeight)} />
-              <Input
-                id="defaultStoneWeight"
-                type="number"
-                step="0.00001"
-                min="0"
-                value={displayWeight(stoneWeight)}
-                onChange={(event) => handleStoneWeightChange(toGramsString(event.target.value))}
-                placeholder="0.000"
-              />
-
-              <ErrorText error={state.errors.defaultStoneWeight} />
-            </div>
+            <input type="hidden" name="defaultStoneWeight" value={submittedWeight(stoneWeight)} />
           )}
 
           <div>

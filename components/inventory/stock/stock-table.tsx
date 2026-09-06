@@ -1,19 +1,14 @@
 "use client"
 
-import Link from "next/link"
-import { Eye, Pencil } from "lucide-react"
-
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import * as React from "react"
 
-import type { InventoryStockStatus, InventoryFinish } from "@prisma/client"
 import type { getInventoryStock } from "@/lib/actions/inventory/stock-actions"
 
-import { StockStatusBadge } from "@/components/inventory/shared/stock-status-badge"
-import { FinishBadge } from "@/components/inventory/shared/finish-badge"
-import { formatShortDate } from "@/lib/utils"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
+import { ActiveBadge } from "@/components/shared/active-badge"
+import { cn } from "@/lib/utils"
 
 // Derived from the actual server action's return shape (rather than
 // hand-declared) so this table never drifts out of sync with whatever
@@ -34,6 +29,9 @@ type StockTableProps = {
   pagination: Pagination
   selectedIds: string[]
   onSelectionChange: (ids: string[]) => void
+  /** Which row's detail is showing in the panel alongside this table — distinct from selectedIds, which is the bulk-action checkbox selection. */
+  activeStockId?: string | null
+  onActivate?: (id: string) => void
 }
 
 function formatNumber(value: number | string | null | undefined, digits = 3) {
@@ -41,16 +39,9 @@ function formatNumber(value: number | string | null | undefined, digits = 3) {
   return Number(value).toFixed(digits)
 }
 
-function formatAmount(value: number | string | null | undefined) {
+function formatWeightCell(value: number | string | null | undefined) {
   if (value === null || value === undefined || value === "") return "-"
-  return `₹${Number(value).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-}
-
-function formatDate(value: Date | string | null | undefined) {
-  return formatShortDate(value)
+  return `${Number(value).toFixed(3)} g`
 }
 
 export function StockTable({
@@ -58,6 +49,8 @@ export function StockTable({
   pagination,
   selectedIds,
   onSelectionChange,
+  activeStockId,
+  onActivate,
 }: StockTableProps) {
   const allIds = React.useMemo(
     () => stockItems.map((item) => item.id),
@@ -122,28 +115,35 @@ export function StockTable({
                 />
               </th>
               <SortableTableHead label="Stock Code" sortKey="stockCode" defaultSortBy="createdAt" />
-              <SortableTableHead label="Product" sortKey="product" defaultSortBy="createdAt" />
-              <SortableTableHead label="Metal" sortKey="metalType" defaultSortBy="createdAt" />
-              <SortableTableHead label="Purity" sortKey="purity" defaultSortBy="createdAt" />
-              <SortableTableHead label="Qty" sortKey="quantity" defaultSortBy="createdAt" />
-              <th className="px-4 py-3 text-left font-medium">Gross Wt.</th>
-              <SortableTableHead label="Net Wt." sortKey="netWeight" defaultSortBy="createdAt" />
-              <SortableTableHead label="Sale Amt." sortKey="saleAmount" defaultSortBy="createdAt" />
-              <SortableTableHead label="Status" sortKey="status" defaultSortBy="createdAt" />
-              <SortableTableHead label="Finish" sortKey="finish" defaultSortBy="createdAt" />
-              <SortableTableHead label="Location" sortKey="location" defaultSortBy="createdAt" />
-              <SortableTableHead label="Purchase Date" sortKey="purchaseDate" defaultSortBy="createdAt" />
-              <th className="px-4 py-3 text-left font-medium">Action</th>
+              <SortableTableHead label="Title" sortKey="product" defaultSortBy="createdAt" />
+              <th className="px-4 py-3 text-right font-medium">Gross Weight</th>
+              {/* Only Net Weight has a server-side sort option (getStockOrderBy) — Gross Weight isn't sortable there, so it stays a plain header. */}
+              <SortableTableHead
+                label="Net Weight"
+                sortKey="netWeight"
+                defaultSortBy="createdAt"
+                align="right"
+              />
+              <SortableTableHead label="Active" sortKey="isActive" defaultSortBy="createdAt" />
             </tr>
           </thead>
 
           <tbody>
             {stockItems.map((item) => {
               const checked = selectedIds.includes(item.id)
+              const isActive = activeStockId === item.id
 
               return (
-                <tr key={item.id} className="border-b last:border-0">
-                  <td className="px-4 py-3">
+                <tr
+                  key={item.id}
+                  onClick={() => onActivate?.(item.id)}
+                  className={cn(
+                    "border-b last:border-0",
+                    onActivate && "cursor-pointer hover:bg-accent/50",
+                    isActive && "bg-accent",
+                  )}
+                >
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={checked}
@@ -153,10 +153,12 @@ export function StockTable({
                     />
                   </td>
 
+                  <td className="px-4 py-3 text-foreground">{item.stockCode}</td>
+
                   <td className="px-4 py-3 font-medium">
                     <RecordHoverCard
-                      label={item.stockCode}
-                      href={`/inventory/stock/${item.id}`}
+                      label={item.product?.name ?? item.stockCode}
+                      href={onActivate ? undefined : `/inventory/stock/${item.id}`}
                       title={item.product?.name ?? item.stockCode}
                       subtitle={item.stockCode}
                       footerLabel="View stock item"
@@ -170,12 +172,6 @@ export function StockTable({
                         },
                         {
                           fields: [
-                            { label: "Gross", value: formatNumber(item.grossWeight) },
-                            { label: "Net", value: formatNumber(item.netWeight) },
-                          ],
-                        },
-                        {
-                          fields: [
                             { label: "Quantity", value: item.quantity },
                             { label: "Location", value: item.location?.name },
                           ],
@@ -184,63 +180,14 @@ export function StockTable({
                     />
                   </td>
 
-                  <td className="px-4 py-3">
-                    {item.product ? (
-                      <Link
-                        href={`/inventory/products/${item.product.id}?from=${encodeURIComponent("/inventory/stock")}`}
-                        className="hover:underline"
-                      >
-                        <div className="font-medium text-primary">
-                          {item.product.name}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {item.product.productCode}
-                        </div>
-                      </Link>
-                    ) : (
-                      <div className="font-medium">-</div>
-                    )}
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {formatWeightCell(item.grossWeight)}
                   </td>
-
-                  <td className="px-4 py-3">{item.metalType?.name ?? "-"}</td>
-                  <td className="px-4 py-3">{item.purity ?? "-"}</td>
-                  <td className="px-4 py-3">{item.quantity}</td>
-                  <td className="px-4 py-3">{formatNumber(item.grossWeight)}</td>
-                  <td className="px-4 py-3">{formatNumber(item.netWeight)}</td>
-                  <td className="px-4 py-3">{formatAmount(item.saleAmount)}</td>
-
-                  <td className="px-4 py-3">
-                    <StockStatusBadge
-                      status={item.status as InventoryStockStatus}
-                      quantity={item.quantity}
-                    />
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {formatWeightCell(item.netWeight)}
                   </td>
-
                   <td className="px-4 py-3">
-                    <FinishBadge finish={item.finish as InventoryFinish} />
-                  </td>
-
-                  <td className="px-4 py-3">{item.location?.name ?? "-"}</td>
-                  <td className="px-4 py-3">{formatDate(item.purchaseDate)}</td>
-
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <Link
-                        href={`/inventory/stock/${item.id}`}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
-                        title="View stock item"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Link>
-
-                      <Link
-                        href={`/inventory/stock/${item.id}/edit`}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-indigo-600 hover:bg-indigo-50"
-                        title="Edit stock item"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Link>
-                    </div>
+                    <ActiveBadge isActive={item.isActive} />
                   </td>
                 </tr>
               )

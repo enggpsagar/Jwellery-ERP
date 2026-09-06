@@ -149,6 +149,11 @@ export type GetProductsParams = {
    * "UNASSIGNED" for products with no metal set. Dynamic: whatever the
    * store has configured, not a fixed set of categories. */
   metalTypeId?: string;
+  /** "ACTIVE" | "INACTIVE" — otherwise (including "ALL"/undefined) every
+   * product matches, same convention as DataTableToolbar's other status
+   * filters. This is the only way to actually see just the inactive
+   * products — active-first sort alone still shows them, just at the end. */
+  status?: string;
 };
 
 type ExportProductsParams = {
@@ -157,9 +162,15 @@ type ExportProductsParams = {
   sortBy?: string;
   sortOrder?: ProductSortOrder;
   type?: string;
+  status?: string;
 };
 
-function getProductWhere(storeId: string, search?: string, metalTypeId?: string) {
+function getProductWhere(
+  storeId: string,
+  search?: string,
+  metalTypeId?: string,
+  status?: string,
+) {
   const query = String(search || "").trim();
 
   return {
@@ -168,6 +179,11 @@ function getProductWhere(storeId: string, search?: string, metalTypeId?: string)
       ? { metalTypeId: null }
       : metalTypeId
         ? { metalTypeId }
+        : {}),
+    ...(status === "ACTIVE"
+      ? { isActive: true }
+      : status === "INACTIVE"
+        ? { isActive: false }
         : {}),
     ...(query
       ? {
@@ -181,19 +197,27 @@ function getProductWhere(storeId: string, search?: string, metalTypeId?: string)
   };
 }
 
+// Active products always sort ahead of inactive ones, regardless of which
+// column the user picked — that column only decides ordering *within* each
+// of those two groups (skipped when the user explicitly sorted by Status
+// itself, since prepending it there would be redundant).
 function getProductOrderBy(
   sortBy: ProductSortBy = "createdAt",
   sortOrder: ProductSortOrder = "desc",
 ) {
-  if (sortBy === "name") return { name: sortOrder };
-  if (sortBy === "productCode") return { productCode: sortOrder };
-  if (sortBy === "category") return { category: { name: sortOrder } };
-  if (sortBy === "categoryType") return { categoryType: { name: sortOrder } };
-  if (sortBy === "metalType") return { metalType: { name: sortOrder } };
-  if (sortBy === "defaultPurity") return { defaultPurity: sortOrder };
-  if (sortBy === "defaultNetWeight") return { defaultNetWeight: sortOrder };
-  if (sortBy === "isActive") return { isActive: sortOrder };
-  return { createdAt: sortOrder };
+  const primary =
+    sortBy === "name" ? { name: sortOrder }
+    : sortBy === "productCode" ? { productCode: sortOrder }
+    : sortBy === "category" ? { category: { name: sortOrder } }
+    : sortBy === "categoryType" ? { categoryType: { name: sortOrder } }
+    : sortBy === "metalType" ? { metalType: { name: sortOrder } }
+    : sortBy === "defaultPurity" ? { defaultPurity: sortOrder }
+    : sortBy === "defaultNetWeight" ? { defaultNetWeight: sortOrder }
+    : sortBy === "isActive" ? { isActive: sortOrder }
+    : { createdAt: sortOrder };
+
+  if (sortBy === "isActive") return [primary];
+  return [{ isActive: "desc" as const }, primary];
 }
 
 function mapProductRow(row: {
@@ -269,7 +293,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   const sortOrder: ProductSortOrder = params.sortOrder || "desc";
 
   const storeId = await requireStoreScope();
-  const where = getProductWhere(storeId, search, params.metalTypeId);
+  const where = getProductWhere(storeId, search, params.metalTypeId, params.status);
   const orderBy = getProductOrderBy(sortBy, sortOrder);
 
   const [totalCount, rows] = await Promise.all([
@@ -322,7 +346,7 @@ async function getAllProductsForExport(params: ExportProductsParams = {}) {
         id: { in: params.selectedIds },
         storeId,
       }
-    : getProductWhere(storeId, params.search, params.type);
+    : getProductWhere(storeId, params.search, params.type, params.status);
 
   const rows = await prisma.product.findMany({
     where,
@@ -1024,6 +1048,55 @@ export async function deleteProduct(id: string): Promise<ProductFormState> {
       message: "Failed to delete product",
       errors: {},
     };
+  }
+}
+
+/** Flips a product's Active/Inactive status — same immediate, no-confirm
+ * toggle as enableKarigar/disableKarigar, used by the Status switch on the
+ * product detail view instead of a separate confirm dialog. */
+export async function disableProduct(id: string): Promise<ProductFormState> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const { count } = await prisma.product.updateMany({
+      where: { id, storeId },
+      data: { isActive: false },
+    });
+
+    if (count === 0) {
+      return { success: false, message: "Product not found", errors: {} };
+    }
+
+    revalidatePath("/inventory/products");
+    revalidatePath(`/inventory/products/${id}`);
+
+    return { success: true, message: "Product marked inactive", errors: {} };
+  } catch (error) {
+    console.error("disableProduct error:", error);
+    return { success: false, message: "Failed to update product", errors: {} };
+  }
+}
+
+export async function enableProduct(id: string): Promise<ProductFormState> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const { count } = await prisma.product.updateMany({
+      where: { id, storeId },
+      data: { isActive: true },
+    });
+
+    if (count === 0) {
+      return { success: false, message: "Product not found", errors: {} };
+    }
+
+    revalidatePath("/inventory/products");
+    revalidatePath(`/inventory/products/${id}`);
+
+    return { success: true, message: "Product marked active", errors: {} };
+  } catch (error) {
+    console.error("enableProduct error:", error);
+    return { success: false, message: "Failed to update product", errors: {} };
   }
 }
 

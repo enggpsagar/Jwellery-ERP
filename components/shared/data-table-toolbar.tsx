@@ -40,6 +40,12 @@ type DataTableToolbarProps = {
    * different concept from this metal-family classification. */
   typeOptions?: Option[]
   typeLabel?: string
+  /** Hides the "Sort by …" and Ascending/Descending dropdowns — for a table
+   * (Products, Stock) that sorts only via its own per-column
+   * SortableTableHead clicks and doesn't want a second, redundant sort
+   * control in the toolbar. Defaults to false so every existing caller keeps
+   * both dropdowns exactly as before. */
+  hideSort?: boolean
   /** Omit when this table has no row-select — the single Export button then always exports the filtered set. */
   selectedIds?: string[]
   entityLabel: string
@@ -67,6 +73,7 @@ export function DataTableToolbar({
   statusOptions,
   typeOptions,
   typeLabel = "Type",
+  hideSort = false,
   selectedIds,
   entityLabel,
   exportAction,
@@ -85,11 +92,6 @@ export function DataTableToolbar({
   const currentType = searchParams.get("type") ?? "ALL"
 
   const [search, setSearch] = React.useState(currentSearch)
-  // Collapsed to an icon by default, expanding into the input on click —
-  // starts expanded when a search is already active (from a URL/back-nav),
-  // so an in-progress filter is never hidden behind an icon the user has to
-  // know to click first.
-  const [searchOpen, setSearchOpen] = React.useState(!!currentSearch)
   const [isPending, startTransition] = React.useTransition()
   const [isExporting, setIsExporting] = React.useState(false)
 
@@ -172,49 +174,29 @@ export function DataTableToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 shadow-sm">
-      {searchOpen ? (
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            autoFocus
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onBlur={() => {
-              // Collapses back to just the icon once empty and unfocused —
-              // an active search stays expanded (visible + editable), so
-              // this never hides a filter that's actually doing something.
-              if (!search.trim()) setSearchOpen(false)
-            }}
-            placeholder={searchPlaceholder}
-            className="pl-9 pr-8"
-            disabled={isPending}
-          />
-          {search ? (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              title="Clear search"
-              aria-label="Clear search"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          ) : null}
-        </div>
-      ) : (
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={() => setSearchOpen(true)}
-          title="Search"
-          aria-label="Search"
-        >
-          <Search className="h-4 w-4" />
-        </Button>
-      )}
+      <div className="relative w-full sm:w-64">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={searchPlaceholder}
+          className="pl-9 pr-8"
+          disabled={isPending}
+        />
+        {search ? (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            title="Clear search"
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-1 flex-wrap items-center gap-3">
         {statusOptions ? (
           <select
             className="rounded-md border px-3 py-2 text-sm"
@@ -247,28 +229,32 @@ export function DataTableToolbar({
           </select>
         ) : null}
 
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
-          value={currentSortBy}
-          onChange={(e) => updateParam("sortBy", e.target.value)}
-          disabled={isPending}
-        >
-          {sortOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        {hideSort ? null : (
+          <>
+            <select
+              className="rounded-md border px-3 py-2 text-sm"
+              value={currentSortBy}
+              onChange={(e) => updateParam("sortBy", e.target.value)}
+              disabled={isPending}
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
 
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
-          value={currentSortOrder}
-          onChange={(e) => updateParam("sortOrder", e.target.value)}
-          disabled={isPending}
-        >
-          <option value="desc">Descending</option>
-          <option value="asc">Ascending</option>
-        </select>
+            <select
+              className="rounded-md border px-3 py-2 text-sm"
+              value={currentSortOrder}
+              onChange={(e) => updateParam("sortOrder", e.target.value)}
+              disabled={isPending}
+            >
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+          </>
+        )}
 
         <select
           className="rounded-md border px-3 py-2 text-sm"
@@ -280,6 +266,10 @@ export function DataTableToolbar({
           <option value="20">20 / page</option>
           <option value="50">50 / page</option>
         </select>
+      </div>
+
+      <div className="flex items-center gap-3">
+        {bulkActions}
 
         <Button
           type="button"
@@ -292,8 +282,6 @@ export function DataTableToolbar({
         >
           {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}
         </Button>
-
-        {bulkActions}
       </div>
     </div>
   )

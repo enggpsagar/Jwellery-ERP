@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 
 import {
   updatePurityFineness,
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/providers/toast-provider";
 
 type PurityFormProps = {
   rows: PurityFinenessRow[];
@@ -26,6 +27,16 @@ export function PuritySettingsForm({ rows, canEdit }: PurityFormProps) {
     updatePurityFineness,
     initialState,
   );
+  const toast = useToast();
+
+  useEffect(() => {
+    if (state.message && state.success) {
+      toast.success(state.message);
+    } else if (state.message && !state.success) {
+      toast.error(state.message);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   return (
     <form
@@ -46,18 +57,6 @@ export function PuritySettingsForm({ rows, canEdit }: PurityFormProps) {
       {!canEdit ? (
         <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
           Only the Store Owner can edit these settings. You have view-only access.
-        </div>
-      ) : null}
-
-      {state.message ? (
-        <div
-          className={`rounded-lg px-4 py-3 text-sm ${
-            state.success
-              ? "bg-green-50 text-green-700"
-              : "bg-red-50 text-red-700"
-          }`}
-        >
-          {state.message}
         </div>
       ) : null}
 

@@ -25,7 +25,7 @@ export default async function ApiKeysSettingsPage() {
   const keys = await listApiKeys();
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-5xl space-y-6 p-6">
       <PageBackHeader
         title="API Keys"
         description="Credentials for a future mobile app or an AI assistant (via MCP) to act on this store directly — scoped to only the permissions you grant."

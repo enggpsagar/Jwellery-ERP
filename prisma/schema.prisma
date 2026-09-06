@@ -84,6 +84,7 @@ model Store {
   supportTickets       SupportTicket[]
   creditNotes          CreditNote[]
   reminders            Reminder[]
+  gstRates             GstRate[]
 
   @@index([code])
 }
@@ -673,6 +674,14 @@ model Invoice {
   stoneCharges           Decimal        @default(0) @db.Decimal(12, 2)
   discount               Decimal        @default(0) @db.Decimal(12, 2)
   taxAmount              Decimal        @default(0) @db.Decimal(12, 2)
+  // Which configured GstRate (Settings > GST Rates) was picked, snapshotted
+  // at the time — see GstRate's own doc comment for why this is a snapshot
+  // rather than a live read of the master rate. Nullable: an invoice raised
+  // before this field existed, or a Composition-scheme store's invoice
+  // (never carries a rate at all), has none.
+  gstRateId              String?
+  gstRateName            String?
+  gstRatePercent         Decimal?       @db.Decimal(5, 2)
   totalAmount            Decimal        @default(0) @db.Decimal(12, 2)
   paidAmount             Decimal        @default(0) @db.Decimal(12, 2)
   balanceAmount          Decimal        @default(0) @db.Decimal(12, 2)
@@ -709,6 +718,7 @@ model Invoice {
   createdBy              User?          @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
   cancelledBy            User?          @relation("InvoiceCancelledBy", fields: [cancelledById], references: [id])
   customer               Customer       @relation(fields: [customerId], references: [id])
+  gstRate                GstRate?       @relation(fields: [gstRateId], references: [id])
   items                  InvoiceItem[]
   ledgerEntries          LedgerEntry[]
   convertedFromKacha     KachaInvoice?  @relation("KachaConvertedToPakka")
@@ -1127,6 +1137,13 @@ model Purchase {
   sgstAmount          Decimal        @default(0) @db.Decimal(12, 2)
   cgstAmount          Decimal        @default(0) @db.Decimal(12, 2)
   igstAmount          Decimal        @default(0) @db.Decimal(12, 2)
+  // Which configured GstRate (Settings > GST Rates) was picked, snapshotted
+  // at the time — see GstRate's own doc comment. Nullable: a purchase
+  // raised before this field existed, or one where the vendor charges no
+  // GST at all (isVendorGstApplicable), has none.
+  gstRateId           String?
+  gstRateName         String?
+  gstRatePercent      Decimal?       @db.Decimal(5, 2)
   totalAmount         Decimal        @default(0) @db.Decimal(12, 2)
   paidAmount          Decimal        @default(0) @db.Decimal(12, 2)
   balanceAmount       Decimal        @default(0) @db.Decimal(12, 2)
@@ -1142,6 +1159,7 @@ model Purchase {
   updatedAt           DateTime       @updatedAt
   store               Store          @relation(fields: [storeId], references: [id])
   vendor              Vendor         @relation(fields: [vendorId], references: [id])
+  gstRate             GstRate?       @relation(fields: [gstRateId], references: [id])
   items               PurchaseItem[]
   ledgerEntries       LedgerEntry[]
   locationId          String?
@@ -1227,6 +1245,46 @@ model CaratConversionRate {
   @@unique([storeId, purity])
 }
 
+/**
+ * A store-managed, reusable GST rate — Settings > GST Rates (Add/Edit/
+ * Activate/Deactivate). Replaces the old single BusinessSettings.
+ * defaultGstRate flat number: a store can now define as many rates as it
+ * needs (e.g. "Metal" 3%, "Making Charges" 18%, "Artisan Services" 18%,
+ * plus any custom one), picked from a dropdown everywhere a GST % is
+ * chosen (Invoice/Purchase/Quotation), instead of a single figure applied
+ * to the whole document. `name` is the label shown in that dropdown.
+ *
+ * This is the GST *rate* only — GstScheme (REGULAR_B2C/REGULAR_B2B/
+ * COMPOSITION, on BusinessSettings) and the SGST/CGST/IGST split
+ * (computeGst() in lib/gst.ts, driven by store vs. counterparty state)
+ * are separate, unrelated concerns and stay exactly as they are.
+ *
+ * Deactivating (isActive=false) removes a rate from the picker for NEW
+ * documents without touching any document that already used it — see
+ * Invoice.gstRateId/gstRatePercent/gstRateName (and the same trio on
+ * Purchase/Quotation), which snapshot the rate actually applied at the
+ * time, so a later change or deactivation here never rewrites history.
+ * `isDefault` (at most one true per store, enforced in application code,
+ * not a DB constraint) is which rate a brand-new document preselects.
+ */
+model GstRate {
+  id          String   @id @default(cuid())
+  storeId     String
+  name        String
+  ratePercent Decimal  @db.Decimal(5, 2)
+  isActive    Boolean  @default(true)
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  invoices    Invoice[]
+  purchases   Purchase[]
+  quotations  Quotation[]
+
+  @@unique([storeId, name])
+  @@index([storeId])
+}
+
 model KarigarReceiptItem {
   id               String          @id @default(cuid())
   karigarJobId     String
@@ -1275,6 +1333,12 @@ model Quotation {
   sgstAmount      Decimal         @default(0) @db.Decimal(12, 2)
   cgstAmount      Decimal         @default(0) @db.Decimal(12, 2)
   igstAmount      Decimal         @default(0) @db.Decimal(12, 2)
+  // Which configured GstRate (Settings > GST Rates) was picked, snapshotted
+  // at the time — see GstRate's own doc comment. Nullable: a quotation
+  // raised before this field existed has none.
+  gstRateId       String?
+  gstRateName     String?
+  gstRatePercent  Decimal?        @db.Decimal(5, 2)
   totalAmount     Decimal         @default(0) @db.Decimal(12, 2)
   notes           String?
   convertedToId   String?         @unique
@@ -1282,6 +1346,7 @@ model Quotation {
   updatedAt       DateTime        @updatedAt
   store           Store           @relation(fields: [storeId], references: [id])
   customer        Customer        @relation(fields: [customerId], references: [id])
+  gstRate         GstRate?        @relation(fields: [gstRateId], references: [id])
   convertedTo     Invoice?        @relation("QuotationConvertedToInvoice", fields: [convertedToId], references: [id])
   items           QuotationItem[]
   locationId      String?

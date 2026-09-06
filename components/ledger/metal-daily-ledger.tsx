@@ -74,7 +74,7 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
               Purchased, sold, and running closing balance per unit, by day.
             </CardDescription>
           </div>
-          <ExportMenu href="/ledger/export?scope=metal-wise" label="Export" />
+          <ExportMenu href="/ledger/export?scope=metal-wise" label="Export" iconOnly />
         </div>
 
         <Select value={dateRange} onValueChange={setDateRange}>

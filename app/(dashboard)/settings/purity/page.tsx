@@ -29,7 +29,7 @@ export default async function PuritySettingsPage() {
   ]);
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-5xl space-y-6 p-6">
       <PageBackHeader
         title="Purity & Carat Settings"
         description="Define the fine-metal percentage used to convert weights across purities."

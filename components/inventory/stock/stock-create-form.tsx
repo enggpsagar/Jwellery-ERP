@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { PurityType } from "@prisma/client";
 
@@ -28,6 +28,7 @@ type StockCreateFormProps = {
 export function StockCreateForm({ products, locations, caratConversionRates, defaultLocationId, metals }: StockCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
+  const formRef = useRef<HTMLFormElement>(null);
 
   const [state, formAction, pending] = useActionState(
     createInventoryStock,
@@ -53,6 +54,7 @@ export function StockCreateForm({ products, locations, caratConversionRates, def
 
   return (
     <form
+      ref={formRef}
       onSubmit={(event) => {
         // Deliberately not `action={formAction}` directly on the form:
         // React resets a form's uncontrolled fields once an action-bound
@@ -75,6 +77,7 @@ export function StockCreateForm({ products, locations, caratConversionRates, def
         metals={metals}
         state={state}
         pending={pending}
+        formRef={formRef}
       />
     </form>
   );

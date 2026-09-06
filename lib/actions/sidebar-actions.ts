@@ -3,6 +3,8 @@
 
 import { UserRole } from "@prisma/client"
 
+import { LedgerSourceType } from "@prisma/client"
+
 import { prisma } from "@/lib/prisma"
 import { getLocationScope, locationWhere } from "@/lib/location-scope"
 
@@ -17,6 +19,8 @@ export type SidebarCounts = {
   invoices: number
   kachaInvoices: number
   creditNotes: number
+  paymentsIn: number
+  paymentsOut: number
   users: number
   stores: number
 }
@@ -32,6 +36,8 @@ const EMPTY_COUNTS: SidebarCounts = {
   invoices: 0,
   kachaInvoices: 0,
   creditNotes: 0,
+  paymentsIn: 0,
+  paymentsOut: 0,
   users: 0,
   stores: 0,
 }
@@ -75,6 +81,8 @@ export async function getSidebarCounts(
     invoices,
     kachaInvoices,
     creditNotes,
+    paymentsIn,
+    paymentsOut,
     users,
     stores,
   ] = await Promise.all([
@@ -89,6 +97,13 @@ export async function getSidebarCounts(
     prisma.kachaInvoice.count({ where: { storeId, ...withLocation } }),
     // No locationId on CreditNote — matches getCreditNotes()'s own filter.
     prisma.creditNote.count({ where: { storeId } }),
+    // Matches getPaymentsIn/getPaymentsOut's own filter exactly.
+    prisma.ledgerEntry.count({
+      where: { storeId, sourceType: LedgerSourceType.PAYMENT_IN, ...withLocation },
+    }),
+    prisma.ledgerEntry.count({
+      where: { storeId, sourceType: LedgerSourceType.PAYMENT_OUT, ...withLocation },
+    }),
     prisma.user.count({ where: { storeId } }),
     // Only a Super Admin's sidebar shows "Stores" at all (see
     // getNavForRole in app-sidebar.tsx) — a plain count query is cheap
@@ -108,6 +123,8 @@ export async function getSidebarCounts(
     invoices,
     kachaInvoices,
     creditNotes,
+    paymentsIn,
+    paymentsOut,
     users,
     stores,
   }

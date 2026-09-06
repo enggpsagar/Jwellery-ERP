@@ -29,7 +29,7 @@ export default async function LocationsSettingsPage() {
   ]);
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-5xl space-y-6 p-6">
       <PageBackHeader
         title="Locations"
         description="Define the physical locations your store keeps stock in."

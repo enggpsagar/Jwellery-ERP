@@ -66,10 +66,6 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
   const currentType = searchParams.get("type") ?? "ALL"
 
   const [search, setSearch] = React.useState(currentSearch)
-  // Collapsed to an icon by default, expanding into the input on click —
-  // starts expanded when a search is already active (URL/back-nav), so an
-  // in-progress filter is never hidden behind an icon.
-  const [searchOpen, setSearchOpen] = React.useState(!!currentSearch)
   const [isPending, startTransition] = React.useTransition()
   const [isExporting, setIsExporting] = React.useState(false)
 
@@ -148,46 +144,29 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 shadow-sm">
-      {searchOpen ? (
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            autoFocus
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onBlur={() => {
-              if (!search.trim()) setSearchOpen(false)
-            }}
-            placeholder="Search by name, code, mobile..."
-            className="pl-9 pr-8"
-            disabled={isPending}
-          />
-          {search ? (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              title="Clear search"
-              aria-label="Clear search"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          ) : null}
-        </div>
-      ) : (
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={() => setSearchOpen(true)}
-          title="Search"
-          aria-label="Search"
-        >
-          <Search className="h-4 w-4" />
-        </Button>
-      )}
+      <div className="relative w-full sm:w-64">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name, code, mobile..."
+          className="pl-9 pr-8"
+          disabled={isPending}
+        />
+        {search ? (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            title="Clear search"
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-1 flex-wrap items-center gap-3">
         <select
           className="rounded-md border px-3 py-2 text-sm"
           value={currentType}
@@ -207,27 +186,6 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
 
         <select
           className="rounded-md border px-3 py-2 text-sm"
-          value={currentSortBy}
-          onChange={(e) => updateParam("sortBy", e.target.value)}
-          disabled={isPending}
-        >
-          <option value="createdAt">Sort by Created Date</option>
-          <option value="name">Sort by Name</option>
-          <option value="code">Sort by Code</option>
-        </select>
-
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
-          value={currentSortOrder}
-          onChange={(e) => updateParam("sortOrder", e.target.value)}
-          disabled={isPending}
-        >
-          <option value="desc">Descending</option>
-          <option value="asc">Ascending</option>
-        </select>
-
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
           value={currentPageSize}
           onChange={(e) => updateParam("pageSize", e.target.value)}
           disabled={isPending}
@@ -236,6 +194,10 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
           <option value="20">20 / page</option>
           <option value="50">50 / page</option>
         </select>
+      </div>
+
+      <div className="flex items-center gap-3">
+        {bulkActions}
 
         <Button
           type="button"
@@ -248,8 +210,6 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
         >
           {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}
         </Button>
-
-        {bulkActions}
       </div>
     </div>
   )

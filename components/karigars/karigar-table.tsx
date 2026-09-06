@@ -84,11 +84,8 @@ export function KarigarTable({
               <SortableTableHead label="Code" sortKey="code" defaultSortBy="createdAt" />
               <SortableTableHead label="Name" sortKey="name" defaultSortBy="createdAt" />
               <th className="px-4 py-3 text-left font-medium">Mobile</th>
-              <th className="px-4 py-3 text-left font-medium">Specialization</th>
-              <th className="px-4 py-3 text-left font-medium">Metal Type</th>
               <th className="px-4 py-3 text-left font-medium">City</th>
               <th className="px-4 py-3 text-left font-medium">Opening Gold</th>
-              <th className="px-4 py-3 text-left font-medium">Status</th>
             </tr>
           </thead>
 
@@ -144,21 +141,8 @@ export function KarigarTable({
                   />
                 </td>
                 <td className="px-4 py-3">{karigar.mobile || "-"}</td>
-                <td className="px-4 py-3">{karigar.specialization || "-"}</td>
-                <td className="px-4 py-3">{karigar.metalTypeName || "-"}</td>
                 <td className="px-4 py-3">{karigar.city || "-"}</td>
                 <td className="px-4 py-3">{karigar.openingGold.toFixed(3)} g</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                      karigar.isActive
-                        ? "bg-green-100 text-green-700"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {karigar.isActive ? "Active" : "Inactive"}
-                  </span>
-                </td>
               </tr>
               )
             })}

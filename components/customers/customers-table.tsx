@@ -3,7 +3,6 @@
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import * as React from "react"
 import type { Customer } from "@/lib/actions/customer-actions"
-import { CustomerRowActions } from "@/components/customers/customer-row-actions"
 import { CustomersPagination } from "@/components/customers/customers-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import { cn, toTitleCase } from "@/lib/utils"
@@ -20,14 +19,8 @@ function inr(value: number | string | null | undefined) {
   }).format(amount)
 }
 
-type StateItem = {
-  id: string
-  name: string
-}
-
 type CustomersTableProps = {
   customers: Customer[]
-  states: StateItem[]
   pagination: {
     page: number
     pageSize: number
@@ -45,7 +38,6 @@ type CustomersTableProps = {
 
 export function CustomersTable({
   customers,
-  states,
   pagination,
   selectedCustomerIds,
   onSelectionChange,
@@ -118,7 +110,6 @@ export function CustomersTable({
               <th className="px-4 py-3 font-medium">City</th>
               <th className="px-4 py-3 font-medium">State</th>
               <SortableTableHead label="Balance" sortKey="openingBalance" defaultSortBy="createdAt" />
-              <th className="px-4 py-3 font-medium text-right">Actions</th>
             </tr>
           </thead>
 
@@ -202,10 +193,6 @@ export function CustomersTable({
 
                   <td className="px-4 py-3 text-foreground">
                     ₹ {Number(customer.openingBalance || 0).toLocaleString("en-IN")}
-                  </td>
-
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <CustomerRowActions customer={customer} states={states} />
                   </td>
                 </tr>
               )

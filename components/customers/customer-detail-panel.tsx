@@ -76,12 +76,7 @@ export function CustomerDetailPanel({ customerId, states }: CustomerDetailPanelP
   return (
     <div className="space-y-4 rounded-xl border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">{toTitleCase(customer.name)}</h2>
-          <p className="text-sm text-muted-foreground">
-            {customer.customerType || "Customer"}
-          </p>
-        </div>
+        <h2 className="text-lg font-semibold">{toTitleCase(customer.name)}</h2>
         <CustomerRowActions customer={customer} states={states} />
       </div>
 

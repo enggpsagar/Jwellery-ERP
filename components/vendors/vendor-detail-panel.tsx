@@ -73,12 +73,7 @@ export function VendorDetailPanel({ vendorId, states }: VendorDetailPanelProps) 
   return (
     <div className="space-y-4 rounded-xl border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">{toTitleCase(vendor.name)}</h2>
-          <p className="text-sm text-muted-foreground">
-            {vendor.vendorType || "Vendor"}
-          </p>
-        </div>
+        <h2 className="text-lg font-semibold">{toTitleCase(vendor.name)}</h2>
         <VendorRowActions vendor={vendor} states={states} />
       </div>
 

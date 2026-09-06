@@ -51,7 +51,6 @@ export function CustomerDetailContent({
 
       <DetailSection
         title="Customer Information"
-        description="Contact details and identifiers."
         icon={User}
         tint="var(--chart-1)"
       >
@@ -106,7 +105,6 @@ export function CustomerDetailContent({
       {(customer.totalOrders ?? 0) > 0 || customer.openingBalance !== 0 ? (
       <DetailSection
         title="Business Summary"
-        description="Order and financial summary for this customer."
         icon={IndianRupee}
         tint="var(--chart-2)"
       >

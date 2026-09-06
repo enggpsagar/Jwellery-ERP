@@ -3,7 +3,6 @@
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import * as React from "react"
 import type { Vendor } from "@/lib/actions/vendor-actions"
-import { VendorRowActions } from "@/components/vendors/vendor-row-actions"
 import { VendorsPagination } from "@/components/vendors/vendors-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import { cn } from "@/lib/utils"
@@ -20,14 +19,8 @@ function inr(value: number | string | null | undefined) {
   }).format(amount)
 }
 
-type StateItem = {
-  id: string
-  name: string
-}
-
 type VendorsTableProps = {
   vendors: Vendor[]
-  states: StateItem[]
   pagination: {
     page: number
     pageSize: number
@@ -45,7 +38,6 @@ type VendorsTableProps = {
 
 export function VendorsTable({
   vendors,
-  states,
   pagination,
   selectedVendorIds,
   onSelectionChange,
@@ -118,7 +110,6 @@ export function VendorsTable({
               <th className="px-4 py-3 font-medium">City</th>
               <th className="px-4 py-3 font-medium">State</th>
               <SortableTableHead label="Balance" sortKey="openingBalance" defaultSortBy="createdAt" />
-              <th className="px-4 py-3 font-medium text-right">Actions</th>
             </tr>
           </thead>
 
@@ -194,10 +185,6 @@ export function VendorsTable({
 
                   <td className="px-4 py-3 text-foreground">
                     ₹ {Number(vendor.openingBalance || 0).toLocaleString("en-IN")}
-                  </td>
-
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <VendorRowActions vendor={vendor} states={states} />
                   </td>
                 </tr>
               )

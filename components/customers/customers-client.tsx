@@ -96,7 +96,6 @@ export function CustomersClient({
 
           <CustomersTable
             customers={customers}
-            states={states}
             pagination={pagination}
             selectedCustomerIds={selectedCustomerIds}
             onSelectionChange={setSelectedCustomerIds}

@@ -48,7 +48,6 @@ export function VendorDetailContent({
 
       <DetailSection
         title="Vendor Information"
-        description="Contact details and identifiers."
         icon={Truck}
         tint="var(--chart-1)"
       >
@@ -97,7 +96,6 @@ export function VendorDetailContent({
       {hasBusinessSummary ? (
         <DetailSection
           title="Business Summary"
-          description="Purchase and payment summary for this vendor."
           icon={IndianRupee}
           tint="var(--chart-2)"
         >

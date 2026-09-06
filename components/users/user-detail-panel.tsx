@@ -5,6 +5,7 @@ import { Users } from "lucide-react"
 import { UserDetailContent } from "@/components/users/user-detail-content"
 import { UserRowActions } from "@/components/users/user-row-actions"
 import { ROLE_LABELS } from "@/lib/roles"
+import { toTitleCase } from "@/lib/utils"
 
 import type { UserRole, UserStatus } from "@prisma/client"
 
@@ -60,7 +61,7 @@ export function UserDetailPanel({ user, karigars, locations }: UserDetailPanelPr
     <div className="space-y-4 rounded-xl border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">{user.name ?? "Unnamed user"}</h2>
+          <h2 className="text-lg font-semibold">{user.name ? toTitleCase(user.name) : "Unnamed user"}</h2>
           <p className="text-sm text-muted-foreground">{ROLE_LABELS[user.role]}</p>
         </div>
         <UserRowActions user={user} />

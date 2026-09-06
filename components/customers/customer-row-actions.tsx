@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Archive, Pencil, Trash2 } from "lucide-react"
+import { Archive, Pencil, Receipt, Trash2 } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 
 import type { Customer } from "@/lib/actions/customer-actions"
@@ -87,6 +87,18 @@ export function CustomerRowActions({
   return (
     <>
       <div className="flex items-center justify-end gap-2">
+        {/* Carries this customer straight into the invoice form's customer
+            field — the whole point of starting a sale from here instead of
+            /billing/new directly is not having to look them up again. */}
+        <Link
+          href={`/billing/new?customerId=${customer.id}&from=${encodeURIComponent("/customers")}`}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-accent"
+          aria-label={`New sale for ${customer.name}`}
+          title="New sale"
+        >
+          <Receipt className="h-4 w-4" />
+        </Link>
+
         {/* A page, not a dialog — the edit form carries every field the
             record holds and does not fit a modal on a phone. */}
         <Link

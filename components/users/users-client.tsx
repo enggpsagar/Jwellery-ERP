@@ -96,21 +96,24 @@ export function UsersClient({
         </Button>
       </div>
 
-      <DataTableToolbar
-        searchPlaceholder="Search by name, email, or phone..."
-        sortOptions={[
-          { value: "createdAt", label: "Sort by Created Date" },
-          { value: "name", label: "Sort by Name" },
-          { value: "email", label: "Sort by Email" },
-          { value: "role", label: "Sort by Role" },
-        ]}
-        defaultSortBy="createdAt"
-        entityLabel="users"
-        exportAction={exportUsersToExcel}
-      />
-
+      {/* Toolbar lives inside the table's own column (not spanning the
+          detail panel too) — it filters/sorts/exports the table, so it
+          belongs with the table, not the whole page. */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
         <div className="space-y-3">
+          <DataTableToolbar
+            searchPlaceholder="Search by name, email, or phone..."
+            sortOptions={[
+              { value: "createdAt", label: "Sort by Created Date" },
+              { value: "name", label: "Sort by Name" },
+              { value: "email", label: "Sort by Email" },
+              { value: "role", label: "Sort by Role" },
+            ]}
+            defaultSortBy="createdAt"
+            entityLabel="users"
+            exportAction={exportUsersToExcel}
+          />
+
           <UserTable
             users={users}
             karigars={karigars}

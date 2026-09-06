@@ -80,33 +80,38 @@ export function KarigarsClient({
         }
       />
 
-      <KarigarsToolbar
-        selectedKarigarIds={selectedKarigarIds}
-        metals={metals}
-        bulkActions={
-          <BulkDeleteButton
-            selectedIds={selectedKarigarIds}
-            itemLabelSingular="karigar"
-            itemLabelPlural="karigars"
-            getDisplayName={(id) => karigars.find((karigar) => karigar.id === id)?.name ?? id}
-            onDelete={bulkDeleteKarigars}
-            onDone={() => setSelectedKarigarIds([])}
-          />
-        }
-      />
-
+      {/* Toolbar lives inside the table's own column (not spanning the
+          detail panel too) — it filters/sorts/exports the table, so it
+          belongs with the table, not the whole page. */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
-        <KarigarTable
-          karigars={karigars}
-          pagination={pagination}
-          selectedKarigarIds={selectedKarigarIds}
-          onSelectionChange={setSelectedKarigarIds}
-          metals={metals}
-          locations={locations}
-          defaultLocationId={defaultLocationId}
-          activeKarigarId={activeKarigarId}
-          onActivate={setActiveKarigarId}
-        />
+        <div className="space-y-4">
+          <KarigarsToolbar
+            selectedKarigarIds={selectedKarigarIds}
+            metals={metals}
+            bulkActions={
+              <BulkDeleteButton
+                selectedIds={selectedKarigarIds}
+                itemLabelSingular="karigar"
+                itemLabelPlural="karigars"
+                getDisplayName={(id) => karigars.find((karigar) => karigar.id === id)?.name ?? id}
+                onDelete={bulkDeleteKarigars}
+                onDone={() => setSelectedKarigarIds([])}
+              />
+            }
+          />
+
+          <KarigarTable
+            karigars={karigars}
+            pagination={pagination}
+            selectedKarigarIds={selectedKarigarIds}
+            onSelectionChange={setSelectedKarigarIds}
+            metals={metals}
+            locations={locations}
+            defaultLocationId={defaultLocationId}
+            activeKarigarId={activeKarigarId}
+            onActivate={setActiveKarigarId}
+          />
+        </div>
 
         <KarigarDetailPanel karigarId={activeKarigarId} />
       </div>

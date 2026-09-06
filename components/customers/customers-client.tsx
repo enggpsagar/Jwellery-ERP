@@ -72,33 +72,38 @@ export function CustomersClient({
         </div>
       </div>
 
-      <CustomersToolbar
-        selectedCustomerIds={selectedCustomerIds}
-        bulkActions={
-          <BulkDeleteButton
-            selectedIds={selectedCustomerIds}
-            itemLabelSingular="customer"
-            itemLabelPlural="customers"
-            getDisplayName={(id) => customers.find((customer) => customer.id === id)?.name ?? id}
-            onDelete={bulkDeleteCustomers}
-            onDone={() => setSelectedCustomerIds([])}
-          />
-        }
-      />
-
       {/* List + detail side by side, matching the Party List / Party
           Details / role-specific-details pattern this page follows —
-          stacks on narrow viewports since there's no room for both. */}
+          stacks on narrow viewports since there's no room for both. The
+          toolbar lives inside the table's own column (not spanning the
+          detail panel too) — it filters/sorts/exports the table, so it
+          belongs with the table, not the whole page. */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
-        <CustomersTable
-          customers={customers}
-          states={states}
-          pagination={pagination}
-          selectedCustomerIds={selectedCustomerIds}
-          onSelectionChange={setSelectedCustomerIds}
-          activeCustomerId={activeCustomerId}
-          onActivate={setActiveCustomerId}
-        />
+        <div className="space-y-4">
+          <CustomersToolbar
+            selectedCustomerIds={selectedCustomerIds}
+            bulkActions={
+              <BulkDeleteButton
+                selectedIds={selectedCustomerIds}
+                itemLabelSingular="customer"
+                itemLabelPlural="customers"
+                getDisplayName={(id) => customers.find((customer) => customer.id === id)?.name ?? id}
+                onDelete={bulkDeleteCustomers}
+                onDone={() => setSelectedCustomerIds([])}
+              />
+            }
+          />
+
+          <CustomersTable
+            customers={customers}
+            states={states}
+            pagination={pagination}
+            selectedCustomerIds={selectedCustomerIds}
+            onSelectionChange={setSelectedCustomerIds}
+            activeCustomerId={activeCustomerId}
+            onActivate={setActiveCustomerId}
+          />
+        </div>
 
         <CustomerDetailPanel customerId={activeCustomerId} states={states} />
       </div>

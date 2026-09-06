@@ -3,6 +3,8 @@
 
 "use client";
 
+import * as React from "react";
+
 import { RecordHoverCard } from "@/components/shared/record-hover-card";
 
 import {
@@ -57,6 +59,9 @@ interface Props {
   /** Which row's detail is showing in the panel alongside this table — a separate concern from any future bulk selection. */
   activeUserId?: string | null;
   onActivate?: (id: string) => void;
+  /** Bulk-action checkbox selection — omit to hide the checkbox column entirely. */
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
 }
 
 export function UserTable({
@@ -66,12 +71,60 @@ export function UserTable({
   allowSuperAdmin = false,
   activeUserId,
   onActivate,
+  selectedIds,
+  onSelectionChange,
 }: Props) {
+  const allIds = React.useMemo(() => users.map((user) => user.id), [users]);
+
+  const allSelected =
+    !!selectedIds && allIds.length > 0 && allIds.every((id) => selectedIds.includes(id));
+
+  const someSelected =
+    !!selectedIds && allIds.some((id) => selectedIds.includes(id)) && !allSelected;
+
+  const headerCheckboxRef = React.useRef<HTMLInputElement | null>(null);
+
+  React.useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected]);
+
+  const toggleAll = (checked: boolean) => {
+    if (!selectedIds || !onSelectionChange) return;
+    if (checked) {
+      onSelectionChange(Array.from(new Set([...selectedIds, ...allIds])));
+      return;
+    }
+    onSelectionChange(selectedIds.filter((id) => !allIds.includes(id)));
+  };
+
+  const toggleOne = (id: string, checked: boolean) => {
+    if (!selectedIds || !onSelectionChange) return;
+    if (checked) {
+      onSelectionChange(Array.from(new Set([...selectedIds, id])));
+      return;
+    }
+    onSelectionChange(selectedIds.filter((selectedId) => selectedId !== id));
+  };
+
   return (
     <div className="rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
+            {selectedIds && onSelectionChange ? (
+              <TableHead className="w-10 px-2">
+                <input
+                  ref={headerCheckboxRef}
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={(e) => toggleAll(e.target.checked)}
+                  className="h-4 w-4 rounded border-input"
+                  aria-label="Select all users"
+                />
+              </TableHead>
+            ) : null}
             <SortableTableHead
               label="Name"
               sortKey="name"
@@ -99,7 +152,7 @@ export function UserTable({
           {users.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={6}
+                colSpan={selectedIds && onSelectionChange ? 6 : 5}
                 className="py-8 text-center text-muted-foreground"
               >
                 No users found.
@@ -115,6 +168,17 @@ export function UserTable({
                   activeUserId === user.id && "bg-accent",
                 )}
               >
+                {selectedIds && onSelectionChange ? (
+                  <TableCell className="px-2" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(user.id)}
+                      onChange={(e) => toggleOne(user.id, e.target.checked)}
+                      className="h-4 w-4 rounded border-input"
+                      aria-label={`Select ${user.name ?? "user"}`}
+                    />
+                  </TableCell>
+                ) : null}
                 <TableCell>
                   <RecordHoverCard
                     label={user.name ?? "-"}

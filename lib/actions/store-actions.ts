@@ -365,6 +365,33 @@ export async function archiveStore(storeId: string): Promise<StoreFormState> {
   }
 }
 
+export type BulkArchiveResult = {
+  archivedCount: number;
+  failures: { id: string; message: string }[];
+};
+
+/**
+ * Archives each selected store through the exact same archiveStore() call
+ * a single-row Archive uses — never a bare updateMany — so the SUPER_ADMIN
+ * role check and not-found handling apply identically whether one row or
+ * several were ticked at once.
+ */
+export async function bulkArchiveStores(ids: string[]): Promise<BulkArchiveResult> {
+  const failures: BulkArchiveResult["failures"] = [];
+  let archivedCount = 0;
+
+  for (const id of ids) {
+    const result = await archiveStore(id);
+    if (result.success) {
+      archivedCount++;
+    } else {
+      failures.push({ id, message: result.message });
+    }
+  }
+
+  return { archivedCount, failures };
+}
+
 export async function restoreStore(storeId: string): Promise<StoreFormState> {
   try {
     await requireRole(UserRole.SUPER_ADMIN);

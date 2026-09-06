@@ -74,7 +74,11 @@ export function KarigarsClient({
       {/* Toolbar lives inside the table's own column (not spanning the
           detail panel too) — it filters/sorts/exports the table, so it
           belongs with the table, not the whole page. */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
+      {/* The left list table only has 5 narrow columns (Code/Name/Mobile/
+          City/Opening Gold); the right panel's Material Ledger table has far
+          more (date/type/metal/debit/credit/balance) and needs the room —
+          give it the larger share instead of the list. */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] xl:items-start">
         <div className="space-y-4">
           <KarigarsToolbar
             selectedKarigarIds={selectedKarigarIds}

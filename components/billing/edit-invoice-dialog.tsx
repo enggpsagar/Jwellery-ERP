@@ -95,7 +95,7 @@ export function EditInvoiceDialog({
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <Pencil className="h-4 w-4" />
-          Edit Details
+          Edit Date &amp; E-way Bill
         </Button>
       </DialogTrigger>
 

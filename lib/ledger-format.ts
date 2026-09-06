@@ -20,6 +20,10 @@ export function formatLedgerSource(
       return "Karigar Receipt"
     case LedgerSourceType.ADJUSTMENT:
       return "Adjustment"
+    case LedgerSourceType.PAYMENT_IN:
+      return "Payment In"
+    case LedgerSourceType.PAYMENT_OUT:
+      return "Payment Out"
     default:
       return String(sourceType)
         .replaceAll("_", " ")

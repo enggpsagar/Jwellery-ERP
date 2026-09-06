@@ -129,7 +129,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               <Button asChild variant="outline" className="gap-2">
                 <Link href={`/billing/${invoice.id}/edit`}>
                   <Pencil className="h-4 w-4" />
-                  Edit
+                  Edit Items
                 </Link>
               </Button>
             )}

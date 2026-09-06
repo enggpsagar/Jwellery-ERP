@@ -906,7 +906,19 @@ export function InvoiceForm({
         <ScanToAddPanel onScanned={addScannedStock} />
 
         <div className="space-y-3">
-          {items.map((item) => (
+          {items.map((item) => {
+            // Once a line is linked to a Stock Item, the physical facts
+            // about that piece (weight, purity, HSN, stone details) come
+            // from Inventory and are shown read-only here — the invoice
+            // uses the existing product/stock data rather than letting a
+            // second, possibly-inconsistent copy of it be typed in at sale
+            // time. Pricing (Rate, Making/Stone Charge, discounts) stays
+            // editable regardless, since selling price is commonly re-keyed
+            // to the day's metal rate independent of what the stock was
+            // priced at when it was entered.
+            const isLinked = Boolean(item.inventoryStockId)
+
+            return (
             <div key={item.key} className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="md:col-span-2 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -934,6 +946,8 @@ export function InvoiceForm({
                   <Label className="text-xs">Item Name</Label>
                   <Input
                     value={item.itemName}
+                    readOnly={isLinked}
+                    className={isLinked ? "bg-muted" : undefined}
                     onChange={(e) => updateItem(item.key, { itemName: e.target.value })}
                   />
                 </div>
@@ -967,6 +981,7 @@ export function InvoiceForm({
                   <Select
                     value={item.purity}
                     onValueChange={(value) => handlePurityChange(item, value)}
+                    disabled={isLinked}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select purity" />
@@ -987,6 +1002,8 @@ export function InvoiceForm({
                     type="number"
                     step="0.00001"
                     value={item.grossWeight === 0 ? "" : item.grossWeight}
+                    readOnly={isLinked}
+                    className={isLinked ? "bg-muted" : undefined}
                     onChange={(e) => {
                       const grossWeight = Number(e.target.value) || 0
                       const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
@@ -1007,6 +1024,8 @@ export function InvoiceForm({
                     type="number"
                     step="0.00001"
                     value={item.netWeight === 0 ? "" : item.netWeight}
+                    readOnly={isLinked}
+                    className={isLinked ? "bg-muted" : undefined}
                     onChange={(e) => handleNetWeightChange(item, e.target.value)}
                   />
                   {!item.netTouched && (
@@ -1021,6 +1040,8 @@ export function InvoiceForm({
                       type="number"
                       step="0.001"
                       value={item.caratWeight === 0 ? "" : item.caratWeight}
+                      readOnly={isLinked}
+                      className={isLinked ? "bg-muted" : undefined}
                       onChange={(e) => handleCaratWeightChange(item, e.target.value)}
                     />
                     <p className="text-xs text-muted-foreground">
@@ -1037,6 +1058,8 @@ export function InvoiceForm({
                     type="number"
                     step="0.00001"
                     value={item.dmoWeight === 0 ? "" : item.dmoWeight}
+                    readOnly={isLinked}
+                    className={isLinked ? "bg-muted" : undefined}
                     onChange={(e) => {
                       const dmoWeight = Number(e.target.value) || 0
                       const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
@@ -1115,6 +1138,7 @@ export function InvoiceForm({
                   <IncludesStoneToggle
                     checked={item.hasStoneComponent}
                     onChange={(checked) => updateItem(item.key, { hasStoneComponent: checked })}
+                    disabled={isLinked}
                   />
 
                   {item.hasStoneComponent && (
@@ -1141,6 +1165,7 @@ export function InvoiceForm({
                       stoneWeightUnit={item.stoneWeightUnit}
                       onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
                       netStoneWeightTouched={item.netStoneWeightTouched}
+                      lockPhysicalFields={isLinked}
                     />
                   )}
                 </div>
@@ -1151,6 +1176,8 @@ export function InvoiceForm({
                   <Label className="text-xs">HSN Code</Label>
                   <Input
                     value={item.hsnCode}
+                    readOnly={isLinked}
+                    className={isLinked ? "bg-muted" : undefined}
                     onChange={(e) => updateItem(item.key, { hsnCode: e.target.value })}
                   />
                 </div>
@@ -1165,13 +1192,15 @@ export function InvoiceForm({
                       <Input
                         type="number"
                         step="0.00001"
-                        className="flex-1"
+                        className={isLinked ? "flex-1 bg-muted" : "flex-1"}
                         value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
+                        readOnly={isLinked}
                         onChange={(e) => handleStoneWeightInputChange(item, e.target.value)}
                       />
                       <Select
                         value={item.stoneWeightUnit}
                         onValueChange={(unit) => handleStoneWeightUnitChange(item, unit as "GRAM" | "CARAT")}
+                        disabled={isLinked}
                       >
                         <SelectTrigger className="w-16">
                           <SelectValue />
@@ -1247,7 +1276,8 @@ export function InvoiceForm({
                 </button>
               )}
             </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 

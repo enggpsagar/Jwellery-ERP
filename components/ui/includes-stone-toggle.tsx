@@ -7,6 +7,12 @@ type IncludesStoneToggleProps = {
   onChange: (checked: boolean) => void;
   label?: string;
   className?: string;
+  /** Not used by the Product form (see its own history — editability there
+   * is never based on metal type). Invoice line items need this instead:
+   * once a line is linked to a Stock Item, whether that physical piece
+   * includes a stone is a fact carried over from Inventory, not a choice
+   * the invoice re-makes. */
+  disabled?: boolean;
 };
 
 /**
@@ -21,11 +27,13 @@ export function IncludesStoneToggle({
   onChange,
   label = "Includes a Stone",
   className,
+  disabled = false,
 }: IncludesStoneToggleProps) {
   return (
     <label
       className={cn(
-        "inline-flex cursor-pointer select-none items-center gap-2 text-sm font-semibold",
+        "inline-flex select-none items-center gap-2 text-sm font-semibold",
+        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
         className
       )}
     >
@@ -33,6 +41,7 @@ export function IncludesStoneToggle({
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
+        disabled={disabled}
         className="peer sr-only"
       />
       <span

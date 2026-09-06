@@ -58,6 +58,12 @@ type StoneComponentFieldsProps = {
   stoneWeightUnit: "GRAM" | "CARAT"
   onStoneWeightUnitChange: (unit: "GRAM" | "CARAT") => void
   netStoneWeightTouched: boolean
+  /** Invoice line items only: once a line is linked to a Stock Item, which
+   * stone it physically has and how much it weighs are facts carried over
+   * from Inventory, not re-editable here — only Stone Rate/Stone Charge
+   * (pricing, not physical) stay editable. Not used by the Product form,
+   * where this component's fields are the source of truth being defined. */
+  lockPhysicalFields?: boolean
 }
 
 /**
@@ -95,6 +101,7 @@ export function StoneComponentFields({
   stoneWeightUnit,
   onStoneWeightUnitChange,
   netStoneWeightTouched,
+  lockPhysicalFields = false,
 }: StoneComponentFieldsProps) {
   const [stoneSearch, setStoneSearch] = useState("")
   const [typeSearch, setTypeSearch] = useState("")
@@ -148,7 +155,11 @@ export function StoneComponentFields({
         <div className="col-span-2 space-y-1">
           <Label className="text-xs">Stone</Label>
           <div className="flex gap-1.5">
-            <Select value={stoneMetalTypeName} onValueChange={handleStoneSelect}>
+            <Select
+              value={stoneMetalTypeName}
+              onValueChange={handleStoneSelect}
+              disabled={lockPhysicalFields}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a stone" />
               </SelectTrigger>
@@ -176,15 +187,17 @@ export function StoneComponentFields({
               </SelectContent>
             </Select>
 
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              title="Add Stone"
-              onClick={() => setAddStoneOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+            {!lockPhysicalFields && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                title="Add Stone"
+                onClick={() => setAddStoneOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -195,6 +208,8 @@ export function StoneComponentFields({
             step="0.001"
             value={caratWeight === 0 ? "" : caratWeight}
             onChange={(event) => onCaratWeightChange(event.target.value)}
+            readOnly={lockPhysicalFields}
+            className={lockPhysicalFields ? "bg-muted" : undefined}
           />
           <p className="text-xs text-muted-foreground">
             Stone's own weight — independent of Net Weight
@@ -232,11 +247,16 @@ export function StoneComponentFields({
             <Input
               type="number"
               step="0.00001"
-              className="flex-1"
+              className={lockPhysicalFields ? "flex-1 bg-muted" : "flex-1"}
               value={stoneWeightInput === 0 ? "" : stoneWeightInput}
               onChange={(event) => onStoneWeightInputChange(event.target.value)}
+              readOnly={lockPhysicalFields}
             />
-            <Select value={stoneWeightUnit} onValueChange={(unit) => onStoneWeightUnitChange(unit as "GRAM" | "CARAT")}>
+            <Select
+              value={stoneWeightUnit}
+              onValueChange={(unit) => onStoneWeightUnitChange(unit as "GRAM" | "CARAT")}
+              disabled={lockPhysicalFields}
+            >
               <SelectTrigger className="w-16">
                 <SelectValue />
               </SelectTrigger>
@@ -258,16 +278,18 @@ export function StoneComponentFields({
         <div className="space-y-1.5 rounded-md bg-muted/40 p-2.5">
           <div className="flex items-center justify-between">
             <Label className="text-xs">Stone Types</Label>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-6 gap-1 px-1.5 text-xs"
-              onClick={() => setAddTypeOpen(true)}
-            >
-              <Plus className="h-3 w-3" />
-              Add Stone Type
-            </Button>
+            {!lockPhysicalFields && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 gap-1 px-1.5 text-xs"
+                onClick={() => setAddTypeOpen(true)}
+              >
+                <Plus className="h-3 w-3" />
+                Add Stone Type
+              </Button>
+            )}
           </div>
 
           {typesForStone.length > 3 && (
@@ -291,6 +313,7 @@ export function StoneComponentFields({
                     type="checkbox"
                     checked={selectedTypeNames.includes(type.name)}
                     onChange={(event) => toggleType(type.name, event.target.checked)}
+                    disabled={lockPhysicalFields}
                   />
                   {type.name}
                 </label>

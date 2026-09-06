@@ -144,7 +144,7 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 shadow-sm">
-      <div className="relative min-w-[160px] flex-1 sm:max-w-64">
+      <div className="relative min-w-[120px] flex-1 sm:max-w-44">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={search}

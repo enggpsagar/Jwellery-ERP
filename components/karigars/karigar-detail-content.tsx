@@ -44,7 +44,11 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      {/* One grid, not two stacked ones — Opening Gold/Cash/Specialization/
+          Status and the live metal balance ribbons all need to read as a
+          single row of at-a-glance cards, not visually split across a hard
+          row break just because they used to be two separate <div>s. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {hasOpeningGold && (
             <Card size="sm">
               <CardHeader>
@@ -81,16 +85,12 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
           )}
 
         <KarigarStatusCard karigarId={karigar.id} isActive={karigar.isActive} />
-      </div>
 
-      {/* Live balances, grouped right alongside Opening Gold/Status above
-          rather than separated by the Cash Balance line — ribbon-style: a
-          full-width colored band per metal (so Gold vs Silver reads at a
-          glance), carrying the label itself — a proper horizontal banner,
-          not a thin accent line — with the weight made prominent below it,
-          since that number is the thing anyone glancing at this card
-          actually wants. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {/* Live balances — ribbon-style: a full-width colored band per
+            metal (so Gold vs Silver reads at a glance), carrying the label
+            itself — a proper horizontal banner, not a thin accent line —
+            with the weight made prominent below it, since that number is
+            the thing anyone glancing at this card actually wants. */}
         {ledger.materialGroups.map((group) => {
           const isOwed = group.finalFineBalance > 0
           const isCredit = group.finalFineBalance < 0

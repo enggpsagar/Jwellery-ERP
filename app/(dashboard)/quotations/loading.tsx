@@ -5,7 +5,7 @@ export default function QuotationsLoading() {
     <main className="space-y-6 p-6">
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <Loader className="h-16 w-16" />
+          <Loader className="h-24 w-24" />
           <p className="text-sm text-muted-foreground">Loading quotations...</p>
         </div>
       </div>

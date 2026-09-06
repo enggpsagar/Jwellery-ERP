@@ -14,6 +14,7 @@ import {
 } from "@/lib/actions/inventory-stock-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { classifyMetalName } from "@/lib/business-units"
+import { GRAMS_PER_CARAT, toPrimaryUnit } from "@/lib/purity"
 import { LocationSelect } from "@/components/shared/location-select"
 import { useToast } from "@/components/providers/toast-provider"
 import { ProductSelect, type ProductOption } from "@/components/inventory/shared/product-select"
@@ -56,6 +57,14 @@ type ReceiptItem = {
   metalTypeId: string
   purity: string
   quantity: number
+  /** Always in grams internally, regardless of weightUnit — that only picks
+   * what's displayed/typed (converted via toPrimaryUnit on the way in and
+   * out) and what unit this item's weights are persisted in at submit. One
+   * shared toggle per item (not per field) — every weight here describes
+   * the same physical returned piece. No store-specific gram/carat rate is
+   * threaded into this form, so conversions use the universal 1 ct = 0.2 g
+   * constant. */
+  weightUnit: "GRAM" | "CARAT"
   grossWeight: number
   lessWeight: number
   netWeight: number
@@ -110,6 +119,7 @@ function emptyReceiptItem(defaultMetal?: StoreMetalRow, defaultLocationId?: stri
           : classifyMetalName(defaultMetal?.name) === "SILVER"
             ? "SILVER_999"
             : "GOLD_22K",
+    weightUnit: defaultMetal?.primaryUnit ?? "GRAM",
     quantity: 1,
     grossWeight: 0,
     lessWeight: 0,
@@ -241,6 +251,7 @@ export function ReceiveItemsForm({
 
   const updateItemMetal = (key: string, metalTypeId: string) => {
     const metal = metalById.get(metalTypeId)
+    const weightUnit = metal?.primaryUnit ?? "GRAM"
     setItems((prev) =>
       prev.map((item) => {
         if (item.key !== key) return item
@@ -252,11 +263,11 @@ export function ReceiveItemsForm({
           const purity = validOptions.some((o) => o.value === item.purity)
             ? item.purity
             : (validOptions[0]?.value ?? "GOLD_22K")
-          return { ...item, metalTypeId, purity }
+          return { ...item, metalTypeId, purity, weightUnit }
         }
         // hasPurity=false: purity has no meaning, force the sentinel value
         // the backend requires (KarigarReceiptItem.purity is non-nullable).
-        return { ...item, metalTypeId, purity: "OTHER" }
+        return { ...item, metalTypeId, purity: "OTHER", weightUnit }
       }),
     )
   }
@@ -336,17 +347,23 @@ export function ReceiveItemsForm({
   )
 
   const itemsJson = JSON.stringify(
-    items.map((item) => ({
+    items.map((item) => {
+      // Every weight below is tracked internally in grams (see ReceiptItem's
+      // doc comment) — converted here, once, to this item's own metal's
+      // configured Primary Unit, which is what actually gets persisted.
+      const unit = metalById.get(item.metalTypeId)?.primaryUnit ?? "GRAM"
+      const toUnit = (grams: number) => toPrimaryUnit(grams, "GRAM", unit, GRAMS_PER_CARAT)
+      return {
       itemName: item.itemName || "Item",
       productId: item.productId || null,
       metalTypeId: item.metalTypeId,
       purity: item.purity,
       quantity: item.quantity || 1,
-      grossWeight: item.grossWeight || null,
-      lessWeight: item.lessWeight || null,
-      netWeight: item.netWeight || null,
-      stoneWeight: item.stoneWeight || null,
-      dmoWeight: item.dmoWeight || null,
+      grossWeight: toUnit(item.grossWeight) || null,
+      lessWeight: toUnit(item.lessWeight) || null,
+      netWeight: toUnit(item.netWeight) || null,
+      stoneWeight: toUnit(item.stoneWeight) || null,
+      dmoWeight: toUnit(item.dmoWeight) || null,
       wastagePercent: item.wastagePercent || null,
       tagNumber: item.tagNumber || null,
       purchaseRate: item.purchaseRate || null,
@@ -361,7 +378,8 @@ export function ReceiveItemsForm({
       manufactureDate: item.manufactureDate || null,
       locationId: item.locationId || null,
       remarks: item.remarks || null,
-    })),
+      }
+    }),
   )
 
   const canSubmit = items.every((item) => item.netWeight > 0 && item.metalTypeId)
@@ -515,7 +533,25 @@ export function ReceiveItemsForm({
                     WEIGHT DETAILS
                 ============================ */}
                 <div className="rounded-xl border p-4">
-                  <h3 className="mb-4 text-sm font-semibold">Weight Details</h3>
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold">Weight Details</h3>
+
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-muted-foreground">Weight Unit</Label>
+                      <Select
+                        value={item.weightUnit}
+                        onValueChange={(unit) => updateItem(item.key, { weightUnit: unit as "GRAM" | "CARAT" })}
+                      >
+                        <SelectTrigger className="h-9 w-28">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GRAM">Gram</SelectItem>
+                          <SelectItem value="CARAT">Carat</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
                   <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-4">
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -543,13 +579,17 @@ export function ReceiveItemsForm({
                     </div>
 
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">Gross Weight (g)</Label>
+                      <Label className="text-xs">Gross Weight</Label>
                       <Input
                         type="number"
                         step="0.00001"
-                        value={item.grossWeight === 0 ? "" : item.grossWeight}
+                        value={
+                          item.grossWeight === 0
+                            ? ""
+                            : toPrimaryUnit(item.grossWeight, "GRAM", item.weightUnit, GRAMS_PER_CARAT)
+                        }
                         onChange={(e) => {
-                          const grossWeight = Number(e.target.value) || 0
+                          const grossWeight = toPrimaryUnit(Number(e.target.value) || 0, item.weightUnit, "GRAM", GRAMS_PER_CARAT)
                           const derived = item.netTouched
                             ? null
                             : deriveNetWeight(
@@ -567,13 +607,17 @@ export function ReceiveItemsForm({
                     </div>
 
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">Less Weight (g)</Label>
+                      <Label className="text-xs">Less Weight</Label>
                       <Input
                         type="number"
                         step="0.00001"
-                        value={item.lessWeight === 0 ? "" : item.lessWeight}
+                        value={
+                          item.lessWeight === 0
+                            ? ""
+                            : toPrimaryUnit(item.lessWeight, "GRAM", item.weightUnit, GRAMS_PER_CARAT)
+                        }
                         onChange={(e) => {
-                          const lessWeight = Number(e.target.value) || 0
+                          const lessWeight = toPrimaryUnit(Number(e.target.value) || 0, item.weightUnit, "GRAM", GRAMS_PER_CARAT)
                           const derived = item.netTouched
                             ? null
                             : deriveNetWeight(
@@ -591,14 +635,18 @@ export function ReceiveItemsForm({
                     </div>
 
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">Net Weight (g) <RequiredMark /></Label>
+                      <Label className="text-xs">Net Weight <RequiredMark /></Label>
                       <Input
                         type="number"
                         step="0.00001"
-                        value={item.netWeight === 0 ? "" : item.netWeight}
+                        value={
+                          item.netWeight === 0
+                            ? ""
+                            : toPrimaryUnit(item.netWeight, "GRAM", item.weightUnit, GRAMS_PER_CARAT)
+                        }
                         onChange={(e) =>
                           updateItem(item.key, {
-                            netWeight: Number(e.target.value) || 0,
+                            netWeight: toPrimaryUnit(Number(e.target.value) || 0, item.weightUnit, "GRAM", GRAMS_PER_CARAT),
                             netTouched: true,
                           })
                         }
@@ -611,13 +659,17 @@ export function ReceiveItemsForm({
                     </div>
 
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">Stone Weight (g)</Label>
+                      <Label className="text-xs">Stone Weight</Label>
                       <Input
                         type="number"
                         step="0.00001"
-                        value={item.stoneWeight === 0 ? "" : item.stoneWeight}
+                        value={
+                          item.stoneWeight === 0
+                            ? ""
+                            : toPrimaryUnit(item.stoneWeight, "GRAM", item.weightUnit, GRAMS_PER_CARAT)
+                        }
                         onChange={(e) => {
-                          const stoneWeight = Number(e.target.value) || 0
+                          const stoneWeight = toPrimaryUnit(Number(e.target.value) || 0, item.weightUnit, "GRAM", GRAMS_PER_CARAT)
                           const derived = item.netTouched
                             ? null
                             : deriveNetWeight(
@@ -635,13 +687,17 @@ export function ReceiveItemsForm({
                     </div>
 
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">Dust/Making/Other Wt (g)</Label>
+                      <Label className="text-xs">Dust/Making/Other Wt</Label>
                       <Input
                         type="number"
                         step="0.00001"
-                        value={item.dmoWeight === 0 ? "" : item.dmoWeight}
+                        value={
+                          item.dmoWeight === 0
+                            ? ""
+                            : toPrimaryUnit(item.dmoWeight, "GRAM", item.weightUnit, GRAMS_PER_CARAT)
+                        }
                         onChange={(e) => {
-                          const dmoWeight = Number(e.target.value) || 0
+                          const dmoWeight = toPrimaryUnit(Number(e.target.value) || 0, item.weightUnit, "GRAM", GRAMS_PER_CARAT)
                           const derived = item.netTouched
                             ? null
                             : deriveNetWeight(

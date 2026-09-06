@@ -22,6 +22,7 @@ import { RecordKarigarPaymentDialog } from "@/components/karigars/record-karigar
 import { KarigarLedgerTabs } from "@/components/karigars/karigar-ledger-tabs";
 import { KarigarStatusCard } from "@/components/karigars/karigar-status-card";
 import { ExportMenu } from "@/components/shared/export-menu";
+import { toTitleCase } from "@/lib/utils";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -74,7 +75,7 @@ export default async function KarigarDetailPage({ params }: Props) {
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
-        title={karigar.name}
+        title={toTitleCase(karigar.name)}
         description={`Karigar code: ${karigar.code || "-"} · Mobile: ${karigar.mobile || "-"}`}
         backHref="/karigars"
         backLabel="Back to Karigars"

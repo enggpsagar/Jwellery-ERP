@@ -2,6 +2,7 @@
 import Link from "next/link"
 
 import type { KarigarLedgerSummaryRow } from "@/lib/actions/ledger-actions"
+import { toTitleCase } from "@/lib/utils"
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 
 import {
@@ -108,9 +109,9 @@ export function KarigarLedgerSummaryTable({ rows, totals }: KarigarLedgerSummary
                 <TableRow key={row.id}>
                   <TableCell>
                     <RecordHoverCard
-                      label={row.name}
+                      label={toTitleCase(row.name)}
                       href={`/karigars/${row.id}`}
-                      title={row.name}
+                      title={toTitleCase(row.name)}
                       subtitle={row.code ?? undefined}
                       footerLabel="View karigar"
                       sections={[

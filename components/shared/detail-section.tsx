@@ -69,7 +69,10 @@ export function DetailGrid({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * One label/value pair.
+ * One label/value pair. Renders nothing at all when there's no value — a
+ * record with no Alternate Phone doesn't need a "Alternate Phone: —" line
+ * any more than it needs the field omitted from the create form; an unset
+ * field is not information, so it isn't shown as if it were.
  *
  * Deliberately not a bordered box: a page of twelve outlined tiles reads as
  * twelve competing objects. The label carries the structure and the value
@@ -88,20 +91,14 @@ export function DetailField({
   const empty =
     value === undefined || value === null || value === "" || value === "-"
 
+  if (empty) return null
+
   return (
     <div className={span ? "sm:col-span-2 lg:col-span-3" : undefined}>
       <p className="text-xs uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <div
-        className={
-          empty
-            ? "mt-1 text-sm text-muted-foreground"
-            : "mt-1 text-sm font-medium break-words"
-        }
-      >
-        {empty ? "—" : value}
-      </div>
+      <div className="mt-1 text-sm font-medium break-words">{value}</div>
     </div>
   )
 }

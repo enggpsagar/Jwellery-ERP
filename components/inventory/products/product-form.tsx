@@ -12,7 +12,7 @@ import {
   type StoreMetalOriginRow,
 } from "@/lib/actions/taxonomy-actions";
 import { classifyPurityFamily, type PurityFamily } from "@/lib/business-units";
-import { resolveGramsPerCarat } from "@/lib/purity";
+import { resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity";
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select";
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle";
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields";
@@ -288,6 +288,38 @@ export function ProductForm({
     product?.defaultCaratWeight ?? "",
   );
   const isCaratFamily = metalFamily === "DIAMOND" || metalFamily === "STONE";
+
+  // The selected metal's configured Primary Unit (Settings > Taxonomy) —
+  // what Gross/Stone/Net Weight are actually persisted in, regardless of
+  // which unit the toggle below is currently showing for entry
+  // convenience. One shared toggle for the whole Weights section (not one
+  // per field), same reasoning as the Stock form: every weight here
+  // describes the same design/piece.
+  const primaryUnit = selectedMetal?.primaryUnit ?? "GRAM";
+  const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
+  const [weightUnit, setWeightUnit] = useState<"GRAM" | "CARAT">(primaryUnit);
+
+  useEffect(() => {
+    setWeightUnit(primaryUnit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metalTypeId]);
+
+  function displayWeight(grams: string) {
+    if (grams.trim() === "" || !Number.isFinite(Number(grams))) return "";
+    return String(toPrimaryUnit(Number(grams), "GRAM", weightUnit, gramsPerCarat));
+  }
+
+  function toGramsString(typed: string) {
+    if (typed.trim() === "" || !Number.isFinite(Number(typed))) return "";
+    return String(toPrimaryUnit(Number(typed), weightUnit, "GRAM", gramsPerCarat));
+  }
+
+  // The actual submitted value — the metal's real configured Primary Unit,
+  // independent of whatever weightUnit the toggle happens to be showing.
+  function submittedWeight(grams: string) {
+    if (grams.trim() === "" || !Number.isFinite(Number(grams))) return "";
+    return String(toPrimaryUnit(Number(grams), "GRAM", primaryUnit, gramsPerCarat));
+  }
 
   // A composite piece — e.g. a Gold ring with an embedded diamond — keeps
   // its metal as the primary purity/weight (unchanged), and separately
@@ -927,26 +959,43 @@ export function ProductForm({
       ============================= */}
 
       <div className="rounded-xl border p-6">
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold">Weights</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Typical weights for this design. They prefill the stock entry, and
-            each piece can still be corrected against the scale afterwards.
-          </p>
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold">Weights</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Typical weights for this design. They prefill the stock entry, and
+              each piece can still be corrected against the scale afterwards.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Label htmlFor="weightUnit" className="text-xs text-muted-foreground">
+              Weight Unit
+            </Label>
+            <Select value={weightUnit} onValueChange={(unit) => setWeightUnit(unit as "GRAM" | "CARAT")}>
+              <SelectTrigger id="weightUnit" className="h-9 w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="GRAM">Gram</SelectItem>
+                <SelectItem value="CARAT">Carat</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div>
-            <Label htmlFor="defaultGrossWeight">Gross Weight (g)</Label>
+            <Label htmlFor="defaultGrossWeight">Gross Weight</Label>
 
+            <input type="hidden" name="defaultGrossWeight" value={submittedWeight(grossWeight)} />
             <Input
               id="defaultGrossWeight"
-              name="defaultGrossWeight"
               type="number"
               step="0.00001"
               min="0"
-              value={grossWeight}
-              onChange={(event) => setGrossWeight(event.target.value)}
+              value={displayWeight(grossWeight)}
+              onChange={(event) => setGrossWeight(toGramsString(event.target.value))}
               placeholder="0.000"
             />
 
@@ -960,16 +1009,16 @@ export function ProductForm({
               here only for a plain metal item with no stone component. */}
           {!hasStoneComponent && (
             <div>
-              <Label htmlFor="defaultStoneWeight">Stone Weight (g)</Label>
+              <Label htmlFor="defaultStoneWeight">Stone Weight</Label>
 
+              <input type="hidden" name="defaultStoneWeight" value={submittedWeight(stoneWeight)} />
               <Input
                 id="defaultStoneWeight"
-                name="defaultStoneWeight"
                 type="number"
                 step="0.00001"
                 min="0"
-                value={stoneWeight}
-                onChange={(event) => handleStoneWeightChange(event.target.value)}
+                value={displayWeight(stoneWeight)}
+                onChange={(event) => handleStoneWeightChange(toGramsString(event.target.value))}
                 placeholder="0.000"
               />
 
@@ -978,16 +1027,16 @@ export function ProductForm({
           )}
 
           <div>
-            <Label htmlFor="defaultNetWeight">Net Weight (g)</Label>
+            <Label htmlFor="defaultNetWeight">Net Weight</Label>
 
+            <input type="hidden" name="defaultNetWeight" value={submittedWeight(netWeight)} />
             <Input
               id="defaultNetWeight"
-              name="defaultNetWeight"
               type="number"
               step="0.00001"
               min="0"
-              value={netWeight}
-              onChange={(event) => handleNetWeightChange(event.target.value)}
+              value={displayWeight(netWeight)}
+              onChange={(event) => handleNetWeightChange(toGramsString(event.target.value))}
               placeholder="0.000"
             />
 

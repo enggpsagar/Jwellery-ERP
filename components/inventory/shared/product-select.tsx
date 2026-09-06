@@ -119,14 +119,16 @@ export function ProductSelect({
               No products found
             </div>
           ) : (
-            filtered.map((product) => (
-              <SelectItem key={product.id} value={product.id}>
-                {product.name}{" "}
-                <span className="text-muted-foreground">
-                  ({product.productCode})
-                </span>
-              </SelectItem>
-            ))
+            <div className="max-h-72 overflow-y-auto">
+              {filtered.map((product) => (
+                <SelectItem key={product.id} value={product.id}>
+                  {product.name}{" "}
+                  <span className="text-muted-foreground">
+                    ({product.productCode})
+                  </span>
+                </SelectItem>
+              ))}
+            </div>
           )}
 
           {/* Rendered outside the empty/non-empty branch above, so it is

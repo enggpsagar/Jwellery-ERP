@@ -1390,10 +1390,13 @@ export function InvoiceForm({
                     />
                   </div>
 
-                  {/* Once this is a composite line with "Includes a Stone"
-                      checked, Stone Charge moves down into that box, next to
-                      the Carat Weight/Rate it's computed from — see below. */}
-                  {(isCaratLine(item) || !item.hasStoneComponent) && (
+                  {/* For a carat-weighed line (no "Includes a Stone" toggle
+                      applies there at all), Stone Charge always shows here.
+                      For every other line, it's only ever visible once
+                      "Includes a Stone" is checked, inside that toggle's own
+                      box below — while off, no stone means nothing to
+                      charge for, so it stays fully hidden here. */}
+                  {isCaratLine(item) && (
                     <div className="max-w-[200px] space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Stone Charge</Label>
                       <Input
@@ -1417,10 +1420,18 @@ export function InvoiceForm({
                         onChange={(checked) =>
                           updateItem(item.key, {
                             hasStoneComponent: checked,
-                            // Net Stone Weight is now hidden once the toggle is
-                            // off — clear it so a hidden field can't silently
-                            // keep submitting whatever was last entered.
-                            ...(checked ? {} : { stoneWeightInput: 0, netStoneWeightTouched: false }),
+                            // Net Stone Weight and Stone Charge are now both
+                            // hidden once the toggle is off — clear them so a
+                            // hidden field can't silently keep submitting
+                            // whatever was last entered.
+                            ...(checked
+                              ? {}
+                              : {
+                                  stoneWeightInput: 0,
+                                  netStoneWeightTouched: false,
+                                  stoneCharge: 0,
+                                  stoneChargeTouched: false,
+                                }),
                           })
                         }
                         disabled={isLinked}

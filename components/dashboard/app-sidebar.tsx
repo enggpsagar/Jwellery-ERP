@@ -23,6 +23,7 @@ import {
   FileText,
   CreditCard,
   Plus,
+  Wallet,
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
@@ -95,6 +96,15 @@ const mainNav: NavItem[] = [
     title: "Ledger",
     href: "/ledger",
     icon: CircleDollarSign,
+  },
+  {
+    title: "Payments",
+    href: "/payments/in",
+    icon: Wallet,
+    items: [
+      { title: "Payment In", href: "/payments/in" },
+      { title: "Payment Out", href: "/payments/out" },
+    ],
   },
   {
     title: "Inventory",

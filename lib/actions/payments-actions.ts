@@ -184,9 +184,12 @@ export async function getPaymentFormKarigars(): Promise<PaymentKarigarOption[]> 
  * Record a standalone "Payment In" against a customer — not tied to any
  * specific invoice/Kacha slip (an on-account receipt). Same CREDIT/
  * PAYMENT_IN shape recordInvoicePayment writes, just without an invoiceId.
+ * Unbound (reads customerId from the CustomerSelect's own hidden field)
+ * rather than a bound first argument, since which customer this is against
+ * is chosen inside the dialog itself, not fixed ahead of time the way a
+ * per-record "Record Payment" dialog already knows its invoiceId/karigarId.
  */
 export async function recordCustomerPayment(
-  customerId: string,
   prevState: PaymentFormState = { success: false, message: "" },
   formData: FormData,
 ): Promise<PaymentFormState> {
@@ -197,6 +200,7 @@ export async function recordCustomerPayment(
       return { success: false, message: "You do not have permission to record payments." }
     }
 
+    const customerId = String(formData.get("customerId") || "").trim()
     if (!customerId) {
       return { success: false, message: "Select a customer" }
     }
@@ -248,29 +252,37 @@ export async function recordCustomerPayment(
 }
 
 /**
- * Record a standalone "Payment Out" against a vendor — not tied to any
- * specific purchase (an on-account payment). Same DEBIT/PAYMENT_OUT shape
- * recordPurchasePayment writes (paying a vendor reduces what the shop
- * owes them, opposite polarity from a customer receipt), just without a
- * purchaseId. For a Karigar party, the Payment Out dialog calls the
- * existing recordKarigarPayment action instead — it already supports
- * on-account payments and uses CREDIT there, matching that ledger's own
- * established convention.
+ * Record a standalone "Payment Out" against either a Vendor or a Karigar —
+ * not tied to any specific purchase/job (an on-account payment). One action
+ * for both party types (the dialog's own party-type toggle picks which),
+ * since useActionState needs one stable action reference and which party
+ * type this is isn't known until submit time.
+ *
+ * A Vendor payment is DEBIT — recordPurchasePayment's own established
+ * convention (paying down what the shop owes reduces that payable, the
+ * opposite polarity from a customer receipt). A Karigar payment is CREDIT
+ * — recordKarigarPayment's own established convention. These two ledgers
+ * genuinely use opposite polarity for "money paid out" today; this keeps
+ * both consistent with their own existing history rather than unifying
+ * them into one (which would silently invert every past Vendor or Karigar
+ * entry's meaning).
  */
-export async function recordVendorPayment(
-  vendorId: string,
+export async function recordPaymentOut(
   prevState: PaymentFormState = { success: false, message: "" },
   formData: FormData,
 ): Promise<PaymentFormState> {
   try {
-    try {
-      await requirePermission(PERMISSIONS.PURCHASE_UPDATE)
-    } catch {
-      return { success: false, message: "You do not have permission to record purchase payments." }
+    const partyType = String(formData.get("partyType") || "")
+    if (partyType !== "VENDOR" && partyType !== "KARIGAR") {
+      return { success: false, message: "Select who this payment is for" }
     }
 
-    if (!vendorId) {
-      return { success: false, message: "Select a vendor" }
+    try {
+      await requirePermission(
+        partyType === "VENDOR" ? PERMISSIONS.PURCHASE_UPDATE : PERMISSIONS.KARIGAR_UPDATE,
+      )
+    } catch {
+      return { success: false, message: "You do not have permission to record this payment." }
     }
 
     const paymentsRaw = String(formData.get("paymentsJson") || "[]")
@@ -283,26 +295,66 @@ export async function recordVendorPayment(
 
     const storeId = await requireStoreScope()
 
-    const vendor = await prisma.vendor.findFirst({
-      where: { id: vendorId, storeId },
-      select: { id: true, name: true },
+    if (partyType === "VENDOR") {
+      const vendorId = String(formData.get("vendorId") || "").trim()
+      if (!vendorId) return { success: false, message: "Select a vendor" }
+
+      const vendor = await prisma.vendor.findFirst({
+        where: { id: vendorId, storeId },
+        select: { id: true, name: true },
+      })
+      if (!vendor) return { success: false, message: "Vendor not found" }
+
+      await prisma.$transaction(
+        payments.map((payment, index) =>
+          prisma.ledgerEntry.create({
+            data: {
+              storeId,
+              type: LedgerEntryType.DEBIT,
+              sourceType: LedgerSourceType.PAYMENT_OUT,
+              vendorId,
+              amount: payment.amount,
+              paymentMethod: payment.method as PaymentMethod,
+              paymentReference: payment.reference ?? undefined,
+              bankName: payment.bankName ?? undefined,
+              attachmentUrl: payment.attachmentUrl ?? undefined,
+              description: notes ?? (index === 0 ? `Payment made to ${vendor.name}` : undefined),
+            },
+          }),
+        ),
+      )
+
+      revalidatePath("/payments/out")
+      revalidatePath("/ledger")
+      revalidatePath(`/vendors/${vendorId}`)
+
+      return { success: true, message: "Payment Out recorded" }
+    }
+
+    const karigarId = String(formData.get("karigarId") || "").trim()
+    if (!karigarId) return { success: false, message: "Select a karigar" }
+
+    const karigar = await prisma.karigar.findFirst({
+      where: { id: karigarId, storeId },
+      select: { id: true, name: true, locationId: true },
     })
-    if (!vendor) return { success: false, message: "Vendor not found" }
+    if (!karigar) return { success: false, message: "Karigar not found" }
 
     await prisma.$transaction(
       payments.map((payment, index) =>
         prisma.ledgerEntry.create({
           data: {
             storeId,
-            type: LedgerEntryType.DEBIT,
+            type: LedgerEntryType.CREDIT,
             sourceType: LedgerSourceType.PAYMENT_OUT,
-            vendorId,
+            karigarId,
             amount: payment.amount,
             paymentMethod: payment.method as PaymentMethod,
             paymentReference: payment.reference ?? undefined,
             bankName: payment.bankName ?? undefined,
             attachmentUrl: payment.attachmentUrl ?? undefined,
-            description: notes ?? (index === 0 ? `Payment made to ${vendor.name}` : undefined),
+            locationId: karigar.locationId ?? undefined,
+            description: notes ?? (index === 0 ? `Payment made to ${karigar.name}` : undefined),
           },
         }),
       ),
@@ -310,11 +362,11 @@ export async function recordVendorPayment(
 
     revalidatePath("/payments/out")
     revalidatePath("/ledger")
-    revalidatePath(`/vendors/${vendorId}`)
+    revalidatePath(`/karigars/${karigarId}`)
 
     return { success: true, message: "Payment Out recorded" }
   } catch (error) {
-    console.error("recordVendorPayment error:", error)
+    console.error("recordPaymentOut error:", error)
     return { success: false, message: "Failed to record payment" }
   }
 }

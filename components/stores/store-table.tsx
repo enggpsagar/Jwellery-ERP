@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { StoreRowActions } from "@/components/stores/store-row-actions"
+import { StoreDeleteDialog } from "@/components/stores/store-delete-dialog"
 import { ChangePlanDialog } from "@/components/stores/change-plan-dialog"
 import type { PlanRow } from "@/lib/actions/plan-actions"
 import type { StorePlanOverview } from "@/lib/actions/store-plan-actions"
@@ -203,6 +204,7 @@ export function StoreTable({
                       storeName={store.name}
                       isActive={store.isActive}
                     />
+                    <StoreDeleteDialog storeId={store.id} storeName={store.name} />
                   </div>
                 </TableCell>
               </TableRow>

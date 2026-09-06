@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 
 import {
   updateCaratConversionRates,
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/providers/toast-provider";
 
 type CaratConversionFormProps = {
   rows: CaratConversionRateRow[];
@@ -33,6 +34,16 @@ export function CaratConversionForm({ rows, canEdit }: CaratConversionFormProps)
     updateCaratConversionRates,
     initialState,
   );
+  const toast = useToast();
+
+  useEffect(() => {
+    if (state.message && state.success) {
+      toast.success(state.message);
+    } else if (state.message && !state.success) {
+      toast.error(state.message);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   return (
     <form
@@ -42,18 +53,6 @@ export function CaratConversionForm({ rows, canEdit }: CaratConversionFormProps)
       }}
       className="space-y-6"
     >
-      {state.message ? (
-        <div
-          className={`rounded-lg px-4 py-3 text-sm ${
-            state.success
-              ? "bg-green-50 text-green-700"
-              : "bg-red-50 text-red-700"
-          }`}
-        >
-          {state.message}
-        </div>
-      ) : null}
-
       <fieldset disabled={!canEdit}>
         <Card>
           <CardHeader>

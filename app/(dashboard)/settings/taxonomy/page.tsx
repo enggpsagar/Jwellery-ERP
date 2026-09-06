@@ -28,7 +28,7 @@ export default async function TaxonomySettingsPage() {
   ]);
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-5xl space-y-6 p-6">
       <PageBackHeader
         title="Metals, Stones & Categories"
         description="Define the metals, stones, categories, and item types your store deals in."

@@ -8,6 +8,7 @@ import { createInventoryStock } from "@/lib/actions/inventory/stock-actions";
 import {
   initialStockFormState,
 } from "@/lib/inventory/stock-types";
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions";
 
 import { useToast } from "@/components/providers/toast-provider";
 import { StockForm } from "./stock-form";
@@ -21,9 +22,10 @@ type StockCreateFormProps = {
    * start blank. Not threaded into edit mode: an existing stock entry's
    * saved location is untouched by this. */
   defaultLocationId?: string;
+  metals: StoreMetalRow[];
 };
 
-export function StockCreateForm({ products, locations, caratConversionRates, defaultLocationId }: StockCreateFormProps) {
+export function StockCreateForm({ products, locations, caratConversionRates, defaultLocationId, metals }: StockCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
 
@@ -70,6 +72,7 @@ export function StockCreateForm({ products, locations, caratConversionRates, def
         locations={locations}
         caratConversionRates={caratConversionRates}
         defaultLocationId={defaultLocationId}
+        metals={metals}
         state={state}
         pending={pending}
       />

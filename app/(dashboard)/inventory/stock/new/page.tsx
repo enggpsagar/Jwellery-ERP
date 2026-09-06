@@ -6,6 +6,7 @@ import {
   getStoreLocations,
 } from "@/lib/actions/store-location-actions";
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions";
+import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper";
@@ -17,11 +18,12 @@ export const metadata: Metadata = {
 
 export default async function NewStockPage() {
 
-  const [products, locations, caratConversionRates, defaultLocationId] = await Promise.all([
+  const [products, locations, caratConversionRates, defaultLocationId, metals] = await Promise.all([
     getInventoryStockFormProducts(),
     getStoreLocations(),
     getCaratConversionRateMap(),
     getDefaultLocationId(),
+    getStoreMetals(),
   ]);
 
   return (
@@ -40,6 +42,7 @@ export default async function NewStockPage() {
           locations={locations}
           caratConversionRates={caratConversionRates}
           defaultLocationId={defaultLocationId ?? undefined}
+          metals={metals}
         />
       </ResetFormWrapper>
 

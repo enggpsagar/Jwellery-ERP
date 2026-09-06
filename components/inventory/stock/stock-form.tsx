@@ -10,7 +10,8 @@ import {
 } from "@prisma/client";
 
 import type { StockFormState } from "@/lib/inventory/stock-types";
-import { isCaratWeighedMetal, resolveGramsPerCarat } from "@/lib/purity";
+import { isCaratWeighedMetal, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity";
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,6 +133,10 @@ type StockFormProps = {
    * Conversion Rules) — see the same prop on InvoiceForm. */
   caratConversionRates: Record<PurityType, number>;
 
+  /** Every metal/stone (Settings > Taxonomy), for the selected product's
+   * configured Primary Unit — see the Weight Unit toggle below. */
+  metals: StoreMetalRow[];
+
   state: StockFormState;
 
   pending: boolean;
@@ -150,6 +155,7 @@ export function StockForm({
   locations,
   defaultLocationId,
   caratConversionRates,
+  metals,
   state,
   pending,
 }: StockFormProps) {
@@ -288,6 +294,40 @@ export function StockForm({
   // gates the Carat Weight field and its conversion against Net Weight.
   const isCaratFamily = isCaratWeighedMetal(selectedProduct?.metalType?.name);
 
+  // The selected product's metal's configured Primary Unit (Settings >
+  // Taxonomy) — what Gross/Less/Net/Stone/Dust weight are actually
+  // persisted in, regardless of which unit the toggle below is currently
+  // showing for entry convenience.
+  const primaryUnit = metals.find((m) => m.id === selectedProduct?.metalType?.id)?.primaryUnit ?? "GRAM";
+  const gramsPerCarat = resolveGramsPerCarat(selectedProduct?.defaultPurity, caratConversionRates);
+
+  // One shared toggle for the whole Weight Details section, not one per
+  // field — every weight here describes the same physical piece/metal, so
+  // a per-field unit would just be more clicks for no real benefit (unlike
+  // a multi-line document where Stone Weight can genuinely differ in
+  // nature from the metal's own weight). Defaults to the metal's Primary
+  // Unit; a store owner can still switch it to enter a one-off weighing in
+  // the other unit — the value is always converted to Primary Unit at
+  // submit (see the hidden inputs below) regardless of what's shown here.
+  const [weightUnit, setWeightUnit] = useState<"GRAM" | "CARAT">(primaryUnit);
+
+  function displayWeight(grams: string) {
+    if (grams.trim() === "" || !Number.isFinite(Number(grams))) return "";
+    return String(toPrimaryUnit(Number(grams), "GRAM", weightUnit, gramsPerCarat));
+  }
+
+  function toGramsString(typed: string) {
+    if (typed.trim() === "" || !Number.isFinite(Number(typed))) return "";
+    return String(toPrimaryUnit(Number(typed), weightUnit, "GRAM", gramsPerCarat));
+  }
+
+  // The actual submitted value — the metal's real configured Primary Unit,
+  // independent of whatever weightUnit the toggle happens to be showing.
+  function submittedWeight(grams: string) {
+    if (grams.trim() === "" || !Number.isFinite(Number(grams))) return "";
+    return String(toPrimaryUnit(Number(grams), "GRAM", primaryUnit, gramsPerCarat));
+  }
+
   // Seed the weights from the chosen product, and keep following it while the
   // fields are untouched, so switching product corrects them rather than
   // leaving the previous product's figures behind.
@@ -298,6 +338,8 @@ export function StockForm({
     setNetWeight(selectedProduct.defaultNetWeight ?? "");
     setStoneWeight(selectedProduct.defaultStoneWeight ?? "");
     setCaratWeight(selectedProduct.defaultCaratWeight ?? "");
+    setWeightUnit(primaryUnit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProduct, weightsTouched]);
 
   // `ProductSelect` is a shared component whose `ProductOption` type
@@ -472,7 +514,24 @@ export function StockForm({
       ============================ */}
 
       <div className="rounded-xl border p-6">
-        <h3 className="mb-6 text-lg font-semibold">Weight Details</h3>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold">Weight Details</h3>
+
+          <div className="flex items-center gap-2">
+            <Label htmlFor="weightUnit" className="text-xs text-muted-foreground">
+              Weight Unit
+            </Label>
+            <Select value={weightUnit} onValueChange={(unit) => setWeightUnit(unit as "GRAM" | "CARAT")}>
+              <SelectTrigger id="weightUnit" className="h-9 w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="GRAM">Gram</SelectItem>
+                <SelectItem value="CARAT">Carat</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div>
@@ -490,45 +549,45 @@ export function StockForm({
           </div>
 
           <div>
-            <Label htmlFor="grossWeight">Gross Weight (gm)</Label>
+            <Label htmlFor="grossWeight">Gross Weight</Label>
 
+            <input type="hidden" name="grossWeight" value={submittedWeight(grossWeight)} />
             <Input
               id="grossWeight"
-              name="grossWeight"
               type="number"
               step="0.00001"
-              value={grossWeight}
-              onChange={(event) => editGrossWeight(event.target.value)}
+              value={displayWeight(grossWeight)}
+              onChange={(event) => editGrossWeight(toGramsString(event.target.value))}
             />
 
             <ErrorText error={state.errors.grossWeight} />
           </div>
 
           <div>
-            <Label htmlFor="lessWeight">Less Weight (gm)</Label>
+            <Label htmlFor="lessWeight">Less Weight</Label>
 
+            <input type="hidden" name="lessWeight" value={submittedWeight(lessWeight)} />
             <Input
               id="lessWeight"
-              name="lessWeight"
               type="number"
               step="0.00001"
-              value={lessWeight}
-              onChange={(event) => editLessWeight(event.target.value)}
+              value={displayWeight(lessWeight)}
+              onChange={(event) => editLessWeight(toGramsString(event.target.value))}
             />
 
             <ErrorText error={state.errors.lessWeight} />
           </div>
 
           <div>
-            <Label htmlFor="netWeight">Net Weight (gm)</Label>
+            <Label htmlFor="netWeight">Net Weight</Label>
 
+            <input type="hidden" name="netWeight" value={submittedWeight(netWeight)} />
             <Input
               id="netWeight"
-              name="netWeight"
               type="number"
               step="0.00001"
-              value={netWeight}
-              onChange={(event) => editNetWeight(event.target.value)}
+              value={displayWeight(netWeight)}
+              onChange={(event) => editNetWeight(toGramsString(event.target.value))}
             />
             {!netTouched && (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -540,15 +599,15 @@ export function StockForm({
           </div>
 
           <div>
-            <Label htmlFor="stoneWeight">Stone Weight (gm)</Label>
+            <Label htmlFor="stoneWeight">Stone Weight</Label>
 
+            <input type="hidden" name="stoneWeight" value={submittedWeight(stoneWeight)} />
             <Input
               id="stoneWeight"
-              name="stoneWeight"
               type="number"
               step="0.00001"
-              value={stoneWeight}
-              onChange={(event) => editStoneWeight(event.target.value)}
+              value={displayWeight(stoneWeight)}
+              onChange={(event) => editStoneWeight(toGramsString(event.target.value))}
             />
 
             <ErrorText error={state.errors.stoneWeight} />
@@ -577,15 +636,15 @@ export function StockForm({
           )}
 
           <div>
-            <Label htmlFor="dmoWeight">Dust/Making/Other Wt (g)</Label>
+            <Label htmlFor="dmoWeight">Dust/Making/Other Wt</Label>
 
+            <input type="hidden" name="dmoWeight" value={submittedWeight(dmoWeight)} />
             <Input
               id="dmoWeight"
-              name="dmoWeight"
               type="number"
               step="0.00001"
-              value={dmoWeight}
-              onChange={(event) => editDmoWeight(event.target.value)}
+              value={displayWeight(dmoWeight)}
+              onChange={(event) => editDmoWeight(toGramsString(event.target.value))}
             />
 
             <ErrorText error={state.errors.dmoWeight} />

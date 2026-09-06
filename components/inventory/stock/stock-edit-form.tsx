@@ -12,6 +12,7 @@ import {
   initialStockFormState,
   type StockFormState,
 } from "@/lib/inventory/stock-types";
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions";
 
 import { useToast } from "@/components/providers/toast-provider";
 
@@ -23,6 +24,7 @@ type StockEditFormProps = {
   products: any[];
   locations: any[];
   caratConversionRates: Record<PurityType, number>;
+  metals: StoreMetalRow[];
 };
 
 
@@ -31,6 +33,7 @@ export function StockEditForm({
   products,
   locations,
   caratConversionRates,
+  metals,
 }: StockEditFormProps) {
 
   const router = useRouter();
@@ -98,6 +101,7 @@ export function StockEditForm({
         products={products}
         locations={locations}
         caratConversionRates={caratConversionRates}
+        metals={metals}
         state={state}
         pending={pending}
       />

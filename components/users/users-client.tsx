@@ -3,8 +3,10 @@
 "use client";
 
 import Link from "next/link";
+import * as React from "react";
 
 import { UserTable } from "@/components/users/user-table";
+import { UserDetailPanel } from "@/components/users/user-detail-panel";
 import { Button } from "@/components/ui/button";
 import { DataTableToolbar } from "@/components/shared/data-table-toolbar";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
@@ -62,6 +64,22 @@ export function UsersClient({
   allowSuperAdmin,
   pagination,
 }: UsersClientProps) {
+  // Which row's full detail shows in the right-hand panel — defaults to
+  // the first row on this page/search result so the panel is never empty
+  // on load, matching the Customers/Vendors/Karigars layout this mirrors.
+  const [activeUserId, setActiveUserId] = React.useState<string | null>(
+    users[0]?.id ?? null,
+  );
+
+  React.useEffect(() => {
+    setActiveUserId((current) => {
+      if (current && users.some((user) => user.id === current)) return current;
+      return users[0]?.id ?? null;
+    });
+  }, [users]);
+
+  const activeUser = users.find((user) => user.id === activeUserId) ?? null;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -91,23 +109,29 @@ export function UsersClient({
         exportAction={exportUsersToExcel}
       />
 
-      <div className="space-y-3">
-        <UserTable
-          users={users}
-          karigars={karigars}
-          locations={locations}
-          allowSuperAdmin={allowSuperAdmin}
-        />
-
-        <div className="rounded-xl border">
-          <DataTablePagination
-            page={pagination.page}
-            totalPages={pagination.totalPages}
-            totalCount={pagination.totalCount}
-            pageSize={pagination.pageSize}
-            itemLabel="users"
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
+        <div className="space-y-3">
+          <UserTable
+            users={users}
+            karigars={karigars}
+            locations={locations}
+            allowSuperAdmin={allowSuperAdmin}
+            activeUserId={activeUserId}
+            onActivate={setActiveUserId}
           />
+
+          <div className="rounded-xl border">
+            <DataTablePagination
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              totalCount={pagination.totalCount}
+              pageSize={pagination.pageSize}
+              itemLabel="users"
+            />
+          </div>
         </div>
+
+        <UserDetailPanel user={activeUser} karigars={karigars} locations={locations} />
       </div>
     </div>
   );

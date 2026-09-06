@@ -13,6 +13,11 @@ import { resolveStoreName } from "@/lib/invite-email"
 import { MONEY_UNIT } from "@/lib/business-units"
 import { getActiveBusinessUnits, type BusinessUnitOption } from "@/lib/business-units.server"
 
+/** Thin "use server" re-export so client components (e.g. the master-detail ledger panel) can call this without importing the server-only business-units.server module directly. */
+export async function getCustomerLedgerBusinessUnits(): Promise<BusinessUnitOption[]> {
+  return getActiveBusinessUnits()
+}
+
 export type CustomerLedgerFormState = {
   success: boolean
   message: string

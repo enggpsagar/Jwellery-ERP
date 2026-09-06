@@ -5,8 +5,9 @@ import {
   DetailGrid,
   DetailSection,
 } from "@/components/shared/detail-section"
+import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/users/status-badge"
-import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles"
+import { ROLE_LABELS, ROLE_BADGE_CLASSES, MODULE_DEFINITIONS } from "@/lib/roles"
 import { toTitleCase, formatShortDate, cn } from "@/lib/utils"
 
 import type { UserRole, UserStatus } from "@prisma/client"
@@ -66,7 +67,12 @@ export function UserDetailContent({
           <DetailField label="Name" value={user.name ? toTitleCase(user.name) : "-"} />
           <DetailField label="Email" value={user.email} />
           <DetailField label="Phone" value={user.phone} />
-          <DetailField label="Role" value={ROLE_LABELS[user.role]} />
+          <DetailField
+            label="Role"
+            value={
+              <Badge className={ROLE_BADGE_CLASSES[user.role]}>{ROLE_LABELS[user.role]}</Badge>
+            }
+          />
           <DetailField label="Status" value={<StatusBadge status={user.status} />} />
           <DetailField label="Account" value={user.isActive ? "Active" : "Deactivated"} />
           <DetailField

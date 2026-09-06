@@ -2,7 +2,7 @@
 
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { UserRole } from "@prisma/client";
+import { UserRole, UserStatus } from "@prisma/client";
 
 import { getUsers, type UserSortBy, type SortOrder } from "@/lib/user";
 import { prisma } from "@/lib/prisma";
@@ -21,6 +21,7 @@ type UsersPageProps = {
     search?: string;
     sortBy?: UserSortBy;
     sortOrder?: SortOrder;
+    status?: string;
   }>;
 };
 
@@ -43,11 +44,14 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
   const search = params.search || "";
   const sortBy = params.sortBy || "createdAt";
   const sortOrder = params.sortOrder || "desc";
+  const status = Object.values(UserStatus).includes(params.status as UserStatus)
+    ? (params.status as UserStatus)
+    : undefined;
 
   const storeId = await getEffectiveStoreId();
 
   const [{ users, pagination }, karigars, locations] = await Promise.all([
-    getUsers(storeId, { page, pageSize, search, sortBy, sortOrder }),
+    getUsers(storeId, { page, pageSize, search, sortBy, sortOrder, status }),
     storeId
       ? prisma.karigar.findMany({
           where: { storeId, isActive: true },

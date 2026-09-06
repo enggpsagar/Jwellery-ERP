@@ -117,6 +117,11 @@ export function UsersClient({
             selectedIds={selectedIds}
             entityLabel="users"
             exportAction={exportUsersToExcel}
+            statusOptions={[
+              { value: "INVITED", label: "Invited" },
+              { value: "ACTIVE", label: "Active" },
+              { value: "DISABLED", label: "Disabled" },
+            ]}
             bulkActions={
               <BulkDeleteButton
                 selectedIds={selectedIds}

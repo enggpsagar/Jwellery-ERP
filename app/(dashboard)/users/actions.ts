@@ -3,7 +3,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Prisma, UserRole } from "@prisma/client";
+import { Prisma, UserRole, UserStatus } from "@prisma/client";
 import { ZodError } from "zod";
 
 import {
@@ -241,6 +241,7 @@ export type ExportUsersParams = {
   search?: string;
   sortBy?: string;
   sortOrder?: SortOrder;
+  status?: string;
 };
 
 export async function exportUsersToExcel(params: ExportUsersParams = {}): Promise<{
@@ -262,6 +263,7 @@ export async function exportUsersToExcel(params: ExportUsersParams = {}): Promis
       search: params.search,
       sortBy: params.sortBy as UserSortBy,
       sortOrder: params.sortOrder,
+      status: params.status as UserStatus | undefined,
     });
 
     if (!users.length) {

@@ -21,7 +21,7 @@ import { StatusBadge } from "@/components/users/status-badge";
 import { SortableTableHead } from "@/components/shared/sortable-table-head";
 import { cn, formatShortDate } from "@/lib/utils";
 
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_LABELS, ROLE_BADGE_CLASSES } from "@/lib/roles";
 
 import type { UserRole, UserStatus } from "@prisma/client";
 
@@ -220,7 +220,7 @@ export function UserTable({
                 <TableCell>{user.phone ?? "-"}</TableCell>
 
                 <TableCell>
-                  <Badge variant="outline">{ROLE_LABELS[user.role]}</Badge>
+                  <Badge className={ROLE_BADGE_CLASSES[user.role]}>{ROLE_LABELS[user.role]}</Badge>
                 </TableCell>
 
                 <TableCell>

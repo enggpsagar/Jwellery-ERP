@@ -18,6 +18,10 @@ export type GetUsersParams = {
   search?: string;
   sortBy?: UserSortBy;
   sortOrder?: SortOrder;
+  /** Filters by UserStatus (INVITED/ACTIVE/DISABLED) — otherwise every
+   * status matches. Without this, a disabled user has no way to be found
+   * except by scrolling the full unfiltered list. */
+  status?: UserStatus;
 };
 
 export type UsersPagination = {
@@ -46,8 +50,11 @@ const USER_SELECT = {
   locationAccess: { select: { locationId: true } },
 } as const;
 
-function getUsersWhere(storeId: string | null, search?: string) {
-  const base = storeId ? { storeId } : { role: UserRole.SUPER_ADMIN };
+function getUsersWhere(storeId: string | null, search?: string, status?: UserStatus) {
+  const base = {
+    ...(storeId ? { storeId } : { role: UserRole.SUPER_ADMIN }),
+    ...(status ? { status } : {}),
+  };
   const query = String(search || "").trim();
 
   if (!query) return base;
@@ -76,7 +83,7 @@ export async function getUsers(storeId: string | null, params: GetUsersParams = 
   const sortBy = params.sortBy || "createdAt";
   const sortOrder = params.sortOrder || "desc";
 
-  const where = getUsersWhere(storeId, search);
+  const where = getUsersWhere(storeId, search, params.status);
   const orderBy = getUsersOrderBy(sortBy, sortOrder);
 
   const [totalCount, users] = await Promise.all([
@@ -107,9 +114,9 @@ export async function getUsers(storeId: string | null, params: GetUsersParams = 
 /** Same filter/sort as getUsers, but unpaginated — used by the Excel export. */
 export async function getAllUsersForExport(
   storeId: string | null,
-  params: Pick<GetUsersParams, "search" | "sortBy" | "sortOrder"> = {}
+  params: Pick<GetUsersParams, "search" | "sortBy" | "sortOrder" | "status"> = {}
 ) {
-  const where = getUsersWhere(storeId, params.search);
+  const where = getUsersWhere(storeId, params.search, params.status);
   const orderBy = getUsersOrderBy(params.sortBy || "createdAt", params.sortOrder || "desc");
 
   return prisma.user.findMany({

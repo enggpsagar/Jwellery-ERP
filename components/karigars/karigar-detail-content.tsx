@@ -102,14 +102,16 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
         </p>
       )}
 
-      {/* Ribbon-style: a colored accent stripe per metal (so Gold vs Silver
-          reads at a glance) over the weight itself, made prominent — the
-          number is the thing anyone glancing at this card actually wants,
-          not a full sentence restating it. */}
+      {/* Ribbon-style: a full-width colored band per metal (so Gold vs
+          Silver reads at a glance), carrying the label itself — a proper
+          horizontal banner, not a thin accent line — with the weight
+          made prominent below it, since that number is the thing anyone
+          glancing at this card actually wants. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {ledger.materialGroups.map((group) => {
           const isOwed = group.finalFineBalance > 0
           const isCredit = group.finalFineBalance < 0
+          const accent = metalRibbonColor(group.metalLabel)
 
           return (
             <div
@@ -117,16 +119,18 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
               className="overflow-hidden rounded-xl border bg-card shadow-sm"
             >
               <div
-                className="h-1.5 w-full"
-                style={{ backgroundColor: metalRibbonColor(group.metalLabel) }}
-              />
-              <div className="p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {group.metalLabel} Balance
-                </p>
+                className="px-4 py-2 text-xs font-semibold uppercase tracking-wide"
+                style={{
+                  backgroundColor: `color-mix(in oklab, ${accent} 18%, transparent)`,
+                  color: accent,
+                }}
+              >
+                {group.metalLabel} Balance
+              </div>
+              <div className="p-4 pt-3">
                 <p
                   className={cn(
-                    "mt-1 text-2xl font-bold tabular-nums",
+                    "text-2xl font-bold tabular-nums",
                     isOwed ? "text-red-700" : isCredit ? "text-emerald-700" : "text-foreground",
                   )}
                 >

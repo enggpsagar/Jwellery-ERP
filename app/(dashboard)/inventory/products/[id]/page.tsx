@@ -169,14 +169,10 @@ export default async function ProductDetailsPage({ params, searchParams }: Props
         />
         {product.metalType?.isGemstone ? (
           <Field
-            label="Origin"
+            label="Stone Type"
             value={
               <Badge variant="secondary">
-                {product.stoneOriginOption?.origin === "NATURAL"
-                  ? "Natural"
-                  : product.stoneOriginOption?.origin === "LAB_GROWN"
-                    ? "Lab-Grown"
-                    : "Not set"}
+                {product.stoneOriginOption?.name ?? "Not set"}
               </Badge>
             }
           />

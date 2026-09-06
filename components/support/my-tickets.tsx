@@ -92,6 +92,7 @@ export function MyTickets({ tickets, initialExpandedId }: MyTicketsProps) {
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs text-muted-foreground">{ticket.ticketNumber}</span>
                   <span className="truncate font-medium">{ticket.subject}</span>
                   <TicketStatusBadge status={ticket.status} />
                 </div>

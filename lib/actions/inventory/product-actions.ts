@@ -59,7 +59,7 @@ function serializeProduct(product: {
     name: string;
     isGemstone: boolean;
   } | null;
-  stoneOriginOption: { id: string; origin: "NATURAL" | "LAB_GROWN" } | null;
+  stoneOriginOption: { id: string; name: string } | null;
   defaultPurity: PurityType | null;
   defaultMakingCharge: { toString(): string } | null;
   defaultMakingChargeType: ChargeType;
@@ -118,7 +118,7 @@ const PRODUCT_RELATIONS = {
   metalType: {
     select: { id: true, name: true, isGemstone: true },
   },
-  stoneOriginOption: { select: { id: true, origin: true } },
+  stoneOriginOption: { select: { id: true, name: true } },
 } as const;
 
 export type ProductSortBy = "name" | "productCode" | "createdAt";
@@ -425,7 +425,7 @@ async function validateTaxonomySelection(
   }
 
   if (stoneOriginOptionId && !originRow) {
-    errors.stoneOriginOptionId = ["Selected origin is invalid for this metal"];
+    errors.stoneOriginOptionId = ["Selected Stone Type is invalid for this metal"];
   }
 
   return errors;

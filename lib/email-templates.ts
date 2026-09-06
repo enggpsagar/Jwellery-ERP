@@ -1,3 +1,5 @@
+import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst";
+
 function formatCurrency(value: number) {
   return `₹${Number(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }
@@ -566,12 +568,92 @@ export function inviteUserEmail(params: {
   };
 }
 
+function addressBlock(lines: (string | null | undefined)[]) {
+  return lines
+    .filter((line): line is string => Boolean(line && line.trim()))
+    .map((line) => `<div>${line}</div>`)
+    .join("");
+}
+
+function invoiceLineItemsTable(
+  items: {
+    itemName: string;
+    purity: string | null;
+    quantity: number;
+    netWeight: number | null;
+    rate: number | null;
+    makingCharge: number;
+    stoneCharge: number;
+    schemeDiscount: number;
+    sgstAmount: number;
+    cgstAmount: number;
+    igstAmount: number;
+    lineTotal: number;
+  }[],
+  isInterState: boolean,
+) {
+  const rows = items
+    .map(
+      (item) => `
+      <tr>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb;">${item.itemName}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb;">${item.purity ?? "-"}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.netWeight ? item.netWeight.toFixed(3) + " g" : "-"}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.rate ? formatCurrency(item.rate) : "-"}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.makingCharge)}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.stoneCharge)}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.schemeDiscount)}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(isInterState ? item.igstAmount : item.sgstAmount + item.cgstAmount)}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.lineTotal)}</td>
+      </tr>`,
+    )
+    .join("");
+
+  return `
+  <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 11px;">
+    <thead>
+      <tr style="background: #f9fafb;">
+        <th style="padding: 6px; text-align: left;">Item</th>
+        <th style="padding: 6px; text-align: left;">Purity</th>
+        <th style="padding: 6px; text-align: center;">Qty</th>
+        <th style="padding: 6px; text-align: right;">Net Wt</th>
+        <th style="padding: 6px; text-align: right;">Rate</th>
+        <th style="padding: 6px; text-align: right;">Making</th>
+        <th style="padding: 6px; text-align: right;">Stone</th>
+        <th style="padding: 6px; text-align: right;">Discount</th>
+        <th style="padding: 6px; text-align: right;">${isInterState ? "IGST" : "SGST+CGST"}</th>
+        <th style="padding: 6px; text-align: right;">Total</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
 export function invoiceEmail(params: {
   storeName: string;
   invoiceNumber: string;
   invoiceDate: string;
-  customerName: string;
-  items: Parameters<typeof itemsTable>[0];
+  status: string;
+  gstScheme: "REGULAR_B2C" | "REGULAR_B2B" | "COMPOSITION";
+  business: {
+    name: string;
+    address: string | null;
+    city: string | null;
+    state: string | null;
+    pincode: string | null;
+    phone: string | null;
+    gstNumber: string | null;
+  };
+  customer: {
+    name: string;
+    addressLine1: string | null;
+    addressLine2: string | null;
+    city: string | null;
+    state: string | null;
+    phone: string | null;
+  };
+  items: Parameters<typeof invoiceLineItemsTable>[0];
   subtotal: number;
   makingCharges: number;
   stoneCharges: number;
@@ -580,11 +662,59 @@ export function invoiceEmail(params: {
   totalAmount: number;
   paidAmount: number;
   balanceAmount: number;
+  amountInWords: string;
+  notes: string | null;
+  terms: string | null;
 }) {
+  const isInterState = params.items.some((item) => item.igstAmount > 0);
+  const heading = documentHeading(params.gstScheme);
+
+  const businessLines = addressBlock([
+    `<strong>${params.business.name}</strong>`,
+    params.business.address,
+    [params.business.city, params.business.state].filter(Boolean).join(", ") || null,
+    params.business.pincode ? `PIN: ${params.business.pincode}` : null,
+    params.business.phone ? `Phone: ${params.business.phone}` : null,
+    params.business.gstNumber ? `GSTIN: ${params.business.gstNumber}` : null,
+  ]);
+
+  const customerLines = addressBlock([
+    `<strong>${params.customer.name || "Customer"}</strong>`,
+    params.customer.addressLine1,
+    params.customer.addressLine2,
+    [params.customer.city, params.customer.state].filter(Boolean).join(", ") || null,
+    params.customer.phone ? `Phone: ${params.customer.phone}` : null,
+  ]);
+
   const body = `
-    <p>Hi ${params.customerName || "Customer"},</p>
-    <p>Here is your invoice <strong>${params.invoiceNumber}</strong> dated ${formatDate(params.invoiceDate)}.</p>
-    ${itemsTable(params.items)}
+    <p style="text-align: center; font-weight: bold; font-size: 15px; margin-bottom: 2px;">${heading}</p>
+    ${
+      params.gstScheme === "COMPOSITION"
+        ? `<p style="text-align: center; font-size: 11px; font-style: italic; color: #6b7280; margin-top: 0;">${COMPOSITION_DISCLAIMER}</p>`
+        : ""
+    }
+
+    <div style="display: flex; justify-content: space-between; font-size: 12px; margin: 12px 0;">
+      <span>Invoice No: <strong>${params.invoiceNumber}</strong></span>
+      <span>Date: ${formatDate(params.invoiceDate)}</span>
+      <span>Status: ${params.status}</span>
+    </div>
+
+    <table style="width: 100%; margin-bottom: 12px;">
+      <tr>
+        <td style="vertical-align: top; width: 50%; font-size: 12px; padding-right: 12px;">
+          <div style="color: #6b7280; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">From</div>
+          ${businessLines}
+        </td>
+        <td style="vertical-align: top; width: 50%; font-size: 12px;">
+          <div style="color: #6b7280; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Bill To</div>
+          ${customerLines}
+        </td>
+      </tr>
+    </table>
+
+    ${invoiceLineItemsTable(params.items, isInterState)}
+
     <div style="font-size: 13px; max-width: 260px; margin-left: auto;">
       ${summaryRow("Subtotal", formatCurrency(params.subtotal))}
       ${summaryRow("Making Charges", formatCurrency(params.makingCharges))}
@@ -595,6 +725,11 @@ export function invoiceEmail(params: {
       ${summaryRow("Paid", formatCurrency(params.paidAmount))}
       ${summaryRow("Balance Due", formatCurrency(params.balanceAmount), true)}
     </div>
+
+    <p style="font-size: 11px; color: #6b7280; margin-top: 16px;">Value in words: ${params.amountInWords}</p>
+
+    ${params.notes ? `<p style="font-size: 12px;"><strong>Notes:</strong> ${params.notes}</p>` : ""}
+    ${params.terms ? `<p style="font-size: 10px; color: #6b7280;"><strong>Terms &amp; Conditions:</strong> ${params.terms}</p>` : ""}
   `;
 
   return {
@@ -817,6 +952,36 @@ function stripHtmlForEmailText(html: string) {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** A support ticket message's optional attachment (see
+ *  prisma/schema.prisma's SupportTicketMessage doc comment) — the email
+ *  never embeds the file itself, just a line noting its name with a link
+ *  out to it (or to the ticket, whichever reads better in context). */
+type TicketMessageAttachment = { name: string; url: string } | null | undefined;
+
+function ticketAttachmentLineHtml(attachment: TicketMessageAttachment) {
+  if (!attachment) return "";
+  return `<p style="margin: 8px 0 0; font-size: 13px; color: #4b5563;">📎 Attachment: <a href="${attachment.url}" style="color: #111827; font-weight: bold;">${attachment.name}</a></p>`;
+}
+
+function ticketAttachmentLineText(attachment: TicketMessageAttachment) {
+  if (!attachment) return [];
+  return [`Attachment: ${attachment.name} (${attachment.url})`];
+}
+
+/**
+ * Every email sent about one ticket — the initial submission notice and
+ * every reply in both directions — shares this exact subject string, so
+ * mail clients thread them together as one conversation rather than the
+ * "New support ticket: X" / "Re: X" pair this used to be (which never
+ * matched each other, let alone across replies). Carries the human-readable
+ * ticketNumber (see SupportTicket.ticketNumber's own doc comment) so a
+ * Super Admin or submitter searching their inbox can find the whole thread
+ * by it.
+ */
+function ticketEmailSubject(ticketNumber: string, subject: string) {
+  return `[${ticketNumber}] ${subject}`;
+}
+
 /**
  * Sent to the Super Admin(s) when a new support ticket is submitted from
  * either Contact Us surface (public /contact or the authenticated app's
@@ -827,6 +992,7 @@ function stripHtmlForEmailText(html: string) {
  */
 export function newSupportTicketEmail(params: {
   appName: string;
+  ticketNumber: string;
   subject: string;
   submitterName: string;
   submitterEmail: string;
@@ -834,8 +1000,9 @@ export function newSupportTicketEmail(params: {
   storeName: string | null;
   messageHtml: string;
   viewUrl: string;
+  attachment?: TicketMessageAttachment;
 }) {
-  const { appName, subject, submitterName, submitterEmail, submitterPhone, storeName, messageHtml, viewUrl } = params;
+  const { appName, ticketNumber, subject, submitterName, submitterEmail, submitterPhone, storeName, messageHtml, viewUrl, attachment } = params;
 
   const body = `
     <p style="margin-top: 0;">A new support ticket was submitted on ${appName}.</p>
@@ -851,6 +1018,7 @@ export function newSupportTicketEmail(params: {
     </table>
 
     ${ticketMessageBlock(messageHtml)}
+    ${ticketAttachmentLineHtml(attachment)}
 
     <p style="margin-top: 20px;">
       <a href="${viewUrl}" style="background: #111827; color: #ffffff; padding: 10px 18px; border-radius: 6px; text-decoration: none; display: inline-block;">
@@ -869,12 +1037,13 @@ export function newSupportTicketEmail(params: {
     `Store: ${storeName ?? "— (public site visitor)"}`,
     "",
     stripHtmlForEmailText(messageHtml),
+    ...ticketAttachmentLineText(attachment),
     "",
     `View & reply: ${viewUrl}`,
   ].join("\n");
 
   return {
-    subject: `New support ticket: ${subject}`,
+    subject: ticketEmailSubject(ticketNumber, subject),
     html: wrapEmail(appName, "New support ticket", body),
     text,
   };
@@ -890,19 +1059,22 @@ export function newSupportTicketEmail(params: {
  */
 export function supportTicketReplyEmail(params: {
   appName: string;
+  ticketNumber: string;
   subject: string;
   recipientName: string;
   replierLabel: string;
   messageHtml: string;
   viewUrl: string;
+  attachment?: TicketMessageAttachment;
 }) {
-  const { appName, subject, recipientName, replierLabel, messageHtml, viewUrl } = params;
+  const { appName, ticketNumber, subject, recipientName, replierLabel, messageHtml, viewUrl, attachment } = params;
 
   const body = `
     <p style="margin-top: 0;">Hi ${recipientName},</p>
     <p>${replierLabel} replied on your support ticket <strong>${subject}</strong>.</p>
 
     ${ticketMessageBlock(messageHtml)}
+    ${ticketAttachmentLineHtml(attachment)}
 
     <p style="margin-top: 20px;">
       <a href="${viewUrl}" style="background: #111827; color: #ffffff; padding: 10px 18px; border-radius: 6px; text-decoration: none; display: inline-block;">
@@ -917,12 +1089,13 @@ export function supportTicketReplyEmail(params: {
     `${replierLabel} replied on your support ticket "${subject}":`,
     "",
     stripHtmlForEmailText(messageHtml),
+    ...ticketAttachmentLineText(attachment),
     "",
     `View & reply: ${viewUrl}`,
   ].join("\n");
 
   return {
-    subject: `Re: ${subject}`,
+    subject: ticketEmailSubject(ticketNumber, subject),
     html: wrapEmail(appName, "New reply on your support ticket", body),
     text,
   };

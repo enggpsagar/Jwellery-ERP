@@ -118,6 +118,9 @@ export default async function SupportTicketsPage({ searchParams }: SupportTicket
                   <TableRow key={ticket.id} className="cursor-pointer">
                     <TableCell className="font-medium">
                       <Link href={`/support-tickets/${ticket.id}`} className="hover:underline">
+                        <span className="mr-1.5 font-mono text-xs text-muted-foreground">
+                          {ticket.ticketNumber}
+                        </span>
                         {ticket.subject}
                       </Link>
                     </TableCell>

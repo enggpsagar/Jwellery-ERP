@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { UserRole, StoneOrigin } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
@@ -14,16 +14,17 @@ export type StoreMetalRow = {
   isActive: boolean;
   // isGemstone: false -> a Metals-section row. true -> a Stones-section row
   // (see TaxonomySettingsForm, which splits this same list by the flag).
-  // Origin options (Natural/Lab-Grown) live on the separate
-  // StoreMetalOrigin child table — see getStoreMetalOrigins below, mirroring
-  // how a StoreCategory's Types live on StoreCategoryType.
+  // Stone Type options (free text — Natural, Lab-Grown, Moissanite, or
+  // whatever else the store adds) live on the separate StoreMetalOrigin
+  // child table — see getStoreMetalOrigins below, mirroring how a
+  // StoreCategory's Types live on StoreCategoryType.
   isGemstone: boolean;
 };
 
 export type StoreMetalOriginRow = {
   id: string;
   storeMetalId: string;
-  origin: StoneOrigin;
+  name: string;
   isActive: boolean;
 };
 
@@ -258,12 +259,14 @@ export async function deleteStoreMetal(id: string): Promise<TaxonomyFormState> {
 }
 
 // ---------------------------------------------------------------------------
-// Store Metal Origins (cascading under a gemstone Stone)
+// Store Metal Origins (cascading under a gemstone Stone) — user-facing label
+// is "Stone Types". Free text, Store-Admin-managed, exactly like Store
+// Category Types below (was a fixed Natural/Lab-Grown enum until 2026-09 —
+// see StoreMetalOrigin's schema doc comment).
 // ---------------------------------------------------------------------------
 //
 // Mirrors the Store Category Types section below exactly: a Stone's own
-// list of Natural/Lab-Grown options, managed the same way a Category's
-// Types are.
+// list of Stone Type options, managed the same way a Category's Types are.
 
 export async function getStoreMetalOrigins(
   storeMetalId: string,
@@ -274,13 +277,13 @@ export async function getStoreMetalOrigins(
 
   const origins = await prisma.storeMetalOrigin.findMany({
     where: { storeMetalId, storeId },
-    orderBy: { origin: "asc" },
+    orderBy: { name: "asc" },
   });
 
   return origins.map((option) => ({
     id: option.id,
     storeMetalId: option.storeMetalId,
-    origin: option.origin,
+    name: option.name,
     isActive: option.isActive,
   }));
 }
@@ -301,15 +304,12 @@ export async function upsertStoreMetalOrigin(
   try {
     const id = String(formData.get("id") || "").trim();
     const storeMetalId = String(formData.get("storeMetalId") || "").trim();
-    const originRaw = String(formData.get("origin") || "").trim();
-    const origin =
-      originRaw === "NATURAL" || originRaw === "LAB_GROWN"
-        ? (originRaw as StoneOrigin)
-        : null;
+    const name = String(formData.get("name") || "").trim();
 
     const errors: Record<string, string[]> = {};
     if (!storeMetalId) errors.storeMetalId = ["Stone is required"];
-    if (!origin) errors.origin = ["Select Natural or Lab-Grown"];
+    if (!name) errors.name = ["Type name is required"];
+    else if (name.length > 60) errors.name = ["Type name must be 60 characters or fewer"];
 
     if (Object.keys(errors).length > 0) {
       return { success: false, message: "Please fix the form errors", errors };
@@ -331,16 +331,16 @@ export async function upsertStoreMetalOrigin(
     }
 
     const existing = await prisma.storeMetalOrigin.findFirst({
-      where: { storeMetalId, origin: origin!, NOT: id ? { id } : undefined },
+      where: { storeMetalId, name, NOT: id ? { id } : undefined },
       select: { id: true },
     });
 
     if (existing) {
       return {
         success: false,
-        message: "This origin already exists for this stone",
+        message: "A type with this name already exists for this stone",
         errors: {
-          origin: ["This origin already exists for this stone"],
+          name: ["A type with this name already exists for this stone"],
         },
       };
     }
@@ -348,15 +348,15 @@ export async function upsertStoreMetalOrigin(
     if (id) {
       const { count } = await prisma.storeMetalOrigin.updateMany({
         where: { id, storeId },
-        data: { origin: origin!, storeMetalId },
+        data: { name, storeMetalId },
       });
 
       if (count === 0) {
-        return { success: false, message: "Origin option not found" };
+        return { success: false, message: "Stone Type not found" };
       }
     } else {
       await prisma.storeMetalOrigin.create({
-        data: { storeId, storeMetalId, origin: origin! },
+        data: { storeId, storeMetalId, name },
       });
     }
 
@@ -364,20 +364,20 @@ export async function upsertStoreMetalOrigin(
 
     return {
       success: true,
-      message: id ? "Origin updated successfully" : "Origin added successfully",
+      message: id ? "Stone Type updated successfully" : "Stone Type added successfully",
     };
   } catch (error: any) {
     if (error?.code === "P2002") {
       return {
         success: false,
-        message: "This origin already exists for this stone",
+        message: "A type with this name already exists for this stone",
         errors: {
-          origin: ["This origin already exists for this stone"],
+          name: ["A type with this name already exists for this stone"],
         },
       };
     }
     console.error("upsertStoreMetalOrigin error:", error);
-    return { success: false, message: "Failed to save origin" };
+    return { success: false, message: "Failed to save Stone Type" };
   }
 }
 
@@ -403,18 +403,18 @@ export async function toggleStoreMetalOriginActive(
     });
 
     if (count === 0) {
-      return { success: false, message: "Origin option not found" };
+      return { success: false, message: "Stone Type not found" };
     }
 
     revalidatePath(TAXONOMY_PATH);
 
     return {
       success: true,
-      message: isActive ? "Origin activated" : "Origin deactivated",
+      message: isActive ? "Stone Type activated" : "Stone Type deactivated",
     };
   } catch (error) {
     console.error("toggleStoreMetalOriginActive error:", error);
-    return { success: false, message: "Failed to update origin" };
+    return { success: false, message: "Failed to update Stone Type" };
   }
 }
 
@@ -422,7 +422,7 @@ export async function deleteStoreMetalOrigin(id: string): Promise<TaxonomyFormSt
   try {
     await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
   } catch {
-    return { success: false, message: "Only a Store Admin or Super Admin can delete an origin option." };
+    return { success: false, message: "Only a Store Admin or Super Admin can delete a Stone Type." };
   }
 
   try {
@@ -433,22 +433,22 @@ export async function deleteStoreMetalOrigin(id: string): Promise<TaxonomyFormSt
       include: { _count: { select: { products: true } } },
     });
 
-    if (!option) return { success: false, message: "Origin option not found" };
+    if (!option) return { success: false, message: "Stone Type not found" };
 
     if (option._count.products > 0) {
       return {
         success: false,
-        message: `This origin is used by ${option._count.products} product(s) and cannot be deleted. Disable it instead.`,
+        message: `This Stone Type is used by ${option._count.products} product(s) and cannot be deleted. Disable it instead.`,
       };
     }
 
     await prisma.storeMetalOrigin.delete({ where: { id } });
     revalidatePath(TAXONOMY_PATH);
 
-    return { success: true, message: "Origin option deleted" };
+    return { success: true, message: "Stone Type deleted" };
   } catch (error) {
     console.error("deleteStoreMetalOrigin error:", error);
-    return { success: false, message: "Failed to delete origin option" };
+    return { success: false, message: "Failed to delete Stone Type" };
   }
 }
 

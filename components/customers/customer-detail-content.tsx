@@ -37,6 +37,12 @@ export function CustomerDetailContent({
 
   return (
     <div className="space-y-6">
+      {/* Ledger first — it's the primary reason this page gets opened day
+          to day (financial activity), not the contact-card details below
+          it. The customer's own identity is already established by this
+          page's own header, so it doesn't need to lead here too. */}
+      {ledger}
+
       <DetailSection
         title="Customer Information"
         description="Contact details and identifiers."
@@ -112,8 +118,6 @@ export function CustomerDetailContent({
           <DetailField label="Last Payment" value={customer.lastPaymentDate} />
         </DetailGrid>
       </DetailSection>
-
-      {ledger}
     </div>
   )
 }

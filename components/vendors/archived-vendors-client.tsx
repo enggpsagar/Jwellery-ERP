@@ -1,14 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import * as React from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
 import type { Vendor } from "@/lib/actions/vendor-actions"
-import { toTitleCase } from "@/lib/utils"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Input } from "@/components/ui/input"
-import { VendorsPagination } from "@/components/vendors/vendors-pagination"
-import { ArchivedVendorRestoreButton } from "@/components/vendors/archived-vendor-restore-button"
+import { VendorsTable } from "@/components/vendors/vendors-table"
+import { ArchivedVendorDetailPanel } from "@/components/vendors/archived-vendor-detail-panel"
 
 type ArchivedVendorsClientProps = {
   vendors: Vendor[]
@@ -22,6 +21,12 @@ type ArchivedVendorsClientProps = {
   }
 }
 
+/**
+ * Same master-detail layout as the active Vendors page (search/sort/
+ * paginated list on the left, full detail — including the ledger — on
+ * the right), matching the same treatment already given to Archived
+ * Customers and Disabled Artisans.
+ */
 export function ArchivedVendorsClient({
   vendors,
   pagination,
@@ -29,7 +34,19 @@ export function ArchivedVendorsClient({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get("search") ?? "")
+  const [search, setSearch] = React.useState(searchParams.get("search") ?? "")
+  const [selectedVendorIds, setSelectedVendorIds] = React.useState<string[]>([])
+  const [activeVendorId, setActiveVendorId] = React.useState<string | null>(
+    vendors[0]?.id ?? null,
+  )
+
+  React.useEffect(() => {
+    setSelectedVendorIds([])
+    setActiveVendorId((current) => {
+      if (current && vendors.some((vendor) => vendor.id === current)) return current
+      return vendors[0]?.id ?? null
+    })
+  }, [vendors])
 
   function updateSearch(value: string) {
     setSearch(value)
@@ -49,59 +66,27 @@ export function ArchivedVendorsClient({
         backLabel="Back to Vendors"
       />
 
-      <div className="max-w-sm">
-        <Input
-          placeholder="Search archived vendors..."
-          value={search}
-          onChange={(e) => updateSearch(e.target.value)}
-        />
-      </div>
-
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        {vendors.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            No archived vendors.
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
+        <div className="space-y-4">
+          <div className="max-w-sm">
+            <Input
+              placeholder="Search archived vendors..."
+              value={search}
+              onChange={(e) => updateSearch(e.target.value)}
+            />
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead className="bg-muted/40">
-                <tr className="text-left text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Vendor Name</th>
-                  <th className="px-4 py-3 font-medium">Phone</th>
-                  <th className="px-4 py-3 font-medium">City</th>
-                  <th className="px-4 py-3 font-medium">State</th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vendors.map((vendor) => (
-                  <tr key={vendor.id} className="border-t">
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      {toTitleCase(vendor.name)}
-                    </td>
-                    <td className="px-4 py-3 text-foreground">{vendor.phone || "-"}</td>
-                    <td className="px-4 py-3 text-foreground">{vendor.city || "-"}</td>
-                    <td className="px-4 py-3 text-foreground">{vendor.state || "-"}</td>
-                    <td className="px-4 py-3 text-right">
-                      <ArchivedVendorRestoreButton
-                        vendorId={vendor.id}
-                        vendorName={toTitleCase(vendor.name)}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
 
-        <VendorsPagination
-          page={pagination.page}
-          pageSize={pagination.pageSize}
-          totalCount={pagination.totalCount}
-          totalPages={pagination.totalPages}
-        />
+          <VendorsTable
+            vendors={vendors}
+            pagination={pagination}
+            selectedVendorIds={selectedVendorIds}
+            onSelectionChange={setSelectedVendorIds}
+            activeVendorId={activeVendorId}
+            onActivate={setActiveVendorId}
+          />
+        </div>
+
+        <ArchivedVendorDetailPanel vendorId={activeVendorId} />
       </div>
     </main>
   )

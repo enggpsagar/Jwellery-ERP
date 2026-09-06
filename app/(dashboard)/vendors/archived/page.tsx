@@ -12,6 +12,8 @@ type ArchivedVendorsPageProps = {
     page?: string
     pageSize?: string
     search?: string
+    sortBy?: "name" | "createdAt" | "openingBalance"
+    sortOrder?: "asc" | "desc"
   }>
 }
 
@@ -25,11 +27,15 @@ export default async function ArchivedVendorsPage({
   const page = Number(params.page || 1)
   const pageSize = Number(params.pageSize || 10)
   const search = params.search || ""
+  const sortBy = params.sortBy || "createdAt"
+  const sortOrder = params.sortOrder || "desc"
 
   const { vendors, pagination } = await getVendors({
     page,
     pageSize,
     search,
+    sortBy,
+    sortOrder,
     archived: true,
   })
 

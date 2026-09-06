@@ -1171,7 +1171,7 @@ export function InvoiceForm({
                     </Select>
                   </div>
                   {!item.netTouched && (
-                    <p className="text-[10px] leading-tight text-muted-foreground">Gross − stone − dust/other</p>
+                    <p className="text-[10px] leading-tight text-muted-foreground">Gross − stone</p>
                   )}
                 </div>
 
@@ -1333,52 +1333,6 @@ export function InvoiceForm({
                         </p>
                       </div>
                     )}
-
-                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">Dust/Making/Other Wt</Label>
-                      <div className="flex gap-1">
-                        <Input
-                          type="number"
-                          step="0.00001"
-                          className={isLinked ? "flex-1 bg-muted" : "flex-1"}
-                          value={
-                            item.dmoWeight === 0
-                              ? ""
-                              : toPrimaryUnit(
-                                  item.dmoWeight,
-                                  "GRAM",
-                                  item.dmoWeightUnit,
-                                  resolveGramsPerCarat(item.purity, caratConversionRates),
-                                )
-                          }
-                          readOnly={isLinked}
-                          onChange={(e) => {
-                            const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
-                            const dmoWeight = toPrimaryUnit(Number(e.target.value) || 0, item.dmoWeightUnit, "GRAM", gramsPerCarat)
-                            const derived = item.netTouched
-                              ? null
-                              : deriveNetWeight(item.grossWeight, item.stoneWeightInput, dmoWeight)
-                            updateItem(item.key, {
-                              dmoWeight,
-                              ...(derived !== null ? { netWeight: derived } : {}),
-                            })
-                          }}
-                        />
-                        <Select
-                          value={item.dmoWeightUnit}
-                          onValueChange={(unit) => updateItem(item.key, { dmoWeightUnit: unit as "GRAM" | "CARAT" })}
-                          disabled={isLinked}
-                        >
-                          <SelectTrigger className="w-16">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="GRAM">g</SelectItem>
-                            <SelectItem value="CARAT">ct</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
 
                     <MakingChargeInput
                       rate={item.rate}

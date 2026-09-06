@@ -137,31 +137,34 @@ export function StoresClient({
         )}
       </Card>
 
-      <DataTableToolbar
-        searchPlaceholder="Search by store name, code, or city..."
-        sortOptions={[
-          { value: "createdAt", label: "Sort by Created Date" },
-          { value: "name", label: "Sort by Name" },
-          { value: "code", label: "Sort by Code" },
-        ]}
-        defaultSortBy="createdAt"
-        selectedIds={selectedIds}
-        entityLabel="stores"
-        exportAction={exportStoresToExcel}
-        bulkActions={
-          <BulkArchiveButton
-            selectedIds={selectedIds}
-            itemLabelSingular="store"
-            itemLabelPlural="stores"
-            getDisplayName={(id) => stores.find((store) => store.id === id)?.name ?? id}
-            onArchive={bulkArchiveStores}
-            onDone={() => setSelectedIds([])}
-          />
-        }
-      />
-
+      {/* Toolbar lives inside the table's own column (not spanning the
+          detail panel too) — it filters/sorts/exports the table, so it
+          belongs with the table, not the whole page. */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
         <div className="space-y-3">
+          <DataTableToolbar
+            searchPlaceholder="Search by store name, code, or city..."
+            sortOptions={[
+              { value: "createdAt", label: "Sort by Created Date" },
+              { value: "name", label: "Sort by Name" },
+              { value: "code", label: "Sort by Code" },
+            ]}
+            defaultSortBy="createdAt"
+            selectedIds={selectedIds}
+            entityLabel="stores"
+            exportAction={exportStoresToExcel}
+            bulkActions={
+              <BulkArchiveButton
+                selectedIds={selectedIds}
+                itemLabelSingular="store"
+                itemLabelPlural="stores"
+                getDisplayName={(id) => stores.find((store) => store.id === id)?.name ?? id}
+                onArchive={bulkArchiveStores}
+                onDone={() => setSelectedIds([])}
+              />
+            }
+          />
+
           <StoreTable
             stores={stores}
             plans={plans}

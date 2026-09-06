@@ -69,30 +69,35 @@ export function VendorsClient({
         </div>
       </div>
 
-      <VendorsToolbar
-        selectedVendorIds={selectedVendorIds}
-        bulkActions={
-          <BulkDeleteButton
-            selectedIds={selectedVendorIds}
-            itemLabelSingular="vendor"
-            itemLabelPlural="vendors"
-            getDisplayName={(id) => vendors.find((vendor) => vendor.id === id)?.name ?? id}
-            onDelete={bulkDeleteVendors}
-            onDone={() => setSelectedVendorIds([])}
-          />
-        }
-      />
-
+      {/* Toolbar lives inside the table's own column (not spanning the
+          detail panel too) — it filters/sorts/exports the table, so it
+          belongs with the table, not the whole page. */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
-        <VendorsTable
-          vendors={vendors}
-          states={states}
-          pagination={pagination}
-          selectedVendorIds={selectedVendorIds}
-          onSelectionChange={setSelectedVendorIds}
-          activeVendorId={activeVendorId}
-          onActivate={setActiveVendorId}
-        />
+        <div className="space-y-4">
+          <VendorsToolbar
+            selectedVendorIds={selectedVendorIds}
+            bulkActions={
+              <BulkDeleteButton
+                selectedIds={selectedVendorIds}
+                itemLabelSingular="vendor"
+                itemLabelPlural="vendors"
+                getDisplayName={(id) => vendors.find((vendor) => vendor.id === id)?.name ?? id}
+                onDelete={bulkDeleteVendors}
+                onDone={() => setSelectedVendorIds([])}
+              />
+            }
+          />
+
+          <VendorsTable
+            vendors={vendors}
+            states={states}
+            pagination={pagination}
+            selectedVendorIds={selectedVendorIds}
+            onSelectionChange={setSelectedVendorIds}
+            activeVendorId={activeVendorId}
+            onActivate={setActiveVendorId}
+          />
+        </div>
 
         <VendorDetailPanel vendorId={activeVendorId} states={states} />
       </div>

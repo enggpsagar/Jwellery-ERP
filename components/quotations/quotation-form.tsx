@@ -29,6 +29,7 @@ import { LocationSelect } from "@/components/shared/location-select"
 import { PURITY_SELECT_OPTIONS, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 import { RequiredMark } from "@/components/shared/required-mark"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
+import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
 import { StockItemSelect } from "@/components/inventory/shared/stock-item-select"
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
@@ -145,8 +146,11 @@ type QuotationFormProps = {
   metals: StoreMetalRow[]
   origins: StoreMetalOriginRow[]
   caratConversionRates: Record<PurityType, number>
-  /** Store's default GST%, split into SGST+CGST (intra-state) or IGST
-   * (inter-state) via computeGst() — see lib/gst.ts. */
+  /** The store's configured GST rates (Settings > GST Rates) — see the
+   * same prop on InvoiceForm for the full explanation. */
+  gstRates: GstRateRow[]
+  /** Legacy last-resort fallback (BusinessSettings.defaultGstRate) — see
+   * the same prop on InvoiceForm. */
   defaultGstRate?: number
   /** Store's configured per-piece BIS hallmark charge (Settings > Hallmark
    * Charge) — auto-filled into a line's HM Charge the moment its Purity is
@@ -170,6 +174,7 @@ export function QuotationForm({
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
+  gstRates,
   defaultGstRate = 0,
   hallmarkChargePerPiece = 0,
   gstScheme,
@@ -193,9 +198,25 @@ export function QuotationForm({
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
-  // A Composition-scheme store can never charge GST — its rate starts (and
-  // stays) at 0 regardless of whatever Settings has saved as the default.
-  const [gstRate, setGstRate] = useState(gstScheme === "COMPOSITION" ? 0 : defaultGstRate)
+  // A Composition-scheme store can never charge GST — so no rate is
+  // selected at all regardless of the store's configured GST Rates.
+  const [gstRateId, setGstRateId] = useState<string>(() => {
+    if (gstScheme === "COMPOSITION") return ""
+    return (
+      gstRates.find((r) => r.isDefault && r.isActive)?.id ??
+      gstRates.find((r) => r.isActive)?.id ??
+      ""
+    )
+  })
+  const availableGstRates = useMemo(
+    () => gstRates.filter((r) => r.isActive || r.id === gstRateId),
+    [gstRates, gstRateId],
+  )
+  const selectedGstRate = gstRates.find((r) => r.id === gstRateId)
+  // The plain percent, still fed into computeGst() exactly as before — only
+  // where the number comes from changed.
+  const gstRate =
+    gstScheme === "COMPOSITION" ? 0 : (selectedGstRate?.ratePercent ?? defaultGstRate)
 
   const selectedCustomer = customers.find((customer) => customer.id === customerId)
 
@@ -473,6 +494,7 @@ export function QuotationForm({
       <input type="hidden" name="itemsJson" value={itemsJson} />
       <input type="hidden" name="discount" value={discount} />
       <input type="hidden" name="taxAmount" value={taxAmount} />
+      <input type="hidden" name="gstRateId" value={gstRateId} />
       <input type="hidden" name="sgstAmount" value={gstBreakdown.sgst} />
       <input type="hidden" name="cgstAmount" value={gstBreakdown.cgst} />
       <input type="hidden" name="igstAmount" value={gstBreakdown.igst} />
@@ -814,16 +836,25 @@ export function QuotationForm({
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <div className="flex items-center justify-between">
-            <Label>GST Rate %</Label>
+            <Label>GST Rate</Label>
             <GstSchemeBadge scheme={gstScheme} />
           </div>
-          <Input
-            type="number"
-            step="0.01"
-            value={gstRate === 0 ? "" : gstRate}
+          <Select
+            value={gstRateId || undefined}
             disabled={gstScheme === "COMPOSITION"}
-            onChange={(e) => setGstRate(Number(e.target.value) || 0)}
-          />
+            onValueChange={(value) => setGstRateId(value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select GST rate" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableGstRates.map((rate) => (
+                <SelectItem key={rate.id} value={rate.id}>
+                  {rate.name} ({rate.ratePercent}%)
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <p className="text-xs text-muted-foreground">
             {gstScheme === "COMPOSITION"
               ? "Not used — Composition Scheme never charges GST."

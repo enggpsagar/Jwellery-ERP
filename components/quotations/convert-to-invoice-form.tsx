@@ -15,6 +15,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 
 const initialState: QuotationFormState = { success: false, message: "" }
 
@@ -43,11 +51,19 @@ type QuotationSummary = {
 
 type ConvertToInvoiceFormProps = {
   quotation: QuotationSummary
+  /** The store's configured GST rates (Settings > GST Rates) — see the
+   * same prop on InvoiceForm for the full explanation. Picking one here
+   * recomputes Tax Amount from this quotation's own taxable base, same as
+   * the server-computed defaultTaxAmount fallback used to. */
+  gstRates: GstRateRow[]
+  /** Last-resort fallback (BusinessSettings.defaultGstRate) — only used to
+   * seed Tax Amount when the store somehow has zero GstRate rows. */
   defaultTaxAmount?: number
 }
 
 export function ConvertToInvoiceForm({
   quotation,
+  gstRates,
   defaultTaxAmount = 0,
 }: ConvertToInvoiceFormProps) {
   const router = useRouter()
@@ -59,9 +75,33 @@ export function ConvertToInvoiceForm({
     quotation.stoneCharges -
     quotation.discount
 
-  const [taxAmount, setTaxAmount] = useState(defaultTaxAmount)
+  const [gstRateId, setGstRateId] = useState<string>(
+    () =>
+      gstRates.find((r) => r.isDefault && r.isActive)?.id ??
+      gstRates.find((r) => r.isActive)?.id ??
+      "",
+  )
+  const activeGstRates = useMemo(() => gstRates.filter((r) => r.isActive), [gstRates])
+  const initialGstRate = gstRates.find((r) => r.id === gstRateId)
+  const initialTaxAmount = initialGstRate
+    ? Math.round(((subtotalBeforeTax * initialGstRate.ratePercent) / 100) * 100) / 100
+    : defaultTaxAmount
+
+  const [taxAmount, setTaxAmount] = useState(initialTaxAmount)
   const [paidAmount, setPaidAmount] = useState(0)
   const [notes, setNotes] = useState(quotation.notes ?? "")
+
+  // Picking a different GST Rate recomputes Tax Amount from this
+  // quotation's own taxable base — the user can still hand-edit the ₹
+  // figure afterward (e.g. a negotiated final tax), same as the old
+  // server-precomputed defaultTaxAmount only ever seeded the field once.
+  const handleGstRateChange = (id: string) => {
+    setGstRateId(id)
+    const rate = gstRates.find((r) => r.id === id)
+    if (rate) {
+      setTaxAmount(Math.round(((subtotalBeforeTax * rate.ratePercent) / 100) * 100) / 100)
+    }
+  }
 
   const totalAmount = useMemo(
     () => subtotalBeforeTax + taxAmount,
@@ -100,6 +140,7 @@ export function ConvertToInvoiceForm({
     >
       <input type="hidden" name="taxAmount" value={taxAmount} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
+      <input type="hidden" name="gstRateId" value={gstRateId} />
 
       <div className="rounded-xl border bg-card p-6 space-y-4">
         <h2 className="text-lg font-semibold">From Quotation {quotation.quotationNumber}</h2>
@@ -133,7 +174,23 @@ export function ConvertToInvoiceForm({
       <div className="rounded-xl border bg-card p-6 space-y-4">
         <h2 className="text-lg font-semibold">Invoice Details</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+            <Label>GST Rate</Label>
+            <Select value={gstRateId || undefined} onValueChange={handleGstRateChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select GST rate" />
+              </SelectTrigger>
+              <SelectContent>
+                {activeGstRates.map((rate) => (
+                  <SelectItem key={rate.id} value={rate.id}>
+                    {rate.name} ({rate.ratePercent}%)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Tax Amount</Label>
             <Input

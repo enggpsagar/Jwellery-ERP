@@ -34,6 +34,7 @@ import {
   getInvoiceFormStockItems,
 } from "@/lib/actions/invoice-actions";
 import { OversellError } from "@/lib/inventory/oversell-error";
+import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import {
   buildExcelExport,
   buildMultiSheetExcelExport,
@@ -780,6 +781,11 @@ export async function convertKachaToPakka(
     const taxAmount = toNumber(formData.get("taxAmount"));
     const dueDateRaw = String(formData.get("dueDate") || "");
     const notes = String(formData.get("notes") || "").trim() || kachaInvoice.notes;
+    const gstRateId = String(formData.get("gstRateId") || "").trim() || null;
+    // Re-resolved against the store's own current GstRate row rather than
+    // trusted from the client — see resolveGstRateSnapshot's own doc
+    // comment.
+    const gstRateSnapshot = await resolveGstRateSnapshot(storeId, gstRateId);
 
     const subtotal = Number(kachaInvoice.subtotal);
     const makingCharges = Number(kachaInvoice.makingCharges);
@@ -826,6 +832,9 @@ export async function convertKachaToPakka(
           // slip it came from had one, the same visibility gap this
           // session fixed on plain invoice/slip creation.
           locationId: kachaInvoice.locationId ?? undefined,
+          gstRateId: gstRateSnapshot?.gstRateId ?? undefined,
+          gstRateName: gstRateSnapshot?.gstRateName ?? undefined,
+          gstRatePercent: gstRateSnapshot?.gstRatePercent ?? undefined,
           items: {
             create: kachaInvoice.items.map((item) => ({
               itemName: item.itemName,

@@ -11,6 +11,7 @@ import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
+import { getGstRates } from "@/lib/actions/gst-rate-actions"
 import { resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 
 import { InvoiceForm, type LineItem } from "@/components/billing/invoice-form"
@@ -46,7 +47,7 @@ export default async function EditInvoicePage({ params }: Props) {
     redirect(`/billing/${id}`)
   }
 
-  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates] =
+  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates, gstRates] =
     await Promise.all([
       getInvoiceFormCustomers(),
       getInvoiceFormStockItems(id),
@@ -55,6 +56,7 @@ export default async function EditInvoicePage({ params }: Props) {
       getStoreMetals(),
       getAllStoreMetalOrigins(),
       getCaratConversionRateMap(),
+      getGstRates(),
     ])
 
   // Weight fields on a saved invoice item are persisted in that line's own
@@ -128,6 +130,8 @@ export default async function EditInvoicePage({ params }: Props) {
         metals={metals}
         origins={origins}
         caratConversionRates={caratConversionRates}
+        gstRates={gstRates}
+        initialGstRateId={invoice.gstRateId ?? undefined}
         defaultGstRate={businessSettings.defaultGstRate}
         hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
         gstScheme={businessSettings.gstScheme}

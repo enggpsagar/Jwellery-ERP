@@ -33,6 +33,7 @@ import { RequiredMark } from "@/components/shared/required-mark"
 import { PaidNowFields } from "@/components/shared/paid-now-fields"
 import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
+import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 
@@ -163,8 +164,11 @@ type PurchaseFormProps = {
   /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
    * Conversion Rules) — see the same prop on InvoiceForm. */
   caratConversionRates: Record<PurityType, number>
-  /** Store's default GST%, split into SGST+CGST (intra-state) or IGST
-   * (inter-state) via computeGst() — see lib/gst.ts. */
+  /** The store's configured GST rates (Settings > GST Rates) — see the
+   * same prop on InvoiceForm for the full explanation. */
+  gstRates: GstRateRow[]
+  /** Legacy last-resort fallback (BusinessSettings.defaultGstRate) — see
+   * the same prop on InvoiceForm. */
   defaultGstRate?: number
   /** Drives whether GST can be charged at all (never, for Composition) and
    * how it's split — see computeGst()'s own doc comment in lib/gst.ts. */
@@ -193,7 +197,7 @@ type PurchaseDraft = {
   vendorId: string
   items: LineItem[]
   discount: number
-  gstRate: number
+  gstRateId: string
   /** "Paid Now" payment-method rows — see paymentRows' own comment below
    * for why this is an array of rows rather than a single number. */
   paymentRows: PaymentMethodValue[]
@@ -211,6 +215,7 @@ export function PurchaseForm({
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
+  gstRates,
   defaultGstRate = 0,
   gstScheme,
   storeState,
@@ -245,9 +250,26 @@ export function PurchaseForm({
   const [locationId, setLocationId] = useState(initialLocationId ?? "")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
-  // A Composition-scheme store can never charge/record GST — its rate
-  // starts (and stays) at 0 regardless of whatever Settings has saved.
-  const [gstRate, setGstRate] = useState(gstScheme === "COMPOSITION" ? 0 : defaultGstRate)
+  const [gstRateId, setGstRateId] = useState<string>(
+    () =>
+      gstRates.find((r) => r.isDefault && r.isActive)?.id ??
+      gstRates.find((r) => r.isActive)?.id ??
+      "",
+  )
+  // GST Rate options: active rows, plus whatever's currently selected (a
+  // restored draft could reference one since deactivated).
+  const availableGstRates = useMemo(
+    () => gstRates.filter((r) => r.isActive || r.id === gstRateId),
+    [gstRates, gstRateId],
+  )
+  const selectedGstRate = gstRates.find((r) => r.id === gstRateId)
+  // The plain percent, still fed into computePurchaseGst() exactly as
+  // before — only where the number comes from changed. A purchase's GST
+  // depends on the vendor's own registration, not our store's scheme (see
+  // computePurchaseGst()'s doc comment), so — unlike Invoice — Composition
+  // doesn't zero this; the disabled state below is keyed on the vendor's
+  // gstType instead.
+  const gstRate = selectedGstRate?.ratePercent ?? defaultGstRate
   // "Paid Now" collects a method (Cash/UPI/etc.) per row, same PaymentMethodFields
   // component the "Record Payment" dialog uses — paidAmount is always derived
   // from these rows (never tracked separately), so it can't go stale relative
@@ -287,7 +309,7 @@ export function PurchaseForm({
       vendorId,
       items,
       discount,
-      gstRate,
+      gstRateId,
       paymentRows,
       purchaseDate: formData ? String(formData.get("purchaseDate") ?? "") : "",
       notes: formData ? String(formData.get("notes") ?? "") : "",
@@ -336,7 +358,7 @@ export function PurchaseForm({
     if (draft) {
       setVendorId(newVendorId || draft.vendorId || "")
       setDiscount(draft.discount ?? 0)
-      setGstRate(draft.gstRate ?? 0)
+      setGstRateId(draft.gstRateId ?? "")
       setPaymentRows(draft.paymentRows ?? [])
 
       let nextItems =
@@ -717,6 +739,7 @@ export function PurchaseForm({
       <input type="hidden" name="sgstAmount" value={gstBreakdown.sgst} />
       <input type="hidden" name="cgstAmount" value={gstBreakdown.cgst} />
       <input type="hidden" name="igstAmount" value={gstBreakdown.igst} />
+      <input type="hidden" name="gstRateId" value={gstRateId} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
       <input type="hidden" name="paymentsJson" value={paymentsJson} />
 
@@ -1157,7 +1180,7 @@ export function PurchaseForm({
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <div className="flex items-center justify-between">
-            <Label>GST Rate %</Label>
+            <Label>GST Rate</Label>
             <GstSchemeBadge scheme={gstScheme} />
           </div>
           {selectedVendor ? (
@@ -1165,15 +1188,24 @@ export function PurchaseForm({
               Vendor GST Type: <span className="font-medium">{partyGstTypeLabel(selectedVendor.gstType)}</span>
             </p>
           ) : null}
-          <Input
-            type="number"
-            step="0.01"
-            value={gstRate === 0 ? "" : gstRate}
+          <Select
+            value={gstRateId || undefined}
             // A purchase's GST depends on the VENDOR's own registration, not
             // our store's scheme — see computePurchaseGst()'s doc comment.
             disabled={!selectedVendor || !isVendorGstApplicable(selectedVendor.gstType)}
-            onChange={(e) => setGstRate(Number(e.target.value) || 0)}
-          />
+            onValueChange={(value) => setGstRateId(value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select GST rate" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableGstRates.map((rate) => (
+                <SelectItem key={rate.id} value={rate.id}>
+                  {rate.name} ({rate.ratePercent}%)
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <p className="text-xs text-muted-foreground">
             {!selectedVendor
               ? "Select a vendor first."

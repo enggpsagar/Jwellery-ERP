@@ -20,6 +20,7 @@ import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope } from "@/lib/store-context";
 import { isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst";
+import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import {
   getLocationScope,
   locationWhere,
@@ -541,6 +542,7 @@ export async function createPurchase(
     const sgstAmount = toNumber(formData.get("sgstAmount"));
     const cgstAmount = toNumber(formData.get("cgstAmount"));
     const igstAmount = toNumber(formData.get("igstAmount"));
+    const gstRateId = String(formData.get("gstRateId") || "").trim() || null;
 
     // paymentsJson (1-2 method rows, or none for a fully-on-credit purchase)
     // is what purchase-form.tsx's "Paid Now" section sends. See
@@ -577,6 +579,13 @@ export async function createPurchase(
     else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
 
     const storeId = await requireStoreScope();
+
+    // Re-resolved against the store's own current GstRate row rather than
+    // trusted from the client — see resolveGstRateSnapshot's own doc
+    // comment. A missing/invalid id (e.g. an unregistered vendor, whose GST
+    // Rate picker is disabled and never selects one) just leaves the
+    // snapshot null instead of failing the save.
+    const gstRateSnapshot = await resolveGstRateSnapshot(storeId, gstRateId);
 
     const vendor = await prisma.vendor.findFirst({
       where: { id: vendorId, storeId },
@@ -698,6 +707,9 @@ export async function createPurchase(
           balanceAmount,
           notes,
           vendorInvoiceNumber,
+          gstRateId: gstRateSnapshot?.gstRateId ?? undefined,
+          gstRateName: gstRateSnapshot?.gstRateName ?? undefined,
+          gstRatePercent: gstRateSnapshot?.gstRatePercent ?? undefined,
           locationId: resolvedLocationId ?? undefined,
           createdById: actor.id ?? undefined,
           createdByName: actor.name ?? actor.email ?? undefined,

@@ -28,6 +28,7 @@ import {
 import { sendMail } from "@/lib/mailer";
 import { invoiceEmail } from "@/lib/email-templates";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
+import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import { getReturnEligibility } from "@/lib/return-window";
 import { amountInWords } from "@/lib/number-to-words";
 import { resolveStoreName } from "@/lib/invite-email";
@@ -248,6 +249,9 @@ function mapInvoice(invoice: any) {
     notes: invoice.notes,
     locationId: invoice.locationId ?? null,
     locationName: invoice.location?.name ?? null,
+    gstRateId: invoice.gstRateId ?? null,
+    gstRateName: invoice.gstRateName ?? null,
+    gstRatePercent: invoice.gstRatePercent != null ? Number(invoice.gstRatePercent) : null,
     ewayBillNumber: invoice.ewayBillNumber ?? null,
     ewayBillDate: invoice.ewayBillDate?.toISOString() ?? null,
     transporterName: invoice.transporterName ?? null,
@@ -780,6 +784,7 @@ export async function createInvoice(
     const notes = String(formData.get("notes") || "").trim() || null;
     const locationId = String(formData.get("locationId") || "").trim() || null;
     const replacesId = String(formData.get("replacesId") || "").trim() || null;
+    const gstRateId = String(formData.get("gstRateId") || "").trim() || null;
 
     const subtotal = items.reduce(
       (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
@@ -827,6 +832,13 @@ export async function createInvoice(
     const storeId = await resolveActingStoreId(
       String(formData.get("storeId") || "") || null,
     );
+
+    // Re-resolved against the store's own current GstRate row rather than
+    // trusted from the client — see resolveGstRateSnapshot's own doc
+    // comment. A missing/invalid id (e.g. a Composition-scheme document,
+    // which never selects a rate) just leaves the snapshot null instead of
+    // failing the save.
+    const gstRateSnapshot = await resolveGstRateSnapshot(storeId, gstRateId);
 
     // Authorization lives here, not only in middleware: a server action is a
     // POST endpoint that can be invoked from any page the caller is allowed
@@ -963,6 +975,9 @@ export async function createInvoice(
           balanceAmount,
           notes,
           locationId: resolvedLocationId ?? undefined,
+          gstRateId: gstRateSnapshot?.gstRateId ?? undefined,
+          gstRateName: gstRateSnapshot?.gstRateName ?? undefined,
+          gstRatePercent: gstRateSnapshot?.gstRatePercent ?? undefined,
           // Recorded at the moment of sale, name included, so the invoice
           // still says who raised it after that person leaves the shop.
           createdById: actor.id ?? null,
@@ -1354,6 +1369,10 @@ export async function updateInvoice(
     }
 
     const manualDiscount = toNumber(formData.get("discount"));
+    const gstRateId = String(formData.get("gstRateId") || "").trim() || null;
+    // Re-resolved against the store's own current GstRate row rather than
+    // trusted from the client — same reasoning as createInvoice.
+    const gstRateSnapshot = await resolveGstRateSnapshot(storeId, gstRateId);
 
     const subtotal = items.reduce(
       (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
@@ -1462,6 +1481,9 @@ export async function updateInvoice(
           dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
           notes,
           locationId: resolvedLocationId ?? null,
+          gstRateId: gstRateSnapshot?.gstRateId ?? null,
+          gstRateName: gstRateSnapshot?.gstRateName ?? null,
+          gstRatePercent: gstRateSnapshot?.gstRatePercent ?? null,
           items: {
             deleteMany: {},
             create: items.map((item) => ({

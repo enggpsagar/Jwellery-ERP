@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope } from "@/lib/store-context";
+import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import {
   getLocationScope,
   locationWhere,
@@ -436,6 +437,7 @@ export async function createQuotation(
     const sgstAmount = toNumber(formData.get("sgstAmount"));
     const cgstAmount = toNumber(formData.get("cgstAmount"));
     const igstAmount = toNumber(formData.get("igstAmount"));
+    const gstRateId = String(formData.get("gstRateId") || "").trim() || null;
     const quotationDateRaw = String(formData.get("quotationDate") || "");
     const validUntilRaw = String(formData.get("validUntil") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
@@ -454,6 +456,13 @@ export async function createQuotation(
     const totalAmount = subtotal + makingCharges + stoneCharges - discount + taxAmount;
 
     const storeId = await requireStoreScope();
+
+    // Re-resolved against the store's own current GstRate row rather than
+    // trusted from the client — see resolveGstRateSnapshot's own doc
+    // comment. A missing/invalid id (e.g. a Composition-scheme document,
+    // which never selects a rate) just leaves the snapshot null instead of
+    // failing the save.
+    const gstRateSnapshot = await resolveGstRateSnapshot(storeId, gstRateId);
 
     const customer = await prisma.customer.findFirst({
       where: { id: customerId, storeId },
@@ -527,6 +536,9 @@ export async function createQuotation(
         totalAmount,
         notes,
         locationId: resolvedLocationId ?? undefined,
+        gstRateId: gstRateSnapshot?.gstRateId ?? undefined,
+        gstRateName: gstRateSnapshot?.gstRateName ?? undefined,
+        gstRatePercent: gstRateSnapshot?.gstRatePercent ?? undefined,
         items: {
           create: items.map((item) => ({
             itemName: item.itemName,
@@ -651,6 +663,11 @@ export async function convertQuotationToInvoice(
     const paidAmount = toNumber(formData.get("paidAmount"));
     const dueDateRaw = String(formData.get("dueDate") || "");
     const notes = String(formData.get("notes") || "").trim() || quotation.notes;
+    const gstRateId = String(formData.get("gstRateId") || "").trim() || null;
+    // Re-resolved against the store's own current GstRate row rather than
+    // trusted from the client — see resolveGstRateSnapshot's own doc
+    // comment.
+    const gstRateSnapshot = await resolveGstRateSnapshot(storeId, gstRateId);
 
     // A Composition-scheme store is legally barred from charging any GST at
     // all — this form re-asks for a fresh tax amount rather than reusing
@@ -700,6 +717,9 @@ export async function convertQuotationToInvoice(
           balanceAmount,
           notes,
           locationId: quotation.locationId ?? undefined,
+          gstRateId: gstRateSnapshot?.gstRateId ?? undefined,
+          gstRateName: gstRateSnapshot?.gstRateName ?? undefined,
+          gstRatePercent: gstRateSnapshot?.gstRatePercent ?? undefined,
           // Recorded the same way a direct invoice does, so a quotation-born
           // sale attributes to whoever converted it instead of falling into
           // the Sales-by-User report's "Not recorded" bucket.

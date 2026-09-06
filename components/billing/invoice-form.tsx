@@ -33,6 +33,7 @@ import type { PaymentMethodValue } from "@/components/shared/payment-method-fiel
 import { PURITY_SELECT_OPTIONS, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
+import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
 import { StockItemSelect } from "@/components/inventory/shared/stock-item-select"
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
@@ -182,10 +183,19 @@ type InvoiceFormProps = {
    * Conversion Rules), resolved via resolveGramsPerCarat() wherever a
    * Carat Weight is converted to/from grams on this form. */
   caratConversionRates: Record<PurityType, number>
-  /** Store's default GST%, split into SGST+CGST (intra-state) or IGST
-   * (inter-state) per line via computeGst() — see lib/gst.ts. Editable here
-   * per invoice — a store on an exempt sale, or one that changes its rate
-   * mid-year, isn't stuck with whatever Settings says today. */
+  /** The store's configured GST rates (Settings > GST Rates) — picked from
+   * a dropdown per invoice, split into SGST+CGST (intra-state) or IGST
+   * (inter-state) via computeGst() — see lib/gst.ts. Includes inactive rows
+   * too (filtered to active-or-currently-selected in this component) so an
+   * invoice already using a since-deactivated rate can still show it. */
+  gstRates: GstRateRow[]
+  /** The rate this invoice already used (edit/replace) — preselects it even
+   * if it's no longer the store's default, or has since been deactivated. */
+  initialGstRateId?: string
+  /** Legacy last-resort fallback (BusinessSettings.defaultGstRate) — only
+   * used when the store somehow has zero GstRate rows at all, which
+   * shouldn't happen given every store is seeded with one, but this avoids
+   * a hard crash if it ever does. */
   defaultGstRate?: number
   /** Store's configured per-piece BIS hallmark charge (Settings > Hallmark
    * Charge) — auto-filled into a line's HM Charge the moment its Purity is
@@ -228,6 +238,8 @@ export function InvoiceForm({
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
+  gstRates,
+  initialGstRateId,
   defaultGstRate = 0,
   hallmarkChargePerPiece = 0,
   gstScheme,
@@ -252,9 +264,33 @@ export function InvoiceForm({
   )
   const [discount, setDiscount] = useState(0)
   // A Composition-scheme store can never charge GST — see GstScheme's doc
-  // comment in schema.prisma — so its rate starts (and stays) at 0
-  // regardless of whatever Settings has saved as the store's default.
-  const [gstRate, setGstRate] = useState(gstScheme === "COMPOSITION" ? 0 : defaultGstRate)
+  // comment in schema.prisma — so no rate is selected at all regardless of
+  // the store's configured GST Rates or default.
+  const [gstRateId, setGstRateId] = useState<string>(() => {
+    if (gstScheme === "COMPOSITION") return ""
+    if (initialGstRateId && gstRates.some((r) => r.id === initialGstRateId)) {
+      return initialGstRateId
+    }
+    return (
+      gstRates.find((r) => r.isDefault && r.isActive)?.id ??
+      gstRates.find((r) => r.isActive)?.id ??
+      ""
+    )
+  })
+  // GST Rate options: active rows, plus this invoice's already-selected rate
+  // even if it's since been deactivated (edit/replace) — see gstRates' own
+  // doc comment above.
+  const availableGstRates = useMemo(
+    () => gstRates.filter((r) => r.isActive || r.id === gstRateId),
+    [gstRates, gstRateId],
+  )
+  const selectedGstRate = gstRates.find((r) => r.id === gstRateId)
+  // The plain percent, still fed into computeGst() exactly as before — only
+  // where the number comes from changed, not the tax math itself. Falls
+  // back to the store's legacy BusinessSettings.defaultGstRate only if
+  // somehow no GstRate could be resolved (e.g. a store with zero rows).
+  const gstRate =
+    gstScheme === "COMPOSITION" ? 0 : (selectedGstRate?.ratePercent ?? defaultGstRate)
   // Full line-item edit (editInvoiceId set) still shows a bare "Paid Now"
   // number for the same reason it always has — updateInvoice never reads
   // paidAmount off the form at all (it recomputes from the invoice's own
@@ -811,6 +847,7 @@ export function InvoiceForm({
       <input type="hidden" name="itemsJson" value={itemsJson} />
       <input type="hidden" name="discount" value={discount} />
       <input type="hidden" name="taxAmount" value={taxAmount} />
+      <input type="hidden" name="gstRateId" value={gstRateId} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
       <input type="hidden" name="paymentsJson" value={paymentsJson} />
       {replacesId && <input type="hidden" name="replacesId" value={replacesId} />}
@@ -1421,16 +1458,25 @@ export function InvoiceForm({
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <div className="flex items-center justify-between">
-            <Label>GST Rate %</Label>
+            <Label>GST Rate</Label>
             <GstSchemeBadge scheme={gstScheme} />
           </div>
-          <Input
-            type="number"
-            step="0.01"
-            value={gstRate === 0 ? "" : gstRate}
+          <Select
+            value={gstRateId || undefined}
             disabled={gstScheme === "COMPOSITION"}
-            onChange={(e) => setGstRate(Number(e.target.value) || 0)}
-          />
+            onValueChange={(value) => setGstRateId(value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select GST rate" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableGstRates.map((rate) => (
+                <SelectItem key={rate.id} value={rate.id}>
+                  {rate.name} ({rate.ratePercent}%)
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <p className="text-xs text-muted-foreground">
             {gstScheme === "COMPOSITION"
               ? "Not used — Composition Scheme never charges GST."

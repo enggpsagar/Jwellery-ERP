@@ -85,7 +85,7 @@ function daysAgo(dateISO: string) {
   return Math.floor((now - then) / (1000 * 60 * 60 * 24))
 }
 
-const PAGE_SIZE = 20
+const pageSizeOptions = [10, 20, 50, 100]
 
 const dateRanges = [
   { value: "7d", label: "Last 7 days" },
@@ -124,6 +124,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
   const [selected, setSelected] = useState<LedgerEntryRow | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
 
   const accounts = useMemo(
     () => Array.from(new Set(entries.map((e) => e.account).filter((a) => a !== "—"))).sort(),
@@ -156,16 +157,16 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
 
   useEffect(() => {
     setPage(1)
-  }, [account, txnType, dateRange, search])
+  }, [account, txnType, dateRange, search, pageSize])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, totalPages)
   const paginated = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
   )
-  const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length)
+  const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1
+  const rangeEnd = Math.min(currentPage * pageSize, filtered.length)
 
   function clearFilters() {
     setAccount("all")
@@ -237,7 +238,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {summaryCards.map((card) => (
           <Card
             key={card.label}
@@ -299,7 +300,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
                 Money movement across all customer and karigar accounts.
               </CardDescription>
             </div>
-            <ExportMenu href="/ledger/export?scope=entries" label="Export" />
+            <ExportMenu href="/ledger/export?scope=entries" label="Export" iconOnly />
           </div>
 
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -500,7 +501,28 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
               <span className="font-medium text-foreground">{filtered.length}</span> entries
             </p>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Show per page</span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(v) => setPageSize(Number(v))}
+                >
+                  <SelectTrigger className="h-8 w-[80px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {pageSizeOptions.map((size) => (
+                        <SelectItem key={size} value={String(size)}>
+                          {size}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <Button
                 variant="outline"
                 size="sm"

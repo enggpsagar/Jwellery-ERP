@@ -775,7 +775,7 @@ export function PurchaseForm({
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <Label>Location</Label>
+          <Label>Store Location</Label>
           <LocationSelect
             locations={locations}
             name="locationId"

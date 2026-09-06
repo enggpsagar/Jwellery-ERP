@@ -86,6 +86,7 @@ model Store {
   creditNotes          CreditNote[]
   reminders            Reminder[]
   gstRates             GstRate[]
+  draftOrders          DraftOrder[]
 
   @@index([code])
 }
@@ -171,6 +172,7 @@ model StoreLocation {
   userAccess       UserLocationAccess[]
   creditNotes      CreditNote[]
   reminders        Reminder[]
+  draftOrders      DraftOrder[]
 
   @@unique([storeId, name])
 }
@@ -284,6 +286,7 @@ model StoreMetal {
   // StoreMetalOrigin's own doc comment). See Product.stoneOriginOptionId for
   // how a product picks exactly one.
   origins             StoreMetalOrigin[]
+  draftOrderItems     DraftOrderItem[]
 
   @@unique([storeId, name])
 }
@@ -392,6 +395,7 @@ model Customer {
   ledgerEntries  LedgerEntry[]
   quotations     Quotation[]
   creditNotes    CreditNote[]
+  draftOrders    DraftOrder[]
 
   @@unique([storeId, customerCode])
   @@unique([storeId, phone])
@@ -1072,6 +1076,10 @@ model KarigarJob {
   metalType         StoreMetal?          @relation(fields: [metalTypeId], references: [id])
   locationId        String?
   location          StoreLocation?       @relation(fields: [locationId], references: [id])
+  // Back-relation for DraftOrder.karigarJobId — the FK lives on DraftOrder
+  // (a job is issued to fulfil at most one Draft Order in this pass; see
+  // DraftOrder's own doc comment).
+  draftOrder        DraftOrder?
 
   @@unique([storeId, jobNumber])
   @@index([inventoryStockId])
@@ -1346,10 +1354,80 @@ model KarigarReceiptItem {
   product          Product?        @relation(fields: [productId], references: [id])
   inventoryStock   InventoryStock? @relation(fields: [inventoryStockId], references: [id])
   metalType        StoreMetal?     @relation(fields: [metalTypeId], references: [id])
+  // Back-relation for DraftOrderItem.karigarReceiptItemId — the FK lives on
+  // DraftOrderItem, set once this specific receipt fulfils an order's item.
+  draftOrderItem   DraftOrderItem?
 
   @@index([karigarJobId])
   @@index([productId])
   @@index([inventoryStockId])
+}
+
+// A phone/counter order captured before the physical piece exists — staff
+// record the customer + what they want (DraftOrderItem, below), send it to
+// a Karigar for manufacturing (sets karigarJobId), and once every item is
+// matched to what the Karigar actually returned, this flips to RECEIVED.
+// Deliberately one Draft Order <-> at most one KarigarJob (karigarJobId is
+// unique): pooling several orders' metal into one job, or splitting one
+// order across multiple jobs, is out of scope for this pass.
+model DraftOrder {
+  id            String           @id @default(cuid())
+  storeId       String
+  orderNumber   String
+  customerId    String
+  orderDate     DateTime         @default(now())
+  expectedDate  DateTime?
+  // DRAFT (just created) -> SENT_TO_KARIGAR (job created) -> RECEIVED
+  // (every item matched to a KarigarReceiptItem) -> CANCELLED (only ever
+  // reachable from DRAFT). Plain String, same convention as
+  // KarigarJob.status/Quotation.status.
+  status        String           @default("DRAFT")
+  karigarJobId  String?          @unique
+  locationId    String?
+  notes         String?
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  store      Store            @relation(fields: [storeId], references: [id])
+  customer   Customer         @relation(fields: [customerId], references: [id])
+  karigarJob KarigarJob?      @relation(fields: [karigarJobId], references: [id])
+  location   StoreLocation?   @relation(fields: [locationId], references: [id])
+  items      DraftOrderItem[]
+
+  @@unique([storeId, orderNumber])
+  @@index([storeId, status])
+  @@index([customerId])
+}
+
+// One requested piece on a DraftOrder. estimatedWeight/estimatedRate are the
+// staff's rough figures at order time, not what's actually produced — the
+// real weight/rate lands on the linked KarigarReceiptItem/InventoryStock
+// once received (see karigarReceiptItemId below).
+model DraftOrderItem {
+  id                   String      @id @default(cuid())
+  draftOrderId         String
+  itemName             String
+  metalTypeId          String?
+  purity               PurityType?
+  quantity             Int         @default(1)
+  estimatedWeight      Decimal?    @db.Decimal(12, 5)
+  estimatedRate        Decimal?    @db.Decimal(12, 2)
+  designNotes          String?
+  // Set once this specific piece is received — the single source of truth
+  // for "has this item been fulfilled," and how its Product/InventoryStock
+  // are looked up (via karigarReceiptItem.productId/inventoryStockId)
+  // rather than duplicating those FKs here.
+  karigarReceiptItemId String?     @unique
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  draftOrder         DraftOrder          @relation(fields: [draftOrderId], references: [id], onDelete: Cascade)
+  metalType          StoreMetal?         @relation(fields: [metalTypeId], references: [id])
+  karigarReceiptItem KarigarReceiptItem? @relation(fields: [karigarReceiptItemId], references: [id])
+
+  @@index([draftOrderId])
 }
 
 model Quotation {

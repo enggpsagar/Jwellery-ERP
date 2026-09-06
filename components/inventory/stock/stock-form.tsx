@@ -956,7 +956,7 @@ export function StockForm({
           </div>
 
           <div>
-            <Label>Location</Label>
+            <Label>Store Location</Label>
 
             <LocationSelect
               locations={locations}

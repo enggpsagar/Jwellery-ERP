@@ -24,13 +24,21 @@ export function ProductDetailContent({ product }: { product: Product }) {
   const grossWeight = formatWeight(product.defaultGrossWeight)
   const stoneWeight = formatWeight(product.defaultStoneWeight)
   const netWeight = formatWeight(product.defaultNetWeight)
+  const caratWeight = formatCarat(product.defaultCaratWeight)
+  const stoneRate = formatCharge(product.defaultStoneRate, "FIXED")
 
-  const hasMetalDetails =
-    Boolean(product.metalType?.name) ||
-    Boolean(product.defaultPurity) ||
-    Boolean(product.metalType?.isGemstone)
+  const hasMetalDetails = Boolean(product.metalType?.name) || Boolean(product.defaultPurity)
   const hasCharges = Boolean(makingCharge) || Boolean(stoneCharge)
   const hasWeights = Boolean(grossWeight) || Boolean(stoneWeight) || Boolean(netWeight)
+  // A piece carries stone info either as a stand-alone gemstone product
+  // (stoneOriginOptionId, only meaningful when the metal itself is a
+  // gemstone) or as a composite metal+stone piece (hasStoneComponent) — the
+  // Weights section already shows Stone Weight either way, but this is
+  // where the rest of that stone's own description lives.
+  const hasStoneDetails =
+    Boolean(stoneWeight) ||
+    product.hasStoneComponent ||
+    Boolean(product.stoneOriginOption?.name)
   const hasAdditionalInfo = Boolean(product.description) || Boolean(product.notes)
 
   return (
@@ -57,16 +65,6 @@ export function ProductDetailContent({ product }: { product: Product }) {
             label="Default Purity"
             value={product.defaultPurity?.replaceAll("_", " ")}
           />
-          {product.metalType?.isGemstone ? (
-            <Field
-              label="Stone Type"
-              value={
-                <Badge variant="secondary">
-                  {product.stoneOriginOption?.name ?? "Not set"}
-                </Badge>
-              }
-            />
-          ) : null}
         </Section>
       ) : null}
 
@@ -102,6 +100,29 @@ export function ProductDetailContent({ product }: { product: Product }) {
           <Field label="Gross Weight" value={grossWeight} />
           <Field label="Stone Weight" value={stoneWeight} />
           <Field label="Net Weight" value={netWeight} />
+        </Section>
+      ) : null}
+
+      {hasStoneDetails ? (
+        <Section title="Stone Details">
+          <Field label="Carat Weight" value={caratWeight} />
+          {product.metalType?.isGemstone ? (
+            <Field
+              label="Stone Type"
+              value={
+                <Badge variant="secondary">
+                  {product.stoneOriginOption?.name ?? "Not set"}
+                </Badge>
+              }
+            />
+          ) : null}
+          {product.hasStoneComponent ? (
+            <>
+              <Field label="Embedded Stone" value={product.defaultStoneMetalTypeName} />
+              <Field label="Embedded Stone Type" value={product.defaultStoneTypeNames} />
+              <Field label="Stone Rate (per ct)" value={stoneRate} />
+            </>
+          ) : null}
         </Section>
       ) : null}
 
@@ -197,4 +218,9 @@ function formatCharge(
 function formatWeight(value: unknown) {
   if (value === null || value === undefined || value === "") return null
   return `${Number(value).toFixed(3)} g`
+}
+
+function formatCarat(value: unknown) {
+  if (value === null || value === undefined || value === "") return null
+  return `${Number(value).toFixed(3)} ct`
 }

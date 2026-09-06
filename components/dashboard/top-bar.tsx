@@ -124,7 +124,13 @@ export function TopBar({
 
         {canAccessPurchases && (
           <Link href="/purchases/new">
-            <Button size="sm" variant="outline">
+            <Button
+              size="sm"
+              // Blue (chart-1) — distinct from New Invoice's gold so the two
+              // don't compete for the same "primary action" read, but still
+              // one of this app's own chart hues rather than an ad-hoc color.
+              className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
+            >
               <Plus className="h-4 w-4 sm:mr-1" />
               <span className="hidden sm:inline">Add Purchase</span>
             </Button>

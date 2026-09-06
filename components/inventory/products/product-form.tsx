@@ -55,6 +55,7 @@ export type StoreMetalOption = {
   isActive: boolean;
   isGemstone: boolean;
   primaryUnit: "GRAM" | "CARAT";
+  sellingPrice: number | null;
 };
 
 export type StoreCategoryOption = {

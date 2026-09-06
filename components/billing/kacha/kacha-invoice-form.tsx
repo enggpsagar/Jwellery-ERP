@@ -165,6 +165,7 @@ export function KachaInvoiceForm({
 }: KachaInvoiceFormProps) {
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
+  const metalById = useMemo(() => new Map(metals.map((m) => [m.id, m])), [metals])
   const router = useRouter()
   const toast = useToast()
 
@@ -246,7 +247,7 @@ export function KachaInvoiceForm({
       purity: stock.purity ?? "",
       grossWeight: stock.grossWeight ?? 0,
       netWeight: stock.netWeight ?? 0,
-      rate: stock.saleRate ?? 0,
+      rate: stock.saleRate ?? metalById.get(stock.metalType?.id ?? "")?.sellingPrice ?? 0,
       quantity: available > 0 ? 1 : 0,
       caratWeight: stock.caratWeight ?? 0,
       stoneRate: stock.stoneRate ?? 0,

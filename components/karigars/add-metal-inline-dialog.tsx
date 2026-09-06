@@ -27,6 +27,7 @@ type NewMetal = {
   isActive: boolean
   isGemstone: boolean
   primaryUnit: "GRAM" | "CARAT"
+  sellingPrice: number | null
 }
 
 /**
@@ -58,6 +59,9 @@ export function AddMetalInlineDialog({ onCreated }: { onCreated: (metal: NewMeta
         // Matches upsertStoreMetal's own default when this dialog doesn't
         // send a primaryUnit field at all.
         primaryUnit: isGemstone ? "CARAT" : "GRAM",
+        // This dialog doesn't ask for a Selling Price — that's set later,
+        // per metal, in Settings > Taxonomy.
+        sellingPrice: null,
       })
       toast.success(state.message || "Added")
       setOpen(false)

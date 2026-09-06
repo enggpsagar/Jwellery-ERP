@@ -76,14 +76,14 @@ const MODULES = [
   },
   {
     icon: Hammer,
-    title: "Karigar Job Tracking",
+    title: "Artisan Job Tracking",
     body: "Issue material to a goldsmith, track the job, and receive finished pieces back. Wastage folds into the fine weight credited, so a job's closing balance actually reconciles.",
     tint: "var(--chart-1)",
   },
   {
     icon: CircleDollarSign,
     title: "Ledger",
-    body: "Every movement across customers, vendors and karigars in one place, plus a metal-wise view showing what was bought and sold each day with a running closing balance.",
+    body: "Every movement across customers, vendors and artisans in one place, plus a metal-wise view showing what was bought and sold each day with a running closing balance.",
     tint: "var(--chart-3)",
   },
   {
@@ -128,7 +128,7 @@ const JEWELLERY_SPECIFICS = [
   {
     icon: ShieldCheck,
     title: "Wastage that reconciles",
-    body: "Each item's wastage percentage folds into the fine weight credited back from a karigar, so a job closes against what was issued instead of reading as unexplained missing metal.",
+    body: "Each item's wastage percentage folds into the fine weight credited back from an artisan, so a job closes against what was issued instead of reading as unexplained missing metal.",
   },
   {
     icon: CalendarClock,
@@ -154,7 +154,7 @@ const ROLES = [
     tint: "var(--chart-1)",
   },
   {
-    title: "Karigar",
+    title: "Artisan",
     body: "Signs in and sees only their own assigned jobs. Nothing else in the application is reachable.",
     tint: "var(--chart-3)",
   },

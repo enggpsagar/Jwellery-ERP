@@ -33,7 +33,7 @@ const REPORT_LABELS: Record<ReportType, string> = {
   byUser: "Sales by User",
   vendorPurchase: "Vendor Purchase",
   inventory: "Inventory Valuation",
-  karigar: "Karigar Outstanding",
+  karigar: "Artisan Outstanding",
   dues: "Customer Dues",
   goldFlow: "Gold Flow",
   metalWise: "By Metal",
@@ -123,12 +123,12 @@ async function buildRows(type: ReportType, range: DateRange) {
       return [
         {
           "Purchased (fine g)": report.purchasedFine,
-          "Issued to Karigar (fine g)": report.issuedToKarigarFine,
-          "Received from Karigar (fine g)": report.receivedFromKarigarFine,
+          "Issued to Artisan (fine g)": report.issuedToKarigarFine,
+          "Received from Artisan (fine g)": report.receivedFromKarigarFine,
           "Wastage (fine g)": report.wastageFine,
           "Sold (fine g)": report.soldFine,
           "Remaining Stock (fine g)": report.remainingStockFine,
-          "Still with Karigar (fine g)": report.withKarigarFine,
+          "Still with Artisan (fine g)": report.withKarigarFine,
           "Items Sold": report.itemsSoldCount,
           "Items Created": report.itemsCreatedCount,
           "Items Remaining": report.itemsRemainingCount,
@@ -146,7 +146,7 @@ async function buildRows(type: ReportType, range: DateRange) {
         "Sold Amount (₹)": row.soldAmount,
         "In Stock Weight (g)": row.inStockWeight,
         "In Stock Value (₹)": row.inStockValue,
-        "With Karigar Weight (g)": row.withKarigarWeight,
+        "With Artisan Weight (g)": row.withKarigarWeight,
         "Reconciliation Gap (g)": row.reconciliationGap,
       }))
     }

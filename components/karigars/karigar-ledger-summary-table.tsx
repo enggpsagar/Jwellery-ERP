@@ -86,7 +86,7 @@ export function KarigarLedgerSummaryTable({ rows, totals }: KarigarLedgerSummary
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Karigar</TableHead>
+              <TableHead>Artisan</TableHead>
               <TableHead className="text-right">Gold Issued</TableHead>
               <TableHead className="text-right">Gold Used (Delivered Items)</TableHead>
               <TableHead className="text-right">Outstanding Gold</TableHead>
@@ -101,7 +101,7 @@ export function KarigarLedgerSummaryTable({ rows, totals }: KarigarLedgerSummary
             {rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                  No karigars yet.
+                  No artisans yet.
                 </TableCell>
               </TableRow>
             ) : (
@@ -113,7 +113,7 @@ export function KarigarLedgerSummaryTable({ rows, totals }: KarigarLedgerSummary
                       href={`/karigars/${row.id}`}
                       title={toTitleCase(row.name)}
                       subtitle={row.code ?? undefined}
-                      footerLabel="View karigar"
+                      footerLabel="View artisan"
                       sections={[
                         {
                           fields: [

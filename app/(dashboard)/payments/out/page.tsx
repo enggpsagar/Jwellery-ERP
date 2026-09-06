@@ -24,7 +24,7 @@ export default async function PaymentOutPage() {
     <main className="space-y-6 p-6">
       <PageBackHeader
         title="Payment Out"
-        description="Every payment made to a vendor or karigar — from a purchase bill, a karigar's own payment action, or recorded here directly."
+        description="Every payment made to a vendor or artisan — from a purchase bill, an artisan's own payment action, or recorded here directly."
         backHref="/dashboard"
         backLabel="Back to Dashboard"
         action={<PaymentOutDialog vendors={vendors} karigars={karigars} />}

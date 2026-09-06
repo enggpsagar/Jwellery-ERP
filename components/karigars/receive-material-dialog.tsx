@@ -149,13 +149,13 @@ export function ReceiveMaterialDialog({
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Receive Material from Karigar</DialogTitle>
+          <DialogTitle>Receive Material from Artisan</DialogTitle>
         </DialogHeader>
 
         {activeMetals.length === 0 ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              This karigar has no metals/stones assigned yet. Assign at least one
+              This artisan has no metals/stones assigned yet. Assign at least one
               before receiving material.
             </p>
             <DialogFooter>
@@ -163,7 +163,7 @@ export function ReceiveMaterialDialog({
                 Close
               </Button>
               <Link href={`/karigars/${karigarId}/edit`}>
-                <Button type="button">Edit Karigar</Button>
+                <Button type="button">Edit Artisan</Button>
               </Link>
             </DialogFooter>
           </div>

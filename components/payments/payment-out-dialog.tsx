@@ -153,13 +153,13 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
                     : "text-muted-foreground hover:bg-accent"
                 }`}
               >
-                Karigar
+                Artisan
               </button>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label required>{partyType === "VENDOR" ? "Vendor" : "Karigar"}</Label>
+            <Label required>{partyType === "VENDOR" ? "Vendor" : "Artisan"}</Label>
             {partyType === "VENDOR" ? (
               <VendorSelect
                 vendors={vendors}

@@ -42,15 +42,15 @@ export function DisabledKarigarsClient({
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
-        title="Disabled Karigars"
-        description="Karigars removed from the active list. Their job and ledger history is kept — enabling one makes it available in Karigars again."
+        title="Disabled Artisans"
+        description="Artisans removed from the active list. Their job and ledger history is kept — enabling one makes it available in Artisans again."
         backHref="/karigars"
-        backLabel="Back to Karigars"
+        backLabel="Back to Artisans"
       />
 
       <div className="max-w-sm">
         <Input
-          placeholder="Search disabled karigars..."
+          placeholder="Search disabled artisans..."
           value={search}
           onChange={(e) => updateSearch(e.target.value)}
         />
@@ -59,14 +59,14 @@ export function DisabledKarigarsClient({
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         {karigars.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
-            No disabled karigars.
+            No disabled artisans.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full border-collapse text-sm">
               <thead className="bg-muted/40">
                 <tr className="text-left text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Karigar Name</th>
+                  <th className="px-4 py-3 font-medium">Artisan Name</th>
                   <th className="px-4 py-3 font-medium">Code</th>
                   <th className="px-4 py-3 font-medium">Mobile</th>
                   <th className="px-4 py-3 font-medium">Specialization</th>

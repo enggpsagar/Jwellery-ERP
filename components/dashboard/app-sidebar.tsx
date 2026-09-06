@@ -123,7 +123,7 @@ const mainNav: NavItem[] = [
     quickAddHref: "/purchases/new",
   },
   {
-    title: "Karigar",
+    title: "Artisan",
     href: "/karigars",
     icon: Hammer,
     countKey: "karigars",

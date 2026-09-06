@@ -154,7 +154,7 @@ async function assertKarigarInStore(karigarId: string | null, storeId: string) {
   });
 
   if (!karigar) {
-    throw new Error("Selected karigar was not found in this store.");
+    throw new Error("Selected artisan was not found in this store.");
   }
 }
 

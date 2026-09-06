@@ -94,7 +94,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   ADMIN: "Admin",
   MANAGER: "Manager",
   STAFF: "Staff",
-  KARIGAR: "Karigar",
+  KARIGAR: "Artisan",
 };
 
 /**
@@ -184,7 +184,7 @@ export const MODULE_DEFINITIONS: {
   },
   {
     key: "karigars",
-    label: "Karigar Management",
+    label: "Artisan Management",
     href: "/karigars",
     permissions: [
       PERMISSIONS.KARIGAR_VIEW,

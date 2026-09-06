@@ -992,7 +992,7 @@ export async function deleteProduct(id: string): Promise<ProductFormState> {
         return {
           success: false,
           message:
-            "This product cannot be deleted because inventory or transaction records are linked to it. Please first remove all stock entries for this product. If any stock is already used in sales or karigar jobs, remove those dependent records first.",
+            "This product cannot be deleted because inventory or transaction records are linked to it. Please first remove all stock entries for this product. If any stock is already used in sales or artisan jobs, remove those dependent records first.",
           errors: {},
         };
       }

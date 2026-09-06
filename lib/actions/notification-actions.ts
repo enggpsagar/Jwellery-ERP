@@ -138,11 +138,11 @@ export async function getNotifications(): Promise<NotificationsResponse> {
   if (overdueJobCount > 0) {
     groups.push({
       key: "karigar-jobs",
-      label: "Overdue karigar jobs",
+      label: "Overdue artisan jobs",
       count: overdueJobCount,
       items: overdueJobs.map((job) => ({
         id: job.id,
-        title: job.jobNumber ? `Job ${job.jobNumber}` : "Karigar job",
+        title: job.jobNumber ? `Job ${job.jobNumber}` : "Artisan job",
         description: `${job.karigar.name} — expected ${job.expectedDate?.toLocaleDateString("en-IN")}`,
         href: `/karigars`,
       })),

@@ -107,7 +107,7 @@ export default async function ReceiveItemsPage({ params }: Props) {
             : ""
         }`}
         backHref={`/karigars/${id}`}
-        backLabel="Back to Karigar"
+        backLabel="Back to Artisan"
       />
 
       <ReceiveItemsForm

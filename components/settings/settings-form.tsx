@@ -506,7 +506,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               const checked = businessUnits.includes(option.value);
               const description =
                 option.value === "MONEY"
-                  ? "Track customer/karigar dues and payments in rupees."
+                  ? "Track customer/artisan dues and payments in rupees."
                   : option.isGemstone
                     ? `Track dues and payments in carats of ${option.label.toLowerCase()} weight.`
                     : `Track dues and payments in grams of fine ${option.label.toLowerCase()}.`;

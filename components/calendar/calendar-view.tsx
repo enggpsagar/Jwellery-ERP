@@ -14,7 +14,7 @@ const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 const TYPE_META: Record<CalendarEvent["type"], { label: string; dot: string; chip: string }> = {
   INVOICE_DUE: { label: "Invoice Due", dot: "bg-blue-500", chip: "bg-blue-100 text-blue-800" },
   QUOTATION_EXPIRY: { label: "Quotation Expiry", dot: "bg-amber-500", chip: "bg-amber-100 text-amber-800" },
-  KARIGAR_RETURN: { label: "Karigar Return", dot: "bg-purple-500", chip: "bg-purple-100 text-purple-800" },
+  KARIGAR_RETURN: { label: "Artisan Return", dot: "bg-purple-500", chip: "bg-purple-100 text-purple-800" },
   PLAN_RENEWAL: { label: "Plan Renewal", dot: "bg-rose-500", chip: "bg-rose-100 text-rose-800" },
   REMINDER: { label: "Reminder", dot: "bg-emerald-500", chip: "bg-emerald-100 text-emerald-800" },
   HOLIDAY: { label: "Holiday", dot: "bg-orange-500", chip: "bg-orange-100 text-orange-800" },

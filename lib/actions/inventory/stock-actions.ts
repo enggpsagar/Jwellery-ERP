@@ -1039,7 +1039,7 @@ export async function updateInventoryStock(
       return {
         success: true,
         message:
-          "Stock updated successfully. Some core fields were locked because this stock is already linked to invoice / karigar records.",
+          "Stock updated successfully. Some core fields were locked because this stock is already linked to invoice / artisan records.",
         errors: {},
       }
     }
@@ -1142,7 +1142,7 @@ export async function deleteInventoryStock(id: string): Promise<StockFormState> 
       return {
         success: false,
         message:
-          "This stock cannot be deleted because it is already linked to invoice or karigar records.",
+          "This stock cannot be deleted because it is already linked to invoice or artisan records.",
         errors: {},
       }
     }

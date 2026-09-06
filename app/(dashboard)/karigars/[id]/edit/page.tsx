@@ -23,9 +23,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { id } = await params;
     const karigar = await getKarigar(id);
-    return { title: karigar ? `Edit ${karigar.name}` : "Edit Karigar" };
+    return { title: karigar ? `Edit ${karigar.name}` : "Edit Artisan" };
   } catch {
-    return { title: "Edit Karigar" };
+    return { title: "Edit Artisan" };
   }
 }
 
@@ -46,10 +46,10 @@ export default async function EditKarigarPage({ params }: Props) {
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
-        title="Edit Karigar"
+        title="Edit Artisan"
         description={`Update details for ${karigar.name}.`}
         backHref="/karigars"
-        backLabel="Back to Karigars"
+        backLabel="Back to Artisans"
       />
 
       <KarigarEditForm

@@ -293,11 +293,11 @@ async function assertKarigarAssignedMetal(karigarId: string, metalTypeId: string
   });
 
   if (assignments.length === 0) {
-    return "This karigar has no metals/stones assigned — edit their profile to assign at least one before issuing or receiving material.";
+    return "This artisan has no metals/stones assigned — edit their profile to assign at least one before issuing or receiving material.";
   }
 
   if (!assignments.some((assignment) => assignment.metalTypeId === metalTypeId)) {
-    return "This karigar is not assigned to work with the selected metal/stone.";
+    return "This artisan is not assigned to work with the selected metal/stone.";
   }
 
   return null;
@@ -345,7 +345,7 @@ export async function issueMaterialToKarigar(
       select: { id: true },
     });
 
-    if (!karigar) return { success: false, message: "Karigar not found" };
+    if (!karigar) return { success: false, message: "Artisan not found" };
 
     const metalTypeId = String(formData.get("metalTypeId") || "").trim();
     const issuePurityRaw = String(formData.get("issuePurity") || "");
@@ -449,7 +449,7 @@ export async function issueMaterialToKarigar(
     return { success: true, message: `Material issued — Job ${jobNumber}` };
   } catch (error) {
     console.error("issueMaterialToKarigar error:", error);
-    return { success: false, message: "Failed to issue material to karigar" };
+    return { success: false, message: "Failed to issue material to artisan" };
   }
 }
 
@@ -479,7 +479,7 @@ export async function recordMaterialReceiptFromKarigar(
       select: { id: true, name: true },
     });
 
-    if (!karigar) return { success: false, message: "Karigar not found" };
+    if (!karigar) return { success: false, message: "Artisan not found" };
 
     const metalTypeId = String(formData.get("metalTypeId") || "").trim();
     const receivePurityRaw = String(formData.get("receivePurity") || "");
@@ -592,7 +592,7 @@ export async function receiveItemsFromKarigar(
       where: { id: jobId, storeId },
     });
 
-    if (!job) return { success: false, message: "Karigar job not found" };
+    if (!job) return { success: false, message: "Artisan job not found" };
     if (job.status === "received") {
       return { success: false, message: "This job has already been received" };
     }
@@ -871,7 +871,7 @@ export async function receiveItemsFromKarigar(
     return { success: true, message };
   } catch (error) {
     console.error("receiveItemsFromKarigar error:", error);
-    return { success: false, message: "Failed to receive items from karigar" };
+    return { success: false, message: "Failed to receive items from artisan" };
   }
 }
 
@@ -902,7 +902,7 @@ export async function recordKarigarPayment(
       select: { id: true, name: true, locationId: true },
     });
 
-    if (!karigar) return { success: false, message: "Karigar not found" };
+    if (!karigar) return { success: false, message: "Artisan not found" };
 
     await prisma.$transaction(
       payments.map((payment, index) =>

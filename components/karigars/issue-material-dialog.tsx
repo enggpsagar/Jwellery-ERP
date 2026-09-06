@@ -159,13 +159,13 @@ export function IssueMaterialDialog({
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Issue Material to Karigar</DialogTitle>
+          <DialogTitle>Issue Material to Artisan</DialogTitle>
         </DialogHeader>
 
         {activeMetals.length === 0 ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              This karigar has no metals/stones assigned yet. Assign at least one
+              This artisan has no metals/stones assigned yet. Assign at least one
               before issuing material.
             </p>
             <DialogFooter>
@@ -173,7 +173,7 @@ export function IssueMaterialDialog({
                 Close
               </Button>
               <Link href={`/karigars/${karigarId}/edit`}>
-                <Button type="button">Edit Karigar</Button>
+                <Button type="button">Edit Artisan</Button>
               </Link>
             </DialogFooter>
           </div>

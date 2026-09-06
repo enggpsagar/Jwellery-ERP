@@ -839,7 +839,7 @@ function addedByLabel(
   purchaseCreator: { name: string | null; role: UserRole | null } | null,
   stockCreator: { name: string | null; role: UserRole | null },
 ): string {
-  if (karigarName) return `Karigar: ${karigarName}`;
+  if (karigarName) return `Artisan: ${karigarName}`;
 
   if (purchaseCreator?.name) {
     return `${roleLabel(purchaseCreator.role)}: ${purchaseCreator.name}`;
@@ -947,12 +947,12 @@ export async function getItemLedgerReport(): Promise<ItemLedgerReport> {
       const job = receiptItem.karigarJob;
       events.push({
         date: job.issueDate,
-        label: `Issued to Karigar ${job.karigar.name}`,
+        label: `Issued to Artisan ${job.karigar.name}`,
       });
       if (job.receivedDate) {
         events.push({
           date: job.receivedDate,
-          label: `Received from Karigar ${job.karigar.name}`,
+          label: `Received from Artisan ${job.karigar.name}`,
         });
       }
     }

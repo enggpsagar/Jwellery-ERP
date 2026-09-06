@@ -407,10 +407,10 @@ export function UserFormDialog({
 
         {role === UserRole.KARIGAR && (
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40 md:col-span-2">
-            <Label>Linked Karigar</Label>
+            <Label>Linked Artisan</Label>
             <Select value={karigarId} onValueChange={handleKarigarSelect}>
               <SelectTrigger>
-                <SelectValue placeholder="Select karigar" />
+                <SelectValue placeholder="Select artisan" />
               </SelectTrigger>
               <SelectContent>
                 {karigars.map((karigar) => (

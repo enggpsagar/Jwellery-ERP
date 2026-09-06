@@ -51,7 +51,7 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
     return (
       <div className="flex h-full min-h-[24rem] flex-col items-center justify-center gap-2 rounded-xl border bg-card p-6 text-center text-muted-foreground">
         <Hammer className="h-8 w-8" />
-        <p className="text-sm">Select a karigar to view their details.</p>
+        <p className="text-sm">Select an artisan to view their details.</p>
       </div>
     )
   }

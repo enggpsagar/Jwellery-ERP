@@ -452,7 +452,7 @@ export async function createKarigar(
     if (!name) {
       return {
         success: false,
-        message: "Karigar name is required",
+        message: "Artisan name is required",
         errors: { name: ["Name is required"] },
       };
     }
@@ -564,19 +564,19 @@ export async function createKarigar(
       message:
         data.mobile || data.email
           ? data.email && emailSent
-            ? "Karigar created — a welcome email was sent so they can sign in"
-            : "Karigar created — they can now sign in with this mobile/email"
-          : "Karigar created successfully",
+            ? "Artisan created — a welcome email was sent so they can sign in"
+            : "Artisan created — they can now sign in with this mobile/email"
+          : "Artisan created successfully",
     };
   } catch (error: any) {
     if (error.code === "P2002") {
       return {
         success: false,
-        message: "Karigar code, mobile, or email already exists",
+        message: "Artisan code, mobile, or email already exists",
       };
     }
     console.error("createKarigar error:", error);
-    return { success: false, message: "Failed to create karigar" };
+    return { success: false, message: "Failed to create artisan" };
   }
 }
 
@@ -591,7 +591,7 @@ export async function updateKarigar(
     if (!name) {
       return {
         success: false,
-        message: "Karigar name is required",
+        message: "Artisan name is required",
         errors: { name: ["Name is required"] },
       };
     }
@@ -649,7 +649,7 @@ export async function updateKarigar(
     });
 
     if (!existing) {
-      return { success: false, message: "Karigar not found" };
+      return { success: false, message: "Artisan not found" };
     }
 
     const contactErrors = await checkContactUniqueness(
@@ -720,16 +720,16 @@ export async function updateKarigar(
       });
     }
 
-    return { success: true, message: "Karigar updated successfully" };
+    return { success: true, message: "Artisan updated successfully" };
   } catch (error: any) {
     if (error.code === "P2002") {
       return {
         success: false,
-        message: "Karigar code, mobile, or email already exists",
+        message: "Artisan code, mobile, or email already exists",
       };
     }
     console.error("updateKarigar error:", error);
-    return { success: false, message: "Failed to update karigar" };
+    return { success: false, message: "Failed to update artisan" };
   }
 }
 
@@ -752,17 +752,17 @@ export async function disableKarigar(id: string): Promise<KarigarFormState> {
     });
 
     if (count === 0) {
-      return { success: false, message: "Karigar not found" };
+      return { success: false, message: "Artisan not found" };
     }
 
     revalidatePath("/karigars");
     revalidatePath("/karigars/disabled");
     revalidatePath(`/karigars/${id}`);
 
-    return { success: true, message: "Karigar disabled" };
+    return { success: true, message: "Artisan disabled" };
   } catch (error) {
     console.error("disableKarigar error:", error);
-    return { success: false, message: "Failed to disable karigar" };
+    return { success: false, message: "Failed to disable artisan" };
   }
 }
 
@@ -776,17 +776,17 @@ export async function enableKarigar(id: string): Promise<KarigarFormState> {
     });
 
     if (count === 0) {
-      return { success: false, message: "Karigar not found" };
+      return { success: false, message: "Artisan not found" };
     }
 
     revalidatePath("/karigars");
     revalidatePath("/karigars/disabled");
     revalidatePath(`/karigars/${id}`);
 
-    return { success: true, message: "Karigar re-enabled" };
+    return { success: true, message: "Artisan re-enabled" };
   } catch (error) {
     console.error("enableKarigar error:", error);
-    return { success: false, message: "Failed to re-enable karigar" };
+    return { success: false, message: "Failed to re-enable artisan" };
   }
 }
 
@@ -809,7 +809,7 @@ export async function deleteKarigar(id: string): Promise<KarigarFormState> {
     });
 
     if (!karigar) {
-      return { success: false, message: "Karigar not found" };
+      return { success: false, message: "Artisan not found" };
     }
 
     // Jobs are the real blocker: deleting a karigar with job history would
@@ -823,7 +823,7 @@ export async function deleteKarigar(id: string): Promise<KarigarFormState> {
     if (karigar.karigarJobs.length > 0) {
       return {
         success: false,
-        message: "This karigar has jobs linked to them and cannot be deleted. Mark them inactive instead.",
+        message: "This artisan has jobs linked to them and cannot be deleted. Mark them inactive instead.",
       };
     }
 
@@ -841,13 +841,13 @@ export async function deleteKarigar(id: string): Promise<KarigarFormState> {
 
     const message =
       karigar.ledgerEntries.length > 0
-        ? "Karigar deleted successfully. Their recorded payments are kept but no longer linked to a karigar."
-        : "Karigar deleted successfully";
+        ? "Artisan deleted successfully. Their recorded payments are kept but no longer linked to an artisan."
+        : "Artisan deleted successfully";
 
     return { success: true, message };
   } catch (error) {
     console.error("deleteKarigar error:", error);
-    return { success: false, message: "Failed to delete karigar" };
+    return { success: false, message: "Failed to delete artisan" };
   }
 }
 
@@ -924,12 +924,12 @@ export async function exportKarigarsToExcel(
     });
 
     if (!karigars.length) {
-      return { success: false, message: "No karigars found to export." };
+      return { success: false, message: "No artisans found to export." };
     }
 
     const rows = karigars.map((karigar, index) => ({
       "Sr No": index + 1,
-      "Karigar Code": karigar.code ?? "",
+      "Artisan Code": karigar.code ?? "",
       Name: karigar.name,
       Mobile: karigar.mobile ?? "",
       WhatsApp: karigar.whatsapp ?? "",
@@ -973,7 +973,7 @@ export async function exportKarigarsToExcel(
     ];
 
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Karigars");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Artisans");
 
     const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
     const fileName = getKarigarExportFileName();
@@ -986,6 +986,6 @@ export async function exportKarigarsToExcel(
     };
   } catch (error) {
     console.error("exportKarigarsToExcel error:", error);
-    return { success: false, message: "Failed to export karigars." };
+    return { success: false, message: "Failed to export artisans." };
   }
 }

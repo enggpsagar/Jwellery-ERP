@@ -98,7 +98,7 @@ export async function getQuickSaleTarget(
   } else if (stock.status === InventoryStockStatus.SOLD) {
     blockedReason = "This piece has already been sold.";
   } else if (stock.status === InventoryStockStatus.ISSUED_TO_KARIGAR) {
-    blockedReason = "This piece is currently out with a karigar.";
+    blockedReason = "This piece is currently out with an artisan.";
   } else if (stock.status !== InventoryStockStatus.IN_STOCK) {
     blockedReason = `This piece is marked ${String(stock.status)
       .replaceAll("_", " ")

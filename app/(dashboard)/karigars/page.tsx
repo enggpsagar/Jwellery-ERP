@@ -8,7 +8,7 @@ import { getStoreMetals } from "@/lib/actions/taxonomy-actions"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 
 export const metadata: Metadata = {
-  title: "Karigars",
+  title: "Artisans",
 }
 
 type KarigarsPageProps = {

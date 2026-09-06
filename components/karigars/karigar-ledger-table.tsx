@@ -391,16 +391,16 @@ function MetalGroupSection({
   // case) means the reverse.
   const owesLabel =
     group.finalFineBalance > 0
-      ? `Karigar owes you ${group.finalFineBalance.toFixed(3)}g`
+      ? `Artisan owes you ${group.finalFineBalance.toFixed(3)}g`
       : group.finalFineBalance < 0
-        ? `You owe the karigar ${Math.abs(group.finalFineBalance).toFixed(3)}g`
+        ? `You owe the artisan ${Math.abs(group.finalFineBalance).toFixed(3)}g`
         : "Settled"
 
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-4 lg:flex-row">
         <MaterialSideTable
-          title="Gold Given to Karigar"
+          title="Gold Given to Artisan"
           rows={issuedRows}
           metalLabel={group.metalLabel}
           search={search}
@@ -409,7 +409,7 @@ function MetalGroupSection({
           onSort={onSort}
         />
         <MaterialSideTable
-          title="Material Received from Karigar"
+          title="Material Received from Artisan"
           rows={receivedRows}
           metalLabel={group.metalLabel}
           search={search}
@@ -585,7 +585,7 @@ export function KarigarLedgerTable({
           hidden entirely when settled (0) since there's nothing to report. */}
       {finalCashBalance !== 0 && (
         <p className="text-sm">
-          <span className="text-muted-foreground">Cash Balance (owed to karigar): </span>
+          <span className="text-muted-foreground">Cash Balance (owed to artisan): </span>
           <span className="font-semibold text-red-700">
             ₹ {finalCashBalance.toLocaleString("en-IN")}
           </span>

@@ -74,7 +74,7 @@ export function KarigarRowActions({
       }
     } catch (error) {
       console.error(error)
-      toast.error("Failed to disable karigar")
+      toast.error("Failed to disable artisan")
     } finally {
       setLoading(false)
     }
@@ -87,7 +87,7 @@ export function KarigarRowActions({
           <Link
             href={`/karigars/${karigarId}`}
             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
-            title="View karigar"
+            title="View artisan"
           >
             <Eye className="h-4 w-4" />
           </Link>
@@ -96,7 +96,7 @@ export function KarigarRowActions({
         <Link
           href={`/karigars/${karigarId}/edit`}
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-muted"
-          title="Edit karigar"
+          title="Edit artisan"
         >
           <Pencil className="h-4 w-4" />
         </Link>
@@ -116,7 +116,7 @@ export function KarigarRowActions({
           type="button"
           onClick={() => setConfirmDisable(true)}
           className="inline-flex items-center gap-1 rounded-md border border-amber-200 px-2 py-1 text-sm text-amber-700 hover:bg-amber-50"
-          title="Disable karigar"
+          title="Disable artisan"
         >
           <Ban className="h-4 w-4" />
         </button>
@@ -132,15 +132,15 @@ export function KarigarRowActions({
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Disable Karigar</DialogTitle>
+            <DialogTitle>Disable Artisan</DialogTitle>
             <DialogDescription>
               Are you sure you want to disable{" "}
               <span className="font-medium text-foreground">{karigarName}</span>?
               <br />
               <br />
-              Disabled karigars are removed from the active Karigars list, but their job
+              Disabled artisans are removed from the active Artisans list, but their job
               and ledger history remains in the system. You can re-enable them any time
-              from Disabled Karigars.
+              from Disabled Artisans.
             </DialogDescription>
           </DialogHeader>
 
@@ -161,7 +161,7 @@ export function KarigarRowActions({
                   Disabling...
                 </>
               ) : (
-                "Disable Karigar"
+                "Disable Artisan"
               )}
             </Button>
           </DialogFooter>

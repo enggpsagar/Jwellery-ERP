@@ -78,7 +78,7 @@ export function KarigarTable({
                   checked={allSelected}
                   onChange={toggleAll}
                   className="h-4 w-4"
-                  aria-label="Select all karigars"
+                  aria-label="Select all artisans"
                 />
               </th>
               <SortableTableHead label="Code" sortKey="code" defaultSortBy="createdAt" />
@@ -123,7 +123,7 @@ export function KarigarTable({
                     href={onActivate ? undefined : `/karigars/${karigar.id}`}
                     title={karigar.name}
                     subtitle={karigar.code || undefined}
-                    footerLabel="View karigar"
+                    footerLabel="View artisan"
                     sections={[
                       {
                         fields: [

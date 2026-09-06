@@ -6,7 +6,7 @@ const STATUS_LABELS: Record<InventoryStockStatus, string> = {
   IN_STOCK: "In Stock",
   SOLD: "Sold",
   RESERVED: "Reserved",
-  ISSUED_TO_KARIGAR: "With Karigar",
+  ISSUED_TO_KARIGAR: "With Artisan",
   DAMAGED: "Damaged",
   ARCHIVED: "Archived",
 };

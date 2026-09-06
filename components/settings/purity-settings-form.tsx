@@ -67,7 +67,7 @@ export function PuritySettingsForm({ rows, canEdit }: PurityFormProps) {
             <CardTitle>Purity / Carat Fineness</CardTitle>
             <p className="text-sm text-muted-foreground">
               The fine-metal percentage for each purity. Used to convert gold/silver
-              issued to and received from a Karigar into a common fine-weight basis.
+              issued to and received from an Artisan into a common fine-weight basis.
             </p>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">

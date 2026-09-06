@@ -243,7 +243,7 @@ useEffect(() => {
             <option value="IN_STOCK">IN_STOCK</option>
             <option value="SOLD">SOLD</option>
             <option value="RESERVED">RESERVED</option>
-            <option value="ISSUED_TO_KARIGAR">ISSUED_TO_KARIGAR</option>
+            <option value="ISSUED_TO_KARIGAR">Issued to Artisan</option>
             <option value="DAMAGED">DAMAGED</option>
             <option value="ARCHIVED">ARCHIVED</option>
           </select>

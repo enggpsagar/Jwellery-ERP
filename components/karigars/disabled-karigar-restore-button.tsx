@@ -44,7 +44,7 @@ export function DisabledKarigarRestoreButton({
       }
     } catch (error) {
       console.error(error)
-      toast.error("Failed to re-enable karigar")
+      toast.error("Failed to re-enable artisan")
     } finally {
       setLoading(false)
     }
@@ -71,10 +71,10 @@ export function DisabledKarigarRestoreButton({
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Enable Karigar</DialogTitle>
+            <DialogTitle>Enable Artisan</DialogTitle>
             <DialogDescription>
               Re-enable <span className="font-medium text-foreground">{karigarName}</span>{" "}
-              and bring them back to the active Karigars list?
+              and bring them back to the active Artisans list?
             </DialogDescription>
           </DialogHeader>
 
@@ -95,7 +95,7 @@ export function DisabledKarigarRestoreButton({
                   Enabling...
                 </>
               ) : (
-                "Enable Karigar"
+                "Enable Artisan"
               )}
             </Button>
           </DialogFooter>

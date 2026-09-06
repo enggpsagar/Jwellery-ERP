@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Users } from "lucide-react"
 
 import { getCustomerById, type Customer } from "@/lib/actions/customer-actions"
+import { toTitleCase } from "@/lib/utils"
 import { CustomerRowActions } from "@/components/customers/customer-row-actions"
 import { CustomerDetailContent } from "@/components/customers/customer-detail-content"
 import { CustomerLedgerCardClient } from "@/components/customers/ledger/customer-ledger-card-client"
@@ -76,7 +77,7 @@ export function CustomerDetailPanel({ customerId, states }: CustomerDetailPanelP
     <div className="space-y-4 rounded-xl border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">{customer.name}</h2>
+          <h2 className="text-lg font-semibold">{toTitleCase(customer.name)}</h2>
           <p className="text-sm text-muted-foreground">
             {customer.customerType || "Customer"}
           </p>

@@ -1,6 +1,7 @@
 import { IndianRupee, MapPin, Truck } from "lucide-react"
 
 import type { Vendor } from "@/lib/actions/vendor-actions"
+import { toTitleCase } from "@/lib/utils"
 import {
   DetailField,
   DetailGrid,
@@ -36,7 +37,7 @@ export function VendorDetailContent({
         tint="var(--chart-1)"
       >
         <DetailGrid>
-          <DetailField label="Vendor Name" value={vendor.name} />
+          <DetailField label="Vendor Name" value={toTitleCase(vendor.name)} />
           <DetailField label="Phone" value={vendor.phone} />
           <DetailField label="Alternate Phone" value={vendor.altPhone} />
           <DetailField label="Email" value={vendor.email} />

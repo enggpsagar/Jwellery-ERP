@@ -290,7 +290,7 @@ export async function getKarigarDetailBundle(id: string): Promise<KarigarDetailB
   const scope = await getLocationScope();
 
   const [ledger, metals, locations, defaultLocationId, openJobsRaw, materialCounts] = await Promise.all([
-    getKarigarLedger(id),
+    getKarigarLedger(id, karigar.name),
     getStoreMetals(),
     getStoreLocations(),
     getDefaultLocationId(),

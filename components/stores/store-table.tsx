@@ -1,8 +1,5 @@
 "use client"
 
-import Link from "next/link"
-import { Eye, Pencil } from "lucide-react"
-
 import {
   Table,
   TableBody,
@@ -12,8 +9,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { StoreRowActions } from "@/components/stores/store-row-actions"
-import { StoreDeleteDialog } from "@/components/stores/store-delete-dialog"
 import { ChangePlanDialog } from "@/components/stores/change-plan-dialog"
 import type { PlanRow } from "@/lib/actions/plan-actions"
 import type { StorePlanOverview } from "@/lib/actions/store-plan-actions"
@@ -190,35 +185,16 @@ export function StoreTable({
                   </div>
                 </TableCell>
                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                  {/* View/Edit/Archive/Delete already live in the detail
+                      panel's own header once this row is selected — only
+                      Change Plan has no equivalent there yet. */}
                   <div className="flex items-center justify-end gap-2">
-                    <Link
-                      href={`/stores/${store.id}`}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-accent"
-                      aria-label={`View ${store.name}`}
-                      title="View store"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Link>
-                    <Link
-                      href={`/stores/${store.id}/edit`}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-accent"
-                      aria-label={`Edit ${store.name}`}
-                      title="Edit store"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Link>
                     <ChangePlanDialog
                       storeId={store.id}
                       storeName={store.name}
                       currentPlanId={store.plan?.id ?? null}
                       plans={plans}
                     />
-                    <StoreRowActions
-                      storeId={store.id}
-                      storeName={store.name}
-                      isActive={store.isActive}
-                    />
-                    <StoreDeleteDialog storeId={store.id} storeName={store.name} />
                   </div>
                 </TableCell>
               </TableRow>

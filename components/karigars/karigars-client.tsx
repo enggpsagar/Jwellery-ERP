@@ -22,25 +22,16 @@ type PaginationInfo = {
   hasPrevPage: boolean
 }
 
-type LocationOption = {
-  id: string
-  name: string
-}
-
 type KarigarsClientProps = {
   karigars: Karigar[]
   pagination: PaginationInfo
   metals: StoreMetalRow[]
-  locations?: LocationOption[]
-  defaultLocationId?: string | null
 }
 
 export function KarigarsClient({
   karigars,
   pagination,
   metals,
-  locations = [],
-  defaultLocationId = null,
 }: KarigarsClientProps) {
   const [selectedKarigarIds, setSelectedKarigarIds] = React.useState<string[]>([])
   // Which row's full detail shows in the right-hand panel — defaults to
@@ -105,9 +96,6 @@ export function KarigarsClient({
             pagination={pagination}
             selectedKarigarIds={selectedKarigarIds}
             onSelectionChange={setSelectedKarigarIds}
-            metals={metals}
-            locations={locations}
-            defaultLocationId={defaultLocationId}
             activeKarigarId={activeKarigarId}
             onActivate={setActiveKarigarId}
           />

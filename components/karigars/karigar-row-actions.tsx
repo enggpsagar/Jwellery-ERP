@@ -33,6 +33,15 @@ type KarigarRowActionsProps = {
   assignedMetalTypeIds: string[]
   locations?: LocationOption[]
   defaultLocationId?: string | null
+  /** Off inside the detail panel — a "View karigar" link back to the
+   * page you're already looking at (inline, via this same panel) isn't
+   * an action. Defaults on for the list table, where it's the only way
+   * to get there. */
+  showView?: boolean
+  /** Off inside the detail panel, which already has its own full Issue
+   * Material button — this icon-only trigger next to it would just be a
+   * second way to open the same dialog. Defaults on for the list table. */
+  showIssueMaterial?: boolean
 }
 
 export function KarigarRowActions({
@@ -42,6 +51,8 @@ export function KarigarRowActions({
   assignedMetalTypeIds,
   locations = [],
   defaultLocationId = null,
+  showView = true,
+  showIssueMaterial = true,
 }: KarigarRowActionsProps) {
   const router = useRouter()
   const toast = useToast()
@@ -72,13 +83,15 @@ export function KarigarRowActions({
   return (
     <>
       <div className="flex items-center gap-2">
-        <Link
-          href={`/karigars/${karigarId}`}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
-          title="View karigar"
-        >
-          <Eye className="h-4 w-4" />
-        </Link>
+        {showView && (
+          <Link
+            href={`/karigars/${karigarId}`}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
+            title="View karigar"
+          >
+            <Eye className="h-4 w-4" />
+          </Link>
+        )}
 
         <Link
           href={`/karigars/${karigarId}/edit`}
@@ -88,14 +101,16 @@ export function KarigarRowActions({
           <Pencil className="h-4 w-4" />
         </Link>
 
-        <IssueMaterialDialog
-          trigger="icon"
-          karigarId={karigarId}
-          metals={metals}
-          assignedMetalTypeIds={assignedMetalTypeIds}
-          locations={locations}
-          defaultLocationId={defaultLocationId}
-        />
+        {showIssueMaterial && (
+          <IssueMaterialDialog
+            trigger="icon"
+            karigarId={karigarId}
+            metals={metals}
+            assignedMetalTypeIds={assignedMetalTypeIds}
+            locations={locations}
+            defaultLocationId={defaultLocationId}
+          />
+        )}
 
         <button
           type="button"

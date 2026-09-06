@@ -16,7 +16,6 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/users/status-badge";
-import { UserRowActions } from "@/components/users/user-row-actions";
 import { SortableTableHead } from "@/components/shared/sortable-table-head";
 import { cn } from "@/lib/utils";
 
@@ -93,7 +92,6 @@ export function UserTable({
               className="h-10 px-2 whitespace-nowrap"
             />
             <TableHead>Status</TableHead>
-            <TableHead className="text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
 
@@ -165,9 +163,6 @@ export function UserTable({
                   <StatusBadge status={user.status} />
                 </TableCell>
 
-                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                  <UserRowActions user={user} />
-                </TableCell>
               </TableRow>
             ))
           )}

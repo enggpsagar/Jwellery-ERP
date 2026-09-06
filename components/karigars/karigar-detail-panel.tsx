@@ -8,6 +8,7 @@ import { IssueMaterialDialog } from "@/components/karigars/issue-material-dialog
 import { ReceiveMaterialDialog } from "@/components/karigars/receive-material-dialog"
 import { RecordKarigarPaymentDialog } from "@/components/karigars/record-karigar-payment-dialog"
 import { KarigarDetailContent } from "@/components/karigars/karigar-detail-content"
+import { KarigarRowActions } from "@/components/karigars/karigar-row-actions"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toTitleCase } from "@/lib/utils"
 
@@ -94,6 +95,16 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
             count={materialCounts.receivedCount}
           />
           <RecordKarigarPaymentDialog karigarId={karigar.id} />
+          <KarigarRowActions
+            karigarId={karigar.id}
+            karigarName={karigar.name}
+            metals={metals}
+            assignedMetalTypeIds={karigar.assignedMetalTypeIds}
+            locations={locations}
+            defaultLocationId={defaultLocationId}
+            showView={false}
+            showIssueMaterial={false}
+          />
         </div>
       </div>
 

@@ -12,6 +12,7 @@ import { resolveBackLink } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getReturnEligibility } from "@/lib/return-window"
 import { APP_NAME } from "@/lib/constants/app"
+import { toTitleCase } from "@/lib/utils"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog"
 import { EmailInvoiceButton } from "@/components/billing/email-invoice-button"
@@ -101,7 +102,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
     <main className="space-y-6 p-6">
       <PageBackHeader
         title={invoice.invoiceNumber}
-        description={invoice.customer?.name ?? ""}
+        description={invoice.customer?.name ? toTitleCase(invoice.customer.name) : ""}
         backHref={backTo.href}
         backLabel={backTo.label}
         action={
@@ -261,7 +262,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                 href={`/customers/${invoice.customer.id}?from=${encodeURIComponent(`/billing/${invoice.id}`)}`}
                 className="font-medium text-primary underline-offset-4 hover:underline"
               >
-                {invoice.customer.name}
+                {toTitleCase(invoice.customer.name)}
                 {invoice.customer.phone ? ` (${invoice.customer.phone})` : ""}
               </Link>
             ) : (
@@ -271,16 +272,13 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               <p className="font-medium">—</p>
             )}
           </div>
+
+          <div>
+            <p className="text-sm text-muted-foreground">QR Code</p>
+            <InvoiceQrCard dataUrl={qrDataUrl} invoiceNumber={invoice.invoiceNumber} />
+          </div>
         </div>
       </div>
-
-      <InvoiceQrCard
-        dataUrl={qrDataUrl}
-        invoiceNumber={invoice.invoiceNumber}
-        customerName={invoice.customer?.name ?? null}
-        invoiceDate={new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}
-        totalAmount={`₹${invoice.totalAmount.toFixed(2)}`}
-      />
 
       {isCancelled && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 space-y-3">

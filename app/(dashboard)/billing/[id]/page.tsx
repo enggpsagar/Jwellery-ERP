@@ -3,6 +3,7 @@ import { cache } from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowLeftCircle, ArrowRightCircle, Pencil, Plus, Printer, Receipt } from "lucide-react"
+import QRCode from "qrcode"
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
 import { getCreditNotesForInvoice } from "@/lib/actions/credit-note-actions"
@@ -18,6 +19,7 @@ import { ShareWhatsAppButton } from "@/components/billing/share-whatsapp-button"
 import { EditInvoiceDialog } from "@/components/billing/edit-invoice-dialog"
 import { CancelInvoiceDialog } from "@/components/billing/cancel-invoice-dialog"
 import { ReturnItemsDialog } from "@/components/billing/return-items-dialog"
+import { InvoiceQrCard } from "@/components/billing/invoice-qr-card"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
 
@@ -90,6 +92,11 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   )
   const canReturnItems = isReturnable && returnEligibility.eligible
 
+  // Generated fresh every load, same as the stock QR (no stored column) —
+  // just scans straight to this invoice's own detail page.
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+  const qrDataUrl = await QRCode.toDataURL(`${baseUrl}/billing/${invoice.id}`)
+
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
@@ -138,11 +145,19 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               </Button>
             )}
             {isCancellable && (
-              <CancelInvoiceDialog
-                invoiceId={invoice.id}
-                invoiceNumber={invoice.invoiceNumber}
-                balanceAmount={invoice.balanceAmount}
-              />
+              <>
+                <CancelInvoiceDialog
+                  invoiceId={invoice.id}
+                  invoiceNumber={invoice.invoiceNumber}
+                  balanceAmount={invoice.balanceAmount}
+                  mode="returnExchange"
+                />
+                <CancelInvoiceDialog
+                  invoiceId={invoice.id}
+                  invoiceNumber={invoice.invoiceNumber}
+                  balanceAmount={invoice.balanceAmount}
+                />
+              </>
             )}
             {canReturnItems && (
               <ReturnItemsDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
@@ -258,6 +273,14 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           </div>
         </div>
       </div>
+
+      <InvoiceQrCard
+        dataUrl={qrDataUrl}
+        invoiceNumber={invoice.invoiceNumber}
+        customerName={invoice.customer?.name ?? null}
+        invoiceDate={new Date(invoice.invoiceDate).toLocaleDateString("en-IN")}
+        totalAmount={`₹${invoice.totalAmount.toFixed(2)}`}
+      />
 
       {isCancelled && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 space-y-3">

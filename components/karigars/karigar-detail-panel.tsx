@@ -9,6 +9,7 @@ import { ReceiveMaterialDialog } from "@/components/karigars/receive-material-di
 import { RecordKarigarPaymentDialog } from "@/components/karigars/record-karigar-payment-dialog"
 import { KarigarDetailContent } from "@/components/karigars/karigar-detail-content"
 import { Skeleton } from "@/components/ui/skeleton"
+import { toTitleCase } from "@/lib/utils"
 
 type KarigarDetailPanelProps = {
   karigarId: string | null
@@ -70,7 +71,7 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
     <div className="space-y-4 rounded-xl border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">{karigar.name}</h2>
+          <h2 className="text-lg font-semibold">{toTitleCase(karigar.name)}</h2>
           <p className="text-sm text-muted-foreground">
             Code: {karigar.code || "-"} · Mobile: {karigar.mobile || "-"}
           </p>

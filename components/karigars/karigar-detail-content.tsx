@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { KarigarLedgerTabs } from "@/components/karigars/karigar-ledger-tabs"
 import { KarigarStatusCard } from "@/components/karigars/karigar-status-card"
+import { ExportMenu } from "@/components/shared/export-menu"
 
 /**
  * The body of a karigar's detail view — balance cards, open jobs, and
@@ -155,13 +156,16 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
           <CardTitle>Karigar Ledger</CardTitle>
+          <ExportMenu href={`/karigars/${karigar.id}/ledger-export`} label="Export Ledger" />
         </CardHeader>
         <CardContent>
           <KarigarLedgerTabs
             rows={ledger.rows}
             finalCashBalance={ledger.finalCashBalance}
+            totalDebit={ledger.totalDebit}
+            totalCredit={ledger.totalCredit}
             materialGroups={ledger.materialGroups}
           />
         </CardContent>

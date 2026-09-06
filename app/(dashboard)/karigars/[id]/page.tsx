@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { getKarigarDetailBundle } from "@/lib/actions/karigar-actions";
+import { toTitleCase } from "@/lib/utils";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { IssueMaterialDialog } from "@/components/karigars/issue-material-dialog";
@@ -38,7 +39,7 @@ export default async function KarigarDetailPage({ params }: Props) {
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
-        title={karigar.name}
+        title={toTitleCase(karigar.name)}
         description={`Karigar code: ${karigar.code || "-"} · Mobile: ${karigar.mobile || "-"}`}
         backHref="/karigars"
         backLabel="Back to Karigars"

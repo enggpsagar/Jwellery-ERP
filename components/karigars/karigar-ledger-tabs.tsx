@@ -15,12 +15,16 @@ type TabKey = (typeof TABS)[number]["key"]
 type KarigarLedgerTabsProps = {
   rows: KarigarLedgerRow[]
   finalCashBalance: number
+  totalDebit: number
+  totalCredit: number
   materialGroups: KarigarLedgerMetalGroup[]
 }
 
 export function KarigarLedgerTabs({
   rows,
   finalCashBalance,
+  totalDebit,
+  totalCredit,
   materialGroups,
 }: KarigarLedgerTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("financial")
@@ -46,6 +50,8 @@ export function KarigarLedgerTabs({
       <KarigarLedgerTable
         rows={rows}
         finalCashBalance={finalCashBalance}
+        totalDebit={totalDebit}
+        totalCredit={totalCredit}
         materialGroups={materialGroups}
         variant={activeTab}
       />

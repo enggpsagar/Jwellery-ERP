@@ -182,6 +182,11 @@ type InvoiceFormProps = {
    * Conversion Rules), resolved via resolveGramsPerCarat() wherever a
    * Carat Weight is converted to/from grams on this form. */
   caratConversionRates: Record<PurityType, number>
+  /** Store-configured selling price per Gold/Silver/Platinum purity
+   * (Settings > Purity > Metal Selling Rates) — resolved by a line's own
+   * `purity` and consulted before falling back to the linked metal's flat
+   * StoreMetal.sellingPrice when prefilling a stock-linked line's Rate. */
+  metalSellingRates: Partial<Record<PurityType, number>>
   /** Store's default GST%, split into SGST+CGST (intra-state) or IGST
    * (inter-state) per line via computeGst() — see lib/gst.ts. Editable here
    * per invoice — a store on an exempt sale, or one that changes its rate
@@ -228,6 +233,7 @@ export function InvoiceForm({
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
+  metalSellingRates,
   defaultGstRate = 0,
   hallmarkChargePerPiece = 0,
   gstScheme,
@@ -350,13 +356,22 @@ export function InvoiceForm({
       stoneWeightInput: stock.stoneWeight ?? 0,
       stoneWeightUnit: linkedUnit,
       // A specific piece's own recorded sale rate wins when it has one;
-      // otherwise fall back to the metal's configured default Selling Price
-      // (Settings > Taxonomy) so the field isn't just silently 0 — still
-      // fully editable either way, and plain manual entry when neither is set.
-      rate: stock.saleRate ?? metalById.get(stock.metalType?.id ?? "")?.sellingPrice ?? 0,
+      // otherwise the store's configured per-purity Selling Price (Settings
+      // > Purity > Metal Selling Rates), then the metal's flat default
+      // Selling Price (Settings > Taxonomy) so the field isn't just
+      // silently 0 — still fully editable either way, and plain manual
+      // entry when none of these are set.
+      rate:
+        stock.saleRate ??
+        metalSellingRates[stock.purity as PurityType] ??
+        metalById.get(stock.metalType?.id ?? "")?.sellingPrice ??
+        0,
       hsnCode: stock.hsnCode ?? "",
       caratWeight: stock.caratWeight ?? 0,
-      stoneRate: stock.stoneRate ?? 0,
+      stoneRate:
+        stock.stoneRate ??
+        metalByName.get((stock.stoneMetalTypeName ?? "").toLowerCase())?.sellingPrice ??
+        0,
       hasStoneComponent: stock.stoneRate != null,
       stoneCharge: stock.stoneRate != null && stock.caratWeight != null
         ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
@@ -473,10 +488,17 @@ export function InvoiceForm({
           dmoWeightUnit: linkedUnit,
           stoneWeightInput: stock.stoneWeight ?? 0,
           stoneWeightUnit: linkedUnit,
-          rate: stock.saleRate ?? metalById.get(stock.metalType?.id ?? "")?.sellingPrice ?? 0,
+          rate:
+            stock.saleRate ??
+            metalSellingRates[stock.purity as PurityType] ??
+            metalById.get(stock.metalType?.id ?? "")?.sellingPrice ??
+            0,
           hsnCode: stock.hsnCode ?? "",
           caratWeight: stock.caratWeight ?? 0,
-          stoneRate: stock.stoneRate ?? 0,
+          stoneRate:
+            stock.stoneRate ??
+            metalByName.get((stock.stoneMetalTypeName ?? "").toLowerCase())?.sellingPrice ??
+            0,
           hasStoneComponent: stock.stoneRate != null,
           stoneCharge: stock.stoneRate != null && stock.caratWeight != null
             ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
@@ -550,6 +572,13 @@ export function InvoiceForm({
   // what Gross/Net/Dmo/Stone Weight are actually persisted in at submit,
   // regardless of what unit is currently toggled for display/entry.
   const metalById = useMemo(() => new Map(metals.map((m) => [m.id, m])), [metals])
+  // Stone components are tracked by name (stoneMetalTypeName), not id — no
+  // stoneMetalTypeId field exists — so the stone-rate fallback needs its
+  // own name-keyed lookup instead of reusing metalById.
+  const metalByName = useMemo(
+    () => new Map(metals.map((m) => [m.name.toLowerCase(), m])),
+    [metals],
+  )
   const primaryUnitFor = (item: LineItem) => metalById.get(item.metalTypeId)?.primaryUnit ?? "GRAM"
 
   // Whether this line's Carat Weight field should show/convert: an explicit

@@ -23,6 +23,25 @@ export type CaratConversionRateRow = {
   gramsPerCarat: number;
 };
 
+export type MetalSellingRateRow = {
+  purity: PurityType;
+  sellingPrice: number | null;
+};
+
+// Karat/fineness purities only — Diamond and other gemstones are priced
+// per stone type via StoreMetal.sellingPrice, not per purity (see the
+// MetalSellingRate model comment in schema.prisma).
+const METAL_PURITIES: PurityType[] = [
+  PurityType.GOLD_24K,
+  PurityType.GOLD_22K,
+  PurityType.GOLD_20K,
+  PurityType.GOLD_18K,
+  PurityType.SILVER_999,
+  PurityType.SILVER_925,
+  PurityType.PLATINUM_950,
+  PurityType.PLATINUM_900,
+];
+
 export type PurityFormState = {
   success: boolean;
   message: string;
@@ -57,6 +76,83 @@ export async function getCaratConversionRates(): Promise<CaratConversionRateRow[
 export async function getCaratConversionRateMap(): Promise<Record<PurityType, number>> {
   const storeId = await requireStoreScope();
   return getGramsPerCaratMap(storeId);
+}
+
+/** Full selling-price table for the current store's karat/fineness
+ * purities — powers the Settings > Purity "Metal Selling Rates" grid.
+ * Unlike getCaratConversionRates/getPurityFineness, unconfigured purities
+ * come back as null rather than a seeded default: there's no meaningful
+ * universal selling price, so an unconfigured row must stay absent. */
+export async function getMetalSellingRates(): Promise<MetalSellingRateRow[]> {
+  const storeId = await requireStoreScope();
+  const rows = await prisma.metalSellingRate.findMany({ where: { storeId } });
+
+  const byPurity = new Map(rows.map((row) => [row.purity, Number(row.sellingPrice)]));
+
+  return METAL_PURITIES.map((purity) => ({
+    purity,
+    sellingPrice: byPurity.get(purity) ?? null,
+  }));
+}
+
+/** Lookup-map counterpart of getMetalSellingRates, for the rate-prefill
+ * fallback chain in Invoice/Kacha/Quotation forms — only the configured
+ * purities are present, so a `??` chain falls through cleanly. */
+export async function getMetalSellingRateMap(): Promise<Partial<Record<PurityType, number>>> {
+  const storeId = await requireStoreScope();
+  const rows = await prisma.metalSellingRate.findMany({ where: { storeId } });
+
+  const map: Partial<Record<PurityType, number>> = {};
+  for (const row of rows) {
+    map[row.purity] = Number(row.sellingPrice);
+  }
+  return map;
+}
+
+export async function updateMetalSellingRates(
+  prevState: PurityFormState,
+  formData: FormData,
+): Promise<PurityFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return {
+      success: false,
+      message: "Only the Store Owner can update these settings.",
+    };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const updates = METAL_PURITIES.map((purity) => {
+      const raw = formData.get(`sellingPrice_${purity}`);
+      const value = Number(raw);
+
+      // Blank/invalid/zero-or-less clears the rate entirely (rather than
+      // writing a bogus default, since unlike fineness/carat-conversion
+      // there's no meaningful universal selling price to fall back to) so
+      // the item-level fallback to StoreMetal.sellingPrice can take over.
+      if (raw === null || raw === "" || Number.isNaN(value) || value <= 0) {
+        return prisma.metalSellingRate.deleteMany({ where: { storeId, purity } });
+      }
+
+      return prisma.metalSellingRate.upsert({
+        where: { storeId_purity: { storeId, purity } },
+        update: { sellingPrice: value },
+        create: { storeId, purity, sellingPrice: value },
+      });
+    });
+
+    await prisma.$transaction(updates);
+
+    revalidatePath("/settings/purity");
+
+    return { success: true, message: "Metal selling rates updated successfully" };
+  } catch (error) {
+    console.error("updateMetalSellingRates error:", error);
+    return { success: false, message: "Failed to update metal selling rates" };
+  }
 }
 
 export async function updatePurityFineness(

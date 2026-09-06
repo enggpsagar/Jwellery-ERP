@@ -85,7 +85,7 @@ export function RecordKachaPaymentDialog({
             <div className="text-red-600 text-sm">{state.message}</div>
           )}
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label required>Amount (Balance: ₹{balanceAmount.toFixed(2)})</Label>
             <Input
               name="amount"
@@ -97,7 +97,7 @@ export function RecordKachaPaymentDialog({
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Notes</Label>
             <Textarea name="notes" rows={2} placeholder="e.g. Cash, UPI, cheque #..." />
           </div>

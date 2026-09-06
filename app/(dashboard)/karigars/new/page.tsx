@@ -2,8 +2,10 @@
 
 import type { Metadata } from "next";
 
-import { getStoreLocations } from "@/lib/actions/store-location-actions";
+import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions";
 import { getStates } from "@/lib/actions/location-actions";
+import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
+import { getBusinessSettings } from "@/lib/actions/settings-actions";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { KarigarCreateForm } from "@/components/karigars/karigar-create-form";
@@ -13,9 +15,12 @@ export const metadata: Metadata = {
 };
 
 export default async function NewKarigarPage() {
-  const [locations, states] = await Promise.all([
+  const [locations, states, metals, defaultLocationId, settings] = await Promise.all([
     getStoreLocations(),
     getStates(),
+    getStoreMetals(),
+    getDefaultLocationId(),
+    getBusinessSettings(),
   ]);
 
   return (
@@ -27,7 +32,14 @@ export default async function NewKarigarPage() {
         backLabel="Back to Karigars"
       />
 
-      <KarigarCreateForm locations={locations} states={states} />
+      <KarigarCreateForm
+        locations={locations}
+        states={states}
+        metals={metals}
+        defaultLocationId={defaultLocationId}
+        defaultState={settings.state}
+        defaultCity={settings.city}
+      />
     </main>
   );
 }

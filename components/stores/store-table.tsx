@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Pencil } from "lucide-react"
+import { Eye, Pencil } from "lucide-react"
 
 import {
   Table,
@@ -13,10 +13,12 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { StoreRowActions } from "@/components/stores/store-row-actions"
+import { StoreDeleteDialog } from "@/components/stores/store-delete-dialog"
 import { ChangePlanDialog } from "@/components/stores/change-plan-dialog"
 import type { PlanRow } from "@/lib/actions/plan-actions"
 import type { StorePlanOverview } from "@/lib/actions/store-plan-actions"
 import { StorePlanHover } from "@/components/stores/store-plan-hover"
+import { SortableTableHead } from "@/components/shared/sortable-table-head"
 
 type StoreRow = {
   id: string
@@ -68,18 +70,60 @@ export function StoreTable({
   stores,
   plans,
   planOverviews,
+  selectedIds,
+  onSelectionChange,
 }: {
   stores: StoreRow[]
   plans: PlanRow[]
   planOverviews: Record<string, StorePlanOverview>
+  selectedIds: string[]
+  onSelectionChange: (ids: string[]) => void
 }) {
+  const allIds = stores.map((store) => store.id)
+  const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.includes(id))
+
+  function toggleAll(checked: boolean) {
+    if (checked) {
+      onSelectionChange(Array.from(new Set([...selectedIds, ...allIds])))
+    } else {
+      onSelectionChange(selectedIds.filter((id) => !allIds.includes(id)))
+    }
+  }
+
+  function toggleOne(id: string, checked: boolean) {
+    if (checked) {
+      onSelectionChange(Array.from(new Set([...selectedIds, id])))
+    } else {
+      onSelectionChange(selectedIds.filter((selectedId) => selectedId !== id))
+    }
+  }
+
   return (
     <div className="rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Store</TableHead>
-            <TableHead>Code</TableHead>
+            <TableHead className="w-10">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={(event) => toggleAll(event.target.checked)}
+                aria-label="Select all stores"
+                className="h-4 w-4 rounded border-input"
+              />
+            </TableHead>
+            <SortableTableHead
+              label="Store"
+              sortKey="name"
+              defaultSortBy="createdAt"
+              className="h-10 px-2 whitespace-nowrap"
+            />
+            <SortableTableHead
+              label="Code"
+              sortKey="code"
+              defaultSortBy="createdAt"
+              className="h-10 px-2 whitespace-nowrap"
+            />
             <TableHead>City</TableHead>
             <TableHead>Users</TableHead>
             <TableHead>Customers</TableHead>
@@ -93,13 +137,22 @@ export function StoreTable({
         <TableBody>
           {stores.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+              <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
                 No stores yet. Create the first one to get started.
               </TableCell>
             </TableRow>
           ) : (
             stores.map((store) => (
               <TableRow key={store.id}>
+                <TableCell>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(store.id)}
+                    onChange={(event) => toggleOne(store.id, event.target.checked)}
+                    aria-label={`Select ${store.name}`}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                </TableCell>
                 <TableCell>
                   <StorePlanHover
                     storeName={store.name}
@@ -125,6 +178,14 @@ export function StoreTable({
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
                     <Link
+                      href={`/stores/${store.id}`}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-accent"
+                      aria-label={`View ${store.name}`}
+                      title="View store"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Link>
+                    <Link
                       href={`/stores/${store.id}/edit`}
                       className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-accent"
                       aria-label={`Edit ${store.name}`}
@@ -143,6 +204,7 @@ export function StoreTable({
                       storeName={store.name}
                       isActive={store.isActive}
                     />
+                    <StoreDeleteDialog storeId={store.id} storeName={store.name} />
                   </div>
                 </TableCell>
               </TableRow>

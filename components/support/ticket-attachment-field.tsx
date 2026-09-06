@@ -111,7 +111,7 @@ export function TicketAttachmentField({ ticketId }: TicketAttachmentFieldProps) 
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
       <Label>Attachment (optional)</Label>
 
       {attachment ? (
@@ -127,6 +127,7 @@ export function TicketAttachmentField({ ticketId }: TicketAttachmentFieldProps) 
             type="button"
             onClick={clearAttachment}
             aria-label="Remove attachment"
+            title="Remove attachment"
             className="shrink-0 rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />

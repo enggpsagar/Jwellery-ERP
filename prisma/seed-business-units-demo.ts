@@ -1,14 +1,19 @@
-// Demo/exploration data for the Business Model (Money/Gold/Silver/Diamond)
-// feature — creates 4 separate stores, each configured with a different
-// combination of business units, and populates each with customers, ledger
-// entries, invoices, and a karigar job so switching between them (as Super
-// Admin, via the store switcher) shows real, differing data across the
-// Ledger, Customers, Billing, and Karigar Management pages. Safe to re-run:
-// everything is upserted/cleared-and-recreated by a stable natural key
-// (store code, customer phone, invoice number, karigar code).
+// Demo/exploration data for the Business Model (Money + whatever
+// metals/gemstones a store configures) feature — creates 4 separate stores,
+// each configured with a different combination of business units, and
+// populates each with customers, ledger entries, invoices, and a karigar job
+// so switching between them (as Super Admin, via the store switcher) shows
+// real, differing data across the Ledger, Customers, Billing, and Karigar
+// Management pages. Safe to re-run: everything is upserted/cleared-and-
+// recreated by a stable natural key (store code, customer phone, invoice
+// number, karigar code).
+//
+// businessUnits is no longer a fixed BusinessUnit enum array — it's
+// computed per store as "MONEY" plus the live StoreMetal.id for each name in
+// `metals` (see seedStore below), matching the real dynamic-business-units
+// picker (lib/business-units.server.ts).
 import {
   PrismaClient,
-  BusinessUnit,
   LedgerEntryType,
   LedgerSourceType,
   InvoiceStatus,
@@ -63,7 +68,6 @@ type StockSeed = {
 type DemoStore = {
   code: string;
   name: string;
-  businessUnits: BusinessUnit[];
   metals: string[];
   customers: {
     name: string;
@@ -80,7 +84,6 @@ const STORES: DemoStore[] = [
   {
     code: "DEMO-GOLD",
     name: "Demo - Gold Business",
-    businessUnits: [BusinessUnit.MONEY, BusinessUnit.GOLD],
     metals: ["Gold"],
     customers: [
       {
@@ -155,7 +158,6 @@ const STORES: DemoStore[] = [
   {
     code: "DEMO-SILVER",
     name: "Demo - Silver Business",
-    businessUnits: [BusinessUnit.MONEY, BusinessUnit.SILVER],
     metals: ["Silver"],
     customers: [
       {
@@ -220,7 +222,6 @@ const STORES: DemoStore[] = [
   {
     code: "DEMO-DIAMOND",
     name: "Demo - Diamond Business",
-    businessUnits: [BusinessUnit.MONEY, BusinessUnit.DIAMOND],
     metals: ["Diamond"],
     customers: [
       {
@@ -264,12 +265,6 @@ const STORES: DemoStore[] = [
   {
     code: "DEMO-MIXED",
     name: "Demo - Money + Gold + Silver + Diamond",
-    businessUnits: [
-      BusinessUnit.MONEY,
-      BusinessUnit.GOLD,
-      BusinessUnit.SILVER,
-      BusinessUnit.DIAMOND,
-    ],
     metals: ["Gold", "Silver", "Diamond"],
     customers: [
       {
@@ -367,16 +362,6 @@ async function seedStore(demo: DemoStore) {
     create: { name: demo.name, code: demo.code },
   });
 
-  await prisma.businessSettings.upsert({
-    where: { storeId: store.id },
-    update: { businessUnits: demo.businessUnits },
-    create: {
-      storeId: store.id,
-      businessName: demo.name,
-      businessUnits: demo.businessUnits,
-    },
-  });
-
   const metalIdByName = new Map<string, string>();
   for (const metalName of demo.metals) {
     const existing = await prisma.storeMetal.findFirst({
@@ -391,6 +376,22 @@ async function seedStore(demo: DemoStore) {
 
     metalIdByName.set(metalName, metal.id);
   }
+
+  // businessUnits is "MONEY" plus the live StoreMetal.id for each metal this
+  // demo store deals in — matches the real dynamic picker (a store's
+  // Business Model options are its own configured StoreMetal rows, not a
+  // fixed Gold/Silver/Diamond enum).
+  const businessUnits = ["MONEY", ...demo.metals.map((name) => metalIdByName.get(name)!)];
+
+  await prisma.businessSettings.upsert({
+    where: { storeId: store.id },
+    update: { businessUnits },
+    create: {
+      storeId: store.id,
+      businessName: demo.name,
+      businessUnits,
+    },
+  });
 
   // Customers + manual ledger entries
   const customerRows = [];
@@ -645,7 +646,7 @@ async function seedStore(demo: DemoStore) {
   }
 
   console.log(
-    `Seeded ${demo.code} — units: ${demo.businessUnits.join(", ")}, customers: ${demo.customers.length}, invoices: ${demo.invoices.length}, karigar: ${demo.karigar ? "yes" : "no"}, stock: ${demo.stock.length}`
+    `Seeded ${demo.code} — units: ${businessUnits.join(", ")}, customers: ${demo.customers.length}, invoices: ${demo.invoices.length}, karigar: ${demo.karigar ? "yes" : "no"}, stock: ${demo.stock.length}`
   );
 }
 

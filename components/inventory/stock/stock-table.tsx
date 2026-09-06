@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { Eye, Pencil } from "lucide-react"
 
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import * as React from "react"
@@ -11,6 +12,7 @@ import type { getInventoryStock } from "@/lib/actions/inventory/stock-actions"
 import { StockStatusBadge } from "@/components/inventory/shared/stock-status-badge"
 import { FinishBadge } from "@/components/inventory/shared/finish-badge"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
+import { SortableTableHead } from "@/components/shared/sortable-table-head"
 
 // Derived from the actual server action's return shape (rather than
 // hand-declared) so this table never drifts out of sync with whatever
@@ -121,19 +123,18 @@ export function StockTable({
                   className="h-4 w-4 rounded border-input"
                 />
               </th>
-              <th className="px-4 py-3 text-left font-medium">Stock Code</th>
-              <th className="px-4 py-3 text-left font-medium">Product</th>
-              <th className="px-4 py-3 text-left font-medium">Metal</th>
-              <th className="px-4 py-3 text-left font-medium">Purity</th>
-              <th className="px-4 py-3 text-left font-medium">Qty</th>
+              <SortableTableHead label="Stock Code" sortKey="stockCode" defaultSortBy="createdAt" />
+              <SortableTableHead label="Product" sortKey="product" defaultSortBy="createdAt" />
+              <SortableTableHead label="Metal" sortKey="metalType" defaultSortBy="createdAt" />
+              <SortableTableHead label="Purity" sortKey="purity" defaultSortBy="createdAt" />
+              <SortableTableHead label="Qty" sortKey="quantity" defaultSortBy="createdAt" />
               <th className="px-4 py-3 text-left font-medium">Gross Wt.</th>
-              <th className="px-4 py-3 text-left font-medium">Net Wt.</th>
-              <th className="px-4 py-3 text-left font-medium">Making</th>
-              <th className="px-4 py-3 text-left font-medium">Sale Amt.</th>
-              <th className="px-4 py-3 text-left font-medium">Status</th>
-              <th className="px-4 py-3 text-left font-medium">Finish</th>
-              <th className="px-4 py-3 text-left font-medium">Location</th>
-              <th className="px-4 py-3 text-left font-medium">Purchase Date</th>
+              <SortableTableHead label="Net Wt." sortKey="netWeight" defaultSortBy="createdAt" />
+              <SortableTableHead label="Sale Amt." sortKey="saleAmount" defaultSortBy="createdAt" />
+              <SortableTableHead label="Status" sortKey="status" defaultSortBy="createdAt" />
+              <SortableTableHead label="Finish" sortKey="finish" defaultSortBy="createdAt" />
+              <SortableTableHead label="Location" sortKey="location" defaultSortBy="createdAt" />
+              <SortableTableHead label="Purchase Date" sortKey="purchaseDate" defaultSortBy="createdAt" />
               <th className="px-4 py-3 text-left font-medium">Action</th>
             </tr>
           </thead>
@@ -208,7 +209,6 @@ export function StockTable({
                   <td className="px-4 py-3">{item.quantity}</td>
                   <td className="px-4 py-3">{formatNumber(item.grossWeight)}</td>
                   <td className="px-4 py-3">{formatNumber(item.netWeight)}</td>
-                  <td className="px-4 py-3">{formatAmount(item.makingCharge)}</td>
                   <td className="px-4 py-3">{formatAmount(item.saleAmount)}</td>
 
                   <td className="px-4 py-3">
@@ -226,19 +226,21 @@ export function StockTable({
                   <td className="px-4 py-3">{formatDate(item.purchaseDate)}</td>
 
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
                       <Link
                         href={`/inventory/stock/${item.id}`}
-                        className="text-sm font-medium text-blue-600 hover:underline"
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
+                        title="View stock item"
                       >
-                        View
+                        <Eye className="h-4 w-4" />
                       </Link>
 
                       <Link
                         href={`/inventory/stock/${item.id}/edit`}
-                        className="text-sm font-medium text-blue-600 hover:underline"
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-amber-700 hover:bg-amber-50"
+                        title="Edit stock item"
                       >
-                        Edit
+                        <Pencil className="h-4 w-4" />
                       </Link>
                     </div>
                   </td>

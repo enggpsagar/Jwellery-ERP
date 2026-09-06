@@ -1,12 +1,13 @@
 // lib/actions/report-actions.ts
 "use server";
 
-import { InventoryStockStatus, InventoryTransactionType, InvoiceStatus } from "@prisma/client";
+import { InventoryStockStatus, InventoryTransactionType, InvoiceStatus, UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
 import { getFinenessMap, toFineWeight } from "@/lib/purity";
+import { ROLE_LABELS } from "@/lib/roles";
 
 export type DateRange = { from?: string; to?: string };
 
@@ -742,10 +743,11 @@ export type ItemLedgerRow = {
   purchaseDate: string | null;
   purchaseQuantity: number | null;
   vendorName: string | null;
-  // No staff-attribution column exists on Purchase today — always "Not
-  // recorded" until that's added, kept visible rather than dropped so the
-  // gap is honest instead of silently missing.
-  purchasedBy: string;
+  // Who is actually responsible for this item entering stock — see
+  // addedByLabel()'s own doc comment for the priority order (Karigar, then
+  // Purchase, then a manual add). "Not recorded" only for a row from before
+  // this attribution existed.
+  addedBy: string;
   totalSoldQuantity: number;
   lastSaleDate: string | null;
   soldTo: string;
@@ -776,12 +778,52 @@ function transactionTypeLabel(type: InventoryTransactionType) {
 }
 
 /**
+ * Who is actually responsible for an inventory item entering stock —
+ * replaces the old fixed "Unknown Vendor" / "Purchased by: Not recorded"
+ * placeholders with the real person or goldsmith, role-labeled the same way
+ * throughout so any role (not just Karigar/Staff) reads consistently.
+ *
+ * Priority order, matching how a piece can actually enter stock:
+ * 1. A karigar's finished work (receiveItemsFromKarigar creates the stock
+ *    row directly from the job) — attributed to the Karigar (the goldsmith
+ *    themself), not whichever staff member clicked "Receive", since the
+ *    goldsmith is who is actually responsible for the piece existing.
+ * 2. A vendor Purchase — attributed to whichever user recorded it
+ *    (Purchase.createdByName/createdByRole).
+ * 3. A manual stock add — attributed to whichever user added it
+ *    (InventoryStock.createdByName/createdByRole).
+ * 4. None of the above recorded (a row predating this attribution, or an
+ *    otherwise-untracked path) — "Not recorded", kept visible rather than
+ *    silently omitted.
+ */
+function roleLabel(role: UserRole | null | undefined): string {
+  return role ? ROLE_LABELS[role] : "User";
+}
+
+function addedByLabel(
+  karigarName: string | null,
+  purchaseCreator: { name: string | null; role: UserRole | null } | null,
+  stockCreator: { name: string | null; role: UserRole | null },
+): string {
+  if (karigarName) return `Karigar: ${karigarName}`;
+
+  if (purchaseCreator?.name) {
+    return `${roleLabel(purchaseCreator.role)}: ${purchaseCreator.name}`;
+  }
+
+  if (stockCreator.name) {
+    return `${roleLabel(stockCreator.role)}: ${stockCreator.name}`;
+  }
+
+  return "Not recorded";
+}
+
+/**
  * Full purchase-to-sale history per inventory item: when it was bought and
  * from whom, when (and to whom, by whom) it sold, and every step in between.
  *
- * "Purchased by" (which staff member logged the purchase) cannot be
- * populated — Purchase has no createdBy field yet, unlike Invoice — so that
- * column always reads "Not recorded" rather than being silently omitted.
+ * "Added by" (who is responsible for this item entering stock) is resolved
+ * by addedByLabel() below — see its own doc comment for the priority order.
  */
 export async function getItemLedgerReport(): Promise<ItemLedgerReport> {
   const storeId = await requireStoreScope();
@@ -792,7 +834,12 @@ export async function getItemLedgerReport(): Promise<ItemLedgerReport> {
     orderBy: { createdAt: "desc" },
     include: {
       product: { select: { name: true } },
-      purchaseItems: { select: { quantity: true } },
+      purchaseItems: {
+        select: {
+          quantity: true,
+          purchase: { select: { createdByName: true, createdByRole: true } },
+        },
+      },
       invoiceItems: {
         select: {
           quantity: true,
@@ -818,11 +865,23 @@ export async function getItemLedgerReport(): Promise<ItemLedgerReport> {
           },
         },
       },
-      karigarJobs: {
+      // NOT stock.karigarJobs — that relation is populated via
+      // KarigarJob.inventoryStockId, which no current code path (issue or
+      // receive) ever sets; it's dead. The receive flow
+      // (receiveItemsFromKarigar) links a newly-created stock row back to
+      // its originating job through KarigarReceiptItem.inventoryStockId
+      // instead — confirmed by grepping every karigarJob.create/update call
+      // in the codebase for inventoryStockId (found none) while verifying
+      // this fix against a real end-to-end run.
+      karigarReceiptItems: {
         select: {
-          issueDate: true,
-          receivedDate: true,
-          karigar: { select: { name: true } },
+          karigarJob: {
+            select: {
+              issueDate: true,
+              receivedDate: true,
+              karigar: { select: { name: true } },
+            },
+          },
         },
       },
       transactions: {
@@ -837,17 +896,21 @@ export async function getItemLedgerReport(): Promise<ItemLedgerReport> {
 
     const purchaseQuantity =
       stock.purchaseItems.reduce((sum, item) => sum + item.quantity, 0) || null;
+    const purchaseCreator =
+      stock.purchaseItems.find((item) => item.purchase.createdByName)?.purchase ?? null;
+    const karigarName = stock.karigarReceiptItems[0]?.karigarJob.karigar.name ?? null;
 
     if (stock.purchaseDate) {
       events.push({
         date: stock.purchaseDate,
         label: `Purchased${purchaseQuantity ? ` (Qty ${purchaseQuantity})` : ""} from ${
           stock.vendorName ?? "Unknown vendor"
-        }`,
+        }${purchaseCreator ? ` by ${roleLabel(purchaseCreator.createdByRole)}: ${purchaseCreator.createdByName}` : ""}`,
       });
     }
 
-    for (const job of stock.karigarJobs) {
+    for (const receiptItem of stock.karigarReceiptItems) {
+      const job = receiptItem.karigarJob;
       events.push({
         date: job.issueDate,
         label: `Issued to Karigar ${job.karigar.name}`,
@@ -913,7 +976,13 @@ export async function getItemLedgerReport(): Promise<ItemLedgerReport> {
       purchaseDate: stock.purchaseDate ? stock.purchaseDate.toISOString() : null,
       purchaseQuantity,
       vendorName: stock.vendorName,
-      purchasedBy: "Not recorded",
+      addedBy: addedByLabel(
+        karigarName,
+        purchaseCreator
+          ? { name: purchaseCreator.createdByName, role: purchaseCreator.createdByRole }
+          : null,
+        { name: stock.createdByName, role: stock.createdByRole },
+      ),
       totalSoldQuantity,
       lastSaleDate: lastSaleDate ? (lastSaleDate as Date).toISOString() : null,
       soldTo: soldToNames.size ? Array.from(soldToNames).join(", ") : "-",

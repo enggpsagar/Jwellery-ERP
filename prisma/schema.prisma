@@ -46,30 +46,44 @@ model Store {
   reminderEmailEnabled    Boolean @default(true)
   reminderWhatsappEnabled Boolean @default(false)
 
-  users            User[]
-  userMemberships  UserStoreMembership[]
-  planHistory      StorePlanHistory[]
-  scanSessions     ScanSession[]
-  customers        Customer[]
-  karigars         Karigar[]
-  products         Product[]
-  inventoryStock   InventoryStock[]
-  invoices         Invoice[]
-  kachaInvoices    KachaInvoice[]
-  ledgerEntries    LedgerEntry[]
-  karigarJobs      KarigarJob[]
-  metalRates       MetalRate[]
-  businessSettings BusinessSettings?
-  inviteTokens     InviteToken[]
-  vendors          Vendor[]
-  purchases        Purchase[]
-  purityFinenesses PurityFineness[]
-  quotations       Quotation[]
-  storeMetals      StoreMetal[]
-  storeCategories  StoreCategory[]
-  storeLocations   StoreLocation[]
-  apiKeys          ApiKey[]
-  supportTickets   SupportTicket[]
+  /**
+   * Pre-fills the Location field wherever one is picked while creating a
+   * record (Stock, Products, Invoices, Purchases, ...), so a single-location
+   * store never has to pick the same one every time. Set to the "Main
+   * Counter" location created at registration; changeable afterward from
+   * Settings > Locations. Named relation since StoreLocation.store (the
+   * ownership FK) is a second, separate relation between these two models.
+   */
+  defaultLocationId String?
+  defaultLocation   StoreLocation? @relation("StoreDefaultLocation", fields: [defaultLocationId], references: [id])
+
+  users                User[]
+  userMemberships      UserStoreMembership[]
+  planHistory          StorePlanHistory[]
+  scanSessions         ScanSession[]
+  customers            Customer[]
+  karigars             Karigar[]
+  products             Product[]
+  inventoryStock       InventoryStock[]
+  invoices             Invoice[]
+  kachaInvoices        KachaInvoice[]
+  ledgerEntries        LedgerEntry[]
+  karigarJobs          KarigarJob[]
+  metalRates           MetalRate[]
+  businessSettings     BusinessSettings?
+  inviteTokens         InviteToken[]
+  vendors              Vendor[]
+  purchases            Purchase[]
+  purityFinenesses     PurityFineness[]
+  caratConversionRates CaratConversionRate[]
+  quotations           Quotation[]
+  storeMetals          StoreMetal[]
+  storeCategories      StoreCategory[]
+  storeLocations       StoreLocation[]
+  apiKeys              ApiKey[]
+  supportTickets       SupportTicket[]
+  creditNotes          CreditNote[]
+  reminders            Reminder[]
 
   @@index([code])
 }
@@ -141,6 +155,9 @@ model StoreLocation {
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   store           Store                @relation(fields: [storeId], references: [id])
+  // Back-relation for Store.defaultLocationId — practically ever at most one
+  // Store (the one this location itself belongs to), never a real list.
+  defaultForStores Store[]             @relation("StoreDefaultLocation")
   inventoryStocks InventoryStock[]
   karigars        Karigar[]
   purchases       Purchase[]
@@ -150,6 +167,8 @@ model StoreLocation {
   ledgerEntries   LedgerEntry[]
   quotations      Quotation[]
   userAccess      UserLocationAccess[]
+  creditNotes     CreditNote[]
+  reminders       Reminder[]
 
   @@unique([storeId, name])
 }
@@ -239,6 +258,7 @@ model StoreMetal {
   purchaseItems       PurchaseItem[]
   karigarReceiptItems KarigarReceiptItem[]
   quotationItems      QuotationItem[]
+  karigars            Karigar[]
   // Only meaningful when isGemstone is true — the same one-to-many shape as
   // StoreCategory.types below. Replaces the old single nullable
   // StoreMetal.stoneOrigin column: a store dealing in BOTH natural and
@@ -331,6 +351,9 @@ model Customer {
   // gstinRequired() in lib/gst.ts.
   gstType        PartyGstType   @default(UNREGISTERED)
   panNumber      String?
+  // Optional KYC id — validated (12 digits + Verhoeff checksum, see
+  // lib/aadhaar.ts) only when actually entered.
+  aadhaarNumber  String?
   // A customer-facing loyalty/scheme reference number some stores print on
   // the invoice (e.g. "Encircle Id") — opaque to the app, shown as-is.
   registrationId String?
@@ -352,6 +375,7 @@ model Customer {
   kachaInvoices  KachaInvoice[]
   ledgerEntries  LedgerEntry[]
   quotations     Quotation[]
+  creditNotes    CreditNote[]
 
   @@unique([storeId, customerCode])
   @@unique([storeId, phone])
@@ -390,9 +414,17 @@ model Karigar {
   loginUser      User?
   locationId     String?
   location       StoreLocation? @relation(fields: [locationId], references: [id])
+  // The metal this karigar mainly works with (Gold/Silver/Diamond/...) —
+  // distinct from `specialization`, which is a free-text craft description
+  // ("Chain making", "Stone setting"). Optional: only drives the Karigars
+  // page's Type filter, same classifyPurityFamily grouping the Stock page's
+  // Type filter already uses.
+  metalTypeId    String?
+  metalType      StoreMetal?    @relation(fields: [metalTypeId], references: [id])
 
   @@unique([storeId, code])
   @@index([name])
+  @@index([metalTypeId])
   @@index([mobile])
   @@index([code])
   @@index([locationId])
@@ -400,56 +432,66 @@ model Karigar {
 }
 
 model Product {
-  id                      String               @id @default(cuid())
-  storeId                 String
-  productCode             String
-  name                    String
-  categoryId              String?
-  categoryTypeId          String?
-  metalTypeId             String?
+  id                        String               @id @default(cuid())
+  storeId                   String
+  productCode               String
+  name                      String
+  categoryId                String?
+  categoryTypeId            String?
+  metalTypeId               String?
   // Only meaningful when metalType.isGemstone is true — mirrors
   // categoryTypeId's role exactly: metalTypeId stays the stone selector
   // (Diamond, Ruby, ...), this is the finer-grained pick of which of that
   // stone's Store-Admin-defined Stone Type options (Natural, Lab-Grown,
   // Moissanite, or whatever else the store has added — see
   // StoreMetalOrigin) this product is.
-  stoneOriginOptionId     String?
-  defaultPurity           PurityType?
-  defaultMakingCharge     Decimal?             @db.Decimal(12, 2)
-  defaultMakingChargeType ChargeType           @default(FIXED)
-  defaultStoneCharge      Decimal?             @db.Decimal(12, 2)
-  defaultStoneChargeType  ChargeType           @default(FIXED)
+  stoneOriginOptionId       String?
+  defaultPurity             PurityType?
+  defaultMakingCharge       Decimal?             @db.Decimal(12, 2)
+  defaultMakingChargeType   ChargeType           @default(FIXED)
+  defaultStoneCharge        Decimal?             @db.Decimal(12, 2)
+  defaultStoneChargeType    ChargeType           @default(FIXED)
   // Typical weights for this design, used to prefill a stock entry rather
   // than to describe any one piece — two rings off the same design are never
   // identical to the milligram, so the per-piece truth stays on
   // InventoryStock. Same Decimal(12, 5) as the columns they seed.
-  defaultGrossWeight      Decimal?             @db.Decimal(12, 5)
-  defaultNetWeight        Decimal?             @db.Decimal(12, 5)
-  defaultStoneWeight      Decimal?             @db.Decimal(12, 5)
-  defaultCaratWeight      Decimal?             @db.Decimal(10, 3)
+  defaultGrossWeight        Decimal?             @db.Decimal(12, 5)
+  defaultNetWeight          Decimal?             @db.Decimal(12, 5)
+  defaultStoneWeight        Decimal?             @db.Decimal(12, 5)
+  defaultCaratWeight        Decimal?             @db.Decimal(10, 3)
   // A composite piece — one metal (priced by weight, unchanged) plus one
   // embedded stone/diamond component (priced by defaultStoneRate × the
   // existing defaultCaratWeight above, auto-summed into Stone Charge)
   // rather than a flat manually-typed Stone Charge. Distinct from a line
   // whose own metal IS Diamond/Stone (isCaratWeighedMetal) — that's a
   // single carat-priced item, not a metal+stone combination.
-  hasStoneComponent       Boolean              @default(false)
-  defaultStoneRate        Decimal?             @db.Decimal(12, 2)
-  designCode              String?
-  hsnCode                 String?
-  description             String?
-  notes                   String?
-  isActive                Boolean              @default(true)
-  createdAt               DateTime             @default(now())
-  updatedAt               DateTime             @updatedAt
-  store                   Store                @relation(fields: [storeId], references: [id])
-  stockItems              InventoryStock[]
-  purchaseItems           PurchaseItem[]
-  karigarReceiptItems     KarigarReceiptItem[]
-  category                StoreCategory?       @relation(fields: [categoryId], references: [id])
-  categoryType            StoreCategoryType?   @relation(fields: [categoryTypeId], references: [id])
-  metalType               StoreMetal?          @relation(fields: [metalTypeId], references: [id])
-  stoneOriginOption       StoreMetalOrigin?    @relation(fields: [stoneOriginOptionId], references: [id])
+  hasStoneComponent         Boolean              @default(false)
+  defaultStoneRate          Decimal?             @db.Decimal(12, 2)
+  // Which Stone (a StoreMetal row, e.g. "Diamond") and which of its Stone
+  // Type options (StoreMetalOrigin rows, e.g. "Natural, Lab-Grown" — comma
+  // joined, several may apply to one embedded stone) — plain denormalized
+  // names rather than FKs, same convention as vendorName/createdByName
+  // elsewhere: this is a descriptive label on the line, not something
+  // queried/joined on, so a real relation (times six tables) would be
+  // more machinery than the data warrants. Only meaningful alongside
+  // hasStoneComponent.
+  defaultStoneMetalTypeName String?
+  defaultStoneTypeNames     String?
+  designCode                String?
+  hsnCode                   String?
+  description               String?
+  notes                     String?
+  isActive                  Boolean              @default(true)
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+  store                     Store                @relation(fields: [storeId], references: [id])
+  stockItems                InventoryStock[]
+  purchaseItems             PurchaseItem[]
+  karigarReceiptItems       KarigarReceiptItem[]
+  category                  StoreCategory?       @relation(fields: [categoryId], references: [id])
+  categoryType              StoreCategoryType?   @relation(fields: [categoryTypeId], references: [id])
+  metalType                 StoreMetal?          @relation(fields: [metalTypeId], references: [id])
+  stoneOriginOption         StoreMetalOrigin?    @relation(fields: [stoneOriginOptionId], references: [id])
 
   @@unique([storeId, productCode])
   @@index([categoryId])
@@ -495,6 +537,10 @@ model InventoryStock {
   // needed at the stock level — a non-null caratWeight/stoneRate here is
   // signal enough.
   stoneRate           Decimal?               @db.Decimal(12, 2)
+  // Denormalized names, not FKs — see Product.defaultStoneMetalTypeName's
+  // doc comment for why.
+  stoneMetalTypeName  String?
+  stoneTypeNames      String?
   otherCharge         Decimal?               @db.Decimal(12, 2)
   purchaseAmount      Decimal?               @db.Decimal(12, 2)
   saleAmount          Decimal?               @db.Decimal(12, 2)
@@ -503,6 +549,17 @@ model InventoryStock {
   manufactureDate     DateTime?
   locationId          String?
   remarks             String?
+  // Who manually added this stock row — only meaningful for a manual add
+  // (see createInventoryStock's own comment: "no vendor/karigar
+  // counterparty"). A row created from a Purchase or a karigar job's
+  // receipt is instead attributed via that Purchase's own createdBy or the
+  // karigarJobs relation below — see getItemLedgerReport's addedByLabel()
+  // for the priority order. Name/role are durable snapshots (same
+  // convention as Invoice.createdByName) since a user can be renamed,
+  // promoted, or deleted after adding this item.
+  createdById         String?
+  createdByName       String?
+  createdByRole       UserRole?
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
   store               Store                  @relation(fields: [storeId], references: [id])
@@ -518,6 +575,8 @@ model InventoryStock {
   quotationItems      QuotationItem[]
   metalType           StoreMetal?            @relation(fields: [metalTypeId], references: [id])
   location            StoreLocation?         @relation(fields: [locationId], references: [id])
+  createdBy           User?                  @relation("InventoryStockCreatedBy", fields: [createdById], references: [id])
+  creditNoteItems     CreditNoteItem[]
 
   @@unique([storeId, stockCode])
   @@unique([storeId, tagNumber])
@@ -583,6 +642,19 @@ model Invoice {
   cancelledById          String?
   cancelledByName        String?
   cancellationReason     String?
+  // E-way Bill — record-keeping only. This app never calls the government's
+  // E-way Bill API (no GSP/NIC credentials involved); the store still
+  // generates the actual bill on ewaybillgst.gov.in and enters its number
+  // back here, purely so it prints on the invoice and travels with the
+  // shipment's paperwork. See EditInvoiceDialog, available on every
+  // non-cancelled invoice regardless of payment status — E-way Bills are
+  // usually generated at dispatch, not necessarily at billing time.
+  ewayBillNumber         String?
+  ewayBillDate           DateTime?
+  transporterName        String?
+  vehicleNumber          String?
+  transportMode          TransportMode?
+  distanceKm             Int?
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
   store                  Store          @relation(fields: [storeId], references: [id])
@@ -603,6 +675,7 @@ model Invoice {
   replacesId             String?        @unique
   replaces               Invoice?       @relation("InvoiceReplaces", fields: [replacesId], references: [id])
   replacedBy             Invoice?       @relation("InvoiceReplaces")
+  creditNotes            CreditNote[]
 
   @@unique([storeId, invoiceNumber])
   @@index([createdById])
@@ -612,6 +685,108 @@ model Invoice {
   @@index([status])
   @@index([invoiceNumber])
   @@index([storeId])
+  @@index([locationId])
+}
+
+/// A return against a PAID/PARTIAL invoice, raised within the store's
+/// configured returnWindowDays (BusinessSettings) of that invoice's
+/// invoiceDate — see lib/actions/credit-note-actions.ts's isReturnEligible().
+/// Deliberately its own document (own number series, own date), not a
+/// mutation of the original Invoice: the invoice must keep saying what was
+/// actually billed/received historically, same reasoning as
+/// Invoice.cancelledAt leaving totalAmount/paidAmount untouched and
+/// explaining itself via an offsetting LedgerEntry instead.
+model CreditNote {
+  id               String   @id @default(cuid())
+  storeId          String
+  creditNoteNumber String
+  invoiceId        String
+  customerId       String
+  creditNoteDate   DateTime @default(now())
+  reason           String?
+  totalAmount      Decimal  @default(0) @db.Decimal(12, 2)
+  notes            String?
+  // Same id/name-snapshot convention as Invoice.createdById/createdByName —
+  // staff leave and get renamed, and a credit note has to keep saying who
+  // processed it.
+  createdById      String?
+  createdByName    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  store         Store            @relation(fields: [storeId], references: [id])
+  invoice       Invoice          @relation(fields: [invoiceId], references: [id])
+  customer      Customer         @relation(fields: [customerId], references: [id])
+  createdBy     User?            @relation("CreditNoteCreatedBy", fields: [createdById], references: [id])
+  items         CreditNoteItem[]
+  ledgerEntries LedgerEntry[]
+  locationId    String?
+  location      StoreLocation?   @relation(fields: [locationId], references: [id])
+
+  @@unique([storeId, creditNoteNumber])
+  @@index([creditNoteNumber])
+  @@index([invoiceId])
+  @@index([customerId])
+  @@index([storeId])
+  @@index([locationId])
+}
+
+/// One returned line, snapshotting the InvoiceItem it came from — quantity
+/// here is how many of that line's pieces this particular credit note
+/// covers, which can be less than the original quantity, and a second
+/// return against the same invoice line is only blocked from exceeding
+/// what's left by summing prior CreditNoteItem rows for the same
+/// invoiceItemId (see getReturnableQuantity in credit-note-actions.ts) —
+/// no denormalized "remaining" counter is kept on InvoiceItem itself, to
+/// avoid it drifting out of sync with the credit notes that are the actual
+/// source of truth.
+model CreditNoteItem {
+  id               String   @id @default(cuid())
+  creditNoteId     String
+  invoiceItemId    String
+  inventoryStockId String?
+  itemName         String
+  quantity         Int      @default(1)
+  rate             Decimal? @db.Decimal(12, 2)
+  lineTotal        Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt        DateTime @default(now())
+
+  creditNote     CreditNote      @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+  invoiceItem    InvoiceItem     @relation(fields: [invoiceItemId], references: [id])
+  inventoryStock InventoryStock? @relation(fields: [inventoryStockId], references: [id])
+
+  @@index([creditNoteId])
+  @@index([invoiceItemId])
+  @@index([inventoryStockId])
+}
+
+/// A free-form, manually-added reminder for the Calendar View — the catch-all
+/// for "other important tasks/deadlines" that don't already have a date
+/// field somewhere else in the schema (Invoice.dueDate, Quotation.validUntil,
+/// KarigarJob.expectedDate, Store.planExpiresAt — see
+/// lib/actions/calendar-actions.ts's getCalendarEvents, which merges all of
+/// these into one feed). Not itself tied to any other record on purpose:
+/// a reminder here is exactly the kind of thing that has no natural home
+/// elsewhere.
+model Reminder {
+  id            String   @id @default(cuid())
+  storeId       String
+  title         String
+  notes         String?
+  dueDate       DateTime
+  isDone        Boolean  @default(false)
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  store      Store          @relation(fields: [storeId], references: [id])
+  createdBy  User?          @relation("ReminderCreatedBy", fields: [createdById], references: [id])
+  locationId String?
+  location   StoreLocation? @relation(fields: [locationId], references: [id])
+
+  @@index([storeId])
+  @@index([dueDate])
   @@index([locationId])
 }
 
@@ -650,81 +825,93 @@ model KachaInvoice {
 }
 
 model KachaInvoiceItem {
-  id               String          @id @default(cuid())
-  kachaInvoiceId   String
-  itemName         String
-  metalTypeId      String?
-  purity           PurityType?
-  quantity         Int             @default(1)
-  grossWeight      Decimal?        @db.Decimal(12, 5)
-  netWeight        Decimal?        @db.Decimal(12, 5)
-  dmoWeight        Decimal?        @db.Decimal(12, 5)
-  stoneWeight      Decimal?        @db.Decimal(12, 5)
-  caratWeight      Decimal?        @db.Decimal(10, 3)
-  rate             Decimal?        @db.Decimal(12, 2)
-  makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
-  makingChargeType ChargeType      @default(FIXED)
-  stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
-  stoneRate        Decimal?        @db.Decimal(12, 2)
-  lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
-  inventoryStockId String?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  inventoryStock   InventoryStock? @relation(fields: [inventoryStockId], references: [id])
-  kachaInvoice     KachaInvoice    @relation(fields: [kachaInvoiceId], references: [id], onDelete: Cascade)
-  metalType        StoreMetal?     @relation(fields: [metalTypeId], references: [id])
+  id                 String          @id @default(cuid())
+  kachaInvoiceId     String
+  itemName           String
+  metalTypeId        String?
+  purity             PurityType?
+  quantity           Int             @default(1)
+  grossWeight        Decimal?        @db.Decimal(12, 5)
+  netWeight          Decimal?        @db.Decimal(12, 5)
+  dmoWeight          Decimal?        @db.Decimal(12, 5)
+  stoneWeight        Decimal?        @db.Decimal(12, 5)
+  caratWeight        Decimal?        @db.Decimal(10, 3)
+  rate               Decimal?        @db.Decimal(12, 2)
+  makingCharge       Decimal         @default(0) @db.Decimal(12, 2)
+  makingChargeType   ChargeType      @default(FIXED)
+  // Hallmarking charge, folded into the slip's Making Charges total — same
+  // convention as InvoiceItem.hmCharge's own doc comment.
+  hmCharge           Decimal         @default(0) @db.Decimal(12, 2)
+  stoneCharge        Decimal         @default(0) @db.Decimal(12, 2)
+  stoneRate          Decimal?        @db.Decimal(12, 2)
+  // Denormalized names, not FKs — see Product.defaultStoneMetalTypeName's
+  // doc comment for why.
+  stoneMetalTypeName String?
+  stoneTypeNames     String?
+  lineTotal          Decimal         @default(0) @db.Decimal(12, 2)
+  inventoryStockId   String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  inventoryStock     InventoryStock? @relation(fields: [inventoryStockId], references: [id])
+  kachaInvoice       KachaInvoice    @relation(fields: [kachaInvoiceId], references: [id], onDelete: Cascade)
+  metalType          StoreMetal?     @relation(fields: [metalTypeId], references: [id])
 
   @@index([kachaInvoiceId])
   @@index([inventoryStockId])
 }
 
 model InvoiceItem {
-  id               String          @id @default(cuid())
-  invoiceId        String
-  itemName         String
-  metalTypeId      String?
-  quantity         Int             @default(1)
-  grossWeight      Decimal?        @db.Decimal(12, 5)
-  netWeight        Decimal?        @db.Decimal(12, 5)
-  dmoWeight        Decimal?        @db.Decimal(12, 5)
+  id                 String          @id @default(cuid())
+  invoiceId          String
+  itemName           String
+  metalTypeId        String?
+  quantity           Int             @default(1)
+  grossWeight        Decimal?        @db.Decimal(12, 5)
+  netWeight          Decimal?        @db.Decimal(12, 5)
+  dmoWeight          Decimal?        @db.Decimal(12, 5)
   // Net stone weight (carats or grams, store's choice — same free-typed
   // convention as every other weight field), separate from dmoWeight (which
   // is Dust/Making/Other, not stone).
-  stoneWeight      Decimal?        @db.Decimal(12, 5)
+  stoneWeight        Decimal?        @db.Decimal(12, 5)
   // Diamond weight in carats, only meaningful when purity is DIAMOND — a
   // dedicated, unambiguous unit (unlike stoneWeight above), since rate then
   // prices per carat rather than per gram.
-  caratWeight      Decimal?        @db.Decimal(10, 3)
-  rate             Decimal?        @db.Decimal(12, 2)
-  makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
-  makingChargeType ChargeType      @default(FIXED)
+  caratWeight        Decimal?        @db.Decimal(10, 3)
+  rate               Decimal?        @db.Decimal(12, 2)
+  makingCharge       Decimal         @default(0) @db.Decimal(12, 2)
+  makingChargeType   ChargeType      @default(FIXED)
   // Hallmarking charge, shown as its own line under Making Charges on the
   // printed invoice — distinct from makingCharge itself.
-  hmCharge         Decimal         @default(0) @db.Decimal(12, 2)
-  stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
-  stoneRate        Decimal?        @db.Decimal(12, 2)
+  hmCharge           Decimal         @default(0) @db.Decimal(12, 2)
+  stoneCharge        Decimal         @default(0) @db.Decimal(12, 2)
+  stoneRate          Decimal?        @db.Decimal(12, 2)
+  // Denormalized names, not FKs — see Product.defaultStoneMetalTypeName's
+  // doc comment for why.
+  stoneMetalTypeName String?
+  stoneTypeNames     String?
   // Per-line scheme/discount amount, separate from Invoice.discount (which
   // is an invoice-level total) — the printed format wants one column per
   // line, not a single amount split across items after the fact.
-  schemeDiscount   Decimal         @default(0) @db.Decimal(12, 2)
-  sgstAmount       Decimal         @default(0) @db.Decimal(12, 2)
-  cgstAmount       Decimal         @default(0) @db.Decimal(12, 2)
+  schemeDiscount     Decimal         @default(0) @db.Decimal(12, 2)
+  sgstAmount         Decimal         @default(0) @db.Decimal(12, 2)
+  cgstAmount         Decimal         @default(0) @db.Decimal(12, 2)
   // Charged instead of sgstAmount+cgstAmount when the sale is inter-state
   // (customer's state differs from the store's own) - never both at once,
   // see computeGst() in lib/gst.ts. Always 0 for a Composition-scheme store,
   // same as sgst/cgst - a composition dealer never itemizes GST at all.
-  igstAmount       Decimal         @default(0) @db.Decimal(12, 2)
+  igstAmount         Decimal         @default(0) @db.Decimal(12, 2)
   // HSN snapshot at sale time — Product.hsnCode can change later, and a
   // manually-entered line (no linked stock/product) has no HSN otherwise.
-  hsnCode          String?
-  lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  inventoryStockId String?
-  purity           PurityType?
-  inventoryStock   InventoryStock? @relation(fields: [inventoryStockId], references: [id])
-  invoice          Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  metalType        StoreMetal?     @relation(fields: [metalTypeId], references: [id])
+  hsnCode            String?
+  lineTotal          Decimal         @default(0) @db.Decimal(12, 2)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  inventoryStockId   String?
+  purity             PurityType?
+  inventoryStock     InventoryStock? @relation(fields: [inventoryStockId], references: [id])
+  invoice            Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  metalType          StoreMetal?     @relation(fields: [metalTypeId], references: [id])
+  creditNoteItems    CreditNoteItem[]
 
   @@index([invoiceId])
   @@index([inventoryStockId])
@@ -739,6 +926,7 @@ model LedgerEntry {
   customerId       String?
   karigarId        String?
   invoiceId        String?
+  creditNoteId     String?
   purchaseId       String?
   vendorId         String?
   metalTypeId      String?
@@ -761,6 +949,7 @@ model LedgerEntry {
   store            Store            @relation(fields: [storeId], references: [id])
   customer         Customer?        @relation(fields: [customerId], references: [id])
   invoice          Invoice?         @relation(fields: [invoiceId], references: [id])
+  creditNote       CreditNote?      @relation(fields: [creditNoteId], references: [id])
   karigar          Karigar?         @relation(fields: [karigarId], references: [id])
   purchase         Purchase?        @relation(fields: [purchaseId], references: [id])
   vendor           Vendor?          @relation(fields: [vendorId], references: [id])
@@ -772,6 +961,7 @@ model LedgerEntry {
   @@index([customerId])
   @@index([karigarId])
   @@index([invoiceId])
+  @@index([creditNoteId])
   @@index([purchaseId])
   @@index([vendorId])
   @@index([type])
@@ -837,6 +1027,9 @@ model Vendor {
   // gstScheme - see isVendorGstApplicable() in lib/gst.ts, used by the
   // Purchases form/action instead of the store's own scheme.
   gstType        PartyGstType     @default(UNREGISTERED)
+  // Optional KYC id — validated (12 digits + Verhoeff checksum, see
+  // lib/aadhaar.ts) only when actually entered.
+  aadhaarNumber  String?
   notes          String?
   openingBalance Decimal          @default(0) @db.Decimal(12, 2)
   isActive       Boolean          @default(true)
@@ -886,6 +1079,13 @@ model Purchase {
   paidAmount          Decimal        @default(0) @db.Decimal(12, 2)
   balanceAmount       Decimal        @default(0) @db.Decimal(12, 2)
   notes               String?
+  // Which staff member recorded this purchase — previously untracked (see
+  // getItemLedgerReport's own former comment on why "Purchased by" always
+  // read "Not recorded"). Name/role are durable snapshots, same convention
+  // as Invoice.createdByName.
+  createdById         String?
+  createdByName       String?
+  createdByRole       UserRole?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   store               Store          @relation(fields: [storeId], references: [id])
@@ -894,6 +1094,7 @@ model Purchase {
   ledgerEntries       LedgerEntry[]
   locationId          String?
   location            StoreLocation? @relation(fields: [locationId], references: [id])
+  createdBy           User?          @relation("PurchaseCreatedBy", fields: [createdById], references: [id])
 
   @@unique([storeId, purchaseNumber])
   @@index([vendorId])
@@ -904,34 +1105,38 @@ model Purchase {
 }
 
 model PurchaseItem {
-  id               String          @id @default(cuid())
-  purchaseId       String
-  productId        String
-  itemName         String
-  metalTypeId      String?
-  purity           PurityType?
-  quantity         Int             @default(1)
-  grossWeight      Decimal?        @db.Decimal(12, 5)
-  netWeight        Decimal?        @db.Decimal(12, 5)
-  dmoWeight        Decimal?        @db.Decimal(12, 5)
-  stoneWeight      Decimal?        @db.Decimal(12, 5)
-  caratWeight      Decimal?        @db.Decimal(10, 3)
-  rate             Decimal?        @db.Decimal(12, 2)
-  makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
-  makingChargeType ChargeType      @default(FIXED)
-  stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
-  stoneRate        Decimal?        @db.Decimal(12, 2)
+  id                 String          @id @default(cuid())
+  purchaseId         String
+  productId          String
+  itemName           String
+  metalTypeId        String?
+  purity             PurityType?
+  quantity           Int             @default(1)
+  grossWeight        Decimal?        @db.Decimal(12, 5)
+  netWeight          Decimal?        @db.Decimal(12, 5)
+  dmoWeight          Decimal?        @db.Decimal(12, 5)
+  stoneWeight        Decimal?        @db.Decimal(12, 5)
+  caratWeight        Decimal?        @db.Decimal(10, 3)
+  rate               Decimal?        @db.Decimal(12, 2)
+  makingCharge       Decimal         @default(0) @db.Decimal(12, 2)
+  makingChargeType   ChargeType      @default(FIXED)
+  stoneCharge        Decimal         @default(0) @db.Decimal(12, 2)
+  stoneRate          Decimal?        @db.Decimal(12, 2)
+  // Denormalized names, not FKs — see Product.defaultStoneMetalTypeName's
+  // doc comment for why.
+  stoneMetalTypeName String?
+  stoneTypeNames     String?
   // HSN snapshot at purchase time - same reasoning as InvoiceItem.hsnCode:
   // Product.hsnCode can change later, and this line might not even have a
   // linked product yet at the time of entry.
-  hsnCode          String?
-  lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
-  inventoryStockId String?
-  createdAt        DateTime        @default(now())
-  purchase         Purchase        @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  product          Product         @relation(fields: [productId], references: [id])
-  inventoryStock   InventoryStock? @relation(fields: [inventoryStockId], references: [id])
-  metalType        StoreMetal?     @relation(fields: [metalTypeId], references: [id])
+  hsnCode            String?
+  lineTotal          Decimal         @default(0) @db.Decimal(12, 2)
+  inventoryStockId   String?
+  createdAt          DateTime        @default(now())
+  purchase           Purchase        @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product            Product         @relation(fields: [productId], references: [id])
+  inventoryStock     InventoryStock? @relation(fields: [inventoryStockId], references: [id])
+  metalType          StoreMetal?     @relation(fields: [metalTypeId], references: [id])
 
   @@index([purchaseId])
   @@index([productId])
@@ -946,6 +1151,26 @@ model PurityFineness {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   store           Store      @relation(fields: [storeId], references: [id])
+
+  @@unique([storeId, purity])
+}
+
+// How many grams one carat is worth, per purity — the store-configurable
+// counterpart to the app-wide GRAMS_PER_CARAT default (0.2g, the real
+// diamond-carat standard) in lib/purity.ts. Same shape/role as
+// PurityFineness above (one row per PurityType, lazily seeded with
+// defaults on first read — see getGramsPerCaratMap), just a different
+// number: this converts a Carat Weight into grams (Product/Stock/
+// Invoice/Purchase/Kacha/Quotation's Carat Weight <-> Net Weight fields),
+// fineness converts a weight into its fine-metal content.
+model CaratConversionRate {
+  id            String     @id @default(cuid())
+  storeId       String
+  purity        PurityType
+  gramsPerCarat Decimal    @db.Decimal(6, 4)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  store         Store      @relation(fields: [storeId], references: [id])
 
   @@unique([storeId, purity])
 }
@@ -1018,26 +1243,33 @@ model Quotation {
 }
 
 model QuotationItem {
-  id               String          @id @default(cuid())
-  quotationId      String
-  itemName         String
-  metalTypeId      String?
-  purity           PurityType?
-  quantity         Int             @default(1)
-  grossWeight      Decimal?        @db.Decimal(12, 5)
-  netWeight        Decimal?        @db.Decimal(12, 5)
-  stoneWeight      Decimal?        @db.Decimal(12, 5)
-  caratWeight      Decimal?        @db.Decimal(10, 3)
-  rate             Decimal?        @db.Decimal(12, 2)
-  makingCharge     Decimal         @default(0) @db.Decimal(12, 2)
-  makingChargeType ChargeType      @default(FIXED)
-  stoneCharge      Decimal         @default(0) @db.Decimal(12, 2)
-  stoneRate        Decimal?        @db.Decimal(12, 2)
-  lineTotal        Decimal         @default(0) @db.Decimal(12, 2)
-  inventoryStockId String?
-  quotation        Quotation       @relation(fields: [quotationId], references: [id], onDelete: Cascade)
-  inventoryStock   InventoryStock? @relation(fields: [inventoryStockId], references: [id])
-  metalType        StoreMetal?     @relation(fields: [metalTypeId], references: [id])
+  id                 String          @id @default(cuid())
+  quotationId        String
+  itemName           String
+  metalTypeId        String?
+  purity             PurityType?
+  quantity           Int             @default(1)
+  grossWeight        Decimal?        @db.Decimal(12, 5)
+  netWeight          Decimal?        @db.Decimal(12, 5)
+  stoneWeight        Decimal?        @db.Decimal(12, 5)
+  caratWeight        Decimal?        @db.Decimal(10, 3)
+  rate               Decimal?        @db.Decimal(12, 2)
+  makingCharge       Decimal         @default(0) @db.Decimal(12, 2)
+  makingChargeType   ChargeType      @default(FIXED)
+  // Hallmarking charge, folded into the quotation's Making Charges total —
+  // same convention as InvoiceItem.hmCharge's own doc comment.
+  hmCharge           Decimal         @default(0) @db.Decimal(12, 2)
+  stoneCharge        Decimal         @default(0) @db.Decimal(12, 2)
+  stoneRate          Decimal?        @db.Decimal(12, 2)
+  // Denormalized names, not FKs — see Product.defaultStoneMetalTypeName's
+  // doc comment for why.
+  stoneMetalTypeName String?
+  stoneTypeNames     String?
+  lineTotal          Decimal         @default(0) @db.Decimal(12, 2)
+  inventoryStockId   String?
+  quotation          Quotation       @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  inventoryStock     InventoryStock? @relation(fields: [inventoryStockId], references: [id])
+  metalType          StoreMetal?     @relation(fields: [metalTypeId], references: [id])
 
   @@index([quotationId])
   @@index([inventoryStockId])
@@ -1131,12 +1363,42 @@ model BusinessSettings {
   // Tax defaults
   defaultGstRate Float @default(3.0) // jewellery GST is typically 3%
 
+  // BIS hallmarking fee, charged as a flat ₹ amount per hallmarked piece
+  // (not a % or per-gram charge — that's how the Assaying & Hallmarking
+  // Centre actually bills a jewellery store) on every Gold/Silver line item
+  // across Invoice/Kacha Slip/Quotation — see isHallmarkablePurity() in
+  // lib/purity.ts for exactly which PurityType values qualify (Platinum/
+  // Diamond/Other never get this). The ₹45 default is a PLACEHOLDER, same
+  // spirit as this codebase's other "needs real-world verification before
+  // trusting it" numbers (e.g. a payment-threshold placeholder elsewhere
+  // in this app) — BIS hallmarking rates change periodically via official
+  // notification, and this was never confirmed against a specific store's
+  // current hallmarking-centre invoice. Settings UI must tell the store to
+  // verify/correct this figure, not present it as an authoritative rate.
+  hallmarkChargePerPiece Decimal @default(45) @db.Decimal(12, 2)
+
+  // How many days after invoiceDate a sold item may still be returned via a
+  // Credit Note — see CreditNote and lib/actions/credit-note-actions.ts'
+  // isReturnEligible(). A store-wide figure (not per-product/category) by
+  // design: this is a policy the whole store states to every customer, not
+  // a per-item attribute.
+  returnWindowDays Int @default(30)
+
   // Financial year
   financialYearStartMonth Int @default(4) // April = 4, common in India
 
   // Which unit(s) this business transacts and settles balances in.
   // Drives how the ledger (general + per-customer) totals/entries are denominated.
-  businessUnits BusinessUnit[] @default([MONEY])
+  // Each entry is either the literal sentinel "MONEY" (always available, not
+  // a real row anywhere) or a live StoreMetal.id — covering both plain
+  // metals and gemstones (StoreMetal.isGemstone), since a store's actual set
+  // of settlement units is whatever it has configured in Taxonomy, not a
+  // fixed Gold/Silver/Diamond list. Used to be BusinessUnit[] (a fixed
+  // Postgres enum) — see the dynamic-business-units migration for the
+  // one-time backfill from that enum to StoreMetal ids. Resolve this via
+  // getActiveBusinessUnits()/getAvailableBusinessUnitOptions()
+  // (lib/business-units.server.ts), never read raw.
+  businessUnits String[] @default(["MONEY"])
 
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
@@ -1240,11 +1502,15 @@ enum TicketStatus {
  * so the Super Admin inbox can sort/filter by recent activity with a single
  * indexed column instead of an aggregate subquery per row.
  * `ticketNumber` is a human-readable, platform-wide identifier
- * (`TKT-{year}-{padded sequence}`) assigned at creation — mirrors the
- * `{prefix}-{year}-{padded count}` shape every other numbered document in
- * this schema already uses (Invoice.invoiceNumber, PurchaseBill's own
- * number, Quotation.quotationNumber, KachaInvoice's slip number — see each
- * one's own `generate*Number` in lib/actions/*.ts), except counted across
+ * (`TKT-{YYYYMMDD}-{HHMM}-{padded daily sequence}`, e.g.
+ * `TKT-20260903-1745-0003`) assigned at creation — same idea as
+ * Invoice.invoiceNumber's own `{prefix}-{YYYYMMDD}-{padded daily sequence}`
+ * (see generateInvoiceNumber in lib/actions/invoice-actions.ts), except
+ * this one also encodes the time, since Purchase/Quotation/KachaInvoice
+ * still use the older `{prefix}-{year}-{padded count}` shape (see each
+ * one's own `generate*Number` in lib/actions/*.ts) — a ticket's own
+ * date/time is encoded directly into the number so it's readable at a
+ * glance without opening it. Counted across
  * every store rather than scoped to one, since a ticket itself is
  * platform-wide, not a per-store record (see storeId above). Shown to both
  * the submitter and the Super Admin, and threaded into the ticket's emails
@@ -1320,6 +1586,7 @@ model User {
   email                 String?                @unique
   phone                 String?                @unique
   image                 String?
+  panNumber             String?
   role                  UserRole               @default(STAFF)
   status                UserStatus             @default(INVITED)
   isActive              Boolean                @default(true)
@@ -1337,6 +1604,9 @@ model User {
   country               String?                @default("India")
   pincode               String?
   state                 String?
+  // Optional KYC id — validated (12 digits + Verhoeff checksum, see
+  // lib/aadhaar.ts) only when actually entered.
+  aadhaarNumber         String?
   accounts              Account[]
   employee              Employee?
   store                 Store?                 @relation(fields: [storeId], references: [id])
@@ -1356,6 +1626,10 @@ model User {
   customersCreated      Customer[]             @relation("CustomerCreatedBy")
   supportTicketsFiled   SupportTicket[]        @relation("SupportTicketSubmittedBy")
   supportTicketMessages SupportTicketMessage[] @relation("SupportTicketMessageAuthor")
+  inventoryStocksAdded  InventoryStock[]       @relation("InventoryStockCreatedBy")
+  purchasesRecorded     Purchase[]             @relation("PurchaseCreatedBy")
+  creditNotesCreated    CreditNote[]           @relation("CreditNoteCreatedBy")
+  remindersCreated      Reminder[]             @relation("ReminderCreatedBy")
 
   @@index([storeId])
 }
@@ -1497,6 +1771,10 @@ enum PaymentMethod {
 enum LedgerSourceType {
   MANUAL
   SALE
+  // A Credit Note's refund entry — same naming as the pre-existing
+  // InventoryTransactionType.SALE_RETURN so both sides of a return use one
+  // consistent term.
+  SALE_RETURN
   PURCHASE
   KARIGAR_ISSUE
   KARIGAR_RECEIPT
@@ -1510,17 +1788,17 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+/** The four transport modes the E-way Bill portal itself offers. */
+enum TransportMode {
+  ROAD
+  RAIL
+  AIR
+  SHIP
+}
 
 enum ChargeType {
   FIXED
   PERCENTAGE
-}
-
-enum BusinessUnit {
-  MONEY
-  GOLD
-  SILVER
-  DIAMOND
 }
 
 // The three GST registration types a jewellery business can operate under

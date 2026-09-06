@@ -365,6 +365,33 @@ export async function archiveStore(storeId: string): Promise<StoreFormState> {
   }
 }
 
+export type BulkArchiveResult = {
+  archivedCount: number;
+  failures: { id: string; message: string }[];
+};
+
+/**
+ * Archives each selected store through the exact same archiveStore() call
+ * a single-row Archive uses — never a bare updateMany — so the SUPER_ADMIN
+ * role check and not-found handling apply identically whether one row or
+ * several were ticked at once.
+ */
+export async function bulkArchiveStores(ids: string[]): Promise<BulkArchiveResult> {
+  const failures: BulkArchiveResult["failures"] = [];
+  let archivedCount = 0;
+
+  for (const id of ids) {
+    const result = await archiveStore(id);
+    if (result.success) {
+      archivedCount++;
+    } else {
+      failures.push({ id, message: result.message });
+    }
+  }
+
+  return { archivedCount, failures };
+}
+
 export async function restoreStore(storeId: string): Promise<StoreFormState> {
   try {
     await requireRole(UserRole.SUPER_ADMIN);
@@ -392,6 +419,195 @@ export async function restoreStore(storeId: string): Promise<StoreFormState> {
   } catch (error) {
     console.error("restoreStore error:", error);
     return { success: false, message: "Failed to restore store" };
+  }
+}
+
+export type StoreRecordCounts = {
+  customers: number;
+  vendors: number;
+  karigars: number;
+  products: number;
+  invoices: number;
+  kachaInvoices: number;
+  purchases: number;
+  quotations: number;
+  users: number;
+  total: number;
+};
+
+/**
+ * Read-only counts for the handful of entities a human recognizes on a
+ * confirmation screen, used to decide whether a plain archive/delete is
+ * safe or whether Force Delete (forceDeleteStore, below) is required.
+ * Deliberately approximate/simple — NOT the exhaustive model list that
+ * forceDeleteStore itself has to enumerate.
+ */
+export async function getStoreRecordCounts(storeId: string): Promise<StoreRecordCounts> {
+  await requireRole(UserRole.SUPER_ADMIN);
+
+  const [customers, vendors, karigars, products, invoices, kachaInvoices, purchases, quotations, users] =
+    await Promise.all([
+      prisma.customer.count({ where: { storeId } }),
+      prisma.vendor.count({ where: { storeId } }),
+      prisma.karigar.count({ where: { storeId } }),
+      prisma.product.count({ where: { storeId } }),
+      prisma.invoice.count({ where: { storeId } }),
+      prisma.kachaInvoice.count({ where: { storeId } }),
+      prisma.purchase.count({ where: { storeId } }),
+      prisma.quotation.count({ where: { storeId } }),
+      prisma.user.count({ where: { storeId } }),
+    ]);
+
+  const total =
+    customers + vendors + karigars + products + invoices + kachaInvoices + purchases + quotations + users;
+
+  return { customers, vendors, karigars, products, invoices, kachaInvoices, purchases, quotations, users, total };
+}
+
+/**
+ * Permanently deletes a Store and every row anywhere in the schema that
+ * belongs to it — direct storeId rows AND transitive children that only
+ * belong to it via a parent (InvoiceItem, PurchaseItem, etc). Only 22 of the
+ * ~29 storeId-bearing models cascade at the DB level, so a bare
+ * `store.delete()` fails on any store with real data — this walks the full
+ * dependency graph by hand instead of widening the schema's cascade
+ * behaviour just for this one rare admin action.
+ *
+ * Everything runs as ONE prisma.$transaction([...]) array (not the
+ * interactive callback form) so a failure anywhere rolls back the entire
+ * operation — never a half-deleted store. Every operation below is scoped
+ * either directly by `storeId` or through a parent relation/id list that is
+ * itself derived from `storeId` — never a bare deleteMany({}).
+ *
+ * Two circular/self-referential FKs need clearing BEFORE their target rows
+ * can be deleted, or the delete throws:
+ *   - Store.defaultLocationId points at one of this store's own
+ *     StoreLocation rows, so StoreLocation can't be deleted while Store
+ *     still points at it.
+ *   - Invoice.replacesId is a self-reference (a replacement invoice points
+ *     at the cancelled one it replaced) — deleting both rows in the same
+ *     storeId-scoped deleteMany is not guaranteed safe DELETE-order-wise, so
+ *     the pointer is nulled first.
+ *
+ * User is the other special case: it is NOT deleted by storeId directly.
+ * `User.storeId` is only a user's *default* membership (predates
+ * UserStoreMembership) — a user can also hold live membership rows into
+ * OTHER stores. Deleting such a person because their default store is being
+ * destroyed would break their access to a store that isn't being deleted.
+ * So the exact set of user ids to remove is resolved up front: storeId
+ * matches AND no UserStoreMembership row points at a *different* store.
+ * `User.karigarId` (this store's Karigar login) and any `User.invitedById`
+ * pointing at one of these users are nulled before the Karigar/User rows
+ * they'd otherwise block are removed.
+ */
+export async function forceDeleteStore(storeId: string): Promise<{ success: boolean; message: string }> {
+  try {
+    await requireRole(UserRole.SUPER_ADMIN);
+
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { name: true },
+    });
+
+    if (!store) {
+      return { success: false, message: "Store not found" };
+    }
+
+    // Resolve the exact User ids this store "owns" outright — see the
+    // function doc comment above for why this can't just be `{ storeId }`.
+    const ownedUsers = await prisma.user.findMany({
+      where: {
+        storeId,
+        storeMemberships: { none: { storeId: { not: storeId } } },
+      },
+      select: { id: true },
+    });
+    const userIds = ownedUsers.map((u) => u.id);
+
+    await prisma.$transaction([
+      // --- Clear circular / self-referential FKs before anything they'd block ---
+      prisma.store.update({ where: { id: storeId }, data: { defaultLocationId: null } }),
+      prisma.invoice.updateMany({ where: { storeId }, data: { replacesId: null } }),
+      prisma.user.updateMany({ where: { invitedById: { in: userIds } }, data: { invitedById: null } }),
+      prisma.user.updateMany({ where: { id: { in: userIds } }, data: { karigarId: null } }),
+
+      // --- Deepest line-item / leaf children first ---
+      prisma.inventoryTransaction.deleteMany({ where: { inventoryStock: { storeId } } }),
+      prisma.scanSessionItem.deleteMany({ where: { session: { storeId } } }),
+      prisma.creditNoteItem.deleteMany({ where: { creditNote: { storeId } } }),
+      prisma.karigarReceiptItem.deleteMany({ where: { karigarJob: { storeId } } }),
+      prisma.invoiceItem.deleteMany({ where: { invoice: { storeId } } }),
+      prisma.kachaInvoiceItem.deleteMany({ where: { kachaInvoice: { storeId } } }),
+      prisma.purchaseItem.deleteMany({ where: { purchase: { storeId } } }),
+      prisma.quotationItem.deleteMany({ where: { quotation: { storeId } } }),
+
+      // --- Mid-level documents ---
+      prisma.ledgerEntry.deleteMany({ where: { storeId } }),
+      prisma.scanSession.deleteMany({ where: { storeId } }),
+      prisma.karigarJob.deleteMany({ where: { storeId } }),
+      prisma.inventoryStock.deleteMany({ where: { storeId } }),
+      prisma.creditNote.deleteMany({ where: { storeId } }),
+      prisma.kachaInvoice.deleteMany({ where: { storeId } }),
+      prisma.quotation.deleteMany({ where: { storeId } }),
+      prisma.invoice.deleteMany({ where: { storeId } }),
+      prisma.purchase.deleteMany({ where: { storeId } }),
+      prisma.reminder.deleteMany({ where: { storeId } }),
+      prisma.userLocationAccess.deleteMany({ where: { location: { storeId } } }),
+
+      // --- Parties / catalog ---
+      prisma.karigar.deleteMany({ where: { storeId } }),
+      prisma.customer.deleteMany({ where: { storeId } }),
+      prisma.vendor.deleteMany({ where: { storeId } }),
+      prisma.product.deleteMany({ where: { storeId } }),
+
+      // --- Taxonomy (must outlive Product, which references all of these) ---
+      prisma.storeCategoryType.deleteMany({ where: { storeId } }),
+      prisma.storeCategory.deleteMany({ where: { storeId } }),
+      prisma.storeMetalOrigin.deleteMany({ where: { storeId } }),
+      prisma.storeMetal.deleteMany({ where: { storeId } }),
+      prisma.storeLocation.deleteMany({ where: { storeId } }),
+
+      // --- Store-level singletons / settings tables ---
+      prisma.metalRate.deleteMany({ where: { storeId } }),
+      prisma.purityFineness.deleteMany({ where: { storeId } }),
+      prisma.caratConversionRate.deleteMany({ where: { storeId } }),
+      prisma.businessSettings.deleteMany({ where: { storeId } }),
+      prisma.apiKey.deleteMany({ where: { storeId } }),
+
+      // --- Support tickets (platform-wide model, so scoped by storeId only,
+      // plus a safety-net null on any OTHER store's ticket/message authored
+      // by a user this store is about to delete) ---
+      prisma.supportTicketMessage.deleteMany({ where: { ticket: { storeId } } }),
+      prisma.supportTicketMessage.updateMany({ where: { authorId: { in: userIds } }, data: { authorId: null } }),
+      prisma.supportTicket.updateMany({ where: { submittedById: { in: userIds } }, data: { submittedById: null } }),
+      prisma.supportTicket.deleteMany({ where: { storeId } }),
+
+      // --- Invite tokens: scoped delete for invites INTO this store, plus a
+      // safety-net null for any invite (possibly for another store) accepted
+      // by a user this store is about to delete ---
+      prisma.inviteToken.updateMany({ where: { userId: { in: userIds } }, data: { userId: null } }),
+      prisma.inviteToken.deleteMany({ where: { storeId } }),
+
+      // --- This store's user accounts and everything hanging off them ---
+      prisma.employee.deleteMany({ where: { userId: { in: userIds } } }),
+      prisma.account.deleteMany({ where: { userId: { in: userIds } } }),
+      prisma.session.deleteMany({ where: { userId: { in: userIds } } }),
+      prisma.otpCode.deleteMany({ where: { userId: { in: userIds } } }),
+      prisma.userStoreMembership.deleteMany({ where: { storeId } }),
+      prisma.user.deleteMany({ where: { id: { in: userIds } } }),
+
+      prisma.storePlanHistory.deleteMany({ where: { storeId } }),
+
+      // --- Finally, the Store row itself ---
+      prisma.store.delete({ where: { id: storeId } }),
+    ]);
+
+    revalidatePath("/stores");
+
+    return { success: true, message: `Store "${store.name}" and all its data were permanently deleted` };
+  } catch (error) {
+    console.error("forceDeleteStore error:", error);
+    return { success: false, message: "Failed to force-delete store" };
   }
 }
 

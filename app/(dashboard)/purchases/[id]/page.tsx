@@ -100,7 +100,15 @@ export default async function PurchaseDetailPage({ params }: Props) {
           <tbody>
             {purchase.items.map((item: (typeof purchase.items)[number]) => (
               <tr key={item.id} className="border-b last:border-0">
-                <td className="px-4 py-3">{item.itemName}</td>
+                <td className="px-4 py-3">
+                  {item.itemName}
+                  {item.stoneMetalTypeName ? (
+                    <span className="block text-xs text-muted-foreground">
+                      Stone: {item.stoneMetalTypeName}
+                      {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3">{item.quantity}</td>
                 <td className="px-4 py-3">{item.purity ?? "-"}</td>
                 <td className="px-4 py-3">
@@ -143,7 +151,7 @@ export default async function PurchaseDetailPage({ params }: Props) {
           <span>Total</span>
           <span>₹{purchase.totalAmount.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-between text-blue-600 font-medium">
           <span>Paid</span>
           <span>₹{purchase.paidAmount.toFixed(2)}</span>
         </div>

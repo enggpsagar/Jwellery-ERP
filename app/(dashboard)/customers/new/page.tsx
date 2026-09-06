@@ -32,7 +32,13 @@ export default async function NewCustomerPage({
         backLabel={returnTo ? "Back without saving" : "Back to Customers"}
       />
 
-      <CustomerCreateForm states={states} returnTo={returnTo} gstScheme={settings.gstScheme} />
+      <CustomerCreateForm
+        states={states}
+        returnTo={returnTo}
+        gstScheme={settings.gstScheme}
+        defaultState={settings.state}
+        defaultCity={settings.city}
+      />
     </main>
   )
 }

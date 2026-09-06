@@ -4,10 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
-import type { GstScheme, PartyGstType } from "@prisma/client"
+import type { GstScheme, PartyGstType, PurityType } from "@prisma/client"
 
 import { createPurchase, type PurchaseFormState } from "@/lib/actions/purchase-actions"
-import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, GRAMS_PER_CARAT } from "@/lib/purity"
+import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, resolveGramsPerCarat } from "@/lib/purity"
 import { useToast } from "@/components/providers/toast-provider"
 import { computePurchaseGst, isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
@@ -28,7 +28,13 @@ import { ProductSelect } from "@/components/inventory/shared/product-select"
 import { LocationSelect } from "@/components/shared/location-select"
 
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
+import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { RequiredMark } from "@/components/shared/required-mark"
+import { PaidNowFields } from "@/components/shared/paid-now-fields"
+import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
+import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
+import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
+import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 
 type VendorOption = {
   id: string
@@ -53,6 +59,8 @@ type ProductOption = {
   hasStoneComponent: boolean
   defaultStoneRate: number | null
   defaultCaratWeight: number | null
+  defaultStoneMetalTypeName: string | null
+  defaultStoneTypeNames: string | null
   hsnCode: string | null
   isActive: boolean
 }
@@ -74,6 +82,12 @@ type LineItem = {
   stoneRate: number
   hasStoneComponent: boolean
   stoneChargeTouched: boolean
+  /** Once Net Stone Weight is edited directly, the Stone Carat Weight ->
+   * Net Stone Weight auto-fill (see handleCaratWeightChange) stops
+   * overwriting it — same escape hatch as stoneChargeTouched. */
+  netStoneWeightTouched: boolean
+  stoneMetalTypeName: string
+  stoneTypeNames: string[]
   dmoWeight: number
   stoneWeightInput: number
   stoneWeightUnit: "GRAM" | "CARAT"
@@ -103,6 +117,9 @@ function emptyLineItem(): LineItem {
     stoneRate: 0,
     hasStoneComponent: false,
     stoneChargeTouched: false,
+    netStoneWeightTouched: false,
+    stoneMetalTypeName: "",
+    stoneTypeNames: [],
     dmoWeight: 0,
     stoneWeightInput: 0,
     stoneWeightUnit: "GRAM",
@@ -128,6 +145,13 @@ type PurchaseFormProps = {
   vendors: VendorOption[]
   products: ProductOption[]
   locations?: LocationOption[]
+  /** Stones/Stone Types for the "Includes a Stone" picker — see the same
+   * prop on InvoiceForm for the full explanation. */
+  metals: StoreMetalRow[]
+  origins: StoreMetalOriginRow[]
+  /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
+   * Conversion Rules) — see the same prop on InvoiceForm. */
+  caratConversionRates: Record<PurityType, number>
   /** Store's default GST%, split into SGST+CGST (intra-state) or IGST
    * (inter-state) via computeGst() — see lib/gst.ts. */
   defaultGstRate?: number
@@ -137,6 +161,12 @@ type PurchaseFormProps = {
   /** The store's own state, compared against the selected vendor's state to
    * tell an inter-state purchase (IGST) from an intra-state one (SGST+CGST). */
   storeState?: string | null
+  /** Store's default location (Settings > Locations), pre-filled on this
+   * create-only form — see Store.defaultLocationId's own doc comment in
+   * schema.prisma. Server-side validation on submit (resolveWritableLocationId
+   * in purchase-actions.ts) is the actual source of truth for what a
+   * restricted user may write; this only seeds the initial UI selection. */
+  initialLocationId?: string | null
 }
 
 /**
@@ -153,7 +183,9 @@ type PurchaseDraft = {
   items: LineItem[]
   discount: number
   gstRate: number
-  paidAmount: number
+  /** "Paid Now" payment-method rows — see paymentRows' own comment below
+   * for why this is an array of rows rather than a single number. */
+  paymentRows: PaymentMethodValue[]
   purchaseDate: string
   notes: string
   vendorInvoiceNumber: string
@@ -165,10 +197,16 @@ export function PurchaseForm({
   vendors,
   products,
   locations = [],
+  metals: initialMetals,
+  origins: initialOrigins,
+  caratConversionRates,
   defaultGstRate = 0,
   gstScheme,
   storeState,
+  initialLocationId,
 }: PurchaseFormProps) {
+  const [metals, setMetals] = useState(initialMetals)
+  const [origins, setOrigins] = useState(initialOrigins)
   const router = useRouter()
   const searchParams = useSearchParams()
   const toast = useToast()
@@ -193,13 +231,18 @@ export function PurchaseForm({
   }))
 
   const [vendorId, setVendorId] = useState("")
-  const [locationId, setLocationId] = useState("")
+  const [locationId, setLocationId] = useState(initialLocationId ?? "")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
   // A Composition-scheme store can never charge/record GST — its rate
   // starts (and stays) at 0 regardless of whatever Settings has saved.
   const [gstRate, setGstRate] = useState(gstScheme === "COMPOSITION" ? 0 : defaultGstRate)
-  const [paidAmount, setPaidAmount] = useState(0)
+  // "Paid Now" collects a method (Cash/UPI/etc.) per row, same PaymentMethodFields
+  // component the "Record Payment" dialog uses — paidAmount is always derived
+  // from these rows (never tracked separately), so it can't go stale relative
+  // to what's actually been entered.
+  const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
+  const paidAmount = paymentRows.reduce((sum, row) => sum + (row.amount || 0), 0)
 
   const selectedVendor = vendors.find((vendor) => vendor.id === vendorId)
 
@@ -234,7 +277,7 @@ export function PurchaseForm({
       items,
       discount,
       gstRate,
-      paidAmount,
+      paymentRows,
       purchaseDate: formData ? String(formData.get("purchaseDate") ?? "") : "",
       notes: formData ? String(formData.get("notes") ?? "") : "",
       vendorInvoiceNumber: formData ? String(formData.get("vendorInvoiceNumber") ?? "") : "",
@@ -283,7 +326,7 @@ export function PurchaseForm({
       setVendorId(newVendorId || draft.vendorId || "")
       setDiscount(draft.discount ?? 0)
       setGstRate(draft.gstRate ?? 0)
-      setPaidAmount(draft.paidAmount ?? 0)
+      setPaymentRows(draft.paymentRows ?? [])
 
       let nextItems =
         draft.items && draft.items.length ? draft.items : [emptyLineItem()]
@@ -395,6 +438,11 @@ export function PurchaseForm({
       stoneRate: product.hasStoneComponent ? product.defaultStoneRate ?? 0 : 0,
       hasStoneComponent: product.hasStoneComponent,
       stoneChargeTouched: false,
+      stoneMetalTypeName: product.hasStoneComponent ? product.defaultStoneMetalTypeName ?? "" : "",
+      stoneTypeNames:
+        product.hasStoneComponent && product.defaultStoneTypeNames
+          ? product.defaultStoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
+          : [],
       caratWeight: product.defaultCaratWeight ?? 0,
       hsnCode: product.hsnCode ?? "",
     })
@@ -429,11 +477,37 @@ export function PurchaseForm({
     if (isCaratLine(item)) {
       const caratNum = Number(value)
       if (value.trim() !== "" && Number.isFinite(caratNum)) {
-        patch.netWeight = Number((caratNum * GRAMS_PER_CARAT).toFixed(5))
+        const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+        patch.netWeight = Number((caratNum * gramsPerCarat).toFixed(5))
         patch.netTouched = true
       }
-    } else if (item.hasStoneComponent && !item.stoneChargeTouched) {
-      patch.stoneCharge = Number((item.stoneRate * caratWeight).toFixed(2))
+    } else if (item.hasStoneComponent) {
+      if (!item.stoneChargeTouched) {
+        patch.stoneCharge = Number((item.stoneRate * caratWeight).toFixed(2))
+      }
+
+      // Net Stone Weight mirrors Stone Carat Weight until the user edits Net
+      // Stone Weight directly (netStoneWeightTouched — same override escape
+      // hatch as stoneChargeTouched). Converted to grams when the Net Stone
+      // Weight unit is set to grams (via the same resolveGramsPerCarat rate
+      // this line already uses elsewhere), so the mirrored value is always
+      // correct regardless of which unit is displayed — this also then feeds
+      // the metal's own Net Weight via the same gross/stone/dmo calc used
+      // elsewhere, unless that has separately been taken over (netTouched).
+      if (!item.netStoneWeightTouched) {
+        const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+        const stoneWeightInput =
+          item.stoneWeightUnit === "CARAT"
+            ? caratWeight
+            : Number((caratWeight * gramsPerCarat).toFixed(5))
+        patch.stoneWeightInput = stoneWeightInput
+
+        if (!item.netTouched) {
+          const stoneWeightGrams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit, gramsPerCarat)
+          const derived = deriveNetWeight(item.grossWeight, stoneWeightGrams, item.dmoWeight)
+          if (derived !== null) patch.netWeight = derived
+        }
+      }
     }
 
     updateItem(item.key, patch)
@@ -454,15 +528,42 @@ export function PurchaseForm({
     updateItem(item.key, { stoneCharge: Number(value) || 0, stoneChargeTouched: true })
   }
 
+  // Editing Net Stone Weight directly is the escape hatch out of the Stone
+  // Carat Weight auto-fill above — same override pattern as Stone Charge.
+  const handleStoneWeightInputChange = (item: LineItem, value: string) => {
+    const stoneWeightInput = Number(value) || 0
+    const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
+    const derived = item.netTouched
+      ? undefined
+      : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+    updateItem(item.key, {
+      stoneWeightInput,
+      netStoneWeightTouched: true,
+      ...(derived !== null && derived !== undefined ? { netWeight: derived } : {}),
+    })
+  }
+
+  const handleStoneWeightUnitChange = (item: LineItem, unit: "GRAM" | "CARAT") => {
+    const grams = stoneWeightToGrams(item.stoneWeightInput, unit, resolveGramsPerCarat(item.purity, caratConversionRates))
+    const derived = item.netTouched
+      ? undefined
+      : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
+    updateItem(item.key, {
+      stoneWeightUnit: unit,
+      ...(derived !== null && derived !== undefined ? { netWeight: derived } : {}),
+    })
+  }
+
   const handleNetWeightChange = (item: LineItem, value: string) => {
     const netWeight = Number(value) || 0
     const patch: Partial<LineItem> = { netWeight, netTouched: true }
 
     if (isCaratLine(item)) {
       const netNum = Number(value)
+      const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
       patch.caratWeight =
         value.trim() !== "" && Number.isFinite(netNum)
-          ? Number((netNum / GRAMS_PER_CARAT).toFixed(3))
+          ? Number((netNum / gramsPerCarat).toFixed(3))
           : 0
     }
 
@@ -540,13 +641,34 @@ export function PurchaseForm({
       makingChargeType: item.makingChargeType,
       stoneCharge: item.stoneCharge,
       stoneRate: item.hasStoneComponent ? item.stoneRate || null : null,
+      stoneMetalTypeName: item.hasStoneComponent ? item.stoneMetalTypeName || null : null,
+      stoneTypeNames:
+        item.hasStoneComponent && item.stoneTypeNames.length
+          ? item.stoneTypeNames.join(", ")
+          : null,
       dmoWeight: item.dmoWeight || null,
-      stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit) || null,
+      stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates)) || null,
       hsnCode: item.hsnCode || null,
     })),
   )
 
   const canSubmit = vendorId && items.every((item) => item.productId)
+
+  // Zero-amount rows (a split row opened but never filled in) are dropped
+  // here — the server's parseOptionalPayments requires any row it does
+  // receive to carry a real amount.
+  const paymentsJson = JSON.stringify(
+    paymentRows
+      .filter((row) => row.amount > 0)
+      .map((row) => ({
+        method: row.method,
+        amount: row.amount,
+        reference: row.reference || null,
+        bankName: row.bankName || null,
+        attachmentUrl: row.attachmentUrl || null,
+      })),
+  )
+  const paidOverTotal = paidAmount > totalAmount
 
   return (
     <form
@@ -572,9 +694,10 @@ export function PurchaseForm({
       <input type="hidden" name="cgstAmount" value={gstBreakdown.cgst} />
       <input type="hidden" name="igstAmount" value={gstBreakdown.igst} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
+      <input type="hidden" name="paymentsJson" value={paymentsJson} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Vendor <RequiredMark /></Label>
           <VendorSelect
             key={vendorSelectKey}
@@ -587,7 +710,7 @@ export function PurchaseForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Purchase Date</Label>
           <Input
             type="date"
@@ -596,7 +719,7 @@ export function PurchaseForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Vendor Invoice Number</Label>
           <Input
             name="vendorInvoiceNumber"
@@ -604,7 +727,7 @@ export function PurchaseForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Location</Label>
           <LocationSelect
             locations={locations}
@@ -632,7 +755,7 @@ export function PurchaseForm({
           {items.map((item) => (
             <div key={item.key} className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="md:col-span-2 space-y-1">
+                <div className="md:col-span-2 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Product <RequiredMark /></Label>
                   <ProductSelect
                     key={productSelectKeys[item.key] ?? 0}
@@ -645,7 +768,7 @@ export function PurchaseForm({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Item Name</Label>
                   <Input
                     value={item.itemName}
@@ -653,7 +776,7 @@ export function PurchaseForm({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Quantity</Label>
                   <Input
                     type="number"
@@ -668,7 +791,7 @@ export function PurchaseForm({
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Purity</Label>
                   <Select
                     value={item.purity}
@@ -687,7 +810,7 @@ export function PurchaseForm({
                   </Select>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Gross Weight (g)</Label>
                   <Input
                     type="number"
@@ -695,7 +818,7 @@ export function PurchaseForm({
                     value={item.grossWeight === 0 ? "" : item.grossWeight}
                     onChange={(e) => {
                       const grossWeight = Number(e.target.value) || 0
-                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit)
+                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
                       const derived = item.netTouched
                         ? undefined
                         : deriveNetWeight(grossWeight, stoneWeightGrams, item.dmoWeight)
@@ -709,7 +832,7 @@ export function PurchaseForm({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Net Weight (g)</Label>
                   <Input
                     type="number"
@@ -722,57 +845,38 @@ export function PurchaseForm({
                   )}
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs">Net Stone Weight</Label>
-                  <div className="flex gap-1">
-                    <Input
-                      type="number"
-                      step="0.00001"
-                      className="flex-1"
-                      value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
-                      onChange={(e) => {
-                        const stoneWeightInput = Number(e.target.value) || 0
-                        const grams = stoneWeightToGrams(stoneWeightInput, item.stoneWeightUnit)
-                        const derived = item.netTouched
-                          ? undefined
-                          : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
-                        updateItem(item.key, {
-                          stoneWeightInput,
-                          ...(derived !== null && derived !== undefined
-                            ? { netWeight: derived }
-                            : {}),
-                        })
-                      }}
-                    />
-                    <Select
-                      value={item.stoneWeightUnit}
-                      onValueChange={(unit) => {
-                        const stoneWeightUnit = unit as "GRAM" | "CARAT"
-                        const grams = stoneWeightToGrams(item.stoneWeightInput, stoneWeightUnit)
-                        const derived = item.netTouched
-                          ? undefined
-                          : deriveNetWeight(item.grossWeight, grams, item.dmoWeight)
-                        updateItem(item.key, {
-                          stoneWeightUnit,
-                          ...(derived !== null && derived !== undefined
-                            ? { netWeight: derived }
-                            : {}),
-                        })
-                      }}
-                    >
-                      <SelectTrigger className="w-16">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="GRAM">g</SelectItem>
-                        <SelectItem value="CARAT">ct</SelectItem>
-                      </SelectContent>
-                    </Select>
+                {/* Once this is a composite line with "Includes a Stone"
+                    checked, Net Stone Weight moves down into that box, next
+                    to the Stone Carat Weight it mirrors — see below. */}
+                {(isCaratLine(item) || !item.hasStoneComponent) && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Net Stone Weight</Label>
+                    <div className="flex gap-1">
+                      <Input
+                        type="number"
+                        step="0.00001"
+                        className="flex-1"
+                        value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
+                        onChange={(e) => handleStoneWeightInputChange(item, e.target.value)}
+                      />
+                      <Select
+                        value={item.stoneWeightUnit}
+                        onValueChange={(unit) => handleStoneWeightUnitChange(item, unit as "GRAM" | "CARAT")}
+                      >
+                        <SelectTrigger className="w-16">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GRAM">g</SelectItem>
+                          <SelectItem value="CARAT">ct</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {isCaratLine(item) && (
-                  <div className="space-y-1">
+                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Carat Weight (ct)</Label>
                     <Input
                       type="number"
@@ -788,7 +892,7 @@ export function PurchaseForm({
                   </div>
                 )}
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Dust/Making/Other Wt (g)</Label>
                   <Input
                     type="number"
@@ -796,7 +900,7 @@ export function PurchaseForm({
                     value={item.dmoWeight === 0 ? "" : item.dmoWeight}
                     onChange={(e) => {
                       const dmoWeight = Number(e.target.value) || 0
-                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit)
+                      const stoneWeightGrams = stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates))
                       const derived = item.netTouched
                         ? undefined
                         : deriveNetWeight(item.grossWeight, stoneWeightGrams, dmoWeight)
@@ -817,48 +921,43 @@ export function PurchaseForm({
                   wedged into the grid above, so a plain Gold line's fields
                   don't reflow every time this gets checked/unchecked. */}
               {!isCaratLine(item) && (
-                <div className="flex flex-wrap items-end gap-4 rounded-md border border-dashed p-3">
-                  <label className="flex items-center gap-2 text-xs font-medium">
-                    <input
-                      type="checkbox"
-                      checked={item.hasStoneComponent}
-                      onChange={(e) =>
-                        updateItem(item.key, { hasStoneComponent: e.target.checked })
-                      }
-                    />
-                    Includes a stone/diamond
-                  </label>
+                <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
+                  <IncludesStoneToggle
+                    checked={item.hasStoneComponent}
+                    onChange={(checked) => updateItem(item.key, { hasStoneComponent: checked })}
+                  />
 
                   {item.hasStoneComponent && (
-                    <>
-                      <div className="w-36 space-y-1">
-                        <Label className="text-xs">Stone Carat Weight (ct)</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={item.caratWeight === 0 ? "" : item.caratWeight}
-                          onChange={(e) => handleCaratWeightChange(item, e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Stone's own weight — independent of Net Weight
-                        </p>
-                      </div>
-                      <div className="w-36 space-y-1">
-                        <Label className="text-xs">Stone Rate (₹/ct)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={item.stoneRate === 0 ? "" : item.stoneRate}
-                          onChange={(e) => handleStoneRateChange(item, e.target.value)}
-                        />
-                      </div>
-                    </>
+                    <StoneComponentFields
+                      metals={metals}
+                      origins={origins}
+                      onMetalsChange={setMetals}
+                      onOriginsChange={setOrigins}
+                      stoneMetalTypeName={item.stoneMetalTypeName}
+                      onStoneChange={(name, typeNames) =>
+                        updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
+                      }
+                      selectedTypeNames={item.stoneTypeNames}
+                      onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
+                      caratWeight={item.caratWeight}
+                      onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
+                      stoneRate={item.stoneRate}
+                      onStoneRateChange={(value) => handleStoneRateChange(item, value)}
+                      stoneCharge={item.stoneCharge}
+                      onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
+                      stoneChargeTouched={item.stoneChargeTouched}
+                      stoneWeightInput={item.stoneWeightInput}
+                      onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
+                      stoneWeightUnit={item.stoneWeightUnit}
+                      onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
+                      netStoneWeightTouched={item.netStoneWeightTouched}
+                    />
                   )}
                 </div>
               )}
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Rate / g</Label>
                   <Input
                     type="number"
@@ -879,17 +978,22 @@ export function PurchaseForm({
                   onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
                 />
 
-                <div className="space-y-1">
-                  <Label className="text-xs">Stone Charge</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={item.stoneCharge === 0 ? "" : item.stoneCharge}
-                    onChange={(e) => handleStoneChargeChange(item, e.target.value)}
-                  />
-                </div>
+                {/* Once this is a composite line with "Includes a Stone"
+                    checked, Stone Charge moves up into that box, next to the
+                    Carat Weight/Rate it's computed from — see above. */}
+                {(isCaratLine(item) || !item.hasStoneComponent) && (
+                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                    <Label className="text-xs">Stone Charge</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={item.stoneCharge === 0 ? "" : item.stoneCharge}
+                      onChange={(e) => handleStoneChargeChange(item, e.target.value)}
+                    />
+                  </div>
+                )}
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">HSN Code</Label>
                   <Input
                     value={item.hsnCode}
@@ -920,20 +1024,20 @@ export function PurchaseForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Discount</Label>
-          <Input
-            type="number"
-            step="0.01"
-            value={discount === 0 ? "" : discount}
-            onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+          <PercentOrFlatInput
+            base={subtotal + makingChargesTotal + stoneChargesTotal}
+            value={discount}
+            onChange={setDiscount}
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>GST Rate %</Label>
-          <GstSchemeBadge scheme={gstScheme} />
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <div className="flex items-center justify-between">
+            <Label>GST Rate %</Label>
+            <GstSchemeBadge scheme={gstScheme} />
+          </div>
           {selectedVendor ? (
             <p className="text-xs text-muted-foreground">
               Vendor GST Type: <span className="font-medium">{partyGstTypeLabel(selectedVendor.gstType)}</span>
@@ -942,7 +1046,7 @@ export function PurchaseForm({
           <Input
             type="number"
             step="0.01"
-            value={gstRate}
+            value={gstRate === 0 ? "" : gstRate}
             // A purchase's GST depends on the VENDOR's own registration, not
             // our store's scheme — see computePurchaseGst()'s doc comment.
             disabled={!selectedVendor || !isVendorGstApplicable(selectedVendor.gstType)}
@@ -960,17 +1064,13 @@ export function PurchaseForm({
                   }`}
           </p>
         </div>
-
-        <div className="space-y-2">
-          <Label>Paid Now</Label>
-          <Input
-            type="number"
-            step="0.01"
-            value={paidAmount === 0 ? "" : paidAmount}
-            onChange={(e) => setPaidAmount(Number(e.target.value) || 0)}
-          />
-        </div>
       </div>
+
+      <PaidNowFields
+        rows={paymentRows}
+        onRowsChange={setPaymentRows}
+        maxAmount={totalAmount > 0 ? totalAmount : undefined}
+      />
 
       {gstScheme !== "COMPOSITION" && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1000,7 +1100,7 @@ export function PurchaseForm({
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label>Notes</Label>
         <Textarea name="notes" rows={2} />
       </div>
@@ -1036,9 +1136,11 @@ export function PurchaseForm({
         </div>
       </div>
 
-      <Button type="submit" disabled={pending || !canSubmit}>
-        {pending ? "Creating..." : "Create Purchase"}
-      </Button>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={pending || !canSubmit || paidOverTotal}>
+          {pending ? "Creating..." : "Create Purchase"}
+        </Button>
+      </div>
     </form>
   )
 }

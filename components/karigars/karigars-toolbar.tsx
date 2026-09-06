@@ -9,9 +9,20 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { exportKarigarsToExcel } from "@/lib/actions/karigar-actions"
 import { useToast } from "@/components/providers/toast-provider"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 
 type KarigarsToolbarProps = {
   selectedKarigarIds: string[]
+  /** The store's own configured metals/stones (Settings > Taxonomy) — the
+   * Type filter's options come directly from this list, so a metal added
+   * there shows up here with no code change. */
+  metals: StoreMetalRow[]
+  /** BulkDeleteButton, rendered inside this same bordered bar (next to
+   * Export) instead of as a separate floating box beside it — it already
+   * renders nothing when nothing is selected, so this slot is simply empty
+   * until a row is ticked. */
+  bulkActions?: React.ReactNode
 }
 
 function downloadBase64File(base64: string, fileName: string) {
@@ -37,7 +48,7 @@ function downloadBase64File(base64: string, fileName: string) {
   window.URL.revokeObjectURL(url)
 }
 
-export function KarigarsToolbar({ selectedKarigarIds }: KarigarsToolbarProps) {
+export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: KarigarsToolbarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -52,6 +63,7 @@ export function KarigarsToolbar({ selectedKarigarIds }: KarigarsToolbarProps) {
     | "asc"
     | "desc"
   const currentPageSize = searchParams.get("pageSize") ?? "10"
+  const currentType = searchParams.get("type") ?? "ALL"
 
   const [search, setSearch] = React.useState(currentSearch)
   const [isPending, startTransition] = React.useTransition()
@@ -107,7 +119,12 @@ export function KarigarsToolbar({ selectedKarigarIds }: KarigarsToolbarProps) {
       const result = await exportKarigarsToExcel(
         hasSelection
           ? { selectedIds: selectedKarigarIds, sortBy: currentSortBy, sortOrder: currentSortOrder }
-          : { search: currentSearch, sortBy: currentSortBy, sortOrder: currentSortOrder },
+          : {
+              search: currentSearch,
+              sortBy: currentSortBy,
+              sortOrder: currentSortOrder,
+              type: currentType !== "ALL" ? currentType : undefined,
+            },
       )
 
       if (!result.success || !result.fileBase64 || !result.fileName) {
@@ -139,6 +156,23 @@ export function KarigarsToolbar({ selectedKarigarIds }: KarigarsToolbarProps) {
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+        <select
+          className="rounded-md border px-3 py-2 text-sm"
+          value={currentType}
+          onChange={(e) => updateParam("type", e.target.value)}
+          disabled={isPending}
+        >
+          <option value="ALL">All Types</option>
+          {metals
+            .filter((metal) => metal.isActive)
+            .map((metal) => (
+              <option key={metal.id} value={metal.id}>
+                {metal.name}
+              </option>
+            ))}
+          <option value={UNASSIGNED_METAL_TYPE}>Unassigned</option>
+        </select>
+
         <select
           className="rounded-md border px-3 py-2 text-sm"
           value={currentSortBy}
@@ -190,6 +224,8 @@ export function KarigarsToolbar({ selectedKarigarIds }: KarigarsToolbarProps) {
             </>
           )}
         </Button>
+
+        {bulkActions}
       </div>
     </div>
   )

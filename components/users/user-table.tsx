@@ -4,6 +4,7 @@
 "use client";
 
 import Link from "next/link";
+import { Pencil, Ban, CircleCheck, Trash2 } from "lucide-react";
 
 import { RecordHoverCard } from "@/components/shared/record-hover-card";
 import { useTransition } from "react";
@@ -22,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/users/status-badge";
 import { useToast } from "@/components/providers/toast-provider";
+import { SortableTableHead } from "@/components/shared/sortable-table-head";
 
 import {
   disableUserAction,
@@ -128,10 +130,25 @@ export function UserTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
+            <SortableTableHead
+              label="Name"
+              sortKey="name"
+              defaultSortBy="createdAt"
+              className="h-10 px-2 whitespace-nowrap"
+            />
+            <SortableTableHead
+              label="Email"
+              sortKey="email"
+              defaultSortBy="createdAt"
+              className="h-10 px-2 whitespace-nowrap"
+            />
             <TableHead>Phone</TableHead>
-            <TableHead>Role</TableHead>
+            <SortableTableHead
+              label="Role"
+              sortKey="role"
+              defaultSortBy="createdAt"
+              className="h-10 px-2 whitespace-nowrap"
+            />
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Action</TableHead>
           </TableRow>
@@ -199,30 +216,38 @@ export function UserTable({
                 </TableCell>
 
                 <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-1">
                     {/* Editing is a full page now, not a popup — the form
                         carries role, module access and location grants, which
                         is more than a dialog should hold. */}
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/users/${user.id}/edit`}>Edit</Link>
+                    <Button variant="outline" size="icon" title="Edit user" asChild>
+                      <Link href={`/users/${user.id}/edit`}>
+                        <Pencil className="h-4 w-4" />
+                      </Link>
                     </Button>
 
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="icon"
                       disabled={isPending}
                       onClick={() => handleToggleStatus(user)}
+                      title={user.status === "DISABLED" ? "Enable user" : "Disable user"}
                     >
-                      {user.status === "DISABLED" ? "Enable" : "Disable"}
+                      {user.status === "DISABLED" ? (
+                        <CircleCheck className="h-4 w-4" />
+                      ) : (
+                        <Ban className="h-4 w-4" />
+                      )}
                     </Button>
 
                     <Button
                       variant="destructive"
-                      size="sm"
+                      size="icon"
                       disabled={isPending}
                       onClick={() => handleDelete(user)}
+                      title="Delete user"
                     >
-                      Delete
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </TableCell>

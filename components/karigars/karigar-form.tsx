@@ -5,15 +5,9 @@ import { useEffect, useMemo, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import type { Karigar } from "@/lib/actions/karigar-actions"
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { getCitiesByStateId } from "@/lib/actions/location-actions"
 import { LocationSelect } from "@/components/shared/location-select"
 import { RequiredMark } from "@/components/shared/required-mark"
@@ -27,6 +21,15 @@ type Props = {
   errors?: Record<string, string[]>
   locations?: StoreLocationRow[]
   states?: StateItem[]
+  metals?: StoreMetalRow[]
+  /** Store's default location — only ever used to pre-fill the Location
+   * field on the create path (`karigar` null). The edit path always keeps
+   * showing the karigar's own saved `locationId`, untouched. */
+  defaultLocationId?: string | null
+  /** The store's own State/City (Settings > Business Profile) — same
+   * create-only pre-fill rule as defaultLocationId above. */
+  defaultState?: string
+  defaultCity?: string
 }
 
 export function KarigarForm({
@@ -35,18 +38,22 @@ export function KarigarForm({
   errors,
   locations = [],
   states = [],
+  metals = [],
+  defaultLocationId = null,
+  defaultState,
+  defaultCity,
 }: Props) {
-  const [locationId, setLocationId] = useState(karigar?.locationId ?? "")
+  const [locationId, setLocationId] = useState(karigar?.locationId ?? defaultLocationId ?? "")
 
   // Selected/keyed by id (to drive the city fetch below), but the form
   // field itself submits the state's name — Karigar.state is a plain text
   // column, same convention as Vendor/Customer's own state field.
   const initialStateId = useMemo(() => {
     const match = states.find(
-      (item) => item.name.toLowerCase() === (karigar?.state ?? "").toLowerCase(),
+      (item) => item.name.toLowerCase() === (karigar?.state ?? defaultState ?? "").toLowerCase(),
     )
     return match?.id ?? ""
-  }, [states, karigar?.state])
+  }, [states, karigar?.state, defaultState])
 
   const [selectedStateId, setSelectedStateId] = useState(initialStateId)
   const [cities, setCities] = useState<CityItem[]>([])
@@ -88,7 +95,7 @@ export function KarigarForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Karigar Code</Label>
           <Input
             name="code"
@@ -97,7 +104,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Name <RequiredMark /></Label>
           <Input
             name="name"
@@ -107,7 +114,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Mobile</Label>
           <Input
             name="mobile"
@@ -122,7 +129,7 @@ export function KarigarForm({
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>WhatsApp</Label>
           <Input
             name="whatsapp"
@@ -131,7 +138,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Email</Label>
           <Input
             name="email"
@@ -143,7 +150,7 @@ export function KarigarForm({
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>State</Label>
           <select
             className="w-full rounded-md border bg-background px-3 py-2 text-sm"
@@ -171,13 +178,13 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>City</Label>
           <select
             name="city"
             className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             disabled={!selectedStateId || loadingCities}
-            defaultValue={karigar?.city ?? ""}
+            defaultValue={karigar?.city ?? defaultCity ?? ""}
             key={cities.length}
           >
             <option value="">
@@ -199,7 +206,7 @@ export function KarigarForm({
           </select>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Pincode</Label>
           <Input
             name="pincode"
@@ -207,7 +214,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Specialization</Label>
           <Input
             name="specialization"
@@ -216,7 +223,30 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <Label>Metal Type</Label>
+          <select
+            name="metalTypeId"
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            defaultValue={karigar?.metalTypeId ?? ""}
+          >
+            <option value="">Select metal (optional)</option>
+            {metals.map((metal) => (
+              <option key={metal.id} value={metal.id}>
+                {metal.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            What this karigar mainly works with — drives the Karigars list&apos;s
+            Type filter.
+          </p>
+          {errors?.metalTypeId?.[0] && (
+            <p className="text-xs text-red-600">{errors.metalTypeId[0]}</p>
+          )}
+        </div>
+
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Location</Label>
           <LocationSelect
             locations={locations}
@@ -229,7 +259,7 @@ export function KarigarForm({
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>GST Number</Label>
           <Input
             name="gstNumber"
@@ -237,25 +267,33 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>PAN Number</Label>
           <Input
             name="panNumber"
             defaultValue={karigar?.panNumber}
+            placeholder="Optional"
           />
+          {errors?.panNumber?.[0] && (
+            <p className="text-xs text-red-600">{errors.panNumber[0]}</p>
+          )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Aadhaar Number</Label>
           <Input
             name="aadhaarNumber"
             defaultValue={karigar?.aadhaarNumber}
+            placeholder="Optional — 12 digits"
           />
+          {errors?.aadhaarNumber?.[0] && (
+            <p className="text-xs text-red-600">{errors.aadhaarNumber[0]}</p>
+          )}
         </div>
 
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label>Address</Label>
         <Textarea
           name="address"
@@ -264,7 +302,7 @@ export function KarigarForm({
         />
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label>Notes</Label>
         <Textarea
           name="notes"
@@ -275,7 +313,7 @@ export function KarigarForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Opening Gold (grams)</Label>
           <Input
             name="openingGold"
@@ -285,7 +323,7 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Opening Cash</Label>
           <Input
             name="openingCash"
@@ -310,13 +348,15 @@ export function KarigarForm({
         </div>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="px-5 py-2 rounded-md bg-primary text-primary-foreground"
-      >
-        {pending ? "Saving..." : karigar ? "Update Karigar" : "Save Karigar"}
-      </button>
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={pending}
+          className="px-5 py-2 rounded-md bg-primary text-primary-foreground"
+        >
+          {pending ? "Saving..." : karigar ? "Update Karigar" : "Save Karigar"}
+        </button>
+      </div>
 
     </div>
   )

@@ -316,7 +316,7 @@ export function QuickSaleForm({
               </>
             ) : (
               <>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label htmlFor="customer" required>Customer</Label>
                   {/* The same picker the full invoice form uses — searchable,
                       and able to create a customer inline, so a first-time
@@ -337,7 +337,7 @@ export function QuickSaleForm({
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label htmlFor="sellingPriceInput" className="text-base" required>
                     Selling price
                   </Label>
@@ -369,7 +369,7 @@ export function QuickSaleForm({
 
                 {/* Only worth asking when there is more than one to sell. */}
                 {target.quantityAvailable > 1 ? (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label htmlFor="quantityInput">Quantity</Label>
                     <Input
                       id="quantityInput"

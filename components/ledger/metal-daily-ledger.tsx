@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState } from "react"
 
 import type { MetalDailyLedgerResult } from "@/lib/actions/ledger-actions"
-import { BUSINESS_UNIT_LABELS, formatUnitValue } from "@/lib/business-units"
+import { formatUnitValue } from "@/lib/business-units"
 import {
   Card,
   CardContent,
@@ -57,8 +57,8 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          This store isn&apos;t configured for any metal business units yet — add Gold,
-          Silver, or Diamond in Settings → Business Units to see a metal-wise ledger.
+          This store isn&apos;t configured for any metal/stone business units yet —
+          add a metal or stone in Settings → Business Model to see a metal-wise ledger.
         </CardContent>
       </Card>
     )
@@ -71,7 +71,7 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
           <div className="flex flex-col gap-1">
             <CardTitle>Metal-wise Daily Ledger</CardTitle>
             <CardDescription>
-              Purchased, sold, and running closing balance per metal, by day.
+              Purchased, sold, and running closing balance per unit, by day.
             </CardDescription>
           </div>
           <ExportMenu href="/ledger/export?scope=metal-wise" label="Export" />
@@ -99,15 +99,15 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
             <TableRow className="hover:bg-transparent">
               <TableHead className="pl-6">Date</TableHead>
               {data.activeUnits.map((unit) => (
-                <TableHead key={unit} colSpan={3} className="text-center border-l">
-                  {BUSINESS_UNIT_LABELS[unit]}
+                <TableHead key={unit.value} colSpan={3} className="text-center border-l">
+                  {unit.label}
                 </TableHead>
               ))}
             </TableRow>
             <TableRow className="hover:bg-transparent">
               <TableHead className="pl-6" />
               {data.activeUnits.map((unit) => (
-                <Fragment key={unit}>
+                <Fragment key={unit.value}>
                   <TableHead className="border-l text-right text-xs">Purchased</TableHead>
                   <TableHead className="text-right text-xs">Sold</TableHead>
                   <TableHead className="text-right text-xs">Closing</TableHead>
@@ -132,14 +132,15 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
                     {row.date}
                   </TableCell>
                   {data.activeUnits.map((unit) => {
-                    const entry = row.units.find((u) => u.unit === unit)
+                    const entry = row.units.find((u) => u.unit === unit.value)
+                    const hint = { value: unit.value, isGemstone: unit.isGemstone }
 
                     return (
-                      <Fragment key={unit}>
+                      <Fragment key={unit.value}>
                         <TableCell className="border-l text-right tabular-nums">
                           {entry && entry.purchasedValue > 0 ? (
                             <span className="text-emerald-600">
-                              {formatUnitValue(unit, entry.purchasedValue)}
+                              {formatUnitValue(hint, entry.purchasedValue)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -148,7 +149,7 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
                         <TableCell className="text-right tabular-nums">
                           {entry && entry.soldValue > 0 ? (
                             <span className="text-destructive">
-                              {formatUnitValue(unit, entry.soldValue)}
+                              {formatUnitValue(hint, entry.soldValue)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -158,10 +159,10 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
                           {entry ? (
                             entry.closingBalance < 0 ? (
                               <span className="text-destructive">
-                                -{formatUnitValue(unit, entry.closingBalance)}
+                                -{formatUnitValue(hint, entry.closingBalance)}
                               </span>
                             ) : (
-                              formatUnitValue(unit, entry.closingBalance)
+                              formatUnitValue(hint, entry.closingBalance)
                             )
                           ) : (
                             <span className="text-muted-foreground">—</span>

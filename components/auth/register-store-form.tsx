@@ -148,7 +148,7 @@ export function RegisterStoreForm({ states }: RegisterStoreFormProps) {
           }}
           className="flex flex-col gap-5"
         >
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="storeName">Store name <RequiredMark /></Label>
             <Input
               id="storeName"
@@ -160,7 +160,7 @@ export function RegisterStoreForm({ states }: RegisterStoreFormProps) {
             <FieldError errors={state.errors?.storeName} />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="ownerName">Your name <RequiredMark /></Label>
             <Input
               id="ownerName"
@@ -171,7 +171,7 @@ export function RegisterStoreForm({ states }: RegisterStoreFormProps) {
             <FieldError errors={state.errors?.ownerName} />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="email">Email <RequiredMark /></Label>
             <Input
               id="email"
@@ -186,7 +186,7 @@ export function RegisterStoreForm({ states }: RegisterStoreFormProps) {
             </p>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="phone">Mobile number <RequiredMark /></Label>
             <Input
               id="phone"
@@ -199,7 +199,7 @@ export function RegisterStoreForm({ states }: RegisterStoreFormProps) {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
               <Label htmlFor="state">State <RequiredMark /></Label>
               {/* Selected/keyed by id (to drive the city fetch below), but the
                   form field itself must submit the state's name — Store.state
@@ -226,7 +226,7 @@ export function RegisterStoreForm({ states }: RegisterStoreFormProps) {
               <FieldError errors={state.errors?.state} />
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
               <Label htmlFor="city">City or area <RequiredMark /></Label>
               <input type="hidden" name="city" value={selectedCity} />
               <Select

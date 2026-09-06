@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import type { PurityType } from "@prisma/client";
 
 import { updateProduct } from "@/lib/actions/inventory/product-actions";
 import {
@@ -10,6 +11,7 @@ import {
 } from "@/lib/inventory/product-types";
 
 import { useToast } from "@/components/providers/toast-provider";
+import type { StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions";
 import {
   ProductForm,
   type StoreCategoryOption,
@@ -36,6 +38,8 @@ type EditProductFormProps = {
     defaultCaratWeight: string | null;
     hasStoneComponent: boolean;
     defaultStoneRate: string | null;
+    defaultStoneMetalTypeName: string | null;
+    defaultStoneTypeNames: string | null;
     designCode: string | null;
     hsnCode: string | null;
     description: string | null;
@@ -46,12 +50,16 @@ type EditProductFormProps = {
   };
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
+  caratConversionRates: Record<PurityType, number>;
+  origins: StoreMetalOriginRow[];
 };
 
 export function EditProductForm({
   product,
   metals,
   categories,
+  caratConversionRates,
+  origins,
 }: EditProductFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -107,6 +115,8 @@ export function EditProductForm({
         pending={pending}
         metals={metals}
         categories={categories}
+        caratConversionRates={caratConversionRates}
+        origins={origins}
       />
     </form>
   );

@@ -265,7 +265,7 @@ function MetalFormRow({
     >
       <input type="hidden" name="id" value={metal?.id ?? ""} />
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="metal-name" required>Name</Label>
         <Input
           id="metal-name"
@@ -290,12 +290,12 @@ function MetalFormRow({
         <Label htmlFor="metal-hasPurity">Has Purity</Label>
       </div>
 
-      <div className="flex gap-2 pb-0.5">
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
-        </Button>
+      <div className="flex justify-end gap-2 pb-0.5">
         <Button type="button" size="sm" variant="outline" onClick={onDone}>
           Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? <Loader className="h-4 w-4" /> : "Save"}
         </Button>
       </div>
     </form>
@@ -493,7 +493,7 @@ function StoneFormRow({
       <input type="hidden" name="id" value={stone?.id ?? ""} />
       <input type="hidden" name="isGemstone" value="on" />
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="stone-name" required>Name</Label>
         <Input
           id="stone-name"
@@ -507,12 +507,12 @@ function StoneFormRow({
         ) : null}
       </div>
 
-      <div className="flex gap-2 pb-0.5">
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
-        </Button>
+      <div className="flex justify-end gap-2 pb-0.5">
         <Button type="button" size="sm" variant="outline" onClick={onDone}>
           Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? <Loader className="h-4 w-4" /> : "Save"}
         </Button>
       </div>
     </form>
@@ -633,7 +633,7 @@ function StoneTypesSection({
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="max-w-xs space-y-1.5">
+        <div className="max-w-xs space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Stone</Label>
           <Select value={selectedStoneId} onValueChange={setSelectedStoneId}>
             <SelectTrigger className="w-full">
@@ -786,7 +786,7 @@ function StoneTypeFormRow({
       <input type="hidden" name="id" value={option?.id ?? ""} />
       <input type="hidden" name="storeMetalId" value={storeMetalId} />
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="stone-type-name" required>Name</Label>
         <Input
           id="stone-type-name"
@@ -800,12 +800,12 @@ function StoneTypeFormRow({
         ) : null}
       </div>
 
-      <div className="flex gap-2 pb-0.5">
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
-        </Button>
+      <div className="flex justify-end gap-2 pb-0.5">
         <Button type="button" size="sm" variant="outline" onClick={onDone}>
           Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? <Loader className="h-4 w-4" /> : "Save"}
         </Button>
       </div>
     </form>
@@ -996,7 +996,7 @@ function CategoryFormRow({
     >
       <input type="hidden" name="id" value={category?.id ?? ""} />
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="category-name" required>Name</Label>
         <Input
           id="category-name"
@@ -1010,12 +1010,12 @@ function CategoryFormRow({
         ) : null}
       </div>
 
-      <div className="flex gap-2 pb-0.5">
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
-        </Button>
+      <div className="flex justify-end gap-2 pb-0.5">
         <Button type="button" size="sm" variant="outline" onClick={onDone}>
           Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? <Loader className="h-4 w-4" /> : "Save"}
         </Button>
       </div>
     </form>
@@ -1133,7 +1133,7 @@ function TypesSection({
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="max-w-xs space-y-1.5">
+        <div className="max-w-xs space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Category</Label>
           <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
             <SelectTrigger className="w-full">
@@ -1290,7 +1290,7 @@ function TypeFormRow({
       <input type="hidden" name="id" value={type?.id ?? ""} />
       <input type="hidden" name="categoryId" value={categoryId} />
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="type-name" required>Name</Label>
         <Input
           id="type-name"
@@ -1304,12 +1304,12 @@ function TypeFormRow({
         ) : null}
       </div>
 
-      <div className="flex gap-2 pb-0.5">
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
-        </Button>
+      <div className="flex justify-end gap-2 pb-0.5">
         <Button type="button" size="sm" variant="outline" onClick={onDone}>
           Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? <Loader className="h-4 w-4" /> : "Save"}
         </Button>
       </div>
     </form>

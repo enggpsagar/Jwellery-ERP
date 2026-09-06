@@ -22,7 +22,10 @@ type QuotationItemRow = {
   rate: number | null
   makingCharge: number
   makingChargeType?: string
+  hmCharge: number
   stoneCharge: number
+  stoneMetalTypeName?: string | null
+  stoneTypeNames?: string | null
   lineTotal: number
 }
 
@@ -151,7 +154,15 @@ export default async function QuotationDetailPage({ params }: Props) {
           <tbody>
             {quotation.items.map((item: QuotationItemRow) => (
               <tr key={item.id} className="border-b last:border-0">
-                <td className="px-4 py-3">{item.itemName}</td>
+                <td className="px-4 py-3">
+                  {item.itemName}
+                  {item.stoneMetalTypeName ? (
+                    <span className="block text-xs text-muted-foreground">
+                      Stone: {item.stoneMetalTypeName}
+                      {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3">{item.quantity}</td>
                 <td className="px-4 py-3">
                   {item.purity === "DIAMOND"
@@ -169,6 +180,11 @@ export default async function QuotationDetailPage({ params }: Props) {
                       </span>
                     ) : null
                   })()}
+                  {item.hmCharge > 0 ? (
+                    <span className="block text-xs text-muted-foreground">
+                      HM ₹{item.hmCharge.toFixed(2)}
+                    </span>
+                  ) : null}
                 </td>
                 <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
                 <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
@@ -184,7 +200,7 @@ export default async function QuotationDetailPage({ params }: Props) {
           <span>₹{quotation.subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Making Charges</span>
+          <span>Making Charges (incl. HM)</span>
           <span>₹{quotation.makingCharges.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">

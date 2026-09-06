@@ -89,7 +89,7 @@ export function CancelInvoiceDialog({
             <div className="text-red-600 text-sm">{state.message}</div>
           )}
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Cancellation Reason</Label>
             <Textarea
               name="cancellationReason"

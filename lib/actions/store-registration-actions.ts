@@ -209,13 +209,21 @@ export async function registerStoreAction(
       });
 
       // The shop's own counter, so location-scoped screens have somewhere to
-      // put things on day one.
-      await tx.storeLocation.create({
+      // put things on day one. Also made this store's default location, so
+      // every location picker across the app pre-fills it instead of the
+      // owner choosing "Main Counter" by hand on every single record until
+      // they add a second one.
+      const mainCounter = await tx.storeLocation.create({
         data: {
           storeId: createdStore.id,
           name: "Main Counter",
           city: city || null,
         },
+      });
+
+      await tx.store.update({
+        where: { id: createdStore.id },
+        data: { defaultLocationId: mainCounter.id },
       });
 
       await tx.storeMetal.createMany({

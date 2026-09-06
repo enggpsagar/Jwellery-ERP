@@ -154,7 +154,7 @@ export function RecordKarigarPaymentDialog({
             <span>₹{total.toFixed(2)}</span>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Notes</Label>
             <Textarea name="notes" rows={2} placeholder="Optional notes..." />
           </div>

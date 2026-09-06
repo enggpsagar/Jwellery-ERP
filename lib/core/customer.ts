@@ -13,6 +13,8 @@
 
 import { prisma } from "@/lib/prisma";
 import type { PartyGstType } from "@prisma/client";
+import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
+import { isValidPanNumber, normalizePanNumber, PAN_INVALID_MESSAGE } from "@/lib/pan";
 
 export type CustomerRecord = {
   id: string;
@@ -37,6 +39,7 @@ export type CustomerRecord = {
    *  store's own gstScheme. See gstinRequired() in lib/gst.ts. */
   gstType?: PartyGstType;
   panNumber?: string;
+  aadhaarNumber?: string;
   registrationId?: string;
   createdByName?: string | null;
   totalOrders?: number;
@@ -100,6 +103,7 @@ export type CustomerInput = {
   gstNumber?: string;
   gstType?: PartyGstType;
   panNumber?: string;
+  aadhaarNumber?: string;
   registrationId?: string;
   notes?: string;
   openingBalance?: number;
@@ -217,6 +221,7 @@ export function mapCustomer(customer: any): CustomerRecord {
     gstNumber: customer.gstin ?? "",
     gstType: customer.gstType ?? "UNREGISTERED",
     panNumber: customer.panNumber ?? "",
+    aadhaarNumber: customer.aadhaarNumber ?? "",
     registrationId: customer.registrationId ?? "",
     createdByName: customer.createdByName ?? null,
     totalOrders,
@@ -283,7 +288,12 @@ export async function getCustomerByIdCore(
 function validateCustomerInput(input: CustomerInput) {
   const errors: Record<string, string[]> = {};
   if (!input.name?.trim()) errors.name = ["Customer name is required"];
-  if (!input.phone?.trim()) errors.phone = ["Phone number is required"];
+  if (input.aadhaarNumber?.trim() && !isValidAadhaarNumber(input.aadhaarNumber)) {
+    errors.aadhaarNumber = [AADHAAR_INVALID_MESSAGE];
+  }
+  if (input.panNumber?.trim() && !isValidPanNumber(input.panNumber)) {
+    errors.panNumber = [PAN_INVALID_MESSAGE];
+  }
   return errors;
 }
 
@@ -300,17 +310,23 @@ export async function createCustomerCore(
       return { success: false, message: "Please fix the form errors", errors };
     }
 
-    const existing = await prisma.customer.findFirst({
-      where: { phone, storeId: ctx.storeId },
-      select: { id: true },
-    });
+    // Phone is optional now — an empty value is stored as null below, and
+    // Postgres never treats two nulls as colliding under the unique index,
+    // so this check (and the constraint itself) only ever matters once a
+    // phone number is actually entered.
+    if (phone) {
+      const existing = await prisma.customer.findFirst({
+        where: { phone, storeId: ctx.storeId },
+        select: { id: true },
+      });
 
-    if (existing) {
-      return {
-        success: false,
-        message: "Phone number already exists",
-        errors: { phone: ["A customer with this phone number already exists"] },
-      };
+      if (existing) {
+        return {
+          success: false,
+          message: "Phone number already exists",
+          errors: { phone: ["A customer with this phone number already exists"] },
+        };
+      }
     }
 
     const customer = await prisma.customer.create({
@@ -326,7 +342,10 @@ export async function createCustomerCore(
         pincode: input.pincode?.trim() || null,
         gstin: input.gstNumber?.trim() || null,
         gstType: input.gstType ?? "UNREGISTERED",
-        panNumber: input.panNumber?.trim() || null,
+        panNumber: input.panNumber?.trim() ? normalizePanNumber(input.panNumber) : null,
+        aadhaarNumber: input.aadhaarNumber?.trim()
+          ? normalizeAadhaarNumber(input.aadhaarNumber)
+          : null,
         registrationId: input.registrationId?.trim() || null,
         notes: input.notes?.trim() || null,
         openingBalance: input.openingBalance ?? 0,
@@ -364,17 +383,19 @@ export async function updateCustomerCore(
       return { success: false, message: "Please fix the form errors", errors };
     }
 
-    const existing = await prisma.customer.findFirst({
-      where: { phone, storeId, NOT: { id } },
-      select: { id: true },
-    });
+    if (phone) {
+      const existing = await prisma.customer.findFirst({
+        where: { phone, storeId, NOT: { id } },
+        select: { id: true },
+      });
 
-    if (existing) {
-      return {
-        success: false,
-        message: "Phone number already exists",
-        errors: { phone: ["A customer with this phone number already exists"] },
-      };
+      if (existing) {
+        return {
+          success: false,
+          message: "Phone number already exists",
+          errors: { phone: ["A customer with this phone number already exists"] },
+        };
+      }
     }
 
     const { count } = await prisma.customer.updateMany({
@@ -390,7 +411,10 @@ export async function updateCustomerCore(
         pincode: input.pincode?.trim() || null,
         gstin: input.gstNumber?.trim() || null,
         gstType: input.gstType ?? "UNREGISTERED",
-        panNumber: input.panNumber?.trim() || null,
+        panNumber: input.panNumber?.trim() ? normalizePanNumber(input.panNumber) : null,
+        aadhaarNumber: input.aadhaarNumber?.trim()
+          ? normalizeAadhaarNumber(input.aadhaarNumber)
+          : null,
         registrationId: input.registrationId?.trim() || null,
         notes: input.notes?.trim() || null,
         openingBalance: input.openingBalance ?? 0,

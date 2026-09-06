@@ -31,6 +31,7 @@ const TYPE_LABEL: Record<GlobalSearchResultType, string> = {
 export function GlobalSearch() {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
+  const desktopInputRef = useRef<HTMLInputElement>(null);
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GlobalSearchResult[]>([]);
@@ -80,6 +81,30 @@ export function GlobalSearch() {
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // The "Ctrl K" hint badge next to the desktop search bar promised this
+  // shortcut but nothing ever actually listened for it — Ctrl/Cmd+K did
+  // whatever the browser does with it (often nothing, sometimes its own
+  // address-bar search) instead of focusing this search. Matches the
+  // `lg:` breakpoint the two layouts (inline bar vs. icon-that-expands)
+  // already switch on, so the shortcut opens whichever one is visible.
+  useEffect(() => {
+    function handleGlobalKeyDown(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+
+        if (window.matchMedia("(min-width: 1024px)").matches) {
+          setOpen(true);
+          desktopInputRef.current?.focus();
+        } else {
+          setMobileOpen(true);
+        }
+      }
+    }
+
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => document.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
   function goTo(result: GlobalSearchResult) {
@@ -170,7 +195,7 @@ export function GlobalSearch() {
   );
 
   return (
-    <div ref={containerRef} className="flex flex-1 items-center lg:max-w-md">
+    <div ref={containerRef} className="flex min-w-0 flex-1 items-center lg:max-w-md">
       {/* Desktop/tablet (>=1024px, matching the sidebar's own mobile
           threshold in hooks/use-mobile.ts) — the full inline pill. Below
           that this used to just vanish with no way to search at all. */}
@@ -186,6 +211,7 @@ export function GlobalSearch() {
         )}
 
         <Input
+          ref={desktopInputRef}
           type="search"
           value={query}
           onChange={(e) => {
@@ -214,6 +240,7 @@ export function GlobalSearch() {
         <button
           type="button"
           aria-label="Search"
+          title="Search"
           onClick={() => setMobileOpen((v) => !v)}
           className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
@@ -243,6 +270,7 @@ export function GlobalSearch() {
               <button
                 type="button"
                 aria-label="Close search"
+                title="Close search"
                 onClick={() => {
                   setMobileOpen(false);
                   setOpen(false);

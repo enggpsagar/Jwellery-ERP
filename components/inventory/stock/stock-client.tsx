@@ -10,6 +10,10 @@ import { PageBackHeader } from "@/components/shared/page-back-header"
 import { StockTable } from "@/components/inventory/stock/stock-table"
 import { StockToolbar } from "@/components/inventory/stock/stock-toolbar"
 import { WebcamQrScanner } from "@/components/shared/webcam-qr-scanner"
+import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
+import { StockImportDialog } from "@/components/inventory/stock/stock-import-dialog"
+import { bulkDeleteInventoryStock } from "@/lib/actions/inventory/stock-actions"
+import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 
 type Pagination = {
   page: number
@@ -23,9 +27,10 @@ type Pagination = {
 type StockClientProps = {
   stockItems: React.ComponentProps<typeof StockTable>["stockItems"]
   pagination: Pagination
+  metals: StoreMetalRow[]
 }
 
-export function StockClient({ stockItems, pagination }: StockClientProps) {
+export function StockClient({ stockItems, pagination, metals }: StockClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
 
   React.useEffect(() => {
@@ -37,7 +42,7 @@ export function StockClient({ stockItems, pagination }: StockClientProps) {
 
   return (
     <main className="space-y-6 p-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <PageBackHeader
           title="Inventory Stock"
           description="Manage physical stock entries for jewellery inventory."
@@ -56,6 +61,8 @@ export function StockClient({ stockItems, pagination }: StockClientProps) {
             <Camera className="mr-2 h-4 w-4" />
             {scanning ? "Close scanner" : "Scan tag"}
           </Button>
+
+          <StockImportDialog />
 
           <Link href="/inventory/stock/new">
             <Button>
@@ -79,7 +86,22 @@ export function StockClient({ stockItems, pagination }: StockClientProps) {
         />
       ) : null}
 
-      <StockToolbar selectedIds={selectedIds} />
+      <StockToolbar
+        selectedIds={selectedIds}
+        metals={metals}
+        bulkActions={
+          <BulkDeleteButton
+            selectedIds={selectedIds}
+            itemLabelSingular="stock item"
+            itemLabelPlural="stock items"
+            getDisplayName={(id) =>
+              stockItems.find((item) => item.id === id)?.stockCode ?? id
+            }
+            onDelete={bulkDeleteInventoryStock}
+            onDone={() => setSelectedIds([])}
+          />
+        }
+      />
 
       <StockTable
         stockItems={stockItems}

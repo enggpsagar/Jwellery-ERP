@@ -8,6 +8,7 @@ import { RecordHoverCard } from "@/components/shared/record-hover-card"
 
 import { KarigarRowActions } from "@/components/karigars/karigar-row-actions"
 import { KarigarsPagination } from "@/components/karigars/karigars-pagination"
+import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import type { Karigar } from "@/lib/actions/karigar-actions"
 
 type PaginationInfo = {
@@ -77,10 +78,11 @@ export function KarigarTable({
                   aria-label="Select all karigars"
                 />
               </th>
-              <th className="px-4 py-3 text-left font-medium">Code</th>
-              <th className="px-4 py-3 text-left font-medium">Name</th>
+              <SortableTableHead label="Code" sortKey="code" defaultSortBy="createdAt" />
+              <SortableTableHead label="Name" sortKey="name" defaultSortBy="createdAt" />
               <th className="px-4 py-3 text-left font-medium">Mobile</th>
               <th className="px-4 py-3 text-left font-medium">Specialization</th>
+              <th className="px-4 py-3 text-left font-medium">Metal Type</th>
               <th className="px-4 py-3 text-left font-medium">City</th>
               <th className="px-4 py-3 text-left font-medium">Opening Gold</th>
               <th className="px-4 py-3 text-left font-medium">Opening Cash</th>
@@ -119,6 +121,7 @@ export function KarigarTable({
                           { label: "Mobile", value: karigar.mobile },
                           { label: "City", value: karigar.city },
                           { label: "Specialization", value: karigar.specialization },
+                          { label: "Metal Type", value: karigar.metalTypeName },
                         ],
                       },
                       {
@@ -133,6 +136,7 @@ export function KarigarTable({
                 </td>
                 <td className="px-4 py-3">{karigar.mobile || "-"}</td>
                 <td className="px-4 py-3">{karigar.specialization || "-"}</td>
+                <td className="px-4 py-3">{karigar.metalTypeName || "-"}</td>
                 <td className="px-4 py-3">{karigar.city || "-"}</td>
                 <td className="px-4 py-3">{karigar.openingGold.toFixed(3)} g</td>
                 <td className="px-4 py-3">₹{karigar.openingCash.toFixed(2)}</td>

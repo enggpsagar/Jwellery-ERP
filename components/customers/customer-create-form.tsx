@@ -34,6 +34,11 @@ type CustomerCreateFormProps = {
    *  doc comment in lib/gst.ts. Freely editable per customer afterward, not
    *  a store-wide restriction. */
   gstScheme: GstScheme
+  /** The store's own State/City (Settings > Business Profile), pre-selected
+   * here so a customer at the same location doesn't require re-entering
+   * them — freely changeable per customer afterward. */
+  defaultState?: string
+  defaultCity?: string
 }
 
 function FieldError({ errors }: { errors?: string[] }) {
@@ -49,7 +54,13 @@ function FieldError({ errors }: { errors?: string[] }) {
  * modal opened from inside one is fragile on touch. A page also survives the
  * keyboard opening, which a small dialog does not.
  */
-export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCreateFormProps) {
+export function CustomerCreateForm({
+  states,
+  returnTo,
+  gstScheme,
+  defaultState,
+  defaultCity,
+}: CustomerCreateFormProps) {
   // Starting point only — a Wholesaler & Manufacturer store still routinely
   // has individual, non-registered buyers, so this stays freely editable
   // per customer rather than being forced by the store's own scheme.
@@ -59,7 +70,9 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
   const router = useRouter()
   const toast = useToast()
 
-  const [selectedStateId, setSelectedStateId] = useState("")
+  const [selectedStateId, setSelectedStateId] = useState(
+    () => states.find((item) => item.name.toLowerCase() === (defaultState ?? "").toLowerCase())?.id ?? "",
+  )
   const [cities, setCities] = useState<CityItem[]>([])
   const [loadingCities, setLoadingCities] = useState(false)
 
@@ -133,7 +146,29 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
           }}
           className="grid gap-5 md:grid-cols-2"
         >
-          <div className="space-y-1">
+          <div className="space-y-1 md:col-span-2 rounded-lg border bg-muted/20 p-4 transition-colors focus-within:bg-accent/40">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <Hash className="h-4 w-4 text-muted-foreground" />
+              GST Number {gstinRequiredNow ? <RequiredMark /> : null}
+            </label>
+            <GstSchemeBadge scheme={gstScheme} />
+            {gstScheme !== "COMPOSITION" ? (
+              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
+            ) : null}
+            <input
+              name="gstNumber"
+              className={FIELD}
+              placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : "Optional"}
+              required={gstinRequiredNow}
+            />
+            {gstinRequiredNow ? (
+              <p className="text-xs text-muted-foreground">
+                GSTIN is required for a valid B2B tax invoice to this customer.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4 text-muted-foreground" />
               Name <RequiredMark />
@@ -142,16 +177,16 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             <FieldError errors={state.errors?.name} />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
-              Phone <RequiredMark />
+              Phone
             </label>
-            <input name="phone" type="tel" className={FIELD} placeholder="9876543210" required />
+            <input name="phone" type="tel" className={FIELD} placeholder="9876543210" />
             <FieldError errors={state.errors?.phone} />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
               Alternate Phone
@@ -159,7 +194,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             <input name="altPhone" type="tel" className={FIELD} placeholder="Optional" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Mail className="h-4 w-4 text-muted-foreground" />
               Email
@@ -167,7 +202,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             <input name="email" type="email" className={FIELD} placeholder="name@example.com" />
           </div>
 
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
@@ -180,7 +215,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               State
@@ -206,7 +241,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               City
@@ -215,7 +250,8 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
               name="city"
               className={FIELD}
               disabled={!selectedStateId || loadingCities}
-              defaultValue=""
+              defaultValue={defaultCity ?? ""}
+              key={cities.length}
             >
               <option value="">
                 {loadingCities ? "Loading cities..." : "Select city"}
@@ -228,7 +264,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             </select>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               Pincode
@@ -236,15 +272,25 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             <input name="pincode" className={FIELD} placeholder="440001" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               PAN Number
             </label>
             <input name="panNumber" className={FIELD} placeholder="Optional" />
+            <FieldError errors={state.errors?.panNumber} />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <Hash className="h-4 w-4 text-muted-foreground" />
+              Aadhaar Number
+            </label>
+            <input name="aadhaarNumber" className={FIELD} placeholder="Optional — 12 digits" />
+            <FieldError errors={state.errors?.aadhaarNumber} />
+          </div>
+
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Hash className="h-4 w-4 text-muted-foreground" />
               Registration / Encircle Id
@@ -252,7 +298,7 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             <input name="registrationId" className={FIELD} placeholder="Optional" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <IndianRupee className="h-4 w-4 text-muted-foreground" />
               Opening Balance
@@ -266,39 +312,17 @@ export function CustomerCreateForm({ states, returnTo, gstScheme }: CustomerCrea
             />
           </div>
 
-          <div className="space-y-1 md:col-span-2">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <Hash className="h-4 w-4 text-muted-foreground" />
-              GST Number {gstinRequiredNow ? <RequiredMark /> : null}
-            </label>
-            <GstSchemeBadge scheme={gstScheme} />
-            {gstScheme !== "COMPOSITION" ? (
-              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
-            ) : null}
-            <input
-              name="gstNumber"
-              className={`${FIELD} md:max-w-sm`}
-              placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : "Optional"}
-              required={gstinRequiredNow}
-            />
-            {gstinRequiredNow ? (
-              <p className="text-xs text-muted-foreground">
-                GSTIN is required for a valid B2B tax invoice to this customer.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">Notes</label>
             <textarea
               name="notes"
-              className={`${FIELD} min-h-9 resize-y`}
-              rows={1}
+              className={`${FIELD} min-h-24 resize-y`}
+              rows={4}
               placeholder="Anything worth remembering"
             />
           </div>
 
-          <div className="flex gap-3 md:col-span-2">
+          <div className="flex justify-end gap-3 pt-2 md:col-span-2">
             <Button type="submit" disabled={pending} size="lg">
               {pending ? "Saving..." : "Save customer"}
             </Button>

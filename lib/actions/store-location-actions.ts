@@ -18,6 +18,9 @@ export type StoreLocationRow = {
   state: string | null;
   city: string | null;
   isActive: boolean;
+  /** Pre-fills the Location field wherever one is picked while creating a
+   * record — see Store.defaultLocationId's own doc comment in schema.prisma. */
+  isDefault: boolean;
 };
 
 export type LocationFormState = {
@@ -31,10 +34,16 @@ const LOCATIONS_PATH = "/settings/locations";
 export async function getStoreLocations(): Promise<StoreLocationRow[]> {
   const storeId = await requireStoreScope();
 
-  const locations = await prisma.storeLocation.findMany({
-    where: { storeId },
-    orderBy: { name: "asc" },
-  });
+  const [locations, store] = await Promise.all([
+    prisma.storeLocation.findMany({
+      where: { storeId },
+      orderBy: { name: "asc" },
+    }),
+    prisma.store.findUnique({
+      where: { id: storeId },
+      select: { defaultLocationId: true },
+    }),
+  ]);
 
   return locations.map((location) => ({
     id: location.id,
@@ -42,7 +51,59 @@ export async function getStoreLocations(): Promise<StoreLocationRow[]> {
     state: location.state,
     city: location.city,
     isActive: location.isActive,
+    isDefault: location.id === store?.defaultLocationId,
   }));
+}
+
+/** Just the id, for the many create forms that only need to know what to
+ * pre-select — cheaper than fetching the whole location list. */
+export async function getDefaultLocationId(): Promise<string | null> {
+  const storeId = await requireStoreScope();
+
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { defaultLocationId: true },
+  });
+
+  return store?.defaultLocationId ?? null;
+}
+
+export async function setDefaultStoreLocation(
+  locationId: string,
+): Promise<LocationFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return {
+      success: false,
+      message: "Only the Store Owner can update these settings.",
+    };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const location = await prisma.storeLocation.findFirst({
+      where: { id: locationId, storeId },
+      select: { id: true },
+    });
+
+    if (!location) {
+      return { success: false, message: "Location not found" };
+    }
+
+    await prisma.store.update({
+      where: { id: storeId },
+      data: { defaultLocationId: locationId },
+    });
+
+    revalidatePath(LOCATIONS_PATH);
+
+    return { success: true, message: "Default location updated" };
+  } catch (error) {
+    console.error("setDefaultStoreLocation error:", error);
+    return { success: false, message: "Failed to update default location" };
+  }
 }
 
 export async function upsertStoreLocation(

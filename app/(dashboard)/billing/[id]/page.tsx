@@ -2,24 +2,35 @@ import type { Metadata } from "next"
 import { cache } from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeftCircle, ArrowRightCircle, Pencil, Plus, Printer } from "lucide-react"
+import { ArrowLeftCircle, ArrowRightCircle, Pencil, Plus, Printer, Receipt } from "lucide-react"
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
+import { getCreditNotesForInvoice } from "@/lib/actions/credit-note-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
+import { getReturnEligibility } from "@/lib/return-window"
+import { APP_NAME } from "@/lib/constants/app"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog"
 import { EmailInvoiceButton } from "@/components/billing/email-invoice-button"
 import { ShareWhatsAppButton } from "@/components/billing/share-whatsapp-button"
 import { EditInvoiceDialog } from "@/components/billing/edit-invoice-dialog"
 import { CancelInvoiceDialog } from "@/components/billing/cancel-invoice-dialog"
+import { ReturnItemsDialog } from "@/components/billing/return-items-dialog"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
 
 type Props = {
   params: Promise<{ id: string }>
   searchParams?: Promise<{ from?: string }>
+}
+
+const TRANSPORT_MODE_LABELS: Record<string, string> = {
+  ROAD: "Road",
+  RAIL: "Rail",
+  AIR: "Air",
+  SHIP: "Ship",
 }
 
 // Shared with generateMetadata below so the invoice is only fetched once
@@ -53,7 +64,9 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
 
   if (!invoice) notFound()
 
-  const whatsappMessage = `Hi! Here is your invoice ${invoice.invoiceNumber} from ${settings.businessName}. Total: ₹${invoice.totalAmount.toFixed(2)}. Balance due: ₹${invoice.balanceAmount.toFixed(2)}.`
+  const creditNotes = await getCreditNotesForInvoice(invoice.id)
+
+  const whatsappMessage = `Hi! Here is your invoice ${invoice.invoiceNumber} from ${settings.businessName}. Total: ₹${invoice.totalAmount.toFixed(2)}. Balance due: ₹${invoice.balanceAmount.toFixed(2)}.\n\nSent via ${APP_NAME}`
 
   const isCancelled = invoice.status === "CANCELLED"
   // Same statuses on purpose: a fully paid invoice's total can't silently
@@ -62,6 +75,16 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   const isCancellable = invoice.status === "DRAFT" || invoice.status === "PARTIAL"
   const canFullyEdit = isCancellable
   const isPaid = invoice.status === "PAID"
+
+  // Returns only ever apply to an invoice the customer actually paid for
+  // and took delivery of — DRAFT (never billed) and CANCELLED (already
+  // reversed) invoices have nothing to return.
+  const isReturnable = invoice.status === "PAID" || invoice.status === "PARTIAL"
+  const returnEligibility = getReturnEligibility(
+    new Date(invoice.invoiceDate),
+    settings.returnWindowDays,
+  )
+  const canReturnItems = isReturnable && returnEligibility.eligible
 
   return (
     <main className="space-y-6 p-6">
@@ -86,7 +109,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               invoiceNumber={invoice.invoiceNumber}
             />
             <EmailInvoiceButton invoiceId={invoice.id} />
-            {isPaid && (
+            {!isCancelled && (
               <EditInvoiceDialog
                 invoiceId={invoice.id}
                 invoiceDate={invoice.invoiceDate}
@@ -94,6 +117,12 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                 notes={invoice.notes}
                 locationId={invoice.locationId ?? null}
                 locations={locations}
+                ewayBillNumber={invoice.ewayBillNumber}
+                ewayBillDate={invoice.ewayBillDate}
+                transporterName={invoice.transporterName}
+                vehicleNumber={invoice.vehicleNumber}
+                transportMode={invoice.transportMode}
+                distanceKm={invoice.distanceKm}
               />
             )}
             {canFullyEdit && (
@@ -110,6 +139,9 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                 invoiceNumber={invoice.invoiceNumber}
                 balanceAmount={invoice.balanceAmount}
               />
+            )}
+            {canReturnItems && (
+              <ReturnItemsDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
             )}
             {!isCancelled && (
               <RecordPaymentDialog
@@ -173,6 +205,24 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             </div>
           )}
 
+          {isReturnable && (
+            <div>
+              <p className="text-sm text-muted-foreground">Return Window</p>
+              {returnEligibility.eligible ? (
+                <p className="font-medium text-green-700">
+                  Eligible until {returnEligibility.windowExpiresAt.toLocaleDateString("en-IN")}
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    {returnEligibility.daysRemaining} day{returnEligibility.daysRemaining === 1 ? "" : "s"} left
+                  </span>
+                </p>
+              ) : (
+                <p className="font-medium text-red-600">
+                  Expired {returnEligibility.windowExpiresAt.toLocaleDateString("en-IN")}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Always shown, including when it is not known: an invoice with
               no answer is different from one nobody has looked at, and the
               blank would otherwise read as a missing field. */}
@@ -231,6 +281,32 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         </div>
       )}
 
+      {creditNotes.length > 0 && (
+        <div className="rounded-xl border bg-card p-6 space-y-3">
+          <p className="font-medium">Credit Notes against this invoice</p>
+          <div className="space-y-2">
+            {creditNotes.map((creditNote) => (
+              <Link
+                key={creditNote.id}
+                href={`/billing/credit-notes/${creditNote.id}`}
+                className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-accent"
+              >
+                <span className="inline-flex items-center gap-2 font-medium">
+                  <Receipt className="h-4 w-4" />
+                  {creditNote.creditNoteNumber}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {new Date(creditNote.creditNoteDate).toLocaleDateString("en-IN")}
+                  </span>
+                </span>
+                <span className="font-medium text-red-600">
+                  -₹{creditNote.totalAmount.toFixed(2)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-xl border bg-card">
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40">
@@ -252,7 +328,15 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               const quantity = isDiamond ? item.caratWeight : item.netWeight
               return (
               <tr key={item.id} className="border-b last:border-0">
-                <td className="px-4 py-3">{item.itemName}</td>
+                <td className="px-4 py-3">
+                  {item.itemName}
+                  {item.stoneMetalTypeName ? (
+                    <span className="block text-xs text-muted-foreground">
+                      Stone: {item.stoneMetalTypeName}
+                      {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3">{item.quantity}</td>
                 <td className="px-4 py-3">
                   {quantity != null ? `${quantity.toFixed(3)} ${isDiamond ? "ct" : "g"}` : "-"}
@@ -300,7 +384,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           <span>Total</span>
           <span>₹{invoice.totalAmount.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-between text-blue-600 font-medium">
           <span>Paid</span>
           <span>₹{invoice.paidAmount.toFixed(2)}</span>
         </div>
@@ -309,6 +393,56 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           <span>₹{invoice.balanceAmount.toFixed(2)}</span>
         </div>
       </div>
+
+      {(invoice.ewayBillNumber ||
+        invoice.transporterName ||
+        invoice.vehicleNumber ||
+        invoice.transportMode ||
+        invoice.distanceKm) && (
+        <div className="rounded-xl border bg-card p-6">
+          <p className="mb-3 text-sm font-medium">E-way Bill</p>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {invoice.ewayBillNumber && (
+              <div>
+                <p className="text-xs text-muted-foreground">E-way Bill Number</p>
+                <p className="font-medium">{invoice.ewayBillNumber}</p>
+              </div>
+            )}
+            {invoice.ewayBillDate && (
+              <div>
+                <p className="text-xs text-muted-foreground">E-way Bill Date</p>
+                <p className="font-medium">
+                  {new Date(invoice.ewayBillDate).toLocaleDateString("en-IN")}
+                </p>
+              </div>
+            )}
+            {invoice.transporterName && (
+              <div>
+                <p className="text-xs text-muted-foreground">Transporter</p>
+                <p className="font-medium">{invoice.transporterName}</p>
+              </div>
+            )}
+            {invoice.vehicleNumber && (
+              <div>
+                <p className="text-xs text-muted-foreground">Vehicle Number</p>
+                <p className="font-medium">{invoice.vehicleNumber}</p>
+              </div>
+            )}
+            {invoice.transportMode && (
+              <div>
+                <p className="text-xs text-muted-foreground">Transport Mode</p>
+                <p className="font-medium">{TRANSPORT_MODE_LABELS[invoice.transportMode]}</p>
+              </div>
+            )}
+            {invoice.distanceKm != null && (
+              <div>
+                <p className="text-xs text-muted-foreground">Distance</p>
+                <p className="font-medium">{invoice.distanceKm} km</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {invoice.notes && (
         <div className="rounded-xl border bg-card p-6">

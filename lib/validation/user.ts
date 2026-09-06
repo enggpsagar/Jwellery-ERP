@@ -3,6 +3,9 @@
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
 
+import { isValidAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
+import { isValidPanNumber, PAN_INVALID_MESSAGE } from "@/lib/pan";
+
 export const createUserSchema = z.object({
   name: z
     .string()
@@ -26,6 +29,30 @@ export const createUserSchema = z.object({
   role: z.nativeEnum(UserRole),
 
   isActive: z.boolean().default(true),
+
+  // Optional KYC id — validated (12 digits + Verhoeff checksum) only when
+  // actually entered. See lib/aadhaar.ts.
+  aadhaarNumber: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine((value) => !value || isValidAadhaarNumber(value), {
+      message: AADHAAR_INVALID_MESSAGE,
+    }),
+
+  // Optional KYC id — validated (5 letters + 4 digits + 1 letter) only when
+  // actually entered. See lib/pan.ts.
+  panNumber: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine((value) => !value || isValidPanNumber(value), {
+      message: PAN_INVALID_MESSAGE,
+    }),
+
+  // Set via the Profile Photo uploader (Vercel Blob URL) — see
+  // app/api/users/photo/route.ts. Never typed by hand.
+  image: z.string().optional().or(z.literal("")),
 
   // Only meaningful when role is KARIGAR — links the login to a Karigar record.
   karigarId: z.string().cuid().optional().or(z.literal("")),

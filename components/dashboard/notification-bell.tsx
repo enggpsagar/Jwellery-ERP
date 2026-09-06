@@ -100,6 +100,7 @@ export function NotificationBell() {
           variant="outline"
           size="icon"
           className="relative text-[var(--chart-2)] hover:text-[var(--chart-2)]"
+          title="Notifications"
         >
           {/* Gold, from the chart palette's slot 2 — the same hue the gold
               KPI tile and gold bars use, so "gold" means one colour across
@@ -173,6 +174,16 @@ export function NotificationBell() {
             </div>
           )}
         </ScrollArea>
+
+        <div className="border-t px-4 py-2">
+          <Link
+            href="/calendar"
+            onClick={() => setOpen(false)}
+            className="block text-center text-xs font-medium text-primary hover:underline"
+          >
+            View Calendar
+          </Link>
+        </div>
       </PopoverContent>
     </Popover>
   );

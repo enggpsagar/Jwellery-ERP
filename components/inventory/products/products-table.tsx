@@ -8,6 +8,7 @@ import { Eye, Pencil } from "lucide-react"
 
 import { DeleteProductButton } from "@/components/inventory/products/delete-product-button"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
+import { SortableTableHead } from "@/components/shared/sortable-table-head"
 
 type ProductRow = {
   id: string
@@ -109,14 +110,19 @@ export function ProductsTable({
                   className="h-4 w-4 rounded border-input"
                 />
               </th>
-              <th className="px-4 py-3 text-left font-medium">Product Code</th>
-              <th className="px-4 py-3 text-left font-medium">Name</th>
-              <th className="px-4 py-3 text-left font-medium">Category</th>
-              <th className="px-4 py-3 text-left font-medium">Type</th>
-              <th className="px-4 py-3 text-left font-medium">Metal</th>
-              <th className="px-4 py-3 text-left font-medium">Purity</th>
-              <th className="px-4 py-3 text-right font-medium">Net Wt (g)</th>
-              <th className="px-4 py-3 text-left font-medium">Status</th>
+              <SortableTableHead label="Product Code" sortKey="productCode" defaultSortBy="createdAt" />
+              <SortableTableHead label="Name" sortKey="name" defaultSortBy="createdAt" />
+              <SortableTableHead label="Category" sortKey="category" defaultSortBy="createdAt" />
+              <SortableTableHead label="Type" sortKey="categoryType" defaultSortBy="createdAt" />
+              <SortableTableHead label="Metal" sortKey="metalType" defaultSortBy="createdAt" />
+              <SortableTableHead label="Purity" sortKey="defaultPurity" defaultSortBy="createdAt" />
+              <SortableTableHead
+                label="Net Wt (g)"
+                sortKey="defaultNetWeight"
+                defaultSortBy="createdAt"
+                align="right"
+              />
+              <SortableTableHead label="Status" sortKey="isActive" defaultSortBy="createdAt" />
               <th className="px-4 py-3 text-left font-medium">Actions</th>
             </tr>
           </thead>

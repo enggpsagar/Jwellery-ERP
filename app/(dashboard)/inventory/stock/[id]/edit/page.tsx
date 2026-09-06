@@ -9,6 +9,7 @@ import {
   getInventoryStockFormProducts,
 } from "@/lib/actions/inventory/stock-actions";
 import { getStoreLocations } from "@/lib/actions/store-location-actions";
+import { getCaratConversionRateMap } from "@/lib/actions/purity-actions";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { StockEditForm } from "@/components/inventory/stock/stock-edit-form";
@@ -41,10 +42,11 @@ export default async function EditInventoryStockPage({
   const { id } = await params;
 
 
-  const [stock, products, locations] = await Promise.all([
+  const [stock, products, locations, caratConversionRates] = await Promise.all([
     getInventoryStock(id),
     getInventoryStockFormProducts(),
     getStoreLocations(),
+    getCaratConversionRateMap(),
   ]);
 
 
@@ -68,6 +70,7 @@ export default async function EditInventoryStockPage({
         stock={stock}
         products={products}
         locations={locations}
+        caratConversionRates={caratConversionRates}
       />
 
     </main>

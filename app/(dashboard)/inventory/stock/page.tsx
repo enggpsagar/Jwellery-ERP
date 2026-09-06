@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 
-import { getInventoryStock } from "@/lib/actions/inventory/stock-actions";
+import {
+  getInventoryStock,
+  type StockSortBy,
+} from "@/lib/actions/inventory/stock-actions";
+import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
+import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 
 import { StockClient } from "@/components/inventory/stock/stock-client";
 
@@ -13,8 +18,9 @@ type InventoryStockPageProps = {
     page?: string
     pageSize?: string
     search?: string
-    sortBy?: "createdAt" | "stockCode" | "netWeight" | "saleAmount"
+    sortBy?: StockSortBy
     sortOrder?: "asc" | "desc"
+    type?: string
   }>
 }
 
@@ -31,13 +37,18 @@ export default async function InventoryStockPage({
   const sortBy = params.sortBy || "createdAt"
   const sortOrder = params.sortOrder || "desc"
 
+  const metals = await getStoreMetals()
+  const validMetalTypeIds = new Set([...metals.map((m) => m.id), UNASSIGNED_METAL_TYPE])
+  const metalTypeId = params.type && validMetalTypeIds.has(params.type) ? params.type : undefined
+
   const { stockItems, pagination } = await getInventoryStock({
     page,
     pageSize,
     search,
     sortBy,
     sortOrder,
+    metalTypeId,
   })
 
-  return <StockClient stockItems={stockItems} pagination={pagination} />;
+  return <StockClient stockItems={stockItems} pagination={pagination} metals={metals} />;
 }

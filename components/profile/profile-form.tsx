@@ -342,19 +342,21 @@ export function ProfileForm() {
             </div>
           </div>
 
-          <Button type="submit" disabled={loading} className="min-w-40">
-            {loading ? (
-              <>
-                <Loader className="mr-2 h-4 w-4" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Save Changes
-              </>
-            )}
-          </Button>
+          <div className="flex justify-end">
+            <Button type="submit" disabled={loading} className="min-w-40">
+              {loading ? (
+                <>
+                  <Loader className="mr-2 h-4 w-4" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>

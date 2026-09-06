@@ -6,10 +6,11 @@ import {
   InventoryStockStatus,
   InventoryFinish,
   ChargeType,
+  type PurityType,
 } from "@prisma/client";
 
 import type { StockFormState } from "@/lib/inventory/stock-types";
-import { isCaratWeighedMetal, GRAMS_PER_CARAT } from "@/lib/purity";
+import { isCaratWeighedMetal, resolveGramsPerCarat } from "@/lib/purity";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,6 +122,16 @@ type StockFormProps = {
 
   locations: LocationOption[];
 
+  /** Create-only — the store's configured default location (Settings >
+   * Locations), pre-selected in the Location picker so a new stock entry
+   * doesn't start blank. Not used in edit mode: an existing stock entry's
+   * saved location is untouched by this. */
+  defaultLocationId?: string | null;
+
+  /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
+   * Conversion Rules) — see the same prop on InvoiceForm. */
+  caratConversionRates: Record<PurityType, number>;
+
   state: StockFormState;
 
   pending: boolean;
@@ -137,6 +148,8 @@ export function StockForm({
   stock,
   products,
   locations,
+  defaultLocationId,
+  caratConversionRates,
   state,
   pending,
 }: StockFormProps) {
@@ -144,7 +157,13 @@ export function StockForm({
     stock?.status ?? InventoryStockStatus.IN_STOCK,
   );
 
-  const [locationId, setLocationId] = useState(stock?.locationId ?? "");
+  // Edit mode always keeps the stock entry's own saved location. Create
+  // mode falls back to the store's configured default only when nothing
+  // else has already resolved a value (there's no other auto-pick logic in
+  // this form today — see stock-create-form.tsx / new/page.tsx).
+  const [locationId, setLocationId] = useState(
+    stock?.locationId ?? defaultLocationId ?? "",
+  );
 
   const [finish, setFinish] = useState(
     stock?.finish ?? InventoryFinish.KACHA,
@@ -228,7 +247,8 @@ export function StockForm({
 
     const netNum = Number(value);
     if (value.trim() !== "" && Number.isFinite(netNum)) {
-      setCaratWeight(String(Number((netNum / GRAMS_PER_CARAT).toFixed(3))));
+      const gramsPerCarat = resolveGramsPerCarat(selectedProduct?.defaultPurity, caratConversionRates);
+      setCaratWeight(String(Number((netNum / gramsPerCarat).toFixed(3))));
     } else {
       setCaratWeight("");
     }
@@ -241,7 +261,8 @@ export function StockForm({
     const caratNum = Number(value);
     if (value.trim() !== "" && Number.isFinite(caratNum)) {
       setNetTouched(true);
-      setNetWeight(String(Number((caratNum * GRAMS_PER_CARAT).toFixed(5))));
+      const gramsPerCarat = resolveGramsPerCarat(selectedProduct?.defaultPurity, caratConversionRates);
+      setNetWeight(String(Number((caratNum * gramsPerCarat).toFixed(5))));
     }
   }
 

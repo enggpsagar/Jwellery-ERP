@@ -1,4 +1,5 @@
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst";
+import { APP_NAME } from "@/lib/constants/app";
 
 function formatCurrency(value: number) {
   return `₹${Number(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -13,10 +14,15 @@ function formatDate(value: string | Date) {
   }).format(date);
 }
 
-function wrapEmail(storeName: string, title: string, bodyHtml: string) {
+function wrapEmail(storeName: string, title: string, bodyHtml: string, logoUrl?: string | null) {
   return `
   <div style="font-family: Arial, Helvetica, sans-serif; max-width: 600px; margin: 0 auto; color: #1f2937;">
-    <div style="padding: 20px 24px; background: #111827; border-radius: 8px 8px 0 0;">
+    <div style="padding: 20px 24px; background: #111827; border-radius: 8px 8px 0 0; display: flex; align-items: center; gap: 10px;">
+      ${
+        logoUrl
+          ? `<img src="${logoUrl}" alt="${storeName}" width="32" height="32" style="border-radius: 6px; object-fit: cover; display: block;" />`
+          : ""
+      }
       <h1 style="margin: 0; color: #ffffff; font-size: 18px;">${storeName}</h1>
     </div>
     <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none;">
@@ -644,6 +650,7 @@ export function invoiceEmail(params: {
     pincode: string | null;
     phone: string | null;
     gstNumber: string | null;
+    logoUrl: string | null;
   };
   customer: {
     name: string;
@@ -730,11 +737,13 @@ export function invoiceEmail(params: {
 
     ${params.notes ? `<p style="font-size: 12px;"><strong>Notes:</strong> ${params.notes}</p>` : ""}
     ${params.terms ? `<p style="font-size: 10px; color: #6b7280;"><strong>Terms &amp; Conditions:</strong> ${params.terms}</p>` : ""}
+
+    <p style="text-align: center; font-size: 10px; color: #9ca3af; margin-top: 20px;">Generated with ${APP_NAME}</p>
   `;
 
   return {
     subject: `Invoice ${params.invoiceNumber} from ${params.storeName}`,
-    html: wrapEmail(params.storeName, `Invoice ${params.invoiceNumber}`, body),
+    html: wrapEmail(params.storeName, `Invoice ${params.invoiceNumber}`, body, params.business.logoUrl),
   };
 }
 

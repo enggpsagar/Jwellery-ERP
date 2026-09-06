@@ -30,7 +30,13 @@ export default async function NewVendorPage({ searchParams }: NewVendorPageProps
         backLabel={returnTo ? "Back without saving" : "Back to Vendors"}
       />
 
-      <VendorCreateForm states={states} returnTo={returnTo} gstScheme={businessSettings.gstScheme} />
+      <VendorCreateForm
+        states={states}
+        returnTo={returnTo}
+        gstScheme={businessSettings.gstScheme}
+        defaultState={businessSettings.state}
+        defaultCity={businessSettings.city}
+      />
     </main>
   )
 }

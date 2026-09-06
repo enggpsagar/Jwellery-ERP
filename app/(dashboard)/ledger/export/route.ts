@@ -6,7 +6,6 @@ import {
   getLedgerEntries,
   getMetalDailyLedger,
 } from "@/lib/actions/ledger-actions"
-import { WEIGHT_BASED_UNITS, CARAT_BASED_UNITS } from "@/lib/business-units"
 import { buildCsvExport, buildExcelExport } from "@/lib/excel-export"
 
 type Scope = "entries" | "metal-wise"
@@ -33,21 +32,16 @@ async function buildMetalWiseRows() {
   const { rows } = await getMetalDailyLedger()
 
   return rows.flatMap((row) =>
-    row.units.map((unit) => {
-      const isWeightBased = WEIGHT_BASED_UNITS.includes(unit.unit)
-      const isCaratBased = CARAT_BASED_UNITS.includes(unit.unit)
-
-      return {
-        Date: row.date,
-        Metal: unit.label,
-        Unit: isWeightBased ? "g" : isCaratBased ? "ct" : "₹",
-        Purchased: unit.purchasedValue,
-        "Purchased Amount (₹)": unit.purchasedAmount,
-        Sold: unit.soldValue,
-        "Sold Amount (₹)": unit.soldAmount,
-        "Closing Balance": unit.closingBalance,
-      }
-    }),
+    row.units.map((unit) => ({
+      Date: row.date,
+      Metal: unit.label,
+      Unit: unit.isGemstone ? "ct" : "g",
+      Purchased: unit.purchasedValue,
+      "Purchased Amount (₹)": unit.purchasedAmount,
+      Sold: unit.soldValue,
+      "Sold Amount (₹)": unit.soldAmount,
+      "Closing Balance": unit.closingBalance,
+    })),
   )
 }
 

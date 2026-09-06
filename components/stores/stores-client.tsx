@@ -1,12 +1,14 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { Gem, Plus } from "lucide-react"
 
 import { StoreTable } from "@/components/stores/store-table"
 import { DataTableToolbar } from "@/components/shared/data-table-toolbar"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
-import { exportStoresToExcel } from "@/lib/actions/store-actions"
+import { BulkArchiveButton } from "@/components/shared/bulk-archive-button"
+import { exportStoresToExcel, bulkArchiveStores } from "@/lib/actions/store-actions"
 import type { PlanRow } from "@/lib/actions/plan-actions"
 import type { StorePlanOverview } from "@/lib/actions/store-plan-actions"
 import { Button } from "@/components/ui/button"
@@ -63,6 +65,12 @@ export function StoresClient({
   plans,
   planOverviews,
 }: StoresClientProps) {
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([])
+
+  React.useEffect(() => {
+    setSelectedIds([])
+  }, [stores])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -125,12 +133,29 @@ export function StoresClient({
           { value: "code", label: "Sort by Code" },
         ]}
         defaultSortBy="createdAt"
+        selectedIds={selectedIds}
         entityLabel="stores"
         exportAction={exportStoresToExcel}
+        bulkActions={
+          <BulkArchiveButton
+            selectedIds={selectedIds}
+            itemLabelSingular="store"
+            itemLabelPlural="stores"
+            getDisplayName={(id) => stores.find((store) => store.id === id)?.name ?? id}
+            onArchive={bulkArchiveStores}
+            onDone={() => setSelectedIds([])}
+          />
+        }
       />
 
       <div className="space-y-3">
-        <StoreTable stores={stores} plans={plans} planOverviews={planOverviews} />
+        <StoreTable
+          stores={stores}
+          plans={plans}
+          planOverviews={planOverviews}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+        />
 
         <div className="rounded-xl border">
           <DataTablePagination

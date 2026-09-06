@@ -96,7 +96,7 @@ function deriveNetWeight(
 // the Add Stock form, so it carries the same field set as StockForm
 // (components/inventory/stock/stock-form.tsx), not just the weight fields
 // needed for the karigar fine-gold ledger calc.
-function emptyReceiptItem(defaultMetal?: StoreMetalRow): ReceiptItem {
+function emptyReceiptItem(defaultMetal?: StoreMetalRow, defaultLocationId?: string | null): ReceiptItem {
   return {
     key: crypto.randomUUID(),
     itemName: "",
@@ -128,7 +128,7 @@ function emptyReceiptItem(defaultMetal?: StoreMetalRow): ReceiptItem {
     saleAmount: 0,
     purchaseDate: "",
     manufactureDate: "",
-    locationId: "",
+    locationId: defaultLocationId ?? "",
     remarks: "",
     netTouched: false,
   }
@@ -155,6 +155,10 @@ type ReceiveItemsFormProps = {
    * free-choice behavior rather than locking to nothing. */
   jobMetalTypeId?: string | null
   jobMetalTypeName?: string | null
+  /** Store's default location — pre-fills each returned item's Location
+   * field, since every returned item becomes a brand-new InventoryStock row
+   * (a create, not an edit against something with a fixed location). */
+  defaultLocationId?: string | null
 }
 
 export function ReceiveItemsForm({
@@ -166,6 +170,7 @@ export function ReceiveItemsForm({
   locations,
   jobMetalTypeId,
   jobMetalTypeName,
+  defaultLocationId,
 }: ReceiveItemsFormProps) {
   const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
   // The job's own issued metal always wins when set — a karigar job can only
@@ -184,7 +189,9 @@ export function ReceiveItemsForm({
     [metals],
   )
 
-  const [items, setItems] = useState<ReceiptItem[]>([emptyReceiptItem(defaultMetal)])
+  const [items, setItems] = useState<ReceiptItem[]>([
+    emptyReceiptItem(defaultMetal, defaultLocationId),
+  ])
   const [labourCharge, setLabourCharge] = useState(0)
   const [editingQuantityKeys, setEditingQuantityKeys] = useState<Set<string>>(new Set())
   const router = useRouter()
@@ -390,7 +397,9 @@ export function ReceiveItemsForm({
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => setItems((prev) => [...prev, emptyReceiptItem(defaultMetal)])}
+          onClick={() =>
+            setItems((prev) => [...prev, emptyReceiptItem(defaultMetal, defaultLocationId)])
+          }
         >
           <Plus className="h-4 w-4 mr-1" /> Add Item
         </Button>
@@ -423,7 +432,7 @@ export function ReceiveItemsForm({
                     ITEM DETAILS
                 ============================ */}
                 <div className="grid gap-4 lg:grid-cols-4">
-                  <div className="space-y-1">
+                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Product</Label>
                     <ProductSelect
                       products={productsFor(item)}
@@ -436,7 +445,7 @@ export function ReceiveItemsForm({
                     />
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Item Name</Label>
                     <Input
                       value={item.itemName}
@@ -444,7 +453,7 @@ export function ReceiveItemsForm({
                     />
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Metal Type <RequiredMark /></Label>
                     {jobMetalTypeId ? (
                       // Locked to what was actually issued for this job — a
@@ -472,7 +481,7 @@ export function ReceiveItemsForm({
                   </div>
 
                   {hasPurity && (
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Purity</Label>
                       <Select
                         value={item.purity}
@@ -492,7 +501,7 @@ export function ReceiveItemsForm({
                     </div>
                   )}
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Tag Number</Label>
                     <Input
                       value={item.tagNumber}
@@ -509,7 +518,7 @@ export function ReceiveItemsForm({
                   <h3 className="mb-4 text-sm font-semibold">Weight Details</h3>
 
                   <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Quantity</Label>
                       {editingQuantityKeys.has(item.key) ? (
                         <Input
@@ -533,7 +542,7 @@ export function ReceiveItemsForm({
                       )}
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Gross Weight (g)</Label>
                       <Input
                         type="number"
@@ -557,7 +566,7 @@ export function ReceiveItemsForm({
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Less Weight (g)</Label>
                       <Input
                         type="number"
@@ -581,7 +590,7 @@ export function ReceiveItemsForm({
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Net Weight (g) <RequiredMark /></Label>
                       <Input
                         type="number"
@@ -601,7 +610,7 @@ export function ReceiveItemsForm({
                       )}
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Stone Weight (g)</Label>
                       <Input
                         type="number"
@@ -625,7 +634,7 @@ export function ReceiveItemsForm({
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Dust/Making/Other Wt (g)</Label>
                       <Input
                         type="number"
@@ -649,7 +658,7 @@ export function ReceiveItemsForm({
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Wastage %</Label>
                       <Input
                         type="number"
@@ -679,7 +688,7 @@ export function ReceiveItemsForm({
                   <h3 className="mb-4 text-sm font-semibold">Pricing &amp; Purchase Details</h3>
 
                   <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Purchase Rate</Label>
                       <Input
                         type="number"
@@ -691,7 +700,7 @@ export function ReceiveItemsForm({
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Sale Rate</Label>
                       <Input
                         type="number"
@@ -717,7 +726,7 @@ export function ReceiveItemsForm({
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Stone Charge</Label>
                       <Input
                         type="number"
@@ -729,7 +738,7 @@ export function ReceiveItemsForm({
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Other Charge</Label>
                       <Input
                         type="number"
@@ -741,7 +750,7 @@ export function ReceiveItemsForm({
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Purchase Amount</Label>
                       <Input
                         type="number"
@@ -753,7 +762,7 @@ export function ReceiveItemsForm({
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Sale Amount</Label>
                       <Input
                         type="number"
@@ -765,7 +774,7 @@ export function ReceiveItemsForm({
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Purchase Date</Label>
                       <Input
                         type="date"
@@ -774,7 +783,7 @@ export function ReceiveItemsForm({
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Date of Manufacture</Label>
                       <Input
                         type="date"
@@ -785,7 +794,7 @@ export function ReceiveItemsForm({
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Location</Label>
                       <LocationSelect
                         locations={locations}
@@ -795,7 +804,7 @@ export function ReceiveItemsForm({
                     </div>
                   </div>
 
-                  <div className="mt-4 space-y-1">
+                  <div className="mt-4 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Remarks</Label>
                     <Textarea
                       rows={3}

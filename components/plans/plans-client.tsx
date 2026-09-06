@@ -158,7 +158,7 @@ function PlanFormRow({ plan, onDone }: { plan?: PlanRow; onDone: () => void }) {
     >
       <input type="hidden" name="id" value={plan?.id ?? ""} />
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="plan-name" required>Name</Label>
         <Input
           id="plan-name"
@@ -172,7 +172,7 @@ function PlanFormRow({ plan, onDone }: { plan?: PlanRow; onDone: () => void }) {
         ) : null}
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="plan-durationDays" required>Duration (days)</Label>
         <Input
           id="plan-durationDays"
@@ -189,7 +189,7 @@ function PlanFormRow({ plan, onDone }: { plan?: PlanRow; onDone: () => void }) {
         ) : null}
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="plan-price" required>Price (₹)</Label>
         <Input
           id="plan-price"
@@ -206,7 +206,7 @@ function PlanFormRow({ plan, onDone }: { plan?: PlanRow; onDone: () => void }) {
         ) : null}
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="plan-sortOrder">Sort Order</Label>
         <Input
           id="plan-sortOrder"
@@ -218,12 +218,12 @@ function PlanFormRow({ plan, onDone }: { plan?: PlanRow; onDone: () => void }) {
         />
       </div>
 
-      <div className="flex gap-2 pb-0.5">
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
-        </Button>
+      <div className="flex justify-end gap-2 pb-0.5">
         <Button type="button" size="sm" variant="outline" onClick={onDone}>
           Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? <Loader className="h-4 w-4" /> : "Save"}
         </Button>
       </div>
     </form>

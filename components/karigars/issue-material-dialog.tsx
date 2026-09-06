@@ -57,12 +57,17 @@ type IssueMaterialDialogProps = {
   karigarId: string
   metals: StoreMetalRow[]
   locations?: LocationOption[]
+  /** Store's default location — pre-fills the Location field, since issuing
+   * material creates a brand-new issue record (a create, not an edit
+   * against something with a fixed location). */
+  defaultLocationId?: string | null
 }
 
 export function IssueMaterialDialog({
   karigarId,
   metals,
   locations = [],
+  defaultLocationId = null,
 }: IssueMaterialDialogProps) {
   const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
   // Mirrors the old hardcoded default of "GOLD": prefer a hasPurity metal if
@@ -75,7 +80,7 @@ export function IssueMaterialDialog({
   const [open, setOpen] = useState(false)
   const [metalTypeId, setMetalTypeId] = useState(defaultMetalId)
   const [issuePurity, setIssuePurity] = useState("GOLD_22K")
-  const [locationId, setLocationId] = useState("")
+  const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const router = useRouter()
   const toast = useToast()
 
@@ -88,9 +93,9 @@ export function IssueMaterialDialog({
 
   // Purity options depend on which metal is selected — Silver should never
   // offer Gold purities and vice versa. classifyMetalName's own return type
-  // is tied to the BusinessUnit enum, which has no Platinum unit, so
-  // Platinum is matched separately by name here rather than widening that
-  // shared classifier (see the same reasoning in product-form.tsx).
+  // (GOLD | SILVER | DIAMOND | OTHER) has no Platinum bucket, so Platinum is
+  // matched separately by name here rather than widening that shared
+  // classifier (see the same reasoning in product-form.tsx).
   const metalFamily = selectedMetal?.name.toLowerCase().includes("platinum")
     ? "PLATINUM"
     : classifyMetalName(selectedMetal?.name)
@@ -159,7 +164,7 @@ export function IssueMaterialDialog({
           )}
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
               <Label>Metal Type <RequiredMark /></Label>
               <Select value={metalTypeId} onValueChange={setMetalTypeId}>
                 <SelectTrigger>
@@ -176,7 +181,7 @@ export function IssueMaterialDialog({
             </div>
 
             {isPreciousMetal && (
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
                 <Label>Purity</Label>
                 <Select value={issuePurity} onValueChange={setIssuePurity}>
                   <SelectTrigger>
@@ -194,17 +199,17 @@ export function IssueMaterialDialog({
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Issue Weight (g) <RequiredMark /></Label>
             <Input name="issueWeight" type="number" step="0.001" min="0" required />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Expected Return Date</Label>
             <Input name="expectedDate" type="date" min={todayForDateInput()} />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Location</Label>
             <LocationSelect
               locations={locations}
@@ -214,7 +219,7 @@ export function IssueMaterialDialog({
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>{isPreciousMetal ? (
               "Notes"
             ) : (

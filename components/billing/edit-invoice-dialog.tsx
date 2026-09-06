@@ -24,6 +24,13 @@ import { LocationSelect, type LocationOption } from "@/components/shared/locatio
 
 const initialState: InvoiceFormState = { success: false, message: "" }
 
+const TRANSPORT_MODE_OPTIONS = [
+  { value: "ROAD", label: "Road" },
+  { value: "RAIL", label: "Rail" },
+  { value: "AIR", label: "Air" },
+  { value: "SHIP", label: "Ship" },
+] as const
+
 type EditInvoiceDialogProps = {
   invoiceId: string
   invoiceDate: string
@@ -31,14 +38,27 @@ type EditInvoiceDialogProps = {
   notes: string | null
   locationId: string | null
   locations: LocationOption[]
+  ewayBillNumber?: string | null
+  ewayBillDate?: string | null
+  transporterName?: string | null
+  vehicleNumber?: string | null
+  transportMode?: string | null
+  distanceKm?: number | null
 }
 
 /**
- * Only invoice date, due date, location, and notes are editable here — no
- * line items, amounts, or payments. Once stock is decremented and ledger
- * entries posted, changing those needs the same reversal logic Cancel
- * already does, not a quiet in-place edit — see cancelInvoice for the
- * real-correction path.
+ * Invoice date, due date, location, notes, and E-way Bill details are
+ * editable here — no line items, amounts, or payments. Once stock is
+ * decremented and ledger entries posted, changing those needs the same
+ * reversal logic Cancel already does, not a quiet in-place edit — see
+ * cancelInvoice for the real-correction path.
+ *
+ * E-way Bill fields are record-keeping only — this app never calls the
+ * government's E-way Bill API. The store generates the actual bill on
+ * ewaybillgst.gov.in and enters its number back here so it prints on the
+ * invoice. Available regardless of payment status (DRAFT/PARTIAL/PAID),
+ * since a bill is usually generated at dispatch, not necessarily at the
+ * moment the invoice itself was raised.
  */
 export function EditInvoiceDialog({
   invoiceId,
@@ -47,6 +67,12 @@ export function EditInvoiceDialog({
   notes,
   locationId,
   locations,
+  ewayBillNumber,
+  ewayBillDate,
+  transporterName,
+  vehicleNumber,
+  transportMode,
+  distanceKm,
 }: EditInvoiceDialogProps) {
   const [open, setOpen] = useState(false)
   const router = useRouter()
@@ -69,7 +95,7 @@ export function EditInvoiceDialog({
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <Pencil className="h-4 w-4" />
-          Edit
+          Edit Details
         </Button>
       </DialogTrigger>
 
@@ -93,24 +119,84 @@ export function EditInvoiceDialog({
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
               <Label>Invoice Date</Label>
               <Input type="date" name="invoiceDate" defaultValue={invoiceDate.slice(0, 10)} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
               <Label>Due Date</Label>
               <Input type="date" name="dueDate" defaultValue={dueDate?.slice(0, 10) ?? ""} />
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Location</Label>
             <LocationSelect locations={locations} name="locationId" defaultValue={locationId ?? ""} />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Notes</Label>
             <Textarea name="notes" rows={3} defaultValue={notes ?? ""} />
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-dashed p-3">
+            <div>
+              <p className="text-sm font-medium">E-way Bill</p>
+              <p className="text-xs text-muted-foreground">
+                Generate the actual bill on ewaybillgst.gov.in, then enter its
+                details here so they print on this invoice.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+                <Label>E-way Bill Number</Label>
+                <Input name="ewayBillNumber" placeholder="Optional" defaultValue={ewayBillNumber ?? ""} />
+              </div>
+              <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+                <Label>E-way Bill Date</Label>
+                <Input type="date" name="ewayBillDate" defaultValue={ewayBillDate?.slice(0, 10) ?? ""} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+                <Label>Transporter Name</Label>
+                <Input name="transporterName" placeholder="Optional" defaultValue={transporterName ?? ""} />
+              </div>
+              <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+                <Label>Vehicle Number</Label>
+                <Input name="vehicleNumber" placeholder="e.g. MH12AB1234" defaultValue={vehicleNumber ?? ""} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+                <Label>Transport Mode</Label>
+                <select
+                  name="transportMode"
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  defaultValue={transportMode ?? ""}
+                >
+                  <option value="">Select mode</option>
+                  {TRANSPORT_MODE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+                <Label>Distance (km)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  name="distanceKm"
+                  placeholder="Optional"
+                  defaultValue={distanceKm ?? ""}
+                />
+              </div>
+            </div>
           </div>
 
           <DialogFooter>

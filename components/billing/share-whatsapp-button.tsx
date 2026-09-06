@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Loader2, MessageCircle } from "lucide-react"
+import { MessageCircle } from "lucide-react"
+import { Loader } from "@/components/ui/loader"
 
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/providers/toast-provider"
@@ -106,7 +107,7 @@ export function ShareWhatsAppButton({
       title={!digits ? "This customer has no phone number on file" : undefined}
     >
       {loading ? (
-        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+        <Loader className="h-4 w-4 mr-1" />
       ) : (
         <MessageCircle className="h-4 w-4 mr-1" />
       )}

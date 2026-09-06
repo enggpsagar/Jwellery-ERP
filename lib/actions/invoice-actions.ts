@@ -11,6 +11,7 @@ import {
   PaymentMethod,
   PurityType,
   ChargeType,
+  TransportMode,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -45,6 +46,8 @@ export type InvoiceLineItemInput = {
   makingChargeType?: ChargeType | string | null;
   stoneCharge: number;
   stoneRate?: number | null;
+  stoneMetalTypeName?: string | null;
+  stoneTypeNames?: string | null;
   dmoWeight?: number | null;
   stoneWeight?: number | null;
   hmCharge?: number;
@@ -100,6 +103,37 @@ function parsePayments(raw: string): PaymentEntryInput[] | null {
   return payments;
 }
 
+/**
+ * Same shape/validation as parsePayments, but allows zero rows — used at
+ * document-CREATION time (createInvoice) where a fully-on-credit invoice
+ * (nothing paid yet) is a normal, valid case. parsePayments itself stays
+ * strict (1-2 rows required) because recordInvoicePayment's dialog only
+ * ever appears once there's a known positive balance to collect against.
+ */
+function parseOptionalPayments(raw: string): PaymentEntryInput[] | null {
+  let payments: PaymentEntryInput[];
+  try {
+    payments = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (!Array.isArray(payments) || payments.length > 2) {
+    return null;
+  }
+
+  for (const payment of payments) {
+    if (!Object.values(PaymentMethod).includes(payment.method as PaymentMethod)) {
+      return null;
+    }
+    if (!(Number(payment.amount) > 0)) {
+      return null;
+    }
+  }
+
+  return payments;
+}
+
 function toNumber(value: unknown, fallback = 0) {
   const num = Number(value);
   return Number.isNaN(num) ? fallback : num;
@@ -134,19 +168,31 @@ function lineTotal(item: InvoiceLineItemInput) {
   );
 }
 
+/**
+ * `{prefix}-{YYYYMMDD}-{padded sequence}`, e.g. `MJJ-20260904-0001` — unlike
+ * the old `{prefix}-{year}-{padded count}` shape, the full date is encoded
+ * directly into the number so it's readable at a glance without opening the
+ * invoice (same reasoning as the support ticket number's own date/time
+ * encoding — see generateTicketNumber in support-ticket-actions.ts). The
+ * sequence resets daily rather than yearly to match: `invoiceStartingNo`
+ * still seeds the first number of each day, same as it always seeded the
+ * first number of each year before.
+ */
 async function generateInvoiceNumber(storeId: string) {
   const settings = await prisma.businessSettings.findUnique({ where: { storeId } });
   const prefix = settings?.invoicePrefix?.trim() || "INV";
   const startingNo = settings?.invoiceStartingNo ?? 1;
-  const year = new Date().getFullYear();
+  const now = new Date();
+  const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const prefixPart = `${prefix}-${datePart}-`;
   const count = await prisma.invoice.count({
     where: {
       storeId,
-      invoiceNumber: { startsWith: `${prefix}-${year}-` },
+      invoiceNumber: { startsWith: prefixPart },
     },
   });
 
-  return `${prefix}-${year}-${String(count + startingNo).padStart(4, "0")}`;
+  return `${prefixPart}${String(count + startingNo).padStart(4, "0")}`;
 }
 
 /**
@@ -168,6 +214,8 @@ export type InvoiceItemView = {
   makingChargeType: ChargeType;
   stoneCharge: number;
   stoneRate: number | null;
+  stoneMetalTypeName: string | null;
+  stoneTypeNames: string | null;
   dmoWeight: number | null;
   stoneWeight: number | null;
   hmCharge: number;
@@ -198,6 +246,12 @@ function mapInvoice(invoice: any) {
     notes: invoice.notes,
     locationId: invoice.locationId ?? null,
     locationName: invoice.location?.name ?? null,
+    ewayBillNumber: invoice.ewayBillNumber ?? null,
+    ewayBillDate: invoice.ewayBillDate?.toISOString() ?? null,
+    transporterName: invoice.transporterName ?? null,
+    vehicleNumber: invoice.vehicleNumber ?? null,
+    transportMode: (invoice.transportMode ?? null) as TransportMode | null,
+    distanceKm: invoice.distanceKm ?? null,
     createdByName: invoice.createdByName ?? invoice.createdBy?.name ?? null,
     cancelledAt: invoice.cancelledAt?.toISOString() ?? null,
     cancelledByName: invoice.cancelledByName ?? invoice.cancelledBy?.name ?? null,
@@ -240,6 +294,8 @@ function mapInvoice(invoice: any) {
       makingChargeType: item.makingChargeType as ChargeType,
       stoneCharge: Number(item.stoneCharge),
       stoneRate: item.stoneRate ? Number(item.stoneRate) : null,
+      stoneMetalTypeName: item.stoneMetalTypeName ?? null,
+      stoneTypeNames: item.stoneTypeNames ?? null,
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
       stoneWeight: item.stoneWeight ? Number(item.stoneWeight) : null,
       hmCharge: Number(item.hmCharge ?? 0),
@@ -511,10 +567,13 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       ? { id: stock.metalType.id, name: stock.metalType.name }
       : null,
     purity: stock.purity,
+    grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,
     netWeight: stock.netWeight ? Number(stock.netWeight) : null,
     stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
     caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
     stoneRate: stock.stoneRate ? Number(stock.stoneRate) : null,
+    stoneMetalTypeName: stock.stoneMetalTypeName ?? null,
+    stoneTypeNames: stock.stoneTypeNames ?? null,
     saleRate: stock.saleRate ? Number(stock.saleRate) : null,
     quantity: stock.quantity,
   }));
@@ -558,10 +617,13 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       hsnCode: stock.product.hsnCode,
       metalType: stock.metalType ? { id: stock.metalType.id, name: stock.metalType.name } : null,
       purity: stock.purity,
+      grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,
       netWeight: stock.netWeight ? Number(stock.netWeight) : null,
       stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
       caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
       stoneRate: stock.stoneRate ? Number(stock.stoneRate) : null,
+      stoneMetalTypeName: stock.stoneMetalTypeName ?? null,
+      stoneTypeNames: stock.stoneTypeNames ?? null,
       saleRate: stock.saleRate ? Number(stock.saleRate) : null,
       quantity: stock.quantity + claimed,
     });
@@ -575,6 +637,8 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
  * linked to an InventoryStock row gets marked SOLD and a SALE transaction
  * is logged against it. If the invoice isn't fully paid up front, a DEBIT
  * ledger entry is recorded against the customer for the outstanding amount.
+ * Whatever IS paid up front (via paymentsJson's 1-2 method rows) gets its
+ * own CREDIT ledger entry per row, same shape recordInvoicePayment writes.
  */
 export async function createInvoice(
   prevState: InvoiceFormState = initialState,
@@ -613,7 +677,25 @@ export async function createInvoice(
     }
 
     const manualDiscount = toNumber(formData.get("discount"));
-    const paidAmount = toNumber(formData.get("paidAmount"));
+
+    // paymentsJson (1-2 method rows, or none for a fully-on-credit sale) is
+    // what invoice-form.tsx's "Paid Now" section sends. A caller that
+    // doesn't send it at all (quick-sale-actions.ts's scan-to-sell flow,
+    // which only collects a flat figure with no method breakdown) falls
+    // back to the legacy plain `paidAmount` field exactly as before — no
+    // method-tagged LedgerEntry gets created for that path, unchanged.
+    const paymentsRaw = formData.get("paymentsJson");
+    const payments = paymentsRaw !== null ? parseOptionalPayments(String(paymentsRaw)) : [];
+    if (payments === null) {
+      return {
+        success: false,
+        message: "Add 1-2 valid payment methods with an amount, or leave Paid Now blank for a fully-on-credit sale.",
+      };
+    }
+    const paidAmount =
+      paymentsRaw !== null
+        ? payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
+        : toNumber(formData.get("paidAmount"));
     const invoiceDateRaw = String(formData.get("invoiceDate") || "");
     const dueDateRaw = String(formData.get("dueDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
@@ -821,6 +903,8 @@ export async function createInvoice(
               makingChargeType: toChargeType(item.makingChargeType),
               stoneCharge: item.stoneCharge,
               stoneRate: item.stoneRate ?? undefined,
+              stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
+              stoneTypeNames: item.stoneTypeNames ?? undefined,
               dmoWeight: item.dmoWeight ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               hmCharge: item.hmCharge ?? 0,
@@ -912,6 +996,29 @@ export async function createInvoice(
             amount: balanceAmount,
             description: `Invoice ${invoiceNumber} balance due`,
             locationId: resolvedLocationId ?? undefined,
+          },
+        });
+      }
+
+      // One CREDIT entry per payment-method row actually collected at the
+      // moment of sale — same shape recordInvoicePayment writes for a later
+      // top-up payment, so the two are indistinguishable in the ledger
+      // besides their timestamp.
+      for (const [index, payment] of payments.entries()) {
+        await tx.ledgerEntry.create({
+          data: {
+            storeId,
+            type: LedgerEntryType.CREDIT,
+            sourceType: LedgerSourceType.SALE,
+            customerId,
+            invoiceId: created.id,
+            amount: payment.amount,
+            paymentMethod: payment.method as PaymentMethod,
+            paymentReference: payment.reference ?? undefined,
+            bankName: payment.bankName ?? undefined,
+            attachmentUrl: payment.attachmentUrl ?? undefined,
+            locationId: resolvedLocationId ?? undefined,
+            description: index === 0 ? `Payment received for ${invoiceNumber}` : undefined,
           },
         });
       }
@@ -1070,6 +1177,21 @@ export async function updateInvoice(
     const notes = String(formData.get("notes") || "").trim() || null;
     const locationId = String(formData.get("locationId") || "").trim() || null;
 
+    // E-way Bill — record-keeping only, no government API call. See the
+    // schema's own doc comment on Invoice.ewayBillNumber.
+    const ewayBillNumber = String(formData.get("ewayBillNumber") || "").trim() || null;
+    const ewayBillDateRaw = String(formData.get("ewayBillDate") || "");
+    const transporterName = String(formData.get("transporterName") || "").trim() || null;
+    const vehicleNumber = String(formData.get("vehicleNumber") || "").trim() || null;
+    const transportModeRaw = String(formData.get("transportMode") || "").trim();
+    const transportMode = (
+      Object.values(TransportMode) as string[]
+    ).includes(transportModeRaw)
+      ? (transportModeRaw as TransportMode)
+      : null;
+    const distanceKmRaw = String(formData.get("distanceKm") || "").trim();
+    const distanceKm = distanceKmRaw ? Math.trunc(Number(distanceKmRaw)) || null : null;
+
     const locationScope = await getLocationScope();
     const locationResolution = await resolveWritableLocationId(storeId, locationId, locationScope);
     if (!locationResolution.ok) {
@@ -1087,6 +1209,12 @@ export async function updateInvoice(
           dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
           notes,
           locationId: resolvedLocationId ?? null,
+          ewayBillNumber,
+          ewayBillDate: ewayBillDateRaw ? new Date(ewayBillDateRaw) : null,
+          transporterName,
+          vehicleNumber,
+          transportMode,
+          distanceKm,
         },
       });
 
@@ -1270,6 +1398,8 @@ export async function updateInvoice(
               makingChargeType: toChargeType(item.makingChargeType),
               stoneCharge: item.stoneCharge,
               stoneRate: item.stoneRate ?? undefined,
+              stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
+              stoneTypeNames: item.stoneTypeNames ?? undefined,
               dmoWeight: item.dmoWeight ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               hmCharge: item.hmCharge ?? 0,
@@ -1585,6 +1715,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
         pincode: settings.pincode || null,
         phone: settings.phone || null,
         gstNumber: settings.gstNumber || null,
+        logoUrl: settings.logoUrl || null,
       },
       customer: {
         name: invoice.customer.name,

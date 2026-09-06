@@ -3,6 +3,7 @@ import { UserRole } from "@prisma/client";
 import { redirect } from "next/navigation";
 
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
+import { getAvailableBusinessUnitOptions } from "@/lib/business-units.server";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { getStates } from "@/lib/actions/location-actions";
 
@@ -26,9 +27,10 @@ export default async function SettingsPage() {
     currentUser?.role === UserRole.SUPER_ADMIN;
   if (!canEdit) redirect("/dashboard");
 
-  const [settings, states] = await Promise.all([
+  const [settings, states, businessUnitOptions] = await Promise.all([
     getBusinessSettings(),
     getStates(),
+    getAvailableBusinessUnitOptions(),
   ]);
 
   return (
@@ -42,7 +44,12 @@ export default async function SettingsPage() {
 
       <SettingsTabs active="business" />
 
-      <SettingsForm settings={settings} canEdit={canEdit} states={states} />
+      <SettingsForm
+        settings={settings}
+        canEdit={canEdit}
+        states={states}
+        unitOptions={businessUnitOptions}
+      />
     </main>
   );
 }

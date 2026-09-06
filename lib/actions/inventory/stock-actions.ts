@@ -13,10 +13,18 @@ import {
 } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { getCurrentUser } from "@/lib/auth/auth"
 import { requireStoreScope } from "@/lib/store-context"
-import { getLocationScope, locationWhere, isLocationAllowed, type LocationScope } from "@/lib/location-scope"
+import {
+  getLocationScope,
+  locationWhere,
+  isLocationAllowed,
+  resolveWritableLocationId,
+  type LocationScope,
+} from "@/lib/location-scope"
 import type { StockFormState } from "@/lib/inventory/stock-types"
-import { buildExcelExport } from "@/lib/excel-export"
+import { buildExcelExport, buildMultiSheetExcelExport, parseExcelUpload } from "@/lib/excel-export"
+import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 import { getFinenessMap, toFineWeight } from "@/lib/purity"
 
 function parseNullableString(value: FormDataEntryValue | null) {
@@ -68,7 +76,19 @@ function toDecimal(value: number | null | undefined): Prisma.Decimal | undefined
   return new Prisma.Decimal(value)
 }
 
-export type StockSortBy = "createdAt" | "stockCode" | "netWeight" | "saleAmount"
+export type StockSortBy =
+  | "createdAt"
+  | "stockCode"
+  | "netWeight"
+  | "saleAmount"
+  | "product"
+  | "metalType"
+  | "purity"
+  | "quantity"
+  | "status"
+  | "finish"
+  | "location"
+  | "purchaseDate"
 export type StockSortOrder = "asc" | "desc"
 
 export type GetInventoryStockParams = {
@@ -77,6 +97,10 @@ export type GetInventoryStockParams = {
   search?: string
   sortBy?: StockSortBy
   sortOrder?: StockSortOrder
+  /** Filters by the store's own StoreMetal id (Settings > Taxonomy) — or
+   * "UNASSIGNED" for stock with no metal set. Dynamic: whatever the store
+   * has configured, not a fixed set of categories. */
+  metalTypeId?: string
 }
 
 type ExportInventoryStockParams = {
@@ -84,6 +108,7 @@ type ExportInventoryStockParams = {
   search?: string
   sortBy?: string
   sortOrder?: StockSortOrder
+  type?: string
 }
 
 const STOCK_INCLUDE = {
@@ -106,12 +131,31 @@ const STOCK_INCLUDE = {
   },
 } as const
 
-function getStockWhere(storeId: string, search: string | undefined, scope: LocationScope) {
+/**
+ * "Type" filters directly by the store's own configured StoreMetal id —
+ * whatever metals/stones this store has set up in Settings > Taxonomy, not
+ * a fixed set of hardcoded categories. A store adding a new metal or stone
+ * there needs no code change for it to show up as its own filter option
+ * (see getStoreMetals, used by the Stock/Karigars toolbars to build the
+ * dropdown). The sentinel "UNASSIGNED" filters to rows with no metal set at
+ * all, since InventoryStock.metalTypeId is nullable.
+ */
+function getStockWhere(
+  storeId: string,
+  search: string | undefined,
+  scope: LocationScope,
+  metalTypeId?: string,
+) {
   const query = String(search || "").trim()
 
   return {
     storeId,
     ...locationWhere(scope),
+    ...(metalTypeId === UNASSIGNED_METAL_TYPE
+      ? { metalTypeId: null }
+      : metalTypeId
+        ? { metalTypeId }
+        : {}),
     ...(query
       ? {
           OR: [
@@ -135,6 +179,14 @@ function getStockOrderBy(
   if (sortBy === "stockCode") return { stockCode: sortOrder }
   if (sortBy === "netWeight") return { netWeight: sortOrder }
   if (sortBy === "saleAmount") return { saleAmount: sortOrder }
+  if (sortBy === "product") return { product: { name: sortOrder } }
+  if (sortBy === "metalType") return { metalType: { name: sortOrder } }
+  if (sortBy === "purity") return { purity: sortOrder }
+  if (sortBy === "quantity") return { quantity: sortOrder }
+  if (sortBy === "status") return { status: sortOrder }
+  if (sortBy === "finish") return { finish: sortOrder }
+  if (sortBy === "location") return { location: { name: sortOrder } }
+  if (sortBy === "purchaseDate") return { purchaseDate: sortOrder }
   return { createdAt: sortOrder }
 }
 
@@ -153,6 +205,8 @@ function mapStockRow(row: any) {
     makingCharge: row.makingCharge?.toString() ?? null,
     stoneCharge: row.stoneCharge?.toString() ?? null,
     stoneRate: row.stoneRate?.toString() ?? null,
+    stoneMetalTypeName: row.stoneMetalTypeName ?? null,
+    stoneTypeNames: row.stoneTypeNames ?? null,
     otherCharge: row.otherCharge?.toString() ?? null,
     purchaseAmount: row.purchaseAmount?.toString() ?? null,
     saleAmount: row.saleAmount?.toString() ?? null,
@@ -168,7 +222,7 @@ export async function getInventoryStock(params: GetInventoryStockParams = {}) {
 
   const storeId = await requireStoreScope()
   const scope = await getLocationScope()
-  const where = getStockWhere(storeId, search, scope)
+  const where = getStockWhere(storeId, search, scope, params.metalTypeId)
   const orderBy = getStockOrderBy(sortBy, sortOrder)
 
   const [totalCount, rows] = await Promise.all([
@@ -201,7 +255,20 @@ export async function getInventoryStock(params: GetInventoryStockParams = {}) {
 async function getAllInventoryStockForExport(
   params: ExportInventoryStockParams = {}
 ) {
-  const validSortBy: StockSortBy[] = ["createdAt", "stockCode", "netWeight", "saleAmount"]
+  const validSortBy: StockSortBy[] = [
+    "createdAt",
+    "stockCode",
+    "netWeight",
+    "saleAmount",
+    "product",
+    "metalType",
+    "purity",
+    "quantity",
+    "status",
+    "finish",
+    "location",
+    "purchaseDate",
+  ]
   const sortBy: StockSortBy = validSortBy.includes(params.sortBy as StockSortBy)
     ? (params.sortBy as StockSortBy)
     : "createdAt"
@@ -209,13 +276,14 @@ async function getAllInventoryStockForExport(
 
   const storeId = await requireStoreScope()
   const scope = await getLocationScope()
+
   const where = params.selectedIds?.length
     ? {
         id: { in: params.selectedIds },
         storeId,
         ...locationWhere(scope),
       }
-    : getStockWhere(storeId, params.search, scope)
+    : getStockWhere(storeId, params.search, scope, params.type)
 
   const rows = await prisma.inventoryStock.findMany({
     where,
@@ -419,6 +487,8 @@ export async function getInventoryStockById(id: string) {
     makingCharge: row.makingCharge?.toString() ?? null,
     stoneCharge: row.stoneCharge?.toString() ?? null,
     stoneRate: row.stoneRate?.toString() ?? null,
+    stoneMetalTypeName: row.stoneMetalTypeName ?? null,
+    stoneTypeNames: row.stoneTypeNames ?? null,
     otherCharge: row.otherCharge?.toString() ?? null,
     purchaseAmount: row.purchaseAmount?.toString() ?? null,
     saleAmount: row.saleAmount?.toString() ?? null,
@@ -514,6 +584,7 @@ export async function createInventoryStock(
     }
 
     const storeId = await requireStoreScope()
+    const currentUser = await getCurrentUser()
 
     const product = await prisma.product.findFirst({
       where: { id: productId, storeId },
@@ -526,6 +597,8 @@ export async function createInventoryStock(
         defaultStoneCharge: true,
         hasStoneComponent: true,
         defaultStoneRate: true,
+        defaultStoneMetalTypeName: true,
+        defaultStoneTypeNames: true,
       },
     })
 
@@ -597,6 +670,8 @@ export async function createInventoryStock(
       product.hasStoneComponent && product.defaultStoneRate != null && caratWeight
         ? new Prisma.Decimal(product.defaultStoneRate).mul(caratWeight)
         : product.defaultStoneCharge
+    const stoneMetalTypeName = product.hasStoneComponent ? product.defaultStoneMetalTypeName : null
+    const stoneTypeNames = product.hasStoneComponent ? product.defaultStoneTypeNames : null
 
     const existing = await prisma.inventoryStock.findFirst({
       where: { stockCode, storeId },
@@ -653,6 +728,8 @@ export async function createInventoryStock(
           makingChargeType,
           stoneCharge,
           stoneRate: stoneRate ?? undefined,
+          stoneMetalTypeName: stoneMetalTypeName ?? undefined,
+          stoneTypeNames: stoneTypeNames ?? undefined,
           otherCharge: toDecimal(otherCharge),
           purchaseAmount: toDecimal(purchaseAmount),
           saleAmount: toDecimal(saleAmount),
@@ -661,6 +738,9 @@ export async function createInventoryStock(
           manufactureDate,
           locationId,
           remarks,
+          createdById: currentUser?.id ?? undefined,
+          createdByName: currentUser?.name ?? undefined,
+          createdByRole: currentUser?.role ?? undefined,
         },
       }),
       ...(netWeight && netWeight > 0
@@ -722,6 +802,8 @@ export async function updateInventoryStock(
         makingChargeType: true,
         stoneCharge: true,
         stoneRate: true,
+        stoneMetalTypeName: true,
+        stoneTypeNames: true,
         invoiceItems: {
           select: { id: true },
           take: 1,
@@ -878,6 +960,8 @@ export async function updateInventoryStock(
     // stoneCharge/makingCharge above, so editing other fields on this stock
     // row never silently wipes what a prior product selection already set.
     let stoneRate: Prisma.Decimal | null = existingStock.stoneRate
+    let stoneMetalTypeName: string | null = existingStock.stoneMetalTypeName
+    let stoneTypeNames: string | null = existingStock.stoneTypeNames
 
     if (!isLockedForCoreChanges) {
       const product = await prisma.product.findFirst({
@@ -891,6 +975,8 @@ export async function updateInventoryStock(
           defaultStoneCharge: true,
           hasStoneComponent: true,
           defaultStoneRate: true,
+          defaultStoneMetalTypeName: true,
+          defaultStoneTypeNames: true,
         },
       })
 
@@ -924,6 +1010,8 @@ export async function updateInventoryStock(
         product.hasStoneComponent && product.defaultStoneRate != null && caratWeight
           ? new Prisma.Decimal(product.defaultStoneRate).mul(caratWeight)
           : product.defaultStoneCharge
+      stoneMetalTypeName = product.hasStoneComponent ? product.defaultStoneMetalTypeName : null
+      stoneTypeNames = product.hasStoneComponent ? product.defaultStoneTypeNames : null
     }
 
     /**
@@ -981,6 +1069,8 @@ export async function updateInventoryStock(
         makingChargeType,
         stoneCharge,
         stoneRate,
+        stoneMetalTypeName,
+        stoneTypeNames,
         otherCharge: toDecimal(otherCharge),
         purchaseAmount: toDecimal(purchaseAmount),
         saleAmount: toDecimal(saleAmount),
@@ -1076,5 +1166,249 @@ export async function deleteInventoryStock(id: string): Promise<StockFormState> 
       message: "Failed to delete stock",
       errors: {},
     }
+  }
+}
+
+export type BulkDeleteResult = {
+  deletedCount: number
+  failures: { id: string; message: string }[]
+}
+
+/**
+ * Deletes each selected stock item through the exact same
+ * deleteInventoryStock() call a single-row delete uses — never a bare
+ * deleteMany — so a bulk selection can't bypass the invoice/kacha/karigar-
+ * job dependency guard just because several rows were ticked at once.
+ * Partial success is expected and reported per row, not treated as a
+ * whole-batch failure.
+ */
+export async function bulkDeleteInventoryStock(ids: string[]): Promise<BulkDeleteResult> {
+  const failures: BulkDeleteResult["failures"] = []
+  let deletedCount = 0
+
+  for (const id of ids) {
+    const result = await deleteInventoryStock(id)
+    if (result.success) {
+      deletedCount++
+    } else {
+      failures.push({ id, message: result.message })
+    }
+  }
+
+  return { deletedCount, failures }
+}
+
+export type StockImportResult = {
+  success: boolean
+  message: string
+  createdCount?: number
+  /** Row-level problems. Populated only when nothing was created — mirrors
+   * importKachaInvoicesFromExcel's own contract: the file must be clean
+   * before anything is created, so a partial import never leaves the
+   * merchant guessing which rows actually landed. */
+  errors?: string[]
+}
+
+/**
+ * A downloadable .xlsx showing the expected columns and one filled-in
+ * example row. Only Product Code and Quantity are required — everything
+ * else a stock entry needs (metal, purity, making/stone charges) comes from
+ * the matched product, same as the single "Stock entry" checkbox on Product
+ * Create ("needs nothing but a quantity").
+ */
+export async function getStockImportTemplate(): Promise<{
+  fileName: string
+  fileBase64: string
+}> {
+  await requireStoreScope()
+
+  const example = {
+    "Product Code": "PRD-0001",
+    Quantity: 5,
+    Location: "",
+  }
+
+  return buildMultiSheetExcelExport(
+    [{ name: "Stock Import", rows: [example], columns: Object.keys(example) }],
+    "stock-import-template",
+  )
+}
+
+function stockImportCell(row: Record<string, unknown>, key: string): string {
+  return String(row[key] ?? "").trim()
+}
+
+/**
+ * Bulk-adds stock quantity across many products from one spreadsheet —
+ * the "multi-row form" alternative: one row per product, Product Code +
+ * Quantity (+ optional Location), instead of repeating the single Add Stock
+ * form by hand for every product. Each row becomes its own new
+ * InventoryStock row (a fresh stock code, quantity from the sheet) rather
+ * than incrementing an existing one, matching how "Add Stock" always
+ * creates a new row too.
+ */
+export async function importInventoryStockFromExcel(
+  formData: FormData,
+): Promise<StockImportResult> {
+  try {
+    const storeId = await requireStoreScope()
+    const currentUser = await getCurrentUser()
+    const file = formData.get("file")
+
+    if (!(file instanceof File) || file.size === 0) {
+      return { success: false, message: "Choose a .xlsx or .csv file to import." }
+    }
+
+    const rows = parseExcelUpload(await file.arrayBuffer())
+
+    if (!rows.length) {
+      return { success: false, message: "That file has no rows to import." }
+    }
+
+    const [products, locations, existingCodes] = await Promise.all([
+      prisma.product.findMany({
+        where: { storeId },
+        select: {
+          id: true,
+          productCode: true,
+          metalTypeId: true,
+          defaultPurity: true,
+          defaultMakingCharge: true,
+          defaultMakingChargeType: true,
+          defaultStoneCharge: true,
+          defaultStoneRate: true,
+          hasStoneComponent: true,
+          defaultStoneMetalTypeName: true,
+          defaultStoneTypeNames: true,
+        },
+      }),
+      prisma.storeLocation.findMany({ where: { storeId }, select: { id: true, name: true } }),
+      prisma.inventoryStock.findMany({
+        where: { storeId, stockCode: { startsWith: "STK-" } },
+        select: { stockCode: true },
+      }),
+    ])
+
+    const productByCode = new Map(
+      products.map((product) => [product.productCode.trim().toLowerCase(), product]),
+    )
+    const locationByName = new Map(
+      locations.map((location) => [location.name.trim().toLowerCase(), location.id]),
+    )
+    const locationScope = await getLocationScope()
+
+    let highestCode = existingCodes.reduce((max, row) => {
+      const match = /^STK-(?:\d{4}-)?(\d+)$/.exec(row.stockCode)
+      return match ? Math.max(max, Number(match[1])) : max
+    }, 0)
+    const year = new Date().getFullYear()
+
+    const errors: string[] = []
+    const toCreate: Prisma.InventoryStockCreateManyInput[] = []
+
+    for (const [index, row] of rows.entries()) {
+      // +2 = one for the header row, one for 1-based spreadsheet numbering.
+      const line = index + 2
+      const productCode = stockImportCell(row, "Product Code")
+
+      if (!productCode) {
+        errors.push(`Row ${line}: Product Code is required`)
+        continue
+      }
+
+      const product = productByCode.get(productCode.trim().toLowerCase())
+      if (!product) {
+        errors.push(`Row ${line}: No product found with code "${productCode}"`)
+        continue
+      }
+
+      if (!product.metalTypeId) {
+        errors.push(
+          `Row ${line}: "${productCode}" has no metal set — add one on the product first`,
+        )
+        continue
+      }
+
+      const rawQuantity = stockImportCell(row, "Quantity")
+      const quantity = rawQuantity === "" ? 0 : Number(rawQuantity)
+      if (!Number.isFinite(quantity) || quantity < 0) {
+        errors.push(`Row ${line}: Quantity must be 0 or more`)
+        continue
+      }
+
+      const locationName = stockImportCell(row, "Location")
+      let resolvedLocationId: string | null = null
+      if (locationName) {
+        const matchedLocationId = locationByName.get(locationName.trim().toLowerCase())
+        if (!matchedLocationId) {
+          errors.push(`Row ${line}: No location found named "${locationName}"`)
+          continue
+        }
+        const resolution = await resolveWritableLocationId(storeId, matchedLocationId, locationScope)
+        if (!resolution.ok) {
+          errors.push(`Row ${line}: ${resolution.message}`)
+          continue
+        }
+        resolvedLocationId = resolution.locationId
+      } else {
+        const resolution = await resolveWritableLocationId(storeId, null, locationScope)
+        if (!resolution.ok) {
+          errors.push(`Row ${line}: ${resolution.message}`)
+          continue
+        }
+        resolvedLocationId = resolution.locationId
+      }
+
+      highestCode += 1
+
+      toCreate.push({
+        storeId,
+        productId: product.id,
+        stockCode: `STK-${year}-${String(highestCode).padStart(4, "0")}`,
+        quantity: Math.trunc(quantity),
+        metalTypeId: product.metalTypeId,
+        purity: product.defaultPurity,
+        makingCharge: product.defaultMakingCharge ?? undefined,
+        makingChargeType: product.defaultMakingChargeType,
+        stoneCharge: product.hasStoneComponent ? product.defaultStoneCharge ?? undefined : undefined,
+        stoneRate: product.hasStoneComponent ? product.defaultStoneRate ?? undefined : undefined,
+        stoneMetalTypeName: product.hasStoneComponent
+          ? product.defaultStoneMetalTypeName ?? undefined
+          : undefined,
+        stoneTypeNames: product.hasStoneComponent
+          ? product.defaultStoneTypeNames ?? undefined
+          : undefined,
+        locationId: resolvedLocationId ?? undefined,
+        createdById: currentUser?.id ?? undefined,
+        createdByName: currentUser?.name ?? undefined,
+        createdByRole: currentUser?.role ?? undefined,
+      })
+    }
+
+    if (errors.length > 0) {
+      return {
+        success: false,
+        message: "Nothing was imported. Fix these rows and try again.",
+        errors,
+      }
+    }
+
+    if (!toCreate.length) {
+      return { success: false, message: "That file has no rows to import." }
+    }
+
+    await prisma.inventoryStock.createMany({ data: toCreate })
+
+    revalidatePath("/inventory")
+    revalidatePath("/inventory/stock")
+
+    return {
+      success: true,
+      message: `Added ${toCreate.length} stock ${toCreate.length === 1 ? "entry" : "entries"}.`,
+      createdCount: toCreate.length,
+    }
+  } catch (error) {
+    console.error("importInventoryStockFromExcel error:", error)
+    return { success: false, message: "Failed to import stock." }
   }
 }

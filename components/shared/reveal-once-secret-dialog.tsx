@@ -55,7 +55,14 @@ export function RevealOnceSecretDialog({
           <code className="flex-1 overflow-x-auto whitespace-nowrap font-mono text-sm">
             {secret}
           </code>
-          <Button type="button" size="sm" variant="outline" onClick={handleCopy}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleCopy}
+            aria-label="Copy secret"
+            title="Copy secret"
+          >
             {copied ? (
               <Check className="h-4 w-4 text-green-600" />
             ) : (

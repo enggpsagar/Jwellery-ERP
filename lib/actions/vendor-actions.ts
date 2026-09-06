@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { formatLedgerSource } from "@/lib/ledger-format"
 import { partyGstTypeLabel } from "@/lib/gst"
+import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar"
 import * as XLSX from "xlsx"
 
 export type Vendor = {
@@ -31,6 +32,7 @@ export type Vendor = {
   /** This vendor's own GST registration status — see gstinRequired() and
    *  isVendorGstApplicable() in lib/gst.ts. */
   gstType?: PartyGstType
+  aadhaarNumber?: string
   totalOrders?: number
   totalPurchaseValue?: string
   pendingAmount?: string
@@ -194,6 +196,7 @@ function mapVendor(vendor: any): Vendor {
     paymentTerms: "",
     gstNumber: vendor.gstin ?? "",
     gstType: vendor.gstType ?? "UNREGISTERED",
+    aadhaarNumber: vendor.aadhaarNumber ?? "",
     totalOrders,
     totalPurchaseValue: formatCurrency(totalPurchaseValueNumber),
     pendingAmount: formatCurrency(pendingAmountNumber),
@@ -460,13 +463,16 @@ export async function addVendor(
     const pincode = String(formData.get("pincode") || "").trim()
     const gstNumber = String(formData.get("gstNumber") || "").trim()
     const gstType = toPartyGstType(formData.get("gstType"))
+    const aadhaarNumber = String(formData.get("aadhaarNumber") || "").trim()
     const notes = String(formData.get("notes") || "").trim()
     const openingBalance = toNumber(formData.get("openingBalance"), 0)
 
     const errors: Record<string, string[]> = {}
 
     if (!name) errors.name = ["Vendor name is required"]
-    if (!phone) errors.phone = ["Phone number is required"]
+    if (aadhaarNumber && !isValidAadhaarNumber(aadhaarNumber)) {
+      errors.aadhaarNumber = [AADHAAR_INVALID_MESSAGE]
+    }
 
     if (Object.keys(errors).length > 0) {
       return {
@@ -492,6 +498,7 @@ export async function addVendor(
         pincode: pincode || null,
         gstin: gstNumber || null,
         gstType,
+        aadhaarNumber: aadhaarNumber ? normalizeAadhaarNumber(aadhaarNumber) : null,
         notes: notes || null,
         openingBalance,
       },
@@ -529,13 +536,16 @@ export async function updateVendor(
     const pincode = String(formData.get("pincode") || "").trim()
     const gstNumber = String(formData.get("gstNumber") || "").trim()
     const gstType = toPartyGstType(formData.get("gstType"))
+    const aadhaarNumber = String(formData.get("aadhaarNumber") || "").trim()
     const notes = String(formData.get("notes") || "").trim()
     const openingBalance = toNumber(formData.get("openingBalance"), 0)
 
     const errors: Record<string, string[]> = {}
 
     if (!name) errors.name = ["Vendor name is required"]
-    if (!phone) errors.phone = ["Phone number is required"]
+    if (aadhaarNumber && !isValidAadhaarNumber(aadhaarNumber)) {
+      errors.aadhaarNumber = [AADHAAR_INVALID_MESSAGE]
+    }
 
     if (Object.keys(errors).length > 0) {
       return {
@@ -560,6 +570,7 @@ export async function updateVendor(
         pincode: pincode || null,
         gstin: gstNumber || null,
         gstType,
+        aadhaarNumber: aadhaarNumber ? normalizeAadhaarNumber(aadhaarNumber) : null,
         notes: notes || null,
         openingBalance,
       },
@@ -708,4 +719,32 @@ export async function deleteVendor(id: string): Promise<VendorFormState> {
       message: "Failed to delete vendor",
     }
   }
+}
+
+export type BulkDeleteResult = {
+  deletedCount: number
+  failures: { id: string; message: string }[]
+}
+
+/**
+ * Deletes each selected vendor through the exact same deleteVendor() call
+ * a single-row delete uses — never a bare deleteMany — so a bulk selection
+ * can't bypass the purchase/ledger dependency guard just because several
+ * rows were ticked at once. Partial success is expected and reported per
+ * row, not treated as a whole-batch failure.
+ */
+export async function bulkDeleteVendors(ids: string[]): Promise<BulkDeleteResult> {
+  const failures: BulkDeleteResult["failures"] = []
+  let deletedCount = 0
+
+  for (const id of ids) {
+    const result = await deleteVendor(id)
+    if (result.success) {
+      deletedCount++
+    } else {
+      failures.push({ id, message: result.message })
+    }
+  }
+
+  return { deletedCount, failures }
 }

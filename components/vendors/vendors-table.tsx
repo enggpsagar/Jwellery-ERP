@@ -7,6 +7,7 @@ import * as React from "react"
 import type { Vendor } from "@/lib/actions/vendor-actions"
 import { VendorRowActions } from "@/components/vendors/vendor-row-actions"
 import { VendorsPagination } from "@/components/vendors/vendors-pagination"
+import { SortableTableHead } from "@/components/shared/sortable-table-head"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -108,11 +109,11 @@ export function VendorsTable({
                   className="h-4 w-4 rounded border-input"
                 />
               </th>
-              <th className="px-4 py-3 font-medium">Vendor Name</th>
+              <SortableTableHead label="Vendor Name" sortKey="name" defaultSortBy="createdAt" />
               <th className="px-4 py-3 font-medium">Phone</th>
               <th className="px-4 py-3 font-medium">City</th>
               <th className="px-4 py-3 font-medium">State</th>
-              <th className="px-4 py-3 font-medium">Balance</th>
+              <SortableTableHead label="Balance" sortKey="openingBalance" defaultSortBy="createdAt" />
               <th className="px-4 py-3 font-medium text-right">Actions</th>
             </tr>
           </thead>

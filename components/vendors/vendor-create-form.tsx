@@ -34,6 +34,11 @@ type VendorCreateFormProps = {
    * doc comment in lib/gst.ts. Freely editable per vendor afterward, not a
    * store-wide restriction. */
   gstScheme: GstScheme
+  /** The store's own State/City (Settings > Business Profile), pre-selected
+   * here so a vendor at the same location doesn't require re-entering them
+   * — freely changeable per vendor afterward. */
+  defaultState?: string
+  defaultCity?: string
 }
 
 /**
@@ -42,14 +47,22 @@ type VendorCreateFormProps = {
  * dialog is gone, this page is linked to directly instead). Also reused
  * mid-flow by other forms' "Add New Vendor" option via a `returnTo`.
  */
-export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFormProps) {
+export function VendorCreateForm({
+  states,
+  returnTo,
+  gstScheme,
+  defaultState,
+  defaultCity,
+}: VendorCreateFormProps) {
   const [gstType, setGstType] = useState(defaultPartyGstType(gstScheme))
   const gstinRequiredNow = gstinRequired(gstScheme, gstType)
 
   const router = useRouter()
   const toast = useToast()
 
-  const [selectedStateId, setSelectedStateId] = useState("")
+  const [selectedStateId, setSelectedStateId] = useState(
+    () => states.find((item) => item.name.toLowerCase() === (defaultState ?? "").toLowerCase())?.id ?? "",
+  )
   const [cities, setCities] = useState<CityItem[]>([])
   const [loadingCities, setLoadingCities] = useState(false)
 
@@ -121,7 +134,29 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
           }}
           className="grid grid-cols-1 gap-4 md:grid-cols-2"
         >
-          <div className="space-y-1">
+          <div className="space-y-1 md:col-span-2 rounded-lg border bg-muted/20 p-4 transition-colors focus-within:bg-accent/40">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <Hash className="h-4 w-4 text-muted-foreground" />
+              GSTIN {gstinRequiredNow ? <RequiredMark /> : null}
+            </label>
+            <GstSchemeBadge scheme={gstScheme} />
+            {gstScheme !== "COMPOSITION" ? (
+              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
+            ) : null}
+            <input
+              name="gstNumber"
+              className={FIELD}
+              placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : "Enter GSTIN"}
+              required={gstinRequiredNow}
+            />
+            {gstinRequiredNow ? (
+              <p className="text-xs text-muted-foreground">
+                GSTIN is required for a valid purchase entry from this vendor.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4 text-muted-foreground" />
               Vendor Name <RequiredMark />
@@ -138,24 +173,23 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
-              Phone <RequiredMark />
+              Phone
             </label>
             <input
               name="phone"
               type="tel"
               className={FIELD}
               placeholder="Enter phone number"
-              required
             />
             {state.errors?.phone?.[0] && (
               <p className="text-sm text-destructive">{state.errors.phone[0]}</p>
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Phone className="h-4 w-4 text-muted-foreground" />
               Alternate Phone
@@ -168,7 +202,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <Mail className="h-4 w-4 text-muted-foreground" />
               Email
@@ -181,7 +215,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             />
           </div>
 
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
@@ -194,7 +228,7 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">State</label>
             {/* Selected/keyed by id (to drive the city fetch below), but the
                 form field itself must submit the state's name — Vendor.state
@@ -218,12 +252,14 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">City</label>
             <select
               name="city"
               className={FIELD}
               disabled={!selectedStateId || loadingCities}
+              defaultValue={defaultCity ?? ""}
+              key={cities.length}
             >
               <option value="">
                 {loadingCities
@@ -240,12 +276,23 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             </select>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">Pincode</label>
             <input name="pincode" className={FIELD} placeholder="Enter pincode" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <Hash className="h-4 w-4 text-muted-foreground" />
+              Aadhaar Number
+            </label>
+            <input name="aadhaarNumber" className={FIELD} placeholder="Optional — 12 digits" />
+            {state.errors?.aadhaarNumber?.[0] && (
+              <p className="text-sm text-destructive">{state.errors.aadhaarNumber[0]}</p>
+            )}
+          </div>
+
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <IndianRupee className="h-4 w-4 text-muted-foreground" />
               Opening Balance
@@ -259,39 +306,17 @@ export function VendorCreateForm({ states, returnTo, gstScheme }: VendorCreateFo
             />
           </div>
 
-          <div className="space-y-1 md:col-span-2">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <Hash className="h-4 w-4 text-muted-foreground" />
-              GSTIN {gstinRequiredNow ? <RequiredMark /> : null}
-            </label>
-            <GstSchemeBadge scheme={gstScheme} />
-            {gstScheme !== "COMPOSITION" ? (
-              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
-            ) : null}
-            <input
-              name="gstNumber"
-              className={`${FIELD} md:max-w-sm`}
-              placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : "Enter GSTIN"}
-              required={gstinRequiredNow}
-            />
-            {gstinRequiredNow ? (
-              <p className="text-xs text-muted-foreground">
-                GSTIN is required for a valid purchase entry from this vendor.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="text-sm font-medium">Notes</label>
             <textarea
               name="notes"
-              rows={1}
-              className={`${FIELD} min-h-9 resize-y`}
+              rows={4}
+              className={`${FIELD} min-h-24 resize-y`}
               placeholder="Any notes about this vendor"
             />
           </div>
 
-          <div className="flex justify-end gap-2 md:col-span-2">
+          <div className="flex justify-end gap-2 pt-2 md:col-span-2">
             <Button
               type="button"
               variant="outline"

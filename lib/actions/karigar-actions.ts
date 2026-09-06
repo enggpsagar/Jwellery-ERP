@@ -9,6 +9,9 @@ import { getLocationScope, locationWhere, type LocationScope } from "@/lib/locat
 import { UserRole, UserStatus } from "@prisma/client";
 import * as XLSX from "xlsx";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
+import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
+import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
+import { isValidPanNumber, normalizePanNumber, PAN_INVALID_MESSAGE } from "@/lib/pan";
 
 export type Karigar = {
   id: string;
@@ -30,6 +33,11 @@ export type Karigar = {
   openingCash: number;
   isActive: boolean;
   locationId: string | null;
+  /** This karigar's main StoreMetal (Settings > Taxonomy) — separate from
+   * the free-text `specialization` craft description. Drives the Karigars
+   * page's Type filter, same as Stock's. */
+  metalTypeId: string | null;
+  metalTypeName: string;
   createdAt?: string;
 };
 
@@ -52,6 +60,10 @@ export type GetKarigarsParams = {
    *  list. Pass false to list disabled ones instead (see /karigars/disabled),
    *  mirroring how getVendors()'s `archived` param works. */
   active?: boolean;
+  /** Filters by the store's own StoreMetal id (Settings > Taxonomy) — or
+   * "UNASSIGNED" for karigars with no metal set. Dynamic: whatever the
+   * store has configured, not a fixed set of categories. */
+  metalTypeId?: string;
 };
 
 export type KarigarListResponse = {
@@ -71,6 +83,7 @@ export type ExportKarigarsParams = {
   search?: string;
   sortBy?: KarigarSortBy;
   sortOrder?: SortOrder;
+  type?: string;
 };
 
 export type ExportResult = {
@@ -112,17 +125,38 @@ function mapKarigar(karigar: any): Karigar {
     openingCash: Number(karigar.openingCash),
     isActive: karigar.isActive,
     locationId: karigar.locationId ?? null,
+    metalTypeId: karigar.metalTypeId ?? null,
+    metalTypeName: karigar.metalType?.name ?? "",
     createdAt: karigar.createdAt?.toISOString?.() ?? undefined,
   };
 }
 
-function getWhere(storeId: string, search: string | undefined, scope: LocationScope, active = true) {
+/**
+ * "Type" filters directly by the store's own configured StoreMetal id —
+ * whatever metals/stones this store has set up in Settings > Taxonomy, not
+ * a fixed set of hardcoded categories. A store adding a new metal or stone
+ * there needs no code change for it to show up as its own filter option.
+ * The sentinel "UNASSIGNED" (lib/business-units.ts) filters to karigars
+ * with no metal set at all.
+ */
+function getWhere(
+  storeId: string,
+  search: string | undefined,
+  scope: LocationScope,
+  active = true,
+  metalTypeId?: string,
+) {
   const query = String(search || "").trim();
 
   return {
     storeId,
     isActive: active,
     ...locationWhere(scope),
+    ...(metalTypeId === UNASSIGNED_METAL_TYPE
+      ? { metalTypeId: null }
+      : metalTypeId
+        ? { metalTypeId }
+        : {}),
     ...(query
       ? {
           OR: [
@@ -156,7 +190,7 @@ export async function getKarigars(
   const sortOrder = params.sortOrder || "desc";
   const storeId = await requireStoreScope();
   const scope = await getLocationScope();
-  const where = getWhere(storeId, search, scope, params.active ?? true);
+  const where = getWhere(storeId, search, scope, params.active ?? true, params.metalTypeId);
 
   const [totalCount, karigars] = await Promise.all([
     prisma.karigar.count({ where }),
@@ -165,6 +199,7 @@ export async function getKarigars(
       orderBy: getOrderBy(sortBy, sortOrder),
       skip: (page - 1) * pageSize,
       take: pageSize,
+      include: { metalType: { select: { name: true } } },
     }),
   ]);
 
@@ -188,6 +223,7 @@ export async function getKarigarById(id: string): Promise<Karigar | null> {
   const scope = await getLocationScope();
   const karigar = await prisma.karigar.findFirst({
     where: { id, storeId, ...locationWhere(scope) },
+    include: { metalType: { select: { name: true } } },
   });
   if (!karigar) return null;
   return mapKarigar(karigar);
@@ -205,14 +241,21 @@ function buildKarigarData(formData: FormData) {
     state: toOptionalString(formData.get("state")),
     pincode: toOptionalString(formData.get("pincode")),
     gstNumber: toOptionalString(formData.get("gstNumber")),
-    panNumber: toOptionalString(formData.get("panNumber")),
-    aadhaarNumber: toOptionalString(formData.get("aadhaarNumber")),
+    panNumber: (() => {
+      const raw = toOptionalString(formData.get("panNumber"));
+      return raw ? normalizePanNumber(raw) : null;
+    })(),
+    aadhaarNumber: (() => {
+      const raw = toOptionalString(formData.get("aadhaarNumber"));
+      return raw ? normalizeAadhaarNumber(raw) : null;
+    })(),
     specialization: toOptionalString(formData.get("specialization")),
     notes: toOptionalString(formData.get("notes")),
     openingGold: toNumber(formData.get("openingGold")),
     openingCash: toNumber(formData.get("openingCash")),
     isActive: formData.get("isActive") === "on" || formData.get("isActive") === "true",
     locationId: toOptionalString(formData.get("locationId")),
+    metalTypeId: toOptionalString(formData.get("metalTypeId")),
   };
 }
 
@@ -247,6 +290,22 @@ async function checkContactUniqueness(
   return errors;
 }
 
+/** Both KYC ids are optional, so only checked (checksum for Aadhaar,
+ * structure for PAN) when the karigar actually entered one. */
+function validateKarigarKycFields(aadhaarNumber: string | null, panNumber: string | null) {
+  const errors: Record<string, string[]> = {};
+
+  if (aadhaarNumber && !isValidAadhaarNumber(aadhaarNumber)) {
+    errors.aadhaarNumber = [AADHAAR_INVALID_MESSAGE];
+  }
+
+  if (panNumber && !isValidPanNumber(panNumber)) {
+    errors.panNumber = [PAN_INVALID_MESSAGE];
+  }
+
+  return errors;
+}
+
 export async function createKarigar(
   prevState: KarigarFormState,
   formData: FormData,
@@ -265,6 +324,15 @@ export async function createKarigar(
     const data = buildKarigarData(formData);
     // isActive should default to true on create, not depend on a checkbox being present
     if (formData.get("isActive") === null) data.isActive = true;
+
+    const kycErrors = validateKarigarKycFields(data.aadhaarNumber, data.panNumber);
+    if (Object.keys(kycErrors).length > 0) {
+      return {
+        success: false,
+        message: "Please fix the form errors",
+        errors: kycErrors,
+      };
+    }
 
     const contactErrors = await checkContactUniqueness(data.mobile, data.email);
     if (Object.keys(contactErrors).length > 0) {
@@ -287,6 +355,20 @@ export async function createKarigar(
           success: false,
           message: "Selected location is invalid",
           errors: { locationId: ["Selected location could not be found"] },
+        };
+      }
+    }
+
+    if (data.metalTypeId) {
+      const metal = await prisma.storeMetal.findFirst({
+        where: { id: data.metalTypeId, storeId },
+        select: { id: true },
+      });
+      if (!metal) {
+        return {
+          success: false,
+          message: "Selected metal type is invalid",
+          errors: { metalTypeId: ["Selected metal type could not be found"] },
         };
       }
     }
@@ -365,6 +447,16 @@ export async function updateKarigar(
     }
 
     const data = buildKarigarData(formData);
+
+    const kycErrors = validateKarigarKycFields(data.aadhaarNumber, data.panNumber);
+    if (Object.keys(kycErrors).length > 0) {
+      return {
+        success: false,
+        message: "Please fix the form errors",
+        errors: kycErrors,
+      };
+    }
+
     const storeId = await requireStoreScope();
 
     if (data.locationId) {
@@ -377,6 +469,20 @@ export async function updateKarigar(
           success: false,
           message: "Selected location is invalid",
           errors: { locationId: ["Selected location could not be found"] },
+        };
+      }
+    }
+
+    if (data.metalTypeId) {
+      const metal = await prisma.storeMetal.findFirst({
+        where: { id: data.metalTypeId, storeId },
+        select: { id: true },
+      });
+      if (!metal) {
+        return {
+          success: false,
+          message: "Selected metal type is invalid",
+          errors: { metalTypeId: ["Selected metal type could not be found"] },
         };
       }
     }
@@ -579,6 +685,34 @@ export async function deleteKarigar(id: string): Promise<KarigarFormState> {
   }
 }
 
+export type BulkDeleteResult = {
+  deletedCount: number;
+  failures: { id: string; message: string }[];
+};
+
+/**
+ * Deletes each selected karigar through the exact same deleteKarigar()
+ * call a single-row delete uses — never a bare deleteMany — so a bulk
+ * selection can't bypass the linked-jobs guard just because several rows
+ * were ticked at once. Partial success is expected and reported per row,
+ * not treated as a whole-batch failure.
+ */
+export async function bulkDeleteKarigars(ids: string[]): Promise<BulkDeleteResult> {
+  const failures: BulkDeleteResult["failures"] = [];
+  let deletedCount = 0;
+
+  for (const id of ids) {
+    const result = await deleteKarigar(id);
+    if (result.success) {
+      deletedCount++;
+    } else {
+      failures.push({ id, message: result.message });
+    }
+  }
+
+  return { deletedCount, failures };
+}
+
 function formatCurrencyINR(value: number) {
   return `₹ ${value.toLocaleString("en-IN")}`;
 }
@@ -612,13 +746,15 @@ export async function exportKarigarsToExcel(
 
     const storeId = await requireStoreScope();
     const scope = await getLocationScope();
+
     const where = selectedIds?.length
       ? { id: { in: selectedIds }, storeId, ...locationWhere(scope) }
-      : getWhere(storeId, search, scope);
+      : getWhere(storeId, search, scope, true, params.type);
 
     const karigars = await prisma.karigar.findMany({
       where,
       orderBy: getOrderBy(sortBy, sortOrder),
+      include: { metalType: { select: { name: true } } },
     });
 
     if (!karigars.length) {
@@ -636,6 +772,7 @@ export async function exportKarigarsToExcel(
       City: karigar.city ?? "",
       Pincode: karigar.pincode ?? "",
       Specialization: karigar.specialization ?? "",
+      "Metal Type": karigar.metalType?.name ?? "",
       GSTIN: karigar.gstNumber ?? "",
       "PAN Number": karigar.panNumber ?? "",
       "Aadhaar Number": karigar.aadhaarNumber ?? "",

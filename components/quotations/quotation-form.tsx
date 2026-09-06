@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
-import type { GstScheme } from "@prisma/client"
+import type { GstScheme, PurityType } from "@prisma/client"
 
 import { createQuotation, type QuotationFormState } from "@/lib/actions/quotation-actions"
 import { useToast } from "@/components/providers/toast-provider"
@@ -24,9 +24,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
+import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { LocationSelect } from "@/components/shared/location-select"
-import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, GRAMS_PER_CARAT } from "@/lib/purity"
+import { PURITY_SELECT_OPTIONS, stoneWeightToGrams, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat } from "@/lib/purity"
 import { RequiredMark } from "@/components/shared/required-mark"
+import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
+import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
+import { StockItemSelect } from "@/components/inventory/shared/stock-item-select"
+import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 
 type CustomerOption = {
   id: string
@@ -42,9 +47,12 @@ type StockOption = {
   productName: string
   metalType: { id: string; name: string } | null
   purity: string | null
+  grossWeight: number | null
   netWeight: number | null
   caratWeight: number | null
   stoneRate: number | null
+  stoneMetalTypeName: string | null
+  stoneTypeNames: string | null
   saleRate: number | null
 }
 
@@ -64,8 +72,20 @@ type LineItem = {
   stoneRate: number
   hasStoneComponent: boolean
   stoneChargeTouched: boolean
+  /** Once Net Stone Weight is edited directly, the Stone Carat Weight ->
+   * Net Stone Weight auto-fill (see handleCaratWeightChange) stops
+   * overwriting it — same escape hatch as stoneChargeTouched. */
+  netStoneWeightTouched: boolean
+  stoneMetalTypeName: string
+  stoneTypeNames: string[]
   stoneWeightInput: number
   stoneWeightUnit: "GRAM" | "CARAT"
+  hmCharge: number
+  /** Once HM Charge is edited directly, the Purity -> HM Charge auto-fill
+   * (Settings' per-piece BIS hallmark rate, applied on Gold/Silver purities
+   * only — see isHallmarkablePurity) stops overwriting it — same escape
+   * hatch as stoneChargeTouched/netStoneWeightTouched. */
+  hmChargeTouched: boolean
   inventoryStockId: string
 }
 
@@ -86,8 +106,13 @@ function emptyLineItem(): LineItem {
     stoneRate: 0,
     hasStoneComponent: false,
     stoneChargeTouched: false,
+    netStoneWeightTouched: false,
+    stoneMetalTypeName: "",
+    stoneTypeNames: [],
     stoneWeightInput: 0,
     stoneWeightUnit: "GRAM",
+    hmCharge: 0,
+    hmChargeTouched: false,
     inventoryStockId: "",
   }
 }
@@ -103,9 +128,24 @@ type QuotationFormProps = {
   customers: CustomerOption[]
   stockItems: StockOption[]
   locations?: LocationOption[]
+  /** Store's default location (Settings > Locations), pre-filled into the
+   * Location field on this create form only — never overrides a value
+   * already resolved some other way (there is none today for Quotation's
+   * Location field, unlike e.g. a restricted single-location Staff auto-pick
+   * elsewhere in the app). */
+  defaultLocationId?: string | null
+  metals: StoreMetalRow[]
+  origins: StoreMetalOriginRow[]
+  caratConversionRates: Record<PurityType, number>
   /** Store's default GST%, split into SGST+CGST (intra-state) or IGST
    * (inter-state) via computeGst() — see lib/gst.ts. */
   defaultGstRate?: number
+  /** Store's configured per-piece BIS hallmark charge (Settings > Hallmark
+   * Charge) — auto-filled into a line's HM Charge the moment its Purity is
+   * set to a Gold/Silver value (isHallmarkablePurity), while hmChargeTouched
+   * is false. See BusinessSettings.hallmarkChargePerPiece's own doc comment
+   * for why this is a store-verified figure, not a guaranteed-current rate. */
+  hallmarkChargePerPiece?: number
   /** Drives whether GST can be charged at all (never, for Composition) and
    * how it's split — see computeGst()'s own doc comment in lib/gst.ts. */
   gstScheme: GstScheme
@@ -118,15 +158,26 @@ export function QuotationForm({
   customers,
   stockItems,
   locations = [],
+  defaultLocationId = null,
+  metals: initialMetals,
+  origins: initialOrigins,
+  caratConversionRates,
   defaultGstRate = 0,
+  hallmarkChargePerPiece = 0,
   gstScheme,
   storeState,
 }: QuotationFormProps) {
   const router = useRouter()
   const toast = useToast()
+  const [metals, setMetals] = useState(initialMetals)
+  const [origins, setOrigins] = useState(initialOrigins)
 
   const [customerId, setCustomerId] = useState("")
-  const [locationId, setLocationId] = useState("")
+  // Seeded from the store's default location (create form only) — matches
+  // LocationSelect's own useState(defaultValue)-on-first-render init, so
+  // this must already be resolved by the time this component first renders,
+  // not set later via an effect.
+  const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
   // A Composition-scheme store can never charge GST — its rate starts (and
@@ -156,6 +207,25 @@ export function QuotationForm({
     )
   }
 
+  // Auto-fills HM Charge to the store's configured per-piece BIS hallmark
+  // rate the moment a line's Purity becomes a Gold/Silver value — never for
+  // Platinum/Diamond/Other, and never once the user has typed into HM
+  // Charge directly (hmChargeTouched). Plain inline logic in the
+  // purity-change handler, not a separate useEffect/local component state —
+  // see making-charge-input.tsx's own doc comment for the class of bug that
+  // pattern avoids.
+  const handlePurityChange = (item: LineItem, purity: string) => {
+    const patch: Partial<LineItem> = { purity }
+    if (!item.hmChargeTouched && isHallmarkablePurity(purity)) {
+      patch.hmCharge = hallmarkChargePerPiece
+    }
+    updateItem(item.key, patch)
+  }
+
+  const handleHmChargeChange = (item: LineItem, value: string) => {
+    updateItem(item.key, { hmCharge: Number(value) || 0, hmChargeTouched: true })
+  }
+
   const applyStockToItem = (key: string, stockId: string) => {
     const stock = stockItems.find((s) => s.id === stockId)
     if (!stock) {
@@ -168,6 +238,7 @@ export function QuotationForm({
       itemName: stock.productName,
       metalTypeId: stock.metalType?.id ?? "",
       purity: stock.purity ?? "",
+      grossWeight: stock.grossWeight ?? 0,
       netWeight: stock.netWeight ?? 0,
       rate: stock.saleRate ?? 0,
       caratWeight: stock.caratWeight ?? 0,
@@ -177,6 +248,15 @@ export function QuotationForm({
         ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
         : 0,
       stoneChargeTouched: false,
+      stoneMetalTypeName: stock.stoneMetalTypeName ?? "",
+      stoneTypeNames: stock.stoneTypeNames
+        ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
+        : [],
+      // InventoryStock carries no hmCharge of its own — nothing
+      // authoritative to protect, so this stays untouched and lets the
+      // Purity-driven auto-fill populate it instead of locking in a stale 0.
+      hmCharge: isHallmarkablePurity(stock.purity) ? hallmarkChargePerPiece : 0,
+      hmChargeTouched: false,
     })
   }
 
@@ -209,10 +289,29 @@ export function QuotationForm({
     if (isCaratLine(item)) {
       const caratNum = Number(value)
       if (value.trim() !== "" && Number.isFinite(caratNum)) {
-        patch.netWeight = Number((caratNum * GRAMS_PER_CARAT).toFixed(5))
+        const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+        patch.netWeight = Number((caratNum * gramsPerCarat).toFixed(5))
       }
-    } else if (item.hasStoneComponent && !item.stoneChargeTouched) {
-      patch.stoneCharge = Number((item.stoneRate * caratWeight).toFixed(2))
+    } else if (item.hasStoneComponent) {
+      if (!item.stoneChargeTouched) {
+        patch.stoneCharge = Number((item.stoneRate * caratWeight).toFixed(2))
+      }
+
+      // Net Stone Weight mirrors Stone Carat Weight until the user edits Net
+      // Stone Weight directly (netStoneWeightTouched — same override escape
+      // hatch as stoneChargeTouched). Converted to grams when the Net Stone
+      // Weight unit is set to grams (via the same resolveGramsPerCarat rate
+      // this line already uses elsewhere), so the mirrored value is always
+      // correct regardless of which unit is displayed. Unlike Invoice/
+      // Purchase/Kacha, a Quotation line has no Gross/Dust weight of its own,
+      // so there's no further metal Net Weight to cascade into here.
+      if (!item.netStoneWeightTouched) {
+        const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+        patch.stoneWeightInput =
+          item.stoneWeightUnit === "CARAT"
+            ? caratWeight
+            : Number((caratWeight * gramsPerCarat).toFixed(5))
+      }
     }
 
     updateItem(item.key, patch)
@@ -233,15 +332,25 @@ export function QuotationForm({
     updateItem(item.key, { stoneCharge: Number(value) || 0, stoneChargeTouched: true })
   }
 
+  // Editing Net Stone Weight directly is the escape hatch out of the Stone
+  // Carat Weight auto-fill above — same override pattern as Stone Charge.
+  const handleStoneWeightInputChange = (item: LineItem, value: string) => {
+    updateItem(item.key, {
+      stoneWeightInput: Number(value) || 0,
+      netStoneWeightTouched: true,
+    })
+  }
+
   const handleNetWeightChange = (item: LineItem, value: string) => {
     const netWeight = Number(value) || 0
     const patch: Partial<LineItem> = { netWeight }
 
     if (isCaratLine(item)) {
       const netNum = Number(value)
+      const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
       patch.caratWeight =
         value.trim() !== "" && Number.isFinite(netNum)
-          ? Number((netNum / GRAMS_PER_CARAT).toFixed(3))
+          ? Number((netNum / gramsPerCarat).toFixed(3))
           : 0
     }
 
@@ -257,15 +366,17 @@ export function QuotationForm({
     item.purity === "DIAMOND" ? item.caratWeight : item.netWeight
 
   const lineTotal = (item: LineItem) =>
-    item.rate * lineQuantity(item) + item.makingCharge + item.stoneCharge
+    item.rate * lineQuantity(item) + item.makingCharge + item.hmCharge + item.stoneCharge
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.rate * lineQuantity(item), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
+  // Hallmarking charge folds into the quotation's Making Charges total —
+  // same convention as invoice-form.tsx's own makingChargesTotal.
   const makingChargesTotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.makingCharge, 0),
+    () => items.reduce((sum, item) => sum + item.makingCharge + item.hmCharge, 0),
     [items],
   )
   const stoneChargesTotal = useMemo(
@@ -307,7 +418,13 @@ export function QuotationForm({
       makingChargeType: item.makingChargeType,
       stoneCharge: item.stoneCharge,
       stoneRate: item.hasStoneComponent ? item.stoneRate || null : null,
-      stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit) || null,
+      stoneMetalTypeName: item.hasStoneComponent ? item.stoneMetalTypeName || null : null,
+      stoneTypeNames:
+        item.hasStoneComponent && item.stoneTypeNames.length
+          ? item.stoneTypeNames.join(", ")
+          : null,
+      stoneWeight: stoneWeightToGrams(item.stoneWeightInput, item.stoneWeightUnit, resolveGramsPerCarat(item.purity, caratConversionRates)) || null,
+      hmCharge: item.hmCharge,
       inventoryStockId: item.inventoryStockId || null,
     })),
   )
@@ -336,7 +453,7 @@ export function QuotationForm({
       <input type="hidden" name="igstAmount" value={gstBreakdown.igst} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Customer <RequiredMark /></Label>
           <CustomerSelect
             customers={customers}
@@ -346,7 +463,7 @@ export function QuotationForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Quotation Date</Label>
           <Input
             type="date"
@@ -355,12 +472,12 @@ export function QuotationForm({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Valid Until</Label>
           <Input type="date" name="validUntil" />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Location</Label>
           <LocationSelect
             locations={locations}
@@ -388,26 +505,21 @@ export function QuotationForm({
           {items.map((item) => (
             <div key={item.key} className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="md:col-span-2 space-y-1">
+                <div className="md:col-span-2 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Link Stock Item (optional)</Label>
-                  <Select
+                  <StockItemSelect
+                    stockItems={stockItems}
                     value={item.inventoryStockId}
                     onValueChange={(value) => applyStockToItem(item.key, value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Not linked to stock" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {stockItems.map((stock) => (
-                        <SelectItem key={stock.id} value={stock.id}>
-                          {stock.stockCode} — {stock.productName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    // See invoice-form.tsx's identical comment — a plain
+                    // applyStockToItem(key, "") only clears inventoryStockId,
+                    // leaving a previously-linked stock's Item Name/weights/
+                    // rate in place, so this resets the whole row instead.
+                    onCreateNew={() => updateItem(item.key, { ...emptyLineItem(), key: item.key })}
+                  />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Item Name</Label>
                   <Input
                     value={item.itemName}
@@ -415,7 +527,7 @@ export function QuotationForm({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Quantity</Label>
                   <Input
                     type="number"
@@ -428,12 +540,12 @@ export function QuotationForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <div className="space-y-1">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Purity</Label>
                   <Select
                     value={item.purity}
-                    onValueChange={(value) => updateItem(item.key, { purity: value })}
+                    onValueChange={(value) => handlePurityChange(item, value)}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select purity" />
@@ -448,7 +560,7 @@ export function QuotationForm({
                   </Select>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Net Weight (g)</Label>
                   <Input
                     type="number"
@@ -458,37 +570,40 @@ export function QuotationForm({
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs">Net Stone Weight</Label>
-                  <div className="flex gap-1">
-                    <Input
-                      type="number"
-                      step="0.00001"
-                      className="flex-1"
-                      value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
-                      onChange={(e) =>
-                        updateItem(item.key, { stoneWeightInput: Number(e.target.value) || 0 })
-                      }
-                    />
-                    <Select
-                      value={item.stoneWeightUnit}
-                      onValueChange={(unit) =>
-                        updateItem(item.key, { stoneWeightUnit: unit as "GRAM" | "CARAT" })
-                      }
-                    >
-                      <SelectTrigger className="w-16">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="GRAM">g</SelectItem>
-                        <SelectItem value="CARAT">ct</SelectItem>
-                      </SelectContent>
-                    </Select>
+                {/* Once this is a composite line with "Includes a Stone"
+                    checked, Net Stone Weight moves down into that box, next
+                    to the Stone Carat Weight it mirrors — see below. */}
+                {(isCaratLine(item) || !item.hasStoneComponent) && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Net Stone Weight</Label>
+                    <div className="flex gap-1">
+                      <Input
+                        type="number"
+                        step="0.00001"
+                        className="flex-1"
+                        value={item.stoneWeightInput === 0 ? "" : item.stoneWeightInput}
+                        onChange={(e) => handleStoneWeightInputChange(item, e.target.value)}
+                      />
+                      <Select
+                        value={item.stoneWeightUnit}
+                        onValueChange={(unit) =>
+                          updateItem(item.key, { stoneWeightUnit: unit as "GRAM" | "CARAT" })
+                        }
+                      >
+                        <SelectTrigger className="w-16">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GRAM">g</SelectItem>
+                          <SelectItem value="CARAT">ct</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {isCaratLine(item) && (
-                  <div className="space-y-1">
+                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Carat Weight (ct)</Label>
                     <Input
                       type="number"
@@ -504,7 +619,7 @@ export function QuotationForm({
                   </div>
                 )}
 
-                <div className="space-y-1">
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Rate / g</Label>
                   <Input
                     type="number"
@@ -525,13 +640,28 @@ export function QuotationForm({
                   onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
                 />
 
-                <div className="space-y-1">
-                  <Label className="text-xs">Stone Charge</Label>
+                {/* Once this is a composite line with "Includes a Stone"
+                    checked, Stone Charge moves down into that box, next to
+                    the Carat Weight/Rate it's computed from — see below. */}
+                {(isCaratLine(item) || !item.hasStoneComponent) && (
+                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                    <Label className="text-xs">Stone Charge</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={item.stoneCharge === 0 ? "" : item.stoneCharge}
+                      onChange={(e) => handleStoneChargeChange(item, e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                  <Label className="text-xs">HM Charge</Label>
                   <Input
                     type="number"
                     step="0.01"
-                    value={item.stoneCharge === 0 ? "" : item.stoneCharge}
-                    onChange={(e) => handleStoneChargeChange(item, e.target.value)}
+                    value={item.hmCharge === 0 ? "" : item.hmCharge}
+                    onChange={(e) => handleHmChargeChange(item, e.target.value)}
                   />
                 </div>
 
@@ -549,42 +679,37 @@ export function QuotationForm({
                   wedged into the grid above, so a plain Gold line's fields
                   don't reflow every time this gets checked/unchecked. */}
               {!isCaratLine(item) && (
-                <div className="flex flex-wrap items-end gap-4 rounded-md border border-dashed p-3">
-                  <label className="flex items-center gap-2 text-xs font-medium">
-                    <input
-                      type="checkbox"
-                      checked={item.hasStoneComponent}
-                      onChange={(e) =>
-                        updateItem(item.key, { hasStoneComponent: e.target.checked })
-                      }
-                    />
-                    Includes a stone/diamond
-                  </label>
+                <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
+                  <IncludesStoneToggle
+                    checked={item.hasStoneComponent}
+                    onChange={(checked) => updateItem(item.key, { hasStoneComponent: checked })}
+                  />
 
                   {item.hasStoneComponent && (
-                    <>
-                      <div className="w-36 space-y-1">
-                        <Label className="text-xs">Stone Carat Weight (ct)</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={item.caratWeight === 0 ? "" : item.caratWeight}
-                          onChange={(e) => handleCaratWeightChange(item, e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Stone's own weight — independent of Net Weight
-                        </p>
-                      </div>
-                      <div className="w-36 space-y-1">
-                        <Label className="text-xs">Stone Rate (₹/ct)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={item.stoneRate === 0 ? "" : item.stoneRate}
-                          onChange={(e) => handleStoneRateChange(item, e.target.value)}
-                        />
-                      </div>
-                    </>
+                    <StoneComponentFields
+                      metals={metals}
+                      origins={origins}
+                      onMetalsChange={setMetals}
+                      onOriginsChange={setOrigins}
+                      stoneMetalTypeName={item.stoneMetalTypeName}
+                      onStoneChange={(name, typeNames) =>
+                        updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
+                      }
+                      selectedTypeNames={item.stoneTypeNames}
+                      onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
+                      caratWeight={item.caratWeight}
+                      onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
+                      stoneRate={item.stoneRate}
+                      onStoneRateChange={(value) => handleStoneRateChange(item, value)}
+                      stoneCharge={item.stoneCharge}
+                      onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
+                      stoneChargeTouched={item.stoneChargeTouched}
+                      stoneWeightInput={item.stoneWeightInput}
+                      onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
+                      stoneWeightUnit={item.stoneWeightUnit}
+                      onStoneWeightUnitChange={(unit) => updateItem(item.key, { stoneWeightUnit: unit })}
+                      netStoneWeightTouched={item.netStoneWeightTouched}
+                    />
                   )}
                 </div>
               )}
@@ -605,22 +730,22 @@ export function QuotationForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Discount</Label>
-          <Input
-            type="number"
-            step="0.01"
-            value={discount === 0 ? "" : discount}
-            onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+          <PercentOrFlatInput
+            base={subtotal + makingChargesTotal + stoneChargesTotal}
+            value={discount}
+            onChange={setDiscount}
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>GST Rate %</Label>
-          <GstSchemeBadge scheme={gstScheme} />
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <div className="flex items-center justify-between">
+            <Label>GST Rate %</Label>
+            <GstSchemeBadge scheme={gstScheme} />
+          </div>
           <Input
             type="number"
             step="0.01"
-            value={gstRate}
+            value={gstRate === 0 ? "" : gstRate}
             disabled={gstScheme === "COMPOSITION"}
             onChange={(e) => setGstRate(Number(e.target.value) || 0)}
           />
@@ -662,7 +787,7 @@ export function QuotationForm({
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label>Notes</Label>
         <Textarea name="notes" rows={2} />
       </div>
@@ -673,7 +798,7 @@ export function QuotationForm({
           <span>₹{subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Making Charges</span>
+          <span>Making Charges (incl. HM)</span>
           <span>₹{makingChargesTotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
@@ -694,9 +819,11 @@ export function QuotationForm({
         </div>
       </div>
 
-      <Button type="submit" disabled={pending || !customerId}>
-        {pending ? "Creating..." : "Create Quotation"}
-      </Button>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={pending || !customerId}>
+          {pending ? "Creating..." : "Create Quotation"}
+        </Button>
+      </div>
     </form>
   )
 }

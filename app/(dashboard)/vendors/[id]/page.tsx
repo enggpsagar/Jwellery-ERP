@@ -129,7 +129,16 @@ export default async function VendorDetailsPage({
             label="Opening Balance"
             value={money(vendor.openingBalance)}
           />
-          <DetailField label="Current Balance" value={vendor.pendingAmount} />
+          <DetailField
+            label="Current Balance"
+            value={
+              vendor.pendingAmount ? (
+                <span className="text-red-600">{vendor.pendingAmount}</span>
+              ) : (
+                vendor.pendingAmount
+              )
+            }
+          />
           <DetailField label="Balance Type" value={vendor.balanceType} />
           <DetailField label="Last Purchase" value={vendor.lastPurchaseDate} />
           <DetailField label="Last Payment" value={vendor.lastPaymentDate} />

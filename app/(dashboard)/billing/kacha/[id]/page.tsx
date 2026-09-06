@@ -125,7 +125,15 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
           <tbody>
             {kachaInvoice.items.map((item: (typeof kachaInvoice.items)[number]) => (
               <tr key={item.id} className="border-b last:border-0">
-                <td className="px-4 py-3">{item.itemName}</td>
+                <td className="px-4 py-3">
+                  {item.itemName}
+                  {item.stoneMetalTypeName ? (
+                    <span className="block text-xs text-muted-foreground">
+                      Stone: {item.stoneMetalTypeName}
+                      {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3">{item.quantity}</td>
                 <td className="px-4 py-3">
                   {item.purity === "DIAMOND"
@@ -133,7 +141,14 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
                     : item.netWeight != null ? `${item.netWeight.toFixed(3)} g` : "-"}
                 </td>
                 <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
-                <td className="px-4 py-3">₹{item.makingCharge.toFixed(2)}</td>
+                <td className="px-4 py-3">
+                  ₹{item.makingCharge.toFixed(2)}
+                  {item.hmCharge > 0 ? (
+                    <span className="block text-xs text-muted-foreground">
+                      HM ₹{item.hmCharge.toFixed(2)}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
                 <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
               </tr>
@@ -148,7 +163,7 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
           <span>₹{kachaInvoice.subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Making Charges</span>
+          <span>Making Charges (incl. HM)</span>
           <span>₹{kachaInvoice.makingCharges.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
@@ -163,7 +178,7 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
           <span>Total</span>
           <span>₹{kachaInvoice.totalAmount.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-between text-blue-600 font-medium">
           <span>Paid</span>
           <span>₹{kachaInvoice.paidAmount.toFixed(2)}</span>
         </div>

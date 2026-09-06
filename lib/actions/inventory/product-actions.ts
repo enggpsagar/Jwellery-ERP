@@ -5,6 +5,8 @@ import { ChargeType, PurityType, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scope";
+import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import type { ProductFormState } from "@/lib/inventory/product-types";
 import { buildExcelExport } from "@/lib/excel-export";
 
@@ -71,6 +73,8 @@ function serializeProduct(product: {
   defaultCaratWeight: { toString(): string } | null;
   hasStoneComponent: boolean;
   defaultStoneRate: { toString(): string } | null;
+  defaultStoneMetalTypeName: string | null;
+  defaultStoneTypeNames: string | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -102,6 +106,8 @@ function serializeProduct(product: {
     defaultCaratWeight: product.defaultCaratWeight?.toString() ?? null,
     hasStoneComponent: product.hasStoneComponent,
     defaultStoneRate: product.defaultStoneRate?.toString() ?? null,
+    defaultStoneMetalTypeName: product.defaultStoneMetalTypeName,
+    defaultStoneTypeNames: product.defaultStoneTypeNames,
     designCode: product.designCode,
     hsnCode: product.hsnCode,
     description: product.description,
@@ -121,7 +127,16 @@ const PRODUCT_RELATIONS = {
   stoneOriginOption: { select: { id: true, name: true } },
 } as const;
 
-export type ProductSortBy = "name" | "productCode" | "createdAt";
+export type ProductSortBy =
+  | "name"
+  | "productCode"
+  | "createdAt"
+  | "category"
+  | "categoryType"
+  | "metalType"
+  | "defaultPurity"
+  | "defaultNetWeight"
+  | "isActive";
 export type ProductSortOrder = "asc" | "desc";
 
 export type GetProductsParams = {
@@ -130,6 +145,10 @@ export type GetProductsParams = {
   search?: string;
   sortBy?: ProductSortBy;
   sortOrder?: ProductSortOrder;
+  /** Filters by the store's own StoreMetal id (Settings > Taxonomy) — or
+   * "UNASSIGNED" for products with no metal set. Dynamic: whatever the
+   * store has configured, not a fixed set of categories. */
+  metalTypeId?: string;
 };
 
 type ExportProductsParams = {
@@ -137,13 +156,19 @@ type ExportProductsParams = {
   search?: string;
   sortBy?: string;
   sortOrder?: ProductSortOrder;
+  type?: string;
 };
 
-function getProductWhere(storeId: string, search?: string) {
+function getProductWhere(storeId: string, search?: string, metalTypeId?: string) {
   const query = String(search || "").trim();
 
   return {
     storeId,
+    ...(metalTypeId === UNASSIGNED_METAL_TYPE
+      ? { metalTypeId: null }
+      : metalTypeId
+        ? { metalTypeId }
+        : {}),
     ...(query
       ? {
           OR: [
@@ -162,6 +187,12 @@ function getProductOrderBy(
 ) {
   if (sortBy === "name") return { name: sortOrder };
   if (sortBy === "productCode") return { productCode: sortOrder };
+  if (sortBy === "category") return { category: { name: sortOrder } };
+  if (sortBy === "categoryType") return { categoryType: { name: sortOrder } };
+  if (sortBy === "metalType") return { metalType: { name: sortOrder } };
+  if (sortBy === "defaultPurity") return { defaultPurity: sortOrder };
+  if (sortBy === "defaultNetWeight") return { defaultNetWeight: sortOrder };
+  if (sortBy === "isActive") return { isActive: sortOrder };
   return { createdAt: sortOrder };
 }
 
@@ -183,6 +214,8 @@ function mapProductRow(row: {
   defaultCaratWeight: { toString(): string } | null;
   hasStoneComponent: boolean;
   defaultStoneRate: { toString(): string } | null;
+  defaultStoneMetalTypeName: string | null;
+  defaultStoneTypeNames: string | null;
   designCode: string | null;
   hsnCode: string | null;
   description: string | null;
@@ -216,6 +249,8 @@ function mapProductRow(row: {
     hasStoneComponent: row.hasStoneComponent,
     defaultStoneRate:
       row.defaultStoneRate != null ? Number(row.defaultStoneRate) : null,
+    defaultStoneMetalTypeName: row.defaultStoneMetalTypeName,
+    defaultStoneTypeNames: row.defaultStoneTypeNames,
     designCode: row.designCode,
     hsnCode: row.hsnCode,
     description: row.description,
@@ -234,7 +269,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   const sortOrder: ProductSortOrder = params.sortOrder || "desc";
 
   const storeId = await requireStoreScope();
-  const where = getProductWhere(storeId, search);
+  const where = getProductWhere(storeId, search, params.metalTypeId);
   const orderBy = getProductOrderBy(sortBy, sortOrder);
 
   const [totalCount, rows] = await Promise.all([
@@ -265,7 +300,17 @@ export async function getProducts(params: GetProductsParams = {}) {
 }
 
 async function getAllProductsForExport(params: ExportProductsParams = {}) {
-  const validSortBy: ProductSortBy[] = ["name", "productCode", "createdAt"];
+  const validSortBy: ProductSortBy[] = [
+    "name",
+    "productCode",
+    "createdAt",
+    "category",
+    "categoryType",
+    "metalType",
+    "defaultPurity",
+    "defaultNetWeight",
+    "isActive",
+  ];
   const sortBy: ProductSortBy = validSortBy.includes(params.sortBy as ProductSortBy)
     ? (params.sortBy as ProductSortBy)
     : "createdAt";
@@ -277,7 +322,7 @@ async function getAllProductsForExport(params: ExportProductsParams = {}) {
         id: { in: params.selectedIds },
         storeId,
       }
-    : getProductWhere(storeId, params.search);
+    : getProductWhere(storeId, params.search, params.type);
 
   const rows = await prisma.product.findMany({
     where,
@@ -326,6 +371,8 @@ export async function exportProductsToExcel(
       "Carat Weight (ct)": product.defaultCaratWeight ?? "-",
       "Has Stone Component": product.hasStoneComponent ? "Yes" : "No",
       "Stone Rate (₹/ct)": product.defaultStoneRate ?? "-",
+      Stone: product.defaultStoneMetalTypeName ?? "-",
+      "Stone Types": product.defaultStoneTypeNames ?? "-",
       Description: product.description || "-",
       Notes: product.notes || "-",
       Status: product.isActive ? "Active" : "Inactive",
@@ -490,6 +537,12 @@ export async function createProduct(
     const defaultStoneRate = parseNullableDecimal(
       formData.get("defaultStoneRate"),
     );
+    const defaultStoneMetalTypeName = parseNullableString(
+      formData.get("defaultStoneMetalTypeName"),
+    );
+    const defaultStoneTypeNames = parseNullableString(
+      formData.get("defaultStoneTypeNames"),
+    );
 
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
@@ -564,6 +617,8 @@ export async function createProduct(
         defaultCaratWeight,
         hasStoneComponent,
         defaultStoneRate,
+        defaultStoneMetalTypeName,
+        defaultStoneTypeNames,
         designCode,
         hsnCode,
         description,
@@ -590,6 +645,26 @@ export async function createProduct(
           errors: { stockQuantity: ["Enter 0 or a positive whole number"] },
         };
       }
+
+      // See resolveWritableLocationId's own doc comment — without this, a
+      // location-restricted Staff user submitting no location at all saved
+      // the stock row with locationId: null, which then never matches their
+      // own location-scoped list afterward.
+      const rawLocationId = String(formData.get("locationId") ?? "").trim();
+      const locationScope = await getLocationScope();
+      const locationResolution = await resolveWritableLocationId(
+        storeId,
+        rawLocationId || null,
+        locationScope,
+      );
+      if (!locationResolution.ok) {
+        return {
+          success: false,
+          message: locationResolution.message,
+          errors: { locationId: [locationResolution.message] },
+        };
+      }
+      const resolvedLocationId = locationResolution.locationId;
 
       // Same max-based derivation as the product code above: a COUNT
       // regresses after a delete onto a code that already exists, and a
@@ -619,6 +694,7 @@ export async function createProduct(
               productId: createdProduct.id,
               stockCode: `STK-${year}-${String(highest + 1 + attempt).padStart(4, "0")}`,
               quantity: Math.trunc(quantity),
+              locationId: resolvedLocationId,
               metalTypeId: metalTypeId || null,
               purity: defaultPurity,
               makingCharge: defaultMakingCharge,
@@ -632,6 +708,8 @@ export async function createProduct(
               stoneWeight: defaultStoneWeight,
               caratWeight: defaultCaratWeight,
               stoneRate: defaultStoneRate,
+              stoneMetalTypeName: defaultStoneMetalTypeName,
+              stoneTypeNames: defaultStoneTypeNames,
             },
           });
 
@@ -740,6 +818,12 @@ export async function updateProduct(
     const defaultStoneRate = parseNullableDecimal(
       formData.get("defaultStoneRate"),
     );
+    const defaultStoneMetalTypeName = parseNullableString(
+      formData.get("defaultStoneMetalTypeName"),
+    );
+    const defaultStoneTypeNames = parseNullableString(
+      formData.get("defaultStoneTypeNames"),
+    );
 
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
@@ -817,6 +901,8 @@ export async function updateProduct(
     defaultCaratWeight,
     hasStoneComponent,
     defaultStoneRate,
+    defaultStoneMetalTypeName,
+    defaultStoneTypeNames,
     designCode,
     hsnCode,
     description,
@@ -939,4 +1025,32 @@ export async function deleteProduct(id: string): Promise<ProductFormState> {
       errors: {},
     };
   }
+}
+
+export type BulkDeleteResult = {
+  deletedCount: number;
+  failures: { id: string; message: string }[];
+};
+
+/**
+ * Deletes each selected product through the exact same deleteProduct()
+ * call a single-row delete uses — never a bare deleteMany — so a bulk
+ * selection can't bypass the stock/dependency guard just because several
+ * rows were ticked at once. Partial success is expected and reported per
+ * row, not treated as a whole-batch failure.
+ */
+export async function bulkDeleteProducts(ids: string[]): Promise<BulkDeleteResult> {
+  const failures: BulkDeleteResult["failures"] = [];
+  let deletedCount = 0;
+
+  for (const id of ids) {
+    const result = await deleteProduct(id);
+    if (result.success) {
+      deletedCount++;
+    } else {
+      failures.push({ id, message: result.message });
+    }
+  }
+
+  return { deletedCount, failures };
 }

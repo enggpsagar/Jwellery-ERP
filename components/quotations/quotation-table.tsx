@@ -6,6 +6,7 @@ import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { Eye, ArrowRightCircle } from "lucide-react"
 
 import { QuotationStatusBadge } from "@/components/quotations/quotation-status-badge"
+import { SortableTableHead } from "@/components/shared/sortable-table-head"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -49,12 +50,12 @@ export function QuotationTable({ quotations }: QuotationTableProps) {
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40">
             <tr className="border-b">
-              <th className="px-4 py-3 text-left font-medium">Quotation #</th>
-              <th className="px-4 py-3 text-left font-medium">Date</th>
+              <SortableTableHead label="Quotation #" sortKey="quotationNumber" defaultSortBy="quotationDate" />
+              <SortableTableHead label="Date" sortKey="quotationDate" defaultSortBy="quotationDate" />
               <th className="px-4 py-3 text-left font-medium">Valid Until</th>
               <th className="px-4 py-3 text-left font-medium">Customer</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
-              <th className="px-4 py-3 text-left font-medium">Total</th>
+              <SortableTableHead label="Total" sortKey="totalAmount" defaultSortBy="quotationDate" />
               <th className="px-4 py-3 text-left font-medium">Converted</th>
               <th className="px-4 py-3 text-left font-medium">Actions</th>
             </tr>

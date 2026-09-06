@@ -3,10 +3,11 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { UserRole, BusinessUnit, GstScheme } from "@prisma/client";
+import { UserRole, GstScheme } from "@prisma/client";
 import { requireStoreScope } from "@/lib/store-context";
 import { requireRole } from "@/lib/auth/auth";
-import { ALL_BUSINESS_UNITS } from "@/lib/business-units";
+import { MONEY_UNIT } from "@/lib/business-units";
+import { getAvailableBusinessUnitOptions } from "@/lib/business-units.server";
 import { LEGACY_PLACEHOLDER_BUSINESS_NAME } from "@/lib/constants/app";
 
 export type BusinessSettings = {
@@ -32,8 +33,20 @@ export type BusinessSettings = {
   invoiceTerms: string;
   invoiceNotes: string;
   defaultGstRate: number;
+  // BIS hallmarking fee, per hallmarked piece — see the schema field's own
+  // doc comment (BusinessSettings.hallmarkChargePerPiece) for why the
+  // default is a placeholder that needs store confirmation, not a
+  // guaranteed-current government rate.
+  hallmarkChargePerPiece: number;
+  // How many days after invoiceDate a sold item may still be returned via a
+  // Credit Note — see prisma/schema.prisma's BusinessSettings.returnWindowDays
+  // doc comment and lib/return-window.ts's getReturnEligibility().
+  returnWindowDays: number;
   financialYearStartMonth: number;
-  businessUnits: BusinessUnit[];
+  // Each entry is "MONEY" or a live StoreMetal.id — see
+  // lib/business-units.server.ts's BusinessUnitOption for the resolved
+  // {value, label, isGemstone} shape pickers should actually render from.
+  businessUnits: string[];
 };
 
 export type SettingsFormState = {
@@ -77,22 +90,32 @@ function mapSettings(settings: any): BusinessSettings {
     invoiceTerms: settings.invoiceTerms ?? "",
     invoiceNotes: settings.invoiceNotes ?? "",
     defaultGstRate: Number(settings.defaultGstRate ?? 3.0),
+    hallmarkChargePerPiece: Number(settings.hallmarkChargePerPiece ?? 45),
+    returnWindowDays: settings.returnWindowDays ?? 30,
     financialYearStartMonth: settings.financialYearStartMonth ?? 4,
     businessUnits: settings.businessUnits?.length
       ? settings.businessUnits
-      : [BusinessUnit.MONEY],
+      : [MONEY_UNIT],
   };
 }
 
-function parseBusinessUnits(formData: FormData): BusinessUnit[] {
+/**
+ * Only accepts values that are actually selectable right now (MONEY or one
+ * of the store's currently active StoreMetal ids) — a stale value from a
+ * cached form (e.g. a metal deactivated/deleted after the page loaded) is
+ * dropped rather than saved, same "don't persist a dangling reference"
+ * spirit as getActiveBusinessUnits' own resolution.
+ */
+async function parseBusinessUnits(formData: FormData): Promise<string[]> {
+  const options = await getAvailableBusinessUnitOptions();
+  const validValues = new Set(options.map((option) => option.value));
+
   const selected = formData
     .getAll("businessUnits")
     .map((value) => String(value))
-    .filter((value): value is BusinessUnit =>
-      ALL_BUSINESS_UNITS.includes(value as BusinessUnit),
-    );
+    .filter((value) => validValues.has(value));
 
-  return selected.length ? selected : [BusinessUnit.MONEY];
+  return selected.length ? selected : [MONEY_UNIT];
 }
 
 /**
@@ -112,15 +135,23 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
     // and whatever lands in `businessName` is what every invoice and email
     // then calls the business — a placeholder here meant real stores sent
     // mail signed "My Jewellery Store".
+    //
+    // City/state also carry over from here: registration required both
+    // (the store code is derived from them, see store-registration-actions.ts)
+    // and stored them on Store.city/Store.state — without this, that same
+    // owner would land on a blank Settings page and have to type the exact
+    // same city/state right back in.
     const store = await prisma.store.findUnique({
       where: { id: storeId },
-      select: { name: true },
+      select: { name: true, city: true, state: true },
     });
 
     settings = await prisma.businessSettings.create({
       data: {
         storeId,
         businessName: store?.name?.trim() || LEGACY_PLACEHOLDER_BUSINESS_NAME,
+        city: store?.city ?? null,
+        state: store?.state ?? null,
       },
     });
   }
@@ -183,7 +214,7 @@ export async function updateBusinessSettings(
     const gstScheme = gstSchemeRaw as GstScheme;
 
     const storeId = await requireStoreScope();
-    const businessUnits = parseBusinessUnits(formData);
+    const businessUnits = await parseBusinessUnits(formData);
 
     await prisma.businessSettings.upsert({
       where: { storeId },
@@ -208,6 +239,11 @@ export async function updateBusinessSettings(
         invoiceTerms: toOptionalString(formData.get("invoiceTerms")),
         invoiceNotes: toOptionalString(formData.get("invoiceNotes")),
         defaultGstRate: toNumber(formData.get("defaultGstRate"), 3.0),
+        hallmarkChargePerPiece: toNumber(
+          formData.get("hallmarkChargePerPiece"),
+          45,
+        ),
+        returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),
           4,
@@ -236,6 +272,11 @@ export async function updateBusinessSettings(
         invoiceTerms: toOptionalString(formData.get("invoiceTerms")),
         invoiceNotes: toOptionalString(formData.get("invoiceNotes")),
         defaultGstRate: toNumber(formData.get("defaultGstRate"), 3.0),
+        hallmarkChargePerPiece: toNumber(
+          formData.get("hallmarkChargePerPiece"),
+          45,
+        ),
+        returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),
           4,
@@ -248,6 +289,7 @@ export async function updateBusinessSettings(
     revalidatePath("/ledger");
     revalidatePath("/customers");
     revalidatePath("/billing/new");
+    revalidatePath("/billing/kacha/new");
     revalidatePath("/quotations/new");
     revalidatePath("/purchases/new");
 

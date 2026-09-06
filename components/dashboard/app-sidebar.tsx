@@ -22,6 +22,7 @@ import {
   PackagePlus,
   FileText,
   CreditCard,
+  Plus,
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
@@ -47,12 +48,27 @@ import {
 } from "@/components/ui/sidebar";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import type { SidebarCounts } from "@/lib/actions/sidebar-actions";
+
+type CountKey = keyof SidebarCounts;
 
 type NavItem = {
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  items?: { title: string; href: string }[];
+  /** When set, renders a live record-count badge beside this item —
+   * omitted for items with no single "count of records" meaning
+   * (Dashboard, Ledger, Reports, Plans, and any parent with sub-items). */
+  countKey?: CountKey;
+  /** quickAddHref, when set, renders a persistent "+" beside this item — a
+   * direct link to its Create/New page, skipping the list-then-Add-button
+   * detour. Only meaningful on a top-level item with no sub-items; a parent
+   * with `items` gets its "+" per sub-item instead (see below). */
+  quickAddHref?: string;
+  /** quickAddHref, when set, renders a persistent "+" beside that sub-item —
+   * a direct link to its Create/New page, skipping the list-then-Add-button
+   * detour. Omitted for sub-items with no single obvious "new" page. */
+  items?: { title: string; href: string; quickAddHref?: string; countKey?: CountKey }[];
 };
 
 const mainNav: NavItem[] = [
@@ -65,11 +81,15 @@ const mainNav: NavItem[] = [
     title: "Customers",
     href: "/customers",
     icon: Users,
+    countKey: "customers",
+    quickAddHref: "/customers/new",
   },
   {
     title: "Vendors",
     href: "/vendors",
     icon: Truck,
+    countKey: "vendors",
+    quickAddHref: "/vendors/new",
   },
   {
     title: "Ledger",
@@ -81,32 +101,39 @@ const mainNav: NavItem[] = [
     href: "/inventory",
     icon: Package,
     items: [
-      { title: "Products", href: "/inventory/products" },
-      { title: "Stock", href: "/inventory/stock" },
+      { title: "Products", href: "/inventory/products", quickAddHref: "/inventory/products/new", countKey: "products" },
+      { title: "Stock", href: "/inventory/stock", quickAddHref: "/inventory/stock/new", countKey: "stock" },
     ],
   },
   {
     title: "Purchases",
     href: "/purchases",
     icon: PackagePlus,
+    countKey: "purchases",
   },
   {
-    title: "Karigar Management",
+    title: "Karigar",
     href: "/karigars",
     icon: Hammer,
+    countKey: "karigars",
+    quickAddHref: "/karigars/new",
   },
   {
     title: "Quotations",
     href: "/quotations",
     icon: FileText,
+    countKey: "quotations",
   },
   {
     title: "Billing",
     href: "/billing",
     icon: ReceiptText,
     items: [
-      { title: "Pakka Invoices", href: "/billing" },
-      { title: "Kacha Slips", href: "/billing/kacha" },
+      { title: "Pakka Invoices", href: "/billing", quickAddHref: "/billing/new", countKey: "invoices" },
+      { title: "Kacha Slips", href: "/billing/kacha", quickAddHref: "/billing/kacha/new", countKey: "kachaInvoices" },
+      // No quickAddHref — a Credit Note is always issued from an existing
+      // invoice's return flow, there is no standalone "new" page for one.
+      { title: "Credit Notes", href: "/billing/credit-notes", countKey: "creditNotes" },
     ],
   },
   {
@@ -118,11 +145,14 @@ const mainNav: NavItem[] = [
     title: "Users",
     href: "/users",
     icon: UserCog,
+    countKey: "users",
+    quickAddHref: "/users/new",
   },
   {
     title: "Stores",
     href: "/stores",
     icon: Store,
+    countKey: "stores",
   },
   {
     title: "Plans",
@@ -191,16 +221,53 @@ const ACTIVE_NAV_CLASS = [
  */
 type OpenMenu = string | null | undefined;
 
+// Same override classes as the section-expand chevron and the quick-add
+// "+" — every small sidebar control shares one look, not a look per section.
+const NAV_CONTROL_CLASS = "text-white/70 hover:bg-card/10 hover:text-white";
+
+// A top-level item's own quick-add "+" (Customers/Vendors/Karigar) sits with
+// no section chevron beside it competing for attention, so — unlike
+// NAV_CONTROL_CLASS above — it stays tinted gold at rest, not just on hover,
+// using the same --chart-2 accent the active-item highlight and NavCount
+// already use for "meant to be noticed." Keep this identical across every
+// item that gets one; it's one control, not a look per item.
+const QUICK_ADD_HIGHLIGHT_CLASS =
+  "text-[color-mix(in_oklab,var(--chart-2)_70%,white)] hover:bg-[color-mix(in_oklab,var(--chart-2)_16%,transparent)] hover:text-[var(--chart-2)]";
+
+/**
+ * "Customers (3)" — inline right after the label, not a right-aligned
+ * badge. Plain text rather than a pill: it sits in the same flex row as the
+ * icon/title with normal document flow, so it never has to fight the
+ * absolutely-positioned chevron/quick-add "+" for the same right-edge slot
+ * the way a SidebarMenuBadge would. Colored with the same gold accent the
+ * active-item highlight uses (--chart-2), not a dim white/50 — a count
+ * that's meant to be noticed shouldn't read as more muted than the label
+ * it's attached to.
+ */
+function NavCount({ count }: { count?: number }) {
+  // A brand-new store's empty lists don't need "(0)" cluttering every item —
+  // this exists to answer "how many," and zero isn't news.
+  if (!count) return null;
+  return (
+    <span className="font-semibold text-[color-mix(in_oklab,var(--chart-2)_75%,white)]">
+      {" "}
+      ({count > 999 ? "999+" : count})
+    </span>
+  );
+}
+
 function SidebarNavItem({
   item,
   pathname,
   openMenu,
   setOpenMenu,
+  counts,
 }: {
   item: NavItem;
   pathname: string;
   openMenu: OpenMenu;
   setOpenMenu: (next: OpenMenu) => void;
+  counts: SidebarCounts;
 }) {
   const Icon = item.icon;
   const isActive = isNavItemActive(pathname, item.href);
@@ -229,9 +296,23 @@ function SidebarNavItem({
         >
           <Link href={item.href}>
             <Icon className="h-4 w-4" />
-            <span>{item.title}</span>
+            <span>
+              {item.title}
+              {item.countKey && <NavCount count={counts[item.countKey]} />}
+            </span>
           </Link>
         </SidebarMenuButton>
+
+        {/* Slightly highlighted (not just on hover, see
+            QUICK_ADD_HIGHLIGHT_CLASS) so the quick-add action is easy to
+            notice — this item has no section chevron to share the row with. */}
+        {item.quickAddHref && (
+          <SidebarMenuAction asChild className={QUICK_ADD_HIGHLIGHT_CLASS}>
+            <Link href={item.quickAddHref} aria-label={`Add new ${item.title}`}>
+              <Plus className="h-4 w-4" />
+            </Link>
+          </SidebarMenuAction>
+        )}
       </SidebarMenuItem>
     );
   }
@@ -262,7 +343,7 @@ function SidebarNavItem({
         onClick={() => setOpenMenu(open ? null : item.title)}
         aria-expanded={open}
         aria-label={`${open ? "Collapse" : "Expand"} ${item.title}`}
-        className="text-white/70 hover:bg-card/10 hover:text-white"
+        className={NAV_CONTROL_CLASS}
       >
         <ChevronRight
           className={`h-4 w-4 shrink-0 transition-transform ${
@@ -281,9 +362,23 @@ function SidebarNavItem({
                 className={ACTIVE_NAV_CLASS}
               >
                 <Link href={subItem.href}>
-                  <span>{subItem.title}</span>
+                  <span>
+                    {subItem.title}
+                    {subItem.countKey && <NavCount count={counts[subItem.countKey]} />}
+                  </span>
                 </Link>
               </SidebarMenuSubButton>
+
+              {/* Same override classes as the section-level chevron above —
+                  "+" icons must look and behave identically everywhere they
+                  appear, not just within one section. */}
+              {subItem.quickAddHref && (
+                <SidebarMenuAction asChild className={NAV_CONTROL_CLASS}>
+                  <Link href={subItem.quickAddHref} aria-label={`Add new ${subItem.title}`}>
+                    <Plus className="h-4 w-4" />
+                  </Link>
+                </SidebarMenuAction>
+              )}
             </SidebarMenuSubItem>
           ))}
         </SidebarMenuSub>
@@ -295,9 +390,25 @@ function SidebarNavItem({
 type AppSidebarProps = {
   storeName?: string | null;
   storeLogoUrl?: string | null;
+  counts?: SidebarCounts;
 };
 
-export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
+const EMPTY_COUNTS: SidebarCounts = {
+  customers: 0,
+  vendors: 0,
+  products: 0,
+  stock: 0,
+  purchases: 0,
+  karigars: 0,
+  quotations: 0,
+  invoices: 0,
+  kachaInvoices: 0,
+  creditNotes: 0,
+  users: 0,
+  stores: 0,
+};
+
+export function AppSidebar({ storeName, storeLogoUrl, counts = EMPTY_COUNTS }: AppSidebarProps = {}) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const role = session?.user?.role;
@@ -363,6 +474,7 @@ export function AppSidebar({ storeName, storeLogoUrl }: AppSidebarProps = {}) {
                   pathname={pathname}
                   openMenu={openMenu}
                   setOpenMenu={setOpenMenu}
+                  counts={counts}
                 />
               ))}
             </SidebarMenu>

@@ -422,6 +422,115 @@ export async function issueMaterialToKarigar(
 }
 
 /**
+ * Record material received back from a karigar with no specific open
+ * KarigarJob to receive it against — covers a balance the karigar already
+ * owed from a previous/historical transaction (or an opening balance set
+ * when they were first added), where there's nothing currently "issued and
+ * outstanding" to reconcile the receipt against. Just a single CREDIT
+ * ledger entry adjusting their outstanding metal balance directly, same
+ * shape as recordKarigarPayment does for cash. Deliberately does not touch
+ * InventoryStock — unlike receiveItemsFromKarigar (which turns a job's
+ * finished pieces into new sellable stock), there's no job/item here to
+ * attach a stock row to, just raw metal being settled against what's owed.
+ */
+export async function recordMaterialReceiptFromKarigar(
+  karigarId: string,
+  prevState: StockActionState = initialState,
+  formData: FormData,
+): Promise<StockActionState> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const karigar = await prisma.karigar.findFirst({
+      where: { id: karigarId, storeId },
+      select: { id: true, name: true },
+    });
+
+    if (!karigar) return { success: false, message: "Karigar not found" };
+
+    const metalTypeId = String(formData.get("metalTypeId") || "").trim();
+    const receivePurityRaw = String(formData.get("receivePurity") || "");
+    const receiveWeight = toDecimalOrNull(formData.get("receiveWeight"));
+    const notes = String(formData.get("notes") || "").trim() || null;
+    const locationId = String(formData.get("locationId") || "").trim() || null;
+
+    if (!metalTypeId) {
+      return { success: false, message: "Select a valid metal type" };
+    }
+
+    if (locationId) {
+      const location = await prisma.storeLocation.findFirst({
+        where: { id: locationId, storeId },
+        select: { id: true },
+      });
+      if (!location) {
+        return { success: false, message: "Selected location is invalid" };
+      }
+
+      const scope = await getLocationScope();
+      if (!isLocationAllowed(scope, locationId)) {
+        return {
+          success: false,
+          message: "You don't have access to file this receipt against this location",
+        };
+      }
+    }
+
+    const storeMetal = await prisma.storeMetal.findFirst({
+      where: { id: metalTypeId, storeId },
+    });
+
+    if (!storeMetal) {
+      return { success: false, message: "Select a valid metal type" };
+    }
+
+    const isPreciousMetal = storeMetal.hasPurity;
+
+    if (!receiveWeight || receiveWeight <= 0) {
+      return { success: false, message: "Enter a valid received weight" };
+    }
+
+    let receivePurity: PurityType | null = null;
+    let receiveFineWeight: number | null = null;
+
+    if (isPreciousMetal) {
+      receivePurity = receivePurityRaw as PurityType;
+      if (!Object.values(PurityType).includes(receivePurity)) {
+        return { success: false, message: "Select a valid purity" };
+      }
+
+      const fineness = await getFinenessMap(storeId);
+      receiveFineWeight = toFineWeight(receiveWeight, receivePurity, fineness);
+    }
+
+    await prisma.ledgerEntry.create({
+      data: {
+        storeId,
+        type: LedgerEntryType.CREDIT,
+        sourceType: LedgerSourceType.KARIGAR_RECEIPT,
+        karigarId,
+        metalTypeId: storeMetal.id,
+        metalWeight: isPreciousMetal ? undefined : receiveWeight,
+        metalWeightFine: isPreciousMetal ? (receiveFineWeight ?? undefined) : undefined,
+        amount: 0,
+        description: isPreciousMetal
+          ? `${receiveWeight}g ${receivePurity} received against outstanding balance (${(receiveFineWeight ?? 0).toFixed(3)}g fine)${notes ? ` — ${notes}` : ""}`
+          : `${receiveWeight}g ${notes ? notes : storeMetal.name} received against outstanding balance`,
+        locationId: locationId ?? undefined,
+      },
+    });
+
+    revalidatePath("/karigars");
+    revalidatePath(`/karigars/${karigarId}`);
+
+    return { success: true, message: "Material received — outstanding balance adjusted" };
+  } catch (error) {
+    console.error("recordMaterialReceiptFromKarigar error:", error);
+    return { success: false, message: "Failed to record material receipt" };
+  }
+}
+
+/**
  * Receive one or more finished items back from a karigar against an open
  * job. Each item is a brand-new fresh product, so it becomes new sellable
  * IN_STOCK inventory carrying the same field set as the Add Stock form

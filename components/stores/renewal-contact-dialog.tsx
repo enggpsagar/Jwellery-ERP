@@ -75,7 +75,7 @@ export function RenewalContactDialog() {
             Your message has been sent. We&apos;ll get back to you shortly.
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="renewal-email-content">
               Email Content <RequiredMark />
             </Label>

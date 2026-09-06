@@ -8,7 +8,9 @@ import {
   getInvoiceFormStockItems,
 } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
-import { getStoreLocations } from "@/lib/actions/store-location-actions"
+import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
+import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
+import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 
 import { InvoiceForm, type LineItem } from "@/components/billing/invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
@@ -42,12 +44,17 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     redirect(`/billing/${id}`)
   }
 
-  const [customers, stockItems, businessSettings, locations] = await Promise.all([
-    getInvoiceFormCustomers(),
-    getInvoiceFormStockItems(),
-    getBusinessSettings(),
-    getStoreLocations(),
-  ])
+  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates, defaultLocationId] =
+    await Promise.all([
+      getInvoiceFormCustomers(),
+      getInvoiceFormStockItems(),
+      getBusinessSettings(),
+      getStoreLocations(),
+      getStoreMetals(),
+      getAllStoreMetalOrigins(),
+      getCaratConversionRateMap(),
+      getDefaultLocationId(),
+    ])
 
   // Every field the form actually tracks, carried over from the cancelled
   // invoice's items. Stored weights are always grams, so the unit toggle
@@ -71,10 +78,22 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     stoneRate: item.stoneRate ?? 0,
     hasStoneComponent: item.stoneRate != null,
     stoneChargeTouched: true,
+    // Same reasoning as stoneChargeTouched/netTouched below — the cancelled
+    // invoice's own saved Net Stone Weight is authoritative and must not be
+    // silently recomputed from Stone Carat Weight when this line loads.
+    netStoneWeightTouched: true,
+    stoneMetalTypeName: item.stoneMetalTypeName ?? "",
+    stoneTypeNames: item.stoneTypeNames
+      ? item.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
+      : [],
     dmoWeight: item.dmoWeight ?? 0,
     stoneWeightInput: item.stoneWeight ?? 0,
     stoneWeightUnit: "GRAM",
     hmCharge: item.hmCharge,
+    // Carried over as-is, same as stoneChargeTouched/netStoneWeightTouched
+    // above — not recomputed from the store's current per-piece rate the
+    // way GST recomputes from the current default rate.
+    hmChargeTouched: true,
     schemeDiscount: item.schemeDiscount,
     hsnCode: item.hsnCode ?? "",
     inventoryStockId: item.inventoryStockId ?? "",
@@ -94,11 +113,15 @@ export default async function ReplaceInvoicePage({ params }: Props) {
         customers={customers}
         stockItems={stockItems}
         locations={locations}
+        metals={metals}
+        origins={origins}
+        caratConversionRates={caratConversionRates}
         defaultGstRate={businessSettings.defaultGstRate}
+        hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
         gstScheme={businessSettings.gstScheme}
         storeState={businessSettings.state}
         initialCustomerId={cancelledInvoice.customer?.id}
-        initialLocationId={cancelledInvoice.locationId ?? undefined}
+        initialLocationId={cancelledInvoice.locationId ?? defaultLocationId ?? undefined}
         initialItems={initialItems}
         replacesId={cancelledInvoice.id}
         replacesInvoiceNumber={cancelledInvoice.invoiceNumber}

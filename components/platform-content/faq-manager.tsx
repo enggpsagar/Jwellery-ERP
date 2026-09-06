@@ -220,7 +220,7 @@ function FaqFormRow({ faq, onDone }: { faq?: PlatformFaqRow; onDone: () => void 
     >
       <input type="hidden" name="id" value={faq?.id ?? ""} />
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="question" required>Question</Label>
         <Input
           id="question"
@@ -234,7 +234,7 @@ function FaqFormRow({ faq, onDone }: { faq?: PlatformFaqRow; onDone: () => void 
         ) : null}
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label htmlFor="answer" required>Answer</Label>
         <RichTextEditor
           id="answer"
@@ -247,12 +247,12 @@ function FaqFormRow({ faq, onDone }: { faq?: PlatformFaqRow; onDone: () => void 
         ) : null}
       </div>
 
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
-        </Button>
+      <div className="flex justify-end gap-2">
         <Button type="button" size="sm" variant="outline" onClick={onDone}>
           Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? <Loader className="h-4 w-4" /> : "Save"}
         </Button>
       </div>
     </form>

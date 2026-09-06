@@ -1,8 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { ArrowDown, ArrowUp, Search } from "lucide-react"
 
 import type { KarigarLedgerRow, KarigarLedgerMetalGroup } from "@/lib/actions/ledger-actions"
+import { cn } from "@/lib/utils"
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 
 import {
@@ -15,6 +17,15 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CASH: "Cash",
@@ -24,6 +35,22 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CARD: "Card",
   OTHER: "Other",
 }
+
+const PAGE_SIZE = 10
+
+type SortKey = "date" | "metal" | "weight" | "amount" | "type"
+
+const FINANCIAL_SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "date", label: "Date" },
+  { value: "type", label: "Type" },
+  { value: "amount", label: "Amount" },
+]
+
+const MATERIAL_SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "date", label: "Date" },
+  { value: "metal", label: "Metal" },
+  { value: "weight", label: "Fine Weight" },
+]
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -37,9 +64,157 @@ function inr(value: number | string | null | undefined) {
   }).format(amount)
 }
 
+function matchesSearch(row: KarigarLedgerRow, query: string) {
+  if (!query) return true
+  const haystack = `${row.description} ${row.sourceLabel} ${row.date} ${row.metalType ?? ""} ${
+    row.paymentMethod ?? ""
+  }`.toLowerCase()
+  return haystack.includes(query)
+}
+
+function compareRows(a: KarigarLedgerRow, b: KarigarLedgerRow, sortKey: SortKey) {
+  switch (sortKey) {
+    case "metal":
+      return (a.metalType ?? "").localeCompare(b.metalType ?? "")
+    case "weight":
+      return Math.abs(a.metalWeightFine ?? 0) - Math.abs(b.metalWeightFine ?? 0)
+    case "amount":
+      return Math.abs(a.amount) - Math.abs(b.amount)
+    case "type":
+      return a.type.localeCompare(b.type)
+    case "date":
+    default:
+      return new Date(a.dateISO).getTime() - new Date(b.dateISO).getTime()
+  }
+}
+
+function filterAndSortRows(
+  rows: KarigarLedgerRow[],
+  search: string,
+  sortKey: SortKey,
+  sortDir: "asc" | "desc",
+) {
+  const query = search.trim().toLowerCase()
+  const filtered = rows.filter((row) => matchesSearch(row, query))
+  return [...filtered].sort((a, b) => {
+    const cmp = compareRows(a, b, sortKey)
+    return sortDir === "asc" ? cmp : -cmp
+  })
+}
+
+function SearchInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+}) {
+  return (
+    <div className="relative flex-1 sm:max-w-xs">
+      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-9 pl-9"
+      />
+    </div>
+  )
+}
+
+function SortControl({
+  sortKey,
+  sortDir,
+  onSortKeyChange,
+  onToggleDir,
+  options,
+}: {
+  sortKey: SortKey
+  sortDir: "asc" | "desc"
+  onSortKeyChange: (value: SortKey) => void
+  onToggleDir: () => void
+  options: { value: SortKey; label: string }[]
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Select value={sortKey} onValueChange={(value) => onSortKeyChange(value as SortKey)}>
+        <SelectTrigger className="h-9 w-[150px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              Sort: {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="h-9 w-9 shrink-0"
+        onClick={onToggleDir}
+        title={sortDir === "asc" ? "Ascending — click for descending" : "Descending — click for ascending"}
+      >
+        {sortDir === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+      </Button>
+    </div>
+  )
+}
+
+function PaginationFooter({
+  currentPage,
+  totalPages,
+  rangeStart,
+  rangeEnd,
+  total,
+  onPrev,
+  onNext,
+}: {
+  currentPage: number
+  totalPages: number
+  rangeStart: number
+  rangeEnd: number
+  total: number
+  onPrev: () => void
+  onNext: () => void
+}) {
+  if (total === 0) return null
+
+  return (
+    <div className="flex flex-col gap-2 border-t px-3 py-2 text-xs md:flex-row md:items-center md:justify-between">
+      <p className="text-muted-foreground">
+        Showing <span className="font-medium text-foreground">{rangeStart}</span>–
+        <span className="font-medium text-foreground">{rangeEnd}</span> of{" "}
+        <span className="font-medium text-foreground">{total}</span> entries
+      </p>
+
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={onPrev}>
+          Previous
+        </Button>
+        <span className="px-1 text-muted-foreground">
+          Page {currentPage} of {totalPages}
+        </span>
+        <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={onNext}>
+          Next
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 type KarigarLedgerTableProps = {
   rows: KarigarLedgerRow[]
   finalCashBalance: number
+  /** Lifetime totals — always over every entry, never the currently
+   *  searched/paginated subset, so the summary cards stay a stable
+   *  "overall" figure no matter what the table above is filtered to. */
+  totalDebit: number
+  totalCredit: number
   /** One entry per metal actually used in this karigar's material ledger —
    *  see getKarigarLedger's own doc comment for why grams of Gold and grams
    *  of Silver are never summed into one balance. Ignored for the
@@ -91,18 +266,44 @@ function MaterialSideTable({
   title,
   rows,
   metalLabel,
+  search,
+  sortKey,
+  sortDir,
 }: {
   title: string
   rows: KarigarLedgerRow[]
   metalLabel: string
+  search: string
+  sortKey: SortKey
+  sortDir: "asc" | "desc"
 }) {
-  const total = rows.reduce((sum, row) => sum + (row.metalWeightFine ?? 0), 0)
+  const [page, setPage] = useState(1)
+
+  const filteredSorted = useMemo(
+    () => filterAndSortRows(rows, search, sortKey, sortDir),
+    [rows, search, sortKey, sortDir],
+  )
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, sortKey, sortDir, rows])
+
+  const totalPages = Math.max(1, Math.ceil(filteredSorted.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const paginated = filteredSorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const rangeStart = filteredSorted.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, filteredSorted.length)
+
+  // This table's own header total tracks whatever's currently filtered —
+  // the stable, always-over-everything total lives in the summary section
+  // below both tables instead (see MetalGroupSection).
+  const filteredTotal = filteredSorted.reduce((sum, row) => sum + (row.metalWeightFine ?? 0), 0)
 
   return (
     <div className="flex-1 space-y-2">
       <div className="flex items-baseline justify-between">
         <h4 className="text-sm font-semibold">{title}</h4>
-        <span className="text-sm font-medium tabular-nums">{total.toFixed(3)}g</span>
+        <span className="text-sm font-medium tabular-nums">{filteredTotal.toFixed(3)}g</span>
       </div>
 
       <div className="rounded-lg border">
@@ -117,14 +318,14 @@ function MaterialSideTable({
           </TableHeader>
 
           <TableBody>
-            {rows.length === 0 ? (
+            {paginated.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                  No entries yet.
+                  {rows.length === 0 ? "No entries yet." : "No entries match your search."}
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((row) => (
+              paginated.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell>
                     <DateCell row={row} metalLabel={metalLabel} />
@@ -148,12 +349,32 @@ function MaterialSideTable({
             )}
           </TableBody>
         </Table>
+
+        <PaginationFooter
+          currentPage={currentPage}
+          totalPages={totalPages}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          total={filteredSorted.length}
+          onPrev={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+        />
       </div>
     </div>
   )
 }
 
-function MetalGroupSection({ group }: { group: KarigarLedgerMetalGroup }) {
+function MetalGroupSection({
+  group,
+  search,
+  sortKey,
+  sortDir,
+}: {
+  group: KarigarLedgerMetalGroup
+  search: string
+  sortKey: SortKey
+  sortDir: "asc" | "desc"
+}) {
   const issuedRows = group.rows.filter((row) => row.type === "DEBIT")
   const receivedRows = group.rows.filter((row) => row.type === "CREDIT")
 
@@ -163,10 +384,10 @@ function MetalGroupSection({ group }: { group: KarigarLedgerMetalGroup }) {
   // case) means the reverse.
   const owesLabel =
     group.finalFineBalance > 0
-      ? `Karigar owes you ${group.finalFineBalance.toFixed(3)}g of ${group.metalLabel}`
+      ? `Karigar owes you ${group.finalFineBalance.toFixed(3)}g`
       : group.finalFineBalance < 0
-        ? `You owe the karigar ${Math.abs(group.finalFineBalance).toFixed(3)}g of ${group.metalLabel}`
-        : `Settled — no ${group.metalLabel} outstanding either way`
+        ? `You owe the karigar ${Math.abs(group.finalFineBalance).toFixed(3)}g`
+        : "Settled"
 
   return (
     <div className="space-y-3">
@@ -175,38 +396,72 @@ function MetalGroupSection({ group }: { group: KarigarLedgerMetalGroup }) {
           title="Gold Given to Karigar"
           rows={issuedRows}
           metalLabel={group.metalLabel}
+          search={search}
+          sortKey={sortKey}
+          sortDir={sortDir}
         />
         <MaterialSideTable
           title="Material Received from Karigar"
           rows={receivedRows}
           metalLabel={group.metalLabel}
+          search={search}
+          sortKey={sortKey}
+          sortDir={sortDir}
         />
       </div>
 
-      <Card
-        className={
-          group.finalFineBalance > 0
-            ? "border-red-200 bg-red-50"
-            : group.finalFineBalance < 0
-              ? "border-emerald-200 bg-emerald-50"
-              : undefined
-        }
-      >
-        <CardContent className="flex items-center justify-between py-3">
-          <span className="text-sm font-medium text-muted-foreground">Net Balance</span>
-          <span
-            className={
-              group.finalFineBalance > 0
-                ? "text-base font-semibold text-red-700"
-                : group.finalFineBalance < 0
-                  ? "text-base font-semibold text-emerald-700"
-                  : "text-base font-semibold"
-            }
-          >
-            {owesLabel}
-          </span>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Card size="sm">
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">
+              Total {group.metalLabel} Issued
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold">{group.totalIssuedFine.toFixed(3)}g</div>
+          </CardContent>
+        </Card>
+
+        <Card size="sm">
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">
+              Total {group.metalLabel} Received
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold">{group.totalReceivedFine.toFixed(3)}g</div>
+          </CardContent>
+        </Card>
+
+        <Card
+          size="sm"
+          className={
+            group.finalFineBalance > 0
+              ? "border-red-200 bg-red-50"
+              : group.finalFineBalance < 0
+                ? "border-emerald-200 bg-emerald-50"
+                : undefined
+          }
+        >
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">Outstanding Balance</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              className={cn(
+                "text-lg font-semibold",
+                group.finalFineBalance > 0
+                  ? "text-red-700"
+                  : group.finalFineBalance < 0
+                    ? "text-emerald-700"
+                    : undefined,
+              )}
+            >
+              {owesLabel}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
@@ -214,6 +469,8 @@ function MetalGroupSection({ group }: { group: KarigarLedgerMetalGroup }) {
 export function KarigarLedgerTable({
   rows,
   finalCashBalance,
+  totalDebit,
+  totalCredit,
   materialGroups,
   variant,
 }: KarigarLedgerTableProps) {
@@ -225,6 +482,36 @@ export function KarigarLedgerTable({
   const [activeMetalId, setActiveMetalId] = useState<string | null>(
     () => materialGroups[0]?.metalTypeId ?? null,
   )
+
+  const [materialSearch, setMaterialSearch] = useState("")
+  const [materialSortKey, setMaterialSortKey] = useState<SortKey>("date")
+  const [materialSortDir, setMaterialSortDir] = useState<"asc" | "desc">("asc")
+
+  const [financialSearch, setFinancialSearch] = useState("")
+  const [financialSortKey, setFinancialSortKey] = useState<SortKey>("date")
+  const [financialSortDir, setFinancialSortDir] = useState<"asc" | "desc">("asc")
+  const [financialPage, setFinancialPage] = useState(1)
+
+  const visibleRows = useMemo(() => rows.filter((row) => row.amount !== null), [rows])
+
+  const financialFilteredSorted = useMemo(
+    () => filterAndSortRows(visibleRows, financialSearch, financialSortKey, financialSortDir),
+    [visibleRows, financialSearch, financialSortKey, financialSortDir],
+  )
+
+  useEffect(() => {
+    setFinancialPage(1)
+  }, [financialSearch, financialSortKey, financialSortDir])
+
+  const financialTotalPages = Math.max(1, Math.ceil(financialFilteredSorted.length / PAGE_SIZE))
+  const financialCurrentPage = Math.min(financialPage, financialTotalPages)
+  const financialPaginated = financialFilteredSorted.slice(
+    (financialCurrentPage - 1) * PAGE_SIZE,
+    financialCurrentPage * PAGE_SIZE,
+  )
+  const financialRangeStart =
+    financialFilteredSorted.length === 0 ? 0 : (financialCurrentPage - 1) * PAGE_SIZE + 1
+  const financialRangeEnd = Math.min(financialCurrentPage * PAGE_SIZE, financialFilteredSorted.length)
 
   if (variant === "material") {
     if (materialGroups.length === 0) {
@@ -261,12 +548,30 @@ export function KarigarLedgerTable({
           })}
         </div>
 
-        <MetalGroupSection group={activeGroup} />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <SearchInput
+            value={materialSearch}
+            onChange={setMaterialSearch}
+            placeholder="Search description, source..."
+          />
+          <SortControl
+            sortKey={materialSortKey}
+            sortDir={materialSortDir}
+            onSortKeyChange={setMaterialSortKey}
+            onToggleDir={() => setMaterialSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+            options={MATERIAL_SORT_OPTIONS}
+          />
+        </div>
+
+        <MetalGroupSection
+          group={activeGroup}
+          search={materialSearch}
+          sortKey={materialSortKey}
+          sortDir={materialSortDir}
+        />
       </div>
     )
   }
-
-  const visibleRows = rows.filter((row) => row.amount !== null)
 
   return (
     <div className="space-y-4">
@@ -283,10 +588,25 @@ export function KarigarLedgerTable({
         </CardContent>
       </Card>
 
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <SearchInput
+          value={financialSearch}
+          onChange={setFinancialSearch}
+          placeholder="Search description, source..."
+        />
+        <SortControl
+          sortKey={financialSortKey}
+          sortDir={financialSortDir}
+          onSortKeyChange={setFinancialSortKey}
+          onToggleDir={() => setFinancialSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+          options={FINANCIAL_SORT_OPTIONS}
+        />
+      </div>
+
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="hover:bg-transparent">
               <TableHead>Date</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Source</TableHead>
@@ -297,14 +617,16 @@ export function KarigarLedgerTable({
           </TableHeader>
 
           <TableBody>
-            {visibleRows.length === 0 ? (
+            {financialPaginated.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                  No financial ledger entries yet.
+                  {visibleRows.length === 0
+                    ? "No financial ledger entries yet."
+                    : "No entries match your search."}
                 </TableCell>
               </TableRow>
             ) : (
-              visibleRows.map((row) => {
+              financialPaginated.map((row) => {
                 const isDebit = row.type === "DEBIT"
                 return (
                   <TableRow key={row.id}>
@@ -325,7 +647,7 @@ export function KarigarLedgerTable({
                     <TableCell className="max-w-xs truncate" title={row.description}>
                       {row.description}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right tabular-nums">
                       {row.amount
                         ? `${isDebit ? "+" : "-"}₹${row.amount.toLocaleString("en-IN")}`
                         : "-"}
@@ -339,6 +661,56 @@ export function KarigarLedgerTable({
             )}
           </TableBody>
         </Table>
+
+        <PaginationFooter
+          currentPage={financialCurrentPage}
+          totalPages={financialTotalPages}
+          rangeStart={financialRangeStart}
+          rangeEnd={financialRangeEnd}
+          total={financialFilteredSorted.length}
+          onPrev={() => setFinancialPage((p) => Math.max(1, p - 1))}
+          onNext={() => setFinancialPage((p) => Math.min(financialTotalPages, p + 1))}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Card size="sm">
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">Total Debit</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold text-destructive">
+              ₹ {totalDebit.toLocaleString("en-IN")}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card size="sm">
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">Total Credit</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold text-emerald-600">
+              ₹ {totalCredit.toLocaleString("en-IN")}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card size="sm" className={finalCashBalance > 0 ? "border-red-200 bg-red-50" : undefined}>
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">Net Balance</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              className={cn(
+                "text-lg font-semibold",
+                finalCashBalance > 0 ? "text-red-700" : undefined,
+              )}
+            >
+              ₹ {finalCashBalance.toLocaleString("en-IN")}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

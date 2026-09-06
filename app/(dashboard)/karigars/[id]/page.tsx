@@ -21,6 +21,7 @@ import { ReceiveMaterialDialog } from "@/components/karigars/receive-material-di
 import { RecordKarigarPaymentDialog } from "@/components/karigars/record-karigar-payment-dialog";
 import { KarigarLedgerTabs } from "@/components/karigars/karigar-ledger-tabs";
 import { KarigarStatusCard } from "@/components/karigars/karigar-status-card";
+import { ExportMenu } from "@/components/shared/export-menu";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -237,13 +238,16 @@ export default async function KarigarDetailPage({ params }: Props) {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
           <CardTitle>Karigar Ledger</CardTitle>
+          <ExportMenu href={`/karigars/${id}/ledger-export`} label="Export Ledger" />
         </CardHeader>
         <CardContent>
           <KarigarLedgerTabs
             rows={ledger.rows}
             finalCashBalance={ledger.finalCashBalance}
+            totalDebit={ledger.totalDebit}
+            totalCredit={ledger.totalCredit}
             materialGroups={ledger.materialGroups}
           />
         </CardContent>

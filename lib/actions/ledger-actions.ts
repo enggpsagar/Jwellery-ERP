@@ -99,6 +99,7 @@ export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
 
 export type KarigarLedgerRow = {
   id: string
+  dateISO: string
   date: string
   type: "CREDIT" | "DEBIT"
   sourceLabel: string
@@ -129,6 +130,12 @@ export type KarigarLedgerMetalGroup = {
   metalLabel: string
   rows: KarigarLedgerRow[]
   finalFineBalance: number
+  /** Lifetime totals for this metal — always over every entry, never the
+   *  currently-searched/paginated subset, so the summary section below the
+   *  two side-by-side tables stays a stable "overall" figure regardless of
+   *  what the tables happen to be filtered/paged to at the moment. */
+  totalIssuedFine: number
+  totalReceivedFine: number
 }
 
 export type KarigarLedgerResult = {
@@ -136,6 +143,10 @@ export type KarigarLedgerResult = {
    *  tab filters to `amount !== null` itself, same as before. */
   rows: KarigarLedgerRow[]
   finalCashBalance: number
+  /** Lifetime cash totals, same "always over everything" rule as the
+   *  material groups' totalIssuedFine/totalReceivedFine above. */
+  totalDebit: number
+  totalCredit: number
   /** Material rows, split one group per metal — see KarigarLedgerMetalGroup.
    *  Ordered by total activity (most-used metal first) so a karigar who
    *  mostly works Gold with the occasional Silver job sees Gold first. */
@@ -158,6 +169,8 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
   })
 
   let cashBalance = 0
+  let totalDebit = 0
+  let totalCredit = 0
   // Running fine-weight balance kept per metalTypeId (or the "no metal
   // recorded" bucket), so interleaved Gold/Silver entries each accumulate
   // against their own total rather than a shared one.
@@ -172,12 +185,15 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
     const metalType = entry.metalType?.name ?? null
 
     cashBalance += (isDebit ? 1 : -1) * amount
+    if (isDebit) totalDebit += amount
+    else totalCredit += amount
 
     const runningFineForMetal = fineBalanceByMetal.get(metalTypeId) ?? 0
     const nextFineForMetal = runningFineForMetal + (isDebit ? 1 : -1) * (metalWeightFine ?? 0)
 
     const row: KarigarLedgerRow = {
       id: entry.id,
+      dateISO: entry.entryDate.toISOString(),
       date: formatDate(entry.entryDate),
       type: entry.type as "CREDIT" | "DEBIT",
       sourceLabel: formatLedgerSource(entry.sourceType),
@@ -211,17 +227,30 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
   })
 
   const materialGroups: KarigarLedgerMetalGroup[] = [...groupsByMetal.entries()]
-    .map(([metalTypeId, group]) => ({
-      metalTypeId,
-      metalLabel: group.metalLabel,
-      rows: group.rows,
-      finalFineBalance: fineBalanceByMetal.get(metalTypeId) ?? 0,
-    }))
+    .map(([metalTypeId, group]) => {
+      const totalIssuedFine = group.rows
+        .filter((row) => row.type === "DEBIT")
+        .reduce((sum, row) => sum + (row.metalWeightFine ?? 0), 0)
+      const totalReceivedFine = group.rows
+        .filter((row) => row.type === "CREDIT")
+        .reduce((sum, row) => sum + (row.metalWeightFine ?? 0), 0)
+
+      return {
+        metalTypeId,
+        metalLabel: group.metalLabel,
+        rows: group.rows,
+        finalFineBalance: fineBalanceByMetal.get(metalTypeId) ?? 0,
+        totalIssuedFine,
+        totalReceivedFine,
+      }
+    })
     .sort((a, b) => b.rows.length - a.rows.length)
 
   return {
     rows,
     finalCashBalance: cashBalance,
+    totalDebit,
+    totalCredit,
     materialGroups,
   }
 }

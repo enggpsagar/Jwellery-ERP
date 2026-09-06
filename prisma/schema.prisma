@@ -148,29 +148,29 @@ model StorePlanHistory {
 }
 
 model StoreLocation {
-  id              String               @id @default(cuid())
-  storeId         String
-  name            String
-  state           String?
-  city            String?
-  isActive        Boolean              @default(true)
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  store           Store                @relation(fields: [storeId], references: [id])
+  id               String               @id @default(cuid())
+  storeId          String
+  name             String
+  state            String?
+  city             String?
+  isActive         Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  store            Store                @relation(fields: [storeId], references: [id])
   // Back-relation for Store.defaultLocationId — practically ever at most one
   // Store (the one this location itself belongs to), never a real list.
-  defaultForStores Store[]             @relation("StoreDefaultLocation")
-  inventoryStocks InventoryStock[]
-  karigars        Karigar[]
-  purchases       Purchase[]
-  invoices        Invoice[]
-  kachaInvoices   KachaInvoice[]
-  karigarJobs     KarigarJob[]
-  ledgerEntries   LedgerEntry[]
-  quotations      Quotation[]
-  userAccess      UserLocationAccess[]
-  creditNotes     CreditNote[]
-  reminders       Reminder[]
+  defaultForStores Store[]              @relation("StoreDefaultLocation")
+  inventoryStocks  InventoryStock[]
+  karigars         Karigar[]
+  purchases        Purchase[]
+  invoices         Invoice[]
+  kachaInvoices    KachaInvoice[]
+  karigarJobs      KarigarJob[]
+  ledgerEntries    LedgerEntry[]
+  quotations       Quotation[]
+  userAccess       UserLocationAccess[]
+  creditNotes      CreditNote[]
+  reminders        Reminder[]
 
   @@unique([storeId, name])
 }
@@ -920,30 +920,30 @@ model KachaInvoiceItem {
 }
 
 model InvoiceItem {
-  id                 String          @id @default(cuid())
+  id                 String           @id @default(cuid())
   invoiceId          String
   itemName           String
   metalTypeId        String?
-  quantity           Int             @default(1)
-  grossWeight        Decimal?        @db.Decimal(12, 5)
-  netWeight          Decimal?        @db.Decimal(12, 5)
-  dmoWeight          Decimal?        @db.Decimal(12, 5)
+  quantity           Int              @default(1)
+  grossWeight        Decimal?         @db.Decimal(12, 5)
+  netWeight          Decimal?         @db.Decimal(12, 5)
+  dmoWeight          Decimal?         @db.Decimal(12, 5)
   // Net stone weight (carats or grams, store's choice — same free-typed
   // convention as every other weight field), separate from dmoWeight (which
   // is Dust/Making/Other, not stone).
-  stoneWeight        Decimal?        @db.Decimal(12, 5)
+  stoneWeight        Decimal?         @db.Decimal(12, 5)
   // Diamond weight in carats, only meaningful when purity is DIAMOND — a
   // dedicated, unambiguous unit (unlike stoneWeight above), since rate then
   // prices per carat rather than per gram.
-  caratWeight        Decimal?        @db.Decimal(10, 3)
-  rate               Decimal?        @db.Decimal(12, 2)
-  makingCharge       Decimal         @default(0) @db.Decimal(12, 2)
-  makingChargeType   ChargeType      @default(FIXED)
+  caratWeight        Decimal?         @db.Decimal(10, 3)
+  rate               Decimal?         @db.Decimal(12, 2)
+  makingCharge       Decimal          @default(0) @db.Decimal(12, 2)
+  makingChargeType   ChargeType       @default(FIXED)
   // Hallmarking charge, shown as its own line under Making Charges on the
   // printed invoice — distinct from makingCharge itself.
-  hmCharge           Decimal         @default(0) @db.Decimal(12, 2)
-  stoneCharge        Decimal         @default(0) @db.Decimal(12, 2)
-  stoneRate          Decimal?        @db.Decimal(12, 2)
+  hmCharge           Decimal          @default(0) @db.Decimal(12, 2)
+  stoneCharge        Decimal          @default(0) @db.Decimal(12, 2)
+  stoneRate          Decimal?         @db.Decimal(12, 2)
   // Denormalized names, not FKs — see Product.defaultStoneMetalTypeName's
   // doc comment for why.
   stoneMetalTypeName String?
@@ -951,29 +951,41 @@ model InvoiceItem {
   // Per-line scheme/discount amount, separate from Invoice.discount (which
   // is an invoice-level total) — the printed format wants one column per
   // line, not a single amount split across items after the fact.
-  schemeDiscount     Decimal         @default(0) @db.Decimal(12, 2)
-  sgstAmount         Decimal         @default(0) @db.Decimal(12, 2)
-  cgstAmount         Decimal         @default(0) @db.Decimal(12, 2)
+  schemeDiscount     Decimal          @default(0) @db.Decimal(12, 2)
+  sgstAmount         Decimal          @default(0) @db.Decimal(12, 2)
+  cgstAmount         Decimal          @default(0) @db.Decimal(12, 2)
   // Charged instead of sgstAmount+cgstAmount when the sale is inter-state
   // (customer's state differs from the store's own) - never both at once,
   // see computeGst() in lib/gst.ts. Always 0 for a Composition-scheme store,
   // same as sgst/cgst - a composition dealer never itemizes GST at all.
-  igstAmount         Decimal         @default(0) @db.Decimal(12, 2)
+  igstAmount         Decimal          @default(0) @db.Decimal(12, 2)
+  // Which configured GstRate (Settings > GST Rates) this specific LINE used
+  // — GST is picked per line, not once for the whole invoice, since a
+  // single document can genuinely mix e.g. a 3% metal line with an 18%
+  // service line. Snapshotted the same way as Invoice's own (now-legacy)
+  // gstRateId trio: never rewritten by a later change/deactivation of the
+  // master rate. Nullable for the same reasons as there — a Composition-
+  // scheme line, or a row saved before this field existed.
+  gstRateId          String?
+  gstRateName        String?
+  gstRatePercent     Decimal?         @db.Decimal(5, 2)
   // HSN snapshot at sale time — Product.hsnCode can change later, and a
   // manually-entered line (no linked stock/product) has no HSN otherwise.
   hsnCode            String?
-  lineTotal          Decimal         @default(0) @db.Decimal(12, 2)
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  lineTotal          Decimal          @default(0) @db.Decimal(12, 2)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
   inventoryStockId   String?
   purity             PurityType?
-  inventoryStock     InventoryStock? @relation(fields: [inventoryStockId], references: [id])
-  invoice            Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  metalType          StoreMetal?     @relation(fields: [metalTypeId], references: [id])
+  inventoryStock     InventoryStock?  @relation(fields: [inventoryStockId], references: [id])
+  invoice            Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  metalType          StoreMetal?      @relation(fields: [metalTypeId], references: [id])
+  gstRate            GstRate?         @relation(fields: [gstRateId], references: [id])
   creditNoteItems    CreditNoteItem[]
 
   @@index([invoiceId])
   @@index([inventoryStockId])
+  @@index([gstRateId])
 }
 
 model LedgerEntry {
@@ -1271,36 +1283,44 @@ model MetalSellingRate {
  * Activate/Deactivate). Replaces the old single BusinessSettings.
  * defaultGstRate flat number: a store can now define as many rates as it
  * needs (e.g. "Metal" 3%, "Making Charges" 18%, "Artisan Services" 18%,
- * plus any custom one), picked from a dropdown everywhere a GST % is
- * chosen (Invoice/Purchase/Quotation), instead of a single figure applied
- * to the whole document. `name` is the label shown in that dropdown.
- *
+ * plus any custom one), picked from a dropdown wherever a GST % is chosen.
+ * `name` is the label shown in that dropdown.
+ * Invoice picks this PER LINE ITEM (InvoiceItem.gstRateId) — a single
+ * invoice can genuinely mix e.g. a 3% metal line with an 18% making-charge
+ * line, so the rate lives on the line, not the document. Invoice's own
+ * gstRateId/gstRateName/gstRatePercent trio is legacy from before this:
+ * still populated (as the invoice's own default-for-new-lines pick) for
+ * backward compatibility with rows saved before per-line rates existed,
+ * but no longer the source of truth for what any given line actually
+ * charged — read InvoiceItem's own trio for that. Purchase and Quotation
+ * still pick one rate for the whole document (their own gstRateId trio,
+ * unchanged) — only Invoice has gone per-line so far.
  * This is the GST *rate* only — GstScheme (REGULAR_B2C/REGULAR_B2B/
  * COMPOSITION, on BusinessSettings) and the SGST/CGST/IGST split
  * (computeGst() in lib/gst.ts, driven by store vs. counterparty state)
  * are separate, unrelated concerns and stay exactly as they are.
- *
  * Deactivating (isActive=false) removes a rate from the picker for NEW
- * documents without touching any document that already used it — see
- * Invoice.gstRateId/gstRatePercent/gstRateName (and the same trio on
- * Purchase/Quotation), which snapshot the rate actually applied at the
+ * lines/documents without touching any that already used it — every
+ * gstRateId/gstRatePercent/gstRateName trio (Invoice, InvoiceItem,
+ * Purchase, Quotation) is a snapshot of the rate actually applied at the
  * time, so a later change or deactivation here never rewrites history.
  * `isDefault` (at most one true per store, enforced in application code,
- * not a DB constraint) is which rate a brand-new document preselects.
+ * not a DB constraint) is which rate a brand-new document/line preselects.
  */
 model GstRate {
-  id          String   @id @default(cuid())
-  storeId     String
-  name        String
-  ratePercent Decimal  @db.Decimal(5, 2)
-  isActive    Boolean  @default(true)
-  isDefault   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  invoices    Invoice[]
-  purchases   Purchase[]
-  quotations  Quotation[]
+  id           String        @id @default(cuid())
+  storeId      String
+  name         String
+  ratePercent  Decimal       @db.Decimal(5, 2)
+  isActive     Boolean       @default(true)
+  isDefault    Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  store        Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  invoices     Invoice[]
+  invoiceItems InvoiceItem[]
+  purchases    Purchase[]
+  quotations   Quotation[]
 
   @@unique([storeId, name])
   @@index([storeId])
@@ -1945,7 +1965,9 @@ enum InvoiceStatus {
   CANCELLED
 }
 
-/** The four transport modes the E-way Bill portal itself offers. */
+/**
+ * The four transport modes the E-way Bill portal itself offers.
+ */
 enum TransportMode {
   ROAD
   RAIL

@@ -104,6 +104,10 @@ export function ProductsClient({
             selectedIds={selectedIds}
             entityLabel="products"
             exportAction={exportProductsToExcel}
+            statusOptions={[
+              { value: "ACTIVE", label: "Active" },
+              { value: "INACTIVE", label: "Inactive" },
+            ]}
             typeOptions={[
               ...metals
                 .filter((metal) => metal.isActive)

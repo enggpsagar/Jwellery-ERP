@@ -149,6 +149,11 @@ export type GetProductsParams = {
    * "UNASSIGNED" for products with no metal set. Dynamic: whatever the
    * store has configured, not a fixed set of categories. */
   metalTypeId?: string;
+  /** "ACTIVE" | "INACTIVE" — otherwise (including "ALL"/undefined) every
+   * product matches, same convention as DataTableToolbar's other status
+   * filters. This is the only way to actually see just the inactive
+   * products — active-first sort alone still shows them, just at the end. */
+  status?: string;
 };
 
 type ExportProductsParams = {
@@ -157,9 +162,15 @@ type ExportProductsParams = {
   sortBy?: string;
   sortOrder?: ProductSortOrder;
   type?: string;
+  status?: string;
 };
 
-function getProductWhere(storeId: string, search?: string, metalTypeId?: string) {
+function getProductWhere(
+  storeId: string,
+  search?: string,
+  metalTypeId?: string,
+  status?: string,
+) {
   const query = String(search || "").trim();
 
   return {
@@ -168,6 +179,11 @@ function getProductWhere(storeId: string, search?: string, metalTypeId?: string)
       ? { metalTypeId: null }
       : metalTypeId
         ? { metalTypeId }
+        : {}),
+    ...(status === "ACTIVE"
+      ? { isActive: true }
+      : status === "INACTIVE"
+        ? { isActive: false }
         : {}),
     ...(query
       ? {
@@ -277,7 +293,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   const sortOrder: ProductSortOrder = params.sortOrder || "desc";
 
   const storeId = await requireStoreScope();
-  const where = getProductWhere(storeId, search, params.metalTypeId);
+  const where = getProductWhere(storeId, search, params.metalTypeId, params.status);
   const orderBy = getProductOrderBy(sortBy, sortOrder);
 
   const [totalCount, rows] = await Promise.all([
@@ -330,7 +346,7 @@ async function getAllProductsForExport(params: ExportProductsParams = {}) {
         id: { in: params.selectedIds },
         storeId,
       }
-    : getProductWhere(storeId, params.search, params.type);
+    : getProductWhere(storeId, params.search, params.type, params.status);
 
   const rows = await prisma.product.findMany({
     where,

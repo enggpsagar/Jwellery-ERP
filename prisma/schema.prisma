@@ -1408,6 +1408,15 @@ model BusinessSettings {
   invoiceTerms      String?
   invoiceNotes      String?
 
+  // Bank account the store gets paid into — printed as the invoice's "Pay
+  // To" block. All optional and independent of each other: the print page
+  // shows the block only once bankName is set, same "don't show a
+  // half-filled section" convention as settings.logoUrl.
+  bankName              String?
+  bankAccountNumber     String?
+  bankIfscCode          String?
+  bankAccountHolderName String?
+
   // Tax defaults
   defaultGstRate Float @default(3.0) // jewellery GST is typically 3%
 

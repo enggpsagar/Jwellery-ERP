@@ -1,13 +1,14 @@
-import { Hammer, Mail, ShieldCheck } from "lucide-react"
+import { Check, Hammer, Mail, ShieldCheck, X } from "lucide-react"
 
 import {
   DetailField,
   DetailGrid,
   DetailSection,
 } from "@/components/shared/detail-section"
+import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/users/status-badge"
-import { ROLE_LABELS } from "@/lib/roles"
-import { toTitleCase, formatShortDate } from "@/lib/utils"
+import { ROLE_LABELS, ROLE_BADGE_CLASSES, MODULE_DEFINITIONS } from "@/lib/roles"
+import { toTitleCase, formatShortDate, cn } from "@/lib/utils"
 
 import type { UserRole, UserStatus } from "@prisma/client"
 
@@ -54,12 +55,6 @@ export function UserDetailContent({
 }) {
   const karigar = user.karigarId ? karigars.find((k) => k.id === user.karigarId) : null
 
-  const accessLocationNames = user.locationAccess?.length
-    ? user.locationAccess
-        .map((la) => locations.find((l) => l.id === la.locationId)?.name ?? la.locationId)
-        .join(", ")
-    : "All locations"
-
   return (
     <div className="space-y-6">
       <DetailSection
@@ -72,7 +67,12 @@ export function UserDetailContent({
           <DetailField label="Name" value={user.name ? toTitleCase(user.name) : "-"} />
           <DetailField label="Email" value={user.email} />
           <DetailField label="Phone" value={user.phone} />
-          <DetailField label="Role" value={ROLE_LABELS[user.role]} />
+          <DetailField
+            label="Role"
+            value={
+              <Badge className={ROLE_BADGE_CLASSES[user.role]}>{ROLE_LABELS[user.role]}</Badge>
+            }
+          />
           <DetailField label="Status" value={<StatusBadge status={user.status} />} />
           <DetailField label="Account" value={user.isActive ? "Active" : "Deactivated"} />
           <DetailField
@@ -89,11 +89,21 @@ export function UserDetailContent({
         tint="var(--chart-3)"
       >
         <DetailGrid>
-          <DetailField label="Locations" span value={accessLocationNames} />
+          <DetailField
+            label="Locations"
+            span
+            value={<LocationAccessChecklist locationAccess={user.locationAccess} locations={locations} />}
+          />
           <DetailField
             label="Permissions"
             span
-            value={user.permissions?.length ? user.permissions.join(", ") : "Role default"}
+            value={
+              user.role === "STAFF" ? (
+                <ModuleAccessChecklist permissions={user.permissions} />
+              ) : (
+                "Full access (role-based)"
+              )
+            }
           />
         </DetailGrid>
       </DetailSection>
@@ -112,6 +122,71 @@ export function UserDetailContent({
           </DetailGrid>
         </DetailSection>
       ) : null}
+    </div>
+  )
+}
+
+/** Read-only counterpart to the checkbox grid on the Add/Edit User form's
+ * own "Module Access" section — a module reads as granted the same way
+ * hasModuleAccess() decides it (an empty permissions array means "not
+ * customized," i.e. every module is granted). */
+function ModuleAccessChecklist({ permissions }: { permissions?: string[] | null }) {
+  const isFullAccess = !permissions?.length
+
+  return (
+    <div className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2 md:grid-cols-3">
+      {MODULE_DEFINITIONS.map((module) => {
+        const granted =
+          isFullAccess || module.permissions.every((permission) => permissions!.includes(permission))
+
+        return (
+          <div key={module.key} className="flex items-center gap-2 text-sm">
+            {granted ? (
+              <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+            ) : (
+              <X className="h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
+            <span className={cn(!granted && "text-muted-foreground")}>{module.label}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Read-only counterpart to the Add/Edit User form's own "Location Access"
+ * checkbox grid — a location reads as granted the same way the form (and
+ * BranchScopeService) treat an empty locationAccess list: every location. */
+function LocationAccessChecklist({
+  locationAccess,
+  locations,
+}: {
+  locationAccess?: { locationId: string }[] | null
+  locations: LocationOption[]
+}) {
+  if (locations.length === 0) {
+    return <p className="text-sm text-muted-foreground">No locations configured yet.</p>
+  }
+
+  const isAllLocations = !locationAccess?.length
+  const grantedIds = new Set(locationAccess?.map((la) => la.locationId))
+
+  return (
+    <div className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2 md:grid-cols-3">
+      {locations.map((location) => {
+        const granted = isAllLocations || grantedIds.has(location.id)
+
+        return (
+          <div key={location.id} className="flex items-center gap-2 text-sm">
+            {granted ? (
+              <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+            ) : (
+              <X className="h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
+            <span className={cn(!granted && "text-muted-foreground")}>{location.name}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation"
 
 import { getKachaInvoiceById } from "@/lib/actions/kacha-invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
+import { getGstRates } from "@/lib/actions/gst-rate-actions"
 import { ConvertToPakkaForm } from "@/components/billing/kacha/convert-to-pakka-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
@@ -30,9 +31,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ConvertKachaToPakkaPage({ params }: Props) {
   const { id } = await params
 
-  const [kachaInvoice, businessSettings] = await Promise.all([
+  const [kachaInvoice, businessSettings, gstRates] = await Promise.all([
     getKachaInvoice(id),
     getBusinessSettings(),
+    getGstRates(),
   ])
 
   if (!kachaInvoice) notFound()
@@ -52,6 +54,7 @@ export default async function ConvertKachaToPakkaPage({ params }: Props) {
 
       <ConvertToPakkaForm
         kachaInvoice={kachaInvoice}
+        gstRates={gstRates}
         defaultGstRate={businessSettings.defaultGstRate}
       />
     </main>

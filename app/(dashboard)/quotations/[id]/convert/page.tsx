@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation"
 
 import { getQuotationById } from "@/lib/actions/quotation-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
+import { getGstRates } from "@/lib/actions/gst-rate-actions"
 import { ConvertToInvoiceForm } from "@/components/quotations/convert-to-invoice-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
@@ -30,9 +31,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ConvertQuotationToInvoicePage({ params }: Props) {
   const { id } = await params
 
-  const [quotation, businessSettings] = await Promise.all([
+  const [quotation, businessSettings, gstRates] = await Promise.all([
     getQuotation(id),
     getBusinessSettings(),
+    getGstRates(),
   ])
 
   if (!quotation) notFound()
@@ -43,6 +45,10 @@ export default async function ConvertQuotationToInvoicePage({ params }: Props) {
 
   const taxableAmount =
     quotation.subtotal + quotation.makingCharges + quotation.stoneCharges - quotation.discount
+  // Last-resort fallback (BusinessSettings.defaultGstRate) only used by the
+  // form when the store somehow has zero GstRate rows — the form otherwise
+  // seeds/recomputes this from whichever GstRate is picked, see
+  // convert-to-invoice-form.tsx.
   const defaultTaxAmount =
     Math.round(((taxableAmount * businessSettings.defaultGstRate) / 100) * 100) / 100
 
@@ -55,7 +61,11 @@ export default async function ConvertQuotationToInvoicePage({ params }: Props) {
         backLabel="Back to Quotation"
       />
 
-      <ConvertToInvoiceForm quotation={quotation} defaultTaxAmount={defaultTaxAmount} />
+      <ConvertToInvoiceForm
+        quotation={quotation}
+        gstRates={gstRates}
+        defaultTaxAmount={defaultTaxAmount}
+      />
     </main>
   )
 }

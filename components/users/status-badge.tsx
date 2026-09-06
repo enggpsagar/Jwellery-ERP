@@ -10,10 +10,21 @@ interface Props {
 export function StatusBadge({ status }: Props) {
   switch (status) {
     case UserStatus.ACTIVE:
-      return <Badge>Active</Badge>;
+      // Badge's own "default" variant is the app's primary color, not
+      // necessarily green — explicit here so Active always reads green,
+      // same convention as ActiveBadge elsewhere in the app.
+      return (
+        <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
+          Active
+        </Badge>
+      );
 
     case UserStatus.INVITED:
-      return <Badge variant="secondary">Invited</Badge>;
+      return (
+        <Badge className="border-amber-200 bg-amber-50 text-amber-700">
+          Invited
+        </Badge>
+      );
 
     case UserStatus.DISABLED:
       return <Badge variant="destructive">Disabled</Badge>;

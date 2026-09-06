@@ -3,7 +3,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Prisma, UserRole } from "@prisma/client";
+import { Prisma, UserRole, UserStatus } from "@prisma/client";
 import { ZodError } from "zod";
 
 import {
@@ -241,6 +241,7 @@ export type ExportUsersParams = {
   search?: string;
   sortBy?: string;
   sortOrder?: SortOrder;
+  status?: string;
 };
 
 export async function exportUsersToExcel(params: ExportUsersParams = {}): Promise<{
@@ -262,6 +263,7 @@ export async function exportUsersToExcel(params: ExportUsersParams = {}): Promis
       search: params.search,
       sortBy: params.sortBy as UserSortBy,
       sortOrder: params.sortOrder,
+      status: params.status as UserStatus | undefined,
     });
 
     if (!users.length) {
@@ -313,4 +315,32 @@ export async function deleteUserAction(id: string): Promise<UserActionState> {
     console.error("deleteUserAction error:", error);
     return { success: false, message: friendlyUserErrorMessage(error, "Failed to delete user") };
   }
+}
+
+export type BulkDeleteResult = {
+  deletedCount: number;
+  failures: { id: string; message: string }[];
+};
+
+/**
+ * Deletes each selected user through the exact same deleteUserAction() call
+ * a single-row delete uses — never a bare deleteMany — so a bulk selection
+ * can't bypass the permission check or any dependency guard just because
+ * several rows were ticked at once. Partial success is expected and
+ * reported per row, not treated as a whole-batch failure.
+ */
+export async function bulkDeleteUsers(ids: string[]): Promise<BulkDeleteResult> {
+  const failures: BulkDeleteResult["failures"] = [];
+  let deletedCount = 0;
+
+  for (const id of ids) {
+    const result = await deleteUserAction(id);
+    if (result.success) {
+      deletedCount++;
+    } else {
+      failures.push({ id, message: result.message });
+    }
+  }
+
+  return { deletedCount, failures };
 }

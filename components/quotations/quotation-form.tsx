@@ -29,6 +29,7 @@ import { LocationSelect } from "@/components/shared/location-select"
 import { PURITY_SELECT_OPTIONS, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 import { RequiredMark } from "@/components/shared/required-mark"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
+import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
 import { StockItemSelect } from "@/components/inventory/shared/stock-item-select"
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
@@ -150,8 +151,11 @@ type QuotationFormProps = {
    * `purity` and consulted before falling back to the linked metal's flat
    * StoreMetal.sellingPrice when prefilling a stock-linked line's Rate. */
   metalSellingRates: Partial<Record<PurityType, number>>
-  /** Store's default GST%, split into SGST+CGST (intra-state) or IGST
-   * (inter-state) via computeGst() — see lib/gst.ts. */
+  /** The store's configured GST rates (Settings > GST Rates) — see the
+   * same prop on InvoiceForm for the full explanation. */
+  gstRates: GstRateRow[]
+  /** Legacy last-resort fallback (BusinessSettings.defaultGstRate) — see
+   * the same prop on InvoiceForm. */
   defaultGstRate?: number
   /** Store's configured per-piece BIS hallmark charge (Settings > Hallmark
    * Charge) — auto-filled into a line's HM Charge the moment its Purity is
@@ -176,6 +180,7 @@ export function QuotationForm({
   origins: initialOrigins,
   caratConversionRates,
   metalSellingRates,
+  gstRates,
   defaultGstRate = 0,
   hallmarkChargePerPiece = 0,
   gstScheme,
@@ -206,9 +211,25 @@ export function QuotationForm({
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const [items, setItems] = useState<LineItem[]>([emptyLineItem()])
   const [discount, setDiscount] = useState(0)
-  // A Composition-scheme store can never charge GST — its rate starts (and
-  // stays) at 0 regardless of whatever Settings has saved as the default.
-  const [gstRate, setGstRate] = useState(gstScheme === "COMPOSITION" ? 0 : defaultGstRate)
+  // A Composition-scheme store can never charge GST — so no rate is
+  // selected at all regardless of the store's configured GST Rates.
+  const [gstRateId, setGstRateId] = useState<string>(() => {
+    if (gstScheme === "COMPOSITION") return ""
+    return (
+      gstRates.find((r) => r.isDefault && r.isActive)?.id ??
+      gstRates.find((r) => r.isActive)?.id ??
+      ""
+    )
+  })
+  const availableGstRates = useMemo(
+    () => gstRates.filter((r) => r.isActive || r.id === gstRateId),
+    [gstRates, gstRateId],
+  )
+  const selectedGstRate = gstRates.find((r) => r.id === gstRateId)
+  // The plain percent, still fed into computeGst() exactly as before — only
+  // where the number comes from changed.
+  const gstRate =
+    gstScheme === "COMPOSITION" ? 0 : (selectedGstRate?.ratePercent ?? defaultGstRate)
 
   const selectedCustomer = customers.find((customer) => customer.id === customerId)
 
@@ -493,6 +514,7 @@ export function QuotationForm({
       <input type="hidden" name="itemsJson" value={itemsJson} />
       <input type="hidden" name="discount" value={discount} />
       <input type="hidden" name="taxAmount" value={taxAmount} />
+      <input type="hidden" name="gstRateId" value={gstRateId} />
       <input type="hidden" name="sgstAmount" value={gstBreakdown.sgst} />
       <input type="hidden" name="cgstAmount" value={gstBreakdown.cgst} />
       <input type="hidden" name="igstAmount" value={gstBreakdown.igst} />
@@ -722,10 +744,13 @@ export function QuotationForm({
                   onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
                 />
 
-                {/* Once this is a composite line with "Includes a Stone"
-                    checked, Stone Charge moves down into that box, next to
-                    the Carat Weight/Rate it's computed from — see below. */}
-                {(isCaratLine(item) || !item.hasStoneComponent) && (
+                {/* For a carat-weighed line (no "Includes a Stone" toggle
+                    applies there at all), Stone Charge always shows here.
+                    For every other line, it's only ever visible once
+                    "Includes a Stone" is checked, inside that toggle's own
+                    box below — while off, no stone means nothing to charge
+                    for, so it stays fully hidden here. */}
+                {isCaratLine(item) && (
                   <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Stone Charge</Label>
                     <Input
@@ -767,10 +792,18 @@ export function QuotationForm({
                     onChange={(checked) =>
                       updateItem(item.key, {
                         hasStoneComponent: checked,
-                        // Net Stone Weight is now hidden once the toggle is
-                        // off — clear it so a hidden field can't silently
-                        // keep submitting whatever was last entered.
-                        ...(checked ? {} : { stoneWeightInput: 0, netStoneWeightTouched: false }),
+                        // Net Stone Weight and Stone Charge are now both
+                        // hidden once the toggle is off — clear them so a
+                        // hidden field can't silently keep submitting
+                        // whatever was last entered.
+                        ...(checked
+                          ? {}
+                          : {
+                              stoneWeightInput: 0,
+                              netStoneWeightTouched: false,
+                              stoneCharge: 0,
+                              stoneChargeTouched: false,
+                            }),
                       })
                     }
                   />
@@ -834,16 +867,25 @@ export function QuotationForm({
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <div className="flex items-center justify-between">
-            <Label>GST Rate %</Label>
+            <Label>GST Rate</Label>
             <GstSchemeBadge scheme={gstScheme} />
           </div>
-          <Input
-            type="number"
-            step="0.01"
-            value={gstRate === 0 ? "" : gstRate}
+          <Select
+            value={gstRateId || undefined}
             disabled={gstScheme === "COMPOSITION"}
-            onChange={(e) => setGstRate(Number(e.target.value) || 0)}
-          />
+            onValueChange={(value) => setGstRateId(value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select GST rate" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableGstRates.map((rate) => (
+                <SelectItem key={rate.id} value={rate.id}>
+                  {rate.name} ({rate.ratePercent}%)
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <p className="text-xs text-muted-foreground">
             {gstScheme === "COMPOSITION"
               ? "Not used — Composition Scheme never charges GST."

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Building2, Gem, Layers, MapPin, KeyRound } from "lucide-react";
+import { Building2, Gem, Layers, MapPin, KeyRound, Percent } from "lucide-react";
 
-type SettingsTab = "business" | "purity" | "taxonomy" | "locations" | "api-keys";
+type SettingsTab = "business" | "purity" | "taxonomy" | "locations" | "api-keys" | "gst-rates";
 
 type SettingsTabsProps = {
   active: SettingsTab;
@@ -22,6 +22,7 @@ const TABS: {
   { id: "taxonomy", href: "/settings/taxonomy", label: "Metals & Categories", icon: Layers, tint: "var(--chart-3)" },
   { id: "locations", href: "/settings/locations", label: "Locations", icon: MapPin, tint: "var(--chart-4)" },
   { id: "api-keys", href: "/settings/api-keys", label: "API Keys", icon: KeyRound, tint: "var(--chart-5)" },
+  { id: "gst-rates", href: "/settings/gst-rates", label: "GST Rates", icon: Percent, tint: "#0891b2" },
 ];
 
 export function SettingsTabs({ active }: SettingsTabsProps) {

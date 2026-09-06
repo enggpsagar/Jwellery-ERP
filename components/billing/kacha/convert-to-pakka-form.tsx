@@ -15,6 +15,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 
 const initialState: KachaInvoiceFormState = { success: false, message: "" }
 
@@ -43,11 +51,17 @@ type KachaInvoiceSummary = {
 
 type ConvertToPakkaFormProps = {
   kachaInvoice: KachaInvoiceSummary
+  /** The store's configured GST rates (Settings > GST Rates) — see the
+   * same prop on InvoiceForm for the full explanation. */
+  gstRates: GstRateRow[]
+  /** Legacy last-resort fallback (BusinessSettings.defaultGstRate) — see
+   * the same prop on InvoiceForm. */
   defaultGstRate: number
 }
 
 export function ConvertToPakkaForm({
   kachaInvoice,
+  gstRates,
   defaultGstRate,
 }: ConvertToPakkaFormProps) {
   const router = useRouter()
@@ -59,7 +73,17 @@ export function ConvertToPakkaForm({
     kachaInvoice.stoneCharges -
     kachaInvoice.discount
 
-  const [gstRate, setGstRate] = useState(defaultGstRate)
+  const [gstRateId, setGstRateId] = useState<string>(
+    () =>
+      gstRates.find((r) => r.isDefault && r.isActive)?.id ??
+      gstRates.find((r) => r.isActive)?.id ??
+      "",
+  )
+  const activeGstRates = useMemo(() => gstRates.filter((r) => r.isActive), [gstRates])
+  const selectedGstRate = gstRates.find((r) => r.id === gstRateId)
+  // The plain percent, still fed into the same tax math as before — only
+  // where the number comes from changed.
+  const gstRate = selectedGstRate?.ratePercent ?? defaultGstRate
   const [notes, setNotes] = useState(kachaInvoice.notes ?? "")
 
   const taxAmount = useMemo(
@@ -99,6 +123,7 @@ export function ConvertToPakkaForm({
       className="space-y-6"
     >
       <input type="hidden" name="taxAmount" value={taxAmount} />
+      <input type="hidden" name="gstRateId" value={gstRateId} />
 
       <div className="rounded-xl border bg-card p-6 space-y-4">
         <h2 className="text-lg font-semibold">From Kacha Slip {kachaInvoice.slipNumber}</h2>
@@ -146,13 +171,19 @@ export function ConvertToPakkaForm({
           </div>
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <Label>GST Rate (%)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={gstRate}
-              onChange={(e) => setGstRate(Number(e.target.value) || 0)}
-            />
+            <Label>GST Rate</Label>
+            <Select value={gstRateId || undefined} onValueChange={(value) => setGstRateId(value)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select GST rate" />
+              </SelectTrigger>
+              <SelectContent>
+                {activeGstRates.map((rate) => (
+                  <SelectItem key={rate.id} value={rate.id}>
+                    {rate.name} ({rate.ratePercent}%)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">

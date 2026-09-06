@@ -56,8 +56,13 @@ export default async function DashboardPage() {
       </div>
 
       {/* Sales — merged Today's Sales / Monthly Revenue into one section
-          with its own period filter, rather than two fixed-period cards. */}
-      <SalesSummaryCard initialData={salesTrend} initialPeriod={DEFAULT_SALES_TREND_PERIOD} />
+          with its own period filter, rather than two fixed-period cards.
+          Half-width at larger breakpoints — full width would leave this
+          small stat+sparkline card looking sparse next to the denser
+          sections below it. */}
+      <div className="lg:w-1/2">
+        <SalesSummaryCard initialData={salesTrend} initialPeriod={DEFAULT_SALES_TREND_PERIOD} />
+      </div>
 
       {/* KPI Cards */}
       <StatCards stats={stats} />

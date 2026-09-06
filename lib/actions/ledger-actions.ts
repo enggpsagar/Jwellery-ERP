@@ -160,7 +160,18 @@ export type KarigarLedgerResult = {
  * a running fine-metal balance (that metal currently out with the karigar),
  * computed by walking the entries once.
  */
-export async function getKarigarLedger(karigarId: string): Promise<KarigarLedgerResult> {
+/**
+ * `karigarName`, when passed, replaces the generic "Artisan Issue"/"Artisan
+ * Receipt" labels with "<name> Issue"/"<name> Receipt" — this is always one
+ * specific karigar's own ledger, so the generic word reads as impersonal
+ * next to their actual name (unlike the main cross-account /ledger page's
+ * own use of formatLedgerSource, which is left as-is: that view already has
+ * a separate Account column naming who each row belongs to).
+ */
+export async function getKarigarLedger(
+  karigarId: string,
+  karigarName?: string,
+): Promise<KarigarLedgerResult> {
   const storeId = await requireStoreScope()
 
   const entries = await prisma.ledgerEntry.findMany({
@@ -197,7 +208,12 @@ export async function getKarigarLedger(karigarId: string): Promise<KarigarLedger
       dateISO: entry.entryDate.toISOString(),
       date: formatDate(entry.entryDate),
       type: entry.type as "CREDIT" | "DEBIT",
-      sourceLabel: formatLedgerSource(entry.sourceType),
+      sourceLabel:
+        karigarName && entry.sourceType === "KARIGAR_ISSUE"
+          ? `${karigarName} Issue`
+          : karigarName && entry.sourceType === "KARIGAR_RECEIPT"
+            ? `${karigarName} Receipt`
+            : formatLedgerSource(entry.sourceType),
       createdByName: entry.createdBy?.name ?? null,
       description: entry.description ?? "",
       metalWeightFine,

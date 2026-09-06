@@ -10,7 +10,8 @@ import { UserDetailPanel } from "@/components/users/user-detail-panel";
 import { Button } from "@/components/ui/button";
 import { DataTableToolbar } from "@/components/shared/data-table-toolbar";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
-import { exportUsersToExcel } from "@/app/(dashboard)/users/actions";
+import { BulkDeleteButton } from "@/components/shared/bulk-delete-button";
+import { exportUsersToExcel, bulkDeleteUsers } from "@/app/(dashboard)/users/actions";
 
 import type { UserRole, UserStatus } from "@prisma/client";
 
@@ -70,8 +71,10 @@ export function UsersClient({
   const [activeUserId, setActiveUserId] = React.useState<string | null>(
     users[0]?.id ?? null,
   );
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
   React.useEffect(() => {
+    setSelectedIds([]);
     setActiveUserId((current) => {
       if (current && users.some((user) => user.id === current)) return current;
       return users[0]?.id ?? null;
@@ -110,8 +113,25 @@ export function UsersClient({
               { value: "role", label: "Sort by Role" },
             ]}
             defaultSortBy="createdAt"
+            hideSort
+            selectedIds={selectedIds}
             entityLabel="users"
             exportAction={exportUsersToExcel}
+            statusOptions={[
+              { value: "INVITED", label: "Invited" },
+              { value: "ACTIVE", label: "Active" },
+              { value: "DISABLED", label: "Disabled" },
+            ]}
+            bulkActions={
+              <BulkDeleteButton
+                selectedIds={selectedIds}
+                itemLabelSingular="user"
+                itemLabelPlural="users"
+                getDisplayName={(id) => users.find((user) => user.id === id)?.name ?? id}
+                onDelete={bulkDeleteUsers}
+                onDone={() => setSelectedIds([])}
+              />
+            }
           />
 
           <UserTable
@@ -121,6 +141,8 @@ export function UsersClient({
             allowSuperAdmin={allowSuperAdmin}
             activeUserId={activeUserId}
             onActivate={setActiveUserId}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
           />
 
           <div className="rounded-xl border">

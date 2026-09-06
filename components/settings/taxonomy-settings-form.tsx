@@ -70,8 +70,12 @@ export function TaxonomySettingsForm({
   return (
     <div className="space-y-6">
       <MetalsSection metals={metalRows} canEdit={canEdit} />
-      <StonesSection stones={stoneRows} canEdit={canEdit} />
-      <StoneTypesSection stones={stoneRows} canEdit={canEdit} />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <StonesSection stones={stoneRows} canEdit={canEdit} />
+        <StoneTypesSection stones={stoneRows} canEdit={canEdit} />
+      </div>
+
       <CategoriesSection categories={categories} canEdit={canEdit} />
       <TypesSection categories={categories} canEdit={canEdit} />
     </div>

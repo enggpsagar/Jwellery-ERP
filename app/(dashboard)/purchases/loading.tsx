@@ -7,7 +7,7 @@ export default function PurchasesLoading() {
     <div className="flex min-h-[400px] items-center justify-center">
       <div className="flex flex-col items-center gap-3">
 
-        <Loader className="h-8 w-8" />
+        <Loader className="h-24 w-24" />
 
         <p className="text-sm text-muted-foreground">
           Loading purchases...

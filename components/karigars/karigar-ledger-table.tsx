@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ArrowDown, ArrowUp, Search } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react"
 
 import type { KarigarLedgerRow, KarigarLedgerMetalGroup } from "@/lib/actions/ledger-actions"
 import { cn } from "@/lib/utils"
@@ -19,13 +19,6 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CASH: "Cash",
@@ -38,19 +31,9 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 
 const PAGE_SIZE = 10
 
-type SortKey = "date" | "metal" | "weight" | "amount" | "type"
-
-const FINANCIAL_SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "date", label: "Date" },
-  { value: "type", label: "Type" },
-  { value: "amount", label: "Amount" },
-]
-
-const MATERIAL_SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "date", label: "Date" },
-  { value: "metal", label: "Metal" },
-  { value: "weight", label: "Fine Weight" },
-]
+// No "metal" key — each side table only ever shows one metal at a time (the
+// active tab), so sorting rows by metal name within it would be a no-op.
+type SortKey = "date" | "weight" | "amount" | "type"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -74,8 +57,6 @@ function matchesSearch(row: KarigarLedgerRow, query: string) {
 
 function compareRows(a: KarigarLedgerRow, b: KarigarLedgerRow, sortKey: SortKey) {
   switch (sortKey) {
-    case "metal":
-      return (a.metalType ?? "").localeCompare(b.metalType ?? "")
     case "weight":
       return Math.abs(a.metalWeightFine ?? 0) - Math.abs(b.metalWeightFine ?? 0)
     case "amount":
@@ -124,45 +105,63 @@ function SearchInput({
   )
 }
 
-function SortControl({
+/**
+ * Clickable column header — client-state counterpart to
+ * shared/sortable-table-head.tsx (same arrow icons, same active/inactive
+ * text color), but driven by local sortKey/sortDir state instead of the
+ * `sortBy`/`sortOrder` URL params that one uses, since this whole ledger
+ * table sorts an in-memory row list rather than a server-paginated query.
+ * Clicking the already-active column toggles direction; clicking a
+ * different column switches to it without resetting direction — same
+ * behavior as the URL-based version.
+ */
+function SortableHead({
+  label,
   sortKey,
+  activeSortKey,
   sortDir,
-  onSortKeyChange,
-  onToggleDir,
-  options,
+  onSort,
+  align = "left",
+  className = "",
 }: {
+  label: string
   sortKey: SortKey
+  activeSortKey: SortKey
   sortDir: "asc" | "desc"
-  onSortKeyChange: (value: SortKey) => void
-  onToggleDir: () => void
-  options: { value: SortKey; label: string }[]
+  onSort: (key: SortKey) => void
+  align?: "left" | "right"
+  className?: string
 }) {
+  const isActive = activeSortKey === sortKey
+  const Icon = isActive ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
+
   return (
-    <div className="flex items-center gap-1.5">
-      <Select value={sortKey} onValueChange={(value) => onSortKeyChange(value as SortKey)}>
-        <SelectTrigger className="h-9 w-[150px]">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              Sort: {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Button
+    <TableHead className={cn(align === "right" ? "text-right" : undefined, className)}>
+      <button
         type="button"
-        variant="outline"
-        size="icon"
-        className="h-9 w-9 shrink-0"
-        onClick={onToggleDir}
-        title={sortDir === "asc" ? "Ascending — click for descending" : "Descending — click for ascending"}
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 hover:text-foreground ${
+          isActive ? "text-foreground" : "text-muted-foreground"
+        } ${align === "right" ? "flex-row-reverse" : ""}`}
       >
-        {sortDir === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-      </Button>
-    </div>
+        {label}
+        <Icon className="h-3.5 w-3.5" />
+      </button>
+    </TableHead>
   )
+}
+
+function toggleOrSwitchSort(
+  key: SortKey,
+  currentKey: SortKey,
+  setKey: (key: SortKey) => void,
+  setDir: (updater: (dir: "asc" | "desc") => "asc" | "desc") => void,
+) {
+  if (key === currentKey) {
+    setDir((d) => (d === "asc" ? "desc" : "asc"))
+  } else {
+    setKey(key)
+  }
 }
 
 function PaginationFooter({
@@ -269,6 +268,7 @@ function MaterialSideTable({
   search,
   sortKey,
   sortDir,
+  onSort,
 }: {
   title: string
   rows: KarigarLedgerRow[]
@@ -276,6 +276,7 @@ function MaterialSideTable({
   search: string
   sortKey: SortKey
   sortDir: "asc" | "desc"
+  onSort: (key: SortKey) => void
 }) {
   const [page, setPage] = useState(1)
 
@@ -310,10 +311,17 @@ function MaterialSideTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Date</TableHead>
+              <SortableHead label="Date" sortKey="date" activeSortKey={sortKey} sortDir={sortDir} onSort={onSort} />
               <TableHead>Source</TableHead>
               <TableHead>Description</TableHead>
-              <TableHead className="text-right">Fine Weight</TableHead>
+              <SortableHead
+                label="Fine Weight"
+                sortKey="weight"
+                activeSortKey={sortKey}
+                sortDir={sortDir}
+                onSort={onSort}
+                align="right"
+              />
             </TableRow>
           </TableHeader>
 
@@ -369,11 +377,13 @@ function MetalGroupSection({
   search,
   sortKey,
   sortDir,
+  onSort,
 }: {
   group: KarigarLedgerMetalGroup
   search: string
   sortKey: SortKey
   sortDir: "asc" | "desc"
+  onSort: (key: SortKey) => void
 }) {
   const issuedRows = group.rows.filter((row) => row.type === "DEBIT")
   const receivedRows = group.rows.filter((row) => row.type === "CREDIT")
@@ -399,6 +409,7 @@ function MetalGroupSection({
           search={search}
           sortKey={sortKey}
           sortDir={sortDir}
+          onSort={onSort}
         />
         <MaterialSideTable
           title="Material Received from Karigar"
@@ -407,6 +418,7 @@ function MetalGroupSection({
           search={search}
           sortKey={sortKey}
           sortDir={sortDir}
+          onSort={onSort}
         />
       </div>
 
@@ -513,6 +525,11 @@ export function KarigarLedgerTable({
     financialFilteredSorted.length === 0 ? 0 : (financialCurrentPage - 1) * PAGE_SIZE + 1
   const financialRangeEnd = Math.min(financialCurrentPage * PAGE_SIZE, financialFilteredSorted.length)
 
+  const handleMaterialSort = (key: SortKey) =>
+    toggleOrSwitchSort(key, materialSortKey, setMaterialSortKey, setMaterialSortDir)
+  const handleFinancialSort = (key: SortKey) =>
+    toggleOrSwitchSort(key, financialSortKey, setFinancialSortKey, setFinancialSortDir)
+
   if (variant === "material") {
     if (materialGroups.length === 0) {
       return (
@@ -548,26 +565,18 @@ export function KarigarLedgerTable({
           })}
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <SearchInput
-            value={materialSearch}
-            onChange={setMaterialSearch}
-            placeholder="Search description, source..."
-          />
-          <SortControl
-            sortKey={materialSortKey}
-            sortDir={materialSortDir}
-            onSortKeyChange={setMaterialSortKey}
-            onToggleDir={() => setMaterialSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-            options={MATERIAL_SORT_OPTIONS}
-          />
-        </div>
+        <SearchInput
+          value={materialSearch}
+          onChange={setMaterialSearch}
+          placeholder="Search description, source..."
+        />
 
         <MetalGroupSection
           group={activeGroup}
           search={materialSearch}
           sortKey={materialSortKey}
           sortDir={materialSortDir}
+          onSort={handleMaterialSort}
         />
       </div>
     )
@@ -588,30 +597,40 @@ export function KarigarLedgerTable({
         </CardContent>
       </Card>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <SearchInput
-          value={financialSearch}
-          onChange={setFinancialSearch}
-          placeholder="Search description, source..."
-        />
-        <SortControl
-          sortKey={financialSortKey}
-          sortDir={financialSortDir}
-          onSortKeyChange={setFinancialSortKey}
-          onToggleDir={() => setFinancialSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-          options={FINANCIAL_SORT_OPTIONS}
-        />
-      </div>
+      <SearchInput
+        value={financialSearch}
+        onChange={setFinancialSearch}
+        placeholder="Search description, source..."
+      />
 
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead>Date</TableHead>
-              <TableHead>Type</TableHead>
+              <SortableHead
+                label="Date"
+                sortKey="date"
+                activeSortKey={financialSortKey}
+                sortDir={financialSortDir}
+                onSort={handleFinancialSort}
+              />
+              <SortableHead
+                label="Type"
+                sortKey="type"
+                activeSortKey={financialSortKey}
+                sortDir={financialSortDir}
+                onSort={handleFinancialSort}
+              />
               <TableHead>Source</TableHead>
               <TableHead>Description</TableHead>
-              <TableHead className="text-right">Cash Amount</TableHead>
+              <SortableHead
+                label="Cash Amount"
+                sortKey="amount"
+                activeSortKey={financialSortKey}
+                sortDir={financialSortDir}
+                onSort={handleFinancialSort}
+                align="right"
+              />
               <TableHead className="text-right">Running Cash Balance</TableHead>
             </TableRow>
           </TableHeader>

@@ -41,10 +41,13 @@ function Row({
 export function StorePlanHover({
   storeName,
   overview,
+  disableLink,
 }: {
   storeName: string
   /** Absent if the ledger could not be read; the name then renders plain. */
   overview?: StorePlanOverview
+  /** In a master-detail list, the row click already activates the detail panel — this avoids a second, competing navigation. */
+  disableLink?: boolean
 }) {
   if (!overview) {
     return <span className="font-medium">{storeName}</span>
@@ -58,12 +61,16 @@ export function StorePlanHover({
         {/* A link, not a bare span: hovering is a shortcut, but the store
             page must still be reachable by click and by keyboard — and
             focus opens the card, so this works without a pointer. */}
-        <Link
-          href={`/stores/${overview.storeId}`}
-          className="font-medium underline-offset-4 hover:underline focus-visible:underline"
-        >
-          {storeName}
-        </Link>
+        {disableLink ? (
+          <span className="font-medium">{storeName}</span>
+        ) : (
+          <Link
+            href={`/stores/${overview.storeId}`}
+            className="font-medium underline-offset-4 hover:underline focus-visible:underline"
+          >
+            {storeName}
+          </Link>
+        )}
       </HoverCardTrigger>
 
       <HoverCardContent className="w-80">

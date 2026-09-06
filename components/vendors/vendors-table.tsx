@@ -1,13 +1,12 @@
 "use client"
 
-import Link from "next/link"
-
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import * as React from "react"
 import type { Vendor } from "@/lib/actions/vendor-actions"
 import { VendorRowActions } from "@/components/vendors/vendor-row-actions"
 import { VendorsPagination } from "@/components/vendors/vendors-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
+import { cn } from "@/lib/utils"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -39,6 +38,9 @@ type VendorsTableProps = {
   }
   selectedVendorIds: string[]
   onSelectionChange: (ids: string[]) => void
+  /** Which row's detail is showing in the panel alongside this table — distinct from selectedVendorIds, which is the bulk-action checkbox selection. */
+  activeVendorId?: string | null
+  onActivate?: (id: string) => void
 }
 
 export function VendorsTable({
@@ -47,6 +49,8 @@ export function VendorsTable({
   pagination,
   selectedVendorIds,
   onSelectionChange,
+  activeVendorId,
+  onActivate,
 }: VendorsTableProps) {
   const allIds = React.useMemo(() => vendors.map((vendor) => vendor.id), [vendors])
 
@@ -121,10 +125,19 @@ export function VendorsTable({
           <tbody>
             {vendors.map((vendor) => {
               const checked = selectedVendorIds.includes(vendor.id)
+              const isActive = activeVendorId === vendor.id
 
               return (
-                <tr key={vendor.id} className="border-t">
-                  <td className="px-4 py-3">
+                <tr
+                  key={vendor.id}
+                  onClick={() => onActivate?.(vendor.id)}
+                  className={cn(
+                    "border-t",
+                    onActivate && "cursor-pointer hover:bg-accent/50",
+                    isActive && "bg-accent",
+                  )}
+                >
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={checked}
@@ -137,7 +150,7 @@ export function VendorsTable({
                   <td className="px-4 py-3 font-medium text-foreground">
                     <RecordHoverCard
                       label={vendor.name}
-                      href={`/vendors/${vendor.id}`}
+                      href={onActivate ? undefined : `/vendors/${vendor.id}`}
                       title={vendor.name}
                       subtitle={vendor.vendorType ?? undefined}
                       footerLabel="View vendor"
@@ -183,7 +196,7 @@ export function VendorsTable({
                     ₹ {Number(vendor.openingBalance || 0).toLocaleString("en-IN")}
                   </td>
 
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <VendorRowActions vendor={vendor} states={states} />
                   </td>
                 </tr>

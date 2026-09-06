@@ -6,6 +6,7 @@ import { VendorsTable } from "@/components/vendors/vendors-table"
 import { VendorsToolbar } from "@/components/vendors/vendors-toolbar"
 import { Button } from "@/components/ui/button"
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
+import { VendorDetailPanel } from "@/components/vendors/vendor-detail-panel"
 import { bulkDeleteVendors, type Vendor } from "@/lib/actions/vendor-actions"
 
 type StateItem = {
@@ -32,9 +33,19 @@ export function VendorsClient({
   pagination,
 }: VendorsClientProps) {
   const [selectedVendorIds, setSelectedVendorIds] = React.useState<string[]>([])
+  // Which row's full detail shows in the right-hand panel — defaults to
+  // the first row on this page/search result so the panel is never empty
+  // on load, matching the Customers layout this mirrors.
+  const [activeVendorId, setActiveVendorId] = React.useState<string | null>(
+    vendors[0]?.id ?? null,
+  )
 
   React.useEffect(() => {
     setSelectedVendorIds([])
+    setActiveVendorId((current) => {
+      if (current && vendors.some((vendor) => vendor.id === current)) return current
+      return vendors[0]?.id ?? null
+    })
   }, [vendors])
 
   return (
@@ -72,13 +83,19 @@ export function VendorsClient({
         }
       />
 
-      <VendorsTable
-        vendors={vendors}
-        states={states}
-        pagination={pagination}
-        selectedVendorIds={selectedVendorIds}
-        onSelectionChange={setSelectedVendorIds}
-      />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
+        <VendorsTable
+          vendors={vendors}
+          states={states}
+          pagination={pagination}
+          selectedVendorIds={selectedVendorIds}
+          onSelectionChange={setSelectedVendorIds}
+          activeVendorId={activeVendorId}
+          onActivate={setActiveVendorId}
+        />
+
+        <VendorDetailPanel vendorId={activeVendorId} states={states} />
+      </div>
     </main>
   )
 }

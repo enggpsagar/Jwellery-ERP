@@ -19,6 +19,7 @@ import type { PlanRow } from "@/lib/actions/plan-actions"
 import type { StorePlanOverview } from "@/lib/actions/store-plan-actions"
 import { StorePlanHover } from "@/components/stores/store-plan-hover"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
+import { cn } from "@/lib/utils"
 
 type StoreRow = {
   id: string
@@ -72,12 +73,17 @@ export function StoreTable({
   planOverviews,
   selectedIds,
   onSelectionChange,
+  activeStoreId,
+  onActivate,
 }: {
   stores: StoreRow[]
   plans: PlanRow[]
   planOverviews: Record<string, StorePlanOverview>
   selectedIds: string[]
   onSelectionChange: (ids: string[]) => void
+  /** Which row's detail is showing in the panel alongside this table — distinct from selectedIds, which is the bulk-action checkbox selection. */
+  activeStoreId?: string | null
+  onActivate?: (id: string) => void
 }) {
   const allIds = stores.map((store) => store.id)
   const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.includes(id))
@@ -143,8 +149,15 @@ export function StoreTable({
             </TableRow>
           ) : (
             stores.map((store) => (
-              <TableRow key={store.id}>
-                <TableCell>
+              <TableRow
+                key={store.id}
+                onClick={() => onActivate?.(store.id)}
+                className={cn(
+                  onActivate && "cursor-pointer hover:bg-accent/50",
+                  activeStoreId === store.id && "bg-accent",
+                )}
+              >
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selectedIds.includes(store.id)}
@@ -157,6 +170,7 @@ export function StoreTable({
                   <StorePlanHover
                     storeName={store.name}
                     overview={planOverviews[store.id]}
+                    disableLink={Boolean(onActivate)}
                   />
                 </TableCell>
                 <TableCell>{store.code}</TableCell>
@@ -175,7 +189,7 @@ export function StoreTable({
                     <PlanStatusBadge planExpiresAt={store.planExpiresAt} />
                   </div>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-end gap-2">
                     <Link
                       href={`/stores/${store.id}`}

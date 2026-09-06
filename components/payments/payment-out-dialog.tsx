@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useActionState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Plus } from "lucide-react"
 
 import { recordPaymentOut, type PaymentFormState } from "@/lib/actions/payments-actions"
@@ -44,7 +44,10 @@ type PaymentOutDialogProps = {
  * flows never disagree.
  */
 export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
-  const [open, setOpen] = useState(false)
+  const searchParams = useSearchParams()
+  // Lets the sidebar's own "+" quick-add (?new=1) open this straight away,
+  // same as PaymentInDialog.
+  const [open, setOpen] = useState(() => searchParams.get("new") === "1")
   const [partyType, setPartyType] = useState<PartyType>("VENDOR")
   const [partyId, setPartyId] = useState("")
   const router = useRouter()

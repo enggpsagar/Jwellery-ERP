@@ -102,8 +102,8 @@ const mainNav: NavItem[] = [
     href: "/payments/in",
     icon: Wallet,
     items: [
-      { title: "Payment In", href: "/payments/in" },
-      { title: "Payment Out", href: "/payments/out" },
+      { title: "Payment In", href: "/payments/in", quickAddHref: "/payments/in?new=1", countKey: "paymentsIn" },
+      { title: "Payment Out", href: "/payments/out", quickAddHref: "/payments/out?new=1", countKey: "paymentsOut" },
     ],
   },
   {
@@ -425,6 +425,8 @@ const EMPTY_COUNTS: SidebarCounts = {
   invoices: 0,
   kachaInvoices: 0,
   creditNotes: 0,
+  paymentsIn: 0,
+  paymentsOut: 0,
   users: 0,
   stores: 0,
 };

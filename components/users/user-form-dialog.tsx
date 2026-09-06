@@ -23,6 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -459,9 +460,9 @@ export function UserFormDialog({
 
   if (asPage) {
     return (
-      <div className="mx-auto max-w-3xl rounded-xl border bg-card p-6 sm:p-8">
-        {formBody}
-      </div>
+      <Card>
+        <CardContent className="p-6">{formBody}</CardContent>
+      </Card>
     )
   }
 

@@ -1,3 +1,7 @@
+"use client"
+
+import { useState } from "react"
+
 import type { KarigarLedgerRow, KarigarLedgerMetalGroup } from "@/lib/actions/ledger-actions"
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 
@@ -165,9 +169,7 @@ function MetalGroupSection({ group }: { group: KarigarLedgerMetalGroup }) {
         : `Settled — no ${group.metalLabel} outstanding either way`
 
   return (
-    <div className="space-y-3 rounded-xl border p-4">
-      <h3 className="text-base font-semibold">{group.metalLabel}</h3>
-
+    <div className="space-y-3">
       <div className="flex flex-col gap-4 lg:flex-row">
         <MaterialSideTable
           title="Gold Given to Karigar"
@@ -215,6 +217,15 @@ export function KarigarLedgerTable({
   materialGroups,
   variant,
 }: KarigarLedgerTableProps) {
+  // One tab per metal actually used, so a karigar working several metals
+  // doesn't turn this page into one long vertical scroll — the first
+  // (most-active, see getKarigarLedger's own sort) metal is shown by
+  // default. Falls back to the first group if the previously-active one
+  // ever disappears from a refreshed list, rather than showing nothing.
+  const [activeMetalId, setActiveMetalId] = useState<string | null>(
+    () => materialGroups[0]?.metalTypeId ?? null,
+  )
+
   if (variant === "material") {
     if (materialGroups.length === 0) {
       return (
@@ -224,11 +235,33 @@ export function KarigarLedgerTable({
       )
     }
 
+    const activeGroup =
+      materialGroups.find((group) => group.metalTypeId === activeMetalId) ?? materialGroups[0]
+
     return (
-      <div className="space-y-4">
-        {materialGroups.map((group) => (
-          <MetalGroupSection key={group.metalTypeId ?? "unassigned"} group={group} />
-        ))}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap gap-2 border-b">
+          {materialGroups.map((group) => {
+            const key = group.metalTypeId ?? "unassigned"
+            const isActive = activeGroup.metalTypeId === group.metalTypeId
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setActiveMetalId(group.metalTypeId)}
+                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+                  isActive
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {group.metalLabel}
+              </button>
+            )
+          })}
+        </div>
+
+        <MetalGroupSection group={activeGroup} />
       </div>
     )
   }

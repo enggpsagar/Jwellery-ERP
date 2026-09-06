@@ -240,6 +240,7 @@ export function GlobalSearch() {
         <button
           type="button"
           aria-label="Search"
+          title="Search"
           onClick={() => setMobileOpen((v) => !v)}
           className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
@@ -269,6 +270,7 @@ export function GlobalSearch() {
               <button
                 type="button"
                 aria-label="Close search"
+                title="Close search"
                 onClick={() => {
                   setMobileOpen(false);
                   setOpen(false);

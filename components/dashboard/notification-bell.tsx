@@ -100,6 +100,7 @@ export function NotificationBell() {
           variant="outline"
           size="icon"
           className="relative text-[var(--chart-2)] hover:text-[var(--chart-2)]"
+          title="Notifications"
         >
           {/* Gold, from the chart palette's slot 2 — the same hue the gold
               KPI tile and gold bars use, so "gold" means one colour across

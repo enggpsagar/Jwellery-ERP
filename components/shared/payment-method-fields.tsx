@@ -224,6 +224,7 @@ export function PaymentMethodFields({ value, onChange, maxAmount }: PaymentMetho
               type="button"
               onClick={() => onChange({ attachmentUrl: "" })}
               className="text-muted-foreground hover:text-foreground"
+              title="Remove attachment"
             >
               <X className="h-3.5 w-3.5" />
               <span className="sr-only">Remove attachment</span>

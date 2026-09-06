@@ -120,6 +120,7 @@ const mainNav: NavItem[] = [
     href: "/purchases",
     icon: PackagePlus,
     countKey: "purchases",
+    quickAddHref: "/purchases/new",
   },
   {
     title: "Karigar",
@@ -133,6 +134,7 @@ const mainNav: NavItem[] = [
     href: "/quotations",
     icon: FileText,
     countKey: "quotations",
+    quickAddHref: "/quotations/new",
   },
   {
     title: "Billing",
@@ -163,6 +165,7 @@ const mainNav: NavItem[] = [
     href: "/stores",
     icon: Store,
     countKey: "stores",
+    quickAddHref: "/stores/new",
   },
   {
     title: "Plans",
@@ -318,7 +321,11 @@ function SidebarNavItem({
             notice — this item has no section chevron to share the row with. */}
         {item.quickAddHref && (
           <SidebarMenuAction asChild className={QUICK_ADD_HIGHLIGHT_CLASS}>
-            <Link href={item.quickAddHref} aria-label={`Add new ${item.title}`}>
+            <Link
+              href={item.quickAddHref}
+              title={`Add new ${item.title}`}
+              aria-label={`Add new ${item.title}`}
+            >
               <Plus className="h-4 w-4" />
             </Link>
           </SidebarMenuAction>
@@ -384,7 +391,11 @@ function SidebarNavItem({
                   appear, not just within one section. */}
               {subItem.quickAddHref && (
                 <SidebarMenuAction asChild className={NAV_CONTROL_CLASS}>
-                  <Link href={subItem.quickAddHref} aria-label={`Add new ${subItem.title}`}>
+                  <Link
+                    href={subItem.quickAddHref}
+                    title={`Add new ${subItem.title}`}
+                    aria-label={`Add new ${subItem.title}`}
+                  >
                     <Plus className="h-4 w-4" />
                   </Link>
                 </SidebarMenuAction>

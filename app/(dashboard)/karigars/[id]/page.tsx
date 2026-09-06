@@ -17,6 +17,7 @@ import { PageBackHeader } from "@/components/shared/page-back-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { IssueMaterialDialog } from "@/components/karigars/issue-material-dialog";
+import { ReceiveMaterialDialog } from "@/components/karigars/receive-material-dialog";
 import { RecordKarigarPaymentDialog } from "@/components/karigars/record-karigar-payment-dialog";
 import { KarigarLedgerTabs } from "@/components/karigars/karigar-ledger-tabs";
 import { KarigarStatusCard } from "@/components/karigars/karigar-status-card";
@@ -79,6 +80,12 @@ export default async function KarigarDetailPage({ params }: Props) {
         action={
           <div className="flex flex-wrap gap-2">
             <IssueMaterialDialog
+              karigarId={id}
+              metals={metals}
+              locations={locations}
+              defaultLocationId={defaultLocationId}
+            />
+            <ReceiveMaterialDialog
               karigarId={id}
               metals={metals}
               locations={locations}

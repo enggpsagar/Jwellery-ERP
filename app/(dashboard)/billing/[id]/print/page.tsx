@@ -127,31 +127,31 @@ export default async function InvoicePrintPage({ params }: Props) {
   const subtotal = invoice.totalAmount - invoice.taxAmount
 
   return (
-    <main className="mx-auto max-w-3xl space-y-4 p-6 text-xs text-black print:max-w-none print:w-full print:p-0 print:text-[9px]">
+    <main className="mx-auto max-w-3xl space-y-4 bg-white p-6 text-[13px] text-slate-900 print:max-w-none print:w-full print:p-0 print:text-[10px]">
       <style>{"@page { size: A4 portrait; margin: 10mm; }"}</style>
 
       <div className="flex justify-end print:hidden">
         <InvoicePrintButton />
       </div>
 
-      <div className="overflow-hidden rounded-lg border print:rounded-none">
+      <div className="overflow-hidden rounded-lg border-2 border-slate-800 bg-white print:rounded-none">
         {/* Contact bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 px-4 py-2 text-white">
           <div className="flex flex-wrap items-center gap-4">
             {settings.phone && (
               <span className="flex items-center gap-1.5">
-                <Phone className="h-3 w-3" /> {settings.phone}
+                <Phone className="h-3.5 w-3.5" /> {settings.phone}
               </span>
             )}
             {settings.email && (
               <span className="flex items-center gap-1.5">
-                <Mail className="h-3 w-3" /> {settings.email}
+                <Mail className="h-3.5 w-3.5" /> {settings.email}
               </span>
             )}
           </div>
           {businessAddressLines.length > 0 && (
             <span className="flex items-center gap-1.5 text-right">
-              <MapPin className="h-3 w-3 shrink-0" /> {businessAddressLines.join(", ")}
+              <MapPin className="h-3.5 w-3.5 shrink-0" /> {businessAddressLines.join(", ")}
             </span>
           )}
         </div>
@@ -159,28 +159,28 @@ export default async function InvoicePrintPage({ params }: Props) {
         {/* Business identity + document heading */}
         <div className="flex flex-wrap items-start justify-between gap-4 bg-slate-800 px-4 py-3 text-white">
           <div className="space-y-0.5">
-            <p className="text-base font-bold uppercase tracking-wide">{settings.businessName}</p>
-            {settings.gstNumber && <p className="text-[10px] text-slate-300">GSTIN: {settings.gstNumber}</p>}
+            <p className="text-lg font-bold uppercase tracking-wide">{settings.businessName}</p>
+            {settings.gstNumber && <p className="text-[11px] text-slate-200">GSTIN: {settings.gstNumber}</p>}
             {settings.state && (
-              <p className="text-[10px] text-slate-300">
+              <p className="text-[11px] text-slate-200">
                 State: {settings.stateCode ? `${settings.stateCode}-` : ""}
                 {settings.state}
               </p>
             )}
           </div>
           <div className="text-right">
-            <p className="text-lg font-semibold">{heading}</p>
+            <p className="text-xl font-bold">{heading}</p>
             {settings.gstScheme === "COMPOSITION" && (
-              <p className="max-w-[220px] text-[9px] italic text-slate-300">{COMPOSITION_DISCLAIMER}</p>
+              <p className="max-w-[220px] text-[10px] italic text-slate-200">{COMPOSITION_DISCLAIMER}</p>
             )}
           </div>
         </div>
 
         {/* Bill To / invoice meta */}
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b p-4">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-slate-300 p-4">
           <div className="space-y-0.5">
-            <p className="font-medium text-indigo-700">Bill To:</p>
-            <p className="text-sm font-bold">{invoice.customer?.name ?? "-"}</p>
+            <p className="font-semibold text-indigo-700">Bill To:</p>
+            <p className="text-base font-bold">{invoice.customer?.name ?? "-"}</p>
             {customerAddressLines.map((line, index) => (
               <p key={index}>{line}</p>
             ))}
@@ -206,10 +206,15 @@ export default async function InvoicePrintPage({ params }: Props) {
           </div>
         </div>
 
-        {/* Line items */}
+        {/* Line items. Every th/td below overrides globals.css's site-wide
+            `table thead th` rule (small-caps, muted-gray, tracked) — that
+            rule sets `color` directly on every `th`, which always wins over
+            an inherited color from a parent's `text-white` class, so it has
+            to be beaten explicitly or the header reads as barely-visible
+            gray-on-indigo. */}
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-indigo-600 text-white [&>th]:p-2 [&>th]:text-left [&>th]:font-semibold">
+            <tr className="bg-indigo-600 [&>th]:border [&>th]:border-indigo-400 [&>th]:p-2 [&>th]:text-left [&>th]:align-middle [&>th]:text-[11px] [&>th]:font-semibold [&>th]:normal-case [&>th]:tracking-normal [&>th]:whitespace-normal [&>th]:text-white">
               <th className="w-6">#</th>
               <th>Item name</th>
               <th>HSN/ SAC</th>
@@ -225,7 +230,10 @@ export default async function InvoicePrintPage({ params }: Props) {
               const { qty, unit, pricePerUnit } = lineQuantity(item)
               const { amount: gstAmount, percent: gstPercent } = lineGst(item)
               return (
-                <tr key={item.id} className="border-b [&>td]:p-2 align-top">
+                <tr
+                  key={item.id}
+                  className="[&>td]:border [&>td]:border-slate-300 [&>td]:p-2 align-top odd:bg-white even:bg-slate-50"
+                >
                   <td>{index + 1}</td>
                   <td className="font-medium">{item.itemName}</td>
                   <td>{item.hsnCode ?? "-"}</td>
@@ -241,7 +249,7 @@ export default async function InvoicePrintPage({ params }: Props) {
                 </tr>
               )
             })}
-            <tr className="bg-indigo-50 font-semibold [&>td]:p-2">
+            <tr className="bg-indigo-100 font-semibold [&>td]:border [&>td]:border-slate-300 [&>td]:p-2">
               <td colSpan={3} className="text-right">
                 Total
               </td>
@@ -290,24 +298,24 @@ export default async function InvoicePrintPage({ params }: Props) {
             </div>
           </div>
 
-          <div className="justify-self-end w-full max-w-[260px] overflow-hidden rounded-md border">
-            <div className="flex justify-between border-b p-1.5">
+          <div className="justify-self-end w-full max-w-[260px] overflow-hidden rounded-md border-2 border-slate-300">
+            <div className="flex justify-between border-b border-slate-300 p-1.5">
               <span>Sub Total</span>
               <span>₹{fmt(subtotal)}</span>
             </div>
             {sortedRateGroups.map((group) =>
               isInterState ? (
-                <div key={group.percent} className="flex justify-between border-b p-1.5">
+                <div key={group.percent} className="flex justify-between border-b border-slate-300 p-1.5">
                   <span>IGST@{group.percent}%</span>
                   <span>₹{fmt(group.igst)}</span>
                 </div>
               ) : (
-                <div key={group.percent} className="flex flex-col border-b">
+                <div key={group.percent} className="flex flex-col border-b border-slate-300">
                   <div className="flex justify-between p-1.5">
                     <span>SGST@{(group.percent / 2).toFixed(2)}%</span>
                     <span>₹{fmt(group.sgst)}</span>
                   </div>
-                  <div className="flex justify-between border-t p-1.5">
+                  <div className="flex justify-between border-t border-slate-300 p-1.5">
                     <span>CGST@{(group.percent / 2).toFixed(2)}%</span>
                     <span>₹{fmt(group.cgst)}</span>
                   </div>
@@ -318,11 +326,11 @@ export default async function InvoicePrintPage({ params }: Props) {
               <span>Total</span>
               <span>₹{fmt(invoice.totalAmount)}</span>
             </div>
-            <div className="flex justify-between border-b p-1.5">
+            <div className="flex justify-between border-b border-slate-300 p-1.5">
               <span>Received</span>
               <span>₹{fmt(invoice.paidAmount)}</span>
             </div>
-            <div className="flex justify-between p-1.5 font-medium text-red-600">
+            <div className="flex justify-between p-1.5 font-bold text-red-600">
               <span>Balance</span>
               <span>₹{fmt(invoice.balanceAmount)}</span>
             </div>
@@ -334,7 +342,7 @@ export default async function InvoicePrintPage({ params }: Props) {
           invoice.vehicleNumber ||
           invoice.transportMode ||
           invoice.distanceKm) && (
-          <div className="border-t p-4">
+          <div className="border-t-2 border-slate-300 p-4">
             <p className="font-semibold">E-way Bill</p>
             <div className="grid grid-cols-3 gap-x-4">
               {invoice.ewayBillNumber && <span>E-way Bill No: {invoice.ewayBillNumber}</span>}
@@ -352,14 +360,14 @@ export default async function InvoicePrintPage({ params }: Props) {
         )}
 
         {invoice.notes && (
-          <div className="border-t p-4">
+          <div className="border-t-2 border-slate-300 p-4">
             <p className="font-semibold">Notes</p>
             <p className="whitespace-pre-wrap">{invoice.notes}</p>
           </div>
         )}
 
         {settings.invoiceTerms && (
-          <div className="border-t p-4">
+          <div className="border-t-2 border-slate-300 p-4">
             <p className="font-semibold">Terms & Conditions</p>
             <p className="whitespace-pre-wrap">{settings.invoiceTerms}</p>
           </div>

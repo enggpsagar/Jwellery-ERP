@@ -807,7 +807,11 @@ export function PurchaseForm({
       <input type="hidden" name="paidAmount" value={paidAmount} />
       <input type="hidden" name="paymentsJson" value={paymentsJson} />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* All four fields on one row instead of Vendor/Date filling row one
+          and Invoice Number/Location wrapping to a half-empty row two —
+          Vendor keeps extra width (2 of 5 columns) since it also carries
+          the GST Type hint text below it. */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <div className="space-y-2 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Vendor <RequiredMark /></Label>
           <VendorSelect

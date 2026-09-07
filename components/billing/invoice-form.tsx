@@ -1630,9 +1630,9 @@ export function InvoiceForm({
         </div>
       </div>
 
-      {/* Side by side rather than stacked — both are narrow, single-purpose
-          fields with no reason to each claim a full row of vertical space. */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {/* Side by side rather than stacked — narrow, single-purpose fields
+          with no reason to each claim a full row of vertical space. */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="space-y-2">
           <PercentOrFlatInput
             base={subtotal + makingChargesTotal + stoneChargesTotal}
@@ -1658,11 +1658,11 @@ export function InvoiceForm({
             maxAmount={totalAmount > 0 ? totalAmount : undefined}
           />
         )}
-      </div>
 
-      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-        <Label>Notes</Label>
-        <Textarea name="notes" rows={2} defaultValue={defaultNotes} />
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <Label>Notes</Label>
+          <Textarea name="notes" rows={2} defaultValue={defaultNotes} />
+        </div>
       </div>
 
       <div className="rounded-lg border bg-muted/30 p-4 space-y-1 text-sm">

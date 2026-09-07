@@ -56,7 +56,6 @@ export default async function NewPurchasePage() {
             caratConversionRates={caratConversionRates}
             gstRates={gstRates}
             defaultGstRate={businessSettings.defaultGstRate}
-            gstScheme={businessSettings.gstScheme}
             storeState={businessSettings.state}
             initialLocationId={defaultLocationId}
           />

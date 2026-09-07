@@ -1172,14 +1172,20 @@ model Purchase {
   // store can never claim ITC on anything, no matter what a vendor charged
   // - see the "ITC not eligible" note rendered wherever this purchase is
   // shown (isItcEligible() in lib/gst.ts).
+  // Document-level totals, now derived by summing every PurchaseItem's own
+  // sgst/cgst/igst — GST is picked per line, not once for the whole
+  // purchase (see PurchaseItem.gstRateId's own doc comment), the same
+  // change Invoice went through first.
   taxAmount           Decimal        @default(0) @db.Decimal(12, 2)
   sgstAmount          Decimal        @default(0) @db.Decimal(12, 2)
   cgstAmount          Decimal        @default(0) @db.Decimal(12, 2)
   igstAmount          Decimal        @default(0) @db.Decimal(12, 2)
-  // Which configured GstRate (Settings > GST Rates) was picked, snapshotted
-  // at the time — see GstRate's own doc comment. Nullable: a purchase
-  // raised before this field existed, or one where the vendor charges no
-  // GST at all (isVendorGstApplicable), has none.
+  // Legacy snapshot only — no longer a real user-facing selection (each
+  // line resolves its own via PurchaseItem.gstRateId instead). Kept for
+  // whatever historical purchases and reports still read it, same as
+  // Invoice's own now-legacy gstRateId trio. Nullable: a purchase raised
+  // before this field existed, or one where the vendor charges no GST at
+  // all (isVendorGstApplicable), has none.
   gstRateId           String?
   gstRateName         String?
   gstRatePercent      Decimal?       @db.Decimal(5, 2)
@@ -1239,6 +1245,20 @@ model PurchaseItem {
   // Product.hsnCode can change later, and this line might not even have a
   // linked product yet at the time of entry.
   hsnCode            String?
+  sgstAmount         Decimal         @default(0) @db.Decimal(12, 2)
+  cgstAmount         Decimal         @default(0) @db.Decimal(12, 2)
+  // Charged instead of sgst+cgst on an inter-state purchase — see
+  // computePurchaseGst() in lib/gst.ts. Never both nonzero on the same line.
+  igstAmount         Decimal         @default(0) @db.Decimal(12, 2)
+  // Which configured GstRate (Settings > GST Rates) THIS line uses — GST is
+  // picked per line, not once for the whole purchase (a single vendor bill
+  // can genuinely mix rates across items), mirroring
+  // InvoiceItem.gstRateId's own doc comment. Nullable: a line saved before
+  // this field existed, or one where the vendor isn't GST-applicable
+  // (isVendorGstApplicable), has none.
+  gstRateId          String?
+  gstRateName        String?
+  gstRatePercent     Decimal?        @db.Decimal(5, 2)
   lineTotal          Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId   String?
   createdAt          DateTime        @default(now())
@@ -1246,10 +1266,12 @@ model PurchaseItem {
   product            Product         @relation(fields: [productId], references: [id])
   inventoryStock     InventoryStock? @relation(fields: [inventoryStockId], references: [id])
   metalType          StoreMetal?     @relation(fields: [metalTypeId], references: [id])
+  gstRate            GstRate?        @relation(fields: [gstRateId], references: [id])
 
   @@index([purchaseId])
   @@index([productId])
   @@index([inventoryStockId])
+  @@index([gstRateId])
 }
 
 model PurityFineness {
@@ -1343,10 +1365,11 @@ model GstRate {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   store        Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  invoices     Invoice[]
-  invoiceItems InvoiceItem[]
-  purchases    Purchase[]
-  quotations   Quotation[]
+  invoices      Invoice[]
+  invoiceItems  InvoiceItem[]
+  purchases     Purchase[]
+  purchaseItems PurchaseItem[]
+  quotations    Quotation[]
 
   @@unique([storeId, name])
   @@index([storeId])

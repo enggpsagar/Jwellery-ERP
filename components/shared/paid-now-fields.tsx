@@ -1,5 +1,8 @@
 "use client"
 
+import { Plus } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
   PaymentMethodFields,
@@ -50,13 +53,15 @@ export function PaidNowFields({ rows, onRowsChange, maxAmount }: PaidNowFieldsPr
       <div className="space-y-2">
         <Label>Paid Now</Label>
         <div>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => onRowsChange([emptyPaymentMethodValue()])}
-            className="text-sm text-primary hover:underline"
           >
-            + Record a payment received now
-          </button>
+            <Plus className="mr-1 h-4 w-4" />
+            Record a payment received now
+          </Button>
         </div>
         <p className="text-xs text-muted-foreground">
           Leave this blank for a fully on-credit document.

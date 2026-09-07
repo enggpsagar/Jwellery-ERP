@@ -153,7 +153,7 @@ export function ScanToAddPanel({
 
           <div className="flex flex-wrap gap-2">
             {onAddManualItem ? (
-              <Button type="button" variant="outline" onClick={onAddManualItem}>
+              <Button type="button" variant="ghost" onClick={onAddManualItem}>
                 <Plus className="mr-1.5 size-4" />
                 Add Item
               </Button>

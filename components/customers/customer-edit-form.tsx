@@ -135,15 +135,17 @@ export function CustomerEditForm({
           }}
           className="grid gap-5 md:grid-cols-2"
         >
-          <div className="space-y-1 md:col-span-2 rounded-lg border bg-muted/20 p-4 transition-colors focus-within:bg-accent/40">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <Hash className="h-4 w-4 text-muted-foreground" />
-              GST Number {gstinRequiredNow ? <RequiredMark /> : null}
-            </label>
-            <GstSchemeBadge scheme={gstScheme} />
-            {gstScheme !== "COMPOSITION" ? (
-              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
-            ) : null}
+          <div className="space-y-2 md:col-span-2 rounded-lg border bg-muted/20 p-4 transition-colors focus-within:bg-accent/40">
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <Hash className="h-4 w-4 text-muted-foreground" />
+                GST Number {gstinRequiredNow ? <RequiredMark /> : null}
+                <GstSchemeBadge scheme={gstScheme} />
+              </label>
+              {gstScheme !== "COMPOSITION" ? (
+                <PartyGstTypeSelect value={gstType} onChange={setGstType} />
+              ) : null}
+            </div>
             <input
               name="gstNumber"
               className={FIELD}
@@ -151,11 +153,6 @@ export function CustomerEditForm({
               placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : undefined}
               required={gstinRequiredNow}
             />
-            {gstinRequiredNow ? (
-              <p className="text-xs text-muted-foreground">
-                GSTIN is required for a valid B2B tax invoice to this customer.
-              </p>
-            ) : null}
           </div>
 
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -213,16 +210,26 @@ export function CustomerEditForm({
             />
           </div>
 
-          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
             </label>
             <textarea
               name="address"
-              className={`${FIELD} min-h-9 resize-y`}
-              rows={1}
+              className={`${FIELD} min-h-24 resize-y`}
+              rows={4}
               defaultValue={customer.address ?? ""}
+            />
+          </div>
+
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+            <label className="text-sm font-medium">Notes</label>
+            <textarea
+              name="notes"
+              className={`${FIELD} min-h-24 resize-y`}
+              rows={4}
+              defaultValue={customer.notes ?? ""}
             />
           </div>
 
@@ -351,16 +358,6 @@ export function CustomerEditForm({
               step="0.01"
               className={FIELD}
               defaultValue={customer.openingBalance ?? 0}
-            />
-          </div>
-
-          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <label className="text-sm font-medium">Notes</label>
-            <textarea
-              name="notes"
-              className={`${FIELD} min-h-24 resize-y`}
-              rows={4}
-              defaultValue={customer.notes ?? ""}
             />
           </div>
 

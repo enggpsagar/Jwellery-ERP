@@ -77,6 +77,7 @@ export function DraftOrdersClient({
           searchPlaceholder="Search by order number, customer..."
           sortOptions={SORT_OPTIONS}
           defaultSortBy="orderDate"
+          hideSort
           statusOptions={STATUS_OPTIONS}
           selectedIds={selectedIds}
           entityLabel="draft orders"

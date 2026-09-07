@@ -641,7 +641,7 @@ export async function getCustomerReturnableInvoices(
   });
 
   const refundable =
-    settings.returnWindowDays > 0
+    settings.returnWindowEnabled && settings.returnWindowDays > 0
       ? invoices
           .filter(
             (invoice) =>

@@ -1675,11 +1675,20 @@ model BusinessSettings {
   // verify/correct this figure, not present it as an authoritative rate.
   hallmarkChargePerPiece Decimal @default(45) @db.Decimal(12, 2)
 
+  // Whether the return window policy is active at all — a store can turn
+  // returns off entirely without losing whatever returnWindowDays it had
+  // configured (re-enabling later restores the same day count, rather than
+  // the old "set days to 0" convention that couldn't distinguish "always
+  // ineligible" from "policy not offered"). Every consumer of
+  // returnWindowDays (invoice detail page, customer ledger's Refund/Replace
+  // pickers, createCreditNote's server-side gate) checks this alongside the
+  // day count.
+  returnWindowEnabled Boolean @default(true)
   // How many days after invoiceDate a sold item may still be returned via a
   // Credit Note — see CreditNote and lib/actions/credit-note-actions.ts'
   // isReturnEligible(). A store-wide figure (not per-product/category) by
   // design: this is a policy the whole store states to every customer, not
-  // a per-item attribute.
+  // a per-item attribute. Only enforced when returnWindowEnabled is true.
   returnWindowDays Int @default(30)
 
   // Financial year

@@ -44,9 +44,14 @@ export type BusinessSettings = {
   // default is a placeholder that needs store confirmation, not a
   // guaranteed-current government rate.
   hallmarkChargePerPiece: number;
+  // Whether the return window policy is switched on at all — see
+  // prisma/schema.prisma's BusinessSettings.returnWindowEnabled doc comment.
+  // Every consumer of returnWindowDays below must also check this.
+  returnWindowEnabled: boolean;
   // How many days after invoiceDate a sold item may still be returned via a
   // Credit Note — see prisma/schema.prisma's BusinessSettings.returnWindowDays
-  // doc comment and lib/return-window.ts's getReturnEligibility().
+  // doc comment and lib/return-window.ts's getReturnEligibility(). Only
+  // enforced when returnWindowEnabled is true.
   returnWindowDays: number;
   financialYearStartMonth: number;
   // Each entry is "MONEY" or a live StoreMetal.id — see
@@ -101,6 +106,7 @@ function mapSettings(settings: any): BusinessSettings {
     bankAccountHolderName: settings.bankAccountHolderName ?? "",
     defaultGstRate: Number(settings.defaultGstRate ?? 3.0),
     hallmarkChargePerPiece: Number(settings.hallmarkChargePerPiece ?? 45),
+    returnWindowEnabled: settings.returnWindowEnabled ?? true,
     returnWindowDays: settings.returnWindowDays ?? 30,
     financialYearStartMonth: settings.financialYearStartMonth ?? 4,
     businessUnits: settings.businessUnits?.length
@@ -257,6 +263,7 @@ export async function updateBusinessSettings(
           formData.get("hallmarkChargePerPiece"),
           45,
         ),
+        returnWindowEnabled: formData.get("returnWindowEnabled") === "on",
         returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),
@@ -294,6 +301,7 @@ export async function updateBusinessSettings(
           formData.get("hallmarkChargePerPiece"),
           45,
         ),
+        returnWindowEnabled: formData.get("returnWindowEnabled") === "on",
         returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),

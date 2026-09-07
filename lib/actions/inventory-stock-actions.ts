@@ -689,6 +689,11 @@ export async function receiveItemsFromKarigar(
     let cumulativeReceiveWeight = 0;
     let issueWeightNum = 0;
 
+    // Default interactive-transaction timeout is 5s — this per-item loop
+    // (possible Product create, InventoryStock create, InventoryTransaction
+    // create, KarigarReceiptItem create) can exceed that on a multi-item
+    // receipt over a real (non-local) DB connection and throw P2028
+    // ("Transaction not found"). Same fix as the sale-document transactions.
     await prisma.$transaction(async (tx) => {
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
@@ -892,7 +897,7 @@ export async function receiveItemsFromKarigar(
           },
         });
       }
-    });
+    }, { timeout: 15000 });
 
     revalidatePath("/karigars");
     revalidatePath(`/karigars/${job.karigarId}`);

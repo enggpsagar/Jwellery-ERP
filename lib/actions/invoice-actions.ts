@@ -1020,6 +1020,11 @@ export async function createInvoice(
     // array has to be plain objects, not promises.
     const perLineGstRateSnapshots = await resolvePerLineGstRateSnapshots(storeId, items);
 
+    // Default interactive-transaction timeout is 5s — a multi-line invoice
+    // does several sequential awaits per item (stock update, ledger entry,
+    // inventory transaction) inside this one callback, which reliably blows
+    // past 5s and throws P2028 ("Transaction not found") on a real (non-local)
+    // DB connection. Same fix as createPurchase's identical transaction.
     const invoice = await prisma.$transaction(async (tx) => {
       const created = await tx.invoice.create({
         data: {
@@ -1195,7 +1200,7 @@ export async function createInvoice(
       }
 
       return created;
-    });
+    }, { timeout: 15000 });
 
     revalidatePath("/billing");
 
@@ -1508,6 +1513,9 @@ export async function updateInvoice(
     // array has to be plain objects, not promises.
     const perLineGstRateSnapshots = await resolvePerLineGstRateSnapshots(storeId, items);
 
+    // Same P2028 risk as createInvoice's transaction — two per-item loops
+    // (restore old lines' stock, then apply the new lines') easily exceed
+    // the default 5s interactive-transaction timeout on a multi-line edit.
     await prisma.$transaction(async (tx) => {
       // 1. Restore every old line's stock first — same as cancelInvoice.
       for (const item of invoice.items) {
@@ -1677,7 +1685,7 @@ export async function updateInvoice(
           },
         });
       }
-    });
+    }, { timeout: 15000 });
 
     revalidatePath("/billing");
     revalidatePath(`/billing/${id}`);
@@ -1897,6 +1905,9 @@ export async function cancelInvoice(
     const cancellationReason = String(formData.get("cancellationReason") || "").trim() || null;
     const balanceAmount = Number(invoice.balanceAmount);
 
+    // Same P2028 risk as createInvoice/updateInvoice — a per-item restore
+    // loop can exceed the default 5s interactive-transaction timeout on a
+    // multi-line invoice.
     await prisma.$transaction(async (tx) => {
       for (const item of invoice.items) {
         if (!item.inventoryStockId) continue;
@@ -1973,7 +1984,7 @@ export async function cancelInvoice(
           cancellationReason,
         },
       });
-    });
+    }, { timeout: 15000 });
 
     revalidatePath("/billing");
     revalidatePath(`/billing/${id}`);

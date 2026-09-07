@@ -727,6 +727,10 @@ export async function convertQuotationToInvoice(
 
     const invoiceNumber = await generateInvoiceNumber(storeId);
 
+    // Default interactive-transaction timeout is 5s — the per-item stock
+    // lookup+decrement loop below can exceed that on a multi-line quotation
+    // over a real (non-local) DB connection and throw P2028 ("Transaction
+    // not found"). Same fix as createInvoice/createPurchase's transactions.
     const invoice = await prisma.$transaction(async (tx) => {
       const created = await tx.invoice.create({
         data: {
@@ -842,7 +846,7 @@ export async function convertQuotationToInvoice(
       });
 
       return created;
-    });
+    }, { timeout: 15000 });
 
     revalidatePath("/quotations");
     revalidatePath(`/quotations/${quotationId}`);

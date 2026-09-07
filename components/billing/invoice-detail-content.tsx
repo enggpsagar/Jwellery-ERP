@@ -79,11 +79,6 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowDays }:
             </div>
           </div>
 
-          <div>
-            <p className="text-sm text-muted-foreground">Invoice Date</p>
-            <p className="font-medium">{formatShortDate(invoice.invoiceDate)}</p>
-          </div>
-
           {invoice.dueDate && (
             <div>
               <p className="text-sm text-muted-foreground">Due Date</p>

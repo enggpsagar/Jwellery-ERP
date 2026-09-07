@@ -306,6 +306,7 @@ function mapPurchase(purchase: any) {
     paidAmount: Number(purchase.paidAmount),
     balanceAmount: Number(purchase.balanceAmount),
     notes: purchase.notes,
+    locationId: purchase.locationId ?? null,
     vendor: purchase.vendor
       ? {
           id: purchase.vendor.id,
@@ -344,6 +345,8 @@ function mapPurchase(purchase: any) {
     })),
   };
 }
+
+export type Purchase = ReturnType<typeof mapPurchase>;
 
 export type PurchaseSortBy = "purchaseDate" | "purchaseNumber" | "totalAmount";
 
@@ -1033,6 +1036,64 @@ export async function recordPurchasePayment(
   } catch (error) {
     console.error("recordPurchasePayment error:", error);
     return { success: false, message: "Failed to record payment" };
+  }
+}
+
+/**
+ * Purchase date, vendor invoice number, store location, and notes are
+ * editable here — no vendor, line items, or amounts. Once stock is created
+ * and ledger entries posted, changing those needs the same
+ * restore-old-stock/reapply-new-stock/reconcile-ledger reversal logic
+ * updateInvoice's own line-item branch uses, not a quiet in-place edit —
+ * mirrors EditInvoiceDialog's identically-scoped metadata-only edit.
+ * Available regardless of payment status (any non-deleted purchase), since
+ * none of these fields affect stock or money.
+ */
+export async function updatePurchase(
+  id: string,
+  prevState: PurchaseFormState = initialState,
+  formData: FormData,
+): Promise<PurchaseFormState> {
+  try {
+    try {
+      await requirePermission(PERMISSIONS.PURCHASE_UPDATE);
+    } catch {
+      return { success: false, message: "You do not have permission to edit purchases." };
+    }
+
+    const storeId = await requireStoreScope();
+    const purchase = await prisma.purchase.findFirst({ where: { id, storeId } });
+    if (!purchase) return { success: false, message: "Purchase not found" };
+
+    const purchaseDateRaw = String(formData.get("purchaseDate") || "");
+    const vendorInvoiceNumber = String(formData.get("vendorInvoiceNumber") || "").trim() || null;
+    const notes = String(formData.get("notes") || "").trim() || null;
+    const locationId = String(formData.get("locationId") || "").trim() || null;
+
+    const locationScope = await getLocationScope();
+    const locationResolution = await resolveWritableLocationId(storeId, locationId, locationScope);
+    if (!locationResolution.ok) {
+      return { success: false, message: locationResolution.message };
+    }
+    const resolvedLocationId = locationResolution.locationId;
+
+    await prisma.purchase.update({
+      where: { id },
+      data: {
+        purchaseDate: purchaseDateRaw ? new Date(purchaseDateRaw) : purchase.purchaseDate,
+        vendorInvoiceNumber,
+        notes,
+        locationId: resolvedLocationId ?? null,
+      },
+    });
+
+    revalidatePath("/purchases");
+    revalidatePath(`/purchases/${id}`);
+
+    return { success: true, message: "Purchase updated" };
+  } catch (error) {
+    console.error("updatePurchase error:", error);
+    return { success: false, message: "Failed to update purchase" };
   }
 }
 

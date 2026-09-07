@@ -356,7 +356,7 @@ export async function exportKachaInvoicesToExcel(
       "Sr. No.": index + 1,
       "Slip #": kachaInvoice.slipNumber,
       Date: formatShortDate(kachaInvoice.invoiceDate),
-      Customer: kachaInvoice.customer?.name || "",
+      Party: kachaInvoice.customer?.name || "",
       Status: kachaInvoice.status,
       Subtotal: kachaInvoice.subtotal,
       "Making Charges": kachaInvoice.makingCharges,
@@ -421,7 +421,7 @@ export async function createKachaInvoice(
     const itemsRaw = String(formData.get("itemsJson") || "[]");
 
     if (!customerId) {
-      return { success: false, message: "Please select a customer" };
+      return { success: false, message: "Please select a party" };
     }
 
     let items: KachaInvoiceLineItemInput[] = [];
@@ -495,7 +495,7 @@ export async function createKachaInvoice(
       select: { id: true },
     });
     if (!customer) {
-      return { success: false, message: "Please select a customer" };
+      return { success: false, message: "Please select a party" };
     }
 
     // See resolveWritableLocationId's own doc comment — without this, a
@@ -950,8 +950,8 @@ export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormSt
  */
 const KACHA_IMPORT_COLUMNS = [
   "Slip Ref",
-  "Customer Phone",
-  "Customer Name",
+  "Party Phone",
+  "Party Name",
   "Date",
   "Item Name",
   "Metal",
@@ -988,8 +988,8 @@ export async function getKachaImportTemplate(): Promise<{
 
   const example = {
     "Slip Ref": "A1",
-    "Customer Phone": "9876543210",
-    "Customer Name": "Walk-in customer",
+    "Party Phone": "9876543210",
+    "Party Name": "Walk-in party",
     Date: new Date().toLocaleDateString("en-IN"),
     "Item Name": "Gold Chain 22K",
     Metal: "Gold",
@@ -1081,8 +1081,8 @@ function flattenBackupWorkbook(
     return {
       // Grouping key: rows of the same original slip rebuild as one slip.
       "Slip Ref": slipNumber,
-      "Customer Phone": cell(slip, "Customer Phone"),
-      "Customer Name": cell(slip, "Customer"),
+      "Party Phone": cell(slip, "Party Phone"),
+      "Party Name": cell(slip, "Party"),
       Date: cell(slip, "Date"),
       "Item Name": cell(item, "Item"),
       Metal: cell(item, "Metal"),
@@ -1206,14 +1206,14 @@ export async function importKachaInvoicesFromExcel(
         ? `Slip Ref "${ref}"`
         : `Row ${head.line}`;
 
-      const phone = cell(head.row, "Customer Phone");
-      const name = cell(head.row, "Customer Name");
+      const phone = cell(head.row, "Party Phone");
+      const name = cell(head.row, "Party Name");
       const customerId =
         (phone && byPhone.get(phone)) || (name && byName.get(name.toLowerCase()));
 
       if (!customerId) {
         errors.push(
-          `${label}: no customer matches phone "${phone}" or name "${name}". Add the customer first.`,
+          `${label}: no party matches phone "${phone}" or name "${name}". Add the party first.`,
         );
         continue;
       }
@@ -1493,9 +1493,9 @@ export async function deleteAllKachaInvoices(
       "Sr. No.": index + 1,
       "Slip #": kachaInvoice.slipNumber,
       Date: new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN"),
-      Customer: kachaInvoice.customer?.name || "",
-      "Customer Phone": kachaInvoice.customer?.phone || "",
-      "Customer GSTIN": kachaInvoice.customer?.gstin || "",
+      Party: kachaInvoice.customer?.name || "",
+      "Party Phone": kachaInvoice.customer?.phone || "",
+      "Party GSTIN": kachaInvoice.customer?.gstin || "",
       Status: kachaInvoice.status,
       Subtotal: Number(kachaInvoice.subtotal),
       "Making Charges": Number(kachaInvoice.makingCharges),
@@ -1613,7 +1613,7 @@ export async function emailKachaInvoiceAction(
     if (!kachaInvoice) return { success: false, message: "Kacha slip not found" };
 
     if (!kachaInvoice.customer?.email) {
-      return { success: false, message: "This customer has no email on file" };
+      return { success: false, message: "This party has no email on file" };
     }
 
     const { subject, html } = kachaSlipEmail({

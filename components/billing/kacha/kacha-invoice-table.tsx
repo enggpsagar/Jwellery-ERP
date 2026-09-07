@@ -111,7 +111,7 @@ export function KachaInvoiceTable({
               </th>
               <SortableTableHead label="Slip #" sortKey="slipNumber" defaultSortBy="invoiceDate" />
               <SortableTableHead label="Date" sortKey="invoiceDate" defaultSortBy="invoiceDate" />
-              <th className="px-4 py-3 text-left font-medium">Customer</th>
+              <th className="px-4 py-3 text-left font-medium">Party</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <SortableTableHead label="Total" sortKey="totalAmount" defaultSortBy="invoiceDate" />
               <th className="px-4 py-3 text-left font-medium">Balance</th>
@@ -148,7 +148,7 @@ export function KachaInvoiceTable({
                             label: "Date",
                             value: formatShortDate(kachaInvoice.invoiceDate),
                           },
-                          { label: "Customer", value: kachaInvoice.customer?.name },
+                          { label: "Party", value: kachaInvoice.customer?.name },
                           { label: "Phone", value: kachaInvoice.customer?.phone },
                           { label: "Status", value: kachaInvoice.status },
                         ],
@@ -184,7 +184,7 @@ export function KachaInvoiceTable({
                       href={`/customers/${kachaInvoice.customer.id}?from=${encodeURIComponent("/billing/kacha")}`}
                       title={kachaInvoice.customer.name}
                       subtitle={kachaInvoice.customer.phone ?? undefined}
-                      footerLabel="View customer"
+                      footerLabel="View party"
                       className="text-primary underline-offset-4 hover:underline"
                       sections={[
                         {

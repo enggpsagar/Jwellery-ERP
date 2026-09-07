@@ -164,14 +164,14 @@ export function ConvertToPakkaForm({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <Label>Customer GSTIN</Label>
+            <Label>Party GSTIN</Label>
             <Input
               defaultValue={kachaInvoice.customer?.gstin ?? ""}
               placeholder="e.g. 27ABCDE1234F1Z5"
               disabled
             />
             <p className="text-xs text-muted-foreground">
-              Managed from the customer&apos;s profile.
+              Managed from the party&apos;s profile.
             </p>
           </div>
 

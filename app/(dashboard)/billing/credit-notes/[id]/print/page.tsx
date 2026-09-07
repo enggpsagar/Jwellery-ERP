@@ -143,7 +143,7 @@ export default async function CreditNotePrintPage({ params }: Props) {
         )}
 
         <div className="border-t border-black p-2">
-          This amount has been credited to the customer's account ledger against invoice{" "}
+          This amount has been credited to the party's account ledger against invoice{" "}
           {creditNote.invoice.invoiceNumber}.
         </div>
       </div>

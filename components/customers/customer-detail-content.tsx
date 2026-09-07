@@ -60,7 +60,7 @@ export function CustomerDetailContent({
       />
 
       <DetailSection
-        title="Customer Information"
+        title="Party Information"
         icon={User}
         tint="var(--chart-1)"
       >
@@ -69,14 +69,14 @@ export function CustomerDetailContent({
           <DetailField label="Alternate Phone" value={customer.altPhone} />
           <DetailField label="Email" value={customer.email} />
           <DetailField label="GST Number" value={customer.gstNumber} />
-          <DetailField label="Customer Type" value={customer.customerType} />
+          <DetailField label="Party Type" value={customer.customerType} />
         </DetailGrid>
       </DetailSection>
 
       {hasAddress ? (
         <DetailSection
           title="Address"
-          description="Where this customer is based."
+          description="Where this party is based."
           icon={MapPin}
           tint="var(--chart-3)"
         >

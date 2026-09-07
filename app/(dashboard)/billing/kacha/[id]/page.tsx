@@ -92,7 +92,7 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
           </div>
 
           <div>
-            <p className="text-sm text-muted-foreground">Customer</p>
+            <p className="text-sm text-muted-foreground">Party</p>
             {kachaInvoice.customer ? (
               <Link
                 href={`/customers/${kachaInvoice.customer.id}?from=${encodeURIComponent(`/billing/kacha/${kachaInvoice.id}`)}`}

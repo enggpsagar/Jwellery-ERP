@@ -123,7 +123,7 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled
           </div>
 
           <div>
-            <p className="text-sm text-muted-foreground">Customer</p>
+            <p className="text-sm text-muted-foreground">Party</p>
             {invoice.customer ? (
               <Link
                 href={`/customers/${invoice.customer.id}?from=${encodeURIComponent(`/billing/${invoice.id}`)}`}

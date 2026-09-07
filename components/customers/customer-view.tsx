@@ -38,11 +38,11 @@ export function CustomerView() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Customer Directory</CardTitle>
+        <CardTitle>Party Directory</CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <Input placeholder="Search customers..." />
+        <Input placeholder="Search parties..." />
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

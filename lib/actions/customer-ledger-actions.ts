@@ -220,11 +220,11 @@ export async function emailLedgerStatementAction(
     })
 
     if (!customer) {
-      return { success: false, message: "Customer not found" }
+      return { success: false, message: "Party not found" }
     }
 
     if (!customer.email) {
-      return { success: false, message: "This customer has no email on file" }
+      return { success: false, message: "This party has no email on file" }
     }
 
     const [entries, summary, storeName] = await Promise.all([
@@ -234,7 +234,7 @@ export async function emailLedgerStatementAction(
     ])
 
     if (!summary) {
-      return { success: false, message: "Customer not found" }
+      return { success: false, message: "Party not found" }
     }
 
     const { subject, html } = ledgerStatementEmail({

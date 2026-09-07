@@ -25,7 +25,7 @@ export default async function NewDraftOrderPage() {
         requireConfirm
         header={{
           title: "New Draft Order",
-          description: "Capture a phone/counter order — what the customer wants, before it exists as a real piece.",
+          description: "Capture a phone/counter order — what the party wants, before it exists as a real piece.",
           backHref: "/orders",
           backLabel: "Back to Draft Orders",
         }}

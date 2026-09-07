@@ -5,7 +5,7 @@ import { getStates } from "@/lib/actions/location-actions"
 import { CustomersClient } from "@/components/customers/customers-client"
 
 export const metadata: Metadata = {
-  title: "Customers",
+  title: "Parties",
 }
 
 type CustomersPageProps = {

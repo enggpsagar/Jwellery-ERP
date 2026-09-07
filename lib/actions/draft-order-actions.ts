@@ -227,7 +227,7 @@ export async function exportDraftOrdersToExcel(params: ExportDraftOrdersParams =
       "Sr. No.": index + 1,
       "Order #": order.orderNumber,
       Date: order.orderDate.toISOString().slice(0, 10),
-      Customer: order.customer?.name ?? "",
+      Party: order.customer?.name ?? "",
       Phone: order.customer?.phone ?? "",
       Items: order._count.items,
       Status: order.status,
@@ -381,7 +381,7 @@ export async function createDraftOrder(
 
     const customerId = String(formData.get("customerId") || "").trim();
     if (!customerId) {
-      return { success: false, message: "Please select a customer" };
+      return { success: false, message: "Please select a party" };
     }
 
     const customer = await prisma.customer.findFirst({
@@ -389,7 +389,7 @@ export async function createDraftOrder(
       select: { id: true },
     });
     if (!customer) {
-      return { success: false, message: "Please select a valid customer" };
+      return { success: false, message: "Please select a valid party" };
     }
 
     const itemsRaw = String(formData.get("itemsJson") || "[]");

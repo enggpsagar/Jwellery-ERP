@@ -5,7 +5,7 @@ import { getStates } from "@/lib/actions/location-actions"
 import { ArchivedCustomersClient } from "@/components/customers/archived-customers-client"
 
 export const metadata: Metadata = {
-  title: "Archived Customers",
+  title: "Archived Parties",
 }
 
 type ArchivedCustomersPageProps = {

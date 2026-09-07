@@ -27,9 +27,9 @@ export async function generateMetadata({
   try {
     const { id } = await params
     const customer = await getCustomer(id)
-    return { title: customer?.name ?? "Customer" }
+    return { title: customer?.name ?? "Party" }
   } catch {
-    return { title: "Customer" }
+    return { title: "Party" }
   }
 }
 
@@ -40,7 +40,7 @@ export default async function CustomerDetailsPage({
   const { id } = await params
   const backTo = resolveBackLink((await searchParams)?.from, {
     href: "/customers",
-    label: "Back to Customers",
+    label: "Back to Parties",
   })
 
   const [customer, states] = await Promise.all([
@@ -56,7 +56,7 @@ export default async function CustomerDetailsPage({
     <main className="mx-auto max-w-5xl space-y-6 p-6">
       <PageBackHeader
         title={toTitleCase(customer.name)}
-        description="Customer details and account information"
+        description="Party details and account information"
         backHref={backTo.href}
         backLabel={backTo.label}
         action={<CustomerRowActions customer={customer} states={states} />}

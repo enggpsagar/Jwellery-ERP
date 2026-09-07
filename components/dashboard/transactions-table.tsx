@@ -97,7 +97,7 @@ export function TransactionsTable({ initialTransactions, initialPeriod }: Transa
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead>Invoice</TableHead>
-              <TableHead>Customer</TableHead>
+              <TableHead>Party</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Metal</TableHead>
               <TableHead className="text-right">Weight</TableHead>

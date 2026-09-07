@@ -43,7 +43,7 @@ export function PaymentInDetailPanel({ row }: { row: PaymentInRow | null }) {
 
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div>
-          <p className="text-muted-foreground">Customer</p>
+          <p className="text-muted-foreground">Party</p>
           {row.customerId ? (
             <Link href={`/customers/${row.customerId}`} className="font-medium hover:underline">
               {row.customerName}

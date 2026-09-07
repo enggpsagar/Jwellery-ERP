@@ -517,7 +517,7 @@ export async function exportInvoicesToExcel(
       "Sr. No.": index + 1,
       "Invoice #": invoice.invoiceNumber,
       Date: formatShortDate(invoice.invoiceDate),
-      Customer: invoice.customer?.name || "",
+      Party: invoice.customer?.name || "",
       Status: invoice.status,
       Subtotal: invoice.subtotal,
       "Making Charges": invoice.makingCharges,
@@ -798,7 +798,7 @@ export async function createInvoice(
     const itemsRaw = String(formData.get("itemsJson") || "[]");
 
     if (!customerId) {
-      return { success: false, message: "Please select a customer" };
+      return { success: false, message: "Please select a party" };
     }
 
     let items: InvoiceLineItemInput[] = [];
@@ -931,7 +931,7 @@ export async function createInvoice(
       select: { id: true },
     });
     if (!customer) {
-      return { success: false, message: "Please select a customer" };
+      return { success: false, message: "Please select a party" };
     }
 
     // A Composition-scheme store is legally barred from charging any GST at
@@ -2187,7 +2187,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
     if (!invoice) return { success: false, message: "Invoice not found" };
 
     if (!invoice.customer?.email) {
-      return { success: false, message: "This customer has no email on file" };
+      return { success: false, message: "This party has no email on file" };
     }
 
     const { subject, html } = invoiceEmail({

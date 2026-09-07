@@ -120,7 +120,7 @@ export function PaymentInDialog({ customers }: PaymentInDialogProps) {
           )}
 
           <div className="space-y-2">
-            <Label required>Customer</Label>
+            <Label required>Party</Label>
             <CustomerSelect
               customers={customers}
               name="customerId"

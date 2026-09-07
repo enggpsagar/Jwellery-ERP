@@ -131,13 +131,13 @@ export async function exportCustomersToExcel(
     if (!customers.length) {
       return {
         success: false,
-        message: "No customers found to export.",
+        message: "No parties found to export.",
       }
     }
 
     const rows = customers.map((customer, index) => ({
       "Sr. No.": index + 1,
-      "Customer Name": customer.name || "",
+      "Party Name": customer.name || "",
       Phone: customer.phone || "",
       "Alternate Phone": customer.altPhone || "",
       Email: customer.email || "",
@@ -163,14 +163,14 @@ export async function exportCustomersToExcel(
 
     const { fileName, fileBase64 } =
       params.format === "csv"
-        ? buildCsvExportBase64(rows, "customers")
+        ? buildCsvExportBase64(rows, "parties")
         : params.format === "pdf"
-          ? buildPdfExportBase64(rows, "Customers", "customers")
-          : buildExcelExport(rows, "Customers", "customers")
+          ? buildPdfExportBase64(rows, "Parties", "parties")
+          : buildExcelExport(rows, "Parties", "parties")
 
     return {
       success: true,
-      message: "Customers exported successfully.",
+      message: "Parties exported successfully.",
       fileName,
       fileBase64,
     }
@@ -178,7 +178,7 @@ export async function exportCustomersToExcel(
     console.error("exportCustomersToExcel error:", error)
     return {
       success: false,
-      message: "Failed to export customers.",
+      message: "Failed to export parties.",
     }
   }
 }
@@ -229,7 +229,7 @@ export async function archiveCustomer(id: string): Promise<CustomerFormState> {
     if (count === 0) {
       return {
         success: false,
-        message: "Customer not found",
+        message: "Party not found",
       }
     }
 
@@ -239,13 +239,13 @@ export async function archiveCustomer(id: string): Promise<CustomerFormState> {
 
     return {
       success: true,
-      message: "Customer archived successfully",
+      message: "Party archived successfully",
     }
   } catch (error) {
     console.error("archiveCustomer error:", error)
     return {
       success: false,
-      message: "Failed to archive customer",
+      message: "Failed to archive party",
     }
   }
 }
@@ -264,7 +264,7 @@ export async function unarchiveCustomer(id: string): Promise<CustomerFormState> 
     if (count === 0) {
       return {
         success: false,
-        message: "Customer not found",
+        message: "Party not found",
       }
     }
 
@@ -274,13 +274,13 @@ export async function unarchiveCustomer(id: string): Promise<CustomerFormState> 
 
     return {
       success: true,
-      message: "Customer restored successfully",
+      message: "Party restored successfully",
     }
   } catch (error) {
     console.error("unarchiveCustomer error:", error)
     return {
       success: false,
-      message: "Failed to restore customer",
+      message: "Failed to restore party",
     }
   }
 }
@@ -306,7 +306,7 @@ export async function deleteCustomer(id: string): Promise<CustomerFormState> {
     if (!customer) {
       return {
         success: false,
-        message: "Customer not found",
+        message: "Party not found",
       }
     }
 
@@ -314,7 +314,7 @@ export async function deleteCustomer(id: string): Promise<CustomerFormState> {
       return {
         success: false,
         message:
-          "Customer cannot be deleted because invoice/ledger history exists. Please archive instead.",
+          "Party cannot be deleted because invoice/ledger history exists. Please archive instead.",
       }
     }
 
@@ -326,13 +326,13 @@ export async function deleteCustomer(id: string): Promise<CustomerFormState> {
 
     return {
       success: true,
-      message: "Customer deleted successfully",
+      message: "Party deleted successfully",
     }
   } catch (error) {
     console.error("deleteCustomer error:", error)
     return {
       success: false,
-      message: "Failed to delete customer",
+      message: "Failed to delete party",
     }
   }
 }

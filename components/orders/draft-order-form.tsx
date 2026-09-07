@@ -109,12 +109,12 @@ export function DraftOrderForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Customer &amp; Order Details</CardTitle>
+          <CardTitle>Party &amp; Order Details</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5 md:col-span-2">
             <Label>
-              Customer <RequiredMark />
+              Party <RequiredMark />
             </Label>
             <CustomerSelect customers={customers} />
           </div>

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const customerInputSchema = z.object({
-  name: z.string().trim().min(1, "Customer name is required").max(200),
+  name: z.string().trim().min(1, "Party name is required").max(200),
   phone: z.string().trim().min(1, "Phone number is required").max(20),
   altPhone: z.string().trim().max(20).optional(),
   email: z.string().trim().email().optional().or(z.literal("")),

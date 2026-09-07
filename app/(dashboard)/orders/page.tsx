@@ -50,7 +50,7 @@ export default async function DraftOrdersPage({ searchParams }: DraftOrdersPageP
     <main className="space-y-6 p-6">
       <PageBackHeader
         title="Draft Orders"
-        description="Phone/counter orders — capture what a customer wants, send it to an artisan, and it becomes real Product & Inventory once received."
+        description="Phone/counter orders — capture what a party wants, send it to an artisan, and it becomes real Product & Inventory once received."
         backHref="/dashboard"
         backLabel="Back to Dashboard"
         action={

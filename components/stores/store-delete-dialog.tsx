@@ -29,7 +29,7 @@ type StoreDeleteDialogProps = {
 }
 
 const COUNT_LABELS: { key: keyof Omit<StoreRecordCounts, "total">; label: string }[] = [
-  { key: "customers", label: "customers" },
+  { key: "customers", label: "parties" },
   { key: "vendors", label: "vendors" },
   { key: "karigars", label: "artisans" },
   { key: "products", label: "products" },
@@ -153,7 +153,7 @@ export function StoreDeleteDialog({ storeId, storeName }: StoreDeleteDialogProps
                 <p className="font-semibold">Force Delete — permanent, no undo</p>
                 <p className="mt-1">
                   This will permanently delete <strong>every record</strong> associated
-                  with this store — customers, vendors, invoices, purchases, ledger
+                  with this store — parties, vendors, invoices, purchases, ledger
                   entries, users, and everything else listed above. This cannot be
                   reversed.
                 </p>
@@ -175,7 +175,7 @@ export function StoreDeleteDialog({ storeId, storeName }: StoreDeleteDialogProps
           ) : (
             <DialogDescription>
               <span className="font-medium text-foreground">{storeName}</span> has no
-              customers, vendors, artisans, products, invoices, purchases, quotations,
+              parties, vendors, artisans, products, invoices, purchases, quotations,
               or other users on file. Deleting it removes the store itself — this
               cannot be undone.
             </DialogDescription>

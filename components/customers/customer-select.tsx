@@ -52,7 +52,7 @@ export function CustomerSelect({
   customers,
   name = "customerId",
   defaultValue,
-  placeholder = "Select a customer",
+  placeholder = "Select a party",
   onChange,
 }: CustomerSelectProps) {
   const [search, setSearch] = useState("")
@@ -139,7 +139,7 @@ export function CustomerSelect({
 
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
-              No customers found{search ? ` for "${search}"` : ""}
+              No parties found{search ? ` for "${search}"` : ""}
             </div>
           ) : (
             filtered.map((customer) => (
@@ -157,7 +157,7 @@ export function CustomerSelect({
           <div className="my-1 border-t" />
           <SelectItem value={ADD_NEW_VALUE} className="font-medium text-primary">
             <UserPlus className="mr-1 h-4 w-4" />
-            Create new customer
+            Create new party
           </SelectItem>
         </SelectContent>
       </Select>
@@ -174,7 +174,7 @@ export function CustomerSelect({
       {customers.length === 0 && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-dashed px-3 py-2">
           <span className="text-sm text-muted-foreground">
-            No customers yet.
+            No parties yet.
           </span>
           <button
             type="button"
@@ -182,7 +182,7 @@ export function CustomerSelect({
             className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
           >
             <UserPlus className="h-3.5 w-3.5" />
-            Add your first customer
+            Add your first party
           </button>
         </div>
       )}

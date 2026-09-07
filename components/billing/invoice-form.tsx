@@ -1007,7 +1007,7 @@ export function InvoiceForm({
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <Label>Customer {!editInvoiceId && <RequiredMark />}</Label>
+          <Label>Party {!editInvoiceId && <RequiredMark />}</Label>
           {editInvoiceId ? (
             // The customer isn't editable here — this changes line items
             // and amounts, not who's billed. Moving an invoice's ledger

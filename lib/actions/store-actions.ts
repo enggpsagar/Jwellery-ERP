@@ -159,7 +159,7 @@ export async function exportStoresToExcel(params: ExportStoresParams = {}): Prom
       Email: store.email || "",
       Status: store.isActive ? "Active" : "Inactive",
       Users: store._count.users,
-      Customers: store._count.customers,
+      Parties: store._count.customers,
       Invoices: store._count.invoices,
       "Created At": store.createdAt.toLocaleString("en-IN"),
     }));

@@ -326,7 +326,7 @@ export async function getCustomerByIdCore(
 
 function validateCustomerInput(input: CustomerInput) {
   const errors: Record<string, string[]> = {};
-  if (!input.name?.trim()) errors.name = ["Customer name is required"];
+  if (!input.name?.trim()) errors.name = ["Party name is required"];
   if (input.aadhaarNumber?.trim() && !isValidAadhaarNumber(input.aadhaarNumber)) {
     errors.aadhaarNumber = [AADHAAR_INVALID_MESSAGE];
   }
@@ -363,7 +363,7 @@ export async function createCustomerCore(
         return {
           success: false,
           message: "Phone number already exists",
-          errors: { phone: ["A customer with this phone number already exists"] },
+          errors: { phone: ["A party with this phone number already exists"] },
         };
       }
     }
@@ -394,17 +394,17 @@ export async function createCustomerCore(
       select: { id: true, name: true, phone: true, customerCode: true },
     });
 
-    return { success: true, message: "Customer added successfully", customer };
+    return { success: true, message: "Party added successfully", customer };
   } catch (error: any) {
     if (error?.code === "P2002") {
       return {
         success: false,
         message: "Phone number already exists",
-        errors: { phone: ["A customer with this phone number already exists"] },
+        errors: { phone: ["A party with this phone number already exists"] },
       };
     }
     console.error("createCustomerCore error:", error);
-    return { success: false, message: "Failed to add customer" };
+    return { success: false, message: "Failed to add party" };
   }
 }
 
@@ -432,7 +432,7 @@ export async function updateCustomerCore(
         return {
           success: false,
           message: "Phone number already exists",
-          errors: { phone: ["A customer with this phone number already exists"] },
+          errors: { phone: ["A party with this phone number already exists"] },
         };
       }
     }
@@ -461,19 +461,19 @@ export async function updateCustomerCore(
     });
 
     if (count === 0) {
-      return { success: false, message: "Customer not found" };
+      return { success: false, message: "Party not found" };
     }
 
-    return { success: true, message: "Customer updated successfully" };
+    return { success: true, message: "Party updated successfully" };
   } catch (error: any) {
     if (error?.code === "P2002") {
       return {
         success: false,
         message: "Phone number already exists",
-        errors: { phone: ["A customer with this phone number already exists"] },
+        errors: { phone: ["A party with this phone number already exists"] },
       };
     }
     console.error("updateCustomerCore error:", error);
-    return { success: false, message: "Failed to update customer" };
+    return { success: false, message: "Failed to update party" };
   }
 }

@@ -71,10 +71,10 @@ export async function linkVendorToCustomer(
       }),
     ])
 
-    if (!customer) return { success: false, message: "Customer not found" }
+    if (!customer) return { success: false, message: "Party not found" }
     if (!vendor) return { success: false, message: "Vendor not found" }
     if (vendor.linkedCustomer && vendor.linkedCustomer.id !== customerId) {
-      return { success: false, message: "This vendor is already linked to a different customer" }
+      return { success: false, message: "This vendor is already linked to a different party" }
     }
 
     await prisma.customer.update({
@@ -89,7 +89,7 @@ export async function linkVendorToCustomer(
     return { success: true, message: `Linked to vendor "${vendor.name}"`, id: vendor.id, name: vendor.name }
   } catch (error: any) {
     if (error?.code === "P2002") {
-      return { success: false, message: "This vendor is already linked to a different customer" }
+      return { success: false, message: "This vendor is already linked to a different party" }
     }
     console.error("linkVendorToCustomer error:", error)
     return { success: false, message: "Failed to link vendor" }
@@ -106,7 +106,7 @@ export async function unlinkCustomerVendor(customerId: string): Promise<LinkActi
       where: { id: customerId, storeId },
       select: { linkedVendorId: true },
     })
-    if (!customer) return { success: false, message: "Customer not found" }
+    if (!customer) return { success: false, message: "Party not found" }
 
     const vendorId = customer.linkedVendorId
 
@@ -138,9 +138,9 @@ export async function createLinkedVendorFromCustomer(customerId: string): Promis
     const storeId = await requireStoreScope()
 
     const customer = await prisma.customer.findFirst({ where: { id: customerId, storeId } })
-    if (!customer) return { success: false, message: "Customer not found" }
+    if (!customer) return { success: false, message: "Party not found" }
     if (customer.linkedVendorId) {
-      return { success: false, message: "This customer is already linked to a vendor" }
+      return { success: false, message: "This party is already linked to a vendor" }
     }
 
     const vendor = await prisma.$transaction(async (tx) => {
@@ -203,7 +203,7 @@ export async function createLinkedCustomerFromVendor(vendorId: string): Promise<
       where: { linkedVendorId: vendorId },
       select: { id: true },
     })
-    if (alreadyLinked) return { success: false, message: "This vendor is already linked to a customer" }
+    if (alreadyLinked) return { success: false, message: "This vendor is already linked to a party" }
 
     if (vendor.phone) {
       const phoneCollision = await prisma.customer.findFirst({
@@ -213,7 +213,7 @@ export async function createLinkedCustomerFromVendor(vendorId: string): Promise<
       if (phoneCollision) {
         return {
           success: false,
-          message: `A customer named "${phoneCollision.name}" already uses this phone number — link to that customer instead of creating a new one`,
+          message: `A party named "${phoneCollision.name}" already uses this phone number — link to that party instead of creating a new one`,
         }
       }
     }
@@ -244,7 +244,7 @@ export async function createLinkedCustomerFromVendor(vendorId: string): Promise<
 
     return {
       success: true,
-      message: `Registered "${vendor.name}" as a customer too`,
+      message: `Registered "${vendor.name}" as a party too`,
       id: customer.id,
       name: customer.name,
     }
@@ -252,10 +252,10 @@ export async function createLinkedCustomerFromVendor(vendorId: string): Promise<
     if (error?.code === "P2002") {
       return {
         success: false,
-        message: "A customer with this phone number already exists — link to that customer instead",
+        message: "A party with this phone number already exists — link to that party instead",
       }
     }
     console.error("createLinkedCustomerFromVendor error:", error)
-    return { success: false, message: "Failed to register as a customer" }
+    return { success: false, message: "Failed to register as a party" }
   }
 }

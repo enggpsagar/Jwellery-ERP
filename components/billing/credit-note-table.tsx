@@ -27,7 +27,7 @@ export function CreditNoteTable({ creditNotes, activeCreditNoteId, onActivate }:
             <tr className="border-b">
               <th className="px-4 py-3 text-left font-medium">Credit Note #</th>
               <th className="px-4 py-3 text-left font-medium">Date</th>
-              <th className="px-4 py-3 text-left font-medium">Customer</th>
+              <th className="px-4 py-3 text-left font-medium">Party</th>
               <th className="px-4 py-3 text-left font-medium">Against Invoice</th>
               <th className="px-4 py-3 text-left font-medium">Amount</th>
             </tr>

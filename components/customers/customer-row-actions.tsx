@@ -58,7 +58,7 @@ export function CustomerRowActions({
       }
     } catch (error) {
       console.error(error)
-      toast.error("Failed to archive customer")
+      toast.error("Failed to archive party")
     } finally {
       setLoading(false)
     }
@@ -78,7 +78,7 @@ export function CustomerRowActions({
       }
     } catch (error) {
       console.error(error)
-      toast.error("Failed to delete customer")
+      toast.error("Failed to delete party")
     } finally {
       setLoading(false)
     }
@@ -93,7 +93,7 @@ export function CustomerRowActions({
           href={`/customers/${customer.id}/edit?returnTo=${encodeURIComponent("/customers")}`}
           className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-indigo-200 text-indigo-600 transition hover:bg-indigo-50"
           aria-label={`Edit ${customer.name}`}
-          title="Edit customer"
+          title="Edit party"
         >
           <Pencil className="h-4 w-4" />
         </Link>
@@ -103,7 +103,7 @@ export function CustomerRowActions({
           onClick={() => setConfirmAction("archive")}
           className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-amber-200 text-amber-700 transition hover:bg-amber-50"
           aria-label={`Archive ${customer.name}`}
-          title="Archive customer"
+          title="Archive party"
         >
           <Archive className="h-4 w-4" />
         </button>
@@ -113,7 +113,7 @@ export function CustomerRowActions({
           onClick={() => setConfirmAction("delete")}
           className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50"
           aria-label={`Delete ${customer.name}`}
-          title="Delete customer"
+          title="Delete party"
         >
           <Trash2 className="h-4 w-4" />
         </button>
@@ -129,7 +129,7 @@ export function CustomerRowActions({
           {confirmAction === "archive" && (
             <>
               <DialogHeader>
-                <DialogTitle>Archive Customer</DialogTitle>
+                <DialogTitle>Archive Party</DialogTitle>
                 <DialogDescription>
                   Are you sure you want to archive{" "}
                   <span className="font-medium text-foreground">
@@ -138,7 +138,7 @@ export function CustomerRowActions({
                   ?
                   <br />
                   <br />
-                  Archived customers are removed from the active customer list,
+                  Archived parties are removed from the active party list,
                   but their historical records remain in the system.
                 </DialogDescription>
               </DialogHeader>
@@ -165,7 +165,7 @@ export function CustomerRowActions({
                       Archiving...
                     </>
                   ) : (
-                    "Archive Customer"
+                    "Archive Party"
                   )}
                 </Button>
               </DialogFooter>
@@ -175,7 +175,7 @@ export function CustomerRowActions({
           {confirmAction === "delete" && (
             <>
               <DialogHeader>
-                <DialogTitle>Delete Customer</DialogTitle>
+                <DialogTitle>Delete Party</DialogTitle>
                 <DialogDescription>
                   Are you sure you want to permanently delete{" "}
                   <span className="font-medium text-foreground">
@@ -188,7 +188,7 @@ export function CustomerRowActions({
                   <br />
                   <br />
                   <span className="text-red-600">
-                    Note: deletion is allowed only if this customer has no
+                    Note: deletion is allowed only if this party has no
                     invoice or ledger history.
                   </span>
                 </DialogDescription>
@@ -216,7 +216,7 @@ export function CustomerRowActions({
                       Deleting...
                     </>
                   ) : (
-                    "Delete Customer"
+                    "Delete Party"
                   )}
                 </Button>
               </DialogFooter>

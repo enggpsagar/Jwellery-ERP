@@ -192,7 +192,7 @@ export function CustomerVendorLinkCard({
           ) : (
             <div className="flex flex-wrap items-center gap-3">
               <p className="min-w-64 flex-1 text-sm text-muted-foreground">
-                Also buy stock back from this customer? Connect them to a vendor record.
+                Also buy stock back from this party? Connect them to a vendor record.
               </p>
               <Button size="sm" className="gap-2" onClick={handleRegisterAsVendor} disabled={loading}>
                 <Link2 className="h-4 w-4" />
@@ -275,7 +275,7 @@ export function CustomerVendorLinkCard({
           <DialogHeader>
             <DialogTitle>Remove vendor link?</DialogTitle>
             <DialogDescription>
-              This only disconnects the two records — neither the customer
+              This only disconnects the two records — neither the party
               nor the vendor themselves are changed or deleted.
             </DialogDescription>
           </DialogHeader>

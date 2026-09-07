@@ -36,7 +36,7 @@ export default async function NewKachaInvoicePage() {
         requireConfirm
         header={{
           title: "New Kacha Slip",
-          description: "Record an informal sale slip for a customer, without GST.",
+          description: "Record an informal sale slip for a party, without GST.",
           backHref: "/billing/kacha",
           backLabel: "Back to Kacha Slips",
         }}

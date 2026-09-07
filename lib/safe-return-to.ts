@@ -47,7 +47,7 @@ export function resolveBackLink(
   if (href.startsWith("/purchases")) return { href, label: "Back to Purchase" }
   if (href.startsWith("/quotations")) return { href, label: "Back to Quotation" }
   if (href.startsWith("/ledger")) return { href, label: "Back to Ledger" }
-  if (href.startsWith("/customers")) return { href, label: "Back to Customers" }
+  if (href.startsWith("/customers")) return { href, label: "Back to Parties" }
   if (href.startsWith("/reports")) return { href, label: "Back to Reports" }
 
   return { href, label: "Back" }

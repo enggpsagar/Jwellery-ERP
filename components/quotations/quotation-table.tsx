@@ -114,7 +114,7 @@ export function QuotationTable({
               <SortableTableHead label="Quotation #" sortKey="quotationNumber" defaultSortBy="quotationDate" />
               <SortableTableHead label="Date" sortKey="quotationDate" defaultSortBy="quotationDate" />
               <th className="px-4 py-3 text-left font-medium">Valid Until</th>
-              <th className="px-4 py-3 text-left font-medium">Customer</th>
+              <th className="px-4 py-3 text-left font-medium">Party</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <SortableTableHead label="Total" sortKey="totalAmount" defaultSortBy="quotationDate" />
               <th className="px-4 py-3 text-left font-medium">Converted</th>
@@ -165,7 +165,7 @@ export function QuotationTable({
                               ? formatShortDate(quotation.validUntil)
                               : null,
                           },
-                          { label: "Customer", value: quotation.customer?.name },
+                          { label: "Party", value: quotation.customer?.name },
                           { label: "Status", value: quotation.status },
                         ],
                       },
@@ -196,7 +196,7 @@ export function QuotationTable({
                       href={`/customers/${quotation.customer.id}`}
                       title={quotation.customer.name}
                       subtitle={quotation.customer.phone ?? undefined}
-                      footerLabel="View customer"
+                      footerLabel="View party"
                       sections={[
                         {
                           fields: [

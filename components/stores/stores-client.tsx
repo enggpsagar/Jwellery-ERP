@@ -153,6 +153,10 @@ export function StoresClient({
             ]}
             defaultSortBy="createdAt"
             hideSort
+            statusOptions={[
+              { value: "ACTIVE", label: "Active" },
+              { value: "INACTIVE", label: "Inactive" },
+            ]}
             selectedIds={selectedIds}
             entityLabel="stores"
             exportAction={exportStoresToExcel}

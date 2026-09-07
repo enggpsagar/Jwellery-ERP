@@ -5,6 +5,7 @@ import {
   getPlatformGoldInventory,
   type StoreSortBy,
   type SortOrder,
+  type StoreStatusFilter,
 } from "@/lib/actions/store-actions";
 import { getPlans } from "@/lib/actions/plan-actions";
 import { getStorePlanOverviews } from "@/lib/actions/store-plan-actions";
@@ -21,6 +22,7 @@ type StoresPageProps = {
     search?: string;
     sortBy?: StoreSortBy;
     sortOrder?: SortOrder;
+    status?: string;
   }>;
 };
 
@@ -34,9 +36,13 @@ export default async function StoresPage({ searchParams }: StoresPageProps) {
   const search = params.search || "";
   const sortBy = params.sortBy || "createdAt";
   const sortOrder = params.sortOrder || "desc";
+  const status =
+    params.status === "ACTIVE" || params.status === "INACTIVE"
+      ? (params.status as StoreStatusFilter)
+      : undefined;
 
   const [{ stores, pagination }, goldSummary, plans] = await Promise.all([
-    getStores({ page, pageSize, search, sortBy, sortOrder }),
+    getStores({ page, pageSize, search, sortBy, sortOrder, status }),
     getPlatformGoldInventory(),
     getPlans({ activeOnly: true }),
   ]);

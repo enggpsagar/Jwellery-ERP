@@ -21,6 +21,7 @@ export type StoreFormState = {
 
 export type StoreSortBy = "name" | "code" | "createdAt";
 export type SortOrder = "asc" | "desc";
+export type StoreStatusFilter = "ACTIVE" | "INACTIVE";
 
 export type GetStoresParams = {
   page?: number;
@@ -28,6 +29,7 @@ export type GetStoresParams = {
   search?: string;
   sortBy?: StoreSortBy;
   sortOrder?: SortOrder;
+  status?: StoreStatusFilter;
 };
 
 export type StoresPagination = {
@@ -43,6 +45,7 @@ type ExportStoresParams = {
   search?: string;
   sortBy?: string;
   sortOrder?: SortOrder;
+  status?: string;
 };
 
 const STORE_INCLUDE = {
@@ -57,17 +60,20 @@ function toOptionalString(value: FormDataEntryValue | null) {
   return str || null;
 }
 
-function getStoresWhere(search?: string) {
+function getStoresWhere(search?: string, status?: StoreStatusFilter) {
   const query = String(search || "").trim();
 
-  if (!query) return {};
-
   return {
-    OR: [
-      { name: { contains: query, mode: "insensitive" as const } },
-      { code: { contains: query, mode: "insensitive" as const } },
-      { city: { contains: query, mode: "insensitive" as const } },
-    ],
+    ...(status ? { isActive: status === "ACTIVE" } : {}),
+    ...(query
+      ? {
+          OR: [
+            { name: { contains: query, mode: "insensitive" as const } },
+            { code: { contains: query, mode: "insensitive" as const } },
+            { city: { contains: query, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
   };
 }
 
@@ -86,7 +92,7 @@ export async function getStores(params: GetStoresParams = {}) {
   const sortBy = params.sortBy || "createdAt";
   const sortOrder = params.sortOrder || "desc";
 
-  const where = getStoresWhere(search);
+  const where = getStoresWhere(search, params.status);
   const orderBy = getStoresOrderBy(sortBy, sortOrder);
 
   const [totalCount, stores] = await Promise.all([
@@ -123,7 +129,11 @@ export async function exportStoresToExcel(params: ExportStoresParams = {}): Prom
   try {
     await requireRole(UserRole.SUPER_ADMIN);
 
-    const where = getStoresWhere(params.search);
+    const status =
+      params.status === "ACTIVE" || params.status === "INACTIVE"
+        ? (params.status as StoreStatusFilter)
+        : undefined;
+    const where = getStoresWhere(params.search, status);
     const orderBy = getStoresOrderBy(
       (params.sortBy as StoreSortBy) || "createdAt",
       params.sortOrder || "desc"

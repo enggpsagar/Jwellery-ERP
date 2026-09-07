@@ -195,12 +195,12 @@ export function VendorsToolbar({
 
         <Button
           type="button"
-          variant="secondary"
           size="icon"
           onClick={handleExport}
           disabled={isExporting}
           title={hasSelection ? `Export selected vendors (${selectedVendorIds.length})` : "Export vendors"}
           aria-label={hasSelection ? `Export selected vendors (${selectedVendorIds.length})` : "Export vendors"}
+          className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
         >
           {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}
         </Button>

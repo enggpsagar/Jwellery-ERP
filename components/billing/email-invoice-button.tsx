@@ -25,17 +25,14 @@ export function EmailInvoiceButton({ invoiceId }: { invoiceId: string }) {
 
   return (
     <Button
+      size="icon"
       onClick={handleClick}
       disabled={pending}
       title="Email Invoice"
+      aria-label="Email Invoice"
       className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
     >
-      {pending ? (
-        <Loader className="h-4 w-4 mr-1" />
-      ) : (
-        <Mail className="h-4 w-4 mr-1" />
-      )}
-      Invoice
+      {pending ? <Loader className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
     </Button>
   )
 }

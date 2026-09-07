@@ -14,6 +14,12 @@ import {
 } from "@/components/ui/card";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { Input } from "@/components/ui/input";
 
@@ -163,34 +169,36 @@ export function MetalRatesTable({ data }: Props) {
             <CardDescription>Gold & Silver historical prices</CardDescription>
           </div>
 
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() =>
-                window.open("/api/metal-rates/export?format=csv", "_blank")
-              }
-            >
-              <Download className="mr-2 h-4 w-4" />
-              CSV
-            </Button>
-
-            <Button
-              variant="outline"
-              onClick={() =>
-                window.open("/api/metal-rates/export?format=excel", "_blank")
-              }
-            >
-              Excel
-            </Button>
-
-            <Button
-              onClick={() =>
-                window.open("/api/metal-rates/export?format=pdf", "_blank")
-              }
-            >
-              PDF
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                title="Export metal rates"
+                aria-label="Export metal rates"
+                className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => window.open("/api/metal-rates/export?format=csv", "_blank")}
+              >
+                CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => window.open("/api/metal-rates/export?format=excel", "_blank")}
+              >
+                Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => window.open("/api/metal-rates/export?format=pdf", "_blank")}
+              >
+                PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardHeader>
 

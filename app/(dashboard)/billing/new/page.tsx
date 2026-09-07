@@ -52,7 +52,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
   })
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-6xl space-y-6 p-6">
       <PageBackHeader
         title="New Invoice"
         description="Bill a customer for jewellery items."

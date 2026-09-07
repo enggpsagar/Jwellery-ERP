@@ -8,6 +8,7 @@ import { toTitleCase, formatShortDate } from "@/lib/utils"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { InvoiceQrCard } from "@/components/billing/invoice-qr-card"
 import { InvoiceItemsTable } from "@/components/billing/invoice-items-table"
+import { InvoiceDueDatePrompt } from "@/components/billing/invoice-due-date-prompt"
 import { Button } from "@/components/ui/button"
 
 const TRANSPORT_MODE_LABELS: Record<string, string> = {
@@ -43,6 +44,10 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowDays }:
 
   return (
     <div className="space-y-6">
+      {!isCancelled && invoice.balanceAmount > 0 && !invoice.dueDate && (
+        <InvoiceDueDatePrompt invoiceId={invoice.id} balanceAmount={invoice.balanceAmount} />
+      )}
+
       <div className="rounded-xl border bg-card p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>

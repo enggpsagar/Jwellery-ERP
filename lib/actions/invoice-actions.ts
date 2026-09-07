@@ -1322,6 +1322,50 @@ export async function recordInvoicePayment(
  *   the ledger with one offsetting entry sized to the actual balance
  *   delta — existing payment entries are never touched or rewritten.
  */
+/**
+ * Sets (or clears) only an invoice's due date — nothing else. A dedicated
+ * action rather than routing this through updateInvoice's own metadata
+ * branch, which submits every field (notes/location/e-way bill) at once
+ * from its own dialog's form; a bare "just the due date" submission there
+ * would read every other field as absent and blank them out. This backs
+ * the "no due date set on a still-owed invoice" prompt (see
+ * InvoiceDetailContent) — the Calendar already surfaces any
+ * Invoice.dueDate on its own (getCalendarEvents), so setting it here is
+ * the whole feature; no separate reminder entity needed.
+ */
+export async function setInvoiceDueDate(
+  id: string,
+  dueDateRaw: string,
+): Promise<InvoiceFormState> {
+  try {
+    try {
+      await requirePermission(PERMISSIONS.BILLING_UPDATE);
+    } catch {
+      return { success: false, message: "You do not have permission to edit invoices." };
+    }
+
+    const storeId = await requireStoreScope();
+    const invoice = await prisma.invoice.findFirst({ where: { id, storeId }, select: { id: true } });
+    if (!invoice) return { success: false, message: "Invoice not found" };
+
+    const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
+    if (dueDateRaw && Number.isNaN(dueDate?.getTime())) {
+      return { success: false, message: "Invalid due date" };
+    }
+
+    await prisma.invoice.update({ where: { id }, data: { dueDate } });
+
+    revalidatePath("/billing");
+    revalidatePath(`/billing/${id}`);
+    revalidatePath("/calendar");
+
+    return { success: true, message: "Due date set" };
+  } catch (error) {
+    console.error("setInvoiceDueDate error:", error);
+    return { success: false, message: "Failed to set due date" };
+  }
+}
+
 export async function updateInvoice(
   id: string,
   prevState: InvoiceFormState = initialState,

@@ -41,7 +41,7 @@ export default async function ScanPage({ searchParams }: ScanPageProps) {
                 scan tags with this phone.
               </p>
             </div>
-            <Button asChild variant="outline" className="w-full">
+            <Button asChild className="w-full">
               <Link href="/billing">Go to billing</Link>
             </Button>
           </CardContent>

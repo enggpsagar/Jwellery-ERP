@@ -184,7 +184,7 @@ export function LedgerDetailDrawer({
             <div className="flex items-center gap-3 border-t p-4">
               {entry.invoiceId ? (
                 <Link href={`/billing/${entry.invoiceId}`} className="flex-1">
-                  <Button variant="outline" className="w-full">
+                  <Button className="w-full">
                     View Invoice
                   </Button>
                 </Link>

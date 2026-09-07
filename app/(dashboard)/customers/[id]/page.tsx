@@ -53,7 +53,7 @@ export default async function CustomerDetailsPage({
   }
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-5xl space-y-6 p-6">
       <PageBackHeader
         title={toTitleCase(customer.name)}
         description="Customer details and account information"

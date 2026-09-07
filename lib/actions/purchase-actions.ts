@@ -20,7 +20,7 @@ import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope } from "@/lib/store-context";
 import { isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst";
-import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
+import { resolveGstRateSnapshot, type GstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import {
   getLocationScope,
   locationWhere,
@@ -62,6 +62,16 @@ export type PurchaseLineItemInput = {
   stoneTypeNames?: string | null;
   dmoWeight?: number | null;
   hsnCode?: string | null;
+  sgstAmount?: number;
+  cgstAmount?: number;
+  // Charged instead of sgst+cgst on an inter-state purchase — see
+  // computePurchaseGst() in lib/gst.ts. Optional purely so an older-shaped
+  // payload doesn't fail to parse; treated as 0 when absent.
+  igstAmount?: number;
+  // Which configured GstRate THIS line uses — see PurchaseItem.gstRateId's
+  // own doc comment in schema.prisma. Optional for the same reason as
+  // InvoiceLineItemInput.gstRateId.
+  gstRateId?: string | null;
 };
 
 /** Never trust client input for the making-charge mode — anything other
@@ -161,9 +171,54 @@ function lineQuantity(item: { purity?: PurityType | null; netWeight?: number | n
   return item.purity === PurityType.DIAMOND ? toNumber(item.caratWeight) : toNumber(item.netWeight);
 }
 
+// Pre-tax — this is also what feeds InventoryStock.purchaseAmount (the
+// stock's own cost basis), which GST paid to the vendor never becomes part
+// of, unlike an as-billed total. See lineTotalWithTax below for the other
+// one, used only for PurchaseItem.lineTotal.
 function lineTotal(item: PurchaseLineItemInput) {
   const metalValue = toNumber(item.rate) * lineQuantity(item);
   return metalValue + toNumber(item.makingCharge) + toNumber(item.stoneCharge);
+}
+
+// Same base as lineTotal, plus this line's own GST — mirrors
+// InvoiceItem.lineTotal's convention (the as-billed total), used only for
+// PurchaseItem.lineTotal, never for stock cost basis.
+function lineTotalWithTax(item: PurchaseLineItemInput) {
+  return (
+    lineTotal(item) +
+    toNumber(item.sgstAmount) +
+    toNumber(item.cgstAmount) +
+    toNumber(item.igstAmount)
+  );
+}
+
+/**
+ * Resolves each line's own gstRateId into a verified snapshot — GST is
+ * picked per line now, not once for the whole purchase (see
+ * PurchaseItem.gstRateId's doc comment in schema.prisma), but a single
+ * purchase commonly has far fewer DISTINCT rates in use than it has lines.
+ * Deduping first means at most one resolveGstRateSnapshot DB call per
+ * distinct id actually used, not one per line item. Must run to completion
+ * BEFORE the prisma.$transaction callback that builds the nested
+ * items.create array — that array has to be plain, already-resolved
+ * objects, not promises. Mirrors invoice-actions.ts's identical helper.
+ */
+async function resolvePerLineGstRateSnapshots(
+  storeId: string,
+  items: PurchaseLineItemInput[],
+) {
+  const distinctIds = [
+    ...new Set(items.map((item) => item.gstRateId).filter((id): id is string => !!id)),
+  ];
+  const snapshots = await Promise.all(
+    distinctIds.map((id) => resolveGstRateSnapshot(storeId, id)),
+  );
+  const map = new Map<string, GstRateSnapshot>();
+  distinctIds.forEach((id, index) => {
+    const snapshot = snapshots[index];
+    if (snapshot) map.set(id, snapshot);
+  });
+  return map;
 }
 
 async function generatePurchaseNumber(storeId: string) {
@@ -240,6 +295,12 @@ function mapPurchase(purchase: any) {
       stoneTypeNames: item.stoneTypeNames ?? null,
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
       hsnCode: item.hsnCode ?? null,
+      sgstAmount: Number(item.sgstAmount ?? 0),
+      cgstAmount: Number(item.cgstAmount ?? 0),
+      igstAmount: Number(item.igstAmount ?? 0),
+      gstRateId: item.gstRateId ?? null,
+      gstRateName: item.gstRateName ?? null,
+      gstRatePercent: item.gstRatePercent != null ? Number(item.gstRatePercent) : null,
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
     })),
@@ -535,13 +596,21 @@ export async function createPurchase(
     }));
 
     const discount = toNumber(formData.get("discount"));
-    const taxAmount = toNumber(formData.get("taxAmount"));
-    // Computed client-side by computePurchaseGst() (lib/gst.ts) — sgst+cgst
-    // on an intra-state purchase, igst alone on an inter-state one, never
-    // both, and always zero when the vendor isn't GST-applicable.
-    const sgstAmount = toNumber(formData.get("sgstAmount"));
-    const cgstAmount = toNumber(formData.get("cgstAmount"));
-    const igstAmount = toNumber(formData.get("igstAmount"));
+    // Recomputed from each line's own sgst/cgst/igst rather than trusted
+    // from a single form field — GST is picked per line now (see
+    // PurchaseItem.gstRateId's doc comment in schema.prisma), so the
+    // per-line breakdown is the source of truth the saved total must match.
+    // sgst+cgst (intra-state) and igst (inter-state) are never both nonzero
+    // on the same line — see computePurchaseGst() in lib/gst.ts — so
+    // summing all three here is safe either way.
+    const sgstAmount = items.reduce((sum, item) => sum + toNumber(item.sgstAmount), 0);
+    const cgstAmount = items.reduce((sum, item) => sum + toNumber(item.cgstAmount), 0);
+    const igstAmount = items.reduce((sum, item) => sum + toNumber(item.igstAmount), 0);
+    const taxAmount = sgstAmount + cgstAmount + igstAmount;
+    // Legacy document-level snapshot only — see Purchase.gstRateId's own
+    // doc comment. Never a real user-facing selection anymore; each line
+    // now resolves its own snapshot via resolvePerLineGstRateSnapshots
+    // below.
     const gstRateId = String(formData.get("gstRateId") || "").trim() || null;
 
     // paymentsJson (1-2 method rows, or none for a fully-on-credit purchase)
@@ -643,6 +712,12 @@ export async function createPurchase(
       stockCodes.push(await generateStockCode(storeId, i));
     }
 
+    // Resolved once, up front, for every DISTINCT rate any line actually
+    // uses — see resolvePerLineGstRateSnapshots' own doc comment. Must
+    // happen before the transaction below since a nested Prisma `create`
+    // array has to be plain objects, not promises.
+    const perLineGstRateSnapshots = await resolvePerLineGstRateSnapshots(storeId, items);
+
     const purchase = await prisma.$transaction(async (tx) => {
       // 1. Create a new InventoryStock row per line item first, so the
       //    Purchase's nested item creates can link straight to it.
@@ -734,7 +809,24 @@ export async function createPurchase(
               stoneTypeNames: item.stoneTypeNames ?? undefined,
               dmoWeight: item.dmoWeight ?? undefined,
               hsnCode: item.hsnCode ?? undefined,
-              lineTotal: lineTotal(item),
+              sgstAmount: item.sgstAmount ?? 0,
+              cgstAmount: item.cgstAmount ?? 0,
+              igstAmount: item.igstAmount ?? 0,
+              // This LINE's own resolved snapshot, distinct from the
+              // purchase-level gstRateSnapshot above — see
+              // PurchaseItem.gstRateId's doc comment. `undefined` (not
+              // `null`) to match this function's existing optional-relation
+              // convention.
+              gstRateId: item.gstRateId
+                ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRateId ?? undefined
+                : undefined,
+              gstRateName: item.gstRateId
+                ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRateName ?? undefined
+                : undefined,
+              gstRatePercent: item.gstRateId
+                ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRatePercent ?? undefined
+                : undefined,
+              lineTotal: lineTotalWithTax(item),
               inventoryStockId: stockIds[i],
             })),
           },

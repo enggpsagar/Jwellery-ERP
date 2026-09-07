@@ -39,6 +39,12 @@ export function CustomerReturnLauncher({ customerId, action }: CustomerReturnLau
   const isRefund = action === "refund"
   const Icon = isRefund ? Undo2 : RotateCcw
   const label = isRefund ? "Refund" : "Replace"
+  // Same solid-chart-hue convention as the header's Sale/Purchase buttons —
+  // Refund and Replace were both a plain grey outline button before,
+  // reading as afterthoughts next to Sale's solid color.
+  const colorClass = isRefund
+    ? "bg-[var(--chart-5)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-5)_88%,black)]"
+    : "bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
 
   useEffect(() => {
     if (!pickerOpen) return
@@ -52,8 +58,7 @@ export function CustomerReturnLauncher({ customerId, action }: CustomerReturnLau
     <>
       <Button
         type="button"
-        variant="outline"
-        className="gap-2"
+        className={`gap-2 ${colorClass}`}
         onClick={() => setPickerOpen(true)}
       >
         <Icon className="h-4 w-4" />

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useActionState } from "react"
-import { Trash2, ChevronDown, ChevronRight } from "lucide-react"
+import { Trash2, ChevronDown, ChevronRight, Search } from "lucide-react"
 import type { GstScheme, PurityType } from "@prisma/client"
 
 import { createInvoice, updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
@@ -1163,13 +1163,64 @@ export function InvoiceForm({
                 </button>
 
                 <div className="space-y-1">
-                  <Input
-                    value={item.itemName}
-                    readOnly={isLinked}
-                    placeholder="Item name"
-                    className={isLinked ? "bg-muted" : undefined}
-                    onChange={(e) => updateItem(item.key, { itemName: e.target.value })}
-                  />
+                  {/* Search-and-select is the default way onto this line —
+                      picking a stock item populates every physical field
+                      below and opens the Details region (see
+                      applyStockToItem). Manual typing is still available,
+                      but only once "Create New Line Item" has been chosen
+                      explicitly (stockLinkDecided tracks that choice); the
+                      search icon button switches back. */}
+                  {item.stockLinkDecided && !item.inventoryStockId ? (
+                    <div className="flex gap-1">
+                      <Input
+                        value={item.itemName}
+                        placeholder="Item name"
+                        className="flex-1"
+                        onChange={(e) => updateItem(item.key, { itemName: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => updateItem(item.key, { stockLinkDecided: false })}
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        aria-label="Search a stock item instead"
+                        title="Search a stock item instead"
+                      >
+                        <Search className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <StockItemSelect
+                      stockItems={stockItems}
+                      value={item.inventoryStockId}
+                      onValueChange={(value) => applyStockToItem(item.key, value)}
+                      onCreateNew={() => {
+                        updateItem(item.key, {
+                          ...emptyLineItem(gstRateId),
+                          key: item.key,
+                          // Explicitly choosing to type this line by hand is
+                          // itself the "decision" the picker requires — see
+                          // stockLinkDecided's own doc comment.
+                          stockLinkDecided: true,
+                        })
+                        setExpandedKeys((prev) => {
+                          const next = new Set(prev)
+                          next.delete(item.key)
+                          return next
+                        })
+                      }}
+                      isDisabled={(stock) => availableForStock(stock.id, item.key) <= 0}
+                      renderLabel={(stock) =>
+                        `${stock.stockCode} — ${stock.productName} (${availableForStock(stock.id, item.key)} available)`
+                      }
+                      placeholder="Search stock item..."
+                      className="w-full"
+                    />
+                  )}
+                  {!item.stockLinkDecided && (
+                    <p className="text-[10px] leading-tight text-destructive">
+                      Select a stock item, or choose &quot;Create New Line Item&quot;
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -1292,51 +1343,7 @@ export function InvoiceForm({
                       narrower sixth, reading as inconsistently oversized
                       next to them. Now it's just the widest cell (2 of 6
                       columns) in the same grid everything else shares. */}
-                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                    <div className="col-span-2 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">
-                        Link Stock Item <RequiredMark />
-                      </Label>
-                      <StockItemSelect
-                        stockItems={stockItems}
-                        value={item.inventoryStockId}
-                        onValueChange={(value) => applyStockToItem(item.key, value)}
-                        // A plain applyStockToItem(key, "") only clears
-                        // inventoryStockId — Item Name/weights/rate etc. from
-                        // whatever stock was previously linked stayed put, so
-                        // picking "Create New Line Item" on an already-linked
-                        // row looked like it did nothing. This resets the whole
-                        // row to a blank manual-entry line instead, keeping only
-                        // its identity (key) so it doesn't jump position.
-                        onCreateNew={() => {
-                          updateItem(item.key, {
-                            ...emptyLineItem(gstRateId),
-                            key: item.key,
-                            // Explicitly choosing to type this line by hand
-                            // is itself the "decision" the picker requires —
-                            // see stockLinkDecided's own doc comment.
-                            stockLinkDecided: true,
-                          })
-                          // Back to a blank manual-entry row — collapse it too,
-                          // matching a freshly-added line's default state.
-                          setExpandedKeys((prev) => {
-                            const next = new Set(prev)
-                            next.delete(item.key)
-                            return next
-                          })
-                        }}
-                        isDisabled={(stock) => availableForStock(stock.id, item.key) <= 0}
-                        renderLabel={(stock) =>
-                          `${stock.stockCode} — ${stock.productName} (${availableForStock(stock.id, item.key)} available)`
-                        }
-                      />
-                      {!item.stockLinkDecided && (
-                        <p className="text-[10px] leading-tight text-destructive">
-                          Select a stock item, or choose &quot;Create New Line Item&quot;
-                        </p>
-                      )}
-                    </div>
-
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Purity</Label>
                       <Select
@@ -1669,9 +1676,13 @@ export function InvoiceForm({
       </div>
 
       {/* Side by side rather than stacked — narrow, single-purpose fields
-          with no reason to each claim a full row of vertical space. */}
+          with no reason to each claim a full row of vertical space. Each
+          gets its own bordered, tinted box (one of this app's chart hues,
+          same convention as the header's Sale/Purchase buttons) so the
+          three don't blur into one long strip and each stays easy to find
+          at a glance. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg border border-[color-mix(in_oklab,var(--chart-2)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-2)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-2)_12%,transparent)]">
           <PercentOrFlatInput
             base={subtotal + makingChargesTotal + stoneChargesTotal}
             value={discount}
@@ -1680,7 +1691,7 @@ export function InvoiceForm({
         </div>
 
         {editInvoiceId ? (
-          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <div className="space-y-2 rounded-lg border border-[color-mix(in_oklab,var(--chart-3)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-3)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-3)_12%,transparent)]">
             <Label>Paid Now</Label>
             <Input
               type="number"
@@ -1690,14 +1701,16 @@ export function InvoiceForm({
             />
           </div>
         ) : (
-          <PaidNowFields
-            rows={paymentRows}
-            onRowsChange={setPaymentRows}
-            maxAmount={totalAmount > 0 ? totalAmount : undefined}
-          />
+          <div className="rounded-lg border border-[color-mix(in_oklab,var(--chart-3)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-3)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-3)_12%,transparent)]">
+            <PaidNowFields
+              rows={paymentRows}
+              onRowsChange={setPaymentRows}
+              maxAmount={totalAmount > 0 ? totalAmount : undefined}
+            />
+          </div>
         )}
 
-        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+        <div className="space-y-2 rounded-lg border border-[color-mix(in_oklab,var(--chart-1)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-1)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-1)_12%,transparent)]">
           <Label>Notes</Label>
           <Textarea name="notes" rows={2} defaultValue={defaultNotes} />
         </div>

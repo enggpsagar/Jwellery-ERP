@@ -8,6 +8,7 @@ import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { safeReturnTo } from "@/lib/safe-return-to"
 
 import { CustomerEditForm } from "@/components/customers/customer-edit-form"
+import { CustomerVendorLinkCard } from "@/components/customers/customer-vendor-link-card"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 type EditCustomerPageProps = {
@@ -52,6 +53,14 @@ export default async function EditCustomerPage({
         description="Update this customer's contact and account details."
         backHref={returnTo ?? "/customers"}
         backLabel={returnTo ? "Back without saving" : "Back to Customers"}
+      />
+
+      {/* Same "is this customer also a vendor" card the detail page shows —
+          previously only visible on /customers/[id], so a linked vendor
+          silently disappeared from view the moment you opened Edit. */}
+      <CustomerVendorLinkCard
+        customerId={customer.id}
+        linkedVendor={customer.linkedVendor ?? null}
       />
 
       <CustomerEditForm

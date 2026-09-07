@@ -13,7 +13,7 @@ import {
   type LinkableOption,
 } from "@/lib/actions/party-link-actions"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { ActiveBadge } from "@/components/shared/active-badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
@@ -163,9 +163,7 @@ export function CustomerVendorLinkCard({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{linkedVendor.name}</span>
-                  <Badge variant={linkedVendor.isActive ? "outline" : "secondary"}>
-                    {linkedVendor.isActive ? "Active" : "Inactive"}
-                  </Badge>
+                  <ActiveBadge isActive={linkedVendor.isActive} />
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {linkedVendor.vendorCode ? `${linkedVendor.vendorCode} — ` : ""}

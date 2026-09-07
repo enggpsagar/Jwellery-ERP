@@ -3,14 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
-import { Plus, Trash2 } from "lucide-react"
-import type { GstScheme, PartyGstType, PurityType } from "@prisma/client"
+import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react"
+import type { PartyGstType, PurityType } from "@prisma/client"
 
 import { createPurchase, type PurchaseFormState } from "@/lib/actions/purchase-actions"
 import { PURITY_SELECT_OPTIONS, isCaratWeighedMetal, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 import { useToast } from "@/components/providers/toast-provider"
 import { computePurchaseGst, isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst"
-import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -104,6 +103,11 @@ type LineItem = {
   /** Once Net Weight is edited directly, the gross/dmo auto-calc stops
    * overwriting it — same override rule as the Product form. */
   netTouched: boolean
+  /** Which configured GstRate (Settings > GST Rates) THIS line uses — GST
+   * is picked per line, not once for the whole purchase, since a vendor's
+   * single bill can genuinely mix rates across items. Mirrors
+   * InvoiceItem.gstRateId's own doc comment in schema.prisma. */
+  gstRateId: string
 }
 
 const PURITY_OPTIONS = PURITY_SELECT_OPTIONS
@@ -114,7 +118,7 @@ const PURITY_OPTIONS = PURITY_SELECT_OPTIONS
 // client's first render — two different crypto.randomUUID() values for
 // the same row caused a hydration mismatch on every line-item form. The
 // initial call passes a fixed key instead so server and client agree.
-function emptyLineItem(key: string = crypto.randomUUID()): LineItem {
+function emptyLineItem(defaultGstRateId?: string, key: string = crypto.randomUUID()): LineItem {
   return {
     key,
     productId: "",
@@ -137,12 +141,18 @@ function emptyLineItem(key: string = crypto.randomUUID()): LineItem {
     netStoneWeightTouched: false,
     stoneMetalTypeName: "",
     stoneTypeNames: [],
+    // Dust/Making/Other Wt has no input anywhere on this form anymore (see
+    // the removed field's own note further down) — kept here at a fixed 0
+    // purely because deriveNetWeight's signature and the persisted
+    // PurchaseItem/InventoryStock columns still expect a value, same as
+    // InvoiceItem.dmoWeight's own now-vestigial field.
     dmoWeight: 0,
     dmoWeightUnit: "GRAM",
     stoneWeightInput: 0,
     stoneWeightUnit: "GRAM",
     hsnCode: "",
     netTouched: false,
+    gstRateId: defaultGstRateId ?? "",
   }
 }
 
@@ -176,9 +186,6 @@ type PurchaseFormProps = {
   /** Legacy last-resort fallback (BusinessSettings.defaultGstRate) — see
    * the same prop on InvoiceForm. */
   defaultGstRate?: number
-  /** Drives whether GST can be charged at all (never, for Composition) and
-   * how it's split — see computeGst()'s own doc comment in lib/gst.ts. */
-  gstScheme: GstScheme
   /** The store's own state, compared against the selected vendor's state to
    * tell an inter-state purchase (IGST) from an intra-state one (SGST+CGST). */
   storeState?: string | null
@@ -203,7 +210,6 @@ type PurchaseDraft = {
   vendorId: string
   items: LineItem[]
   discount: number
-  gstRateId: string
   /** "Paid Now" payment-method rows — see paymentRows' own comment below
    * for why this is an array of rows rather than a single number. */
   paymentRows: PaymentMethodValue[]
@@ -223,7 +229,6 @@ export function PurchaseForm({
   caratConversionRates,
   gstRates,
   defaultGstRate = 0,
-  gstScheme,
   storeState,
   initialLocationId,
 }: PurchaseFormProps) {
@@ -254,27 +259,36 @@ export function PurchaseForm({
 
   const [vendorId, setVendorId] = useState("")
   const [locationId, setLocationId] = useState(initialLocationId ?? "")
-  const [items, setItems] = useState<LineItem[]>([emptyLineItem("initial")])
-  const [discount, setDiscount] = useState(0)
-  const [gstRateId, setGstRateId] = useState<string>(
+  // No longer a user-facing control (each line picks its own GST rate in
+  // its own Details region, same as Invoice) — this is just what a freshly-
+  // added line starts on, resolved once from the store's own default/active
+  // GstRate and never changed afterward, so it doesn't need a setter.
+  const [gstRateId] = useState<string>(
     () =>
       gstRates.find((r) => r.isDefault && r.isActive)?.id ??
       gstRates.find((r) => r.isActive)?.id ??
       "",
   )
-  // GST Rate options: active rows, plus whatever's currently selected (a
-  // restored draft could reference one since deactivated).
-  const availableGstRates = useMemo(
-    () => gstRates.filter((r) => r.isActive || r.id === gstRateId),
-    [gstRates, gstRateId],
-  )
+  const [items, setItems] = useState<LineItem[]>(() => [emptyLineItem(gstRateId, "initial")])
+  // Collapsed by default, matching Invoice's own compact-by-default rule —
+  // see expandedKeys' doc comment on InvoiceForm. A line auto-expands once
+  // a Product is picked for it (applyProductToItem below), since that's
+  // the moment fields the user still needs to fill in (weights, rate) get
+  // meaningful.
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
+  const toggleExpanded = (key: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+  const [discount, setDiscount] = useState(0)
   const selectedGstRate = gstRates.find((r) => r.id === gstRateId)
-  // The plain percent, still fed into computePurchaseGst() exactly as
-  // before — only where the number comes from changed. A purchase's GST
-  // depends on the vendor's own registration, not our store's scheme (see
-  // computePurchaseGst()'s doc comment), so — unlike Invoice — Composition
-  // doesn't zero this; the disabled state below is keyed on the vendor's
-  // gstType instead.
+  // Fallback used only when a line's own gstRateId can't be resolved (e.g. a
+  // since-deleted rate, or a line added before the store had any GstRate
+  // configured) — same last-resort chain as InvoiceForm's own `gstRate`.
   const gstRate = selectedGstRate?.ratePercent ?? defaultGstRate
   // "Paid Now" collects a method (Cash/UPI/etc.) per row, same PaymentMethodFields
   // component the "Record Payment" dialog uses — paidAmount is always derived
@@ -315,7 +329,6 @@ export function PurchaseForm({
       vendorId,
       items,
       discount,
-      gstRateId,
       paymentRows,
       purchaseDate: formData ? String(formData.get("purchaseDate") ?? "") : "",
       notes: formData ? String(formData.get("notes") ?? "") : "",
@@ -364,11 +377,10 @@ export function PurchaseForm({
     if (draft) {
       setVendorId(newVendorId || draft.vendorId || "")
       setDiscount(draft.discount ?? 0)
-      setGstRateId(draft.gstRateId ?? "")
       setPaymentRows(draft.paymentRows ?? [])
 
       let nextItems =
-        draft.items && draft.items.length ? draft.items : [emptyLineItem()]
+        draft.items && draft.items.length ? draft.items : [emptyLineItem(gstRateId)]
 
       // The page refetched on the way back in, so a product created a moment
       // ago is already in `products` — it only needs applying to the line
@@ -396,6 +408,10 @@ export function PurchaseForm({
       }
 
       setItems(nextItems)
+      // Restored, real in-progress data — expanded by default for the same
+      // reason a freshly-linked line is (see expandedKeys' own comment),
+      // rather than making the user hunt for each chevron after a restore.
+      setExpandedKeys(new Set(nextItems.map((item) => item.key)))
 
       if (formRef.current) {
         const dateInput = formRef.current.elements.namedItem(
@@ -493,6 +509,10 @@ export function PurchaseForm({
       caratWeight: product.defaultCaratWeight ?? 0,
       hsnCode: product.hsnCode ?? "",
     })
+    // A product only supplies defaults (making charge, stone, HSN) — weight
+    // and rate still need entering by hand, so expand right away instead of
+    // making the user hunt for the chevron to find what's still blank.
+    setExpandedKeys((prev) => new Set(prev).add(key))
   }
 
   const removeItem = (key: string) => {
@@ -622,8 +642,49 @@ export function PurchaseForm({
   const lineQuantity = (item: LineItem) =>
     item.purity === "DIAMOND" ? item.caratWeight : item.netWeight
 
-  const lineTotal = (item: LineItem) =>
+  // Taxable value per line: metal + making + stone — the base each line's
+  // own GST is computed against. The document's Discount is applied once,
+  // at the very end (see totalAmount below), same as Invoice — it does not
+  // reduce any individual line's own taxable base.
+  const lineTaxableValue = (item: LineItem) =>
     item.rate * lineQuantity(item) + item.makingCharge + item.stoneCharge
+
+  // This line's own GST %, resolved from its own gstRateId against the full
+  // `gstRates` prop — falls back to the document-level default (`gstRate`
+  // above) when blank or unresolved, never throws. Nothing here zeroes for
+  // our own store's Composition scheme (unlike Invoice) — a purchase's GST
+  // is whatever the VENDOR's own invoice shows, driven entirely by their
+  // registration (isVendorGstApplicable), never by ours.
+  const lineGstRatePercent = (item: LineItem) =>
+    gstRates.find((r) => r.id === item.gstRateId)?.ratePercent ?? gstRate
+
+  // GST is picked per line now, not once for the whole purchase (see
+  // PurchaseItem.gstRateId's doc comment in schema.prisma) — a single
+  // vendor bill can genuinely mix rates across items. Every line still
+  // shares the same isInterState verdict, since that only depends on the
+  // one vendor's state vs. the store's own, both constant for the whole
+  // document.
+  const lineGst = (item: LineItem) => {
+    const breakdown = computePurchaseGst(
+      lineTaxableValue(item),
+      lineGstRatePercent(item),
+      selectedVendor?.gstType ?? "UNREGISTERED",
+      storeState,
+      selectedVendor?.state,
+    )
+    const round = (value: number) => Math.round(value * 100) / 100
+    return {
+      sgst: round(breakdown.sgst),
+      cgst: round(breakdown.cgst),
+      igst: round(breakdown.igst),
+      isInterState: breakdown.isInterState,
+    }
+  }
+
+  const lineTotal = (item: LineItem) => {
+    const { sgst, cgst, igst } = lineGst(item)
+    return lineTaxableValue(item) + sgst + cgst + igst
+  }
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.rate * lineQuantity(item), 0),
@@ -638,33 +699,17 @@ export function PurchaseForm({
     () => items.reduce((sum, item) => sum + item.stoneCharge, 0),
     [items],
   )
-
-  // Purchase records tax at the document level, not per line (see
-  // Purchase's own schema comment) — one computePurchaseGst() call against
-  // the whole taxable base. Deliberately keyed off the VENDOR's own gstType,
-  // not our store's gstScheme — a purchase's GST is whatever the vendor's
-  // real invoice shows, which depends on how THEY are registered. Our own
-  // store's Composition status never suppresses this; it only affects
-  // whether we can claim it back — a separate concern, noted below.
-  const taxableValue = subtotal + makingChargesTotal + stoneChargesTotal - discount
-  const gstBreakdown = useMemo(() => {
-    const breakdown = computePurchaseGst(
-      taxableValue,
-      gstRate,
-      selectedVendor?.gstType ?? "UNREGISTERED",
-      storeState,
-      selectedVendor?.state,
-    )
-    const round = (value: number) => Math.round(value * 100) / 100
-    return {
-      sgst: round(breakdown.sgst),
-      cgst: round(breakdown.cgst),
-      igst: round(breakdown.igst),
-      isInterState: breakdown.isInterState,
-    }
+  // Recomputed from each line's own sgst/cgst/igst rather than a single
+  // document-level rate — see lineGst's own comment above.
+  const taxAmount = useMemo(
+    () =>
+      items.reduce((sum, item) => {
+        const { sgst, cgst, igst } = lineGst(item)
+        return sum + sgst + cgst + igst
+      }, 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taxableValue, gstRate, selectedVendor?.gstType, storeState, selectedVendor?.state])
-  const taxAmount = gstBreakdown.sgst + gstBreakdown.cgst + gstBreakdown.igst
+    [items, selectedVendor?.gstType, selectedVendor?.state, storeState, gstRates, gstRate],
+  )
 
   const totalAmount =
     subtotal + makingChargesTotal + stoneChargesTotal - discount + taxAmount
@@ -678,6 +723,7 @@ export function PurchaseForm({
       const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
       const unit = primaryUnitFor(item)
       const toUnit = (grams: number) => toPrimaryUnit(grams, "GRAM", unit, gramsPerCarat)
+      const { sgst, cgst, igst } = lineGst(item)
       return {
         productId: item.productId,
         itemName: item.itemName || "Item",
@@ -700,6 +746,10 @@ export function PurchaseForm({
         dmoWeight: toUnit(item.dmoWeight) || null,
         stoneWeight: toUnit(item.stoneWeightInput) || null,
         hsnCode: item.hsnCode || null,
+        sgstAmount: sgst,
+        cgstAmount: cgst,
+        igstAmount: igst,
+        gstRateId: item.gstRateId || null,
       }
     }),
   )
@@ -722,6 +772,20 @@ export function PurchaseForm({
   )
   const paidOverTotal = paidAmount > totalAmount
 
+  // Document-level totals — summed from each line's own split rather than a
+  // single computePurchaseGst() call, same reasoning as taxAmount above.
+  // Every line shares one isInterState verdict (see lineGst's comment), so
+  // summing sgst/cgst/igst separately across lines is safe either way.
+  const docSgst = items.reduce((sum, item) => sum + lineGst(item).sgst, 0)
+  const docCgst = items.reduce((sum, item) => sum + lineGst(item).cgst, 0)
+  const docIgst = items.reduce((sum, item) => sum + lineGst(item).igst, 0)
+
+  // Same compact-row column widths as InvoiceForm's own compactRowGridCols —
+  // chevron, Product (searchable, wide), Qty, Net Wt, Rate/g, GST, Amount,
+  // remove.
+  const compactRowGridCols =
+    "grid-cols-[28px_minmax(160px,2fr)_76px_168px_112px_104px_116px_28px]"
+
   return (
     <form
       ref={formRef}
@@ -742,9 +806,9 @@ export function PurchaseForm({
       <input type="hidden" name="itemsJson" value={itemsJson} />
       <input type="hidden" name="discount" value={discount} />
       <input type="hidden" name="taxAmount" value={taxAmount} />
-      <input type="hidden" name="sgstAmount" value={gstBreakdown.sgst} />
-      <input type="hidden" name="cgstAmount" value={gstBreakdown.cgst} />
-      <input type="hidden" name="igstAmount" value={gstBreakdown.igst} />
+      <input type="hidden" name="sgstAmount" value={docSgst} />
+      <input type="hidden" name="cgstAmount" value={docCgst} />
+      <input type="hidden" name="igstAmount" value={docIgst} />
       <input type="hidden" name="gstRateId" value={gstRateId} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
       <input type="hidden" name="paymentsJson" value={paymentsJson} />
@@ -761,6 +825,14 @@ export function PurchaseForm({
             addNewHref={`/vendors/new?returnTo=${encodeURIComponent(RETURN_TO)}`}
             onBeforeAddNew={() => saveDraft()}
           />
+          {selectedVendor ? (
+            <p className="text-xs text-muted-foreground">
+              Vendor GST Type: <span className="font-medium">{partyGstTypeLabel(selectedVendor.gstType)}</span>
+              {!isVendorGstApplicable(selectedVendor.gstType)
+                ? " — their invoice can't carry GST, so each line's GST Rate is disabled."
+                : ""}
+            </p>
+          ) : null}
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -796,188 +868,104 @@ export function PurchaseForm({
           <Label>Line Items</Label>
           <Button
             type="button"
-            variant="ghost"
             size="sm"
-            onClick={() => setItems((prev) => [...prev, emptyLineItem()])}
+            onClick={() => setItems((prev) => [...prev, emptyLineItem(gstRateId)])}
+            // Same solid-fill treatment as the Invoice form's "Add Item"
+            // button (one of this app's chart hues, matching the header's
+            // Sale/Purchase button convention) instead of a grey ghost
+            // button that blended into the section header.
+            className="bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
           >
             <Plus className="h-4 w-4 mr-1" /> Add Item
           </Button>
         </div>
 
-        <div className="space-y-3">
-          {items.map((item) => (
-            <div key={item.key} className="rounded-lg border p-4 space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="md:col-span-2 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Product <RequiredMark /></Label>
-                  <ProductSelect
-                    key={productSelectKeys[item.key] ?? 0}
-                    products={productSelectOptions}
-                    name={`product-${item.key}`}
-                    defaultValue={item.productId}
-                    onChange={(productId) => applyProductToItem(item.key, productId)}
-                    addNewHref={`/inventory/products/new?returnTo=${encodeURIComponent(RETURN_TO)}`}
-                    onBeforeAddNew={() => saveDraft(item.key)}
-                  />
-                </div>
+        <div className="overflow-x-auto">
+          <div className="min-w-[900px] space-y-2">
+            {/* Compact-row layout, same shape as the Invoice form: one dense
+                line per item (chevron, Product, Qty, Net Wt, Rate/g, GST,
+                Amount, remove) with everything else — Item Name, Purity,
+                weights, charges, stone details, this line's own GST Rate —
+                tucked behind the chevron in a Details region, instead of
+                every field always on screen. */}
+            <div
+              className={`grid ${compactRowGridCols} items-center gap-2 px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground`}
+            >
+              <span />
+              <span>Product</span>
+              <span>Qty</span>
+              <span>Net Wt</span>
+              <span>Rate / g</span>
+              <span>GST</span>
+              <span>Amount</span>
+              <span />
+            </div>
 
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Item Name</Label>
-                  <Input
-                    value={item.itemName}
-                    onChange={(e) => updateItem(item.key, { itemName: e.target.value })}
-                  />
-                </div>
+            {items.map((item) => {
+              const isExpanded = expandedKeys.has(item.key)
+              const gst = lineGst(item)
+              const gstTotal = gst.isInterState ? gst.igst : gst.sgst + gst.cgst
 
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Quantity</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={item.quantity === 0 ? "" : item.quantity}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) =>
-                      updateItem(item.key, { quantity: Number(e.target.value) || 0 })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Purity</Label>
-                  <Select
-                    value={item.purity}
-                    onValueChange={(value) => updateItem(item.key, { purity: value })}
+              return (
+              <div key={item.key} className="rounded-lg border">
+                <div className={`grid ${compactRowGridCols} items-start gap-2 p-2`}>
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(item.key)}
+                    className="mt-1.5 text-muted-foreground hover:text-foreground"
+                    aria-label={isExpanded ? "Collapse line item details" : "Expand line item details"}
+                    aria-expanded={isExpanded}
                   >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select purity" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PURITY_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </button>
 
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Gross Weight</Label>
-                  <div className="flex gap-1">
-                    <Input
-                      type="number"
-                      step="0.00001"
-                      className="flex-1"
-                      value={
-                        item.grossWeight === 0
-                          ? ""
-                          : toPrimaryUnit(
-                              item.grossWeight,
-                              "GRAM",
-                              item.grossWeightUnit,
-                              resolveGramsPerCarat(item.purity, caratConversionRates),
-                            )
-                      }
-                      onChange={(e) => {
-                        const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
-                        const grossWeight = toPrimaryUnit(Number(e.target.value) || 0, item.grossWeightUnit, "GRAM", gramsPerCarat)
-                        const derived = item.netTouched
-                          ? undefined
-                          : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight)
-                        updateItem(item.key, {
-                          grossWeight,
-                          ...(derived !== null && derived !== undefined
-                            ? { netWeight: derived }
-                            : {}),
-                        })
-                      }}
-                    />
-                    <Select
-                      value={item.grossWeightUnit}
-                      onValueChange={(unit) => updateItem(item.key, { grossWeightUnit: unit as "GRAM" | "CARAT" })}
-                    >
-                      <SelectTrigger className="w-16">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="GRAM">g</SelectItem>
-                        <SelectItem value="CARAT">ct</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Net Weight</Label>
-                  <div className="flex gap-1">
-                    <Input
-                      type="number"
-                      step="0.00001"
-                      className="flex-1"
-                      value={
-                        item.netWeight === 0
-                          ? ""
-                          : toPrimaryUnit(
-                              item.netWeight,
-                              "GRAM",
-                              item.netWeightUnit,
-                              resolveGramsPerCarat(item.purity, caratConversionRates),
-                            )
-                      }
-                      onChange={(e) => handleNetWeightChange(item, e.target.value)}
-                    />
-                    <Select
-                      value={item.netWeightUnit}
-                      onValueChange={(unit) => updateItem(item.key, { netWeightUnit: unit as "GRAM" | "CARAT" })}
-                    >
-                      <SelectTrigger className="w-16">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="GRAM">g</SelectItem>
-                        <SelectItem value="CARAT">ct</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {!item.netTouched && (
-                    <p className="text-xs text-muted-foreground">Gross − stone − dust/other</p>
-                  )}
-                </div>
-
-                {/* For a carat-weighed line (no "Includes a Stone" toggle
-                    applies there at all — see below), Net Stone Weight has
-                    no gating concept and always shows here. For every other
-                    line, this field is only ever visible once "Includes a
-                    Stone" is checked, inside that toggle's own box below —
-                    while off, it stays fully hidden (not shown here) rather
-                    than relocated, per the toggle's on/off gating. */}
-                {isCaratLine(item) && (
                   <div className="space-y-1">
-                    <Label className="text-xs">Net Stone Weight</Label>
+                    <ProductSelect
+                      key={productSelectKeys[item.key] ?? 0}
+                      products={productSelectOptions}
+                      name={`product-${item.key}`}
+                      defaultValue={item.productId}
+                      onChange={(productId) => applyProductToItem(item.key, productId)}
+                      addNewHref={`/inventory/products/new?returnTo=${encodeURIComponent(RETURN_TO)}`}
+                      onBeforeAddNew={() => saveDraft(item.key)}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={item.quantity === 0 ? "" : item.quantity}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) =>
+                        updateItem(item.key, { quantity: Number(e.target.value) || 0 })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-1">
                     <div className="flex gap-1">
                       <Input
                         type="number"
                         step="0.00001"
                         className="flex-1"
                         value={
-                          item.stoneWeightInput === 0
+                          item.netWeight === 0
                             ? ""
                             : toPrimaryUnit(
-                                item.stoneWeightInput,
+                                item.netWeight,
                                 "GRAM",
-                                item.stoneWeightUnit,
+                                item.netWeightUnit,
                                 resolveGramsPerCarat(item.purity, caratConversionRates),
                               )
                         }
-                        onChange={(e) => handleStoneWeightInputChange(item, e.target.value)}
+                        onChange={(e) => handleNetWeightChange(item, e.target.value)}
                       />
                       <Select
-                        value={item.stoneWeightUnit}
-                        onValueChange={(unit) => handleStoneWeightUnitChange(item, unit as "GRAM" | "CARAT")}
+                        value={item.netWeightUnit}
+                        onValueChange={(unit) => updateItem(item.key, { netWeightUnit: unit as "GRAM" | "CARAT" })}
                       >
-                        <SelectTrigger className="w-16">
+                        <SelectTrigger className="w-14" size="sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -986,208 +974,359 @@ export function PurchaseForm({
                         </SelectContent>
                       </Select>
                     </div>
+                    {!item.netTouched && (
+                      <p className="text-[10px] leading-tight text-muted-foreground">Gross − stone</p>
+                    )}
                   </div>
-                )}
 
-                {isCaratLine(item) && (
-                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                    <Label className="text-xs">Carat Weight (ct)</Label>
-                    <Input
-                      type="number"
-                      step="0.001"
-                      value={item.caratWeight === 0 ? "" : item.caratWeight}
-                      onChange={(e) => handleCaratWeightChange(item, e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {item.purity === "DIAMOND"
-                        ? "Priced per carat, not per gram"
-                        : "1 ct = 0.2 g — converts with Net Weight"}
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Dust/Making/Other Wt</Label>
-                  <div className="flex gap-1">
-                    <Input
-                      type="number"
-                      step="0.00001"
-                      className="flex-1"
-                      value={
-                        item.dmoWeight === 0
-                          ? ""
-                          : toPrimaryUnit(
-                              item.dmoWeight,
-                              "GRAM",
-                              item.dmoWeightUnit,
-                              resolveGramsPerCarat(item.purity, caratConversionRates),
-                            )
-                      }
-                      onChange={(e) => {
-                        const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
-                        const dmoWeight = toPrimaryUnit(Number(e.target.value) || 0, item.dmoWeightUnit, "GRAM", gramsPerCarat)
-                        const derived = item.netTouched
-                          ? undefined
-                          : deriveNetWeight(item.grossWeight, item.stoneWeightInput, dmoWeight)
-                        updateItem(item.key, {
-                          dmoWeight,
-                          ...(derived !== null && derived !== undefined
-                            ? { netWeight: derived }
-                            : {}),
-                        })
-                      }}
-                    />
-                    <Select
-                      value={item.dmoWeightUnit}
-                      onValueChange={(unit) => updateItem(item.key, { dmoWeightUnit: unit as "GRAM" | "CARAT" })}
-                    >
-                      <SelectTrigger className="w-16">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="GRAM">g</SelectItem>
-                        <SelectItem value="CARAT">ct</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              {/* A composite piece (metal + an embedded stone) is the
-                  exception, not the rule, for a line whose own metal isn't
-                  Diamond/Stone — kept as its own toggled strip rather than
-                  wedged into the grid above, so a plain Gold line's fields
-                  don't reflow every time this gets checked/unchecked. */}
-              {!isCaratLine(item) && (
-                <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
-                  <IncludesStoneToggle
-                    checked={item.hasStoneComponent}
-                    onChange={(checked) =>
-                      updateItem(item.key, {
-                        hasStoneComponent: checked,
-                        // Net Stone Weight and Stone Charge are now both
-                        // hidden once the toggle is off — clear them so a
-                        // hidden field can't silently keep submitting
-                        // whatever was last entered.
-                        ...(checked
-                          ? {}
-                          : {
-                              stoneWeightInput: 0,
-                              netStoneWeightTouched: false,
-                              stoneCharge: 0,
-                              stoneChargeTouched: false,
-                            }),
-                      })
-                    }
-                  />
-
-                  {item.hasStoneComponent && (
-                    <StoneComponentFields
-                      metals={metals}
-                      origins={origins}
-                      onMetalsChange={setMetals}
-                      onOriginsChange={setOrigins}
-                      stoneMetalTypeName={item.stoneMetalTypeName}
-                      onStoneChange={(name, typeNames) =>
-                        updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
-                      }
-                      selectedTypeNames={item.stoneTypeNames}
-                      onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
-                      caratWeight={item.caratWeight}
-                      onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
-                      stoneRate={item.stoneRate}
-                      onStoneRateChange={(value) => handleStoneRateChange(item, value)}
-                      stoneCharge={item.stoneCharge}
-                      onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
-                      stoneChargeTouched={item.stoneChargeTouched}
-                      stoneWeightInput={toPrimaryUnit(
-                        item.stoneWeightInput,
-                        "GRAM",
-                        item.stoneWeightUnit,
-                        resolveGramsPerCarat(item.purity, caratConversionRates),
-                      )}
-                      onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
-                      stoneWeightUnit={item.stoneWeightUnit}
-                      onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
-                      netStoneWeightTouched={item.netStoneWeightTouched}
-                    />
-                  )}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Rate / g</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={item.rate === 0 ? "" : item.rate}
-                    onChange={(e) =>
-                      updateItem(item.key, { rate: Number(e.target.value) || 0 })
-                    }
-                  />
-                </div>
-
-                <MakingChargeInput
-                  rate={item.rate}
-                  netWeight={item.netWeight}
-                  value={item.makingCharge}
-                  onChange={(v) => updateItem(item.key, { makingCharge: v })}
-                  chargeType={item.makingChargeType}
-                  onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
-                />
-
-                {/* For a carat-weighed line (no "Includes a Stone" toggle
-                    applies there at all), Stone Charge always shows here.
-                    For every other line, it's only ever visible once
-                    "Includes a Stone" is checked, inside that toggle's own
-                    box above — while off, no stone means nothing to charge
-                    for, so it stays fully hidden here. */}
-                {isCaratLine(item) && (
-                  <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                    <Label className="text-xs">Stone Charge</Label>
+                  <div className="space-y-1">
                     <Input
                       type="number"
                       step="0.01"
-                      value={item.stoneCharge === 0 ? "" : item.stoneCharge}
-                      onChange={(e) => handleStoneChargeChange(item, e.target.value)}
+                      value={item.rate === 0 ? "" : item.rate}
+                      onChange={(e) =>
+                        updateItem(item.key, { rate: Number(e.target.value) || 0 })
+                      }
                     />
                   </div>
-                )}
 
-                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">HSN Code</Label>
-                  <Input
-                    value={item.hsnCode}
-                    onChange={(e) => updateItem(item.key, { hsnCode: e.target.value })}
-                    placeholder="e.g. 7113"
-                  />
-                </div>
+                  <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-xs text-muted-foreground">
+                    ₹{gstTotal.toFixed(2)}
+                  </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs">Line Total</Label>
-                  <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-medium">
+                  <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-sm font-medium">
                     ₹{lineTotal(item).toFixed(2)}
                   </div>
-                </div>
-              </div>
 
-              {items.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeItem(item.key)}
-                  className="inline-flex items-center gap-1 text-xs text-red-600 hover:underline"
-                >
-                  <Trash2 className="h-3 w-3" /> Remove item
-                </button>
-              )}
-            </div>
-          ))}
+                  <div className="flex justify-center pt-1">
+                    {items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.key)}
+                        className="text-red-600 hover:text-red-700"
+                        aria-label="Remove item"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <div className="space-y-3 border-t p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="md:col-span-2 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                        <Label className="text-xs">Item Name</Label>
+                        <Input
+                          value={item.itemName}
+                          onChange={(e) => updateItem(item.key, { itemName: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                        <Label className="text-xs">HSN Code</Label>
+                        <Input
+                          value={item.hsnCode}
+                          onChange={(e) => updateItem(item.key, { hsnCode: e.target.value })}
+                          placeholder="e.g. 7113"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                        <Label className="text-xs">Purity</Label>
+                        <Select
+                          value={item.purity}
+                          onValueChange={(value) => updateItem(item.key, { purity: value })}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select purity" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PURITY_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                        <Label className="text-xs">Gross Weight</Label>
+                        <div className="flex gap-1">
+                          <Input
+                            type="number"
+                            step="0.00001"
+                            className="flex-1"
+                            value={
+                              item.grossWeight === 0
+                                ? ""
+                                : toPrimaryUnit(
+                                    item.grossWeight,
+                                    "GRAM",
+                                    item.grossWeightUnit,
+                                    resolveGramsPerCarat(item.purity, caratConversionRates),
+                                  )
+                            }
+                            onChange={(e) => {
+                              const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+                              const grossWeight = toPrimaryUnit(Number(e.target.value) || 0, item.grossWeightUnit, "GRAM", gramsPerCarat)
+                              const derived = item.netTouched
+                                ? undefined
+                                : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight)
+                              updateItem(item.key, {
+                                grossWeight,
+                                ...(derived !== null && derived !== undefined
+                                  ? { netWeight: derived }
+                                  : {}),
+                              })
+                            }}
+                          />
+                          <Select
+                            value={item.grossWeightUnit}
+                            onValueChange={(unit) => updateItem(item.key, { grossWeightUnit: unit as "GRAM" | "CARAT" })}
+                          >
+                            <SelectTrigger className="w-16">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="GRAM">g</SelectItem>
+                              <SelectItem value="CARAT">ct</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* For a carat-weighed line (no "Includes a Stone"
+                          toggle applies there at all — see below), Net
+                          Stone Weight has no gating concept and always
+                          shows here. For every other line, this field is
+                          only ever visible once "Includes a Stone" is
+                          checked, inside that toggle's own box below —
+                          while off, it stays fully hidden (not shown here)
+                          rather than relocated, per the toggle's on/off
+                          gating. */}
+                      {isCaratLine(item) && (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Net Stone Weight</Label>
+                          <div className="flex gap-1">
+                            <Input
+                              type="number"
+                              step="0.00001"
+                              className="flex-1"
+                              value={
+                                item.stoneWeightInput === 0
+                                  ? ""
+                                  : toPrimaryUnit(
+                                      item.stoneWeightInput,
+                                      "GRAM",
+                                      item.stoneWeightUnit,
+                                      resolveGramsPerCarat(item.purity, caratConversionRates),
+                                    )
+                              }
+                              onChange={(e) => handleStoneWeightInputChange(item, e.target.value)}
+                            />
+                            <Select
+                              value={item.stoneWeightUnit}
+                              onValueChange={(unit) => handleStoneWeightUnitChange(item, unit as "GRAM" | "CARAT")}
+                            >
+                              <SelectTrigger className="w-16">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="GRAM">g</SelectItem>
+                                <SelectItem value="CARAT">ct</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
+
+                      {isCaratLine(item) && (
+                        <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                          <Label className="text-xs">Carat Weight (ct)</Label>
+                          <Input
+                            type="number"
+                            step="0.001"
+                            value={item.caratWeight === 0 ? "" : item.caratWeight}
+                            onChange={(e) => handleCaratWeightChange(item, e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            {item.purity === "DIAMOND"
+                              ? "Priced per carat, not per gram"
+                              : "1 ct = 0.2 g — converts with Net Weight"}
+                          </p>
+                        </div>
+                      )}
+
+                      <MakingChargeInput
+                        rate={item.rate}
+                        netWeight={item.netWeight}
+                        value={item.makingCharge}
+                        onChange={(v) => updateItem(item.key, { makingCharge: v })}
+                        chargeType={item.makingChargeType}
+                        onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
+                      />
+
+                      {/* For a carat-weighed line (no "Includes a Stone"
+                          toggle applies there at all), Stone Charge always
+                          shows here. For every other line, it's only ever
+                          visible once "Includes a Stone" is checked, inside
+                          that toggle's own box below — while off, no stone
+                          means nothing to charge for, so it stays fully
+                          hidden here. */}
+                      {isCaratLine(item) && (
+                        <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                          <Label className="text-xs">Stone Charge</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.stoneCharge === 0 ? "" : item.stoneCharge}
+                            onChange={(e) => handleStoneChargeChange(item, e.target.value)}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* A composite piece (metal + an embedded stone) is the
+                        exception, not the rule, for a line whose own metal
+                        isn't Diamond/Stone — kept as its own toggled strip
+                        rather than wedged into the grid above, so a plain
+                        Gold line's fields don't reflow every time this gets
+                        checked/unchecked. */}
+                    {!isCaratLine(item) && (
+                      <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
+                        <IncludesStoneToggle
+                          checked={item.hasStoneComponent}
+                          onChange={(checked) =>
+                            updateItem(item.key, {
+                              hasStoneComponent: checked,
+                              // Net Stone Weight and Stone Charge are now
+                              // both hidden once the toggle is off — clear
+                              // them so a hidden field can't silently keep
+                              // submitting whatever was last entered.
+                              ...(checked
+                                ? {}
+                                : {
+                                    stoneWeightInput: 0,
+                                    netStoneWeightTouched: false,
+                                    stoneCharge: 0,
+                                    stoneChargeTouched: false,
+                                  }),
+                            })
+                          }
+                        />
+
+                        {item.hasStoneComponent && (
+                          <StoneComponentFields
+                            metals={metals}
+                            origins={origins}
+                            onMetalsChange={setMetals}
+                            onOriginsChange={setOrigins}
+                            stoneMetalTypeName={item.stoneMetalTypeName}
+                            onStoneChange={(name, typeNames) =>
+                              updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
+                            }
+                            selectedTypeNames={item.stoneTypeNames}
+                            onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
+                            caratWeight={item.caratWeight}
+                            onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
+                            stoneRate={item.stoneRate}
+                            onStoneRateChange={(value) => handleStoneRateChange(item, value)}
+                            stoneCharge={item.stoneCharge}
+                            onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
+                            stoneChargeTouched={item.stoneChargeTouched}
+                            stoneWeightInput={toPrimaryUnit(
+                              item.stoneWeightInput,
+                              "GRAM",
+                              item.stoneWeightUnit,
+                              resolveGramsPerCarat(item.purity, caratConversionRates),
+                            )}
+                            onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
+                            stoneWeightUnit={item.stoneWeightUnit}
+                            onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
+                            netStoneWeightTouched={item.netStoneWeightTouched}
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Per-line GST Rate — this line's own selection, no
+                        document-level picker anymore (see LineItem.gstRateId's
+                        doc comment). Options: active rows, plus this line's
+                        own already-selected rate even if it's since been
+                        deactivated. */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                        <Label className="text-xs">GST Rate</Label>
+                        <Select
+                          value={item.gstRateId || undefined}
+                          disabled={!selectedVendor || !isVendorGstApplicable(selectedVendor.gstType)}
+                          onValueChange={(value) => updateItem(item.key, { gstRateId: value })}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select GST rate" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {gstRates
+                              .filter((r) => r.isActive || r.id === item.gstRateId)
+                              .map((rate) => (
+                                <SelectItem key={rate.id} value={rate.id}>
+                                  {rate.name} ({rate.ratePercent}%)
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* SGST+CGST for an intra-state purchase, a single
+                          IGST column for inter-state instead — never both,
+                          see computePurchaseGst() in lib/gst.ts. The compact
+                          row above shows only the combined total, as a
+                          quick summary; this is the full breakdown. Percent
+                          shown is THIS line's own resolved rate. */}
+                      {gst.isInterState ? (
+                        <div className="space-y-1">
+                          <Label className="text-xs">IGST ({lineGstRatePercent(item).toFixed(2)}%)</Label>
+                          <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                            ₹{gst.igst.toFixed(2)}
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="space-y-1">
+                            <Label className="text-xs">SGST ({(lineGstRatePercent(item) / 2).toFixed(2)}%)</Label>
+                            <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                              ₹{gst.sgst.toFixed(2)}
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label className="text-xs">CGST ({(lineGstRatePercent(item) / 2).toFixed(2)}%)</Label>
+                            <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                              ₹{gst.cgst.toFixed(2)}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              )
+            })}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
+      {/* Discount / Paid Now / Notes side by side, same boxed-and-tinted
+          treatment as the Invoice form — GST no longer has a document-level
+          box here at all, each line now picks its own rate in its own
+          Details region above. */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="space-y-2 rounded-lg border border-[color-mix(in_oklab,var(--chart-2)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-2)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-2)_12%,transparent)]">
           <PercentOrFlatInput
             base={subtotal + makingChargesTotal + stoneChargesTotal}
             value={discount}
@@ -1195,85 +1334,22 @@ export function PurchaseForm({
           />
         </div>
 
-        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <div className="flex items-center justify-between">
-            <Label>GST Rate</Label>
-            <GstSchemeBadge scheme={gstScheme} />
-          </div>
-          {selectedVendor ? (
-            <p className="text-xs text-muted-foreground">
-              Vendor GST Type: <span className="font-medium">{partyGstTypeLabel(selectedVendor.gstType)}</span>
-            </p>
-          ) : null}
-          <Select
-            value={gstRateId || undefined}
-            // A purchase's GST depends on the VENDOR's own registration, not
-            // our store's scheme — see computePurchaseGst()'s doc comment.
-            disabled={!selectedVendor || !isVendorGstApplicable(selectedVendor.gstType)}
-            onValueChange={(value) => setGstRateId(value)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select GST rate" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableGstRates.map((rate) => (
-                <SelectItem key={rate.id} value={rate.id}>
-                  {rate.name} ({rate.ratePercent}%)
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            {!selectedVendor
-              ? "Select a vendor first."
-              : !isVendorGstApplicable(selectedVendor.gstType)
-                ? `Not used — this vendor is ${partyGstTypeLabel(selectedVendor.gstType).toLowerCase()}, so their invoice can't carry GST.`
-                : `${gstBreakdown.isInterState ? "IGST (inter-state)" : "SGST + CGST (intra-state)"} — total tax ₹${taxAmount.toFixed(2)}${
-                    gstScheme === "COMPOSITION"
-                      ? " — not claimable as input credit, your store is on Composition Scheme"
-                      : ""
-                  }`}
-          </p>
+        <div className="rounded-lg border border-[color-mix(in_oklab,var(--chart-3)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-3)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-3)_12%,transparent)]">
+          <PaidNowFields
+            rows={paymentRows}
+            onRowsChange={setPaymentRows}
+            maxAmount={totalAmount > 0 ? totalAmount : undefined}
+            // A purchase pays the vendor — money out, not in — so "received"
+            // is the wrong word here even though the mechanics (method +
+            // amount rows) are identical to a Sale's Paid Now.
+            direction="pay"
+          />
         </div>
-      </div>
 
-      <PaidNowFields
-        rows={paymentRows}
-        onRowsChange={setPaymentRows}
-        maxAmount={totalAmount > 0 ? totalAmount : undefined}
-      />
-
-      {gstScheme !== "COMPOSITION" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {gstBreakdown.isInterState ? (
-            <div className="space-y-2">
-              <Label className="text-xs">IGST ({gstRate.toFixed(2)}%)</Label>
-              <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                ₹{gstBreakdown.igst.toFixed(2)}
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-2">
-                <Label className="text-xs">SGST ({(gstRate / 2).toFixed(2)}%)</Label>
-                <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                  ₹{gstBreakdown.sgst.toFixed(2)}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">CGST ({(gstRate / 2).toFixed(2)}%)</Label>
-                <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                  ₹{gstBreakdown.cgst.toFixed(2)}
-                </div>
-              </div>
-            </>
-          )}
+        <div className="space-y-2 rounded-lg border border-[color-mix(in_oklab,var(--chart-1)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-1)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-1)_12%,transparent)]">
+          <Label>Notes</Label>
+          <Textarea name="notes" rows={2} />
         </div>
-      )}
-
-      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-        <Label>Notes</Label>
-        <Textarea name="notes" rows={2} />
       </div>
 
       <div className="rounded-lg border bg-muted/30 p-4 space-y-1 text-sm">
@@ -1294,7 +1370,7 @@ export function PurchaseForm({
           <span>-₹{discount.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Tax</span>
+          <span>GST (SGST+CGST or IGST)</span>
           <span>₹{taxAmount.toFixed(2)}</span>
         </div>
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">

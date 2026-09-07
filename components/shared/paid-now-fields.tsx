@@ -17,6 +17,10 @@ type PaidNowFieldsProps = {
    * never exceed it. Undefined (rather than 0) while the total hasn't been
    * priced yet, so the underlying amount input doesn't lock at max=0. */
   maxAmount?: number
+  /** "receive" (default) is a Sale/Invoice/Kacha Slip taking money in;
+   * "pay" is a Purchase paying a vendor out — same mechanics (method +
+   * amount rows), opposite direction, so only the copy changes. */
+  direction?: "receive" | "pay"
 }
 
 /**
@@ -37,7 +41,7 @@ type PaidNowFieldsProps = {
  * tracked as separate state, so it can never go stale relative to the rows
  * actually entered.
  */
-export function PaidNowFields({ rows, onRowsChange, maxAmount }: PaidNowFieldsProps) {
+export function PaidNowFields({ rows, onRowsChange, maxAmount, direction = "receive" }: PaidNowFieldsProps) {
   const updateRow = (index: number, patch: Partial<PaymentMethodValue>) => {
     onRowsChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)))
   }
@@ -47,24 +51,25 @@ export function PaidNowFields({ rows, onRowsChange, maxAmount }: PaidNowFieldsPr
 
   const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0)
   const overMax = maxAmount !== undefined && total > maxAmount
+  const sectionLabel = direction === "pay" ? "Payment Made" : "Paid Now"
 
   if (rows.length === 0) {
     return (
       <div className="space-y-2">
-        <Label>Paid Now</Label>
+        <Label>{sectionLabel}</Label>
         <div>
           <Button
             type="button"
-            variant="outline"
             size="sm"
             onClick={() => onRowsChange([emptyPaymentMethodValue()])}
+            className="bg-[var(--chart-5)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-5)_88%,black)]"
           >
             <Plus className="mr-1 h-4 w-4" />
-            Record a payment received now
+            {direction === "pay" ? "Record a payment made now" : "Record a payment received now"}
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Leave this blank for a fully on-credit document.
+          Leave this blank for a fully on-credit {direction === "pay" ? "purchase" : "document"}.
         </p>
       </div>
     )
@@ -72,7 +77,7 @@ export function PaidNowFields({ rows, onRowsChange, maxAmount }: PaidNowFieldsPr
 
   return (
     <div className="space-y-3">
-      <Label>Paid Now</Label>
+      <Label>{sectionLabel}</Label>
 
       <div className="space-y-3">
         {rows.map((row, index) => (

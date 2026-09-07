@@ -29,6 +29,7 @@ export function QuotationsToolbar({ selectedIds, bulkActions }: QuotationsToolba
       sortOptions={SORT_OPTIONS}
       defaultSortBy="quotationDate"
       defaultSortOrder="desc"
+      hideSort
       statusOptions={STATUS_OPTIONS}
       entityLabel="quotations"
       exportAction={exportQuotationsToExcel}

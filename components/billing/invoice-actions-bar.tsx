@@ -9,16 +9,12 @@ import { APP_NAME } from "@/lib/constants/app"
 import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog"
 import { EmailInvoiceButton } from "@/components/billing/email-invoice-button"
 import { ShareWhatsAppButton } from "@/components/billing/share-whatsapp-button"
-import { EditInvoiceDialog } from "@/components/billing/edit-invoice-dialog"
 import { CancelInvoiceDialog } from "@/components/billing/cancel-invoice-dialog"
 import { ReturnItemsDialog } from "@/components/billing/return-items-dialog"
-import { DeleteInvoiceDialog } from "@/components/billing/delete-invoice-dialog"
 import { Button } from "@/components/ui/button"
-import type { LocationOption } from "@/components/shared/location-select"
 
 type InvoiceActionsBarProps = {
   invoice: Invoice
-  locations: LocationOption[]
   businessName: string
   returnWindowEnabled: boolean
   returnWindowDays: number
@@ -41,7 +37,6 @@ type InvoiceActionsBarProps = {
  */
 export function InvoiceActionsBar({
   invoice,
-  locations,
   businessName,
   returnWindowEnabled,
   returnWindowDays,
@@ -61,22 +56,6 @@ export function InvoiceActionsBar({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {!isCancelled && (
-        <EditInvoiceDialog
-          invoiceId={invoice.id}
-          invoiceDate={invoice.invoiceDate}
-          dueDate={invoice.dueDate}
-          notes={invoice.notes}
-          locationId={invoice.locationId ?? null}
-          locations={locations}
-          ewayBillNumber={invoice.ewayBillNumber}
-          ewayBillDate={invoice.ewayBillDate}
-          transporterName={invoice.transporterName}
-          vehicleNumber={invoice.vehicleNumber}
-          transportMode={invoice.transportMode}
-          distanceKm={invoice.distanceKm}
-        />
-      )}
       {canFullyEdit && (
         <Button asChild variant="outline" className="gap-2">
           <Link href={`/billing/${invoice.id}/edit`}>
@@ -102,9 +81,6 @@ export function InvoiceActionsBar({
       )}
       {canReturnItems && (
         <ReturnItemsDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
-      )}
-      {invoice.status === "DRAFT" && (
-        <DeleteInvoiceDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
       )}
       {!isCancelled && (
         <RecordPaymentDialog invoiceId={invoice.id} balanceAmount={invoice.balanceAmount} />

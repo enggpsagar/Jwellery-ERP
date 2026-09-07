@@ -7,6 +7,7 @@ import { getInvoiceById, type Invoice } from "@/lib/actions/invoice-actions"
 import { getCreditNotesForInvoice, type CreditNoteView } from "@/lib/actions/credit-note-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { InvoiceActionsBar } from "@/components/billing/invoice-actions-bar"
+import { InvoiceRowActions } from "@/components/billing/invoice-row-actions"
 import { InvoiceDetailContent } from "@/components/billing/invoice-detail-content"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { LocationOption } from "@/components/shared/location-select"
@@ -87,11 +88,11 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
     <div className="space-y-4 rounded-xl border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{invoice.invoiceNumber}</h2>
+        <InvoiceRowActions invoice={invoice} locations={locations} />
       </div>
 
       <InvoiceActionsBar
         invoice={invoice}
-        locations={locations}
         businessName={businessName}
         returnWindowEnabled={returnWindowEnabled}
         returnWindowDays={returnWindowDays}

@@ -14,20 +14,11 @@ type InvoiceRow = {
   id: string
   invoiceNumber: string
   invoiceDate: string
-  dueDate: string | null
-  notes: string | null
-  locationId: string | null
   status: string
   totalAmount: number
   balanceAmount: number
   customer: { id: string; name: string; phone: string | null } | null
   convertedFromKacha: { id: string; slipNumber: string } | null
-  ewayBillNumber?: string | null
-  ewayBillDate?: string | null
-  transporterName?: string | null
-  vehicleNumber?: string | null
-  transportMode?: string | null
-  distanceKm?: number | null
 }
 
 type InvoicesClientProps = {
@@ -92,7 +83,6 @@ export function InvoicesClient({ invoices, locations, pagination }: InvoicesClie
 
           <InvoiceTable
             invoices={invoices}
-            locations={locations}
             activeInvoiceId={activeInvoiceId}
             onActivate={setActiveInvoiceId}
           />

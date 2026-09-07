@@ -141,7 +141,7 @@ export function ScanToAddPanel({
 
   if (!sessionId) {
     return (
-      <div className="rounded-lg border border-dashed p-4">
+      <div className="rounded-lg border border-dashed border-yellow-400 bg-yellow-50 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium">Add items by scanning</p>

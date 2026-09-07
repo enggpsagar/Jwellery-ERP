@@ -31,7 +31,6 @@ import { LocationSelect, type LocationOption } from "@/components/shared/locatio
 import { PaidNowFields } from "@/components/shared/paid-now-fields"
 import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
 import { PURITY_SELECT_OPTIONS, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
-import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
 import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
@@ -321,18 +320,11 @@ export function InvoiceForm({
     })
   }
   const [discount, setDiscount] = useState(0)
-  // This is now framed as "default for new line items" only — each line
-  // tracks its own gstRateId independently once set (see LineItem's own doc
-  // comment), so changing this later never retroactively changes an
-  // already-set line, only what a freshly-added one starts on.
-  const [gstRateId, setGstRateId] = useState<string>(resolveDefaultGstRateId)
-  // GST Rate options: active rows, plus this invoice's already-selected rate
-  // even if it's since been deactivated (edit/replace) — see gstRates' own
-  // doc comment above.
-  const availableGstRates = useMemo(
-    () => gstRates.filter((r) => r.isActive || r.id === gstRateId),
-    [gstRates, gstRateId],
-  )
+  // No longer a user-facing control (each line picks its own GST rate in
+  // its own Details region) — this is just what a freshly-added line
+  // starts on, resolved once from the store's own default/active GstRate
+  // and never changed afterward, so it doesn't need a setter.
+  const [gstRateId] = useState<string>(resolveDefaultGstRateId)
   const selectedGstRate = gstRates.find((r) => r.id === gstRateId)
   // The plain percent, still fed into computeGst() exactly as before — only
   // where the number comes from changed, not the tax math itself. Falls
@@ -1557,12 +1549,10 @@ export function InvoiceForm({
                       />
                     </div>
 
-                    {/* Per-line GST Rate — this line's own selection, independent
-                        of the document-level "default for new items" picker
-                        below. Options: active rows, plus this line's own
-                        already-selected rate even if it's since been
-                        deactivated — same pattern as the document-level
-                        picker's own availableGstRates. */}
+                    {/* Per-line GST Rate — this line's own selection, no
+                        document-level picker anymore. Options: active
+                        rows, plus this line's own already-selected rate
+                        even if it's since been deactivated (edit/replace). */}
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">GST Rate</Label>
                       <Select
@@ -1627,42 +1617,12 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <PercentOrFlatInput
-            base={subtotal + makingChargesTotal + stoneChargesTotal}
-            value={discount}
-            onChange={setDiscount}
-          />
-        </div>
-
-        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <div className="flex items-center justify-between">
-            <Label>GST Rate (default for new items)</Label>
-            <GstSchemeBadge scheme={gstScheme} />
-          </div>
-          <Select
-            value={gstRateId || undefined}
-            disabled={gstScheme === "COMPOSITION"}
-            onValueChange={(value) => setGstRateId(value)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select GST rate" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableGstRates.map((rate) => (
-                <SelectItem key={rate.id} value={rate.id}>
-                  {rate.name} ({rate.ratePercent}%)
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            {gstScheme === "COMPOSITION"
-              ? "Not used — Composition Scheme never charges GST."
-              : `Applied to newly-added line items only — each line can use its own rate (see its Details). Split into SGST+CGST (or IGST for an inter-state customer) per line — total tax ₹${taxAmount.toFixed(2)}`}
-          </p>
-        </div>
+      <div className="max-w-sm space-y-2">
+        <PercentOrFlatInput
+          base={subtotal + makingChargesTotal + stoneChargesTotal}
+          value={discount}
+          onChange={setDiscount}
+        />
       </div>
 
       {editInvoiceId ? (

@@ -195,7 +195,7 @@ export function VendorsToolbar({
 
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           size="icon"
           onClick={handleExport}
           disabled={isExporting}

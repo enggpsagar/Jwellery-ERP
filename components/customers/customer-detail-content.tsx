@@ -65,7 +65,6 @@ export function CustomerDetailContent({
         tint="var(--chart-1)"
       >
         <DetailGrid>
-          <DetailField label="Customer Name" value={toTitleCase(customer.name)} />
           <DetailField label="Phone" value={customer.phone} />
           <DetailField label="Alternate Phone" value={customer.altPhone} />
           <DetailField label="Email" value={customer.email} />

@@ -101,17 +101,17 @@ export function ShareWhatsAppButton({
 
   return (
     <Button
-      variant="outline"
       onClick={handleClick}
       disabled={!digits || loading}
-      title={!digits ? "This customer has no phone number on file" : undefined}
+      title={!digits ? "This customer has no phone number on file" : "Share on WhatsApp"}
+      className="bg-[var(--chart-3)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-3)_88%,black)]"
     >
       {loading ? (
         <Loader className="h-4 w-4 mr-1" />
       ) : (
         <MessageCircle className="h-4 w-4 mr-1" />
       )}
-      Share on WhatsApp
+      WhatsApp
     </Button>
   )
 }

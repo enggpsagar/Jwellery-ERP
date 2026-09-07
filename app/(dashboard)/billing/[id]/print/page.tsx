@@ -126,7 +126,11 @@ export default async function InvoicePrintPage({ params }: Props) {
   const sortedRateGroups = Array.from(rateGroups.values()).sort((a, b) => a.percent - b.percent)
   const isInterState = invoice.items.some((item) => item.igstAmount > 0)
 
-  const subtotal = invoice.totalAmount - invoice.taxAmount
+  // The real pre-discount subtotal — invoice.totalAmount already has the
+  // discount subtracted out, so totalAmount - taxAmount alone would show a
+  // "Sub Total" that's silently net-of-discount with no discount line
+  // anywhere to explain the difference.
+  const subtotal = invoice.subtotal + invoice.makingCharges + invoice.stoneCharges
 
   return (
     <main className="mx-auto max-w-3xl space-y-4 bg-white p-6 text-[13px] text-slate-900 print:max-w-none print:w-full print:p-0 print:text-[10px]">
@@ -358,6 +362,12 @@ export default async function InvoicePrintPage({ params }: Props) {
               <span>Sub Total</span>
               <span>₹{fmt(subtotal)}</span>
             </div>
+            {invoice.discount > 0 && (
+              <div className="flex justify-between border-b border-slate-300 p-1.5">
+                <span>Discount</span>
+                <span>-₹{fmt(invoice.discount)}</span>
+              </div>
+            )}
             {sortedRateGroups.map((group) =>
               isInterState ? (
                 <div key={group.percent} className="flex justify-between border-b border-slate-300 p-1.5">

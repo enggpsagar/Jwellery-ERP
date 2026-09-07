@@ -64,7 +64,6 @@ export function UserDetailContent({
         tint="var(--chart-1)"
       >
         <DetailGrid>
-          <DetailField label="Name" value={user.name ? toTitleCase(user.name) : "-"} />
           <DetailField label="Email" value={user.email} />
           <DetailField label="Phone" value={user.phone} />
           <DetailField

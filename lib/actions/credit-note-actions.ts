@@ -114,7 +114,11 @@ async function getReturnableQuantities(invoiceId: string): Promise<Map<string, n
 export async function getInvoiceReturnEligibility(invoiceDate: Date | string): Promise<ReturnEligibility> {
   const settings = await getBusinessSettings();
   const date = typeof invoiceDate === "string" ? new Date(invoiceDate) : invoiceDate;
-  return getReturnEligibility(date, settings.returnWindowDays);
+  const eligibility = getReturnEligibility(date, settings.returnWindowDays);
+  // Forced ineligible (not just 0 days) when the policy is switched off —
+  // passing 0 straight into getReturnEligibility would still read eligible
+  // on the invoice's own creation day (daysElapsed 0 <= 0 days).
+  return settings.returnWindowEnabled ? eligibility : { ...eligibility, eligible: false };
 }
 
 /** Line items on this invoice that still have something left to return — feeds the Return Items dialog. */
@@ -273,6 +277,9 @@ export async function createCreditNote(
     }
 
     const settings = await getBusinessSettings();
+    if (!settings.returnWindowEnabled) {
+      return { success: false, message: "Returns are currently disabled for this store." };
+    }
     const eligibility = getReturnEligibility(invoice.invoiceDate, settings.returnWindowDays);
     if (!eligibility.eligible) {
       return {

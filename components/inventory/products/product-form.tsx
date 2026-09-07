@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 
-import { PurityType, TargetStyle } from "@prisma/client";
+import { PurityType, TargetStyle, type SkuFormat } from "@prisma/client";
 
 import type { ProductFormState } from "@/lib/inventory/product-types";
 import { buildSkuPrefix, TARGET_STYLE_LABEL } from "@/lib/inventory/product-sku";
@@ -121,6 +121,11 @@ type ProductFormProps = {
    * new product doesn't start with it blank. Not used in edit mode: an
    * existing stock entry's saved location is untouched by this. */
   defaultLocationId?: string;
+  /** Create-only — the store's configured SKU layout (Settings > Metals,
+   * Stones & Categories > SKU Format), so this preview never disagrees with
+   * what createProduct actually generates. Undefined in edit mode, where
+   * productCode is immutable and just displayed as-is. */
+  skuFormat?: SkuFormat;
 };
 
 function ErrorText({ error }: { error?: string[] }) {
@@ -140,6 +145,7 @@ export function ProductForm({
   caratConversionRates,
   locations = [],
   defaultLocationId,
+  skuFormat,
 }: ProductFormProps) {
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? "");
 
@@ -256,6 +262,7 @@ export function ProductForm({
           targetStyle: targetStyle as TargetStyle,
           categoryTypeName: selectedCategoryType?.name ?? null,
           categoryName: selectedCategory?.name ?? null,
+          format: skuFormat,
         })
       : null;
 

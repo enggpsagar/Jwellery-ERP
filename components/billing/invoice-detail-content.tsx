@@ -21,6 +21,7 @@ const TRANSPORT_MODE_LABELS: Record<string, string> = {
 type InvoiceDetailContentProps = {
   invoice: Invoice
   creditNotes: CreditNoteView[]
+  returnWindowEnabled: boolean
   returnWindowDays: number
 }
 
@@ -33,13 +34,15 @@ type InvoiceDetailContentProps = {
  * derivation with InvoiceActionsBar so the two can never disagree about
  * what a given invoice's status allows.
  */
-export function InvoiceDetailContent({ invoice, creditNotes, returnWindowDays }: InvoiceDetailContentProps) {
+export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled, returnWindowDays }: InvoiceDetailContentProps) {
   const isCancelled = invoice.status === "CANCELLED"
   const isCancellable = invoice.status === "DRAFT" || invoice.status === "PARTIAL"
   const canFullyEdit = isCancellable
 
   const isReturnable =
-    (invoice.status === "PAID" || invoice.status === "PARTIAL") && returnWindowDays > 0
+    (invoice.status === "PAID" || invoice.status === "PARTIAL") &&
+    returnWindowEnabled &&
+    returnWindowDays > 0
   const returnEligibility = getReturnEligibility(new Date(invoice.invoiceDate), returnWindowDays)
 
   return (

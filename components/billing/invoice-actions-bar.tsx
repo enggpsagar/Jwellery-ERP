@@ -19,6 +19,7 @@ type InvoiceActionsBarProps = {
   invoice: Invoice
   locations: LocationOption[]
   businessName: string
+  returnWindowEnabled: boolean
   returnWindowDays: number
 }
 
@@ -41,6 +42,7 @@ export function InvoiceActionsBar({
   invoice,
   locations,
   businessName,
+  returnWindowEnabled,
   returnWindowDays,
 }: InvoiceActionsBarProps) {
   const isCancelled = invoice.status === "CANCELLED"
@@ -48,7 +50,9 @@ export function InvoiceActionsBar({
   const canFullyEdit = isCancellable
 
   const isReturnable =
-    (invoice.status === "PAID" || invoice.status === "PARTIAL") && returnWindowDays > 0
+    (invoice.status === "PAID" || invoice.status === "PARTIAL") &&
+    returnWindowEnabled &&
+    returnWindowDays > 0
   const returnEligibility = getReturnEligibility(new Date(invoice.invoiceDate), returnWindowDays)
   const canReturnItems = isReturnable && returnEligibility.eligible
 

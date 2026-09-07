@@ -62,6 +62,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             invoice={invoice}
             locations={locations}
             businessName={settings.businessName}
+            returnWindowEnabled={settings.returnWindowEnabled}
             returnWindowDays={settings.returnWindowDays}
           />
         }
@@ -70,6 +71,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
       <InvoiceDetailContent
         invoice={invoice}
         creditNotes={creditNotes}
+        returnWindowEnabled={settings.returnWindowEnabled}
         returnWindowDays={settings.returnWindowDays}
       />
     </main>

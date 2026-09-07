@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StoreLogoUpload } from "@/components/settings/store-logo-upload";
 import { cn } from "@/lib/utils";
@@ -104,6 +105,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
   const [selectedStateId, setSelectedStateId] = useState(initialStateId)
   const [cities, setCities] = useState<CityItem[]>([])
   const [loadingCities, setLoadingCities] = useState(false)
+  const [returnWindowEnabled, setReturnWindowEnabled] = useState(settings.returnWindowEnabled)
   const stateNameMap = useMemo(
     () => new Map(states.map((item) => [item.id, item.name])),
     [states],
@@ -409,6 +411,24 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
           </div>
 
           <div className="space-y-1.5">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="returnWindowEnabled"
+                checked={returnWindowEnabled}
+                onCheckedChange={setReturnWindowEnabled}
+              />
+              <input type="hidden" name="returnWindowEnabled" value={returnWindowEnabled ? "on" : ""} />
+              <Label htmlFor="returnWindowEnabled">Enable Return Window</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Whether customers can return sold items at all. Turning this off
+              hides Return Window/Return Items everywhere in the app without
+              losing the day count below — turn it back on later and the same
+              number of days applies again.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
             <Label htmlFor="returnWindowDays">Return Window (days)</Label>
             <Input
               id="returnWindowDays"
@@ -418,6 +438,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               min="0"
               placeholder="e.g. 7, 15, or 30"
               defaultValue={settings.returnWindowDays}
+              disabled={!returnWindowEnabled}
             />
             <p className="text-xs text-muted-foreground">
               How many days after an invoice's date a sold item may still be

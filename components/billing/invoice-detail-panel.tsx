@@ -30,6 +30,7 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [creditNotes, setCreditNotes] = useState<CreditNoteView[]>([])
   const [businessName, setBusinessName] = useState("")
+  const [returnWindowEnabled, setReturnWindowEnabled] = useState(false)
   const [returnWindowDays, setReturnWindowDays] = useState(0)
   const [loading, setLoading] = useState(false)
 
@@ -51,6 +52,7 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
         setInvoice(invoiceResult)
         setCreditNotes(creditNotesResult)
         setBusinessName(settings.businessName)
+        setReturnWindowEnabled(settings.returnWindowEnabled)
         setReturnWindowDays(settings.returnWindowDays)
       })
       .finally(() => {
@@ -91,10 +93,16 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
         invoice={invoice}
         locations={locations}
         businessName={businessName}
+        returnWindowEnabled={returnWindowEnabled}
         returnWindowDays={returnWindowDays}
       />
 
-      <InvoiceDetailContent invoice={invoice} creditNotes={creditNotes} returnWindowDays={returnWindowDays} />
+      <InvoiceDetailContent
+        invoice={invoice}
+        creditNotes={creditNotes}
+        returnWindowEnabled={returnWindowEnabled}
+        returnWindowDays={returnWindowDays}
+      />
     </div>
   )
 }

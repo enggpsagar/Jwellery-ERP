@@ -4,6 +4,8 @@ import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { PurityType } from "@prisma/client";
 
+import type { SkuFormat } from "@prisma/client";
+
 import { useToast } from "@/components/providers/toast-provider";
 import { createProduct } from "@/lib/actions/inventory/product-actions";
 import type { StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions";
@@ -28,6 +30,8 @@ type ProductCreateFormProps = {
   /** Where to go after saving; the new product's id is appended so the
    * calling screen can select it. */
   returnTo?: string
+  /** The store's configured SKU layout — see the same prop on ProductForm. */
+  skuFormat: SkuFormat;
 };
 
 export function ProductCreateForm({
@@ -38,6 +42,7 @@ export function ProductCreateForm({
   locations,
   defaultLocationId,
   returnTo,
+  skuFormat,
 }: ProductCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -98,6 +103,7 @@ export function ProductCreateForm({
         origins={origins}
         locations={locations}
         defaultLocationId={defaultLocationId}
+        skuFormat={skuFormat}
       />
     </form>
   );

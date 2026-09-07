@@ -23,6 +23,7 @@ export function InvoicesToolbar() {
       searchPlaceholder="Search by invoice number, customer..."
       sortOptions={SORT_OPTIONS}
       defaultSortBy="invoiceDate"
+      hideSort
       statusOptions={STATUS_OPTIONS}
       entityLabel="invoices"
       exportAction={exportInvoicesToExcel}

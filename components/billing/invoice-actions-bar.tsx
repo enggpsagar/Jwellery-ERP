@@ -12,6 +12,7 @@ import { ShareWhatsAppButton } from "@/components/billing/share-whatsapp-button"
 import { EditInvoiceDialog } from "@/components/billing/edit-invoice-dialog"
 import { CancelInvoiceDialog } from "@/components/billing/cancel-invoice-dialog"
 import { ReturnItemsDialog } from "@/components/billing/return-items-dialog"
+import { DeleteInvoiceDialog } from "@/components/billing/delete-invoice-dialog"
 import { Button } from "@/components/ui/button"
 import type { LocationOption } from "@/components/shared/location-select"
 
@@ -101,6 +102,9 @@ export function InvoiceActionsBar({
       )}
       {canReturnItems && (
         <ReturnItemsDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
+      )}
+      {invoice.status === "DRAFT" && (
+        <DeleteInvoiceDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
       )}
       {!isCancelled && (
         <RecordPaymentDialog invoiceId={invoice.id} balanceAmount={invoice.balanceAmount} />

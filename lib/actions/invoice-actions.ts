@@ -2077,7 +2077,10 @@ export async function deleteInvoice(id: string): Promise<InvoiceFormState> {
 
     const invoice = await prisma.invoice.findFirst({
       where: { id, storeId },
-      include: { ledgerEntries: { select: { id: true }, take: 1 } },
+      include: {
+        ledgerEntries: { select: { id: true }, take: 1 },
+        items: true,
+      },
     });
 
     if (!invoice) return { success: false, message: "Invoice not found" };
@@ -2089,8 +2092,55 @@ export async function deleteInvoice(id: string): Promise<InvoiceFormState> {
       };
     }
 
-    await prisma.invoice.delete({ where: { id } });
+    // createInvoice decrements InventoryStock for every linked line item
+    // regardless of status, including DRAFT — deleting the invoice without
+    // restoring that quantity would silently leave stock counts short.
+    // Same restore-and-flip-status logic cancelInvoice already uses, just
+    // inside a hard delete instead of a status change.
+    await prisma.$transaction(async (tx) => {
+      for (const item of invoice.items) {
+        if (!item.inventoryStockId) continue;
+
+        const restoreQty = Math.max(1, item.quantity || 1);
+
+        await tx.inventoryStock.updateMany({
+          where: { id: item.inventoryStockId, storeId },
+          data: { quantity: { increment: restoreQty } },
+        });
+
+        const updatedStock = await tx.inventoryStock.findUnique({
+          where: { id: item.inventoryStockId },
+          select: { quantity: true, status: true },
+        });
+        if (
+          updatedStock &&
+          updatedStock.quantity > 0 &&
+          updatedStock.status === InventoryStockStatus.SOLD
+        ) {
+          await tx.inventoryStock.update({
+            where: { id: item.inventoryStockId },
+            data: { status: InventoryStockStatus.IN_STOCK },
+          });
+        }
+
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryStockId: item.inventoryStockId,
+            transactionType: InventoryTransactionType.SALE_RETURN,
+            quantity: restoreQty,
+            netWeight: item.netWeight ?? undefined,
+            referenceType: "Invoice",
+            referenceId: invoice.id,
+            notes: "Stock restored — draft invoice deleted",
+          },
+        });
+      }
+
+      await tx.invoice.delete({ where: { id } });
+    }, { timeout: 15000 });
+
     revalidatePath("/billing");
+    revalidatePath("/inventory/stock");
 
     return { success: true, message: "Invoice deleted" };
   } catch (error) {

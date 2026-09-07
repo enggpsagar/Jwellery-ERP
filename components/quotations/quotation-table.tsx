@@ -4,11 +4,11 @@ import Link from "next/link"
 import { useEffect, useMemo, useRef } from "react"
 
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
-import { Eye, ArrowRightCircle } from "lucide-react"
+import { ArrowRightCircle } from "lucide-react"
 
 import { QuotationStatusBadge } from "@/components/quotations/quotation-status-badge"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
-import { formatShortDate } from "@/lib/utils"
+import { formatShortDate, cn } from "@/lib/utils"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -38,9 +38,18 @@ type QuotationTableProps = {
   /** Bulk-action checkbox selection — omit to hide the checkbox column entirely. */
   selectedIds?: string[]
   onSelectionChange?: (ids: string[]) => void
+  /** Which row's detail is showing in the panel alongside this table — distinct from selectedIds, which is the bulk-action checkbox selection. */
+  activeQuotationId?: string | null
+  onActivate?: (id: string) => void
 }
 
-export function QuotationTable({ quotations, selectedIds, onSelectionChange }: QuotationTableProps) {
+export function QuotationTable({
+  quotations,
+  selectedIds,
+  onSelectionChange,
+  activeQuotationId,
+  onActivate,
+}: QuotationTableProps) {
   const allIds = useMemo(() => quotations.map((q) => q.id), [quotations])
 
   const allSelected =
@@ -109,15 +118,24 @@ export function QuotationTable({ quotations, selectedIds, onSelectionChange }: Q
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <SortableTableHead label="Total" sortKey="totalAmount" defaultSortBy="quotationDate" />
               <th className="px-4 py-3 text-left font-medium">Converted</th>
-              <th className="px-4 py-3 text-left font-medium">Actions</th>
             </tr>
           </thead>
 
           <tbody>
-            {quotations.map((quotation) => (
-              <tr key={quotation.id} className="border-b last:border-0">
+            {quotations.map((quotation) => {
+              const isActive = activeQuotationId === quotation.id
+              return (
+              <tr
+                key={quotation.id}
+                onClick={() => onActivate?.(quotation.id)}
+                className={cn(
+                  "border-b last:border-0",
+                  onActivate && "cursor-pointer hover:bg-accent/50",
+                  isActive && "bg-accent",
+                )}
+              >
                 {showCheckboxes ? (
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selectedIds!.includes(quotation.id)}
@@ -130,7 +148,7 @@ export function QuotationTable({ quotations, selectedIds, onSelectionChange }: Q
                 <td className="px-4 py-3 font-medium">
                   <RecordHoverCard
                     label={quotation.quotationNumber}
-                    href={`/quotations/${quotation.id}`}
+                    href={onActivate ? undefined : `/quotations/${quotation.id}`}
                     title={quotation.quotationNumber}
                     subtitle={quotation.customer?.name ?? undefined}
                     footerLabel="Open quotation"
@@ -229,17 +247,9 @@ export function QuotationTable({ quotations, selectedIds, onSelectionChange }: Q
                     <span className="text-xs text-muted-foreground">Not converted</span>
                   )}
                 </td>
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/quotations/${quotation.id}`}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
-                    title="View quotation"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Link>
-                </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>

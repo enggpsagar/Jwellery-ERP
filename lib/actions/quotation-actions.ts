@@ -357,6 +357,8 @@ export async function getQuotationById(id: string) {
   return mapQuotation(quotation);
 }
 
+export type Quotation = NonNullable<Awaited<ReturnType<typeof getQuotationById>>>;
+
 /** Lightweight customer list for the quotation form's customer picker. */
 export async function getQuotationFormCustomers() {
   const storeId = await requireStoreScope();

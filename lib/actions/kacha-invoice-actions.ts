@@ -534,6 +534,10 @@ export async function createKachaInvoice(
 
     const slipNumber = await generateSlipNumber(storeId);
 
+    // Default interactive-transaction timeout is 5s — the per-item stock
+    // decrement loop below can exceed that on a multi-line slip over a real
+    // (non-local) DB connection and throw P2028 ("Transaction not found").
+    // Same fix as createInvoice/createPurchase's identical transactions.
     const kachaInvoice = await prisma.$transaction(async (tx) => {
       const created = await tx.kachaInvoice.create({
         data: {
@@ -674,7 +678,7 @@ export async function createKachaInvoice(
       }
 
       return created;
-    });
+    }, { timeout: 15000 });
 
     revalidatePath("/billing/kacha");
 

@@ -770,6 +770,13 @@ export async function createPurchase(
     // array has to be plain objects, not promises.
     const perLineGstRateSnapshots = await resolvePerLineGstRateSnapshots(storeId, items);
 
+    // Default interactive-transaction timeout is 5s — this transaction does
+    // a sequential per-item InventoryStock create, per-item InventoryTransaction
+    // create, plus the Purchase/PurchaseItem/ledger writes, all in one round
+    // trip each; a multi-line purchase over a real (non-local) DB connection
+    // reliably exceeds 5s and throws P2028 ("Transaction not found") once
+    // Prisma has already closed it out from under the callback. Same fix as
+    // store-registration-actions.ts's own transaction for the same reason.
     const purchase = await prisma.$transaction(async (tx) => {
       // 1. Create a new InventoryStock row per line item first, so the
       //    Purchase's nested item creates can link straight to it.
@@ -943,7 +950,7 @@ export async function createPurchase(
       }
 
       return created;
-    });
+    }, { timeout: 15000 });
 
     revalidatePath("/purchases");
     revalidatePath("/inventory/stock");

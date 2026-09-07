@@ -37,7 +37,7 @@ export function DeleteQuotationButton({
   }
 
   return (
-    <Button variant="outline" onClick={handleClick} disabled={pending}>
+    <Button variant="destructive" onClick={handleClick} disabled={pending}>
       {pending ? (
         <Loader className="h-4 w-4 mr-1" />
       ) : (

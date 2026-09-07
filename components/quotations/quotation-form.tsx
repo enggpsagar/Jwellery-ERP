@@ -560,7 +560,7 @@ export function QuotationForm({
           <Label>Line Items</Label>
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => setItems((prev) => [...prev, emptyLineItem()])}
           >

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
-import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react"
+import { Plus, Trash2, ChevronDown, ChevronRight, Search } from "lucide-react"
 import type { PartyGstType, PurityType } from "@prisma/client"
 
 import { createPurchase, type PurchaseFormState } from "@/lib/actions/purchase-actions"
@@ -108,6 +108,18 @@ type LineItem = {
    * single bill can genuinely mix rates across items. Mirrors
    * InvoiceItem.gstRateId's own doc comment in schema.prisma. */
   gstRateId: string
+  /** Tracks whether this line has explicitly gone through the Product
+   * picker's choice — either a real product was picked, or "Enter
+   * Manually (No Product)" was chosen. False only for a freshly-added,
+   * untouched blank row. Required at submit, mirroring Invoice's
+   * stockLinkDecided: an undecided row is ambiguous (forgot to pick one?
+   * meant to skip it?), so the picker's own escape hatch has to be an
+   * explicit choice, not just "leave it blank." A skipped line still needs
+   * a real Product row under the hood (InventoryStock/PurchaseItem's
+   * productId is a hard FK) — resolved server-side to one lazily-created
+   * placeholder per store, see resolveManualEntryProductId in
+   * purchase-actions.ts. */
+  productLinkDecided: boolean
 }
 
 const PURITY_OPTIONS = PURITY_SELECT_OPTIONS
@@ -153,6 +165,7 @@ function emptyLineItem(defaultGstRateId?: string, key: string = crypto.randomUUI
     hsnCode: "",
     netTouched: false,
     gstRateId: defaultGstRateId ?? "",
+    productLinkDecided: false,
   }
 }
 
@@ -486,6 +499,7 @@ export function PurchaseForm({
 
     updateItem(key, {
       productId,
+      productLinkDecided: true,
       itemName: product.name,
       metalTypeId: product.metalType?.id ?? "",
       purity: product.defaultPurity ?? "",
@@ -754,7 +768,7 @@ export function PurchaseForm({
     }),
   )
 
-  const canSubmit = vendorId && items.every((item) => item.productId)
+  const canSubmit = vendorId && items.every((item) => item.productId || item.productLinkDecided)
 
   // Zero-amount rows (a split row opened but never filled in) are dropped
   // here — the server's parseOptionalPayments requires any row it does
@@ -924,15 +938,49 @@ export function PurchaseForm({
                   </button>
 
                   <div className="space-y-1">
-                    <ProductSelect
-                      key={productSelectKeys[item.key] ?? 0}
-                      products={productSelectOptions}
-                      name={`product-${item.key}`}
-                      defaultValue={item.productId}
-                      onChange={(productId) => applyProductToItem(item.key, productId)}
-                      addNewHref={`/inventory/products/new?returnTo=${encodeURIComponent(RETURN_TO)}`}
-                      onBeforeAddNew={() => saveDraft(item.key)}
-                    />
+                    {/* Manual entry (no catalog Product) is an explicit
+                        choice from the picker's own "Enter Manually" row,
+                        not just leaving this blank — see
+                        productLinkDecided's doc comment. The search icon
+                        switches back to picking a real product. */}
+                    {item.productLinkDecided && !item.productId ? (
+                      <div className="flex gap-1">
+                        <div className="flex h-9 flex-1 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                          No product — manual entry
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => updateItem(item.key, { productLinkDecided: false })}
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                          aria-label="Pick a product instead"
+                          title="Pick a product instead"
+                        >
+                          <Search className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <ProductSelect
+                        key={productSelectKeys[item.key] ?? 0}
+                        products={productSelectOptions}
+                        name={`product-${item.key}`}
+                        defaultValue={item.productId}
+                        onChange={(productId) => applyProductToItem(item.key, productId)}
+                        addNewHref={`/inventory/products/new?returnTo=${encodeURIComponent(RETURN_TO)}`}
+                        onBeforeAddNew={() => saveDraft(item.key)}
+                        onSkip={() =>
+                          updateItem(item.key, {
+                            ...emptyLineItem(gstRateId),
+                            key: item.key,
+                            productLinkDecided: true,
+                          })
+                        }
+                      />
+                    )}
+                    {!item.productLinkDecided && (
+                      <p className="text-[10px] leading-tight text-destructive">
+                        Select a product, or choose &quot;Enter Manually&quot;
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-1">

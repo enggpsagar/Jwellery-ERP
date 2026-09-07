@@ -221,6 +221,44 @@ async function resolvePerLineGstRateSnapshots(
   return map;
 }
 
+/** Unique per store — lets resolveManualEntryProductId find-or-create
+ *  without ever racing itself into a duplicate (Product's own
+ *  @@unique([storeId, productCode]) backs this up regardless). */
+const MANUAL_ENTRY_PRODUCT_CODE = "MANUAL-ENTRY";
+
+/**
+ * A Purchase line item can be entered without picking a catalog Product
+ * (the form's "Enter Manually (No Product)" choice) — but
+ * InventoryStock.productId and PurchaseItem.productId are both required,
+ * non-nullable foreign keys, and a large enough set of other places already
+ * assume a real Product hangs off every stock row (the Invoice/Quotation
+ * "pick a stock item to sell" queries, the item-ledger report, My Jobs) that
+ * making the FK nullable everywhere it's read would be a much bigger, more
+ * error-prone change than this. Instead, every manually-entered line reuses
+ * one lazily-created, inactive (so it never appears in the Product picker
+ * itself) placeholder Product per store — created the first time a store
+ * actually uses "Enter Manually", found by its fixed productCode on every
+ * purchase after that.
+ */
+async function resolveManualEntryProductId(storeId: string): Promise<string> {
+  const existing = await prisma.product.findFirst({
+    where: { storeId, productCode: MANUAL_ENTRY_PRODUCT_CODE },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+
+  const created = await prisma.product.create({
+    data: {
+      storeId,
+      productCode: MANUAL_ENTRY_PRODUCT_CODE,
+      name: "Manual Entry (no product)",
+      isActive: false,
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
 async function generatePurchaseNumber(storeId: string) {
   const year = new Date().getFullYear();
   const count = await prisma.purchase.count({
@@ -584,10 +622,6 @@ export async function createPurchase(
       return { success: false, message: "Add at least one line item" };
     }
 
-    if (items.some((item) => !item.productId)) {
-      return { success: false, message: "Every line item must have a product selected" };
-    }
-
     // Don't trust client-submitted charge type — coerce anything unexpected
     // (missing, malformed, or a value outside the enum) down to FIXED.
     items = items.map((item) => ({
@@ -680,6 +714,21 @@ export async function createPurchase(
         success: false,
         message: `This vendor is ${partyGstTypeLabel(vendor.gstType).toLowerCase()} and cannot charge GST on a purchase.`,
       };
+    }
+
+    // A line with no product picked (the form's own "Enter Manually (No
+    // Product)" choice) still needs a real Product row under the hood —
+    // InventoryStock/PurchaseItem.productId is a hard, non-nullable FK, and
+    // making it nullable would ripple into every other place that reads
+    // stock.product.name/hsnCode (the Invoice/Quotation stock pickers, the
+    // item-ledger report, My Jobs...) — see resolveManualEntryProductId's
+    // own doc comment for the fuller reasoning. Resolved to one
+    // lazily-created placeholder per store instead.
+    if (items.some((item) => !item.productId)) {
+      const manualEntryProductId = await resolveManualEntryProductId(storeId);
+      items = items.map((item) =>
+        item.productId ? item : { ...item, productId: manualEntryProductId },
+      );
     }
 
     const productIds = [...new Set(items.map((item) => item.productId))];

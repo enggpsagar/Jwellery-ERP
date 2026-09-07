@@ -20,6 +20,9 @@ import { Input } from "@/components/ui/input"
  * keyboard-reachable. Cannot collide with a record id — those are cuids.
  */
 const ADD_NEW_VALUE = "__add_new_product__"
+/** Sentinel for the opt-in "enter manually, no product" row — see onSkip's
+ * own doc comment below. Same real-SelectItem reasoning as ADD_NEW_VALUE. */
+const SKIP_VALUE = "__skip_product__"
 
 export type ProductOption = {
   id: string
@@ -45,6 +48,14 @@ type ProductSelectProps = {
   /** Runs just before navigating away, so the caller can stash state it
    * would otherwise lose. */
   onBeforeAddNew?: () => void
+  /** When set, an "Enter Manually (No Product)" row appears at the bottom
+   * of the list — opt-in, so the stock/receive-items forms that always
+   * require a real product are unaffected. Picking it does NOT change this
+   * field's own selection; the caller decides what "manual" looks like
+   * (e.g. Purchase's line item swaps this whole picker out for a plain
+   * text field). */
+  onSkip?: () => void
+  skipLabel?: string
 }
 
 /**
@@ -60,6 +71,8 @@ export function ProductSelect({
   onChange,
   addNewHref,
   onBeforeAddNew,
+  onSkip,
+  skipLabel = "Enter Manually (No Product)",
 }: ProductSelectProps) {
   const router = useRouter()
   const [search, setSearch] = useState("")
@@ -93,6 +106,12 @@ export function ProductSelect({
             setOpen(false)
             onBeforeAddNew?.()
             if (addNewHref) router.push(addNewHref)
+            return
+          }
+
+          if (value === SKIP_VALUE) {
+            setOpen(false)
+            onSkip?.()
             return
           }
 
@@ -143,6 +162,15 @@ export function ProductSelect({
               >
                 <Plus className="mr-1 h-4 w-4" />
                 Add New Product
+              </SelectItem>
+            </>
+          )}
+
+          {onSkip && (
+            <>
+              <div className="my-1 border-t" />
+              <SelectItem value={SKIP_VALUE} className="text-muted-foreground">
+                {skipLabel}
               </SelectItem>
             </>
           )}

@@ -34,13 +34,21 @@ function metalRibbonColor(metalLabel: string): string {
  * below already cover that.
  */
 export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }) {
-  const { karigar, ledger } = bundle
+  const { karigar, ledger, metals } = bundle
 
   // Only what's actually set/nonzero — an unused Opening Gold/Cash field or
   // a karigar with no specialization recorded is clutter, not information.
   const hasOpeningGold = karigar.openingGold !== 0
   const hasOpeningCash = karigar.openingCash !== 0
   const hasSpecialization = Boolean(karigar.specialization)
+
+  // Same Metals/Stones split as KarigarForm's own "Assigned Metals &
+  // Stones" picker (isGemstone flag) — shown here read-only, checked
+  // against assignedMetalTypeIds, so the detail view answers "which metals
+  // or stones can this artisan be issued material in" at a glance instead
+  // of only inside the edit form.
+  const activeMetalsOnly = metals.filter((metal) => metal.isActive && !metal.isGemstone)
+  const activeStonesOnly = metals.filter((metal) => metal.isActive && metal.isGemstone)
 
   return (
     <div className="space-y-6">
@@ -85,6 +93,52 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
           )}
 
         <KarigarStatusCard karigarId={karigar.id} isActive={karigar.isActive} />
+
+        {activeMetalsOnly.length > 0 && (
+          <Card size="sm">
+            <CardHeader>
+              <CardTitle className="text-sm text-muted-foreground">Metal</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1.5">
+                {activeMetalsOnly.map((metal) => (
+                  <label key={metal.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={karigar.assignedMetalTypeIds.includes(metal.id)}
+                      disabled
+                      className="h-4 w-4"
+                    />
+                    {metal.name}
+                  </label>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {activeStonesOnly.length > 0 && (
+          <Card size="sm">
+            <CardHeader>
+              <CardTitle className="text-sm text-muted-foreground">Stone</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1.5">
+                {activeStonesOnly.map((stone) => (
+                  <label key={stone.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={karigar.assignedMetalTypeIds.includes(stone.id)}
+                      disabled
+                      className="h-4 w-4"
+                    />
+                    {stone.name}
+                  </label>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Live balances — ribbon-style: a full-width colored band per
             metal (so Gold vs Silver reads at a glance), carrying the label

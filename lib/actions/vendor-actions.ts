@@ -41,6 +41,17 @@ export type Vendor = {
   lastPaymentDate?: string
   notes?: string
   createdAt?: string
+  /** Set only when this vendor is linked to a Customer row for the same
+   *  real-world person/business — see Customer.linkedVendorId's doc
+   *  comment in schema.prisma. Only populated by getVendorById (the detail
+   *  view), never by the list query. */
+  linkedCustomer?: {
+    id: string
+    name: string
+    customerCode: string | null
+    isActive: boolean
+    pendingAmount: string
+  } | null
 }
 
 export type VendorFormState = {
@@ -201,6 +212,20 @@ function mapVendor(vendor: any): Vendor {
     lastPaymentDate,
     notes: vendor.notes ?? "",
     createdAt: vendor.createdAt.toISOString(),
+    linkedCustomer: vendor.linkedCustomer
+      ? {
+          id: vendor.linkedCustomer.id,
+          name: vendor.linkedCustomer.name,
+          customerCode: vendor.linkedCustomer.customerCode,
+          isActive: vendor.linkedCustomer.isActive,
+          pendingAmount: formatCurrency(
+            vendor.linkedCustomer.invoices.reduce(
+              (sum: number, invoice: any) => sum + Number(invoice.balanceAmount || 0),
+              0,
+            ),
+          ),
+        }
+      : null,
   }
 }
 
@@ -291,6 +316,15 @@ export async function getVendorById(id: string): Promise<Vendor | null> {
         },
         orderBy: {
           entryDate: "desc",
+        },
+      },
+      linkedCustomer: {
+        select: {
+          id: true,
+          name: true,
+          customerCode: true,
+          isActive: true,
+          invoices: { select: { balanceAmount: true } },
         },
       },
     },

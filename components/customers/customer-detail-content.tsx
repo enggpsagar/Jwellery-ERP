@@ -7,6 +7,7 @@ import {
   DetailGrid,
   DetailSection,
 } from "@/components/shared/detail-section"
+import { CustomerVendorLinkCard } from "@/components/customers/customer-vendor-link-card"
 
 type StateItem = {
   id: string
@@ -28,10 +29,13 @@ type StateItem = {
 export function CustomerDetailContent({
   customer,
   ledger,
+  onLinkChanged,
 }: {
   customer: Customer
   states: StateItem[]
   ledger: React.ReactNode
+  /** See CustomerVendorLinkCard's own doc comment on its onChanged prop. */
+  onLinkChanged?: () => void
 }) {
   const money = (value: unknown) => `₹ ${Number(value || 0).toLocaleString("en-IN")}`
 
@@ -48,6 +52,12 @@ export function CustomerDetailContent({
           it. The customer's own identity is already established by this
           page's own header, so it doesn't need to lead here too. */}
       {ledger}
+
+      <CustomerVendorLinkCard
+        customerId={customer.id}
+        linkedVendor={customer.linkedVendor ?? null}
+        onChanged={onLinkChanged}
+      />
 
       <DetailSection
         title="Customer Information"

@@ -7,6 +7,7 @@ import {
   DetailGrid,
   DetailSection,
 } from "@/components/shared/detail-section"
+import { VendorCustomerLinkCard } from "@/components/vendors/vendor-customer-link-card"
 
 /**
  * The body of a vendor's detail view — Vendor Information / Address /
@@ -22,9 +23,12 @@ import {
 export function VendorDetailContent({
   vendor,
   ledger,
+  onLinkChanged,
 }: {
   vendor: Vendor
   ledger: React.ReactNode
+  /** See VendorCustomerLinkCard's own doc comment on its onChanged prop. */
+  onLinkChanged?: () => void
 }) {
   const money = (value: unknown) => `₹ ${Number(value || 0).toLocaleString("en-IN")}`
 
@@ -45,6 +49,12 @@ export function VendorDetailContent({
           the contact-card details below it. Renders nothing when this
           vendor has no ledger activity yet (see VendorLedgerBody). */}
       {ledger}
+
+      <VendorCustomerLinkCard
+        vendorId={vendor.id}
+        linkedCustomer={vendor.linkedCustomer ?? null}
+        onChanged={onLinkChanged}
+      />
 
       <DetailSection
         title="Vendor Information"

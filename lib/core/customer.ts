@@ -50,6 +50,19 @@ export type CustomerRecord = {
   lastPaymentDate?: string;
   notes?: string;
   createdAt?: string;
+  /** Set only when this customer is linked to a Vendor row for the same
+   *  real-world person/business — see Customer.linkedVendorId's doc
+   *  comment in schema.prisma. Only meaningfully populated by
+   *  getCustomerByIdCore (the detail view); a list row always maps this to
+   *  null since CUSTOMER_LIST_INCLUDE never fetches it, not because the
+   *  customer definitely has no link. */
+  linkedVendor?: {
+    id: string;
+    name: string;
+    vendorCode: string | null;
+    isActive: boolean;
+    pendingAmount: string;
+  } | null;
 };
 
 export type CustomerFormState = {
@@ -173,6 +186,22 @@ export const CUSTOMER_LIST_INCLUDE = {
   },
 };
 
+/** Same as CUSTOMER_LIST_INCLUDE, plus the linked Vendor row (if any) — kept
+ * off the list include so a paginated Customers list doesn't pay for an
+ * extra join/select on every row for a field only the detail view shows. */
+export const CUSTOMER_DETAIL_INCLUDE = {
+  ...CUSTOMER_LIST_INCLUDE,
+  linkedVendor: {
+    select: {
+      id: true,
+      name: true,
+      vendorCode: true,
+      isActive: true,
+      purchases: { select: { balanceAmount: true } },
+    },
+  },
+};
+
 export function mapCustomer(customer: any): CustomerRecord {
   const totalOrders = customer.invoices.length;
 
@@ -227,6 +256,20 @@ export function mapCustomer(customer: any): CustomerRecord {
     lastPaymentDate,
     notes: customer.notes ?? "",
     createdAt: customer.createdAt.toISOString(),
+    linkedVendor: customer.linkedVendor
+      ? {
+          id: customer.linkedVendor.id,
+          name: customer.linkedVendor.name,
+          vendorCode: customer.linkedVendor.vendorCode,
+          isActive: customer.linkedVendor.isActive,
+          pendingAmount: formatCurrency(
+            customer.linkedVendor.purchases.reduce(
+              (sum: number, purchase: any) => sum + Number(purchase.balanceAmount || 0),
+              0,
+            ),
+          ),
+        }
+      : null,
   };
 }
 
@@ -274,7 +317,7 @@ export async function getCustomerByIdCore(
 ): Promise<CustomerRecord | null> {
   const customer = await prisma.customer.findFirst({
     where: { id, storeId },
-    include: CUSTOMER_LIST_INCLUDE,
+    include: CUSTOMER_DETAIL_INCLUDE,
   });
 
   if (!customer) return null;

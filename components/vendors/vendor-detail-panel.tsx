@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Truck } from "lucide-react"
 
 import { getVendorById, type Vendor } from "@/lib/actions/vendor-actions"
@@ -29,6 +29,11 @@ type VendorDetailPanelProps = {
 export function VendorDetailPanel({ vendorId, states }: VendorDetailPanelProps) {
   const [vendor, setVendor] = useState<Vendor | null>(null)
   const [loading, setLoading] = useState(false)
+
+  const reload = useCallback(() => {
+    if (!vendorId) return
+    getVendorById(vendorId).then((result) => setVendor(result))
+  }, [vendorId])
 
   useEffect(() => {
     if (!vendorId) {
@@ -77,7 +82,11 @@ export function VendorDetailPanel({ vendorId, states }: VendorDetailPanelProps) 
         <VendorRowActions vendor={vendor} states={states} />
       </div>
 
-      <VendorDetailContent vendor={vendor} ledger={<VendorLedgerCardClient vendorId={vendor.id} />} />
+      <VendorDetailContent
+        vendor={vendor}
+        onLinkChanged={reload}
+        ledger={<VendorLedgerCardClient vendorId={vendor.id} />}
+      />
     </div>
   )
 }

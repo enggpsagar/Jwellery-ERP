@@ -388,6 +388,17 @@ model Customer {
   // API/MCP-created customer has no human User behind it at all.
   createdById    String?
   createdByName  String?
+  // Optional link to a Vendor row representing the SAME real-world person
+  // or business — lets someone the store both sells to and buys from (a
+  // customer who also sells old gold back, a wholesaler who's also a
+  // retail buyer) be recorded once on each side while staying connected.
+  // The FK lives here rather than on both sides so there's one source of
+  // truth for the pairing; @unique makes it a true 1:1 — at most one
+  // Customer can claim a given Vendor. Each side keeps its own independent
+  // invoices/purchases/ledger exactly as before; this is purely a display-
+  // level cross-reference. See lib/actions/party-link-actions.ts.
+  linkedVendorId String?        @unique
+  linkedVendor   Vendor?        @relation("CustomerVendorLink", fields: [linkedVendorId], references: [id])
   createdBy      User?          @relation("CustomerCreatedBy", fields: [createdById], references: [id])
   store          Store          @relation(fields: [storeId], references: [id])
   invoices       Invoice[]
@@ -1123,6 +1134,10 @@ model Vendor {
   purchases      Purchase[]
   ledgerEntries  LedgerEntry[]
   inventoryStock InventoryStock[]
+  // Back-relation for Customer.linkedVendorId — see that field's doc
+  // comment. At most one Customer can hold this link (enforced there by
+  // @unique on linkedVendorId), so this is a real 1:1, not a list.
+  linkedCustomer Customer?        @relation("CustomerVendorLink")
 
   @@unique([storeId, vendorCode])
   @@index([name])

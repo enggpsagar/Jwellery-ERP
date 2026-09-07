@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Users } from "lucide-react"
 
 import { getCustomerById, type Customer } from "@/lib/actions/customer-actions"
@@ -32,6 +32,11 @@ type CustomerDetailPanelProps = {
 export function CustomerDetailPanel({ customerId, states }: CustomerDetailPanelProps) {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(false)
+
+  const reload = useCallback(() => {
+    if (!customerId) return
+    getCustomerById(customerId).then((result) => setCustomer(result))
+  }, [customerId])
 
   useEffect(() => {
     if (!customerId) {
@@ -83,6 +88,7 @@ export function CustomerDetailPanel({ customerId, states }: CustomerDetailPanelP
       <CustomerDetailContent
         customer={customer}
         states={states}
+        onLinkChanged={reload}
         ledger={
           <CustomerLedgerCardClient
             customerId={customer.id}

@@ -877,6 +877,7 @@ export function PurchaseForm({
             name="locationId"
             defaultValue={locationId}
             onChange={setLocationId}
+            triggerClassName="h-8 w-full"
           />
         </div>
       </div>
@@ -1240,68 +1241,73 @@ export function PurchaseForm({
                           />
                         </div>
                       )}
+
+                      {/* Includes-a-Stone toggle sits here, in the same row
+                          as Purity/Gross Weight/Making Charge, instead of
+                          its own separate full-width row below — it's a
+                          single small control, not worth a whole row of its
+                          own. Only the toggle lives here; StoneComponentFields
+                          (once checked) still renders as its own row below,
+                          since it needs the room. No toggle applies to a
+                          carat-weighed line at all (see below), so this
+                          cell is simply empty there. */}
+                      {!isCaratLine(item) && (
+                        <div className="flex items-end pb-2">
+                          <IncludesStoneToggle
+                            checked={item.hasStoneComponent}
+                            onChange={(checked) =>
+                              updateItem(item.key, {
+                                hasStoneComponent: checked,
+                                // Net Stone Weight and Stone Charge are now
+                                // both hidden once the toggle is off — clear
+                                // them so a hidden field can't silently keep
+                                // submitting whatever was last entered.
+                                ...(checked
+                                  ? {}
+                                  : {
+                                      stoneWeightInput: 0,
+                                      netStoneWeightTouched: false,
+                                      stoneCharge: 0,
+                                      stoneChargeTouched: false,
+                                    }),
+                              })
+                            }
+                          />
+                        </div>
+                      )}
                     </div>
 
-                    {/* A composite piece (metal + an embedded stone) is the
-                        exception, not the rule, for a line whose own metal
-                        isn't Diamond/Stone — kept as its own toggled strip
-                        rather than wedged into the grid above, so a plain
-                        Gold line's fields don't reflow every time this gets
-                        checked/unchecked. */}
-                    {!isCaratLine(item) && (
-                      <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
-                        <IncludesStoneToggle
-                          checked={item.hasStoneComponent}
-                          onChange={(checked) =>
-                            updateItem(item.key, {
-                              hasStoneComponent: checked,
-                              // Net Stone Weight and Stone Charge are now
-                              // both hidden once the toggle is off — clear
-                              // them so a hidden field can't silently keep
-                              // submitting whatever was last entered.
-                              ...(checked
-                                ? {}
-                                : {
-                                    stoneWeightInput: 0,
-                                    netStoneWeightTouched: false,
-                                    stoneCharge: 0,
-                                    stoneChargeTouched: false,
-                                  }),
-                            })
+                    {!isCaratLine(item) && item.hasStoneComponent && (
+                      <div className="rounded-md border border-dashed p-3">
+                        <StoneComponentFields
+                          metals={metals}
+                          origins={origins}
+                          onMetalsChange={setMetals}
+                          onOriginsChange={setOrigins}
+                          stoneMetalTypeName={item.stoneMetalTypeName}
+                          onStoneChange={(name, typeNames) =>
+                            updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
                           }
+                          selectedTypeNames={item.stoneTypeNames}
+                          onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
+                          caratWeight={item.caratWeight}
+                          onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
+                          stoneRate={item.stoneRate}
+                          onStoneRateChange={(value) => handleStoneRateChange(item, value)}
+                          stoneCharge={item.stoneCharge}
+                          onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
+                          stoneChargeTouched={item.stoneChargeTouched}
+                          stoneWeightInput={toPrimaryUnit(
+                            item.stoneWeightInput,
+                            "GRAM",
+                            item.stoneWeightUnit,
+                            resolveGramsPerCarat(item.purity, caratConversionRates),
+                          )}
+                          onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
+                          stoneWeightUnit={item.stoneWeightUnit}
+                          onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
+                          netStoneWeightTouched={item.netStoneWeightTouched}
                         />
-
-                        {item.hasStoneComponent && (
-                          <StoneComponentFields
-                            metals={metals}
-                            origins={origins}
-                            onMetalsChange={setMetals}
-                            onOriginsChange={setOrigins}
-                            stoneMetalTypeName={item.stoneMetalTypeName}
-                            onStoneChange={(name, typeNames) =>
-                              updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
-                            }
-                            selectedTypeNames={item.stoneTypeNames}
-                            onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
-                            caratWeight={item.caratWeight}
-                            onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
-                            stoneRate={item.stoneRate}
-                            onStoneRateChange={(value) => handleStoneRateChange(item, value)}
-                            stoneCharge={item.stoneCharge}
-                            onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
-                            stoneChargeTouched={item.stoneChargeTouched}
-                            stoneWeightInput={toPrimaryUnit(
-                              item.stoneWeightInput,
-                              "GRAM",
-                              item.stoneWeightUnit,
-                              resolveGramsPerCarat(item.purity, caratConversionRates),
-                            )}
-                            onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
-                            stoneWeightUnit={item.stoneWeightUnit}
-                            onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
-                            netStoneWeightTouched={item.netStoneWeightTouched}
-                          />
-                        )}
                       </div>
                     )}
 

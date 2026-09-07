@@ -1066,10 +1066,33 @@ export async function deletePurchase(id: string): Promise<PurchaseFormState> {
 
     if (!purchase) return { success: false, message: "Purchase not found" };
 
-    const stockUntouched = purchase.items.every(
-      (item) =>
-        !item.inventoryStock || item.inventoryStock.status === InventoryStockStatus.IN_STOCK,
-    );
+    const stockIds = purchase.items
+      .map((item) => item.inventoryStockId)
+      .filter((value): value is string => Boolean(value));
+
+    // status alone isn't enough — it only flips to SOLD once quantity hits
+    // zero, so a PARTIAL sale (say 3 of 10 pieces) leaves it sitting at
+    // IN_STOCK with quantity 7, and the old status-only check let a delete
+    // through anyway, which then hard-deleted a stock row a real, live
+    // InvoiceItem.inventoryStockId still pointed at. Checking for any
+    // transaction on this stock other than the PURCHASE one that created it
+    // catches every way stock can move (a sale, a return-restock, a future
+    // adjustment/transfer type) — not just "fully sold."
+    const movedStockCount = stockIds.length
+      ? await prisma.inventoryTransaction.count({
+          where: {
+            inventoryStockId: { in: stockIds },
+            transactionType: { not: InventoryTransactionType.PURCHASE },
+          },
+        })
+      : 0;
+
+    const stockUntouched =
+      movedStockCount === 0 &&
+      purchase.items.every(
+        (item) =>
+          !item.inventoryStock || item.inventoryStock.status === InventoryStockStatus.IN_STOCK,
+      );
 
     if (
       purchase.status !== InvoiceStatus.DRAFT ||
@@ -1083,10 +1106,6 @@ export async function deletePurchase(id: string): Promise<PurchaseFormState> {
           "Only draft purchases with no payments and unmoved stock can be deleted",
       };
     }
-
-    const stockIds = purchase.items
-      .map((item) => item.inventoryStockId)
-      .filter((value): value is string => Boolean(value));
 
     await prisma.$transaction(async (tx) => {
       await tx.purchase.delete({ where: { id } });

@@ -35,6 +35,10 @@ type LocationSelectProps = {
   defaultValue?: string
   placeholder?: string
   onChange?: (locationId: string) => void
+  /** Overrides the trigger's own default sizing (h-11 w-full) — most
+   * callers sit in a form of similarly-tall fields and want the default,
+   * but one placed alongside plain Inputs (h-8) needs to match them. */
+  triggerClassName?: string
 }
 
 /**
@@ -50,6 +54,7 @@ export function LocationSelect({
   defaultValue,
   placeholder = "Select location",
   onChange,
+  triggerClassName = "h-11 w-full",
 }: LocationSelectProps) {
   const router = useRouter()
   const [selected, setSelected] = useState(defaultValue ?? "")
@@ -85,7 +90,7 @@ export function LocationSelect({
           onChange?.(next)
         }}
       >
-        <SelectTrigger className="h-11 w-full">
+        <SelectTrigger className={triggerClassName}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
 

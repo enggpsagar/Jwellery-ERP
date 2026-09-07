@@ -50,7 +50,7 @@ export default async function VendorDetailsPage({
   }
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-5xl space-y-6 p-6">
       {/* This page had no back link at all — the only way out was the sidebar. */}
       <PageBackHeader
         title={toTitleCase(vendor.name)}

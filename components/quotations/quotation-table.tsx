@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useMemo, useRef } from "react"
 
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { Eye, ArrowRightCircle } from "lucide-react"
@@ -34,9 +35,47 @@ type QuotationRow = {
 
 type QuotationTableProps = {
   quotations: QuotationRow[]
+  /** Bulk-action checkbox selection — omit to hide the checkbox column entirely. */
+  selectedIds?: string[]
+  onSelectionChange?: (ids: string[]) => void
 }
 
-export function QuotationTable({ quotations }: QuotationTableProps) {
+export function QuotationTable({ quotations, selectedIds, onSelectionChange }: QuotationTableProps) {
+  const allIds = useMemo(() => quotations.map((q) => q.id), [quotations])
+
+  const allSelected =
+    !!selectedIds && allIds.length > 0 && allIds.every((id) => selectedIds.includes(id))
+  const someSelected =
+    !!selectedIds && allIds.some((id) => selectedIds.includes(id)) && !allSelected
+
+  const headerCheckboxRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = someSelected
+    }
+  }, [someSelected])
+
+  const toggleAll = (checked: boolean) => {
+    if (!selectedIds || !onSelectionChange) return
+    if (checked) {
+      onSelectionChange(Array.from(new Set([...selectedIds, ...allIds])))
+      return
+    }
+    onSelectionChange(selectedIds.filter((id) => !allIds.includes(id)))
+  }
+
+  const toggleOne = (id: string, checked: boolean) => {
+    if (!selectedIds || !onSelectionChange) return
+    if (checked) {
+      onSelectionChange(Array.from(new Set([...selectedIds, id])))
+      return
+    }
+    onSelectionChange(selectedIds.filter((selectedId) => selectedId !== id))
+  }
+
+  const showCheckboxes = !!selectedIds && !!onSelectionChange
+
   if (!quotations.length) {
     return (
       <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
@@ -51,6 +90,18 @@ export function QuotationTable({ quotations }: QuotationTableProps) {
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40">
             <tr className="border-b">
+              {showCheckboxes ? (
+                <th className="w-10 px-4 py-3">
+                  <input
+                    ref={headerCheckboxRef}
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={(e) => toggleAll(e.target.checked)}
+                    className="h-4 w-4 rounded border-input"
+                    aria-label="Select all quotations"
+                  />
+                </th>
+              ) : null}
               <SortableTableHead label="Quotation #" sortKey="quotationNumber" defaultSortBy="quotationDate" />
               <SortableTableHead label="Date" sortKey="quotationDate" defaultSortBy="quotationDate" />
               <th className="px-4 py-3 text-left font-medium">Valid Until</th>
@@ -65,6 +116,17 @@ export function QuotationTable({ quotations }: QuotationTableProps) {
           <tbody>
             {quotations.map((quotation) => (
               <tr key={quotation.id} className="border-b last:border-0">
+                {showCheckboxes ? (
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds!.includes(quotation.id)}
+                      onChange={(e) => toggleOne(quotation.id, e.target.checked)}
+                      className="h-4 w-4 rounded border-input"
+                      aria-label={`Select ${quotation.quotationNumber}`}
+                    />
+                  </td>
+                ) : null}
                 <td className="px-4 py-3 font-medium">
                   <RecordHoverCard
                     label={quotation.quotationNumber}

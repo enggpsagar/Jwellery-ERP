@@ -30,6 +30,21 @@ type NewMetal = {
   sellingPrice: number | null
 }
 
+type AddMetalInlineDialogProps = {
+  onCreated: (metal: NewMetal) => void
+  /**
+   * Launched from the Metals box vs the Stones box already says which
+   * category the new row is — pre-sets isGemstone to match and hides the
+   * "This is a stone, not a metal" checkbox so the two boxes' own Add
+   * buttons can't accidentally create a row in the wrong list. Omit for
+   * the old single-button, pick-either-category behavior.
+   */
+  category?: "metal" | "stone"
+  /** Defaults to "Add New Metal/Stone" — pass "Add Metal"/"Add Stone" from
+   * each box's own button so the two don't read identically. */
+  triggerLabel?: string
+}
+
 /**
  * Lets "Assigned Metals/Stones" on the Karigar form create a brand-new
  * StoreMetal on the spot, for the case where the metal/stone a karigar
@@ -39,11 +54,11 @@ type NewMetal = {
  * restricted to Admin/Super Admin there — a non-admin submitting this gets
  * that same rejection back as a plain error message).
  */
-export function AddMetalInlineDialog({ onCreated }: { onCreated: (metal: NewMetal) => void }) {
+export function AddMetalInlineDialog({ onCreated, category, triggerLabel }: AddMetalInlineDialogProps) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [hasPurity, setHasPurity] = useState(false)
-  const [isGemstone, setIsGemstone] = useState(false)
+  const [isGemstone, setIsGemstone] = useState(category === "stone")
   const toast = useToast()
 
   const [state, formAction, pending] = useActionState(upsertStoreMetal, initialState)
@@ -67,7 +82,7 @@ export function AddMetalInlineDialog({ onCreated }: { onCreated: (metal: NewMeta
       setOpen(false)
       setName("")
       setHasPurity(false)
-      setIsGemstone(false)
+      setIsGemstone(category === "stone")
     } else if (!state.success && state.message) {
       toast.error(state.message)
     }
@@ -82,12 +97,14 @@ export function AddMetalInlineDialog({ onCreated }: { onCreated: (metal: NewMeta
         className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
       >
         <Plus className="h-3.5 w-3.5" />
-        Add New Metal/Stone
+        {triggerLabel ?? "Add New Metal/Stone"}
       </button>
 
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add Metal/Stone</DialogTitle>
+          <DialogTitle>
+            {category === "stone" ? "Add Stone" : category === "metal" ? "Add Metal" : "Add Metal/Stone"}
+          </DialogTitle>
         </DialogHeader>
 
         <form
@@ -113,17 +130,23 @@ export function AddMetalInlineDialog({ onCreated }: { onCreated: (metal: NewMeta
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="add-metal-is-gemstone"
-              name="isGemstone"
-              checked={isGemstone}
-              onChange={(e) => setIsGemstone(e.target.checked)}
-              className="h-4 w-4"
-            />
-            <Label htmlFor="add-metal-is-gemstone">This is a stone, not a metal</Label>
-          </div>
+          {category ? (
+            // Category already fixed by which box this dialog was opened
+            // from — still submitted as a hidden field, just not editable.
+            <input type="hidden" name="isGemstone" value={isGemstone ? "on" : ""} />
+          ) : (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="add-metal-is-gemstone"
+                name="isGemstone"
+                checked={isGemstone}
+                onChange={(e) => setIsGemstone(e.target.checked)}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="add-metal-is-gemstone">This is a stone, not a metal</Label>
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             <input

@@ -46,7 +46,7 @@ export default async function EditVendorPage({
   if (!vendor) notFound()
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-4xl space-y-6 p-6">
       <PageBackHeader
         title={`Edit ${vendor.name}`}
         description="Update this vendor's contact and account details."

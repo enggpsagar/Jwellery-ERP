@@ -13,6 +13,7 @@ import type { StateOption } from "@/lib/actions/location-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import type { GstScheme } from "@prisma/client"
 import { useToast } from "@/components/providers/toast-provider"
+import { Card, CardContent } from "@/components/ui/card"
 
 import { KarigarForm } from "./karigar-form"
 
@@ -69,59 +70,42 @@ export function KarigarCreateForm({
   }, [state])
 
   return (
+    <Card>
+      <CardContent className="p-6">
+        <form
+          onSubmit={(event) => {
+            // Deliberately not `action={formAction}` directly on the form:
+            // React resets a form's uncontrolled fields once an action-bound
+            // submission settles, regardless of whether the action's own
+            // returned state says success or failure — so a plain validation
+            // error wiped every other field the user had already typed.
+            // Calling the same dispatcher by hand from a prevented submit
+            // sidesteps that auto-reset while keeping identical pending/error-
+            // state behavior.
+            event.preventDefault()
+            formAction(new FormData(event.currentTarget))
+          }}
+          className="space-y-6"
+        >
+          {state.message && (
+            <div className={state.success ? "text-green-600" : "text-red-600"}>
+              {state.message}
+            </div>
+          )}
 
-    <form
-      onSubmit={(event) => {
-        // Deliberately not `action={formAction}` directly on the form:
-        // React resets a form's uncontrolled fields once an action-bound
-        // submission settles, regardless of whether the action's own
-        // returned state says success or failure — so a plain validation
-        // error wiped every other field the user had already typed.
-        // Calling the same dispatcher by hand from a prevented submit
-        // sidesteps that auto-reset while keeping identical pending/error-
-        // state behavior.
-        event.preventDefault()
-        formAction(new FormData(event.currentTarget))
-      }}
-      className="space-y-6"
-    >
-
-
-      {
-        state.message && (
-
-          <div
-            className={
-              state.success
-              ? "text-green-600"
-              : "text-red-600"
-            }
-          >
-
-            {state.message}
-
-          </div>
-
-        )
-      }
-
-
-
-      <KarigarForm
-        pending={pending}
-        errors={state.errors}
-        locations={locations}
-        states={states}
-        metals={metals}
-        defaultLocationId={defaultLocationId}
-        defaultState={defaultState}
-        defaultCity={defaultCity}
-        gstScheme={gstScheme}
-      />
-
-
-    </form>
-
+          <KarigarForm
+            pending={pending}
+            errors={state.errors}
+            locations={locations}
+            states={states}
+            metals={metals}
+            defaultLocationId={defaultLocationId}
+            defaultState={defaultState}
+            defaultCity={defaultCity}
+            gstScheme={gstScheme}
+          />
+        </form>
+      </CardContent>
+    </Card>
   )
-
 }

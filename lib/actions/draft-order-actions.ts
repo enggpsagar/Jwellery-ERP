@@ -9,6 +9,7 @@ import { requireStoreScope } from "@/lib/store-context";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
 import { getFinenessMap, toFineWeight } from "@/lib/purity";
+import { buildExcelExport } from "@/lib/excel-export";
 import {
   assertKarigarAssignedMetal,
   generateJobNumber,
@@ -88,20 +89,214 @@ function mapDraftOrder(order: {
   };
 }
 
-export async function getDraftOrders(): Promise<DraftOrderRow[]> {
+export type DraftOrderSortBy = "orderDate" | "orderNumber";
+export type SortOrder = "asc" | "desc";
+
+export type GetDraftOrdersParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  sortBy?: DraftOrderSortBy;
+  sortOrder?: SortOrder;
+  /** One of DraftOrder's own status strings (DRAFT/SENT_TO_KARIGAR/RECEIVED/CANCELLED). */
+  status?: string;
+};
+
+export type DraftOrdersListResponse = {
+  orders: DraftOrderRow[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+};
+
+function getDraftOrdersWhere(storeId: string, search?: string, status?: string) {
+  const query = String(search || "").trim();
+
+  return {
+    storeId,
+    ...(status ? { status } : {}),
+    ...(query
+      ? {
+          OR: [
+            { orderNumber: { contains: query, mode: "insensitive" as const } },
+            { customer: { name: { contains: query, mode: "insensitive" as const } } },
+            { customer: { phone: { contains: query, mode: "insensitive" as const } } },
+          ],
+        }
+      : {}),
+  };
+}
+
+function getDraftOrdersOrderBy(sortBy: DraftOrderSortBy = "orderDate", sortOrder: SortOrder = "desc") {
+  if (sortBy === "orderNumber") return { orderNumber: sortOrder };
+  return { orderDate: sortOrder };
+}
+
+const DRAFT_ORDER_INCLUDE = {
+  customer: { select: { id: true, name: true, phone: true } },
+  karigarJob: { select: { id: true, jobNumber: true, karigarId: true } },
+  _count: { select: { items: true } },
+} as const;
+
+export async function getDraftOrders(
+  params: GetDraftOrdersParams = {},
+): Promise<DraftOrdersListResponse> {
   const storeId = await requireStoreScope();
 
-  const orders = await prisma.draftOrder.findMany({
-    where: { storeId },
-    include: {
-      customer: { select: { id: true, name: true, phone: true } },
-      karigarJob: { select: { id: true, jobNumber: true, karigarId: true } },
-      _count: { select: { items: true } },
-    },
-    orderBy: { orderDate: "desc" },
-  });
+  const page = Math.max(1, Number(params.page || 1));
+  const pageSize = Math.max(1, Number(params.pageSize || 10));
+  const sortBy: DraftOrderSortBy = params.sortBy || "orderDate";
+  const sortOrder: SortOrder = params.sortOrder || "desc";
 
-  return orders.map(mapDraftOrder);
+  const where = getDraftOrdersWhere(storeId, params.search, params.status);
+  const orderBy = getDraftOrdersOrderBy(sortBy, sortOrder);
+
+  const [totalCount, orders] = await Promise.all([
+    prisma.draftOrder.count({ where }),
+    prisma.draftOrder.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: DRAFT_ORDER_INCLUDE,
+    }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  return {
+    orders: orders.map(mapDraftOrder),
+    pagination: {
+      page,
+      pageSize,
+      totalCount,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+    },
+  };
+}
+
+type ExportDraftOrdersParams = {
+  selectedIds?: string[];
+  search?: string;
+  sortBy?: string;
+  sortOrder?: SortOrder;
+  status?: string;
+};
+
+export async function exportDraftOrdersToExcel(params: ExportDraftOrdersParams = {}): Promise<{
+  success: boolean;
+  message: string;
+  fileName?: string;
+  fileBase64?: string;
+}> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const where = params.selectedIds?.length
+      ? { id: { in: params.selectedIds }, storeId }
+      : getDraftOrdersWhere(
+          storeId,
+          params.search,
+          params.status,
+        );
+
+    const orderBy = getDraftOrdersOrderBy(
+      (params.sortBy as DraftOrderSortBy) || "orderDate",
+      params.sortOrder || "desc",
+    );
+
+    const orders = await prisma.draftOrder.findMany({
+      where,
+      orderBy,
+      include: DRAFT_ORDER_INCLUDE,
+    });
+
+    if (!orders.length) {
+      return { success: false, message: "No draft orders found to export" };
+    }
+
+    const rows = orders.map((order, index) => ({
+      "Sr. No.": index + 1,
+      "Order #": order.orderNumber,
+      Date: order.orderDate.toISOString().slice(0, 10),
+      Customer: order.customer?.name ?? "",
+      Phone: order.customer?.phone ?? "",
+      Items: order._count.items,
+      Status: order.status,
+      "Artisan Job": order.karigarJob?.jobNumber ?? "",
+    }));
+
+    const { fileName, fileBase64 } = buildExcelExport(rows, "Draft Orders", "draft-orders");
+
+    return { success: true, message: "Draft orders exported successfully", fileName, fileBase64 };
+  } catch (error) {
+    console.error("exportDraftOrdersToExcel error:", error);
+    return { success: false, message: "Failed to export draft orders" };
+  }
+}
+
+/** Only a DRAFT (never sent) or already-CANCELLED order can be deleted — one
+ *  that's been SENT_TO_KARIGAR or RECEIVED has a real linked KarigarJob (and,
+ *  once received, real Product/InventoryStock), and deleting the order would
+ *  orphan that history rather than cleanly undo it. Cancel it first via
+ *  cancelDraftOrder if it's still DRAFT-eligible, then delete. */
+export async function deleteDraftOrder(orderId: string): Promise<DraftOrderFormState> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const order = await prisma.draftOrder.findFirst({
+      where: { id: orderId, storeId },
+      select: { id: true, orderNumber: true, status: true },
+    });
+    if (!order) return { success: false, message: "Order not found" };
+
+    if (order.status !== "DRAFT" && order.status !== "CANCELLED") {
+      return {
+        success: false,
+        message: "Only a Draft or Cancelled order can be deleted — this one has already been sent to an artisan",
+      };
+    }
+
+    await prisma.draftOrder.delete({ where: { id: orderId } });
+
+    revalidatePath("/orders");
+
+    return { success: true, message: `Draft Order ${order.orderNumber} deleted` };
+  } catch (error) {
+    console.error("deleteDraftOrder error:", error);
+    return { success: false, message: "Failed to delete order" };
+  }
+}
+
+export type BulkDeleteDraftOrdersResult = {
+  deletedCount: number;
+  failures: { id: string; message: string }[];
+};
+
+/** Runs every selected id through the same guarded deleteDraftOrder() a
+ *  single-row delete uses, so a batch selection can't bypass the
+ *  DRAFT/CANCELLED-only guard just because several rows were ticked at once. */
+export async function bulkDeleteDraftOrders(ids: string[]): Promise<BulkDeleteDraftOrdersResult> {
+  const failures: BulkDeleteDraftOrdersResult["failures"] = [];
+  let deletedCount = 0;
+
+  for (const id of ids) {
+    const result = await deleteDraftOrder(id);
+    if (result.success) {
+      deletedCount++;
+    } else {
+      failures.push({ id, message: result.message });
+    }
+  }
+
+  return { deletedCount, failures };
 }
 
 export type DraftOrderItemRow = {

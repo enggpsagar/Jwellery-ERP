@@ -3,7 +3,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { UserRole, GstScheme } from "@prisma/client";
+import { UserRole, GstScheme, SkuFormat } from "@prisma/client";
 import { requireStoreScope } from "@/lib/store-context";
 import { requireRole } from "@/lib/auth/auth";
 import { MONEY_UNIT } from "@/lib/business-units";
@@ -48,6 +48,12 @@ export type BusinessSettings = {
   // prisma/schema.prisma's BusinessSettings.returnWindowEnabled doc comment.
   // Every consumer of returnWindowDays below must also check this.
   returnWindowEnabled: boolean;
+  // Which SKU layout preset createProduct's generator arranges Metal/
+  // Purity/Style/Category into — see prisma/schema.prisma's SkuFormat and
+  // lib/inventory/product-sku.ts's composeSkuPrefix(). Edited via its own
+  // small SkuFormatForm/updateSkuFormat, not the big updateBusinessSettings
+  // form below.
+  skuFormat: SkuFormat;
   // How many days after invoiceDate a sold item may still be returned via a
   // Credit Note — see prisma/schema.prisma's BusinessSettings.returnWindowDays
   // doc comment and lib/return-window.ts's getReturnEligibility(). Only
@@ -107,6 +113,7 @@ function mapSettings(settings: any): BusinessSettings {
     defaultGstRate: Number(settings.defaultGstRate ?? 3.0),
     hallmarkChargePerPiece: Number(settings.hallmarkChargePerPiece ?? 45),
     returnWindowEnabled: settings.returnWindowEnabled ?? true,
+    skuFormat: settings.skuFormat ?? SkuFormat.METAL_PURITY_STYLE_CATEGORY,
     returnWindowDays: settings.returnWindowDays ?? 30,
     financialYearStartMonth: settings.financialYearStartMonth ?? 4,
     businessUnits: settings.businessUnits?.length
@@ -351,5 +358,51 @@ export async function removeStoreLogo(): Promise<SettingsFormState> {
   } catch (error) {
     console.error("removeStoreLogo error:", error);
     return { success: false, message: "Failed to remove logo" };
+  }
+}
+
+/**
+ * Sets the store's SKU layout preset — its own small action (mirrors
+ * updateCaratConversionRates/updateMetalSellingRates) rather than folded
+ * into the big updateBusinessSettings form, since it's a single choice with
+ * its own dedicated Settings widget. Only affects products created AFTER
+ * this save; existing productCode values are never touched (see SkuFormat's
+ * own doc comment).
+ */
+export async function updateSkuFormat(
+  prevState: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return {
+      success: false,
+      message: "Only the Store Owner can update these settings.",
+    };
+  }
+
+  try {
+    const skuFormatRaw = String(formData.get("skuFormat") || "");
+    if (!Object.values(SkuFormat).includes(skuFormatRaw as SkuFormat)) {
+      return { success: false, message: "Select a valid SKU format" };
+    }
+
+    const storeId = await requireStoreScope();
+
+    // getBusinessSettings() (always called before this form renders) has
+    // already created the row on first access — a plain update is safe.
+    await prisma.businessSettings.update({
+      where: { storeId },
+      data: { skuFormat: skuFormatRaw as SkuFormat },
+    });
+
+    revalidatePath("/settings");
+    revalidatePath("/inventory/products/new");
+
+    return { success: true, message: "SKU format updated" };
+  } catch (error) {
+    console.error("updateSkuFormat error:", error);
+    return { success: false, message: "Failed to update SKU format" };
   }
 }

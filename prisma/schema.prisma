@@ -1658,6 +1658,13 @@ model BusinessSettings {
   bankIfscCode          String?
   bankAccountHolderName String?
 
+  // Which SKU layout preset createProduct's generator uses for every new
+  // product's productCode — see SkuFormat's own doc comment. Defaults to
+  // the layout the SKU feature originally shipped with, so no existing
+  // store's behavior changes until an Admin picks a different preset in
+  // Settings.
+  skuFormat SkuFormat @default(METAL_PURITY_STYLE_CATEGORY)
+
   // Tax defaults
   defaultGstRate Float @default(3.0) // jewellery GST is typically 3%
 
@@ -2131,6 +2138,20 @@ enum TargetStyle {
   GENTS
   KIDS
   UNISEX
+}
+
+// Which structured layout createProduct's SKU generator uses — a
+// store-picked preset (Settings > Business Settings > SKU Format), not a
+// free-form template. See lib/inventory/product-sku.ts's composeSkuPrefix()
+// for exactly what each arranges; e.g. METAL_PURITY_STYLE_CATEGORY produces
+// "G22-LR-001", METAL_CATEGORY_PURITY produces "GR22-001". Changing this
+// only affects products created AFTER the change — existing productCode
+// values are never rewritten, same as every other productCode convention.
+enum SkuFormat {
+  METAL_PURITY_STYLE_CATEGORY
+  METAL_CATEGORY_PURITY
+  CATEGORY_METAL_PURITY
+  STYLE_CATEGORY_METAL_PURITY
 }
 
 // The three GST registration types a jewellery business can operate under

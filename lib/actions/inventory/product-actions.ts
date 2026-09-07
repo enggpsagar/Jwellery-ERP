@@ -639,12 +639,13 @@ export async function createProduct(
     // lookup rather than re-plumbing names through from the client, which
     // can't be trusted anyway (a stale/tampered label would silently mint
     // a wrong-looking SKU).
-    const [metalRow, categoryTypeRow, categoryRow] = await Promise.all([
+    const [metalRow, categoryTypeRow, categoryRow, businessSettings] = await Promise.all([
       prisma.storeMetal.findFirst({ where: { id: metalTypeId, storeId }, select: { name: true } }),
       categoryTypeId
         ? prisma.storeCategoryType.findFirst({ where: { id: categoryTypeId, storeId }, select: { name: true } })
         : Promise.resolve(null),
       prisma.storeCategory.findFirst({ where: { id: categoryId, storeId }, select: { name: true } }),
+      prisma.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true } }),
     ]);
 
     const skuPrefix = buildSkuPrefix({
@@ -653,6 +654,7 @@ export async function createProduct(
       targetStyle: targetStyle as TargetStyle,
       categoryTypeName: categoryTypeRow?.name ?? null,
       categoryName: categoryRow?.name ?? null,
+      format: businessSettings?.skuFormat,
     });
 
     // Sequence is scoped to this exact prefix (e.g. "G22-LR"), not global —

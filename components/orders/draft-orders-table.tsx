@@ -182,9 +182,9 @@ export function DraftOrdersTable({ orders, selectedIds, onSelectionChange }: Dra
             </Button>
             <Button
               type="button"
+              variant="destructive"
               onClick={handleDelete}
               disabled={deleting}
-              className="bg-red-600 text-white hover:bg-red-700"
             >
               {deleting ? "Deleting..." : "Delete Order"}
             </Button>

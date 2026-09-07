@@ -275,7 +275,7 @@ export function DraftOrderForm({
             )
           })}
 
-          <Button type="button" variant="outline" onClick={addItem} className="gap-2">
+          <Button type="button" variant="ghost" onClick={addItem} className="gap-2">
             <Plus className="h-4 w-4" />
             Add Item
           </Button>

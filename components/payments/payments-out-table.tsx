@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Search, FileText } from "lucide-react"
 
@@ -17,6 +17,8 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { PaymentOutDetailPanel } from "@/components/payments/payment-out-detail-panel"
+import { cn } from "@/lib/utils"
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CASH: "Cash",
@@ -36,6 +38,16 @@ function inr(value: number) {
 export function PaymentsOutTable({ rows }: { rows: PaymentOutRow[] }) {
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
+  // Defaults to the first row on load so the panel is never empty —
+  // matching CustomersClient/PurchasesClient/InvoicesClient.
+  const [activeId, setActiveId] = useState<string | null>(rows[0]?.id ?? null)
+
+  useEffect(() => {
+    setActiveId((current) => {
+      if (current && rows.some((row) => row.id === current)) return current
+      return rows[0]?.id ?? null
+    })
+  }, [rows])
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -53,8 +65,10 @@ export function PaymentsOutTable({ rows }: { rows: PaymentOutRow[] }) {
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
   const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
   const rangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length)
+  const activeRow = rows.find((row) => row.id === activeId) ?? null
 
   return (
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card size="sm">
@@ -113,7 +127,11 @@ export function PaymentsOutTable({ rows }: { rows: PaymentOutRow[] }) {
                 </TableRow>
               ) : (
                 paginated.map((row) => (
-                  <TableRow key={row.id}>
+                  <TableRow
+                    key={row.id}
+                    onClick={() => setActiveId(row.id)}
+                    className={cn("cursor-pointer hover:bg-accent/50", activeId === row.id && "bg-accent")}
+                  >
                     <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                       {row.date}
                     </TableCell>
@@ -185,6 +203,9 @@ export function PaymentsOutTable({ rows }: { rows: PaymentOutRow[] }) {
           </div>
         )}
       </Card>
+    </div>
+
+      <PaymentOutDetailPanel row={activeRow} />
     </div>
   )
 }

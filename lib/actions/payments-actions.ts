@@ -65,6 +65,8 @@ export type PaymentInRow = {
   amount: number
   paymentMethod: string | null
   paymentReference: string | null
+  bankName: string | null
+  attachmentUrl: string | null
   invoiceId: string | null
   invoiceNumber: string | null
   description: string
@@ -99,6 +101,8 @@ export async function getPaymentsIn(): Promise<PaymentInRow[]> {
     amount: Number(entry.amount),
     paymentMethod: entry.paymentMethod,
     paymentReference: entry.paymentReference,
+    bankName: entry.bankName,
+    attachmentUrl: entry.attachmentUrl,
     invoiceId: entry.invoiceId,
     invoiceNumber: entry.invoice?.invoiceNumber ?? null,
     description: entry.description ?? "",
@@ -115,6 +119,8 @@ export type PaymentOutRow = {
   amount: number
   paymentMethod: string | null
   paymentReference: string | null
+  bankName: string | null
+  attachmentUrl: string | null
   purchaseId: string | null
   purchaseNumber: string | null
   description: string
@@ -152,6 +158,8 @@ export async function getPaymentsOut(): Promise<PaymentOutRow[]> {
       amount: Number(entry.amount),
       paymentMethod: entry.paymentMethod,
       paymentReference: entry.paymentReference,
+      bankName: entry.bankName,
+      attachmentUrl: entry.attachmentUrl,
       purchaseId: entry.purchaseId,
       purchaseNumber: entry.purchase?.purchaseNumber ?? null,
       description: entry.description ?? "",

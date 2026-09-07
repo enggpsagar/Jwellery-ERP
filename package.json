@@ -11,7 +11,8 @@
     "db:seed:inventory": "tsx prisma/seed-inventory.ts",
     "db:seed:demo": "tsx prisma/seed-demo.ts",
     "db:seed:kacha": "tsx prisma/seed-kacha-demo.ts",
-    "db:seed:business-units-demo": "tsx prisma/seed-business-units-demo.ts"
+    "db:seed:business-units-demo": "tsx prisma/seed-business-units-demo.ts",
+    "db:seed:full-demo": "tsx prisma/seed-full-demo.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

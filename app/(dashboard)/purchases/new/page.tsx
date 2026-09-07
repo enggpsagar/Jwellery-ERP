@@ -33,7 +33,7 @@ export default async function NewPurchasePage() {
     ])
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-6xl space-y-6 p-6">
       {/* PurchaseForm reads ?newVendorId / ?newProductId via useSearchParams,
           which needs a Suspense boundary to avoid opting the whole route out
           of static optimisation. */}

@@ -106,6 +106,13 @@ const mainNav: NavItem[] = [
     ],
   },
   {
+    title: "Purchases",
+    href: "/purchases",
+    icon: PackagePlus,
+    countKey: "purchases",
+    quickAddHref: "/purchases/new",
+  },
+  {
     title: "Ledger",
     href: "/ledger",
     icon: CircleDollarSign,
@@ -127,13 +134,6 @@ const mainNav: NavItem[] = [
       { title: "Products", href: "/inventory/products", quickAddHref: "/inventory/products/new", countKey: "products" },
       { title: "Stock", href: "/inventory/stock", quickAddHref: "/inventory/stock/new", countKey: "stock" },
     ],
-  },
-  {
-    title: "Purchases",
-    href: "/purchases",
-    icon: PackagePlus,
-    countKey: "purchases",
-    quickAddHref: "/purchases/new",
   },
   {
     title: "Artisan",

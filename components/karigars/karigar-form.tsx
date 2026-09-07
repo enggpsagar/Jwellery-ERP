@@ -247,32 +247,48 @@ export function KarigarForm({
           />
         </div>
 
-        {/* Nothing to show yet on create — the code doesn't exist until the
-            artisan is actually saved, so "Auto-generated on save" was a
-            field with no real information in it. Only rendered in edit
-            mode; Name below takes the freed-up column on create instead of
-            leaving an empty cell, so every pairing after it (State/City,
-            etc.) still lands exactly where it already does in edit mode. */}
-        {karigar ? (
-          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <Label>Artisan Code</Label>
-            <Input value={karigar.code} disabled readOnly />
-            <p className="text-xs text-muted-foreground">
-              System-generated and unique — cannot be edited.
-            </p>
-          </div>
-        ) : null}
-
+        {/* Identity row: Artisan Code (edit only), Name, and Aadhaar Number
+            sit together, compact, instead of Aadhaar being stranded in its
+            own spread-out row further down the form. Column count flexes
+            with whether Artisan Code is present, so Name+Aadhaar still land
+            side by side on create. */}
         <div
-          className={`space-y-2 rounded-lg transition-colors focus-within:bg-accent/40 ${karigar ? "" : "md:col-span-2"}`}
+          className={`grid grid-cols-1 gap-4 md:col-span-2 ${karigar ? "md:grid-cols-3" : "md:grid-cols-2"}`}
         >
-          <Label>Name <RequiredMark /></Label>
-          <Input
-            name="name"
-            placeholder="Artisan name"
-            defaultValue={karigar?.name}
-            required
-          />
+          {/* Nothing to show yet on create — the code doesn't exist until
+              the artisan is actually saved, so "Auto-generated on save"
+              was a field with no real information in it. */}
+          {karigar ? (
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+              <Label>Artisan Code</Label>
+              <Input value={karigar.code} disabled readOnly />
+              <p className="text-xs text-muted-foreground">
+                System-generated and unique — cannot be edited.
+              </p>
+            </div>
+          ) : null}
+
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+            <Label>Name <RequiredMark /></Label>
+            <Input
+              name="name"
+              placeholder="Artisan name"
+              defaultValue={karigar?.name}
+              required
+            />
+          </div>
+
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+            <Label>Aadhaar Number</Label>
+            <Input
+              name="aadhaarNumber"
+              defaultValue={karigar?.aadhaarNumber}
+              placeholder="Optional — 12 digits"
+            />
+            {errors?.aadhaarNumber?.[0] && (
+              <p className="text-xs text-red-600">{errors.aadhaarNumber[0]}</p>
+            )}
+          </div>
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -535,18 +551,6 @@ export function KarigarForm({
           />
           {errors?.panNumber?.[0] && (
             <p className="text-xs text-red-600">{errors.panNumber[0]}</p>
-          )}
-        </div>
-
-        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <Label>Aadhaar Number</Label>
-          <Input
-            name="aadhaarNumber"
-            defaultValue={karigar?.aadhaarNumber}
-            placeholder="Optional — 12 digits"
-          />
-          {errors?.aadhaarNumber?.[0] && (
-            <p className="text-xs text-red-600">{errors.aadhaarNumber[0]}</p>
           )}
         </div>
 

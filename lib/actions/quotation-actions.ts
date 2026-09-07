@@ -615,6 +615,34 @@ export async function deleteQuotation(id: string): Promise<QuotationFormState> {
   }
 }
 
+export type BulkDeleteResult = {
+  deletedCount: number;
+  failures: { id: string; message: string }[];
+};
+
+/**
+ * Deletes each selected quotation through the exact same deleteQuotation()
+ * call a single-row delete uses — never a bare deleteMany — so a bulk
+ * selection can't bypass the "only open quotations can be deleted" guard
+ * just because several rows were ticked at once. Partial success is
+ * expected and reported per row, not treated as a whole-batch failure.
+ */
+export async function bulkDeleteQuotations(ids: string[]): Promise<BulkDeleteResult> {
+  const failures: BulkDeleteResult["failures"] = [];
+  let deletedCount = 0;
+
+  for (const id of ids) {
+    const result = await deleteQuotation(id);
+    if (result.success) {
+      deletedCount++;
+    } else {
+      failures.push({ id, message: result.message });
+    }
+  }
+
+  return { deletedCount, failures };
+}
+
 /**
  * Convert an open quotation into a real Invoice. Unlike Kacha→Pakka
  * conversion (which is a paperwork upgrade over a sale that already

@@ -2,9 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 
 import { getQuotations } from "@/lib/actions/quotation-actions"
-import { QuotationTable } from "@/components/quotations/quotation-table"
-import { QuotationsToolbar } from "@/components/quotations/quotations-toolbar"
-import { DataTablePagination } from "@/components/shared/data-table-pagination"
+import { QuotationsClient } from "@/components/quotations/quotations-client"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
 
@@ -58,18 +56,7 @@ export default async function QuotationsPage({ searchParams }: QuotationsPagePro
         }
       />
 
-      <QuotationsToolbar />
-
-      <div>
-        <QuotationTable quotations={quotations} />
-        <DataTablePagination
-          page={pagination.page}
-          totalPages={pagination.totalPages}
-          totalCount={pagination.totalCount}
-          pageSize={pagination.pageSize}
-          itemLabel="quotations"
-        />
-      </div>
+      <QuotationsClient quotations={quotations} pagination={pagination} />
     </main>
   )
 }

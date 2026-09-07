@@ -95,7 +95,7 @@ export function KachaImportDialog() {
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={handleTemplate}
             disabled={downloading}

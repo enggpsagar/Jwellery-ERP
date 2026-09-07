@@ -9,7 +9,7 @@ import { formatLedgerSource } from "@/lib/ledger-format"
 import { partyGstTypeLabel } from "@/lib/gst"
 import { formatShortDate } from "@/lib/utils"
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar"
-import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export"
+import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export"
 
 export type Vendor = {
   id: string
@@ -99,7 +99,7 @@ type ExportVendorsParams = {
   search?: string
   sortBy?: VendorSortBy
   sortOrder?: SortOrder
-  format?: "csv" | "xlsx"
+  format?: "csv" | "xlsx" | "pdf"
 }
 
 export type VendorLedgerEntryItem = {
@@ -451,7 +451,9 @@ export async function exportVendorsToExcel(
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "vendors")
-        : buildExcelExport(rows, "Vendors", "vendors")
+        : params.format === "pdf"
+          ? buildPdfExportBase64(rows, "Vendors", "vendors")
+          : buildExcelExport(rows, "Vendors", "vendors")
 
     return {
       success: true,

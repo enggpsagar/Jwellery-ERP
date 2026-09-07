@@ -8,7 +8,7 @@ import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, locationWhere, type LocationScope } from "@/lib/location-scope";
 import { UserRole, UserStatus, type PartyGstType } from "@prisma/client";
 import * as XLSX from "xlsx";
-import { buildCsvExportBase64 } from "@/lib/excel-export";
+import { buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
@@ -104,7 +104,7 @@ export type ExportKarigarsParams = {
   sortBy?: KarigarSortBy;
   sortOrder?: SortOrder;
   type?: string;
-  format?: "csv" | "xlsx";
+  format?: "csv" | "xlsx" | "pdf";
 };
 
 export type ExportResult = {
@@ -948,6 +948,16 @@ export async function exportKarigarsToExcel(
 
     if (params.format === "csv") {
       const { fileName, fileBase64 } = buildCsvExportBase64(rows, "artisans");
+      return {
+        success: true,
+        message: `Exported ${karigars.length} artisan(s) successfully.`,
+        fileBase64,
+        fileName,
+      };
+    }
+
+    if (params.format === "pdf") {
+      const { fileName, fileBase64 } = buildPdfExportBase64(rows, "Artisans", "artisans");
       return {
         success: true,
         message: `Exported ${karigars.length} artisan(s) successfully.`,

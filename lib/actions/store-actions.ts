@@ -8,7 +8,7 @@ import { StorePlanAction, UserRole, UserStatus, InventoryStockStatus } from "@pr
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth/auth";
 import { ACTIVE_STORE_COOKIE } from "@/lib/store-context";
-import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export";
+import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import { classifyMetalName } from "@/lib/business-units";
 import { buildUniqueStoreCode } from "@/lib/store-code";
 import { sendInviteEmailSafely } from "@/lib/invite-email";
@@ -46,7 +46,7 @@ type ExportStoresParams = {
   sortBy?: string;
   sortOrder?: SortOrder;
   status?: string;
-  format?: "csv" | "xlsx";
+  format?: "csv" | "xlsx" | "pdf";
 };
 
 const STORE_INCLUDE = {
@@ -167,7 +167,9 @@ export async function exportStoresToExcel(params: ExportStoresParams = {}): Prom
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "stores")
-        : buildExcelExport(rows, "Stores", "stores");
+        : params.format === "pdf"
+          ? buildPdfExportBase64(rows, "Stores", "stores")
+          : buildExcelExport(rows, "Stores", "stores");
 
     return {
       success: true,

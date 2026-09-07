@@ -1,4 +1,6 @@
 import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -72,6 +74,51 @@ export function buildExcelExport(
   const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 
   return { fileName, fileBase64: Buffer.from(buffer).toString("base64") };
+}
+
+/**
+ * Same rows, same { fileName, fileBase64 } shape as buildExcelExport/
+ * buildCsvExportBase64 — a table export as an actual PDF, via jsPDF +
+ * jspdf-autotable (already a dependency, used the same way for the
+ * metal-rates export and the invoice PDF at app/api/billing/[id]/pdf).
+ * Landscape by default: these row shapes carry as many columns as their
+ * Excel export does, and most of these tables are wider than they are
+ * tall.
+ */
+export function buildPdfExportBase64(
+  rows: Record<string, unknown>[],
+  title: string,
+  filePrefix: string,
+): { fileName: string; fileBase64: string } {
+  const doc = new jsPDF({ orientation: "landscape" });
+
+  doc.setFontSize(16);
+  doc.text(title, 14, 15);
+  doc.setFontSize(9);
+  doc.setTextColor(120);
+  doc.text(`Generated: ${new Date().toLocaleString("en-IN")}`, 14, 21);
+  doc.setTextColor(0);
+
+  const headers = rows.length ? Object.keys(rows[0]) : [];
+
+  const cellText = (value: unknown) => (value === null || value === undefined ? "" : String(value));
+
+  autoTable(doc, {
+    startY: 26,
+    head: headers.length ? [headers] : undefined,
+    body: rows.map((row) => headers.map((key) => cellText(row[key]))),
+    styles: { fontSize: 7, cellPadding: 1.5 },
+    headStyles: { fillColor: [212, 175, 55], textColor: 255 },
+    didDrawPage: () => {
+      if (rows.length === 0) {
+        doc.setFontSize(10);
+        doc.text("No records to export.", 14, 32);
+      }
+    },
+  });
+
+  const pdf = doc.output("arraybuffer");
+  return { fileName: timestampedFileName(filePrefix, "pdf"), fileBase64: Buffer.from(pdf).toString("base64") };
 }
 
 /**

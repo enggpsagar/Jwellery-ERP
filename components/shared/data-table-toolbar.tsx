@@ -15,7 +15,7 @@ import {
 import { useToast } from "@/components/providers/toast-provider"
 import { downloadBase64File } from "@/lib/download-file"
 
-export type DataTableExportFormat = "csv" | "xlsx"
+export type DataTableExportFormat = "csv" | "xlsx" | "pdf"
 
 export type DataTableExportParams = {
   selectedIds?: string[]
@@ -178,7 +178,9 @@ export function DataTableToolbar({
         result.fileName,
         format === "csv"
           ? "text/csv"
-          : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          : format === "pdf"
+            ? "application/pdf"
+            : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       )
       toast.success(result.message || `${entityLabel} exported successfully.`)
     } catch (error) {
@@ -305,6 +307,7 @@ export function DataTableToolbar({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => handleExport("csv")}>CSV</DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExport("xlsx")}>Excel</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("pdf")}>PDF</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

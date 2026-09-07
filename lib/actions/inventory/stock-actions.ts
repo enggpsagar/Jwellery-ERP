@@ -26,6 +26,7 @@ import type { StockFormState } from "@/lib/inventory/stock-types"
 import {
   buildExcelExport,
   buildCsvExportBase64,
+  buildPdfExportBase64,
   buildMultiSheetExcelExport,
   parseExcelUpload,
 } from "@/lib/excel-export"
@@ -116,7 +117,7 @@ type ExportInventoryStockParams = {
   sortBy?: string
   sortOrder?: StockSortOrder
   type?: string
-  format?: "csv" | "xlsx"
+  format?: "csv" | "xlsx" | "pdf"
 }
 
 const STOCK_INCLUDE = {
@@ -358,7 +359,9 @@ export async function exportInventoryStockToExcel(
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "inventory-stock")
-        : buildExcelExport(rows, "Inventory Stock", "inventory-stock")
+        : params.format === "pdf"
+          ? buildPdfExportBase64(rows, "Inventory Stock", "inventory-stock")
+          : buildExcelExport(rows, "Inventory Stock", "inventory-stock")
 
     return {
       success: true,

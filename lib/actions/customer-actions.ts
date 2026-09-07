@@ -7,7 +7,7 @@ import { partyGstTypeLabel } from "@/lib/gst"
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { getCurrentUser } from "@/lib/auth/auth"
-import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export"
+import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export"
 import {
   getCustomersCore,
   getCustomerByIdCore,
@@ -43,7 +43,7 @@ type ExportCustomersParams = {
   search?: string
   sortBy?: CustomerSortBy
   sortOrder?: SortOrder
-  format?: "csv" | "xlsx"
+  format?: "csv" | "xlsx" | "pdf"
 }
 
 function toNumber(value: FormDataEntryValue | null, fallback = 0) {
@@ -164,7 +164,9 @@ export async function exportCustomersToExcel(
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "customers")
-        : buildExcelExport(rows, "Customers", "customers")
+        : params.format === "pdf"
+          ? buildPdfExportBase64(rows, "Customers", "customers")
+          : buildExcelExport(rows, "Customers", "customers")
 
     return {
       success: true,

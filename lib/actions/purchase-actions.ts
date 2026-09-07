@@ -28,7 +28,7 @@ import {
   resolveWritableLocationId,
   type LocationScope,
 } from "@/lib/location-scope";
-import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export";
+import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import { formatShortDate } from "@/lib/utils";
 import type {
   DataTableExportParams,
@@ -492,7 +492,9 @@ export async function exportPurchasesToExcel(
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "purchases")
-        : buildExcelExport(rows, "Purchases", "purchases");
+        : params.format === "pdf"
+          ? buildPdfExportBase64(rows, "Purchases", "purchases")
+          : buildExcelExport(rows, "Purchases", "purchases");
 
     return {
       success: true,

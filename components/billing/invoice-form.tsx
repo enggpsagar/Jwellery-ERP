@@ -1160,13 +1160,27 @@ export function InvoiceForm({
                     type="number"
                     min={1}
                     max={item.inventoryStockId ? availableForStock(item.inventoryStockId, item.key) : undefined}
-                    value={item.quantity}
+                    // Empty while the field is genuinely blank mid-edit
+                    // (e.g. clearing "1" to type "12") — forcing it back to
+                    // 1 on every keystroke (the old `|| 1` fallback) made it
+                    // impossible to ever actually delete/replace that
+                    // digit. Same "show empty, not a forced minimum" as
+                    // every other numeric field on this line (Rate, etc.).
+                    value={item.quantity === 0 ? "" : item.quantity}
                     onChange={(e) => {
-                      const requested = Number(e.target.value) || 1
+                      const requested = e.target.value === "" ? 0 : Number(e.target.value) || 0
                       const quantity = item.inventoryStockId
                         ? Math.min(requested, Math.max(availableForStock(item.inventoryStockId, item.key), 1))
                         : requested
                       updateItem(item.key, { quantity })
+                    }}
+                    onBlur={() => {
+                      // Only enforced once editing is done, not mid-keystroke
+                      // — an invoice can't actually be submitted with a 0/
+                      // blank quantity (see hasInvalidRate-style guards), so
+                      // this just restores a sane value for a field left
+                      // empty rather than blocking typing along the way.
+                      if (!item.quantity) updateItem(item.key, { quantity: 1 })
                     }}
                   />
                   {item.inventoryStockId && (

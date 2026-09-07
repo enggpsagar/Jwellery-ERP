@@ -599,10 +599,18 @@ export function QuotationForm({
                   <Input
                     type="number"
                     min={1}
-                    value={item.quantity}
+                    // Empty while genuinely blank mid-edit — forcing it
+                    // back to 1 on every keystroke made it impossible to
+                    // ever delete/replace that digit.
+                    value={item.quantity === 0 ? "" : item.quantity}
                     onChange={(e) =>
-                      updateItem(item.key, { quantity: Number(e.target.value) || 1 })
+                      updateItem(item.key, {
+                        quantity: e.target.value === "" ? 0 : Number(e.target.value) || 0,
+                      })
                     }
+                    onBlur={() => {
+                      if (!item.quantity) updateItem(item.key, { quantity: 1 })
+                    }}
                   />
                 </div>
               </div>

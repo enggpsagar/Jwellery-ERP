@@ -612,13 +612,19 @@ export function KachaInvoiceForm({
                     type="number"
                     min={1}
                     max={item.inventoryStockId ? availableForStock(item.inventoryStockId, item.key) : undefined}
-                    value={item.quantity}
+                    // Empty while genuinely blank mid-edit — forcing it
+                    // back to 1 on every keystroke made it impossible to
+                    // ever delete/replace that digit.
+                    value={item.quantity === 0 ? "" : item.quantity}
                     onChange={(e) => {
-                      const requested = Number(e.target.value) || 1
+                      const requested = e.target.value === "" ? 0 : Number(e.target.value) || 0
                       const quantity = item.inventoryStockId
                         ? Math.min(requested, Math.max(availableForStock(item.inventoryStockId, item.key), 1))
                         : requested
                       updateItem(item.key, { quantity })
+                    }}
+                    onBlur={() => {
+                      if (!item.quantity) updateItem(item.key, { quantity: 1 })
                     }}
                   />
                   {item.inventoryStockId && (

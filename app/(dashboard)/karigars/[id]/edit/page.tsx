@@ -44,7 +44,7 @@ export default async function EditKarigarPage({ params }: Props) {
   }
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-4xl space-y-6 p-6">
       <PageBackHeader
         title="Edit Artisan"
         description={`Update details for ${karigar.name}.`}

@@ -30,7 +30,7 @@ export function EmailLedgerStatementButton({ customerId }: { customerId: string 
       ) : (
         <Mail className="h-4 w-4 mr-1" />
       )}
-      Ledger
+      Email Ledger
     </Button>
   )
 }

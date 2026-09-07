@@ -65,12 +65,31 @@ export function KarigarForm({
     () => metalOptions.filter((m) => m.isActive),
     [metalOptions],
   )
-  const allMetalsAssigned =
-    activeMetalOptions.length > 0 &&
-    activeMetalOptions.every((m) => assignedMetalTypeIds.includes(m.id))
+  // Split into two independent checkbox groups — Metals and Stones read as
+  // two different concerns to a store, and cramming both into one list left
+  // the box's own width mostly blank once a store only has a couple of each.
+  const activeMetalsOnly = useMemo(
+    () => activeMetalOptions.filter((m) => !m.isGemstone),
+    [activeMetalOptions],
+  )
+  const activeStonesOnly = useMemo(
+    () => activeMetalOptions.filter((m) => m.isGemstone),
+    [activeMetalOptions],
+  )
+  const allMetalsSelected =
+    activeMetalsOnly.length > 0 &&
+    activeMetalsOnly.every((m) => assignedMetalTypeIds.includes(m.id))
+  const allStonesSelected =
+    activeStonesOnly.length > 0 &&
+    activeStonesOnly.every((m) => assignedMetalTypeIds.includes(m.id))
 
-  function toggleSelectAllMetals() {
-    setAssignedMetalTypeIds(allMetalsAssigned ? [] : activeMetalOptions.map((m) => m.id))
+  function toggleSelectAllGroup(group: StoreMetalRow[], allSelected: boolean) {
+    const groupIds = group.map((m) => m.id)
+    setAssignedMetalTypeIds((current) =>
+      allSelected
+        ? current.filter((id) => !groupIds.includes(id))
+        : Array.from(new Set([...current, ...groupIds])),
+    )
   }
 
   const [gstType, setGstType] = useState(karigar?.gstType ?? defaultPartyGstType(gstScheme))
@@ -132,6 +151,24 @@ export function KarigarForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
+        <div className="space-y-2 rounded-lg border bg-muted/20 p-4 transition-colors focus-within:bg-accent/40 md:col-span-2">
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+            <Label>
+              GST Number {gstinRequiredNow ? <RequiredMark /> : null}
+              <GstSchemeBadge scheme={gstScheme} />
+            </Label>
+            {gstScheme !== "COMPOSITION" ? (
+              <PartyGstTypeSelect value={gstType} onChange={setGstType} name="gstType" />
+            ) : null}
+          </div>
+          <Input
+            name="gstNumber"
+            defaultValue={karigar?.gstNumber}
+            placeholder={gstinRequiredNow ? "Required for this registration type" : "Optional"}
+            required={gstinRequiredNow}
+          />
+        </div>
+
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Artisan Code</Label>
           {karigar ? (
@@ -178,18 +215,6 @@ export function KarigarForm({
             placeholder="WhatsApp number"
             defaultValue={karigar?.whatsapp}
           />
-        </div>
-
-        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <Label>Email</Label>
-          <Input
-            name="email"
-            type="email"
-            defaultValue={karigar?.email}
-          />
-          {errors?.email?.[0] && (
-            <p className="text-xs text-red-600">{errors.email[0]}</p>
-          )}
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -257,6 +282,18 @@ export function KarigarForm({
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <Label>Email</Label>
+          <Input
+            name="email"
+            type="email"
+            defaultValue={karigar?.email}
+          />
+          {errors?.email?.[0] && (
+            <p className="text-xs text-red-600">{errors.email[0]}</p>
+          )}
+        </div>
+
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Specialization</Label>
           <Input
             name="specialization"
@@ -288,9 +325,9 @@ export function KarigarForm({
           )}
         </div>
 
-        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40 md:col-span-2">
+        <div className="space-y-2 md:col-span-2">
           <div className="flex items-center justify-between">
-            <Label>Assigned Metals/Stones</Label>
+            <Label>Assigned Metals &amp; Stones</Label>
             <AddMetalInlineDialog
               onCreated={(metal) => {
                 setMetalOptions((current) => [...current, metal])
@@ -302,39 +339,81 @@ export function KarigarForm({
             Which metals or stones this karigar can be issued material in — Issue
             Material and Receive Material only ever offer these.
           </p>
-          {activeMetalOptions.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              No active metals/stones configured yet — add one above, or under
-              Settings &gt; Taxonomy.
-            </p>
-          ) : (
-            <div className="space-y-2 rounded-md border p-3">
-              <label className="flex items-center gap-2 border-b pb-2 text-sm font-medium">
-                <input
-                  type="checkbox"
-                  checked={allMetalsAssigned}
-                  onChange={toggleSelectAllMetals}
-                  className="h-4 w-4"
-                />
-                Select All
-              </label>
-              <div className="flex flex-wrap gap-x-4 gap-y-2">
-                {activeMetalOptions.map((metal) => (
-                  <label key={metal.id} className="flex items-center gap-2 text-sm">
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-2 rounded-lg border p-3 transition-colors focus-within:bg-accent/40">
+              <Label className="text-xs text-muted-foreground">Metals</Label>
+              {activeMetalsOnly.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No active metals configured yet.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 border-b pb-2 text-sm font-medium">
                     <input
                       type="checkbox"
-                      name="assignedMetalTypeIds"
-                      value={metal.id}
-                      checked={assignedMetalTypeIds.includes(metal.id)}
-                      onChange={(e) => toggleAssignedMetal(metal.id, e.target.checked)}
+                      checked={allMetalsSelected}
+                      onChange={() => toggleSelectAllGroup(activeMetalsOnly, allMetalsSelected)}
                       className="h-4 w-4"
                     />
-                    {metal.name}
+                    Select All
                   </label>
-                ))}
-              </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2">
+                    {activeMetalsOnly.map((metal) => (
+                      <label key={metal.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name="assignedMetalTypeIds"
+                          value={metal.id}
+                          checked={assignedMetalTypeIds.includes(metal.id)}
+                          onChange={(e) => toggleAssignedMetal(metal.id, e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        {metal.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+
+            <div className="space-y-2 rounded-lg border p-3 transition-colors focus-within:bg-accent/40">
+              <Label className="text-xs text-muted-foreground">Stones</Label>
+              {activeStonesOnly.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No active stones configured yet.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 border-b pb-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={allStonesSelected}
+                      onChange={() => toggleSelectAllGroup(activeStonesOnly, allStonesSelected)}
+                      className="h-4 w-4"
+                    />
+                    Select All
+                  </label>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2">
+                    {activeStonesOnly.map((metal) => (
+                      <label key={metal.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name="assignedMetalTypeIds"
+                          value={metal.id}
+                          checked={assignedMetalTypeIds.includes(metal.id)}
+                          onChange={(e) => toggleAssignedMetal(metal.id, e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        {metal.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {errors?.assignedMetalTypeIds?.[0] && (
             <p className="text-xs text-red-600">{errors.assignedMetalTypeIds[0]}</p>
           )}
@@ -351,24 +430,6 @@ export function KarigarForm({
           {errors?.locationId?.[0] && (
             <p className="text-xs text-red-600">{errors.locationId[0]}</p>
           )}
-        </div>
-
-        <div className="space-y-2 rounded-lg border bg-muted/20 p-4 transition-colors focus-within:bg-accent/40 md:col-span-2">
-          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-            <Label>
-              GST Number {gstinRequiredNow ? <RequiredMark /> : null}
-              <GstSchemeBadge scheme={gstScheme} />
-            </Label>
-            {gstScheme !== "COMPOSITION" ? (
-              <PartyGstTypeSelect value={gstType} onChange={setGstType} name="gstType" />
-            ) : null}
-          </div>
-          <Input
-            name="gstNumber"
-            defaultValue={karigar?.gstNumber}
-            placeholder={gstinRequiredNow ? "Required for this registration type" : "Optional"}
-            required={gstinRequiredNow}
-          />
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">

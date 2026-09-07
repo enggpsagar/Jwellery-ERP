@@ -1,7 +1,8 @@
 import type { Metadata } from "next"
 import { cache } from "react"
 import { notFound } from "next/navigation"
-import { Phone, Mail, MapPin } from "lucide-react"
+import Link from "next/link"
+import { Phone, Mail, MapPin, ArrowLeft } from "lucide-react"
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
@@ -129,9 +130,26 @@ export default async function InvoicePrintPage({ params }: Props) {
 
   return (
     <main className="mx-auto max-w-3xl space-y-4 bg-white p-6 text-[13px] text-slate-900 print:max-w-none print:w-full print:p-0 print:text-[10px]">
-      <style>{"@page { size: A4 portrait; margin: 10mm; }"}</style>
+      {/* Without this, Chrome/Edge/Firefox all default the print dialog's
+          own "Background graphics" toggle to OFF, silently dropping every
+          background color on this page (the violet header, table header,
+          Total rows) unless the user finds and checks that box themselves —
+          forcing it here makes the print match what's on screen by default. */}
+      <style>
+        {`@page { size: A4 portrait; margin: 10mm; }
+          @media print {
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          }`}
+      </style>
 
-      <div className="flex justify-end print:hidden">
+      <div className="flex justify-between print:hidden">
+        <Link
+          href={`/billing/${invoice.id}`}
+          className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Invoice
+        </Link>
         <InvoicePrintButton />
       </div>
 

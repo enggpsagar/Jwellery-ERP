@@ -127,7 +127,7 @@ export function CategoryChart({ initialData, initialPeriod }: CategoryChartProps
   const total = chartData.reduce((acc, c) => acc + c.value, 0)
 
   return (
-    <Card className="gap-0">
+    <Card className="h-full gap-0">
       <CardHeader className="flex flex-col gap-3 border-b [.border-b]:pb-5">
         <div className="flex items-baseline justify-between gap-3">
           <div>
@@ -159,11 +159,11 @@ export function CategoryChart({ initialData, initialPeriod }: CategoryChartProps
         </div>
       </CardHeader>
 
-      <CardContent className="pt-6">
+      <CardContent className="flex flex-1 flex-col pt-6">
         {chartData.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">
-            No sales recorded yet.
-          </p>
+          <div className="flex flex-1 items-center justify-center">
+            <p className="text-sm text-muted-foreground">No sales recorded yet.</p>
+          </div>
         ) : (
           <>
             <ChartContainer

@@ -106,7 +106,7 @@ export const ROLE_BADGE_CLASSES: Record<UserRole, string> = {
   SUPER_ADMIN: "border-violet-200 bg-violet-50 text-violet-700",
   ADMIN: "border-blue-200 bg-blue-50 text-blue-700",
   MANAGER: "border-indigo-200 bg-indigo-50 text-indigo-700",
-  STAFF: "border-slate-200 bg-slate-50 text-slate-700",
+  STAFF: "border-teal-200 bg-teal-50 text-teal-700",
   KARIGAR: "border-amber-200 bg-amber-50 text-amber-700",
 };
 

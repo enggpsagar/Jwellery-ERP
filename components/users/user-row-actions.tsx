@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Pencil, Ban, CircleCheck, Trash2 } from "lucide-react";
+import { Pencil, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -102,14 +102,14 @@ export function UserRowActions({ user }: { user: ActionableUser }) {
         title={user.status === "DISABLED" ? "Enable user" : "Disable user"}
         className={
           user.status === "DISABLED"
-            ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-            : "border-amber-200 text-amber-700 hover:bg-amber-50"
+            ? "border-red-200 text-red-600 hover:bg-red-50"
+            : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
         }
       >
         {user.status === "DISABLED" ? (
-          <CircleCheck className="h-4 w-4" />
+          <ToggleLeft className="h-5 w-5" />
         ) : (
-          <Ban className="h-4 w-4" />
+          <ToggleRight className="h-5 w-5" />
         )}
       </Button>
 

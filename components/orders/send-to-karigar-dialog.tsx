@@ -64,7 +64,11 @@ export function SendToKarigarDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button type="button" className="gap-2" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        className="gap-2 bg-[var(--chart-3)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-3)_88%,black)]"
+        onClick={() => setOpen(true)}
+      >
         <Send className="h-4 w-4" />
         Send to Artisan
       </Button>

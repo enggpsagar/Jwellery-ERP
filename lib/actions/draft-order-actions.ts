@@ -491,6 +491,57 @@ export async function cancelDraftOrder(orderId: string): Promise<DraftOrderFormS
 }
 
 /**
+ * Metadata-only edit — Order Date, Expected Date, Notes. Never the
+ * customer or items: those are what the order's items/artisan-job flow is
+ * actually built around, so changing them needs the real create/send flow,
+ * not a quiet in-place edit (same reasoning as EditInvoiceDialog/
+ * EditPurchaseDialog elsewhere in this app). Only allowed while still
+ * DRAFT — once sent to an artisan or received, the order is a record of
+ * what actually happened.
+ */
+export async function updateDraftOrder(
+  orderId: string,
+  prevState: DraftOrderFormState = initialState,
+  formData: FormData,
+): Promise<DraftOrderFormState> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const order = await prisma.draftOrder.findFirst({
+      where: { id: orderId, storeId },
+      select: { id: true, status: true },
+    });
+    if (!order) return { success: false, message: "Order not found" };
+    if (order.status !== "DRAFT") {
+      return { success: false, message: "Only a draft (not yet sent to an artisan) order can be edited" };
+    }
+
+    const orderDateRaw = String(formData.get("orderDate") || "");
+    if (!orderDateRaw) return { success: false, message: "Order Date is required" };
+
+    const expectedDateRaw = String(formData.get("expectedDate") || "");
+    const notes = String(formData.get("notes") || "").trim() || null;
+
+    await prisma.draftOrder.update({
+      where: { id: orderId },
+      data: {
+        orderDate: new Date(orderDateRaw),
+        expectedDate: expectedDateRaw ? new Date(expectedDateRaw) : null,
+        notes,
+      },
+    });
+
+    revalidatePath("/orders");
+    revalidatePath(`/orders/${orderId}`);
+
+    return { success: true, message: "Order updated" };
+  } catch (error) {
+    console.error("updateDraftOrder error:", error);
+    return { success: false, message: "Failed to update order" };
+  }
+}
+
+/**
  * Sends a Draft Order's items to an artisan for manufacturing: creates a
  * KarigarJob (same validations as issueMaterialToKarigar — karigar exists,
  * metal/karigar assignment, location access) sized to the sum of the

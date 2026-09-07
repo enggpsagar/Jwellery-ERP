@@ -37,6 +37,21 @@ export function buildCsvExport(
 }
 
 /**
+ * Same rows, same call shape as `buildExcelExport` ({ fileName, fileBase64
+ * }) — a drop-in for whichever format the export toolbar's dropdown picked,
+ * so a call site only ever needs one ternary between the two builders
+ * rather than two different result shapes to route through
+ * DataTableExportResult/downloadBase64File.
+ */
+export function buildCsvExportBase64(
+  rows: Record<string, unknown>[],
+  filePrefix: string,
+): { fileName: string; fileBase64: string } {
+  const { fileName, content } = buildCsvExport(rows, filePrefix);
+  return { fileName, fileBase64: Buffer.from(content, "utf-8").toString("base64") };
+}
+
+/**
  * Builds an .xlsx workbook from plain-object rows and returns it as a
  * base64 string ready to send across a server action boundary, plus a
  * timestamped filename. Mirrors the export-building logic already

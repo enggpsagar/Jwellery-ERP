@@ -9,7 +9,7 @@ import { requireStoreScope } from "@/lib/store-context";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
 import { getFinenessMap, toFineWeight } from "@/lib/purity";
-import { buildExcelExport } from "@/lib/excel-export";
+import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export";
 import {
   assertKarigarAssignedMetal,
   generateJobNumber,
@@ -188,6 +188,7 @@ type ExportDraftOrdersParams = {
   sortBy?: string;
   sortOrder?: SortOrder;
   status?: string;
+  format?: "csv" | "xlsx";
 };
 
 export async function exportDraftOrdersToExcel(params: ExportDraftOrdersParams = {}): Promise<{
@@ -233,7 +234,10 @@ export async function exportDraftOrdersToExcel(params: ExportDraftOrdersParams =
       "Artisan Job": order.karigarJob?.jobNumber ?? "",
     }));
 
-    const { fileName, fileBase64 } = buildExcelExport(rows, "Draft Orders", "draft-orders");
+    const { fileName, fileBase64 } =
+      params.format === "csv"
+        ? buildCsvExportBase64(rows, "draft-orders")
+        : buildExcelExport(rows, "Draft Orders", "draft-orders");
 
     return { success: true, message: "Draft orders exported successfully", fileName, fileBase64 };
   } catch (error) {

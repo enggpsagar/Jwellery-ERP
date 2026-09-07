@@ -7,7 +7,7 @@ import { partyGstTypeLabel } from "@/lib/gst"
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { getCurrentUser } from "@/lib/auth/auth"
-import * as XLSX from "xlsx"
+import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export"
 import {
   getCustomersCore,
   getCustomerByIdCore,
@@ -43,6 +43,7 @@ type ExportCustomersParams = {
   search?: string
   sortBy?: CustomerSortBy
   sortOrder?: SortOrder
+  format?: "csv" | "xlsx"
 }
 
 function toNumber(value: FormDataEntryValue | null, fallback = 0) {
@@ -160,29 +161,16 @@ export async function exportCustomersToExcel(
         : "",
     }))
 
-    const worksheet = XLSX.utils.json_to_sheet(rows)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Customers")
-
-    const now = new Date()
-    const pad = (value: number) => String(value).padStart(2, "0")
-
-    const fileName = `customers-${now.getFullYear()}-${pad(
-      now.getMonth() + 1
-    )}-${pad(now.getDate())}-${pad(now.getHours())}-${pad(
-      now.getMinutes()
-    )}-${pad(now.getSeconds())}.xlsx`
-
-    const buffer = XLSX.write(workbook, {
-      type: "buffer",
-      bookType: "xlsx",
-    })
+    const { fileName, fileBase64 } =
+      params.format === "csv"
+        ? buildCsvExportBase64(rows, "customers")
+        : buildExcelExport(rows, "Customers", "customers")
 
     return {
       success: true,
       message: "Customers exported successfully.",
       fileName,
-      fileBase64: Buffer.from(buffer).toString("base64"),
+      fileBase64,
     }
   } catch (error) {
     console.error("exportCustomersToExcel error:", error)

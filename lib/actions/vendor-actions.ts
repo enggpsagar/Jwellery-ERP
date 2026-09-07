@@ -9,7 +9,7 @@ import { formatLedgerSource } from "@/lib/ledger-format"
 import { partyGstTypeLabel } from "@/lib/gst"
 import { formatShortDate } from "@/lib/utils"
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar"
-import * as XLSX from "xlsx"
+import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export"
 
 export type Vendor = {
   id: string
@@ -99,6 +99,7 @@ type ExportVendorsParams = {
   search?: string
   sortBy?: VendorSortBy
   sortOrder?: SortOrder
+  format?: "csv" | "xlsx"
 }
 
 export type VendorLedgerEntryItem = {
@@ -447,29 +448,16 @@ export async function exportVendorsToExcel(
         : "",
     }))
 
-    const worksheet = XLSX.utils.json_to_sheet(rows)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Vendors")
-
-    const now = new Date()
-    const pad = (value: number) => String(value).padStart(2, "0")
-
-    const fileName = `vendors-${now.getFullYear()}-${pad(
-      now.getMonth() + 1
-    )}-${pad(now.getDate())}-${pad(now.getHours())}-${pad(
-      now.getMinutes()
-    )}-${pad(now.getSeconds())}.xlsx`
-
-    const buffer = XLSX.write(workbook, {
-      type: "buffer",
-      bookType: "xlsx",
-    })
+    const { fileName, fileBase64 } =
+      params.format === "csv"
+        ? buildCsvExportBase64(rows, "vendors")
+        : buildExcelExport(rows, "Vendors", "vendors")
 
     return {
       success: true,
       message: "Vendors exported successfully.",
       fileName,
-      fileBase64: Buffer.from(buffer).toString("base64"),
+      fileBase64,
     }
   } catch (error) {
     console.error("exportVendorsToExcel error:", error)

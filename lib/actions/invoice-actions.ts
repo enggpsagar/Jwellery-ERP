@@ -33,7 +33,7 @@ import { resolveGstRateSnapshot, type GstRateSnapshot } from "@/lib/actions/gst-
 import { getReturnEligibility } from "@/lib/return-window";
 import { amountInWords } from "@/lib/number-to-words";
 import { resolveStoreName } from "@/lib/invite-email";
-import { buildExcelExport } from "@/lib/excel-export";
+import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export";
 import { OversellError } from "@/lib/inventory/oversell-error";
 import { formatShortDate } from "@/lib/utils";
 
@@ -479,6 +479,7 @@ export type ExportInvoicesParams = {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   status?: string;
+  format?: "csv" | "xlsx";
 };
 
 export type ExportInvoicesResult = {
@@ -526,7 +527,10 @@ export async function exportInvoicesToExcel(
       Balance: invoice.balanceAmount,
     }));
 
-    const { fileName, fileBase64 } = buildExcelExport(rows, "Invoices", "invoices");
+    const { fileName, fileBase64 } =
+      params.format === "csv"
+        ? buildCsvExportBase64(rows, "invoices")
+        : buildExcelExport(rows, "Invoices", "invoices");
 
     return { success: true, message: "Invoices exported successfully.", fileName, fileBase64 };
   } catch (error) {

@@ -6,8 +6,16 @@ import { Download, Search, X } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useToast } from "@/components/providers/toast-provider"
 import { downloadBase64File } from "@/lib/download-file"
+
+export type DataTableExportFormat = "csv" | "xlsx"
 
 export type DataTableExportParams = {
   selectedIds?: string[]
@@ -16,6 +24,7 @@ export type DataTableExportParams = {
   sortOrder?: "asc" | "desc"
   status?: string
   type?: string
+  format?: DataTableExportFormat
 }
 
 export type DataTableExportResult = {
@@ -135,25 +144,27 @@ export function DataTableToolbar({
   const hasSelection = !!selectedIds && selectedIds.length > 0
 
   /**
-   * One button instead of two separate "Export Selected"/"Export Filtered
+   * One menu instead of two separate "Export Selected"/"Export Filtered
    * Results" actions — it exports the current selection when there is one,
    * otherwise everything matching the current search/sort/status. Selecting
    * rows is already how a user narrows an export, so a second button for
-   * the unfiltered case was a distinction without a difference.
+   * the unfiltered case was a distinction without a difference. The format
+   * choice (CSV/Excel) is the only other decision left, hence the dropdown.
    */
-  const handleExport = async () => {
+  const handleExport = async (format: DataTableExportFormat) => {
     try {
       setIsExporting(true)
 
       const result = await exportAction(
         hasSelection
-          ? { selectedIds, sortBy: currentSortBy, sortOrder: currentSortOrder }
+          ? { selectedIds, sortBy: currentSortBy, sortOrder: currentSortOrder, format }
           : {
               search: currentSearch,
               sortBy: currentSortBy,
               sortOrder: currentSortOrder,
               status: currentStatus !== "ALL" ? currentStatus : undefined,
               type: currentType !== "ALL" ? currentType : undefined,
+              format,
             },
       )
 
@@ -162,7 +173,13 @@ export function DataTableToolbar({
         return
       }
 
-      downloadBase64File(result.fileBase64, result.fileName)
+      downloadBase64File(
+        result.fileBase64,
+        result.fileName,
+        format === "csv"
+          ? "text/csv"
+          : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      )
       toast.success(result.message || `${entityLabel} exported successfully.`)
     } catch (error) {
       console.error(error)
@@ -271,17 +288,25 @@ export function DataTableToolbar({
       <div className="flex items-center gap-3">
         {bulkActions}
 
-        <Button
-          type="button"
-          size="icon"
-          onClick={handleExport}
-          disabled={isExporting}
-          title={hasSelection ? `Export selected ${entityLabel} (${selectedIds!.length})` : `Export ${entityLabel}`}
-          aria-label={hasSelection ? `Export selected ${entityLabel} (${selectedIds!.length})` : `Export ${entityLabel}`}
-          className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
-        >
-          {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              size="icon"
+              disabled={isExporting}
+              title={hasSelection ? `Export selected ${entityLabel} (${selectedIds!.length})` : `Export ${entityLabel}`}
+              aria-label={hasSelection ? `Export selected ${entityLabel} (${selectedIds!.length})` : `Export ${entityLabel}`}
+              className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
+            >
+              {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+            </Button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleExport("csv")}>CSV</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("xlsx")}>Excel</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   )

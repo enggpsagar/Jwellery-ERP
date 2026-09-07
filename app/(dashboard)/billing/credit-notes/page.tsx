@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 
 import { getCreditNotes } from "@/lib/actions/credit-note-actions"
-import { CreditNoteTable } from "@/components/billing/credit-note-table"
+import { CreditNotesClient } from "@/components/billing/credit-notes-client"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 export const metadata: Metadata = {
@@ -28,7 +28,7 @@ export default async function CreditNotesPage() {
         backLabel="Back to Billing"
       />
 
-      <CreditNoteTable creditNotes={creditNotes} />
+      <CreditNotesClient creditNotes={creditNotes} />
     </main>
   )
 }

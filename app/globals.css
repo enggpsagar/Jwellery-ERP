@@ -5,7 +5,10 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-heading: var(--font-heading-serif);
+  /* One plain sans everywhere (headings included) — matches the clean,
+     utilitarian look of business apps like Vyapar rather than the earlier
+     "premium jewellery" serif-heading pairing. */
+  --font-heading: var(--font-sans);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono), "Geist Mono Fallback";
   --color-sidebar-ring: var(--sidebar-ring);

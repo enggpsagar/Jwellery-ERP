@@ -268,7 +268,11 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
                 </div>
                 <CardTitle
                   className={cn(
-                    "text-2xl tabular-nums",
+                    // font-sans overrides CardTitle's own font-heading
+                    // (a serif display face, right for an actual heading but
+                    // hard to read as digits) — these numbers are data, not
+                    // a heading, and need to read plainly at a glance.
+                    "font-sans text-2xl tabular-nums",
                     POLARITY_TEXT[card.polarity],
                   )}
                 >

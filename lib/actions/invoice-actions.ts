@@ -692,7 +692,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
     where: { storeId, status: InventoryStockStatus.IN_STOCK, isActive: true },
     orderBy: { stockCode: "asc" },
     include: {
-      product: { select: { name: true, hsnCode: true } },
+      product: { select: { name: true, hsnCode: true, productCode: true } },
       metalType: { select: { id: true, name: true } },
     },
   });
@@ -701,6 +701,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
     id: stock.id,
     stockCode: stock.stockCode,
     productName: stock.product.name,
+    productCode: stock.product.productCode,
     hsnCode: stock.product.hsnCode,
     metalType: stock.metalType
       ? { id: stock.metalType.id, name: stock.metalType.name }
@@ -744,7 +745,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
     const stock = await prisma.inventoryStock.findFirst({
       where: { id: stockId, storeId },
       include: {
-        product: { select: { name: true, hsnCode: true } },
+        product: { select: { name: true, hsnCode: true, productCode: true } },
         metalType: { select: { id: true, name: true } },
       },
     });
@@ -753,6 +754,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       id: stock.id,
       stockCode: stock.stockCode,
       productName: stock.product.name,
+      productCode: stock.product.productCode,
       hsnCode: stock.product.hsnCode,
       metalType: stock.metalType ? { id: stock.metalType.id, name: stock.metalType.name } : null,
       purity: stock.purity,

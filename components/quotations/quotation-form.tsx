@@ -46,6 +46,7 @@ type StockOption = {
   id: string
   stockCode: string
   productName: string
+  productCode: string | null
   metalType: { id: string; name: string } | null
   purity: string | null
   grossWeight: number | null

@@ -47,6 +47,7 @@ type StockOption = {
   id: string
   stockCode: string
   productName: string
+  productCode: string | null
   metalType: { id: string; name: string } | null
   purity: string | null
   grossWeight: number | null
@@ -599,7 +600,7 @@ export function KachaInvoiceForm({
                     onCreateNew={() => updateItem(item.key, { ...emptyLineItem(), key: item.key })}
                     isDisabled={(stock) => availableForStock(stock.id, item.key) <= 0}
                     renderLabel={(stock) =>
-                      `${stock.stockCode} — ${stock.productName} (${availableForStock(stock.id, item.key)} available)`
+                      `${stock.stockCode}${stock.productCode ? ` (${stock.productCode})` : ""} — ${stock.productName} (${availableForStock(stock.id, item.key)} available)`
                     }
                   />
                 </div>

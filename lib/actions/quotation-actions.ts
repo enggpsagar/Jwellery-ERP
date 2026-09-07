@@ -369,7 +369,7 @@ export async function getQuotationFormStockItems() {
     where: { storeId, status: InventoryStockStatus.IN_STOCK, isActive: true },
     orderBy: { stockCode: "asc" },
     include: {
-      product: { select: { name: true } },
+      product: { select: { name: true, productCode: true } },
       metalType: { select: { id: true, name: true } },
     },
   });
@@ -378,6 +378,7 @@ export async function getQuotationFormStockItems() {
     id: stock.id,
     stockCode: stock.stockCode,
     productName: stock.product.name,
+    productCode: stock.product.productCode,
     metalType: stock.metalType,
     purity: stock.purity,
     grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,

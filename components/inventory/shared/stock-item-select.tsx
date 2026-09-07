@@ -25,6 +25,12 @@ type StockItemBase = {
   id: string
   stockCode: string
   productName: string
+  /** The linked Product's own SKU (Product.productCode) — shown alongside
+   * the stock code so a merchant can recognize a piece by its structured
+   * SKU (e.g. "G22-LR-001") wherever stock gets linked into a sale, not
+   * just on the Inventory screens. Optional since a couple of callers'
+   * stock queries don't carry it (yet) — the default label just omits it. */
+  productCode?: string | null
 }
 
 type StockItemSelectProps<T extends StockItemBase> = {
@@ -70,7 +76,8 @@ export function StockItemSelect<T extends StockItemBase>({
     return stockItems.filter(
       (stock) =>
         stock.stockCode.toLowerCase().includes(query) ||
-        stock.productName.toLowerCase().includes(query),
+        stock.productName.toLowerCase().includes(query) ||
+        (stock.productCode ?? "").toLowerCase().includes(query),
     )
   }, [stockItems, search])
 
@@ -119,7 +126,9 @@ export function StockItemSelect<T extends StockItemBase>({
         ) : (
           filtered.map((stock) => (
             <SelectItem key={stock.id} value={stock.id} disabled={isDisabled?.(stock) ?? false}>
-              {renderLabel ? renderLabel(stock) : `${stock.stockCode} — ${stock.productName}`}
+              {renderLabel
+                ? renderLabel(stock)
+                : `${stock.stockCode}${stock.productCode ? ` (${stock.productCode})` : ""} — ${stock.productName}`}
             </SelectItem>
           ))
         )}

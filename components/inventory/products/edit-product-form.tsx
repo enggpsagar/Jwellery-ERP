@@ -26,6 +26,7 @@ type EditProductFormProps = {
     categoryId: string | null;
     categoryTypeId: string | null;
     metalTypeId: string | null;
+    targetStyle: string | null;
     stoneOriginOptionId: string | null;
     defaultPurity: string | null;
     defaultMakingCharge: string | null;

@@ -13,7 +13,7 @@ export default async function NewStorePage() {
   const plans = await getPlans({ activeOnly: true })
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-4xl space-y-6 p-6">
       <PageBackHeader
         title="Create Store"
         description="Set up a new store and its admin."

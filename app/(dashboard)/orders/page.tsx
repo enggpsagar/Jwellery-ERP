@@ -1,8 +1,12 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
-import { getDraftOrders } from "@/lib/actions/draft-order-actions"
-import { DraftOrdersTable } from "@/components/orders/draft-orders-table"
+import {
+  getDraftOrders,
+  type DraftOrderSortBy,
+  type SortOrder,
+} from "@/lib/actions/draft-order-actions"
+import { DraftOrdersClient } from "@/components/orders/draft-orders-client"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
 
@@ -12,8 +16,35 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic"
 
-export default async function DraftOrdersPage() {
-  const orders = await getDraftOrders()
+type DraftOrdersPageProps = {
+  searchParams?: Promise<{
+    page?: string
+    pageSize?: string
+    search?: string
+    sortBy?: DraftOrderSortBy
+    sortOrder?: SortOrder
+    status?: string
+  }>
+}
+
+export default async function DraftOrdersPage({ searchParams }: DraftOrdersPageProps) {
+  const params = (await searchParams) ?? {}
+
+  const page = Number(params.page || 1)
+  const pageSize = Number(params.pageSize || 10)
+  const search = params.search || ""
+  const sortBy = params.sortBy || "orderDate"
+  const sortOrder = params.sortOrder || "desc"
+  const status = params.status || undefined
+
+  const { orders, pagination } = await getDraftOrders({
+    page,
+    pageSize,
+    search,
+    sortBy,
+    sortOrder,
+    status,
+  })
 
   return (
     <main className="space-y-6 p-6">
@@ -29,7 +60,7 @@ export default async function DraftOrdersPage() {
         }
       />
 
-      <DraftOrdersTable orders={orders} />
+      <DraftOrdersClient orders={orders} pagination={pagination} />
     </main>
   )
 }

@@ -123,7 +123,7 @@ export function CustomerSelect({
           onChange?.(value, customers.find((customer) => customer.id === value))
         }}
       >
-        <SelectTrigger>
+        <SelectTrigger className="h-11 w-full">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
 

@@ -979,7 +979,7 @@ export function InvoiceForm({
             // customerId is part of the form's shape either way.
             <>
               <input type="hidden" name="customerId" value={customerId} />
-              <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm">
+              <div className="flex h-11 items-center rounded-md border bg-muted px-3 text-sm">
                 {customers.find((c) => c.id === customerId)?.name ?? "—"}
               </div>
             </>
@@ -998,13 +998,14 @@ export function InvoiceForm({
           <Input
             type="date"
             name="invoiceDate"
+            className="h-11"
             defaultValue={new Date().toISOString().slice(0, 10)}
           />
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Due Date</Label>
-          <Input type="date" name="dueDate" min={todayForDateInput()} />
+          <Input type="date" name="dueDate" className="h-11" min={todayForDateInput()} />
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -1305,7 +1306,7 @@ export function InvoiceForm({
                         onValueChange={(value) => handlePurityChange(item, value)}
                         disabled={isLinked}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="h-11 w-full">
                           <SelectValue placeholder="Select purity" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1324,7 +1325,7 @@ export function InvoiceForm({
                         <Input
                           type="number"
                           step="0.00001"
-                          className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                          className={isLinked ? "h-11 flex-1 bg-muted" : "h-11 flex-1"}
                           value={
                             item.grossWeight === 0
                               ? ""
@@ -1353,7 +1354,7 @@ export function InvoiceForm({
                           onValueChange={(unit) => updateItem(item.key, { grossWeightUnit: unit as "GRAM" | "CARAT" })}
                           disabled={isLinked}
                         >
-                          <SelectTrigger className="w-16">
+                          <SelectTrigger className="h-11 w-16">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1391,6 +1392,41 @@ export function InvoiceForm({
                       chargeType={item.makingChargeType}
                       onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
                     />
+
+                    {/* Includes-a-Stone toggle sits here, in the same row as
+                        Purity/Gross Weight/Making Charge, instead of its own
+                        separate full-width row below — it's a single small
+                        control, not worth a whole row of its own. Only the
+                        toggle lives here; StoneComponentFields (once
+                        checked) still renders as its own row below, since
+                        it needs the room. No toggle applies to a carat-
+                        weighed line at all (see below), so this cell is
+                        simply empty there. */}
+                    {!isCaratLine(item) && (
+                      <div className="flex items-end pb-2">
+                        <IncludesStoneToggle
+                          checked={item.hasStoneComponent}
+                          onChange={(checked) =>
+                            updateItem(item.key, {
+                              hasStoneComponent: checked,
+                              // Net Stone Weight and Stone Charge are now both
+                              // hidden once the toggle is off — clear them so a
+                              // hidden field can't silently keep submitting
+                              // whatever was last entered.
+                              ...(checked
+                                ? {}
+                                : {
+                                    stoneWeightInput: 0,
+                                    netStoneWeightTouched: false,
+                                    stoneCharge: 0,
+                                    stoneChargeTouched: false,
+                                  }),
+                            })
+                          }
+                          disabled={isLinked}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* For a carat-weighed line (no "Includes a Stone" toggle
@@ -1411,67 +1447,40 @@ export function InvoiceForm({
                     </div>
                   )}
 
-                  {/* A composite piece (metal + an embedded stone) is the
-                      exception, not the rule, for a line whose own metal isn't
-                      Diamond/Stone — kept as its own toggled strip rather than
-                      wedged into the grid above, so a plain Gold line's fields
-                      don't reflow every time this gets checked/unchecked. */}
-                  {!isCaratLine(item) && (
-                    <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
-                      <IncludesStoneToggle
-                        checked={item.hasStoneComponent}
-                        onChange={(checked) =>
-                          updateItem(item.key, {
-                            hasStoneComponent: checked,
-                            // Net Stone Weight and Stone Charge are now both
-                            // hidden once the toggle is off — clear them so a
-                            // hidden field can't silently keep submitting
-                            // whatever was last entered.
-                            ...(checked
-                              ? {}
-                              : {
-                                  stoneWeightInput: 0,
-                                  netStoneWeightTouched: false,
-                                  stoneCharge: 0,
-                                  stoneChargeTouched: false,
-                                }),
-                          })
+                  {/* StoneComponentFields only, once checked — the toggle
+                      itself now lives in the grid row above. */}
+                  {!isCaratLine(item) && item.hasStoneComponent && (
+                    <div className="rounded-md border border-dashed p-3">
+                      <StoneComponentFields
+                        metals={metals}
+                        origins={origins}
+                        onMetalsChange={setMetals}
+                        onOriginsChange={setOrigins}
+                        stoneMetalTypeName={item.stoneMetalTypeName}
+                        onStoneChange={(name, typeNames) =>
+                          updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
                         }
-                        disabled={isLinked}
+                        selectedTypeNames={item.stoneTypeNames}
+                        onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
+                        caratWeight={item.caratWeight}
+                        onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
+                        stoneRate={item.stoneRate}
+                        onStoneRateChange={(value) => handleStoneRateChange(item, value)}
+                        stoneCharge={item.stoneCharge}
+                        onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
+                        stoneChargeTouched={item.stoneChargeTouched}
+                        stoneWeightInput={toPrimaryUnit(
+                          item.stoneWeightInput,
+                          "GRAM",
+                          item.stoneWeightUnit,
+                          resolveGramsPerCarat(item.purity, caratConversionRates),
+                        )}
+                        onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
+                        stoneWeightUnit={item.stoneWeightUnit}
+                        onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
+                        netStoneWeightTouched={item.netStoneWeightTouched}
+                        lockPhysicalFields={isLinked}
                       />
-
-                      {item.hasStoneComponent && (
-                        <StoneComponentFields
-                          metals={metals}
-                          origins={origins}
-                          onMetalsChange={setMetals}
-                          onOriginsChange={setOrigins}
-                          stoneMetalTypeName={item.stoneMetalTypeName}
-                          onStoneChange={(name, typeNames) =>
-                            updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
-                          }
-                          selectedTypeNames={item.stoneTypeNames}
-                          onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
-                          caratWeight={item.caratWeight}
-                          onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
-                          stoneRate={item.stoneRate}
-                          onStoneRateChange={(value) => handleStoneRateChange(item, value)}
-                          stoneCharge={item.stoneCharge}
-                          onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
-                          stoneChargeTouched={item.stoneChargeTouched}
-                          stoneWeightInput={toPrimaryUnit(
-                            item.stoneWeightInput,
-                            "GRAM",
-                            item.stoneWeightUnit,
-                            resolveGramsPerCarat(item.purity, caratConversionRates),
-                          )}
-                          onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
-                          stoneWeightUnit={item.stoneWeightUnit}
-                          onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
-                          netStoneWeightTouched={item.netStoneWeightTouched}
-                          lockPhysicalFields={isLinked}
-                        />
-                      )}
                     </div>
                   )}
 
@@ -1621,31 +1630,35 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <div className="max-w-sm space-y-2">
-        <PercentOrFlatInput
-          base={subtotal + makingChargesTotal + stoneChargesTotal}
-          value={discount}
-          onChange={setDiscount}
-        />
-      </div>
-
-      {editInvoiceId ? (
-        <div className="max-w-sm space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <Label>Paid Now</Label>
-          <Input
-            type="number"
-            step="0.01"
-            value={legacyPaidAmount === 0 ? "" : legacyPaidAmount}
-            onChange={(e) => setLegacyPaidAmount(Number(e.target.value) || 0)}
+      {/* Side by side rather than stacked — both are narrow, single-purpose
+          fields with no reason to each claim a full row of vertical space. */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <PercentOrFlatInput
+            base={subtotal + makingChargesTotal + stoneChargesTotal}
+            value={discount}
+            onChange={setDiscount}
           />
         </div>
-      ) : (
-        <PaidNowFields
-          rows={paymentRows}
-          onRowsChange={setPaymentRows}
-          maxAmount={totalAmount > 0 ? totalAmount : undefined}
-        />
-      )}
+
+        {editInvoiceId ? (
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+            <Label>Paid Now</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={legacyPaidAmount === 0 ? "" : legacyPaidAmount}
+              onChange={(e) => setLegacyPaidAmount(Number(e.target.value) || 0)}
+            />
+          </div>
+        ) : (
+          <PaidNowFields
+            rows={paymentRows}
+            onRowsChange={setPaymentRows}
+            maxAmount={totalAmount > 0 ? totalAmount : undefined}
+          />
+        )}
+      </div>
 
       <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
         <Label>Notes</Label>

@@ -61,8 +61,6 @@ export function PurchaseDetailContent({ purchase }: { purchase: Purchase }) {
               <th className="px-4 py-3 text-left font-medium">Purity</th>
               <th className="px-4 py-3 text-left font-medium">Weight</th>
               <th className="px-4 py-3 text-left font-medium">Rate</th>
-              <th className="px-4 py-3 text-left font-medium">Making</th>
-              <th className="px-4 py-3 text-left font-medium">Stone</th>
               <th className="px-4 py-3 text-left font-medium">Line Total</th>
             </tr>
           </thead>
@@ -86,8 +84,6 @@ export function PurchaseDetailContent({ purchase }: { purchase: Purchase }) {
                     : item.netWeight != null ? `${item.netWeight.toFixed(3)} g` : "-"}
                 </td>
                 <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
-                <td className="px-4 py-3">₹{item.makingCharge.toFixed(2)}</td>
-                <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
                 <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
               </tr>
             ))}

@@ -62,7 +62,7 @@ export default async function ProductEditPage({
   }
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-6xl space-y-6 p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="mb-2">

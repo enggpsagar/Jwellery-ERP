@@ -56,13 +56,6 @@ export function InvoiceActionsBar({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Link
-        href={`/billing/${invoice.id}/print`}
-        className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
-      >
-        <Printer className="h-4 w-4" />
-        Print
-      </Link>
       <ShareWhatsAppButton
         phone={invoice.customer?.phone}
         message={whatsappMessage}
@@ -115,6 +108,18 @@ export function InvoiceActionsBar({
       {!isCancelled && (
         <RecordPaymentDialog invoiceId={invoice.id} balanceAmount={invoice.balanceAmount} />
       )}
+
+      {/* Rightmost, icon-only — every other action here needs a decision
+          or opens a dialog; Print is the one plain "go do the physical
+          thing" action, so it doesn't compete for the same visual weight. */}
+      <Link
+        href={`/billing/${invoice.id}/print`}
+        className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-md bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
+        aria-label="Print invoice"
+        title="Print"
+      >
+        <Printer className="h-4 w-4" />
+      </Link>
     </div>
   )
 }

@@ -194,14 +194,6 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowDays }:
           <span>₹{invoice.subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Making Charges</span>
-          <span>₹{invoice.makingCharges.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Stone Charges</span>
-          <span>₹{invoice.stoneCharges.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between">
           <span>Discount</span>
           <span>-₹{invoice.discount.toFixed(2)}</span>
         </div>

@@ -93,9 +93,12 @@ export function EditInvoiceDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
+        <Button
+          className="gap-2 bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
+          title="Edit Date & E-way Bill"
+        >
           <Pencil className="h-4 w-4" />
-          Edit Date &amp; E-way Bill
+          E-way Bill
         </Button>
       </DialogTrigger>
 

@@ -127,9 +127,12 @@ export function ReturnItemsDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       {!hideTrigger && (
         <DialogTrigger asChild>
-          <Button variant="outline" className="gap-2">
+          <Button
+            className="gap-2 bg-[var(--chart-5)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-5)_88%,black)]"
+            title="Return Items"
+          >
             <Undo2 className="h-4 w-4" />
-            Return Items
+            Items
           </Button>
         </DialogTrigger>
       )}

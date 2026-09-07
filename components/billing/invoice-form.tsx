@@ -10,6 +10,7 @@ import { createInvoice, updateInvoice, type InvoiceFormState } from "@/lib/actio
 import { useToast } from "@/components/providers/toast-provider"
 import { ScanToAddPanel } from "@/components/billing/scan-to-add-panel"
 import { todayForDateInput } from "@/lib/date-input"
+import { playScanBeep } from "@/lib/scan-beep"
 import { computeGst } from "@/lib/gst"
 
 import { Input } from "@/components/ui/input"
@@ -644,6 +645,7 @@ export function InvoiceForm({
 
       setConfirmingClear(false)
       toast.success(`Added ${stock.productName}`)
+      playScanBeep()
     },
     // gstRateId included so a freshly-scanned line always starts on the
     // document's CURRENT default rather than whatever was default when

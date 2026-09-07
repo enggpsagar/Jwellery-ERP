@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Camera, ScanLine, Square, Wifi } from "lucide-react"
+import { Camera, Plus, ScanLine, Square, Wifi } from "lucide-react"
 
 import {
   pollScanSession,
@@ -30,9 +30,14 @@ const POLL_MS = 2000
 
 export function ScanToAddPanel({
   onScanned,
+  onAddManualItem,
 }: {
   /** Called once per scan, in the order the tags were scanned. */
   onScanned: (stockId: string) => void
+  /** Adds a blank, hand-typed line — offered alongside the two scan routes
+   * since this is where a line item actually gets created, rather than as a
+   * separate control elsewhere on the page. Omit to hide the button. */
+  onAddManualItem?: () => void
 }) {
   const [sessionId, setSessionId] = useState<string | null>(null)
 
@@ -147,6 +152,13 @@ export function ScanToAddPanel({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {onAddManualItem ? (
+              <Button type="button" variant="outline" onClick={onAddManualItem}>
+                <Plus className="mr-1.5 size-4" />
+                Add Item
+              </Button>
+            ) : null}
+
             <Button
               type="button"
               variant="outline"

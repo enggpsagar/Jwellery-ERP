@@ -790,9 +790,13 @@ export function PurchaseForm({
           <Label>Line Items</Label>
           <Button
             type="button"
-            variant="ghost"
             size="sm"
             onClick={() => setItems((prev) => [...prev, emptyLineItem()])}
+            // Same solid-fill treatment as the Invoice form's "Add Item"
+            // button (one of this app's chart hues, matching the header's
+            // Sale/Purchase button convention) instead of a grey ghost
+            // button that blended into the section header.
+            className="bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
           >
             <Plus className="h-4 w-4 mr-1" /> Add Item
           </Button>
@@ -1181,7 +1185,10 @@ export function PurchaseForm({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
+        {/* Boxed and tinted the same as the Invoice form's Discount field —
+            one of this app's chart hues, so it doesn't blur into the plain
+            GST Rate field beside it. */}
+        <div className="space-y-2 rounded-lg border border-[color-mix(in_oklab,var(--chart-2)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-2)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-2)_12%,transparent)]">
           <PercentOrFlatInput
             base={subtotal + makingChargesTotal + stoneChargesTotal}
             value={discount}
@@ -1231,11 +1238,13 @@ export function PurchaseForm({
         </div>
       </div>
 
-      <PaidNowFields
-        rows={paymentRows}
-        onRowsChange={setPaymentRows}
-        maxAmount={totalAmount > 0 ? totalAmount : undefined}
-      />
+      <div className="rounded-lg border border-[color-mix(in_oklab,var(--chart-3)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-3)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-3)_12%,transparent)]">
+        <PaidNowFields
+          rows={paymentRows}
+          onRowsChange={setPaymentRows}
+          maxAmount={totalAmount > 0 ? totalAmount : undefined}
+        />
+      </div>
 
       {gstScheme !== "COMPOSITION" && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1265,7 +1274,7 @@ export function PurchaseForm({
         </div>
       )}
 
-      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+      <div className="space-y-2 rounded-lg border border-[color-mix(in_oklab,var(--chart-1)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-1)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-1)_12%,transparent)]">
         <Label>Notes</Label>
         <Textarea name="notes" rows={2} />
       </div>

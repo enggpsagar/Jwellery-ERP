@@ -55,9 +55,9 @@ export function PaidNowFields({ rows, onRowsChange, maxAmount }: PaidNowFieldsPr
         <div>
           <Button
             type="button"
-            variant="outline"
             size="sm"
             onClick={() => onRowsChange([emptyPaymentMethodValue()])}
+            className="bg-[var(--chart-5)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-5)_88%,black)]"
           >
             <Plus className="mr-1 h-4 w-4" />
             Record a payment received now

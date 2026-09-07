@@ -198,7 +198,12 @@ export function CustomerVendorLinkCard({
                 <Link2 className="h-4 w-4" />
                 {loading ? "Registering..." : "Register as Vendor"}
               </Button>
-              <Button variant="outline" size="sm" onClick={openPicker} disabled={loading}>
+              <Button
+                size="sm"
+                onClick={openPicker}
+                disabled={loading}
+                className="bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
+              >
                 Link to Existing Vendor
               </Button>
             </div>

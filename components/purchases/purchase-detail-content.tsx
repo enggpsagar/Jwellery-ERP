@@ -101,14 +101,6 @@ export function PurchaseDetailContent({ purchase }: { purchase: Purchase }) {
           <span>₹{purchase.subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Making Charges</span>
-          <span>₹{purchase.makingCharges.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Stone Charges</span>
-          <span>₹{purchase.stoneCharges.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between">
           <span>Discount</span>
           <span>-₹{purchase.discount.toFixed(2)}</span>
         </div>

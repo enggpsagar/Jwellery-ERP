@@ -12,6 +12,7 @@ import { ScanToAddPanel } from "@/components/billing/scan-to-add-panel"
 import { todayForDateInput } from "@/lib/date-input"
 import { playScanBeep } from "@/lib/scan-beep"
 import { computeGst } from "@/lib/gst"
+import { computeRoundOff } from "@/lib/round-off"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -872,13 +873,18 @@ export function InvoiceForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items, gstRate, gstScheme, storeState, selectedCustomer?.state],
   )
-  const totalAmount =
+  const rawTotal =
     subtotal +
     makingChargesTotal +
     stoneChargesTotal -
     discount -
     schemeDiscountTotal +
     taxAmount
+  // Standard Indian-billing convention: the Total shown/saved is rounded to
+  // the nearest rupee, with the small signed adjustment surfaced as its own
+  // line — same computeRoundOff the server uses, so what's previewed here is
+  // exactly what createInvoice/updateInvoice will persist.
+  const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal)
   const balanceAmount = Math.max(0, totalAmount - paidAmount)
 
   const itemsJson = JSON.stringify(
@@ -1744,6 +1750,14 @@ export function InvoiceForm({
           <span>GST (SGST+CGST or IGST)</span>
           <span>₹{taxAmount.toFixed(2)}</span>
         </div>
+        {roundOffAmount !== 0 && (
+          <div className="flex justify-between">
+            <span>Round Off</span>
+            <span>
+              {roundOffAmount > 0 ? "+" : "-"}₹{Math.abs(roundOffAmount).toFixed(2)}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
           <span>Total</span>
           <span>₹{totalAmount.toFixed(2)}</span>

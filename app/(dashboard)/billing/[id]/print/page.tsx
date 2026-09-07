@@ -387,6 +387,14 @@ export default async function InvoicePrintPage({ params }: Props) {
                 </div>
               ),
             )}
+            {invoice.roundOffAmount !== 0 && (
+              <div className="flex justify-between border-b border-slate-300 p-1.5">
+                <span>Round Off</span>
+                <span>
+                  {invoice.roundOffAmount > 0 ? "+" : "-"}₹{fmt(Math.abs(invoice.roundOffAmount))}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between bg-violet-400 p-1.5 font-semibold text-white">
               <span>Total</span>
               <span>₹{fmt(invoice.totalAmount)}</span>

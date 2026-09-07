@@ -10,6 +10,7 @@ import { createQuotation, type QuotationFormState } from "@/lib/actions/quotatio
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/providers/toast-provider"
 import { computeGst } from "@/lib/gst"
+import { computeRoundOff } from "@/lib/round-off"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 
 import { Input } from "@/components/ui/input"
@@ -467,8 +468,12 @@ export function QuotationForm({
   }, [taxableValue, gstRate, gstScheme, storeState, selectedCustomer?.state])
   const taxAmount = gstBreakdown.sgst + gstBreakdown.cgst + gstBreakdown.igst
 
-  const totalAmount =
+  const rawTotal =
     subtotal + makingChargesTotal + stoneChargesTotal - discount + taxAmount
+  // Live preview of the same computeRoundOff() the server applies on save
+  // (see createQuotation in quotation-actions.ts) — never submitted itself,
+  // just shown here so the displayed Total already matches what gets saved.
+  const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal)
 
   const itemsJson = JSON.stringify(
     items.map((item) => {
@@ -971,6 +976,14 @@ export function QuotationForm({
           <span>Tax</span>
           <span>₹{taxAmount.toFixed(2)}</span>
         </div>
+        {roundOffAmount !== 0 && (
+          <div className="flex justify-between">
+            <span>Round Off</span>
+            <span>
+              {roundOffAmount > 0 ? "+" : "-"}₹{Math.abs(roundOffAmount).toFixed(2)}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
           <span>Total</span>
           <span>₹{totalAmount.toFixed(2)}</span>

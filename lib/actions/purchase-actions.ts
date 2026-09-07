@@ -20,6 +20,7 @@ import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope } from "@/lib/store-context";
 import { isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst";
+import { computeRoundOff } from "@/lib/round-off";
 import { resolveGstRateSnapshot, type GstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import {
   getLocationScope,
@@ -303,6 +304,7 @@ function mapPurchase(purchase: any) {
     discount: Number(purchase.discount),
     taxAmount: Number(purchase.taxAmount),
     totalAmount: Number(purchase.totalAmount),
+    roundOffAmount: Number(purchase.roundOffAmount ?? 0),
     paidAmount: Number(purchase.paidAmount),
     balanceAmount: Number(purchase.balanceAmount),
     notes: purchase.notes,
@@ -682,7 +684,12 @@ export async function createPurchase(
     );
     const makingCharges = items.reduce((sum, item) => sum + toNumber(item.makingCharge), 0);
     const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
-    const totalAmount = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    // Indian billing convention: the saved total is rounded to the nearest
+    // whole rupee, with the (small, signed) adjustment kept alongside it as
+    // its own line — see lib/round-off.ts. Applied once here, document-level,
+    // same as Discount, regardless of Purchase's per-line GST.
+    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
     const balanceAmount = Math.max(0, totalAmount - paidAmount);
 
     let status: InvoiceStatus = InvoiceStatus.PAID;
@@ -842,6 +849,7 @@ export async function createPurchase(
           cgstAmount,
           igstAmount,
           totalAmount,
+          roundOffAmount,
           paidAmount,
           balanceAmount,
           notes,

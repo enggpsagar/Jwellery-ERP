@@ -175,6 +175,15 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
           <span>Discount</span>
           <span>-₹{kachaInvoice.discount.toFixed(2)}</span>
         </div>
+        {kachaInvoice.roundOffAmount !== 0 && (
+          <div className="flex justify-between">
+            <span>Round Off</span>
+            <span>
+              {kachaInvoice.roundOffAmount >= 0 ? "+" : "-"}₹
+              {Math.abs(kachaInvoice.roundOffAmount).toFixed(2)}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
           <span>Total</span>
           <span>₹{kachaInvoice.totalAmount.toFixed(2)}</span>

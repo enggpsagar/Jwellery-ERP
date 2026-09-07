@@ -9,6 +9,7 @@ import {
   createKachaInvoice,
   type KachaInvoiceFormState,
 } from "@/lib/actions/kacha-invoice-actions"
+import { computeRoundOff } from "@/lib/round-off"
 import { useToast } from "@/components/providers/toast-provider"
 import { cn } from "@/lib/utils"
 
@@ -466,7 +467,11 @@ export function KachaInvoiceForm({
     () => items.reduce((sum, item) => sum + item.stoneCharge, 0),
     [items],
   )
-  const totalAmount = subtotal + makingChargesTotal + stoneChargesTotal - discount
+  const rawTotal = subtotal + makingChargesTotal + stoneChargesTotal - discount
+  // Live preview of the same server-side round-off createKachaInvoice
+  // applies — see lib/round-off.ts. The client never submits this value;
+  // it's entirely recomputed server-side from the persisted line items.
+  const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal)
   const balanceAmount = Math.max(0, totalAmount - paidAmount)
 
   const itemsJson = JSON.stringify(
@@ -1027,6 +1032,14 @@ export function KachaInvoiceForm({
           <span>Discount</span>
           <span>-₹{discount.toFixed(2)}</span>
         </div>
+        {roundOffAmount !== 0 && (
+          <div className="flex justify-between">
+            <span>Round Off</span>
+            <span>
+              {roundOffAmount >= 0 ? "+" : "-"}₹{Math.abs(roundOffAmount).toFixed(2)}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
           <span>Total</span>
           <span>₹{totalAmount.toFixed(2)}</span>

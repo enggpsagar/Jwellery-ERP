@@ -216,6 +216,14 @@ export default async function QuotationDetailPage({ params }: Props) {
           <span>Tax</span>
           <span>₹{quotation.taxAmount.toFixed(2)}</span>
         </div>
+        {quotation.roundOffAmount !== 0 && (
+          <div className="flex justify-between">
+            <span>Round Off</span>
+            <span>
+              {quotation.roundOffAmount > 0 ? "+" : "-"}₹{Math.abs(quotation.roundOffAmount).toFixed(2)}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
           <span>Total</span>
           <span>₹{quotation.totalAmount.toFixed(2)}</span>

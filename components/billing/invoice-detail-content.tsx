@@ -209,6 +209,14 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled
           <span>Tax</span>
           <span>₹{invoice.taxAmount.toFixed(2)}</span>
         </div>
+        {invoice.roundOffAmount !== 0 && (
+          <div className="flex justify-between">
+            <span>Round Off</span>
+            <span>
+              {invoice.roundOffAmount > 0 ? "+" : "-"}₹{Math.abs(invoice.roundOffAmount).toFixed(2)}
+            </span>
+          </div>
+        )}
         <div className="mt-2 flex justify-between border-t pt-2 text-base font-semibold">
           <span>Total</span>
           <span>₹{invoice.totalAmount.toFixed(2)}</span>

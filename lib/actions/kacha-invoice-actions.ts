@@ -15,6 +15,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { computeRoundOff } from "@/lib/round-off";
 import { requireStoreScope } from "@/lib/store-context";
 import {
   getLocationScope,
@@ -164,6 +165,7 @@ function mapKachaInvoice(kachaInvoice: any) {
     makingCharges: Number(kachaInvoice.makingCharges),
     stoneCharges: Number(kachaInvoice.stoneCharges),
     discount: Number(kachaInvoice.discount),
+    roundOffAmount: Number(kachaInvoice.roundOffAmount),
     totalAmount: Number(kachaInvoice.totalAmount),
     paidAmount: Number(kachaInvoice.paidAmount),
     balanceAmount: Number(kachaInvoice.balanceAmount),
@@ -475,7 +477,11 @@ export async function createKachaInvoice(
       0,
     );
     const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
-    const totalAmount = subtotal + makingCharges + stoneCharges - discount;
+    const rawTotal = subtotal + makingCharges + stoneCharges - discount;
+    // Indian-billing convention: the persisted Total is always a whole
+    // rupee, with the (small, signed) adjustment recorded separately rather
+    // than silently absorbed — see lib/round-off.ts.
+    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
     const balanceAmount = Math.max(0, totalAmount - paidAmount);
 
     let status: InvoiceStatus = InvoiceStatus.PAID;
@@ -558,6 +564,7 @@ export async function createKachaInvoice(
           makingCharges,
           stoneCharges,
           discount,
+          roundOffAmount,
           totalAmount,
           paidAmount,
           balanceAmount,
@@ -805,7 +812,11 @@ export async function convertKachaToPakka(
     const discount = Number(kachaInvoice.discount);
     const paidAmount = Number(kachaInvoice.paidAmount);
 
-    const totalAmount = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    // Same Indian-billing round-off convention as createKachaInvoice, applied
+    // here to the new Invoice being created (not the source KachaInvoice,
+    // which keeps its own already-persisted roundOffAmount untouched).
+    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
     const balanceAmount = Math.max(0, totalAmount - paidAmount);
 
     let status: InvoiceStatus = InvoiceStatus.PAID;
@@ -835,6 +846,7 @@ export async function convertKachaToPakka(
           stoneCharges,
           discount,
           taxAmount,
+          roundOffAmount,
           totalAmount,
           paidAmount,
           balanceAmount,
@@ -1301,7 +1313,10 @@ export async function importKachaInvoicesFromExcel(
         (sum, item) => sum + toNumber(item.stoneCharge),
         0,
       );
-      const totalAmount = subtotal + makingCharges + stoneCharges - slip.discount;
+      const rawTotal = subtotal + makingCharges + stoneCharges - slip.discount;
+      // Same Indian-billing round-off convention as createKachaInvoice —
+      // imported slips must land with the same whole-rupee Total invariant.
+      const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
       const balanceAmount = Math.max(0, totalAmount - slip.paidAmount);
 
       let status: InvoiceStatus = InvoiceStatus.PAID;
@@ -1321,6 +1336,7 @@ export async function importKachaInvoicesFromExcel(
           makingCharges,
           stoneCharges,
           discount: slip.discount,
+          roundOffAmount,
           totalAmount,
           paidAmount: slip.paidAmount,
           balanceAmount,

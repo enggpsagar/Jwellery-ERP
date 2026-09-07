@@ -104,6 +104,15 @@ export function PurchaseDetailContent({ purchase }: { purchase: Purchase }) {
           <span>GST (SGST+CGST or IGST)</span>
           <span>₹{purchase.taxAmount.toFixed(2)}</span>
         </div>
+        {purchase.roundOffAmount !== 0 && (
+          <div className="flex justify-between">
+            <span>Round Off</span>
+            <span>
+              {purchase.roundOffAmount >= 0 ? "+" : "-"}₹
+              {Math.abs(purchase.roundOffAmount).toFixed(2)}
+            </span>
+          </div>
+        )}
         <div className="mt-2 flex justify-between border-t pt-2 text-base font-semibold">
           <span>Total</span>
           <span>₹{purchase.totalAmount.toFixed(2)}</span>

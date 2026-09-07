@@ -713,6 +713,12 @@ model Invoice {
   gstRateId              String?
   gstRateName            String?
   gstRatePercent         Decimal?       @db.Decimal(5, 2)
+  // The adjustment applied to round totalAmount to the nearest whole rupee —
+  // see lib/round-off.ts's computeRoundOff(). Positive when the raw total
+  // rounded up, negative when it rounded down; zero on a total that was
+  // already a whole rupee. Always derived server-side from the same figures
+  // that produce totalAmount, never trusted from the client.
+  roundOffAmount         Decimal        @default(0) @db.Decimal(12, 2)
   totalAmount            Decimal        @default(0) @db.Decimal(12, 2)
   paidAmount             Decimal        @default(0) @db.Decimal(12, 2)
   balanceAmount          Decimal        @default(0) @db.Decimal(12, 2)
@@ -890,6 +896,8 @@ model KachaInvoice {
   makingCharges Decimal            @default(0) @db.Decimal(12, 2)
   stoneCharges  Decimal            @default(0) @db.Decimal(12, 2)
   discount      Decimal            @default(0) @db.Decimal(12, 2)
+  // See Invoice.roundOffAmount's own doc comment — same convention.
+  roundOffAmount Decimal           @default(0) @db.Decimal(12, 2)
   totalAmount   Decimal            @default(0) @db.Decimal(12, 2)
   paidAmount    Decimal            @default(0) @db.Decimal(12, 2)
   balanceAmount Decimal            @default(0) @db.Decimal(12, 2)
@@ -1201,6 +1209,8 @@ model Purchase {
   gstRateId           String?
   gstRateName         String?
   gstRatePercent      Decimal?       @db.Decimal(5, 2)
+  // See Invoice.roundOffAmount's own doc comment — same convention.
+  roundOffAmount      Decimal        @default(0) @db.Decimal(12, 2)
   totalAmount         Decimal        @default(0) @db.Decimal(12, 2)
   paidAmount          Decimal        @default(0) @db.Decimal(12, 2)
   balanceAmount       Decimal        @default(0) @db.Decimal(12, 2)
@@ -1511,6 +1521,8 @@ model Quotation {
   gstRateId       String?
   gstRateName     String?
   gstRatePercent  Decimal?        @db.Decimal(5, 2)
+  // See Invoice.roundOffAmount's own doc comment — same convention.
+  roundOffAmount  Decimal         @default(0) @db.Decimal(12, 2)
   totalAmount     Decimal         @default(0) @db.Decimal(12, 2)
   notes           String?
   convertedToId   String?         @unique

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useActionState } from "react"
-import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react"
+import { Trash2, ChevronDown, ChevronRight } from "lucide-react"
 import type { GstScheme, PurityType } from "@prisma/client"
 
 import { createInvoice, updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
@@ -1069,19 +1069,24 @@ export function InvoiceForm({
               )
             ) : null}
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setItems((prev) => [...prev, emptyLineItem(gstRateId)])}
-            >
-              <Plus className="h-4 w-4 mr-1" /> Add Item
-            </Button>
           </div>
         </div>
 
         {/* Above the lines, because it is how the lines get created. */}
         <ScanToAddPanel onScanned={addScannedStock} />
+
+        {/* Compact and directly under the scan panel — adding a blank line
+            by hand is the fallback path, not the primary one, so it doesn't
+            need a full-size button competing with Scan for attention. */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => setItems((prev) => [...prev, emptyLineItem(gstRateId)])}
+        >
+          + Item
+        </Button>
 
         <div className="overflow-x-auto">
           <div className="min-w-[900px] space-y-2">

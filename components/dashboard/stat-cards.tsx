@@ -46,7 +46,7 @@ type StatCardsProps = {
 
 export function StatCards({ stats }: StatCardsProps) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
       {stats.map((stat) => {
         const Icon = iconMap[stat.icon as keyof typeof iconMap]
         const tint = iconTint[stat.icon] ?? "var(--chart-1)"

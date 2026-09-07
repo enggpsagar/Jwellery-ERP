@@ -55,17 +55,16 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* Sales — merged Today's Sales / Monthly Revenue into one section
-          with its own period filter, rather than two fixed-period cards.
-          Half-width at larger breakpoints — full width would leave this
-          small stat+sparkline card looking sparse next to the denser
-          sections below it. */}
-      <div className="lg:w-1/2">
+      {/* Sales summary sits beside the KPI cards in one row instead of its
+          own half-width row above them — that left the other half of the
+          page blank, since the sparkline itself only ever plots
+          SPARKLINE_LENGTH points and gains nothing from stretching wider. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <SalesSummaryCard initialData={salesTrend} initialPeriod={DEFAULT_SALES_TREND_PERIOD} />
+        <div className="lg:col-span-2">
+          <StatCards stats={stats} />
+        </div>
       </div>
-
-      {/* KPI Cards */}
-      <StatCards stats={stats} />
 
       {/* Existing Dashboard Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

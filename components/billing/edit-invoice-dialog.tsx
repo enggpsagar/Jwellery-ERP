@@ -44,6 +44,10 @@ type EditInvoiceDialogProps = {
   vehicleNumber?: string | null
   transportMode?: string | null
   distanceKm?: number | null
+  /** Icon-only trigger (indigo bordered square, matching PurchaseRowActions'
+   * Edit icon) for a table row's Actions column, instead of the full
+   * labeled button used in InvoiceActionsBar. */
+  compact?: boolean
 }
 
 /**
@@ -73,6 +77,7 @@ export function EditInvoiceDialog({
   vehicleNumber,
   transportMode,
   distanceKm,
+  compact = false,
 }: EditInvoiceDialogProps) {
   const [open, setOpen] = useState(false)
   const router = useRouter()
@@ -93,13 +98,24 @@ export function EditInvoiceDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          className="gap-2 bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
-          title="Edit Date & E-way Bill"
-        >
-          <Pencil className="h-4 w-4" />
-          E-way Bill
-        </Button>
+        {compact ? (
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-indigo-200 text-indigo-600 transition hover:bg-indigo-50"
+            aria-label="Edit invoice"
+            title="Edit invoice"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        ) : (
+          <Button
+            className="gap-2 bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
+            title="Edit Date & E-way Bill"
+          >
+            <Pencil className="h-4 w-4" />
+            E-way Bill
+          </Button>
+        )}
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-lg">

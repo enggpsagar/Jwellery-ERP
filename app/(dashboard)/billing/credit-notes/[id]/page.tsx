@@ -39,10 +39,11 @@ export default async function CreditNoteDetailPage({ params }: Props) {
         action={
           <Link
             href={`/billing/credit-notes/${creditNote.id}/print`}
-            className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
+            aria-label="Print credit note"
+            title="Print"
           >
             <Printer className="h-4 w-4" />
-            Print
           </Link>
         }
       />

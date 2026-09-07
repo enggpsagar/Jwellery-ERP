@@ -20,6 +20,10 @@ import { useToast } from "@/components/providers/toast-provider"
 type DeleteInvoiceDialogProps = {
   invoiceId: string
   invoiceNumber: string
+  /** Icon-only trigger (red bordered square, matching PurchaseRowActions'
+   * Delete icon) for a table row's Actions column, instead of the full
+   * labeled button used in InvoiceActionsBar. */
+  compact?: boolean
 }
 
 /**
@@ -29,7 +33,7 @@ type DeleteInvoiceDialogProps = {
  * anything past that needs Cancel instead, since a real payment/ledger
  * entry can't just be quietly erased.
  */
-export function DeleteInvoiceDialog({ invoiceId, invoiceNumber }: DeleteInvoiceDialogProps) {
+export function DeleteInvoiceDialog({ invoiceId, invoiceNumber, compact = false }: DeleteInvoiceDialogProps) {
   const router = useRouter()
   const toast = useToast()
   const [open, setOpen] = React.useState(false)
@@ -63,15 +67,27 @@ export function DeleteInvoiceDialog({ invoiceId, invoiceNumber }: DeleteInvoiceD
         else setOpen(next)
       }}
     >
-      <Button
-        type="button"
-        variant="outline"
-        className="gap-2 border-red-200 text-red-600 hover:bg-red-50"
-        onClick={() => setOpen(true)}
-      >
-        <Trash2 className="h-4 w-4" />
-        Delete
-      </Button>
+      {compact ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50"
+          aria-label={`Delete ${invoiceNumber}`}
+          title="Delete invoice"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          className="gap-2 border-red-200 text-red-600 hover:bg-red-50"
+          onClick={() => setOpen(true)}
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete
+        </Button>
+      )}
 
       <DialogContent className="max-w-md">
         <DialogHeader>

@@ -6,7 +6,9 @@ import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { ArrowLeftCircle } from "lucide-react"
 
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
+import { InvoiceRowActions } from "@/components/billing/invoice-row-actions"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
+import type { LocationOption } from "@/components/shared/location-select"
 import { cn, formatShortDate } from "@/lib/utils"
 
 /** Money as it reads on a jewellery ledger. */
@@ -25,15 +27,25 @@ type InvoiceRow = {
   id: string
   invoiceNumber: string
   invoiceDate: string
+  dueDate: string | null
+  notes: string | null
+  locationId: string | null
   status: string
   totalAmount: number
   balanceAmount: number
   customer: { id: string; name: string; phone: string | null } | null
   convertedFromKacha: { id: string; slipNumber: string } | null
+  ewayBillNumber?: string | null
+  ewayBillDate?: string | null
+  transporterName?: string | null
+  vehicleNumber?: string | null
+  transportMode?: string | null
+  distanceKm?: number | null
 }
 
 type InvoiceTableProps = {
   invoices: InvoiceRow[]
+  locations: LocationOption[]
   /** Which row's detail shows in the panel alongside this table — when
    * provided, a row click activates it instead of the row's own hover-card
    * link navigating away. Same convention as PurchaseTable/CustomersTable. */
@@ -41,7 +53,7 @@ type InvoiceTableProps = {
   onActivate?: (id: string) => void
 }
 
-export function InvoiceTable({ invoices, activeInvoiceId, onActivate }: InvoiceTableProps) {
+export function InvoiceTable({ invoices, locations, activeInvoiceId, onActivate }: InvoiceTableProps) {
   if (!invoices.length) {
     return (
       <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
@@ -63,6 +75,7 @@ export function InvoiceTable({ invoices, activeInvoiceId, onActivate }: InvoiceT
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <SortableTableHead label="Total" sortKey="totalAmount" defaultSortBy="invoiceDate" />
               <th className="px-4 py-3 text-left font-medium">Balance</th>
+              <th className="px-4 py-3 text-right font-medium">Actions</th>
             </tr>
           </thead>
 
@@ -187,6 +200,9 @@ export function InvoiceTable({ invoices, activeInvoiceId, onActivate }: InvoiceT
                   ) : (
                     "₹0.00"
                   )}
+                </td>
+                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <InvoiceRowActions invoice={invoice} locations={locations} />
                 </td>
               </tr>
               )

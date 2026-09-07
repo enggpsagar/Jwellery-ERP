@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { ActiveBadge } from "@/components/shared/active-badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -211,9 +212,7 @@ function MetalsSection({
                   </button>
                 </div>
               ) : (
-                <Badge variant={metal.isActive ? "outline" : "secondary"}>
-                  {metal.isActive ? "Active" : "Inactive"}
-                </Badge>
+                <ActiveBadge isActive={metal.isActive} />
               )}
             </div>
           ),
@@ -485,9 +484,7 @@ function StonesSection({
                   </button>
                 </div>
               ) : (
-                <Badge variant={stone.isActive ? "outline" : "secondary"}>
-                  {stone.isActive ? "Active" : "Inactive"}
-                </Badge>
+                <ActiveBadge isActive={stone.isActive} />
               )}
             </div>
           ),
@@ -799,9 +796,7 @@ function StoneTypesSection({
                       </button>
                     </div>
                   ) : (
-                    <Badge variant={option.isActive ? "outline" : "secondary"}>
-                      {option.isActive ? "Active" : "Inactive"}
-                    </Badge>
+                    <ActiveBadge isActive={option.isActive} />
                   )}
                 </div>
               ),
@@ -1014,9 +1009,7 @@ function CategoriesSection({
                   </button>
                 </div>
               ) : (
-                <Badge variant={category.isActive ? "outline" : "secondary"}>
-                  {category.isActive ? "Active" : "Inactive"}
-                </Badge>
+                <ActiveBadge isActive={category.isActive} />
               )}
             </div>
           ),
@@ -1297,9 +1290,7 @@ function TypesSection({
                       </button>
                     </div>
                   ) : (
-                    <Badge variant={type.isActive ? "outline" : "secondary"}>
-                      {type.isActive ? "Active" : "Inactive"}
-                    </Badge>
+                    <ActiveBadge isActive={type.isActive} />
                   )}
                 </div>
               ),

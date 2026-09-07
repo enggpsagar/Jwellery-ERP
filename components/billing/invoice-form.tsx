@@ -148,9 +148,15 @@ function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: nu
   return net >= 0 ? Number(net.toFixed(3)) : null
 }
 
-function emptyLineItem(defaultGstRateId?: string): LineItem {
+// `key` defaults to a fresh UUID for every "Add Item" click (client-only,
+// safe to randomize), but the very first row is seeded once from
+// useState's initializer, which runs during SSR *and* again on the
+// client's first render — two different crypto.randomUUID() values for
+// the same row caused a hydration mismatch on every line-item form. The
+// initial call passes a fixed key instead so server and client agree.
+function emptyLineItem(defaultGstRateId?: string, key: string = crypto.randomUUID()): LineItem {
   return {
-    key: crypto.randomUUID(),
+    key,
     itemName: "",
     metalTypeId: "",
     purity: "",
@@ -304,7 +310,7 @@ export function InvoiceForm({
   const [items, setItems] = useState<LineItem[]>(
     initialItems && initialItems.length
       ? initialItems
-      : [emptyLineItem(resolveDefaultGstRateId())],
+      : [emptyLineItem(resolveDefaultGstRateId(), "initial")],
   )
   // Which lines' Details region (every field beyond the compact row) is
   // open. Heuristic — a judgment call, not a hard requirement: a line

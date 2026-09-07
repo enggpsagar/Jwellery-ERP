@@ -112,9 +112,15 @@ type LineItem = {
 
 const PURITY_OPTIONS = PURITY_SELECT_OPTIONS
 
-function emptyLineItem(defaultGstRateId?: string): LineItem {
+// `key` defaults to a fresh UUID for every "Add Item" click (client-only,
+// safe to randomize), but the very first row is seeded once from
+// useState's initializer, which runs during SSR *and* again on the
+// client's first render — two different crypto.randomUUID() values for
+// the same row caused a hydration mismatch on every line-item form. The
+// initial call passes a fixed key instead so server and client agree.
+function emptyLineItem(defaultGstRateId?: string, key: string = crypto.randomUUID()): LineItem {
   return {
-    key: crypto.randomUUID(),
+    key,
     productId: "",
     itemName: "",
     metalTypeId: "",
@@ -263,7 +269,7 @@ export function PurchaseForm({
       gstRates.find((r) => r.isActive)?.id ??
       "",
   )
-  const [items, setItems] = useState<LineItem[]>(() => [emptyLineItem(gstRateId)])
+  const [items, setItems] = useState<LineItem[]>(() => [emptyLineItem(gstRateId, "initial")])
   // Collapsed by default, matching Invoice's own compact-by-default rule —
   // see expandedKeys' doc comment on InvoiceForm. A line auto-expands once
   // a Product is picked for it (applyProductToItem below), since that's

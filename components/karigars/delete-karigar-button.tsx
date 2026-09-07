@@ -51,10 +51,9 @@ export function DeleteKarigarButton({
     <>
       <Button
         type="button"
-        variant="outline"
+        variant="destructive"
         size="icon"
         onClick={() => setOpen(true)}
-        className="border-red-200 text-red-600 hover:bg-red-50"
         aria-label={`Delete ${karigarName}`}
         title="Delete artisan"
       >

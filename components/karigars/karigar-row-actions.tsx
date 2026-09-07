@@ -154,7 +154,7 @@ export function KarigarRowActions({
               Cancel
             </Button>
 
-            <Button type="button" onClick={handleDisable} disabled={loading}>
+            <Button type="button" variant="destructive" onClick={handleDisable} disabled={loading}>
               {loading ? (
                 <>
                   <Loader className="mr-2 h-4 w-4" />

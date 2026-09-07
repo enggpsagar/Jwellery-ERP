@@ -180,9 +180,9 @@ export function CustomerVendorLinkCard({
                   </Link>
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="destructive"
                   size="sm"
-                  className="gap-2 text-red-600 hover:bg-red-50"
+                  className="gap-2"
                   onClick={() => setConfirmUnlinkOpen(true)}
                   disabled={loading}
                 >

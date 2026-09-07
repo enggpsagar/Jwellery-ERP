@@ -441,6 +441,9 @@ model Karigar {
   aadhaarNumber  String?
   specialization String?
   notes          String?
+  // Profile photo, uploaded from the Add/Edit Artisan form — same Vercel
+  // Blob pattern as User.image (see app/api/karigars/photo/route.ts).
+  imageUrl       String?
   openingGold    Decimal        @default(0) @db.Decimal(12, 5)
   openingCash    Decimal        @default(0) @db.Decimal(12, 2)
   isActive       Boolean        @default(true)

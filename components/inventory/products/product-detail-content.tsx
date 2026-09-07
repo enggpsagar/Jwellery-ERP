@@ -56,7 +56,6 @@ export function ProductDetailContent({
     <div className="space-y-6">
       <Section title="Basic Information">
         <Field label="Product Code" value={product.productCode} />
-        <Field label="Product Name" value={product.name} />
         <Field label="Category" value={product.category?.name} />
         <Field label="Item Type" value={product.categoryType?.name} />
         <Field

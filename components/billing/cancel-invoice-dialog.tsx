@@ -97,7 +97,7 @@ export function CancelInvoiceDialog({
               Return &amp; Exchange
             </Button>
           ) : (
-            <Button variant="outline" className="gap-2 text-red-600 hover:text-red-700">
+            <Button variant="destructive" className="gap-2">
               <Ban className="h-4 w-4" />
               Cancel Invoice
             </Button>

@@ -173,7 +173,6 @@ export function LocationSettingsForm({ locations, states, canEdit }: LocationSet
           ) : (
             <Button
               type="button"
-              variant="outline"
               className="gap-2"
               onClick={() => setShowAdd(true)}
             >

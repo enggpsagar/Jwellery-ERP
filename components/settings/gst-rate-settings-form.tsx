@@ -159,7 +159,6 @@ export function GstRateSettingsForm({ rates, canEdit }: GstRateSettingsFormProps
           ) : (
             <Button
               type="button"
-              variant="outline"
               className="gap-2"
               onClick={() => setShowAdd(true)}
             >

@@ -225,7 +225,6 @@ function MetalsSection({
           ) : (
             <Button
               type="button"
-              variant="outline"
               className="gap-2"
               onClick={() => setShowAdd(true)}
             >
@@ -500,7 +499,6 @@ function StonesSection({
           ) : (
             <Button
               type="button"
-              variant="outline"
               className="gap-2"
               onClick={() => setShowAdd(true)}
             >
@@ -819,7 +817,6 @@ function StoneTypesSection({
               ) : (
                 <Button
                   type="button"
-                  variant="outline"
                   className="gap-2"
                   onClick={() => setShowAdd(true)}
                 >
@@ -1031,7 +1028,6 @@ function CategoriesSection({
           ) : (
             <Button
               type="button"
-              variant="outline"
               className="gap-2"
               onClick={() => setShowAdd(true)}
             >
@@ -1319,7 +1315,6 @@ function TypesSection({
               ) : (
                 <Button
                   type="button"
-                  variant="outline"
                   className="gap-2"
                   onClick={() => setShowAdd(true)}
                 >

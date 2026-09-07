@@ -249,7 +249,7 @@ export function ApiKeySettingsForm({
                           <Button
                             type="button"
                             size="sm"
-                            variant="outline"
+                            variant="destructive"
                             disabled={revokingId === key.id}
                             onClick={() => handleRevoke(key.id)}
                           >

@@ -2,6 +2,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import QRCode from "qrcode";
 import {
   InvoiceStatus,
   InventoryStockStatus,
@@ -567,8 +568,20 @@ export async function getInvoiceById(id: string) {
   });
 
   if (!invoice) return null;
-  return mapInvoice(invoice);
+  const mapped = mapInvoice(invoice);
+
+  // Generated fresh every load, same as the stock QR (no stored column) —
+  // just scans straight to this invoice's own detail page. Folded in here
+  // (rather than left as inline page code) so every caller of
+  // getInvoiceById gets it for free, including a client-fetched detail
+  // panel that has no server-only env var access of its own.
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  const qrDataUrl = await QRCode.toDataURL(`${baseUrl}/billing/${mapped.id}`);
+
+  return { ...mapped, qrDataUrl };
 }
+
+export type Invoice = NonNullable<Awaited<ReturnType<typeof getInvoiceById>>>;
 
 export type CustomerSaleInvoiceOption = {
   id: string;

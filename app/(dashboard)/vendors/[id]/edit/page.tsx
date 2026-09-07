@@ -8,6 +8,7 @@ import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { safeReturnTo } from "@/lib/safe-return-to"
 
 import { VendorEditForm } from "@/components/vendors/vendor-edit-form"
+import { VendorCustomerLinkCard } from "@/components/vendors/vendor-customer-link-card"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 type EditVendorPageProps = {
@@ -52,6 +53,13 @@ export default async function EditVendorPage({
         description="Update this vendor's contact and account details."
         backHref={returnTo ?? "/vendors"}
         backLabel={returnTo ? "Back without saving" : "Back to Vendors"}
+      />
+
+      {/* Same "is this vendor also a customer" card the detail page shows —
+          same gap as Customer Edit, fixed alongside it. */}
+      <VendorCustomerLinkCard
+        vendorId={vendor.id}
+        linkedCustomer={vendor.linkedCustomer ?? null}
       />
 
       <VendorEditForm

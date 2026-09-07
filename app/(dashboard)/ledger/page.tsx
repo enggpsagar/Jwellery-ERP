@@ -26,7 +26,7 @@ export default async function LedgerPage() {
             Ledger
           </h1>
           <p className="text-sm text-muted-foreground">
-            Track customer and karigar account activity, with invoices linked
+            Track customer and artisan account activity, with invoices linked
             directly to each entry.
           </p>
         </div>

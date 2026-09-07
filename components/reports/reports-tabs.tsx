@@ -880,7 +880,7 @@ export function ReportsTabs({
                 {karigarTable.pageRows.length === 0 ? (
                   <tr>
                     <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
-                      No open karigar jobs match this search.
+                      No open artisan jobs match this search.
                     </td>
                   </tr>
                 ) : (

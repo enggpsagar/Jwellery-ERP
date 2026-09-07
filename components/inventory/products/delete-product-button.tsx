@@ -72,7 +72,7 @@ export function DeleteProductButton({
             <br />
             <br />
             This action cannot be undone. The product can only be deleted if it
-            has no inventory, sales, or karigar dependencies.
+            has no inventory, sales, or artisan dependencies.
           </p>
 
           <DialogFooter>

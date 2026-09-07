@@ -36,7 +36,7 @@ export default async function MyJobsPage() {
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">My Jobs</h1>
         <p className="text-muted-foreground">
-          Your account isn&apos;t linked to a karigar profile yet. Ask your
+          Your account isn&apos;t linked to an artisan profile yet. Ask your
           admin to link it from the Users page.
         </p>
       </div>

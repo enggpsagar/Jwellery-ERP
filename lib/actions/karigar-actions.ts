@@ -43,6 +43,7 @@ export type Karigar = {
   aadhaarNumber: string;
   specialization: string;
   notes: string;
+  imageUrl: string;
   openingGold: number;
   openingCash: number;
   isActive: boolean;
@@ -140,6 +141,7 @@ function mapKarigar(karigar: any): Karigar {
     aadhaarNumber: karigar.aadhaarNumber ?? "",
     specialization: karigar.specialization ?? "",
     notes: karigar.notes ?? "",
+    imageUrl: karigar.imageUrl ?? "",
     openingGold: Number(karigar.openingGold),
     openingCash: Number(karigar.openingCash),
     isActive: karigar.isActive,
@@ -344,6 +346,7 @@ function buildKarigarData(formData: FormData) {
     })(),
     specialization: toOptionalString(formData.get("specialization")),
     notes: toOptionalString(formData.get("notes")),
+    imageUrl: toOptionalString(formData.get("imageUrl")),
     openingGold: toNumber(formData.get("openingGold")),
     openingCash: toNumber(formData.get("openingCash")),
     isActive: formData.get("isActive") === "on" || formData.get("isActive") === "true",
@@ -893,7 +896,7 @@ function getKarigarExportFileName() {
   const minutes = String(now.getMinutes()).padStart(2, "0");
   const seconds = String(now.getSeconds()).padStart(2, "0");
 
-  return `karigars-${year}-${month}-${day}-${hours}-${minutes}-${seconds}.xlsx`;
+  return `artisans-${year}-${month}-${day}-${hours}-${minutes}-${seconds}.xlsx`;
 }
 
 export async function exportKarigarsToExcel(
@@ -972,7 +975,7 @@ export async function exportKarigarsToExcel(
 
     return {
       success: true,
-      message: `Exported ${karigars.length} karigar(s) successfully.`,
+      message: `Exported ${karigars.length} artisan(s) successfully.`,
       fileBase64: buffer.toString("base64"),
       fileName,
     };

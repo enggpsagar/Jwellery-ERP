@@ -1,10 +1,14 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Camera } from "lucide-react"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Loader } from "@/components/ui/loader"
 import type { Karigar } from "@/lib/actions/karigar-actions"
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
@@ -15,6 +19,7 @@ import { gstinRequired, defaultPartyGstType } from "@/lib/gst"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 import { PartyGstTypeSelect } from "@/components/shared/party-gst-type-select"
 import { AddMetalInlineDialog } from "@/components/karigars/add-metal-inline-dialog"
+import { useToast } from "@/components/providers/toast-provider"
 import type { GstScheme } from "@prisma/client"
 
 type StateItem = { id: string; name: string }
@@ -53,6 +58,45 @@ export function KarigarForm({
   defaultCity,
   gstScheme,
 }: Props) {
+  const toast = useToast()
+  const [imageUrl, setImageUrl] = useState(karigar?.imageUrl ?? "")
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+
+  async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file")
+      return
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Photo must be under 2MB")
+      return
+    }
+
+    const uploadData = new FormData()
+    uploadData.append("file", file)
+
+    setUploadingPhoto(true)
+    try {
+      const res = await fetch("/api/karigars/photo", { method: "POST", body: uploadData })
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.error || "Upload failed")
+
+      setImageUrl(data.url)
+      toast.success("Photo uploaded")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Upload failed")
+    } finally {
+      setUploadingPhoto(false)
+      if (photoInputRef.current) photoInputRef.current.value = ""
+    }
+  }
+
   const [locationId, setLocationId] = useState(karigar?.locationId ?? defaultLocationId ?? "")
   const [assignedMetalTypeIds, setAssignedMetalTypeIds] = useState<string[]>(
     karigar?.assignedMetalTypeIds ?? [],
@@ -149,6 +193,40 @@ export function KarigarForm({
   return (
     <div className="space-y-6">
 
+      <input type="hidden" name="imageUrl" value={imageUrl} />
+
+      <div className="flex flex-col items-center gap-3">
+        <Avatar className="h-24 w-24 border-4 shadow-sm">
+          <AvatarImage src={imageUrl || ""} />
+          <AvatarFallback className="text-2xl">
+            {karigar?.name ? karigar.name.charAt(0).toUpperCase() : "A"}
+          </AvatarFallback>
+        </Avatar>
+
+        <input
+          ref={photoInputRef}
+          hidden
+          type="file"
+          accept="image/*"
+          onChange={handlePhotoUpload}
+        />
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={uploadingPhoto}
+          onClick={() => photoInputRef.current?.click()}
+        >
+          {uploadingPhoto ? (
+            <Loader className="mr-2 h-4 w-4" />
+          ) : (
+            <Camera className="mr-2 h-4 w-4" />
+          )}
+          {uploadingPhoto ? "Uploading..." : "Upload Photo"}
+        </Button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         <div className="space-y-2 rounded-lg border bg-muted/20 p-4 transition-colors focus-within:bg-accent/40 md:col-span-2">
@@ -201,7 +279,7 @@ export function KarigarForm({
             defaultValue={karigar?.mobile}
           />
           <p className="text-xs font-medium text-red-600">
-            Doubles as this karigar&apos;s login — must be unique.
+            Doubles as this artisan&apos;s login — must be unique.
           </p>
           {errors?.mobile?.[0] && (
             <p className="text-xs text-red-600">{errors.mobile[0]}</p>
@@ -317,7 +395,7 @@ export function KarigarForm({
             ))}
           </select>
           <p className="text-xs text-muted-foreground">
-            What this karigar mainly works with — drives the Karigars list&apos;s
+            What this artisan mainly works with — drives the Artisans list&apos;s
             Type filter.
           </p>
           {errors?.metalTypeId?.[0] && (
@@ -328,7 +406,7 @@ export function KarigarForm({
         <div className="space-y-2 md:col-span-2">
           <Label>Assigned Metals &amp; Stones</Label>
           <p className="text-xs text-muted-foreground">
-            Which metals or stones this karigar can be issued material in — Issue
+            Which metals or stones this artisan can be issued material in — Issue
             Material and Receive Material only ever offer these.
           </p>
 

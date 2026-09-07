@@ -75,7 +75,7 @@ const karigars = [
     panNumber: "QRSTU3456V",
     aadhaarNumber: "567890123456",
     specialization: "Ring making",
-    notes: "New karigar, onboarded this quarter",
+    notes: "New artisan, onboarded this quarter",
     openingGold: 0,
     openingCash: 0,
     isActive: true,

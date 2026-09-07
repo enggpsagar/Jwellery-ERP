@@ -202,16 +202,26 @@ export function CustomerCreateForm({
             <input name="email" type="email" className={FIELD} placeholder="name@example.com" />
           </div>
 
-          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
             </label>
             <textarea
               name="address"
-              className={`${FIELD} min-h-9 resize-y`}
-              rows={1}
+              className={`${FIELD} min-h-24 resize-y`}
+              rows={4}
               placeholder="Enter full address"
+            />
+          </div>
+
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+            <label className="text-sm font-medium">Notes</label>
+            <textarea
+              name="notes"
+              className={`${FIELD} min-h-24 resize-y`}
+              rows={4}
+              placeholder="Anything worth remembering"
             />
           </div>
 
@@ -309,16 +319,6 @@ export function CustomerCreateForm({
               step="0.01"
               className={FIELD}
               placeholder="0.00"
-            />
-          </div>
-
-          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <label className="text-sm font-medium">Notes</label>
-            <textarea
-              name="notes"
-              className={`${FIELD} min-h-24 resize-y`}
-              rows={4}
-              placeholder="Anything worth remembering"
             />
           </div>
 

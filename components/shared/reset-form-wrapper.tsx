@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { PageBackHeader } from "@/components/shared/page-back-header"
 
 type ResetFormWrapperProps = {
   children: React.ReactNode
@@ -20,6 +21,20 @@ type ResetFormWrapperProps = {
    * where resetting straight away isn't worth the risk. A short record
    * form (name/phone/address) resets immediately instead. */
   requireConfirm?: boolean
+  /**
+   * When set, renders the page's own PageBackHeader here (title/back-link
+   * row) with the Reset button sitting inline as its `action` — parallel to
+   * the title instead of its own row above the card, which otherwise left an
+   * odd gap. Omit to keep the previous standalone-button-row behavior (the
+   * caller renders its own separate PageBackHeader beforehand), which every
+   * other "new" page using this wrapper still does.
+   */
+  header?: {
+    title: string
+    description?: string
+    backHref: string
+    backLabel?: string
+  }
 }
 
 /**
@@ -37,26 +52,38 @@ type ResetFormWrapperProps = {
  * alike, then rebuilds it fresh from the same initial props — the same
  * effect as reopening the page, without an actual navigation.
  */
-export function ResetFormWrapper({ children, requireConfirm = false }: ResetFormWrapperProps) {
+export function ResetFormWrapper({ children, requireConfirm = false, header }: ResetFormWrapperProps) {
   const [resetKey, setResetKey] = useState(0)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const doReset = () => setResetKey((key) => key + 1)
 
+  const resetButton = (
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      title="Reset form"
+      aria-label="Reset form"
+      onClick={() => (requireConfirm ? setConfirmOpen(true) : doReset())}
+    >
+      <RotateCcw className="h-4 w-4" />
+    </Button>
+  )
+
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          title="Reset form"
-          aria-label="Reset form"
-          onClick={() => (requireConfirm ? setConfirmOpen(true) : doReset())}
-        >
-          <RotateCcw className="h-4 w-4" />
-        </Button>
-      </div>
+      {header ? (
+        <PageBackHeader
+          title={header.title}
+          description={header.description}
+          backHref={header.backHref}
+          backLabel={header.backLabel}
+          action={resetButton}
+        />
+      ) : (
+        <div className="flex justify-end">{resetButton}</div>
+      )}
 
       <div key={resetKey}>{children}</div>
 

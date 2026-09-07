@@ -5,7 +5,6 @@ import { safeReturnTo } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 
 import { CustomerCreateForm } from "@/components/customers/customer-create-form"
-import { PageBackHeader } from "@/components/shared/page-back-header"
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 
 export const metadata: Metadata = {
@@ -26,14 +25,14 @@ export default async function NewCustomerPage({
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 p-6">
-      <PageBackHeader
-        title="Add Customer"
-        description="Create a new customer you sell to."
-        backHref={returnTo ?? "/customers"}
-        backLabel={returnTo ? "Back without saving" : "Back to Customers"}
-      />
-
-      <ResetFormWrapper>
+      <ResetFormWrapper
+        header={{
+          title: "Add Customer",
+          description: "Create a new customer you sell to.",
+          backHref: returnTo ?? "/customers",
+          backLabel: returnTo ? "Back without saving" : "Back to Customers",
+        }}
+      >
         <CustomerCreateForm
           states={states}
           returnTo={returnTo}

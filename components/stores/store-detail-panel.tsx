@@ -12,13 +12,17 @@ import {
 } from "@/lib/actions/store-plan-actions"
 import { PlanStatusPill } from "@/components/stores/plan-presentation"
 import { StoreDetailContent } from "@/components/stores/store-detail-content"
-import { StoreRowActions } from "@/components/stores/store-row-actions"
+import { StoreStatusToggle } from "@/components/stores/store-status-toggle"
+import { ChangePlanDialog } from "@/components/stores/change-plan-dialog"
 import { StoreDeleteDialog } from "@/components/stores/store-delete-dialog"
+import type { PlanRow } from "@/lib/actions/plan-actions"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 
 type StoreDetailPanelProps = {
   storeId: string | null
+  plans: PlanRow[]
+  currentPlanId: string | null
 }
 
 /**
@@ -27,7 +31,7 @@ type StoreDetailPanelProps = {
  * StoreDetailContent), just inline next to the list instead of a full
  * navigation.
  */
-export function StoreDetailPanel({ storeId }: StoreDetailPanelProps) {
+export function StoreDetailPanel({ storeId, plans, currentPlanId }: StoreDetailPanelProps) {
   const [overview, setOverview] = useState<StorePlanOverview | null>(null)
   const [history, setHistory] = useState<PlanHistoryRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -88,17 +92,19 @@ export function StoreDetailPanel({ storeId }: StoreDetailPanelProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <StoreStatusToggle storeId={overview.storeId} isActive={overview.isActive} />
+          <ChangePlanDialog
+            storeId={overview.storeId}
+            storeName={overview.name}
+            currentPlanId={currentPlanId}
+            plans={plans}
+          />
           <Button asChild variant="outline" size="sm" className="gap-2">
             <Link href={`/stores/${overview.storeId}/edit`}>
               <Pencil className="size-4" />
               Edit store
             </Link>
           </Button>
-          <StoreRowActions
-            storeId={overview.storeId}
-            storeName={overview.name}
-            isActive={overview.isActive}
-          />
           <StoreDeleteDialog storeId={overview.storeId} storeName={overview.name} />
         </div>
       </div>

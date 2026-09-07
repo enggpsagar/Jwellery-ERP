@@ -83,6 +83,8 @@ export function StoresClient({
     })
   }, [stores])
 
+  const activeStore = stores.find((store) => store.id === activeStoreId)
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -150,6 +152,7 @@ export function StoresClient({
               { value: "code", label: "Sort by Code" },
             ]}
             defaultSortBy="createdAt"
+            hideSort
             selectedIds={selectedIds}
             entityLabel="stores"
             exportAction={exportStoresToExcel}
@@ -167,7 +170,6 @@ export function StoresClient({
 
           <StoreTable
             stores={stores}
-            plans={plans}
             planOverviews={planOverviews}
             selectedIds={selectedIds}
             onSelectionChange={setSelectedIds}
@@ -186,7 +188,11 @@ export function StoresClient({
           </div>
         </div>
 
-        <StoreDetailPanel storeId={activeStoreId} />
+        <StoreDetailPanel
+          storeId={activeStoreId}
+          plans={plans}
+          currentPlanId={activeStore?.plan?.id ?? null}
+        />
       </div>
     </div>
   )

@@ -62,7 +62,7 @@ export function StockToolbar({ selectedIds, metals, bulkActions }: StockToolbarP
           {bulkActions}
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="sm"
             className="gap-1 px-2.5"
             disabled={selectedIds.length === 0}

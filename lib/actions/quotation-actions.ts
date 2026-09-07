@@ -26,7 +26,7 @@ import {
   resolveWritableLocationId,
   type LocationScope,
 } from "@/lib/location-scope";
-import { buildExcelExport } from "@/lib/excel-export";
+import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export";
 import { formatShortDate } from "@/lib/utils";
 import type {
   DataTableExportParams,
@@ -322,7 +322,10 @@ export async function exportQuotationsToExcel(
       "Converted To Invoice": quotation.convertedTo?.invoiceNumber || "",
     }));
 
-    const { fileName, fileBase64 } = buildExcelExport(rows, "Quotations", "quotations");
+    const { fileName, fileBase64 } =
+      params.format === "csv"
+        ? buildCsvExportBase64(rows, "quotations")
+        : buildExcelExport(rows, "Quotations", "quotations");
 
     return {
       success: true,

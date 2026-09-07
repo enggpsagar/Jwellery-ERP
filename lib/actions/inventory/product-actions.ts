@@ -9,7 +9,7 @@ import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scop
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import type { ProductFormState } from "@/lib/inventory/product-types";
 import { buildSkuPrefix } from "@/lib/inventory/product-sku";
-import { buildExcelExport } from "@/lib/excel-export";
+import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export";
 
 function parseNullableString(value: FormDataEntryValue | null) {
   const parsed = String(value || "").trim();
@@ -166,6 +166,7 @@ type ExportProductsParams = {
   sortOrder?: ProductSortOrder;
   type?: string;
   status?: string;
+  format?: "csv" | "xlsx";
 };
 
 function getProductWhere(
@@ -430,11 +431,10 @@ export async function exportProductsToExcel(
         : "-",
     }));
 
-    const { fileName, fileBase64 } = buildExcelExport(
-      rows,
-      "Products",
-      "products",
-    );
+    const { fileName, fileBase64 } =
+      params.format === "csv"
+        ? buildCsvExportBase64(rows, "products")
+        : buildExcelExport(rows, "Products", "products");
 
     return {
       success: true,

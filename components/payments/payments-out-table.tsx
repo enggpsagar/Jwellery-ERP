@@ -113,7 +113,6 @@ export function PaymentsOutTable({ rows }: { rows: PaymentOutRow[] }) {
                 <TableHead>Paid To</TableHead>
                 <TableHead>Method</TableHead>
                 <TableHead>Purchase</TableHead>
-                <TableHead>Description</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
               </TableRow>
             </TableHeader>
@@ -121,7 +120,7 @@ export function PaymentsOutTable({ rows }: { rows: PaymentOutRow[] }) {
             <TableBody>
               {paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
                     {rows.length === 0 ? "No payments made yet." : "No entries match your search."}
                   </TableCell>
                 </TableRow>
@@ -163,9 +162,6 @@ export function PaymentsOutTable({ rows }: { rows: PaymentOutRow[] }) {
                       ) : (
                         <span className="text-xs text-muted-foreground">On account</span>
                       )}
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate text-sm text-muted-foreground" title={row.description}>
-                      {row.description}
                     </TableCell>
                     <TableCell className="text-right font-medium text-red-600">
                       {inr(row.amount)}

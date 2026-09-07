@@ -8,6 +8,7 @@ import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, locationWhere, type LocationScope } from "@/lib/location-scope";
 import { UserRole, UserStatus, type PartyGstType } from "@prisma/client";
 import * as XLSX from "xlsx";
+import { buildCsvExportBase64 } from "@/lib/excel-export";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
@@ -103,6 +104,7 @@ export type ExportKarigarsParams = {
   sortBy?: KarigarSortBy;
   sortOrder?: SortOrder;
   type?: string;
+  format?: "csv" | "xlsx";
 };
 
 export type ExportResult = {
@@ -943,6 +945,16 @@ export async function exportKarigarsToExcel(
       Notes: karigar.notes ?? "",
       "Created At": formatDateIST(karigar.createdAt),
     }));
+
+    if (params.format === "csv") {
+      const { fileName, fileBase64 } = buildCsvExportBase64(rows, "artisans");
+      return {
+        success: true,
+        message: `Exported ${karigars.length} artisan(s) successfully.`,
+        fileBase64,
+        fileName,
+      };
+    }
 
     const worksheet = XLSX.utils.json_to_sheet(rows);
 

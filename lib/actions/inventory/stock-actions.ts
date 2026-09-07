@@ -23,7 +23,12 @@ import {
   type LocationScope,
 } from "@/lib/location-scope"
 import type { StockFormState } from "@/lib/inventory/stock-types"
-import { buildExcelExport, buildMultiSheetExcelExport, parseExcelUpload } from "@/lib/excel-export"
+import {
+  buildExcelExport,
+  buildCsvExportBase64,
+  buildMultiSheetExcelExport,
+  parseExcelUpload,
+} from "@/lib/excel-export"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 import { getFinenessMap, toFineWeight } from "@/lib/purity"
 import { formatShortDate, formatShortDateTime } from "@/lib/utils"
@@ -111,6 +116,7 @@ type ExportInventoryStockParams = {
   sortBy?: string
   sortOrder?: StockSortOrder
   type?: string
+  format?: "csv" | "xlsx"
 }
 
 const STOCK_INCLUDE = {
@@ -349,11 +355,10 @@ export async function exportInventoryStockToExcel(
       "Created At": item.createdAt ? formatShortDateTime(item.createdAt) : "-",
     }))
 
-    const { fileName, fileBase64 } = buildExcelExport(
-      rows,
-      "Inventory Stock",
-      "inventory-stock"
-    )
+    const { fileName, fileBase64 } =
+      params.format === "csv"
+        ? buildCsvExportBase64(rows, "inventory-stock")
+        : buildExcelExport(rows, "Inventory Stock", "inventory-stock")
 
     return {
       success: true,

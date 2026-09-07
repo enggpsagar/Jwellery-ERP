@@ -7,6 +7,7 @@ import { Plus, Trash2 } from "lucide-react"
 import type { GstScheme, PurityType } from "@prisma/client"
 
 import { createQuotation, type QuotationFormState } from "@/lib/actions/quotation-actions"
+import { cn } from "@/lib/utils"
 import { useToast } from "@/components/providers/toast-provider"
 import { computeGst } from "@/lib/gst"
 import { computeRoundOff } from "@/lib/round-off"
@@ -806,7 +807,12 @@ export function QuotationForm({
                   wedged into the grid above, so a plain Gold line's fields
                   don't reflow every time this gets checked/unchecked. */}
               {!isCaratLine(item) && (
-                <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
+                <div
+                  className={cn(
+                    "flex flex-col gap-3 rounded-md border border-dashed p-3 transition-colors",
+                    item.hasStoneComponent && "border-2 border-emerald-400 bg-emerald-50",
+                  )}
+                >
                   <IncludesStoneToggle
                     checked={item.hasStoneComponent}
                     onChange={(checked) =>

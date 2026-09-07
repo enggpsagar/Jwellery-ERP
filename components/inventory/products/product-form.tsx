@@ -1153,7 +1153,7 @@ export function ProductForm({
             regardless of the product's own metal family, so these fields
             (and whatever was already saved in them) are never hidden. */}
         {hasStoneComponent && (
-          <div className="mt-6 rounded-lg border border-dashed p-4">
+          <div className="mt-6 rounded-lg border-2 border-dashed border-emerald-400 bg-emerald-50 p-4">
             <h4 className="mb-4 text-sm font-semibold">Stone Pricing</h4>
 
             <StoneComponentFields

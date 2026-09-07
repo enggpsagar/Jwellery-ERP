@@ -11,6 +11,7 @@ import {
 } from "@/lib/actions/kacha-invoice-actions"
 import { computeRoundOff } from "@/lib/round-off"
 import { useToast } from "@/components/providers/toast-provider"
+import { cn } from "@/lib/utils"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -920,7 +921,12 @@ export function KachaInvoiceForm({
                   wedged into the grid above, so a plain Gold line's fields
                   don't reflow every time this gets checked/unchecked. */}
               {!isCaratLine(item) && (
-                <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
+                <div
+                  className={cn(
+                    "flex flex-col gap-3 rounded-md border border-dashed p-3 transition-colors",
+                    item.hasStoneComponent && "border-2 border-emerald-400 bg-emerald-50",
+                  )}
+                >
                   <IncludesStoneToggle
                     checked={item.hasStoneComponent}
                     onChange={(checked) =>

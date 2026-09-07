@@ -81,7 +81,6 @@ export function KarigarTable({
                   aria-label="Select all artisans"
                 />
               </th>
-              <SortableTableHead label="Code" sortKey="code" defaultSortBy="createdAt" />
               <SortableTableHead label="Name" sortKey="name" defaultSortBy="createdAt" />
               <th className="px-4 py-3 text-left font-medium">Mobile</th>
               <th className="px-4 py-3 text-left font-medium">City</th>
@@ -110,9 +109,6 @@ export function KarigarTable({
                     className="h-4 w-4"
                     aria-label={`Select ${karigar.name}`}
                   />
-                </td>
-                <td className="px-4 py-3">
-                  {karigar.code || "-"}
                 </td>
                 <td className="px-4 py-3 font-medium">
                   <RecordHoverCard

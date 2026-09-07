@@ -1284,7 +1284,7 @@ export function PurchaseForm({
                     </div>
 
                     {!isCaratLine(item) && item.hasStoneComponent && (
-                      <div className="rounded-md border border-dashed p-3">
+                      <div className="rounded-md border-2 border-dashed border-emerald-400 bg-emerald-50 p-3">
                         <StoneComponentFields
                           metals={metals}
                           origins={origins}

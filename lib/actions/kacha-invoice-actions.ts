@@ -38,6 +38,7 @@ import { OversellError } from "@/lib/inventory/oversell-error";
 import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import {
   buildExcelExport,
+  buildCsvExportBase64,
   buildMultiSheetExcelExport,
   parseExcelWorkbook,
 } from "@/lib/excel-export";
@@ -318,6 +319,7 @@ export type ExportKachaInvoicesParams = {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   status?: string;
+  format?: "csv" | "xlsx";
 };
 
 export type ExportKachaInvoicesResult = {
@@ -365,7 +367,10 @@ export async function exportKachaInvoicesToExcel(
       "Converted To Invoice #": kachaInvoice.convertedTo?.invoiceNumber || "",
     }));
 
-    const { fileName, fileBase64 } = buildExcelExport(rows, "Kacha Slips", "kacha-slips");
+    const { fileName, fileBase64 } =
+      params.format === "csv"
+        ? buildCsvExportBase64(rows, "kacha-slips")
+        : buildExcelExport(rows, "Kacha Slips", "kacha-slips");
 
     return {
       success: true,

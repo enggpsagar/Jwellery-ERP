@@ -152,8 +152,17 @@ export function ScanToAddPanel({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {/* Each of the three ways onto this line gets its own one of
+                this app's chart hues (same solid-fill convention as the
+                header's Sale/Purchase buttons) so they read as three
+                distinct, equally prominent entry points rather than one
+                primary action with two grey afterthoughts. */}
             {onAddManualItem ? (
-              <Button type="button" variant="ghost" onClick={onAddManualItem}>
+              <Button
+                type="button"
+                onClick={onAddManualItem}
+                className="bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
+              >
                 <Plus className="mr-1.5 size-4" />
                 Add Item
               </Button>
@@ -161,14 +170,19 @@ export function ScanToAddPanel({
 
             <Button
               type="button"
-              variant="outline"
               onClick={() => setWebcamOpen(true)}
+              className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
             >
               <Camera className="mr-1.5 size-4" />
               Use this camera
             </Button>
 
-            <Button type="button" variant="outline" onClick={start} disabled={starting}>
+            <Button
+              type="button"
+              onClick={start}
+              disabled={starting}
+              className="bg-[var(--chart-3)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-3)_88%,black)]"
+            >
               {starting ? (
                 <Loader className="mr-1.5 size-4" />
               ) : (

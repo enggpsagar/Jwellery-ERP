@@ -1670,9 +1670,13 @@ export function InvoiceForm({
       </div>
 
       {/* Side by side rather than stacked — narrow, single-purpose fields
-          with no reason to each claim a full row of vertical space. */}
+          with no reason to each claim a full row of vertical space. Each
+          gets its own bordered, tinted box (one of this app's chart hues,
+          same convention as the header's Sale/Purchase buttons) so the
+          three don't blur into one long strip and each stays easy to find
+          at a glance. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg border border-[color-mix(in_oklab,var(--chart-2)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-2)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-2)_12%,transparent)]">
           <PercentOrFlatInput
             base={subtotal + makingChargesTotal + stoneChargesTotal}
             value={discount}
@@ -1681,7 +1685,7 @@ export function InvoiceForm({
         </div>
 
         {editInvoiceId ? (
-          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <div className="space-y-2 rounded-lg border border-[color-mix(in_oklab,var(--chart-3)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-3)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-3)_12%,transparent)]">
             <Label>Paid Now</Label>
             <Input
               type="number"
@@ -1691,14 +1695,16 @@ export function InvoiceForm({
             />
           </div>
         ) : (
-          <PaidNowFields
-            rows={paymentRows}
-            onRowsChange={setPaymentRows}
-            maxAmount={totalAmount > 0 ? totalAmount : undefined}
-          />
+          <div className="rounded-lg border border-[color-mix(in_oklab,var(--chart-3)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-3)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-3)_12%,transparent)]">
+            <PaidNowFields
+              rows={paymentRows}
+              onRowsChange={setPaymentRows}
+              maxAmount={totalAmount > 0 ? totalAmount : undefined}
+            />
+          </div>
         )}
 
-        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+        <div className="space-y-2 rounded-lg border border-[color-mix(in_oklab,var(--chart-1)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-1)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-1)_12%,transparent)]">
           <Label>Notes</Label>
           <Textarea name="notes" rows={2} defaultValue={defaultNotes} />
         </div>

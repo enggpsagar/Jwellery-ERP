@@ -1261,8 +1261,14 @@ export function InvoiceForm({
                   rendered while expanded. */}
               {isExpanded && (
                 <div className="space-y-3 border-t p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                  {/* One consistent grid for the whole row — Link Stock
+                      Item used to sit alone in its own half-width row
+                      while Purity/Gross Weight/etc were each a much
+                      narrower sixth, reading as inconsistently oversized
+                      next to them. Now it's just the widest cell (2 of 6
+                      columns) in the same grid everything else shares. */}
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                    <div className="col-span-2 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Link Stock Item (optional)</Label>
                       <StockItemSelect
                         stockItems={stockItems}
@@ -1291,9 +1297,7 @@ export function InvoiceForm({
                         }
                       />
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Purity</Label>
                       <Select

@@ -175,7 +175,7 @@ export function StoreDeleteDialog({ storeId, storeName }: StoreDeleteDialogProps
           ) : (
             <DialogDescription>
               <span className="font-medium text-foreground">{storeName}</span> has no
-              customers, vendors, karigars, products, invoices, purchases, quotations,
+              customers, vendors, artisans, products, invoices, purchases, quotations,
               or other users on file. Deleting it removes the store itself — this
               cannot be undone.
             </DialogDescription>

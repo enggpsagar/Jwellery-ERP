@@ -83,7 +83,7 @@ export function KarigarSelect({
 
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
-              No karigars found
+              No artisans found
             </div>
           ) : (
             filtered.map((karigar) => (

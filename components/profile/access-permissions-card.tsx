@@ -58,7 +58,7 @@ export async function AccessPermissionsCard() {
 
         {role === UserRole.KARIGAR ? (
           <p className="text-sm text-muted-foreground">
-            As a Karigar, you only see the jobs assigned to you — not the wider store workspace.
+            As an Artisan, you only see the jobs assigned to you — not the wider store workspace.
           </p>
         ) : (
           <div>

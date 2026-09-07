@@ -35,7 +35,7 @@ export function KarigarsPagination({
       <p className="text-muted-foreground">
         Showing <span className="font-medium">{start}</span> to{" "}
         <span className="font-medium">{end}</span> of{" "}
-        <span className="font-medium">{totalCount}</span> karigars
+        <span className="font-medium">{totalCount}</span> artisans
       </p>
 
       <div className="flex items-center gap-2">

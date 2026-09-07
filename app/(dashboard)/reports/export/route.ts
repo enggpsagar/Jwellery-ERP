@@ -93,7 +93,7 @@ async function buildRows(type: ReportType, range: DateRange) {
       const report = await getKarigarOutstandingReport()
       return report.jobs.map((job) => ({
         "Job #": job.jobNumber ?? "",
-        Karigar: job.karigarName,
+        Artisan: job.karigarName,
         "Issue Date": formatShortDate(job.issueDate),
         "Expected Date": job.expectedDate ? formatShortDate(job.expectedDate) : "",
         Metal: job.metalType ?? "",

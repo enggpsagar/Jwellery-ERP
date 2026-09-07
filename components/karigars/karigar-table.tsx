@@ -61,7 +61,7 @@ export function KarigarTable({
   if (!karigars.length) {
     return (
       <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
-        No karigars found yet.
+        No artisans found yet.
       </div>
     )
   }

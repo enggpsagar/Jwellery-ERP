@@ -335,7 +335,7 @@ export default async function LandingPage() {
 
             <p className="mt-5 max-w-xl text-lg text-muted-foreground">
               {APP_NAME} keeps one connected record of your trade — who you buy
-              from, what you hold, what your karigars are working on, what you
+              from, what you hold, what your artisans are working on, what you
               sell, and who still owes you. Weights, purity and wastage are
               handled the way a jeweller actually accounts for them.
             </p>

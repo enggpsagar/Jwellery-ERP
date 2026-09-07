@@ -126,7 +126,7 @@ const STORES: DemoStore[] = [
     ],
     karigar: {
       code: "DEMO-GOLD-K1",
-      name: "Demo Gold Karigar",
+      name: "Demo Gold Artisan",
       mobile: "7100000001",
       metal: "Gold",
       issueWeight: 30,
@@ -193,7 +193,7 @@ const STORES: DemoStore[] = [
     ],
     karigar: {
       code: "DEMO-SILVER-K1",
-      name: "Demo Silver Karigar",
+      name: "Demo Silver Artisan",
       mobile: "7100000002",
       metal: "Silver",
       issueWeight: 500,
@@ -311,7 +311,7 @@ const STORES: DemoStore[] = [
     ],
     karigar: {
       code: "DEMO-MIXED-K1",
-      name: "Demo Mixed Karigar",
+      name: "Demo Mixed Artisan",
       mobile: "7100000004",
       metal: "Gold",
       issueWeight: 20,

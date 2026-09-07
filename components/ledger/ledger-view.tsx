@@ -297,7 +297,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
             <div className="flex flex-col gap-1">
               <CardTitle>Ledger Entries</CardTitle>
               <CardDescription>
-                Money movement across all customer and karigar accounts.
+                Money movement across all customer and artisan accounts.
               </CardDescription>
             </div>
             <ExportMenu href="/ledger/export?scope=entries" label="Export" iconOnly />

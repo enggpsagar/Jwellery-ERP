@@ -422,8 +422,8 @@ export function UserFormDialog({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Selecting a karigar fills in Email/Phone from their contact
-              record, so their login always matches it. This karigar will
+              Selecting an artisan fills in Email/Phone from their contact
+              record, so their login always matches it. This artisan will
               only see their own jobs after logging in.
             </p>
           </div>

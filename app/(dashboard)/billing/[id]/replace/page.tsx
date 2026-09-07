@@ -125,6 +125,10 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     // this to its own current default-for-new-lines rate instead.
     gstRateId: "",
     netTouched: true,
+    // Grandfathered — carried over from a real, already-billed invoice, so
+    // it's exempt from the "must decide" gate that only applies to a
+    // freshly-added blank row. See LineItem's own doc comment.
+    stockLinkDecided: true,
   }
   })
 

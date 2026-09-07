@@ -131,6 +131,15 @@ export type LineItem = {
    * already-set line. Falls back to the document-level rate in lineGst()
    * below when blank/unresolved, so an empty string here is always safe. */
   gstRateId: string
+  /** Whether this line has explicitly gone through the Link Stock Item
+   * picker — either linked to a real stock row, or deliberately sent down
+   * "Create New Line Item" to type one by hand. False only for a freshly-
+   * added blank row nobody has touched yet; that's what hasInvalidStockLink
+   * blocks submission on, so a line can't silently skip the picker just by
+   * typing straight into Item Name. Pre-existing lines loaded via
+   * initialItems (edit/replace) are grandfathered to true regardless — see
+   * those pages' own comments on this field. */
+  stockLinkDecided: boolean
 }
 
 function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: number) {
@@ -172,6 +181,7 @@ function emptyLineItem(defaultGstRateId?: string): LineItem {
     inventoryStockId: "",
     netTouched: false,
     gstRateId: defaultGstRateId ?? "",
+    stockLinkDecided: false,
   }
 }
 
@@ -479,6 +489,7 @@ export function InvoiceForm({
       // hmCharge above, so this line starts on the document's current
       // "default for new items" selection rather than blank.
       gstRateId,
+      stockLinkDecided: true,
     })
     // Real data just landed on this line via the stock picker — start it
     // expanded rather than making the user hunt for the chevron to see what
@@ -562,6 +573,7 @@ export function InvoiceForm({
         const scanned: LineItem = {
           ...emptyLineItem(gstRateId),
           inventoryStockId: stock.id,
+          stockLinkDecided: true,
           itemName: stock.productName,
           metalTypeId: stock.metalType?.id ?? "",
           purity: stock.purity ?? "",
@@ -906,6 +918,12 @@ export function InvoiceForm({
   // matching the server's own guard in createInvoice.
   const hasInvalidRate = items.some((item) => !(item.rate > 0))
 
+  // Every line must go through the Link Stock Item picker — either linked
+  // to real stock, or explicitly sent down "Create New Line Item" — so a
+  // line can't be added by typing straight into Item Name without ever
+  // touching the picker. Same unconditional-per-item check as hasInvalidRate.
+  const hasInvalidStockLink = items.some((item) => !item.stockLinkDecided)
+
   // Only meaningful for a fresh invoice — see paymentRows' own comment
   // above. Zero-amount rows (a split row the user opened but never filled
   // in) are dropped here rather than sent through, matching parseOptionalPayments'
@@ -945,6 +963,10 @@ export function InvoiceForm({
         // sidesteps that auto-reset while keeping identical pending/error-
         // state behavior.
         event.preventDefault()
+        if (hasInvalidStockLink) {
+          toast.error("Link every line item to a stock item, or choose \"Create New Line Item\" for a custom piece, before creating the invoice.")
+          return
+        }
         if (hasInvalidRate) {
           toast.error("Enter a selling price (Rate / g) for every line item before creating the invoice.")
           return
@@ -1266,7 +1288,9 @@ export function InvoiceForm({
                       columns) in the same grid everything else shares. */}
                   <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                     <div className="col-span-2 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">Link Stock Item (optional)</Label>
+                      <Label className="text-xs">
+                        Link Stock Item <RequiredMark />
+                      </Label>
                       <StockItemSelect
                         stockItems={stockItems}
                         value={item.inventoryStockId}
@@ -1279,7 +1303,14 @@ export function InvoiceForm({
                         // row to a blank manual-entry line instead, keeping only
                         // its identity (key) so it doesn't jump position.
                         onCreateNew={() => {
-                          updateItem(item.key, { ...emptyLineItem(gstRateId), key: item.key })
+                          updateItem(item.key, {
+                            ...emptyLineItem(gstRateId),
+                            key: item.key,
+                            // Explicitly choosing to type this line by hand
+                            // is itself the "decision" the picker requires —
+                            // see stockLinkDecided's own doc comment.
+                            stockLinkDecided: true,
+                          })
                           // Back to a blank manual-entry row — collapse it too,
                           // matching a freshly-added line's default state.
                           setExpandedKeys((prev) => {
@@ -1293,6 +1324,11 @@ export function InvoiceForm({
                           `${stock.stockCode} — ${stock.productName} (${availableForStock(stock.id, item.key)} available)`
                         }
                       />
+                      {!item.stockLinkDecided && (
+                        <p className="text-[10px] leading-tight text-destructive">
+                          Select a stock item, or choose &quot;Create New Line Item&quot;
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -1697,7 +1733,7 @@ export function InvoiceForm({
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={pending || !customerId || hasInvalidRate || paidOverTotal}>
+        <Button type="submit" disabled={pending || !customerId || hasInvalidStockLink || hasInvalidRate || paidOverTotal}>
           {editInvoiceId
             ? pending
               ? "Saving..."

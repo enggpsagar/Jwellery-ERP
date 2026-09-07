@@ -116,6 +116,10 @@ export default async function EditInvoicePage({ params }: Props) {
     // a row saved before per-line GST rates existed.
     gstRateId: item.gstRateId ?? "",
     netTouched: true,
+    // Grandfathered — this line already has real saved data (linked to
+    // stock or not), so it's exempt from the "must decide" gate that only
+    // applies to a freshly-added blank row. See LineItem's own doc comment.
+    stockLinkDecided: true,
   }
   })
 

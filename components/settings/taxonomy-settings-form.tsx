@@ -76,8 +76,10 @@ export function TaxonomySettingsForm({
         <StoneTypesSection stones={stoneRows} canEdit={canEdit} />
       </div>
 
-      <CategoriesSection categories={categories} canEdit={canEdit} />
-      <TypesSection categories={categories} canEdit={canEdit} />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <CategoriesSection categories={categories} canEdit={canEdit} />
+        <TypesSection categories={categories} canEdit={canEdit} />
+      </div>
     </div>
   );
 }

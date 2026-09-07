@@ -61,9 +61,15 @@ export function StockQrCard({
           QR Code
         </h2>
 
-        <Button type="button" variant="secondary" size="sm" className="gap-2" onClick={() => window.print()}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          title="Print"
+          aria-label="Print"
+          onClick={() => window.print()}
+        >
           <Printer className="h-4 w-4" />
-          Print
         </Button>
       </div>
 

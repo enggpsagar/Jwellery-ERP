@@ -7,7 +7,6 @@ import { getStates } from "@/lib/actions/location-actions";
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 
-import { PageBackHeader } from "@/components/shared/page-back-header";
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper";
 import { KarigarCreateForm } from "@/components/karigars/karigar-create-form";
 
@@ -25,15 +24,15 @@ export default async function NewKarigarPage() {
   ]);
 
   return (
-    <main className="space-y-6 p-6">
-      <PageBackHeader
-        title="Add Karigar"
-        description="Register a new jewellery artisan."
-        backHref="/karigars"
-        backLabel="Back to Artisans"
-      />
-
-      <ResetFormWrapper>
+    <main className="mx-auto max-w-4xl space-y-6 p-6">
+      <ResetFormWrapper
+        header={{
+          title: "Add Karigar",
+          description: "Register a new jewellery artisan.",
+          backHref: "/karigars",
+          backLabel: "Back to Artisans",
+        }}
+      >
         <KarigarCreateForm
           locations={locations}
           states={states}

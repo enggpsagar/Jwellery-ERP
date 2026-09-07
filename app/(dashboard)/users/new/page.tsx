@@ -5,7 +5,6 @@ import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { getEffectiveStoreId } from "@/lib/store-context";
-import { PageBackHeader } from "@/components/shared/page-back-header";
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper";
 import { UserFormDialog } from "@/components/users/user-form-dialog";
 
@@ -51,14 +50,14 @@ export default async function NewUserPage() {
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 p-6">
-      <PageBackHeader
-        title="Add User"
-        description="Create a new user and set their role and access."
-        backHref="/users"
-        backLabel="Back to Users"
-      />
-
-      <ResetFormWrapper>
+      <ResetFormWrapper
+        header={{
+          title: "Add User",
+          description: "Create a new user and set their role and access.",
+          backHref: "/users",
+          backLabel: "Back to Users",
+        }}
+      >
         <UserFormDialog
           asPage
           mode="create"

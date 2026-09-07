@@ -134,26 +134,23 @@ export function VendorCreateForm({
           }}
           className="grid grid-cols-1 gap-4 md:grid-cols-2"
         >
-          <div className="space-y-1 md:col-span-2 rounded-lg border bg-muted/20 p-4 transition-colors focus-within:bg-accent/40">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <Hash className="h-4 w-4 text-muted-foreground" />
-              GSTIN {gstinRequiredNow ? <RequiredMark /> : null}
-            </label>
-            <GstSchemeBadge scheme={gstScheme} />
-            {gstScheme !== "COMPOSITION" ? (
-              <PartyGstTypeSelect value={gstType} onChange={setGstType} />
-            ) : null}
+          <div className="space-y-2 md:col-span-2 rounded-lg border bg-muted/20 p-4 transition-colors focus-within:bg-accent/40">
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <Hash className="h-4 w-4 text-muted-foreground" />
+                GSTIN {gstinRequiredNow ? <RequiredMark /> : null}
+                <GstSchemeBadge scheme={gstScheme} />
+              </label>
+              {gstScheme !== "COMPOSITION" ? (
+                <PartyGstTypeSelect value={gstType} onChange={setGstType} />
+              ) : null}
+            </div>
             <input
               name="gstNumber"
               className={FIELD}
               placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : "Enter GSTIN"}
               required={gstinRequiredNow}
             />
-            {gstinRequiredNow ? (
-              <p className="text-xs text-muted-foreground">
-                GSTIN is required for a valid purchase entry from this vendor.
-              </p>
-            ) : null}
           </div>
 
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -215,16 +212,26 @@ export function VendorCreateForm({
             />
           </div>
 
-          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
             </label>
             <textarea
               name="address"
-              rows={1}
-              className={`${FIELD} min-h-9 resize-y`}
+              rows={4}
+              className={`${FIELD} min-h-24 resize-y`}
               placeholder="Enter full address"
+            />
+          </div>
+
+          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+            <label className="text-sm font-medium">Notes</label>
+            <textarea
+              name="notes"
+              rows={4}
+              className={`${FIELD} min-h-24 resize-y`}
+              placeholder="Any notes about this vendor"
             />
           </div>
 
@@ -303,16 +310,6 @@ export function VendorCreateForm({
               step="0.01"
               defaultValue={0}
               className={FIELD}
-            />
-          </div>
-
-          <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <label className="text-sm font-medium">Notes</label>
-            <textarea
-              name="notes"
-              rows={4}
-              className={`${FIELD} min-h-24 resize-y`}
-              placeholder="Any notes about this vendor"
             />
           </div>
 

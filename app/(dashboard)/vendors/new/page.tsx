@@ -5,7 +5,6 @@ import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { safeReturnTo } from "@/lib/safe-return-to"
 
 import { VendorCreateForm } from "@/components/vendors/vendor-create-form"
-import { PageBackHeader } from "@/components/shared/page-back-header"
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 
 export const metadata: Metadata = {
@@ -23,15 +22,15 @@ export default async function NewVendorPage({ searchParams }: NewVendorPageProps
   const [states, businessSettings] = await Promise.all([getStates(), getBusinessSettings()])
 
   return (
-    <main className="space-y-6 p-6">
-      <PageBackHeader
-        title="Add Vendor"
-        description="Create a new vendor you buy stock from."
-        backHref={returnTo ?? "/vendors"}
-        backLabel={returnTo ? "Back without saving" : "Back to Vendors"}
-      />
-
-      <ResetFormWrapper>
+    <main className="mx-auto max-w-4xl space-y-6 p-6">
+      <ResetFormWrapper
+        header={{
+          title: "Add Vendor",
+          description: "Create a new vendor you buy stock from.",
+          backHref: returnTo ?? "/vendors",
+          backLabel: returnTo ? "Back without saving" : "Back to Vendors",
+        }}
+      >
         <VendorCreateForm
           states={states}
           returnTo={returnTo}

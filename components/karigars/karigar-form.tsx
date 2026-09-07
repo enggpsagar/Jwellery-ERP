@@ -354,22 +354,21 @@ export function KarigarForm({
         </div>
 
         <div className="space-y-2 rounded-lg border bg-muted/20 p-4 transition-colors focus-within:bg-accent/40 md:col-span-2">
-          <Label>GST Number {gstinRequiredNow ? <RequiredMark /> : null}</Label>
-          <GstSchemeBadge scheme={gstScheme} />
-          {gstScheme !== "COMPOSITION" ? (
-            <PartyGstTypeSelect value={gstType} onChange={setGstType} name="gstType" />
-          ) : null}
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+            <Label>
+              GST Number {gstinRequiredNow ? <RequiredMark /> : null}
+              <GstSchemeBadge scheme={gstScheme} />
+            </Label>
+            {gstScheme !== "COMPOSITION" ? (
+              <PartyGstTypeSelect value={gstType} onChange={setGstType} name="gstType" />
+            ) : null}
+          </div>
           <Input
             name="gstNumber"
             defaultValue={karigar?.gstNumber}
             placeholder={gstinRequiredNow ? "Required for this registration type" : "Optional"}
             required={gstinRequiredNow}
           />
-          {gstinRequiredNow ? (
-            <p className="text-xs text-muted-foreground">
-              GSTIN is required for a Regular/Composition-registered karigar.
-            </p>
-          ) : null}
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -398,22 +397,24 @@ export function KarigarForm({
 
       </div>
 
-      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-        <Label>Address</Label>
-        <Textarea
-          name="address"
-          rows={3}
-          defaultValue={karigar?.address}
-        />
-      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <Label>Address</Label>
+          <Textarea
+            name="address"
+            rows={4}
+            defaultValue={karigar?.address}
+          />
+        </div>
 
-      <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-        <Label>Notes</Label>
-        <Textarea
-          name="notes"
-          rows={2}
-          defaultValue={karigar?.notes}
-        />
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+          <Label>Notes</Label>
+          <Textarea
+            name="notes"
+            rows={4}
+            defaultValue={karigar?.notes}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

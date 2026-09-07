@@ -59,7 +59,7 @@ export function RenewalContactDialog() {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
+        <Button className="gap-2">
           <Mail className="size-4" />
           Contact us about renewal
         </Button>

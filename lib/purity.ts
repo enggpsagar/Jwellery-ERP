@@ -194,7 +194,15 @@ export function toPrimaryUnit(
 ): number {
   if (inputUnit === primaryUnit) return value;
   const grams = inputUnit === "CARAT" ? value * gramsPerCarat : value;
-  return primaryUnit === "CARAT" ? grams / gramsPerCarat : grams;
+  const result = primaryUnit === "CARAT" ? grams / gramsPerCarat : grams;
+  // Floating-point multiplication/division (e.g. 160.6 / 0.2) routinely
+  // lands a few bits off a clean decimal — "803.0000000000001" instead of
+  // "803" — which then shows up as-is in a controlled <input>'s value and
+  // makes the field look impossible to edit. Rounding to 8 decimal places
+  // is well past every weight column's actual stored precision (grams are
+  // Decimal(12,5), carats Decimal(10,3)), so it only strips that binary
+  // noise, never a real digit a user typed.
+  return Math.round(result * 1e8) / 1e8;
 }
 
 /**

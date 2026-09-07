@@ -101,9 +101,9 @@ export function BulkDeleteButton({
     <>
       <Button
         type="button"
-        variant="outline"
+        variant="destructive"
         size="sm"
-        className="gap-2 text-red-600 hover:text-red-700"
+        className="gap-2"
         onClick={() => setOpen(true)}
       >
         <Trash2 className="h-4 w-4" />

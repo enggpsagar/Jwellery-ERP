@@ -663,6 +663,7 @@ export function invoiceEmail(params: {
   discount: number;
   taxAmount: number;
   totalAmount: number;
+  roundOffAmount: number;
   paidAmount: number;
   balanceAmount: number;
   amountInWords: string;
@@ -724,6 +725,14 @@ export function invoiceEmail(params: {
       ${summaryRow("Stone Charges", formatCurrency(params.stoneCharges))}
       ${summaryRow("Discount", `-${formatCurrency(params.discount)}`)}
       ${summaryRow("Tax", formatCurrency(params.taxAmount))}
+      ${
+        params.roundOffAmount !== 0
+          ? summaryRow(
+              "Round Off",
+              `${params.roundOffAmount >= 0 ? "+" : "-"}${formatCurrency(Math.abs(params.roundOffAmount))}`,
+            )
+          : ""
+      }
       ${summaryRow("Total", formatCurrency(params.totalAmount), true)}
       ${summaryRow("Paid", formatCurrency(params.paidAmount))}
       ${summaryRow("Balance Due", formatCurrency(params.balanceAmount), true)}

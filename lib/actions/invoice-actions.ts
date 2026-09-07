@@ -16,6 +16,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { computeRoundOff } from "@/lib/round-off";
 import { requirePermission, requirePermissionInStore } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope, resolveActingStoreId } from "@/lib/store-context";
@@ -285,6 +286,7 @@ function mapInvoice(invoice: any) {
     discount: Number(invoice.discount),
     taxAmount: Number(invoice.taxAmount),
     totalAmount: Number(invoice.totalAmount),
+    roundOffAmount: Number(invoice.roundOffAmount ?? 0),
     paidAmount: Number(invoice.paidAmount),
     balanceAmount: Number(invoice.balanceAmount),
     notes: invoice.notes,
@@ -874,7 +876,11 @@ export async function createInvoice(
         sum + toNumber(item.sgstAmount) + toNumber(item.cgstAmount) + toNumber(item.igstAmount),
       0,
     );
-    const totalAmount = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    // Standard Indian-billing convention: the saved Total is rounded to the
+    // nearest rupee, with the (small, signed) adjustment recorded on its own
+    // line rather than silently folded into another figure.
+    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
     const balanceAmount = Math.max(0, totalAmount - paidAmount);
 
     let status: InvoiceStatus = InvoiceStatus.PAID;
@@ -1040,6 +1046,7 @@ export async function createInvoice(
           discount,
           taxAmount,
           totalAmount,
+          roundOffAmount,
           paidAmount,
           balanceAmount,
           notes,
@@ -1518,7 +1525,10 @@ export async function updateInvoice(
         sum + toNumber(item.sgstAmount) + toNumber(item.cgstAmount) + toNumber(item.igstAmount),
       0,
     );
-    const totalAmount = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    // Same rounding convention as createInvoice — the saved Total is always
+    // a whole rupee, with the adjustment recorded separately.
+    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
 
     const paidAmount = Number(invoice.paidAmount);
     if (totalAmount < paidAmount) {
@@ -1610,6 +1620,7 @@ export async function updateInvoice(
           discount,
           taxAmount,
           totalAmount,
+          roundOffAmount,
           balanceAmount: newBalanceAmount,
           status: newStatus,
           invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : invoice.invoiceDate,
@@ -1838,8 +1849,12 @@ export async function updateInvoiceLineItem(
     const newLineMetalValue = rate * weight;
     const subtotal = Number(invoice.subtotal) - oldLineMetalValue + newLineMetalValue;
     const taxAmount = Number(invoice.taxAmount) - oldTax + (newSgst + newCgst + newIgst);
-    const totalAmount =
+    const rawTotal =
       subtotal + Number(invoice.makingCharges) + Number(invoice.stoneCharges) - Number(invoice.discount) + taxAmount;
+    // Same rounding convention as createInvoice/updateInvoice — a single
+    // line's edit can shift the Total across a rupee boundary, so the
+    // round-off is re-derived here too rather than left stale.
+    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
 
     const paidAmount = Number(invoice.paidAmount);
     if (totalAmount < paidAmount) {
@@ -1874,6 +1889,7 @@ export async function updateInvoiceLineItem(
           subtotal,
           taxAmount,
           totalAmount,
+          roundOffAmount,
           balanceAmount: newBalanceAmount,
           status: newStatus,
         },
@@ -2162,6 +2178,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
       discount: Number(invoice.discount),
       taxAmount: Number(invoice.taxAmount),
       totalAmount: Number(invoice.totalAmount),
+      roundOffAmount: Number(invoice.roundOffAmount ?? 0),
       paidAmount: Number(invoice.paidAmount),
       balanceAmount: Number(invoice.balanceAmount),
       amountInWords: amountInWords(Number(invoice.totalAmount)),

@@ -10,6 +10,7 @@ import {
 } from "@/lib/actions/kacha-invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
 import { todayForDateInput } from "@/lib/date-input"
+import { computeRoundOff } from "@/lib/round-off"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -91,7 +92,11 @@ export function ConvertToPakkaForm({
     [taxableAmount, gstRate],
   )
 
-  const totalAmount = taxableAmount + taxAmount
+  const rawTotal = taxableAmount + taxAmount
+  // Live preview of the same server-side round-off convertKachaToPakka
+  // applies to the new Invoice it creates — see lib/round-off.ts. Not
+  // submitted; the server recomputes this from taxAmount/taxableAmount.
+  const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal)
 
   const convertAction = convertKachaToPakka.bind(null, kachaInvoice.id)
   const [state, formAction, pending] = useActionState(convertAction, initialState)
@@ -212,6 +217,14 @@ export function ConvertToPakkaForm({
           <span>GST ({gstRate}%)</span>
           <span>₹{taxAmount.toFixed(2)}</span>
         </div>
+        {roundOffAmount !== 0 && (
+          <div className="flex justify-between">
+            <span>Round Off</span>
+            <span>
+              {roundOffAmount >= 0 ? "+" : "-"}₹{Math.abs(roundOffAmount).toFixed(2)}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
           <span>Total</span>
           <span>₹{totalAmount.toFixed(2)}</span>

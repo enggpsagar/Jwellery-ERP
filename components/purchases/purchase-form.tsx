@@ -10,6 +10,7 @@ import { createPurchase, type PurchaseFormState } from "@/lib/actions/purchase-a
 import { PURITY_SELECT_OPTIONS, isCaratWeighedMetal, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 import { useToast } from "@/components/providers/toast-provider"
 import { computePurchaseGst, isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst"
+import { computeRoundOff } from "@/lib/round-off"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -725,8 +726,13 @@ export function PurchaseForm({
     [items, selectedVendor?.gstType, selectedVendor?.state, storeState, gstRates, gstRate],
   )
 
-  const totalAmount =
+  const rawTotal =
     subtotal + makingChargesTotal + stoneChargesTotal - discount + taxAmount
+  // Indian billing convention: displayed (and eventually saved) Total is
+  // rounded to the nearest whole rupee, with the adjustment surfaced as its
+  // own line above Total — see lib/round-off.ts. Server-side createPurchase
+  // recomputes this itself rather than trusting whatever's shown here.
+  const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal)
   const balanceAmount = Math.max(0, totalAmount - paidAmount)
 
   const itemsJson = JSON.stringify(
@@ -1430,6 +1436,12 @@ export function PurchaseForm({
         <div className="flex justify-between">
           <span>GST (SGST+CGST or IGST)</span>
           <span>₹{taxAmount.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Round Off</span>
+          <span>
+            {roundOffAmount >= 0 ? "+" : "-"}₹{Math.abs(roundOffAmount).toFixed(2)}
+          </span>
         </div>
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
           <span>Total</span>

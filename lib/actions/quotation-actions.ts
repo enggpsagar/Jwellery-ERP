@@ -14,6 +14,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { computeRoundOff } from "@/lib/round-off";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope } from "@/lib/store-context";
@@ -131,6 +132,11 @@ function mapQuotation(quotation: any) {
     stoneCharges: Number(quotation.stoneCharges),
     discount: Number(quotation.discount),
     taxAmount: Number(quotation.taxAmount),
+    // Signed adjustment computeRoundOff() applied to reach totalAmount —
+    // see that helper's doc comment. Persisted at create time, just read
+    // back here rather than recomputed, so a saved document's Total never
+    // drifts if the rounding rule ever changes.
+    roundOffAmount: Number(quotation.roundOffAmount ?? 0),
     totalAmount: Number(quotation.totalAmount),
     notes: quotation.notes,
     convertedToId: quotation.convertedToId,
@@ -454,7 +460,11 @@ export async function createQuotation(
       0,
     );
     const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
-    const totalAmount = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    // Standard Indian-billing "Round Off" — see computeRoundOff's own doc
+    // comment. Server-derived only: the client never submits a round-off
+    // value, it just previews the same computation.
+    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
 
     const storeId = await requireStoreScope();
 
@@ -534,6 +544,7 @@ export async function createQuotation(
         sgstAmount,
         cgstAmount,
         igstAmount,
+        roundOffAmount,
         totalAmount,
         notes,
         locationId: resolvedLocationId ?? undefined,
@@ -718,7 +729,13 @@ export async function convertQuotationToInvoice(
     const stoneCharges = Number(quotation.stoneCharges);
     const discount = Number(quotation.discount);
 
-    const totalAmount = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    // Standard Indian-billing "Round Off" — see computeRoundOff's own doc
+    // comment. This is a fresh Invoice being created from the quotation
+    // (its own tax input, per this function's doc comment), so it gets its
+    // own round-off computed against its own total, independent of whatever
+    // roundOffAmount the source Quotation was saved with.
+    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
     const balanceAmount = Math.max(0, totalAmount - paidAmount);
 
     let status: InvoiceStatus = InvoiceStatus.PAID;
@@ -745,6 +762,7 @@ export async function convertQuotationToInvoice(
           stoneCharges,
           discount,
           taxAmount,
+          roundOffAmount,
           totalAmount,
           paidAmount,
           balanceAmount,

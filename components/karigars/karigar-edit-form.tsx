@@ -11,6 +11,7 @@ import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
 import type { StateOption } from "@/lib/actions/location-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import type { GstScheme } from "@prisma/client"
+import { Card, CardContent } from "@/components/ui/card"
 
 import { KarigarForm } from "./karigar-form"
 

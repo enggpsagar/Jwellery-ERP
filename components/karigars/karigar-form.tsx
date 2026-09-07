@@ -326,15 +326,7 @@ export function KarigarForm({
         </div>
 
         <div className="space-y-2 md:col-span-2">
-          <div className="flex items-center justify-between">
-            <Label>Assigned Metals &amp; Stones</Label>
-            <AddMetalInlineDialog
-              onCreated={(metal) => {
-                setMetalOptions((current) => [...current, metal])
-                setAssignedMetalTypeIds((current) => [...current, metal.id])
-              }}
-            />
-          </div>
+          <Label>Assigned Metals &amp; Stones</Label>
           <p className="text-xs text-muted-foreground">
             Which metals or stones this karigar can be issued material in — Issue
             Material and Receive Material only ever offer these.
@@ -342,7 +334,17 @@ export function KarigarForm({
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2 rounded-lg border p-3 transition-colors focus-within:bg-accent/40">
-              <Label className="text-xs text-muted-foreground">Metals</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">Metals</Label>
+                <AddMetalInlineDialog
+                  category="metal"
+                  triggerLabel="Add Metal"
+                  onCreated={(metal) => {
+                    setMetalOptions((current) => [...current, metal])
+                    setAssignedMetalTypeIds((current) => [...current, metal.id])
+                  }}
+                />
+              </div>
               {activeMetalsOnly.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   No active metals configured yet.
@@ -378,7 +380,17 @@ export function KarigarForm({
             </div>
 
             <div className="space-y-2 rounded-lg border p-3 transition-colors focus-within:bg-accent/40">
-              <Label className="text-xs text-muted-foreground">Stones</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">Stones</Label>
+                <AddMetalInlineDialog
+                  category="stone"
+                  triggerLabel="Add Stone"
+                  onCreated={(metal) => {
+                    setMetalOptions((current) => [...current, metal])
+                    setAssignedMetalTypeIds((current) => [...current, metal.id])
+                  }}
+                />
+              </div>
               {activeStonesOnly.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   No active stones configured yet.

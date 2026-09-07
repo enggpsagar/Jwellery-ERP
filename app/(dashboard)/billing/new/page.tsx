@@ -12,7 +12,6 @@ import { getGstRates } from "@/lib/actions/gst-rate-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
 
 import { InvoiceForm } from "@/components/billing/invoice-form"
-import { PageBackHeader } from "@/components/shared/page-back-header"
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 
 export const metadata: Metadata = {
@@ -53,14 +52,15 @@ export default async function NewInvoicePage({ searchParams }: Props) {
 
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-6">
-      <PageBackHeader
-        title="New Invoice"
-        description="Bill a customer for jewellery items."
-        backHref={backTo.href}
-        backLabel={backTo.label}
-      />
-
-      <ResetFormWrapper requireConfirm>
+      <ResetFormWrapper
+        requireConfirm
+        header={{
+          title: "New Invoice",
+          description: "Bill a customer for jewellery items.",
+          backHref: backTo.href,
+          backLabel: backTo.label,
+        }}
+      >
         <InvoiceForm
           customers={customers}
           stockItems={stockItems}

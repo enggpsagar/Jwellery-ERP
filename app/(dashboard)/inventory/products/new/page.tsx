@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 
 import { ProductCreateForm } from "@/components/inventory/products/product-create-form";
-import { PageBackHeader } from "@/components/shared/page-back-header";
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper";
 import {
   getStoreCategories,
@@ -41,14 +40,14 @@ export default async function NewProductPage({
 
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-6">
-      <PageBackHeader
-        title="Add Product"
-        description="Create a new jewellery product master."
-        backHref={returnTo ?? "/inventory/products"}
-        backLabel={returnTo ? "Back without saving" : "Back to Products"}
-      />
-
-      <ResetFormWrapper>
+      <ResetFormWrapper
+        header={{
+          title: "Add Product",
+          description: "Create a new jewellery product master.",
+          backHref: returnTo ?? "/inventory/products",
+          backLabel: returnTo ? "Back without saving" : "Back to Products",
+        }}
+      >
         <ProductCreateForm
           metals={metals}
           categories={categories}

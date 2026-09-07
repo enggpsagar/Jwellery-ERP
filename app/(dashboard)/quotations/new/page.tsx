@@ -11,7 +11,6 @@ import { getCaratConversionRateMap, getMetalSellingRateMap } from "@/lib/actions
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
 
 import { QuotationForm } from "@/components/quotations/quotation-form"
-import { PageBackHeader } from "@/components/shared/page-back-header"
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 
 export const metadata: Metadata = {
@@ -35,14 +34,15 @@ export default async function NewQuotationPage() {
 
   return (
     <main className="space-y-6 p-6">
-      <PageBackHeader
-        title="New Quotation"
-        description="Prepare a price quotation for a customer."
-        backHref="/quotations"
-        backLabel="Back to Quotations"
-      />
-
-      <ResetFormWrapper requireConfirm>
+      <ResetFormWrapper
+        requireConfirm
+        header={{
+          title: "New Quotation",
+          description: "Prepare a price quotation for a customer.",
+          backHref: "/quotations",
+          backLabel: "Back to Quotations",
+        }}
+      >
         <QuotationForm
           customers={customers}
           stockItems={stockItems}

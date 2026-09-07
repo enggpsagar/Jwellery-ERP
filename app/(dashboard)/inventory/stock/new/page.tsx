@@ -8,7 +8,6 @@ import {
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions";
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
 
-import { PageBackHeader } from "@/components/shared/page-back-header";
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper";
 import { StockCreateForm } from "@/components/inventory/stock/stock-create-form";
 
@@ -29,14 +28,14 @@ export default async function NewStockPage() {
   return (
     <main className="space-y-6 p-6">
 
-      <PageBackHeader
-        title="Add Stock"
-        description="Create a new jewellery inventory stock entry."
-        backHref="/inventory/stock"
-        backLabel="Back to Stock"
-      />
-
-      <ResetFormWrapper>
+      <ResetFormWrapper
+        header={{
+          title: "Add Stock",
+          description: "Create a new jewellery inventory stock entry.",
+          backHref: "/inventory/stock",
+          backLabel: "Back to Stock",
+        }}
+      >
         <StockCreateForm
           products={products}
           locations={locations}

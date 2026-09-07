@@ -12,7 +12,6 @@ import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
 
 import { PurchaseForm } from "@/components/purchases/purchase-form"
-import { PageBackHeader } from "@/components/shared/page-back-header"
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 
 export const metadata: Metadata = {
@@ -35,17 +34,18 @@ export default async function NewPurchasePage() {
 
   return (
     <main className="space-y-6 p-6">
-      <PageBackHeader
-        title="New Purchase"
-        description="Buy stock from a vendor — every line item adds new inventory."
-        backHref="/purchases"
-        backLabel="Back to Purchases"
-      />
-
       {/* PurchaseForm reads ?newVendorId / ?newProductId via useSearchParams,
           which needs a Suspense boundary to avoid opting the whole route out
           of static optimisation. */}
-      <ResetFormWrapper requireConfirm>
+      <ResetFormWrapper
+        requireConfirm
+        header={{
+          title: "New Purchase",
+          description: "Buy stock from a vendor — every line item adds new inventory.",
+          backHref: "/purchases",
+          backLabel: "Back to Purchases",
+        }}
+      >
         <Suspense fallback={null}>
           <PurchaseForm
             vendors={vendors}

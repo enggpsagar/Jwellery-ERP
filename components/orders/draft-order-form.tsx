@@ -34,9 +34,15 @@ const initialState: DraftOrderFormState = { success: false, message: "" }
 
 type ItemRow = DraftOrderItemInput & { key: string }
 
-function emptyItem(): ItemRow {
+// `key` defaults to a fresh UUID for every "Add Item" click (client-only,
+// safe to randomize), but the very first row is seeded once from
+// useState's initializer, which runs during SSR *and* again on the
+// client's first render — two different crypto.randomUUID() values for
+// the same row caused a hydration mismatch. The initial call passes a
+// fixed key instead so server and client agree.
+function emptyItem(key: string = crypto.randomUUID()): ItemRow {
   return {
-    key: crypto.randomUUID(),
+    key,
     itemName: "",
     metalTypeId: "",
     purity: null,
@@ -62,7 +68,7 @@ export function DraftOrderForm({
 }: DraftOrderFormProps) {
   const router = useRouter()
   const toast = useToast()
-  const [items, setItems] = useState<ItemRow[]>([emptyItem()])
+  const [items, setItems] = useState<ItemRow[]>([emptyItem("initial")])
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
 
   const [state, formAction, pending] = useActionState(createDraftOrder, initialState)

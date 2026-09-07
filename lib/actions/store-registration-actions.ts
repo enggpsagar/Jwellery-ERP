@@ -249,6 +249,17 @@ export async function registerStoreAction(
       }
 
       return createdStore;
+    }, {
+      // Default 5s is too tight for this transaction: it's ~15 sequential
+      // writes (store, plan history, owner user + membership, default
+      // location, 5 starter metals, 5 starter categories each with their own
+      // nested types) against a remote Neon connection, and a request that
+      // happens to compete for a pooled connection at the same moment (e.g.
+      // an OTP request for the same phone, fired the instant the owner's
+      // "sign in" link appears) is enough to blow past 5s and roll the whole
+      // registration back — confirmed via a Prisma P2028 timeout while
+      // testing this flow.
+      timeout: 15000,
     });
 
     // Email is best-effort on purpose: the store exists and the owner can

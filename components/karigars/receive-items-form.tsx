@@ -120,9 +120,19 @@ function deriveNetWeight(
 // the Add Stock form, so it carries the same field set as StockForm
 // (components/inventory/stock/stock-form.tsx), not just the weight fields
 // needed for the karigar fine-gold ledger calc.
-function emptyReceiptItem(defaultMetal?: StoreMetalRow, defaultLocationId?: string | null): ReceiptItem {
+// `key` defaults to a fresh UUID for every "Add Item" click (client-only,
+// safe to randomize), but the very first row is seeded once from
+// useState's initializer, which runs during SSR *and* again on the
+// client's first render — two different crypto.randomUUID() values for
+// the same row caused a hydration mismatch. The initial call passes a
+// fixed key instead so server and client agree.
+function emptyReceiptItem(
+  defaultMetal?: StoreMetalRow,
+  defaultLocationId?: string | null,
+  key: string = crypto.randomUUID(),
+): ReceiptItem {
   return {
-    key: crypto.randomUUID(),
+    key,
     itemName: "",
     productId: "",
     metalTypeId: defaultMetal?.id ?? "",
@@ -221,7 +231,7 @@ export function ReceiveItemsForm({
   )
 
   const [items, setItems] = useState<ReceiptItem[]>([
-    emptyReceiptItem(defaultMetal, defaultLocationId),
+    emptyReceiptItem(defaultMetal, defaultLocationId, "initial"),
   ])
   const [labourCharge, setLabourCharge] = useState(0)
   const [editingQuantityKeys, setEditingQuantityKeys] = useState<Set<string>>(new Set())

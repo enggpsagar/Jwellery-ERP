@@ -1,12 +1,8 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 
 import { getInvoices, type InvoiceSortField } from "@/lib/actions/invoice-actions"
-import { InvoiceTable } from "@/components/billing/invoice-table"
-import { InvoicesToolbar } from "@/components/billing/invoices-toolbar"
-import { DataTablePagination } from "@/components/shared/data-table-pagination"
-import { PageBackHeader } from "@/components/shared/page-back-header"
-import { Button } from "@/components/ui/button"
+import { getStoreLocations } from "@/lib/actions/store-location-actions"
+import { InvoicesClient } from "@/components/billing/invoices-client"
 
 export const metadata: Metadata = {
   title: "Billing",
@@ -35,48 +31,12 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   const sortOrder = params.sortOrder || "desc"
   const status = params.status || "ALL"
 
-  const { invoices, pagination } = await getInvoices({
-    page,
-    pageSize,
-    search,
-    sortBy,
-    sortOrder,
-    status,
-  })
+  const [{ invoices, pagination }, locations] = await Promise.all([
+    getInvoices({ page, pageSize, search, sortBy, sortOrder, status }),
+    getStoreLocations(),
+  ])
 
   return (
-    <main className="space-y-6 p-6">
-      <PageBackHeader
-        title="Billing"
-        description="Create and track customer invoices."
-        backHref="/dashboard"
-        backLabel="Back to Dashboard"
-        action={
-          <div className="flex items-center gap-2">
-            <Link href="/billing/kacha">
-              <Button variant="outline">Kacha Slips</Button>
-            </Link>
-
-            <Link href="/billing/new">
-              <Button>New Invoice</Button>
-            </Link>
-          </div>
-        }
-      />
-
-      <InvoicesToolbar />
-
-      <InvoiceTable invoices={invoices} />
-
-      {invoices.length > 0 ? (
-        <DataTablePagination
-          page={pagination.page}
-          totalPages={pagination.totalPages}
-          totalCount={pagination.totalCount}
-          pageSize={pagination.pageSize}
-          itemLabel="invoices"
-        />
-      ) : null}
-    </main>
+    <InvoicesClient invoices={invoices} locations={locations} pagination={pagination} />
   )
 }

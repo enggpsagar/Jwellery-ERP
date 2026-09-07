@@ -1,13 +1,9 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { InvoiceStatus } from "@prisma/client"
 
 import { getPurchases } from "@/lib/actions/purchase-actions"
-import { PurchaseTable } from "@/components/purchases/purchase-table"
-import { PurchasesToolbar } from "@/components/purchases/purchases-toolbar"
-import { DataTablePagination } from "@/components/shared/data-table-pagination"
-import { PageBackHeader } from "@/components/shared/page-back-header"
-import { Button } from "@/components/ui/button"
+import { getStoreLocations } from "@/lib/actions/store-location-actions"
+import { PurchasesClient } from "@/components/purchases/purchases-client"
 
 export const metadata: Metadata = {
   title: "Purchases",
@@ -37,41 +33,12 @@ export default async function PurchasesPage({ searchParams }: PurchasesPageProps
   const isValidStatus = (Object.values(InvoiceStatus) as string[]).includes(params.status ?? "")
   const status = isValidStatus ? (params.status as InvoiceStatus) : "ALL"
 
-  const { purchases, pagination } = await getPurchases({
-    page,
-    pageSize,
-    search,
-    sortBy,
-    sortOrder,
-    status,
-  })
+  const [{ purchases, pagination }, locations] = await Promise.all([
+    getPurchases({ page, pageSize, search, sortBy, sortOrder, status }),
+    getStoreLocations(),
+  ])
 
   return (
-    <main className="space-y-6 p-6">
-      <PageBackHeader
-        title="Purchases"
-        description="Record vendor purchases and bring new stock into inventory."
-        backHref="/dashboard"
-        backLabel="Back to Dashboard"
-        action={
-          <Link href="/purchases/new">
-            <Button>New Purchase</Button>
-          </Link>
-        }
-      />
-
-      <PurchasesToolbar />
-
-      <div>
-        <PurchaseTable purchases={purchases} />
-        <DataTablePagination
-          page={pagination.page}
-          totalPages={pagination.totalPages}
-          totalCount={pagination.totalCount}
-          pageSize={pagination.pageSize}
-          itemLabel="purchases"
-        />
-      </div>
-    </main>
+    <PurchasesClient purchases={purchases} locations={locations} pagination={pagination} />
   )
 }

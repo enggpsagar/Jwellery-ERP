@@ -3,11 +3,11 @@
 import Link from "next/link"
 
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
-import { Eye, Pencil, Printer, ArrowLeftCircle } from "lucide-react"
+import { ArrowLeftCircle } from "lucide-react"
 
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
-import { formatShortDate } from "@/lib/utils"
+import { cn, formatShortDate } from "@/lib/utils"
 
 /** Money as it reads on a jewellery ledger. */
 function inr(value: number | string | null | undefined) {
@@ -34,9 +34,14 @@ type InvoiceRow = {
 
 type InvoiceTableProps = {
   invoices: InvoiceRow[]
+  /** Which row's detail shows in the panel alongside this table — when
+   * provided, a row click activates it instead of the row's own hover-card
+   * link navigating away. Same convention as PurchaseTable/CustomersTable. */
+  activeInvoiceId?: string | null
+  onActivate?: (id: string) => void
 }
 
-export function InvoiceTable({ invoices }: InvoiceTableProps) {
+export function InvoiceTable({ invoices, activeInvoiceId, onActivate }: InvoiceTableProps) {
   if (!invoices.length) {
     return (
       <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
@@ -58,17 +63,26 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <SortableTableHead label="Total" sortKey="totalAmount" defaultSortBy="invoiceDate" />
               <th className="px-4 py-3 text-left font-medium">Balance</th>
-              <th className="px-4 py-3 text-left font-medium">Actions</th>
             </tr>
           </thead>
 
           <tbody>
-            {invoices.map((invoice) => (
-              <tr key={invoice.id} className="border-b last:border-0">
+            {invoices.map((invoice) => {
+              const isActive = activeInvoiceId === invoice.id
+              return (
+              <tr
+                key={invoice.id}
+                onClick={() => onActivate?.(invoice.id)}
+                className={cn(
+                  "border-b last:border-0",
+                  onActivate && "cursor-pointer hover:bg-accent/50",
+                  isActive && "bg-accent",
+                )}
+              >
                 <td className="px-4 py-3 font-medium">
                   <RecordHoverCard
                     label={invoice.invoiceNumber}
-                    href={`/billing/${invoice.id}`}
+                    href={onActivate ? undefined : `/billing/${invoice.id}`}
                     title={invoice.invoiceNumber}
                     subtitle={invoice.customer?.name ?? undefined}
                     footerLabel="Open invoice"
@@ -174,35 +188,9 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                     "₹0.00"
                   )}
                 </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1">
-                    <Link
-                      href={`/billing/${invoice.id}`}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
-                      title="View invoice"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Link>
-
-                    <Link
-                      href={`/billing/${invoice.id}/edit`}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-indigo-600 hover:bg-indigo-50"
-                      title="Edit invoice"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Link>
-
-                    <Link
-                      href={`/billing/${invoice.id}/print`}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-muted"
-                      title="Print invoice"
-                    >
-                      <Printer className="h-4 w-4" />
-                    </Link>
-                  </div>
-                </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>

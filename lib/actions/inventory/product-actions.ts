@@ -1,13 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ChargeType, PurityType, Prisma } from "@prisma/client";
+import { ChargeType, PurityType, TargetStyle, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scope";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import type { ProductFormState } from "@/lib/inventory/product-types";
+import { buildSkuPrefix } from "@/lib/inventory/product-sku";
 import { buildExcelExport } from "@/lib/excel-export";
 
 function parseNullableString(value: FormDataEntryValue | null) {
@@ -53,6 +54,7 @@ function serializeProduct(product: {
   categoryId: string | null;
   categoryTypeId: string | null;
   metalTypeId: string | null;
+  targetStyle: TargetStyle | null;
   stoneOriginOptionId: string | null;
   category: { id: string; name: string } | null;
   categoryType: { id: string; name: string } | null;
@@ -90,6 +92,7 @@ function serializeProduct(product: {
     categoryId: product.categoryId,
     categoryTypeId: product.categoryTypeId,
     metalTypeId: product.metalTypeId,
+    targetStyle: product.targetStyle,
     stoneOriginOptionId: product.stoneOriginOptionId,
     category: product.category,
     categoryType: product.categoryType,
@@ -227,6 +230,7 @@ function mapProductRow(row: {
   category: { name: string } | null;
   categoryType: { name: string } | null;
   metalType: { name: string } | null;
+  targetStyle: TargetStyle | null;
   defaultPurity: PurityType | null;
   defaultMakingCharge: { toString(): string } | null;
   defaultMakingChargeType: ChargeType;
@@ -255,6 +259,7 @@ function mapProductRow(row: {
     category: row.category?.name ?? "-",
     ornamentType: row.categoryType?.name ?? null,
     metalType: row.metalType?.name ?? "-",
+    targetStyle: row.targetStyle,
     defaultPurity: row.defaultPurity,
     defaultMakingCharge:
       row.defaultMakingCharge != null ? Number(row.defaultMakingCharge) : null,
@@ -507,7 +512,6 @@ export async function createProduct(
   formData: FormData,
 ): Promise<ProductFormState> {
   try {
-    const productCode = String(formData.get("productCode") ?? "").trim();
     const name = String(formData.get("name") ?? "").trim();
 
     const categoryId = String(formData.get("categoryId") ?? "").trim();
@@ -516,6 +520,11 @@ export async function createProduct(
     const stoneOriginOptionId = parseNullableString(
       formData.get("stoneOriginOptionId"),
     );
+
+    const targetStyle = parseOptionalEnum(
+      formData.get("targetStyle"),
+      Object.values(TargetStyle),
+    ) as TargetStyle | null;
 
     const defaultPurity = parseOptionalEnum(
       formData.get("defaultPurity"),
@@ -576,12 +585,12 @@ export async function createProduct(
 
     const errors: Record<string, string[]> = {};
 
-    if (!productCode) {
-      errors.productCode = ["Product code is required"];
-    }
-
     if (!name) {
       errors.name = ["Product name is required"];
+    }
+
+    if (!targetStyle) {
+      errors.targetStyle = ["Style is required"];
     }
 
     const storeId = await requireStoreScope();
@@ -605,51 +614,93 @@ export async function createProduct(
       };
     }
 
-    const existing = await prisma.product.findFirst({
-      where: { productCode, storeId },
-      select: { id: true },
+    // SKU generation needs the actual names behind the ids validated above
+    // (validateTaxonomySelection only confirms they exist) — one small
+    // lookup rather than re-plumbing names through from the client, which
+    // can't be trusted anyway (a stale/tampered label would silently mint
+    // a wrong-looking SKU).
+    const [metalRow, categoryTypeRow, categoryRow] = await Promise.all([
+      prisma.storeMetal.findFirst({ where: { id: metalTypeId, storeId }, select: { name: true } }),
+      categoryTypeId
+        ? prisma.storeCategoryType.findFirst({ where: { id: categoryTypeId, storeId }, select: { name: true } })
+        : Promise.resolve(null),
+      prisma.storeCategory.findFirst({ where: { id: categoryId, storeId }, select: { name: true } }),
+    ]);
+
+    const skuPrefix = buildSkuPrefix({
+      metalName: metalRow?.name ?? "X",
+      purity: defaultPurity,
+      targetStyle: targetStyle as TargetStyle,
+      categoryTypeName: categoryTypeRow?.name ?? null,
+      categoryName: categoryRow?.name ?? null,
     });
 
-    if (existing) {
-      return {
-        success: false,
-        message: "Product code already exists.",
-        errors: {
-          productCode: ["This product code is already in use."],
-        },
-      };
+    // Sequence is scoped to this exact prefix (e.g. "G22-LR"), not global —
+    // two different designs (say a Silver Chain) start back at 001 under
+    // their own prefix. Max-based rather than a plain count, same reasoning
+    // as generateStockCode's own comment: a deleted product regresses a
+    // count onto a code that already exists, and a retry would recompute
+    // the identical value and collide again.
+    const existingCodes = await prisma.product.findMany({
+      where: { storeId, productCode: { startsWith: `${skuPrefix}-` } },
+      select: { productCode: true },
+    });
+    const highestSeq = existingCodes.reduce((max, row) => {
+      const match = new RegExp(`^${skuPrefix}-(\\d+)$`).exec(row.productCode);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+
+    let createdProduct: { id: string; name: string; productCode: string } | null = null;
+
+    for (let attempt = 0; attempt < 5 && !createdProduct; attempt += 1) {
+      const productCode = `${skuPrefix}-${String(highestSeq + 1 + attempt).padStart(3, "0")}`;
+
+      try {
+        createdProduct = await prisma.product.create({
+          select: { id: true, name: true, productCode: true },
+          data: {
+            storeId,
+            productCode,
+            name,
+            categoryId,
+            categoryTypeId,
+            metalTypeId,
+            targetStyle: targetStyle as TargetStyle,
+            stoneOriginOptionId,
+            defaultPurity,
+            defaultMakingCharge,
+            defaultMakingChargeType,
+            defaultStoneCharge,
+            defaultStoneChargeType,
+            defaultGrossWeight,
+            defaultNetWeight,
+            defaultStoneWeight,
+            defaultCaratWeight,
+            hasStoneComponent,
+            defaultStoneRate,
+            defaultStoneMetalTypeName,
+            defaultStoneTypeNames,
+            designCode,
+            hsnCode,
+            description,
+            notes,
+            isActive,
+          },
+        });
+      } catch (error) {
+        const isDuplicateCode =
+          error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+        if (!isDuplicateCode) throw error;
+      }
     }
 
-    const createdProduct = await prisma.product.create({
-      select: { id: true, name: true, productCode: true },
-      data: {
-        storeId,
-        productCode,
-        name,
-        categoryId,
-        categoryTypeId,
-        metalTypeId,
-        stoneOriginOptionId,
-        defaultPurity,
-        defaultMakingCharge,
-        defaultMakingChargeType,
-        defaultStoneCharge,
-        defaultStoneChargeType,
-        defaultGrossWeight,
-        defaultNetWeight,
-        defaultStoneWeight,
-        defaultCaratWeight,
-        hasStoneComponent,
-        defaultStoneRate,
-        defaultStoneMetalTypeName,
-        defaultStoneTypeNames,
-        designCode,
-        hsnCode,
-        description,
-        notes,
-        isActive,
-      },
-    });
+    if (!createdProduct) {
+      return {
+        success: false,
+        message: "Could not generate a unique SKU — please try again.",
+        errors: {},
+      };
+    }
 
     // Optional stock entry, opted into on the product form. Everything the
     // row needs beyond a quantity already lives on the product, so nothing
@@ -789,7 +840,9 @@ export async function updateProduct(
   formData: FormData,
 ): Promise<ProductFormState> {
   try {
-    const productCode = String(formData.get("productCode") || "").trim();
+    // productCode is immutable after creation — same convention as every
+    // other auto-generated code in this app (invoiceNumber, stockCode,
+    // jobNumber) — so it's simply never read from the edit form.
     const name = String(formData.get("name") || "").trim();
 
     const categoryId = String(formData.get("categoryId") ?? "").trim();
@@ -798,6 +851,11 @@ export async function updateProduct(
     const stoneOriginOptionId = parseNullableString(
       formData.get("stoneOriginOptionId"),
     );
+
+    const targetStyle = parseOptionalEnum(
+      formData.get("targetStyle"),
+      Object.values(TargetStyle),
+    ) as TargetStyle | null;
 
     const defaultPurity = parseOptionalEnum(
       formData.get("defaultPurity"),
@@ -857,10 +915,6 @@ export async function updateProduct(
 
     const errors: Record<string, string[]> = {};
 
-    if (!productCode) {
-      errors.productCode = ["Product code is required"];
-    }
-
     if (!name) {
       errors.name = ["Product name is required"];
     }
@@ -886,33 +940,14 @@ export async function updateProduct(
       };
     }
 
-    const existing = await prisma.product.findFirst({
-      where: {
-        productCode,
-        storeId,
-        NOT: { id },
-      },
-      select: { id: true },
-    });
-
-    if (existing) {
-      return {
-        success: false,
-        message: "Product code already exists",
-        errors: {
-          productCode: ["This product code is already in use"],
-        },
-      };
-    }
-
    const { count } = await prisma.product.updateMany({
   where: { id, storeId },
   data: {
-    productCode,
     name,
     categoryId,
     categoryTypeId,
     metalTypeId,
+    targetStyle,
     stoneOriginOptionId,
     defaultPurity,
     defaultMakingCharge,

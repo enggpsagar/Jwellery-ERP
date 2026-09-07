@@ -502,11 +502,23 @@ model KarigarMetal {
 model Product {
   id                        String               @id @default(cuid())
   storeId                   String
+  // Doubles as this product's SKU — auto-generated at creation from Metal +
+  // Purity + Target Style + Category Type (e.g. "G22-LR-001" for a Gold 22K
+  // Ladies Ring), never hand-typed or regenerated afterward (see
+  // generateProductSku() in lib/actions/inventory/product-actions.ts).
+  // Products created before this scheme shipped keep whatever code they
+  // already had — this was a plain manually-typed field until then, so an
+  // older value may not follow the structured format at all.
   productCode               String
   name                      String
   categoryId                String?
   categoryTypeId            String?
   metalTypeId               String?
+  // "Ladies"/"Gents"/"Kids"/"Unisex" — see TargetStyle's own doc comment.
+  // Nullable so pre-existing products (created before this field shipped)
+  // aren't retroactively forced to pick one; the create form requires it
+  // for every new product since the SKU generator needs it.
+  targetStyle               TargetStyle?
   // Only meaningful when metalType.isGemstone is true — mirrors
   // categoryTypeId's role exactly: metalTypeId stays the stone selector
   // (Diamond, Ruby, ...), this is the finer-grained pick of which of that
@@ -2097,6 +2109,19 @@ enum TransportMode {
 enum ChargeType {
   FIXED
   PERCENTAGE
+}
+
+// Who a design is made for — the one piece of a Product's SKU (see
+// Product.productCode's own doc comment) with no other home in the schema:
+// Category/Type already names the item shape (Ring, Chain, ...), Metal/
+// Purity already name the material, but nothing previously captured
+// "Ladies" vs "Gents" vs "Kids" vs "Unisex" — a real, independent axis a
+// store designs against (the same Ring category spans all four).
+enum TargetStyle {
+  LADIES
+  GENTS
+  KIDS
+  UNISEX
 }
 
 // The three GST registration types a jewellery business can operate under

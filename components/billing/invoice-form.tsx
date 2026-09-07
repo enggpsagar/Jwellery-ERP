@@ -49,6 +49,7 @@ type StockOption = {
   id: string
   stockCode: string
   productName: string
+  productCode: string | null
   hsnCode: string | null
   metalType: { id: string; name: string } | null
   purity: string | null
@@ -1210,7 +1211,7 @@ export function InvoiceForm({
                       }}
                       isDisabled={(stock) => availableForStock(stock.id, item.key) <= 0}
                       renderLabel={(stock) =>
-                        `${stock.stockCode} — ${stock.productName} (${availableForStock(stock.id, item.key)} available)`
+                        `${stock.stockCode}${stock.productCode ? ` (${stock.productCode})` : ""} — ${stock.productName} (${availableForStock(stock.id, item.key)} available)`
                       }
                       placeholder="Search stock item..."
                       className="w-full"

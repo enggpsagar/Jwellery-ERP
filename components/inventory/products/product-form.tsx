@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 
-import { PurityType } from "@prisma/client";
+import { PurityType, TargetStyle } from "@prisma/client";
 
 import type { ProductFormState } from "@/lib/inventory/product-types";
+import { buildSkuPrefix, TARGET_STYLE_LABEL } from "@/lib/inventory/product-sku";
 import {
   getStoreCategoryTypes,
   getStoreMetalOrigins,
@@ -76,6 +77,7 @@ type Product = {
   categoryId: string | null;
   categoryTypeId: string | null;
   metalTypeId: string | null;
+  targetStyle: string | null;
   stoneOriginOptionId: string | null;
   defaultPurity: string | null;
   defaultMakingCharge: string | null;
@@ -146,6 +148,8 @@ export function ProductForm({
   );
 
   const [metalTypeId, setMetalTypeId] = useState(product?.metalTypeId ?? "");
+
+  const [targetStyle, setTargetStyle] = useState(product?.targetStyle ?? "");
 
   const [stoneOriginOptionId, setStoneOriginOptionId] = useState(
     product?.stoneOriginOptionId ?? "",
@@ -237,6 +241,23 @@ export function ProductForm({
     : Object.values(PurityType);
 
   const [puritySearch, setPuritySearch] = useState("");
+
+  // Live preview of the auto-generated SKU (see buildSkuPrefix's own doc
+  // comment) — the actual sequence number ("-001") is only known once the
+  // product is saved (it depends on how many other products already share
+  // this exact prefix), so this shows the prefix alone with a placeholder.
+  const selectedCategoryType = types.find((item) => item.id === categoryTypeId);
+  const selectedCategory = categories.find((item) => item.id === categoryId);
+  const skuPreview =
+    selectedMetal && targetStyle
+      ? buildSkuPrefix({
+          metalName: selectedMetal.name,
+          purity: defaultPurity === "__none__" ? null : (defaultPurity as PurityType),
+          targetStyle: targetStyle as TargetStyle,
+          categoryTypeName: selectedCategoryType?.name ?? null,
+          categoryName: selectedCategory?.name ?? null,
+        })
+      : null;
 
   const filteredPurities = useMemo(() => {
     const query = puritySearch.trim().toLowerCase();
@@ -585,14 +606,33 @@ export function ProductForm({
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div>
-            <Label htmlFor="productCode">Product Code <RequiredMark /></Label>
+            <Label htmlFor="productCode">SKU / Product Code</Label>
 
-            <Input
-              id="productCode"
-              name="productCode"
-              defaultValue={product?.productCode ?? ""}
-              placeholder="RING-001"
-            />
+            {mode === "edit" ? (
+              <div
+                id="productCode"
+                className="flex h-11 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground"
+              >
+                {product?.productCode}
+              </div>
+            ) : (
+              <>
+                <div
+                  id="productCode"
+                  className="flex h-11 items-center rounded-md border border-dashed bg-muted/40 px-3 text-sm text-muted-foreground"
+                >
+                  {skuPreview ? (
+                    <span className="font-medium text-foreground">{skuPreview}-###</span>
+                  ) : (
+                    "Select Metal, Purity, Style and Category to preview"
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Generated automatically from Metal + Purity + Style + Category — the
+                  final number is assigned when you save.
+                </p>
+              </>
+            )}
 
             <ErrorText error={state.errors.productCode} />
           </div>
@@ -730,6 +770,27 @@ export function ProductForm({
             />
 
             <ErrorText error={state.errors.categoryTypeId} />
+          </div>
+
+          <div>
+            <Label htmlFor="targetStyle">Style <RequiredMark /></Label>
+
+            <Select value={targetStyle || "__none__"} onValueChange={(value) => setTargetStyle(value === "__none__" ? "" : value)}>
+              <SelectTrigger id="targetStyle" className="h-11 w-full">
+                <SelectValue placeholder="Select style" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.values(TargetStyle).map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {TARGET_STYLE_LABEL[value]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <input type="hidden" name="targetStyle" value={targetStyle} />
+
+            <ErrorText error={state.errors.targetStyle} />
           </div>
         </div>
       </div>

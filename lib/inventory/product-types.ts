@@ -9,6 +9,7 @@ export type ProductFormState = {
     categoryId?: string[]
     categoryTypeId?: string[]
     metalTypeId?: string[]
+    targetStyle?: string[]
     stoneOriginOptionId?: string[]
     defaultPurity?: string[]
     defaultMakingCharge?: string[]

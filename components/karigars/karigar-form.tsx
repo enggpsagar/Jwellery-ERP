@@ -247,21 +247,25 @@ export function KarigarForm({
           />
         </div>
 
-        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <Label>Artisan Code</Label>
-          {karigar ? (
+        {/* Nothing to show yet on create — the code doesn't exist until the
+            artisan is actually saved, so "Auto-generated on save" was a
+            field with no real information in it. Only rendered in edit
+            mode; Name below takes the freed-up column on create instead of
+            leaving an empty cell, so every pairing after it (State/City,
+            etc.) still lands exactly where it already does in edit mode. */}
+        {karigar ? (
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+            <Label>Artisan Code</Label>
             <Input value={karigar.code} disabled readOnly />
-          ) : (
-            <p className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-              Auto-generated on save
+            <p className="text-xs text-muted-foreground">
+              System-generated and unique — cannot be edited.
             </p>
-          )}
-          <p className="text-xs text-muted-foreground">
-            System-generated and unique — cannot be edited.
-          </p>
-        </div>
+          </div>
+        ) : null}
 
-        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+        <div
+          className={`space-y-2 rounded-lg transition-colors focus-within:bg-accent/40 ${karigar ? "" : "md:col-span-2"}`}
+        >
           <Label>Name <RequiredMark /></Label>
           <Input
             name="name"

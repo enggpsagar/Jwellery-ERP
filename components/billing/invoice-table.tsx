@@ -70,7 +70,7 @@ export function InvoiceTable({ invoices, locations, activeInvoiceId, onActivate 
             <tr className="border-b">
               <SortableTableHead label="Invoice #" sortKey="invoiceNumber" defaultSortBy="invoiceDate" />
               <SortableTableHead label="Date" sortKey="invoiceDate" defaultSortBy="invoiceDate" />
-              <th className="px-4 py-3 text-left font-medium">Customer</th>
+              <th className="px-4 py-3 text-left font-medium">Party</th>
               <th className="px-4 py-3 text-left font-medium">Source</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <SortableTableHead label="Total" sortKey="totalAmount" defaultSortBy="invoiceDate" />
@@ -106,7 +106,7 @@ export function InvoiceTable({ invoices, locations, activeInvoiceId, onActivate 
                             label: "Date",
                             value: formatShortDate(invoice.invoiceDate),
                           },
-                          { label: "Customer", value: invoice.customer?.name },
+                          { label: "Party", value: invoice.customer?.name },
                           { label: "Phone", value: invoice.customer?.phone },
                           { label: "Status", value: invoice.status },
                         ],
@@ -142,7 +142,7 @@ export function InvoiceTable({ invoices, locations, activeInvoiceId, onActivate 
                       href={`/customers/${invoice.customer.id}?from=${encodeURIComponent("/billing")}`}
                       title={invoice.customer.name}
                       subtitle={invoice.customer.phone ?? undefined}
-                      footerLabel="View customer"
+                      footerLabel="View party"
                       className="text-primary underline-offset-4 hover:underline"
                       sections={[
                         {

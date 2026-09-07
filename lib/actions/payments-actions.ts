@@ -207,7 +207,7 @@ export async function recordCustomerPayment(
 
     const customerId = String(formData.get("customerId") || "").trim()
     if (!customerId) {
-      return { success: false, message: "Select a customer" }
+      return { success: false, message: "Select a party" }
     }
 
     const paymentsRaw = String(formData.get("paymentsJson") || "[]")
@@ -224,7 +224,7 @@ export async function recordCustomerPayment(
       where: { id: customerId, storeId },
       select: { id: true, name: true },
     })
-    if (!customer) return { success: false, message: "Customer not found" }
+    if (!customer) return { success: false, message: "Party not found" }
 
     await prisma.$transaction(
       payments.map((payment, index) =>

@@ -218,7 +218,7 @@ export async function completeQuickSale(
     const customerId = String(formData.get("customerId") || "").trim();
 
     if (!customerId) {
-      return { success: false, message: "Select a customer." };
+      return { success: false, message: "Select a party." };
     }
 
     if (!stockId) {
@@ -255,7 +255,7 @@ export async function completeQuickSale(
     });
 
     if (!customer) {
-      return { success: false, message: "Select a customer." };
+      return { success: false, message: "Select a party." };
     }
 
     const stock = await prisma.inventoryStock.findFirst({

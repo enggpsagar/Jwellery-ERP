@@ -44,7 +44,7 @@ export function CreditNoteDetailContent({ creditNote }: CreditNoteDetailContentP
           </div>
 
           <div>
-            <p className="text-sm text-muted-foreground">Customer</p>
+            <p className="text-sm text-muted-foreground">Party</p>
             {creditNote.customer ? (
               <Link
                 href={`/customers/${creditNote.customer.id}`}

@@ -68,17 +68,17 @@ export function ArchivedCustomersClient({
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
-        title="Archived Customers"
-        description="Customers removed from the active list. Restoring one makes it available in Customers again."
+        title="Archived Parties"
+        description="Parties removed from the active list. Restoring one makes it available in Parties again."
         backHref="/customers"
-        backLabel="Back to Customers"
+        backLabel="Back to Parties"
       />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
         <div className="space-y-4">
           <div className="max-w-sm">
             <Input
-              placeholder="Search archived customers..."
+              placeholder="Search archived parties..."
               value={search}
               onChange={(e) => updateSearch(e.target.value)}
             />

@@ -22,7 +22,7 @@ const TYPE_ICON: Record<GlobalSearchResultType, typeof Users> = {
 };
 
 const TYPE_LABEL: Record<GlobalSearchResultType, string> = {
-  customer: "Customer",
+  customer: "Party",
   product: "Product",
   invoice: "Invoice",
   karigar: "Artisan",
@@ -220,7 +220,7 @@ export function GlobalSearch() {
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Search customers, invoices, products..."
+          placeholder="Search parties, invoices, products..."
           // Recessed well rather than a bordered box, and the focus ring picks
           // up the app's gold so focus reads as part of the theme instead of
           // the browser default.
@@ -261,7 +261,7 @@ export function GlobalSearch() {
                 }}
                 onFocus={() => setOpen(true)}
                 onKeyDown={handleKeyDown}
-                placeholder="Search customers, invoices, products..."
+                placeholder="Search parties, invoices, products..."
                 className="h-10 rounded-full border-transparent bg-muted/70 pl-9 pr-9 shadow-inner"
                 role="combobox"
                 aria-expanded={showDropdown}

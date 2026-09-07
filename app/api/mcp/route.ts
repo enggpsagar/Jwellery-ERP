@@ -38,7 +38,7 @@ function buildServer(request: Request) {
 
   server.tool(
     "list_customers",
-    "List customers for the authenticated store, with optional search and pagination.",
+    "List parties for the authenticated store, with optional search and pagination.",
     {
       search: z.string().optional(),
       page: z.number().int().min(1).optional(),
@@ -57,14 +57,14 @@ function buildServer(request: Request) {
 
   server.tool(
     "get_customer",
-    "Get a single customer by id.",
+    "Get a single party by id.",
     { id: z.string() },
     async ({ id }) => {
       try {
         const auth = await requireApiKey(request, PERMISSIONS.CUSTOMER_VIEW);
         const customer = await getCustomerByIdCore(id, auth.storeId);
         if (!customer) {
-          return { content: [{ type: "text" as const, text: "Customer not found" }], isError: true };
+          return { content: [{ type: "text" as const, text: "Party not found" }], isError: true };
         }
         return { content: [{ type: "text" as const, text: JSON.stringify(customer) }] };
       } catch (error) {
@@ -75,7 +75,7 @@ function buildServer(request: Request) {
 
   server.tool(
     "create_customer",
-    "Create a new customer. Name and phone are required; every other field is optional.",
+    "Create a new party. Name and phone are required; every other field is optional.",
     {
       name: z.string(),
       phone: z.string(),

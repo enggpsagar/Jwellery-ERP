@@ -134,7 +134,7 @@ export const MODULE_DEFINITIONS: {
 }[] = [
   {
     key: "customers",
-    label: "Customers",
+    label: "Parties",
     href: "/customers",
     permissions: [
       PERMISSIONS.CUSTOMER_VIEW,

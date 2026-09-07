@@ -38,7 +38,7 @@ export default async function NewQuotationPage() {
         requireConfirm
         header={{
           title: "New Quotation",
-          description: "Prepare a price quotation for a customer.",
+          description: "Prepare a price quotation for a party.",
           backHref: "/quotations",
           backLabel: "Back to Quotations",
         }}

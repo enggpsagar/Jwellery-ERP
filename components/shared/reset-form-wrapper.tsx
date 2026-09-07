@@ -92,7 +92,7 @@ export function ResetFormWrapper({ children, requireConfirm = false, header }: R
           <DialogHeader>
             <DialogTitle>Reset this form?</DialogTitle>
             <DialogDescription>
-              Everything entered so far — line items, the selected customer/vendor,
+              Everything entered so far — line items, the selected party/vendor,
               payment details — will be cleared. This can&apos;t be undone.
             </DialogDescription>
           </DialogHeader>

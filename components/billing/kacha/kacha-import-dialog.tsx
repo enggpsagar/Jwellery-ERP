@@ -87,7 +87,7 @@ export function KachaImportDialog() {
           <DialogTitle>Import Kacha slips</DialogTitle>
           <DialogDescription>
             One row per line item. Rows sharing a <strong>Slip Ref</strong>{" "}
-            become a single slip. Customers are matched on phone number, then
+            become a single slip. Parties are matched on phone number, then
             name — they must already exist.
           </DialogDescription>
         </DialogHeader>

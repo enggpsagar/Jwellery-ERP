@@ -683,7 +683,7 @@ export function invoiceEmail(params: {
   ]);
 
   const customerLines = addressBlock([
-    `<strong>${params.customer.name || "Customer"}</strong>`,
+    `<strong>${params.customer.name || "Party"}</strong>`,
     params.customer.addressLine1,
     params.customer.addressLine2,
     [params.customer.city, params.customer.state].filter(Boolean).join(", ") || null,
@@ -767,7 +767,7 @@ export function kachaSlipEmail(params: {
   balanceAmount: number;
 }) {
   const body = `
-    <p>Hi ${params.customerName || "Customer"},</p>
+    <p>Hi ${params.customerName || "Party"},</p>
     <p>Here is your Kacha slip <strong>${params.slipNumber}</strong> dated ${formatDate(params.invoiceDate)}.</p>
     ${itemsTable(params.items)}
     <div style="font-size: 13px; max-width: 260px; margin-left: auto;">

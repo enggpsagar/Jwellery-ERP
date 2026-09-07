@@ -84,7 +84,7 @@ export function CustomersTable({
   if (!customers.length) {
     return (
       <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
-        No customers found.
+        No parties found.
       </div>
     )
   }
@@ -101,11 +101,11 @@ export function CustomersTable({
                   type="checkbox"
                   checked={allSelected}
                   onChange={(e) => toggleAll(e.target.checked)}
-                  aria-label="Select all customers"
+                  aria-label="Select all parties"
                   className="h-4 w-4 rounded border-input"
                 />
               </th>
-              <SortableTableHead label="Customer Name" sortKey="name" defaultSortBy="createdAt" />
+              <SortableTableHead label="Party Name" sortKey="name" defaultSortBy="createdAt" />
               <th className="px-4 py-3 font-medium">Phone</th>
               <th className="px-4 py-3 font-medium">City</th>
               <th className="px-4 py-3 font-medium">State</th>
@@ -144,7 +144,7 @@ export function CustomersTable({
                       href={onActivate ? undefined : `/customers/${customer.id}`}
                       title={toTitleCase(customer.name)}
                       subtitle={customer.customerType ?? undefined}
-                      footerLabel="View customer"
+                      footerLabel="View party"
                       sections={[
                         {
                           fields: [

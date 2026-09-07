@@ -81,8 +81,8 @@ export function CustomerReturnLauncher({ customerId, action }: CustomerReturnLau
           ) : !invoices || invoices.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {isRefund
-                ? "None of this customer's invoices currently qualify for a return — either the return window has passed, or none are paid/partially paid."
-                : "None of this customer's invoices currently qualify for Return & Exchange — only draft or partially-paid invoices can be cancelled and replaced."}
+                ? "None of this party's invoices currently qualify for a return — either the return window has passed, or none are paid/partially paid."
+                : "None of this party's invoices currently qualify for Return & Exchange — only draft or partially-paid invoices can be cancelled and replaced."}
             </p>
           ) : null}
 

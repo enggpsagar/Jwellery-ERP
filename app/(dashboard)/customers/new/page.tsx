@@ -8,7 +8,7 @@ import { CustomerCreateForm } from "@/components/customers/customer-create-form"
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 
 export const metadata: Metadata = {
-  title: "Add Customer",
+  title: "Add Party",
 }
 
 type NewCustomerPageProps = {
@@ -27,10 +27,10 @@ export default async function NewCustomerPage({
     <main className="mx-auto max-w-4xl space-y-6 p-6">
       <ResetFormWrapper
         header={{
-          title: "Add Customer",
-          description: "Create a new customer you sell to.",
+          title: "Add Party",
+          description: "Create a new party you sell to.",
           backHref: returnTo ?? "/customers",
-          backLabel: returnTo ? "Back without saving" : "Back to Customers",
+          backLabel: returnTo ? "Back without saving" : "Back to Parties",
         }}
       >
         <CustomerCreateForm

@@ -74,7 +74,7 @@ export function DraftOrdersClient({
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
       <div className="space-y-3">
         <DataTableToolbar
-          searchPlaceholder="Search by order number, customer..."
+          searchPlaceholder="Search by order number, party..."
           sortOptions={SORT_OPTIONS}
           defaultSortBy="orderDate"
           hideSort

@@ -80,7 +80,7 @@ const mainNav: NavItem[] = [
     icon: LayoutDashboard,
   },
   {
-    title: "Customers",
+    title: "Parties",
     href: "/customers",
     icon: Users,
     countKey: "customers",

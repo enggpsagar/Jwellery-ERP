@@ -6,7 +6,7 @@ export default function CustomersLoading() {
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader className="h-24 w-24" />
-          <p className="text-sm text-muted-foreground">Loading customers...</p>
+          <p className="text-sm text-muted-foreground">Loading parties...</p>
         </div>
       </div>
     </main>

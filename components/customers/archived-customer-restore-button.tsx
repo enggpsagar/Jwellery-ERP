@@ -47,7 +47,7 @@ export function ArchivedCustomerRestoreButton({
       }
     } catch (error) {
       console.error(error)
-      toast.error("Failed to restore customer")
+      toast.error("Failed to restore party")
     } finally {
       setLoading(false)
     }
@@ -74,10 +74,10 @@ export function ArchivedCustomerRestoreButton({
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Restore Customer</DialogTitle>
+            <DialogTitle>Restore Party</DialogTitle>
             <DialogDescription>
               Restore <span className="font-medium text-foreground">{customerName}</span>{" "}
-              to the active customer list?
+              to the active party list?
             </DialogDescription>
           </DialogHeader>
 
@@ -98,7 +98,7 @@ export function ArchivedCustomerRestoreButton({
                   Restoring...
                 </>
               ) : (
-                "Restore Customer"
+                "Restore Party"
               )}
             </Button>
           </DialogFooter>

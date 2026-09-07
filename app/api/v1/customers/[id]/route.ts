@@ -15,7 +15,7 @@ export async function GET(request: Request, { params }: Params) {
 
     const customer = await getCustomerByIdCore(id, auth.storeId);
     if (!customer) {
-      return apiError("NOT_FOUND", "Customer not found", 404);
+      return apiError("NOT_FOUND", "Party not found", 404);
     }
 
     return NextResponse.json({ customer });
@@ -38,7 +38,7 @@ export async function PATCH(request: Request, { params }: Params) {
       return NextResponse.json({ success: true, message: result.message });
     }
 
-    if (result.message === "Customer not found") {
+    if (result.message === "Party not found") {
       return apiError("NOT_FOUND", result.message, 404);
     }
 

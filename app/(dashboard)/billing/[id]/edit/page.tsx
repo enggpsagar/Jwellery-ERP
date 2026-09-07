@@ -127,7 +127,7 @@ export default async function EditInvoicePage({ params }: Props) {
     <main className="space-y-6 p-6">
       <PageBackHeader
         title={`Edit ${invoice.invoiceNumber}`}
-        description="Change quantities, rates, making/stone charges, or any line item — stock and the customer's ledger are reconciled automatically."
+        description="Change quantities, rates, making/stone charges, or any line item — stock and the party's ledger are reconciled automatically."
         backHref={`/billing/${id}`}
         backLabel="Back to Invoice"
       />

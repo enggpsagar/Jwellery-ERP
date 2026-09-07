@@ -311,7 +311,7 @@ export async function exportQuotationsToExcel(
       "Quotation Number": quotation.quotationNumber,
       Date: formatShortDate(quotation.quotationDate),
       "Valid Until": quotation.validUntil ? formatShortDate(quotation.validUntil) : "",
-      Customer: quotation.customer?.name || "",
+      Party: quotation.customer?.name || "",
       Status: quotation.status,
       Subtotal: quotation.subtotal,
       "Making Charges": quotation.makingCharges,
@@ -428,7 +428,7 @@ export async function createQuotation(
     const itemsRaw = String(formData.get("itemsJson") || "[]");
 
     if (!customerId) {
-      return { success: false, message: "Please select a customer" };
+      return { success: false, message: "Please select a party" };
     }
 
     let items: QuotationLineItemInput[] = [];
@@ -487,7 +487,7 @@ export async function createQuotation(
       select: { id: true },
     });
     if (!customer) {
-      return { success: false, message: "Please select a customer" };
+      return { success: false, message: "Please select a party" };
     }
 
     // A Composition-scheme store is legally barred from charging any GST at

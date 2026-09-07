@@ -52,7 +52,7 @@ export function QuotationDetailContent({ quotation }: QuotationDetailContentProp
           )}
 
           <div>
-            <p className="text-sm text-muted-foreground">Customer</p>
+            <p className="text-sm text-muted-foreground">Party</p>
             <p className="font-medium">
               {quotation.customer?.name}{" "}
               {quotation.customer?.phone ? `(${quotation.customer.phone})` : ""}

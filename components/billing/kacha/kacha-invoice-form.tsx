@@ -547,7 +547,7 @@ export function KachaInvoiceForm({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <Label>Customer <RequiredMark /></Label>
+          <Label>Party <RequiredMark /></Label>
           <CustomerSelect
             customers={customers}
             defaultValue={customerId}

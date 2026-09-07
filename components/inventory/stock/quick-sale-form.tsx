@@ -271,7 +271,7 @@ export function QuickSaleForm({
                 <div className="divide-y rounded-lg border px-4">
                   <ReviewRow label="Item" value={target.productName} />
                   <ReviewRow label="Tag" value={target.stockCode} />
-                  <ReviewRow label="Customer" value={customerName || "—"} />
+                  <ReviewRow label="Party" value={customerName || "—"} />
                   {quantityValue > 1 ? (
                     <ReviewRow label="Quantity" value={String(quantityValue)} />
                   ) : null}
@@ -317,7 +317,7 @@ export function QuickSaleForm({
             ) : (
               <>
                 <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label htmlFor="customer" required>Customer</Label>
+                  <Label htmlFor="customer" required>Party</Label>
                   {/* The same picker the full invoice form uses — searchable,
                       and able to create a customer inline, so a first-time
                       buyer at the counter doesn't end the sale.
@@ -396,7 +396,7 @@ export function QuickSaleForm({
                   Paid in full
                   {!fullyPaid ? (
                     <span className="text-xs text-muted-foreground">
-                      — goes to the customer&apos;s ledger
+                      — goes to the party&apos;s ledger
                     </span>
                   ) : null}
                 </label>

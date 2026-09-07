@@ -42,7 +42,7 @@ export function DraftOrderDetailContent({ order }: DraftOrderDetailContentProps)
             </div>
           ) : null}
           <div>
-            <div className="text-muted-foreground">Customer</div>
+            <div className="text-muted-foreground">Party</div>
             <div className="mt-1 font-medium">
               {order.customer ? (
                 <Link href={`/customers/${order.customer.id}`} className="text-primary hover:underline">

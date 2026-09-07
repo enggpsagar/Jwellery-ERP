@@ -34,7 +34,7 @@ export function CustomersPagination({
       <p className="text-muted-foreground">
         Showing <span className="font-medium">{start}</span> to{" "}
         <span className="font-medium">{end}</span> of{" "}
-        <span className="font-medium">{totalCount}</span> customers
+        <span className="font-medium">{totalCount}</span> parties
       </p>
 
       <div className="flex items-center gap-2">

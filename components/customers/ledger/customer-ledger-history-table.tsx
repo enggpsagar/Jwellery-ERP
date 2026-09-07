@@ -212,7 +212,7 @@ export function CustomerLedgerHistoryTable({ entries }: { entries: CustomerLedge
               <TableRow>
                 <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   {entries.length === 0
-                    ? "No ledger entries found for this customer."
+                    ? "No ledger entries found for this party."
                     : "No entries match your search."}
                 </TableCell>
               </TableRow>

@@ -106,7 +106,7 @@ export function DraftOrdersTable({
                 </th>
                 <SortableTableHead label="Order #" sortKey="orderNumber" defaultSortBy="orderDate" />
                 <SortableTableHead label="Date" sortKey="orderDate" defaultSortBy="orderDate" />
-                <th className="px-4 py-3 text-left font-medium">Customer</th>
+                <th className="px-4 py-3 text-left font-medium">Party</th>
                 <th className="px-4 py-3 text-left font-medium">Items</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Artisan Job</th>

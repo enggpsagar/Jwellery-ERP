@@ -46,7 +46,7 @@ export default async function QuotationsPage({ searchParams }: QuotationsPagePro
     <main className="space-y-6 p-6">
       <PageBackHeader
         title="Quotations"
-        description="Create and track price quotations for customers."
+        description="Create and track price quotations for parties."
         backHref="/dashboard"
         backLabel="Back to Dashboard"
         action={

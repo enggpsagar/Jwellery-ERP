@@ -25,7 +25,7 @@ type QuotationsToolbarProps = {
 export function QuotationsToolbar({ selectedIds, bulkActions }: QuotationsToolbarProps) {
   return (
     <DataTableToolbar
-      searchPlaceholder="Search by quotation number, customer..."
+      searchPlaceholder="Search by quotation number, party..."
       sortOptions={SORT_OPTIONS}
       defaultSortBy="quotationDate"
       defaultSortOrder="desc"

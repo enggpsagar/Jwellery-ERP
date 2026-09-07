@@ -189,7 +189,7 @@ const TABS = [
   { key: "vendorPurchase", label: "Vendor Purchase" },
   { key: "inventory", label: "Inventory Valuation" },
   { key: "karigar", label: "Artisan Outstanding" },
-  { key: "dues", label: "Customer Dues" },
+  { key: "dues", label: "Party Dues" },
   { key: "goldFlow", label: "Gold Flow" },
   { key: "metalWise", label: "By Metal" },
   { key: "itemLedger", label: "Item Ledger" },
@@ -422,7 +422,7 @@ export function ReportsTabs({
           <ReportSearchBar
             value={salesTable.search}
             onChange={salesTable.setSearch}
-            placeholder="Search invoice #, customer, status..."
+            placeholder="Search invoice #, party, status..."
             resultSummary={`${salesTable.totalCount} of ${salesTable.rawCount}`}
           />
 
@@ -432,7 +432,7 @@ export function ReportsTabs({
                 <tr className="border-b">
                   <SortableTh label="Invoice #" sortKey="invoiceNumber" activeSortKey={salesTable.sortKey} sortDir={salesTable.sortDir} onSort={salesTable.toggleSort} />
                   <SortableTh label="Date" sortKey="date" activeSortKey={salesTable.sortKey} sortDir={salesTable.sortDir} onSort={salesTable.toggleSort} />
-                  <SortableTh label="Customer" sortKey="customer" activeSortKey={salesTable.sortKey} sortDir={salesTable.sortDir} onSort={salesTable.toggleSort} />
+                  <SortableTh label="Party" sortKey="customer" activeSortKey={salesTable.sortKey} sortDir={salesTable.sortDir} onSort={salesTable.toggleSort} />
                   <SortableTh label="Total" sortKey="total" activeSortKey={salesTable.sortKey} sortDir={salesTable.sortDir} onSort={salesTable.toggleSort} />
                   <SortableTh label="Balance" sortKey="balance" activeSortKey={salesTable.sortKey} sortDir={salesTable.sortDir} onSort={salesTable.toggleSort} />
                 </tr>
@@ -462,7 +462,7 @@ export function ReportsTabs({
                                   label: "Date",
                                   value: formatShortDate(invoice.invoiceDate),
                                 },
-                                { label: "Customer", value: invoice.customerName },
+                                { label: "Party", value: invoice.customerName },
                               ],
                             },
                             {
@@ -932,14 +932,14 @@ export function ReportsTabs({
       {activeTab === "dues" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <StatCard title="Customers with Dues" value={customerDues.customerCount} />
+            <StatCard title="Parties with Dues" value={customerDues.customerCount} />
             <StatCard title="Total Outstanding" value={`₹${customerDues.totalDue.toFixed(2)}`} tone="outstanding" />
           </div>
 
           <ReportSearchBar
             value={duesTable.search}
             onChange={duesTable.setSearch}
-            placeholder="Search customer, phone..."
+            placeholder="Search party, phone..."
             resultSummary={`${duesTable.totalCount} of ${duesTable.rawCount}`}
           />
 
@@ -947,7 +947,7 @@ export function ReportsTabs({
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="border-b">
-                  <SortableTh label="Customer" sortKey="name" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
+                  <SortableTh label="Party" sortKey="name" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
                   <SortableTh label="Phone" sortKey="phone" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
                   <SortableTh label="Invoices" sortKey="invoices" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
                   <SortableTh label="Total Due" sortKey="totalDue" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
@@ -957,7 +957,7 @@ export function ReportsTabs({
                 {duesTable.pageRows.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
-                      No outstanding customer dues match this search.
+                      No outstanding party dues match this search.
                     </td>
                   </tr>
                 ) : (
@@ -969,7 +969,7 @@ export function ReportsTabs({
                           href={`/customers/${customer.id}?from=${encodeURIComponent("/reports")}`}
                           title={customer.name}
                           subtitle={customer.phone ?? undefined}
-                          footerLabel="View customer"
+                          footerLabel="View party"
                           className="text-primary underline-offset-4 hover:underline"
                           sections={[
                             {
@@ -1205,7 +1205,7 @@ export function ReportsTabs({
           <ReportSearchBar
             value={itemLedgerTable.search}
             onChange={itemLedgerTable.setSearch}
-            placeholder="Search stock code, item, vendor, customer..."
+            placeholder="Search stock code, item, vendor, party..."
             resultSummary={`${itemLedgerTable.totalCount} of ${itemLedgerTable.rawCount}`}
           />
 

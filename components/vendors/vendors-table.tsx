@@ -106,9 +106,9 @@ export function VendorsTable({
                 />
               </th>
               <SortableTableHead label="Vendor Name" sortKey="name" defaultSortBy="createdAt" />
-              <th className="px-4 py-3 font-medium">Phone</th>
-              <th className="px-4 py-3 font-medium">City</th>
-              <th className="px-4 py-3 font-medium">State</th>
+              <SortableTableHead label="Phone" sortKey="phone" defaultSortBy="createdAt" />
+              <SortableTableHead label="City" sortKey="city" defaultSortBy="createdAt" />
+              <SortableTableHead label="State" sortKey="state" defaultSortBy="createdAt" />
               <SortableTableHead label="Balance" sortKey="openingBalance" defaultSortBy="createdAt" />
             </tr>
           </thead>

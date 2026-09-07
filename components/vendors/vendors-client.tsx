@@ -60,7 +60,12 @@ export function VendorsClient({
 
         <div className="flex items-center gap-2">
           <Link href="/vendors/archived">
-            <Button variant="outline">Archived Vendors</Button>
+            <Button
+              variant="outline"
+              className="border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+            >
+              Archived Vendors
+            </Button>
           </Link>
 
           <Link href="/vendors/new">

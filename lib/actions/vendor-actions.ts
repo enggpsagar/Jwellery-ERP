@@ -69,7 +69,7 @@ export type VendorFormState = {
   }
 }
 
-export type VendorSortBy = "name" | "createdAt" | "openingBalance"
+export type VendorSortBy = "name" | "createdAt" | "openingBalance" | "phone" | "city" | "state"
 export type SortOrder = "asc" | "desc"
 
 export type GetVendorsParams = {
@@ -159,6 +159,9 @@ function getVendorOrderBy(
 ) {
   if (sortBy === "name") return { name: sortOrder }
   if (sortBy === "openingBalance") return { openingBalance: sortOrder }
+  if (sortBy === "phone") return { phone: sortOrder }
+  if (sortBy === "city") return { city: sortOrder }
+  if (sortBy === "state") return { state: sortOrder }
   return { createdAt: sortOrder }
 }
 

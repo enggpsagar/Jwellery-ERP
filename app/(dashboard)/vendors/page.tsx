@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 
-import { getVendors } from "@/lib/actions/vendor-actions"
+import { getVendors, type VendorSortBy } from "@/lib/actions/vendor-actions"
 import { getStates } from "@/lib/actions/location-actions"
 import { VendorsClient } from "@/components/vendors/vendors-client"
 
@@ -13,7 +13,7 @@ type VendorsPageProps = {
     page?: string
     pageSize?: string
     search?: string
-    sortBy?: "name" | "createdAt" | "openingBalance"
+    sortBy?: VendorSortBy
     sortOrder?: "asc" | "desc"
   }>
 }

@@ -94,6 +94,18 @@ const mainNav: NavItem[] = [
     quickAddHref: "/vendors/new",
   },
   {
+    title: "Billing",
+    href: "/billing",
+    icon: ReceiptText,
+    items: [
+      { title: "Pakka Invoices", href: "/billing", quickAddHref: "/billing/new", countKey: "invoices" },
+      { title: "Kacha Slips", href: "/billing/kacha", quickAddHref: "/billing/kacha/new", countKey: "kachaInvoices" },
+      // No quickAddHref — a Credit Note is always issued from an existing
+      // invoice's return flow, there is no standalone "new" page for one.
+      { title: "Credit Notes", href: "/billing/credit-notes", countKey: "creditNotes" },
+    ],
+  },
+  {
     title: "Ledger",
     href: "/ledger",
     icon: CircleDollarSign,
@@ -142,18 +154,6 @@ const mainNav: NavItem[] = [
     href: "/orders",
     icon: Phone,
     quickAddHref: "/orders/new",
-  },
-  {
-    title: "Billing",
-    href: "/billing",
-    icon: ReceiptText,
-    items: [
-      { title: "Pakka Invoices", href: "/billing", quickAddHref: "/billing/new", countKey: "invoices" },
-      { title: "Kacha Slips", href: "/billing/kacha", quickAddHref: "/billing/kacha/new", countKey: "kachaInvoices" },
-      // No quickAddHref — a Credit Note is always issued from an existing
-      // invoice's return flow, there is no standalone "new" page for one.
-      { title: "Credit Notes", href: "/billing/credit-notes", countKey: "creditNotes" },
-    ],
   },
   {
     title: "Reports",

@@ -5,6 +5,7 @@ import Link from "next/link"
 import type { Quotation } from "@/lib/actions/quotation-actions"
 import { formatShortDate } from "@/lib/utils"
 import { ShareWhatsAppButton } from "@/components/billing/share-whatsapp-button"
+import { EditQuotationDialog } from "@/components/quotations/edit-quotation-dialog"
 import { DeleteQuotationButton } from "@/components/quotations/delete-quotation-button"
 import { Button } from "@/components/ui/button"
 
@@ -39,6 +40,12 @@ export function QuotationActionsBar({ quotation, businessName }: QuotationAction
       <ShareWhatsAppButton phone={quotation.customer?.phone} message={whatsappMessage} />
       {quotation.status === "open" ? (
         <>
+          <EditQuotationDialog
+            quotationId={quotation.id}
+            quotationDate={quotation.quotationDate}
+            validUntil={quotation.validUntil}
+            notes={quotation.notes}
+          />
           <DeleteQuotationButton
             quotationId={quotation.id}
             quotationNumber={quotation.quotationNumber}

@@ -600,6 +600,55 @@ export async function createQuotation(
 }
 
 /** Only "open" quotations (never converted) can be deleted. */
+/**
+ * Metadata-only edit — Quotation Date, Valid Until, Notes. Never the
+ * customer or line items: those still need the real create flow. Safe to
+ * allow even a bit more broadly than Invoice/Purchase's equivalent dialogs
+ * since a quotation is a pure proposal — it never touches stock or the
+ * ledger (see convertQuotationToInvoice's own comment on that) — but kept
+ * to the same metadata scope for consistency with every other document's
+ * edit dialog in this app. Only allowed while still "open", same as
+ * deleteQuotation.
+ */
+export async function updateQuotation(
+  id: string,
+  prevState: QuotationFormState = initialState,
+  formData: FormData,
+): Promise<QuotationFormState> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const quotation = await prisma.quotation.findFirst({ where: { id, storeId } });
+    if (!quotation) return { success: false, message: "Quotation not found" };
+    if (quotation.status !== "open") {
+      return { success: false, message: "Only open quotations can be edited" };
+    }
+
+    const quotationDateRaw = String(formData.get("quotationDate") || "");
+    if (!quotationDateRaw) return { success: false, message: "Quotation Date is required" };
+
+    const validUntilRaw = String(formData.get("validUntil") || "");
+    const notes = String(formData.get("notes") || "").trim() || null;
+
+    await prisma.quotation.update({
+      where: { id },
+      data: {
+        quotationDate: new Date(quotationDateRaw),
+        validUntil: validUntilRaw ? new Date(validUntilRaw) : null,
+        notes,
+      },
+    });
+
+    revalidatePath("/quotations");
+    revalidatePath(`/quotations/${id}`);
+
+    return { success: true, message: "Quotation updated" };
+  } catch (error) {
+    console.error("updateQuotation error:", error);
+    return { success: false, message: "Failed to update quotation" };
+  }
+}
+
 export async function deleteQuotation(id: string): Promise<QuotationFormState> {
   try {
     // Authorization lives here, not only in middleware: a server action is a

@@ -19,6 +19,7 @@ type ProductRow = {
   defaultNetWeight: number | null
   defaultGrossWeight: number | null
   defaultStoneWeight: number | null
+  stockQty: number
   isActive: boolean
   createdAt: Date | string
 }
@@ -110,6 +111,7 @@ export function ProductsTable({
                 />
               </th>
               <SortableTableHead label="Product Code" sortKey="productCode" defaultSortBy="createdAt" />
+              <th className="px-4 py-3 text-left font-medium">Stock Qty</th>
               <SortableTableHead label="Title" sortKey="name" defaultSortBy="createdAt" />
               <SortableTableHead label="Active" sortKey="isActive" defaultSortBy="createdAt" />
             </tr>
@@ -140,11 +142,13 @@ export function ProductsTable({
                     />
                   </td>
 
-                  <td className="px-4 py-3 text-foreground">{product.productCode}</td>
-
                   <td className="px-4 py-3 font-medium text-foreground">
+                    {/* First column carries the hover-card preview, matching
+                        every other table in the app (Customers, Purchases,
+                        Invoices) — it used to sit on the Title column
+                        instead, one column later than everywhere else. */}
                     <RecordHoverCard
-                      label={product.name}
+                      label={product.productCode}
                       href={onActivate ? undefined : `/inventory/products/${product.id}`}
                       title={product.name}
                       subtitle={product.productCode}
@@ -181,11 +185,22 @@ export function ProductsTable({
                                   ? `${product.defaultStoneWeight.toFixed(3)} g`
                                   : null,
                             },
+                            { label: "In stock", value: `${product.stockQty}` },
                           ],
                         },
                       ]}
                     />
                   </td>
+
+                  <td className="px-4 py-3 text-foreground">
+                    {product.stockQty > 0 ? (
+                      product.stockQty
+                    ) : (
+                      <span className="text-muted-foreground">0</span>
+                    )}
+                  </td>
+
+                  <td className="px-4 py-3 text-foreground">{product.name}</td>
 
                   <td className="px-4 py-3">
                     <ActiveBadge isActive={product.isActive} />

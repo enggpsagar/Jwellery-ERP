@@ -312,7 +312,27 @@ export async function getProducts(params: GetProductsParams = {}) {
     }),
   ]);
 
-  const products = rows.map(mapProductRow);
+  // How many pieces of this product design are currently in stock, summed
+  // across every InventoryStock lot it has (a design can have several —
+  // different purchases, different pieces) — quantity is already the live
+  // remaining count (it only reaches 0, flipping status to SOLD, as pieces
+  // sell), so a plain sum needs no status filter of its own.
+  const stockQtyByProductId = new Map<string, number>();
+  if (rows.length > 0) {
+    const stockTotals = await prisma.inventoryStock.groupBy({
+      by: ["productId"],
+      where: { storeId, productId: { in: rows.map((row) => row.id) } },
+      _sum: { quantity: true },
+    });
+    for (const total of stockTotals) {
+      stockQtyByProductId.set(total.productId, total._sum.quantity ?? 0);
+    }
+  }
+
+  const products = rows.map((row) => ({
+    ...mapProductRow(row),
+    stockQty: stockQtyByProductId.get(row.id) ?? 0,
+  }));
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   return {

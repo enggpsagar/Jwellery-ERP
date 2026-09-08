@@ -168,7 +168,7 @@ export function DraftOrdersTable({
                         <button
                           type="button"
                           onClick={() => setConfirmOrder(order)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700"
                           aria-label={`Delete ${order.orderNumber}`}
                           title="Delete draft order"
                         >
@@ -207,6 +207,7 @@ export function DraftOrdersTable({
             <Button
               type="button"
               variant="destructive"
+              className="bg-red-600 text-white hover:bg-red-700"
               onClick={handleDelete}
               disabled={deleting}
             >

@@ -110,7 +110,7 @@ export function StoreDeleteDialog({ storeId, storeName }: StoreDeleteDialogProps
       <button
         type="button"
         onClick={handleOpen}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700"
         aria-label={`Delete ${storeName}`}
         title="Delete store"
       >
@@ -194,6 +194,7 @@ export function StoreDeleteDialog({ storeId, storeName }: StoreDeleteDialogProps
             <Button
               type="button"
               variant="destructive"
+              className="bg-red-600 text-white hover:bg-red-700"
               onClick={handleDelete}
               disabled={!canDelete || deleting}
             >

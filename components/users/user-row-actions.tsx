@@ -115,6 +115,7 @@ export function UserRowActions({ user }: { user: ActionableUser }) {
       <Button
         variant="destructive"
         size="icon"
+        className="bg-red-600 text-white hover:bg-red-700"
         disabled={isPending}
         onClick={handleDelete}
         title="Delete user"

@@ -80,7 +80,11 @@ export function DeleteAllKachaDialog({
 
   return (
     <>
-      <Button variant="destructive" onClick={() => handleOpenChange(true)}>
+      <Button
+        variant="destructive"
+        className="bg-red-600 text-white hover:bg-red-700"
+        onClick={() => handleOpenChange(true)}
+      >
         <Trash2 className="mr-1 h-4 w-4" />
         {selectedIds.length ? `Delete ${selectedIds.length} selected` : "Delete all"}
       </Button>
@@ -189,6 +193,7 @@ export function DeleteAllKachaDialog({
             </Button>
             <Button
               variant="destructive"
+              className="bg-red-600 text-white hover:bg-red-700"
               onClick={handleDelete}
               disabled={!canDelete || pending}
             >

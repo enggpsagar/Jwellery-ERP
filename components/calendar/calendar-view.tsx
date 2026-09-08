@@ -232,10 +232,10 @@ export function CalendarView({ year, month, events }: CalendarViewProps) {
                   <button
                     type="button"
                     onClick={() => handleDelete(event)}
-                    className="text-muted-foreground hover:text-red-600"
+                    className="inline-flex h-5 w-5 items-center justify-center rounded bg-red-600 text-white hover:bg-red-700"
                     title="Delete reminder"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3 w-3" />
                   </button>
                 </div>
               )}

@@ -111,7 +111,7 @@ export function VendorRowActions({
         <button
           type="button"
           onClick={() => setConfirmAction("delete")}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700"
           aria-label={`Delete ${vendor.name}`}
           title="Delete vendor"
         >
@@ -207,6 +207,7 @@ export function VendorRowActions({
                 <Button
                   type="button"
                   variant="destructive"
+                  className="bg-red-600 text-white hover:bg-red-700"
                   onClick={handleDelete}
                   disabled={loading}
                 >

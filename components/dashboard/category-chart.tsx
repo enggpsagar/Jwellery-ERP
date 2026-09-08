@@ -63,6 +63,48 @@ const CHART_COLORS = [
 
 const MAX_SLICES = CHART_COLORS.length
 
+const RADIAN = Math.PI / 180
+
+/**
+ * Percentage only, drawn inside the wedge rather than outside it — an
+ * outside label on a large slice (e.g. 68%) can sit far enough left/up to
+ * clip against the chart's own bounding box. Category names stay in the
+ * tooltip and the legend table below instead of risking that overflow.
+ * Skipped for slivers too small to hold readable text.
+ */
+function renderPieSliceLabel(props: {
+  cx?: number
+  cy?: number
+  midAngle?: number
+  innerRadius?: number
+  outerRadius?: number
+  percent?: number
+}) {
+  const { cx = 0, cy = 0, midAngle = 0, innerRadius = 0, outerRadius = 0, percent = 0 } = props
+  if (percent < 0.05) return null
+
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.6
+  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor="middle"
+      dominantBaseline="central"
+      fill="#fff"
+      fontSize={12}
+      fontWeight={600}
+      paintOrder="stroke"
+      stroke="rgba(0,0,0,0.35)"
+      strokeWidth={3}
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  )
+}
+
 type CategoryChartProps = {
   initialData: RevenueByMetal
   initialPeriod: RevenueByMetalPeriod
@@ -183,7 +225,7 @@ export function CategoryChart({ initialData, initialPeriod }: CategoryChartProps
                   nameKey="category"
                   outerRadius={95}
                   labelLine={false}
-                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                  label={renderPieSliceLabel}
                 >
                   {chartData.map((entry) => (
                     <Cell key={entry.category} fill={entry.fill} />

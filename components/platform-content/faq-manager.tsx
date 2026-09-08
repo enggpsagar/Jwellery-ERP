@@ -168,7 +168,7 @@ export function FaqManager({ faqs }: { faqs: PlatformFaqRow[] }) {
                 type="button"
                 onClick={() => handleDelete(faq)}
                 disabled={busyId === faq.id}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-50"
                 aria-label={`Delete ${faq.question}`}
                 title="Delete FAQ"
               >

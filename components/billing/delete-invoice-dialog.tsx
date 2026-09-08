@@ -71,7 +71,7 @@ export function DeleteInvoiceDialog({ invoiceId, invoiceNumber, compact = false 
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700"
           aria-label={`Delete ${invoiceNumber}`}
           title="Delete invoice"
         >
@@ -81,7 +81,7 @@ export function DeleteInvoiceDialog({ invoiceId, invoiceNumber, compact = false 
         <Button
           type="button"
           variant="outline"
-          className="gap-2 border-red-200 text-red-600 hover:bg-red-50"
+          className="gap-2 border-transparent bg-red-600 text-white hover:bg-red-700"
           onClick={() => setOpen(true)}
         >
           <Trash2 className="h-4 w-4" />
@@ -106,7 +106,13 @@ export function DeleteInvoiceDialog({ invoiceId, invoiceNumber, compact = false 
           <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={loading}>
             Cancel
           </Button>
-          <Button type="button" variant="destructive" onClick={handleDelete} disabled={loading}>
+          <Button
+            type="button"
+            variant="destructive"
+            className="bg-red-600 text-white hover:bg-red-700"
+            onClick={handleDelete}
+            disabled={loading}
+          >
             {loading ? (
               <>
                 <Loader className="mr-2 h-4 w-4" />

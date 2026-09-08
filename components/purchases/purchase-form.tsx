@@ -6,7 +6,7 @@ import { useActionState } from "react"
 import { Plus, Trash2, ChevronDown, ChevronRight, Search } from "lucide-react"
 import type { PartyGstType, PurityType } from "@prisma/client"
 
-import { createPurchase, type PurchaseFormState } from "@/lib/actions/purchase-actions"
+import { createPurchase, updatePurchase, type PurchaseFormState } from "@/lib/actions/purchase-actions"
 import { PURITY_SELECT_OPTIONS, isCaratWeighedMetal, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 import { useToast } from "@/components/providers/toast-provider"
 import { computePurchaseGst, isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst"
@@ -66,7 +66,7 @@ type ProductOption = {
   isActive: boolean
 }
 
-type LineItem = {
+export type LineItem = {
   key: string
   productId: string
   itemName: string
@@ -209,6 +209,23 @@ type PurchaseFormProps = {
    * in purchase-actions.ts) is the actual source of truth for what a
    * restricted user may write; this only seeds the initial UI selection. */
   initialLocationId?: string | null
+  /** Set only when editing an existing DRAFT/PARTIAL purchase's line items —
+   * switches the submit target from createPurchase to
+   * updatePurchase.bind(null, editPurchaseId), locks the Vendor field, and
+   * replaces "Paid Now" with a read-only display of what's already been
+   * recorded (this form never rewrites existing payments). Mirrors
+   * InvoiceForm's identically-scoped editInvoiceId prop. */
+  editPurchaseId?: string
+  initialVendorId?: string
+  initialItems?: LineItem[]
+  defaultPurchaseDate?: string
+  defaultVendorInvoiceNumber?: string
+  defaultNotes?: string
+  /** This purchase's already-recorded paidAmount — shown read-only in edit
+   * mode instead of "Paid Now"'s payment-method rows. updatePurchase's
+   * full-item-edit branch never rewrites existing payments (see its own
+   * doc comment), so this form has no way to change it either. */
+  defaultPaidAmount?: number
 }
 
 /**
@@ -245,6 +262,13 @@ export function PurchaseForm({
   defaultGstRate = 0,
   storeState,
   initialLocationId,
+  editPurchaseId,
+  initialVendorId,
+  initialItems,
+  defaultPurchaseDate,
+  defaultVendorInvoiceNumber,
+  defaultNotes,
+  defaultPaidAmount,
 }: PurchaseFormProps) {
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
@@ -271,7 +295,7 @@ export function PurchaseForm({
     metalType: product.metalType?.name ?? null,
   }))
 
-  const [vendorId, setVendorId] = useState("")
+  const [vendorId, setVendorId] = useState(initialVendorId ?? "")
   const [locationId, setLocationId] = useState(initialLocationId ?? "")
   // No longer a user-facing control (each line picks its own GST rate in
   // its own Details region, same as Invoice) — this is just what a freshly-
@@ -283,13 +307,17 @@ export function PurchaseForm({
       gstRates.find((r) => r.isActive)?.id ??
       "",
   )
-  const [items, setItems] = useState<LineItem[]>(() => [emptyLineItem(gstRateId, "initial")])
+  const [items, setItems] = useState<LineItem[]>(
+    () => initialItems ?? [emptyLineItem(gstRateId, "initial")],
+  )
   // Collapsed by default, matching Invoice's own compact-by-default rule —
   // see expandedKeys' doc comment on InvoiceForm. A line auto-expands once
   // a Product is picked for it (applyProductToItem below), since that's
   // the moment fields the user still needs to fill in (weights, rate) get
   // meaningful.
-  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(
+    () => new Set(initialItems?.map((item) => item.key) ?? []),
+  )
   const toggleExpanded = (key: string) => {
     setExpandedKeys((prev) => {
       const next = new Set(prev)
@@ -309,19 +337,19 @@ export function PurchaseForm({
   // from these rows (never tracked separately), so it can't go stale relative
   // to what's actually been entered.
   const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
-  const paidAmount = paymentRows.reduce((sum, row) => sum + (row.amount || 0), 0)
+  const paidAmount = editPurchaseId ? defaultPaidAmount ?? 0 : paymentRows.reduce((sum, row) => sum + (row.amount || 0), 0)
 
   const selectedVendor = vendors.find((vendor) => vendor.id === vendorId)
 
   const [state, formAction, pending] = useActionState(
-    createPurchase,
+    editPurchaseId ? updatePurchase.bind(null, editPurchaseId) : createPurchase,
     initialState,
   )
 
   useEffect(() => {
-    if (state.success && state.purchaseId) {
-      toast.success(state.message || "Purchase created")
-      router.push(`/purchases/${state.purchaseId}`)
+    if (state.success) {
+      toast.success(state.message || (editPurchaseId ? "Purchase updated" : "Purchase created"))
+      router.push(`/purchases/${editPurchaseId ?? state.purchaseId}`)
     } else if (!state.success && state.message) {
       toast.error(state.message)
     }
@@ -840,15 +868,27 @@ export function PurchaseForm({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <div className="space-y-2 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Vendor <RequiredMark /></Label>
-          <VendorSelect
-            key={vendorSelectKey}
-            vendors={vendors}
-            name="vendorId"
-            defaultValue={vendorId}
-            onChange={(id) => setVendorId(id)}
-            addNewHref={`/vendors/new?returnTo=${encodeURIComponent(RETURN_TO)}`}
-            onBeforeAddNew={() => saveDraft()}
-          />
+          {editPurchaseId ? (
+            // Moving a purchase's stock/ledger history to a different vendor
+            // is a distinct operation nobody asked for — same lock/reasoning
+            // as InvoiceForm's Party field in edit mode.
+            <>
+              <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                {selectedVendor?.name ?? "—"}
+              </div>
+              <input type="hidden" name="vendorId" value={vendorId} />
+            </>
+          ) : (
+            <VendorSelect
+              key={vendorSelectKey}
+              vendors={vendors}
+              name="vendorId"
+              defaultValue={vendorId}
+              onChange={(id) => setVendorId(id)}
+              addNewHref={`/vendors/new?returnTo=${encodeURIComponent(RETURN_TO)}`}
+              onBeforeAddNew={() => saveDraft()}
+            />
+          )}
           {selectedVendor ? (
             <p className="text-xs text-muted-foreground">
               Vendor GST Type: <span className="font-medium">{partyGstTypeLabel(selectedVendor.gstType)}</span>
@@ -864,7 +904,7 @@ export function PurchaseForm({
           <Input
             type="date"
             name="purchaseDate"
-            defaultValue={new Date().toISOString().slice(0, 10)}
+            defaultValue={defaultPurchaseDate ?? new Date().toISOString().slice(0, 10)}
           />
         </div>
 
@@ -873,6 +913,7 @@ export function PurchaseForm({
           <Input
             name="vendorInvoiceNumber"
             placeholder="Vendor's own invoice/bill number"
+            defaultValue={defaultVendorInvoiceNumber ?? ""}
           />
         </div>
 
@@ -1399,20 +1440,36 @@ export function PurchaseForm({
         </div>
 
         <div className="rounded-lg border border-[color-mix(in_oklab,var(--chart-3)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-3)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-3)_12%,transparent)]">
-          <PaidNowFields
-            rows={paymentRows}
-            onRowsChange={setPaymentRows}
-            maxAmount={totalAmount > 0 ? totalAmount : undefined}
-            // A purchase pays the vendor — money out, not in — so "received"
-            // is the wrong word here even though the mechanics (method +
-            // amount rows) are identical to a Sale's Paid Now.
-            direction="pay"
-          />
+          {editPurchaseId ? (
+            // Editing line items never rewrites what's already been paid —
+            // use Record Payment for that instead — so this is a plain
+            // read-only figure, same treatment as InvoiceForm's
+            // legacyPaidAmount in edit mode.
+            <div className="space-y-1">
+              <Label>Already Paid</Label>
+              <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                ₹{paidAmount.toFixed(2)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Recorded separately via Record Payment — not editable here.
+              </p>
+            </div>
+          ) : (
+            <PaidNowFields
+              rows={paymentRows}
+              onRowsChange={setPaymentRows}
+              maxAmount={totalAmount > 0 ? totalAmount : undefined}
+              // A purchase pays the vendor — money out, not in — so "received"
+              // is the wrong word here even though the mechanics (method +
+              // amount rows) are identical to a Sale's Paid Now.
+              direction="pay"
+            />
+          )}
         </div>
 
         <div className="space-y-2 rounded-lg border border-[color-mix(in_oklab,var(--chart-1)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-1)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-1)_12%,transparent)]">
           <Label>Notes</Label>
-          <Textarea name="notes" rows={2} />
+          <Textarea name="notes" rows={2} defaultValue={defaultNotes ?? ""} />
         </div>
       </div>
 
@@ -1455,7 +1512,9 @@ export function PurchaseForm({
 
       <div className="flex justify-end">
         <Button type="submit" disabled={pending || !canSubmit || paidOverTotal}>
-          {pending ? "Creating..." : "Create Purchase"}
+          {editPurchaseId
+            ? pending ? "Saving..." : "Save Changes"
+            : pending ? "Creating..." : "Create Purchase"}
         </Button>
       </div>
     </form>

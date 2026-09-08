@@ -1060,14 +1060,11 @@ export async function recordPurchasePayment(
 }
 
 /**
- * Purchase date, vendor invoice number, store location, and notes are
- * editable here — no vendor, line items, or amounts. Once stock is created
- * and ledger entries posted, changing those needs the same
- * restore-old-stock/reapply-new-stock/reconcile-ledger reversal logic
- * updateInvoice's own line-item branch uses, not a quiet in-place edit —
- * mirrors EditInvoiceDialog's identically-scoped metadata-only edit.
- * Available regardless of payment status (any non-deleted purchase), since
- * none of these fields affect stock or money.
+ * Purchase date, vendor invoice number, store location, and notes are always
+ * editable here (any non-deleted purchase — none of these fields affect
+ * stock or money). When the form also submits `itemsJson`, this branches
+ * into a full line-item edit instead — see the dedicated comment on that
+ * branch below for the reconciliation strategy.
  */
 export async function updatePurchase(
   id: string,
@@ -1082,7 +1079,12 @@ export async function updatePurchase(
     }
 
     const storeId = await requireStoreScope();
-    const purchase = await prisma.purchase.findFirst({ where: { id, storeId } });
+    const purchase = await prisma.purchase.findFirst({
+      where: { id, storeId },
+      include: {
+        items: { include: { inventoryStock: { select: { id: true, status: true } } } },
+      },
+    });
     if (!purchase) return { success: false, message: "Purchase not found" };
 
     const purchaseDateRaw = String(formData.get("purchaseDate") || "");
@@ -1096,19 +1098,317 @@ export async function updatePurchase(
       return { success: false, message: locationResolution.message };
     }
     const resolvedLocationId = locationResolution.locationId;
+    const purchaseDate = purchaseDateRaw ? new Date(purchaseDateRaw) : purchase.purchaseDate;
 
-    await prisma.purchase.update({
-      where: { id },
-      data: {
-        purchaseDate: purchaseDateRaw ? new Date(purchaseDateRaw) : purchase.purchaseDate,
-        vendorInvoiceNumber,
-        notes,
-        locationId: resolvedLocationId ?? null,
-      },
+    if (!formData.has("itemsJson")) {
+      await prisma.purchase.update({
+        where: { id },
+        data: {
+          purchaseDate,
+          vendorInvoiceNumber,
+          notes,
+          locationId: resolvedLocationId ?? null,
+        },
+      });
+
+      revalidatePath("/purchases");
+      revalidatePath(`/purchases/${id}`);
+
+      return { success: true, message: "Purchase updated" };
+    }
+
+    // --- Full line-item edit ---
+    //
+    // Only DRAFT/PARTIAL purchases whose stock hasn't moved at all since it
+    // was created (same movedStockCount/status check deletePurchase already
+    // uses) can go through this branch — unlike Invoice's shared stock pool
+    // (restore quantity back, then reapply), each PurchaseItem here owns a
+    // DEDICATED InventoryStock row created just for it. There is no existing
+    // precedent in this codebase for reconciling a purchase-created stock
+    // row that's since been drawn down by an unrelated sale/transfer without
+    // corrupting that other record's already-recorded facts, so rather than
+    // attempt that, an edit is simply refused once any of this purchase's
+    // stock has moved — the metadata-only fields above stay editable
+    // regardless.
+    //
+    // With stock provably untouched, this is free to do the same
+    // delete-and-recreate createPurchase itself does: drop every old
+    // PurchaseItem (unlinking the FK) and its now-orphaned InventoryStock
+    // row (InventoryTransaction cascades), then run createPurchase's own
+    // stock-creation steps again against the new item set.
+    if (purchase.status !== InvoiceStatus.DRAFT && purchase.status !== InvoiceStatus.PARTIAL) {
+      return {
+        success: false,
+        message: "Only draft or partially-paid purchases can have their line items edited.",
+      };
+    }
+
+    const oldStockIds = purchase.items
+      .map((item) => item.inventoryStockId)
+      .filter((value): value is string => Boolean(value));
+
+    const movedStockCount = oldStockIds.length
+      ? await prisma.inventoryTransaction.count({
+          where: {
+            inventoryStockId: { in: oldStockIds },
+            transactionType: { not: InventoryTransactionType.PURCHASE },
+          },
+        })
+      : 0;
+
+    const stockUntouched =
+      movedStockCount === 0 &&
+      purchase.items.every(
+        (item) =>
+          !item.inventoryStock || item.inventoryStock.status === InventoryStockStatus.IN_STOCK,
+      );
+
+    if (!stockUntouched) {
+      return {
+        success: false,
+        message:
+          "One or more items from this purchase have already been sold, transferred, or adjusted — line items can no longer be edited. Date, vendor invoice number, location, and notes can still be changed.",
+      };
+    }
+
+    const itemsRaw = String(formData.get("itemsJson") || "[]");
+    let items: PurchaseLineItemInput[] = [];
+    try {
+      items = JSON.parse(itemsRaw);
+    } catch {
+      return { success: false, message: "Invalid line items" };
+    }
+    if (!items.length) {
+      return { success: false, message: "Add at least one line item" };
+    }
+    items = items.map((item) => ({
+      ...item,
+      makingChargeType: toChargeType(item.makingChargeType),
+    }));
+
+    const discount = toNumber(formData.get("discount"));
+    const sgstAmount = items.reduce((sum, item) => sum + toNumber(item.sgstAmount), 0);
+    const cgstAmount = items.reduce((sum, item) => sum + toNumber(item.cgstAmount), 0);
+    const igstAmount = items.reduce((sum, item) => sum + toNumber(item.igstAmount), 0);
+    const taxAmount = sgstAmount + cgstAmount + igstAmount;
+    const gstRateId = String(formData.get("gstRateId") || "").trim() || null;
+
+    const subtotal = items.reduce(
+      (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
+      0,
+    );
+    const makingCharges = items.reduce((sum, item) => sum + toNumber(item.makingCharge), 0);
+    const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
+    const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
+
+    const paidAmount = Number(purchase.paidAmount);
+    if (totalAmount < paidAmount) {
+      return {
+        success: false,
+        message: "The new total can't be less than what's already been paid against this purchase.",
+      };
+    }
+    const balanceAmount = Math.max(0, totalAmount - paidAmount);
+
+    let status: InvoiceStatus = InvoiceStatus.PAID;
+    if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
+    else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
+
+    const gstRateSnapshot = await resolveGstRateSnapshot(storeId, gstRateId);
+
+    const vendor = await prisma.vendor.findFirst({
+      where: { id: purchase.vendorId, storeId },
+      select: { id: true, name: true, gstType: true },
     });
+    if (!vendor) return { success: false, message: "Vendor not found" };
+
+    if (
+      !isVendorGstApplicable(vendor.gstType) &&
+      (sgstAmount !== 0 || cgstAmount !== 0 || igstAmount !== 0 || taxAmount !== 0)
+    ) {
+      return {
+        success: false,
+        message: `This vendor is ${partyGstTypeLabel(vendor.gstType).toLowerCase()} and cannot charge GST on a purchase.`,
+      };
+    }
+
+    if (items.some((item) => !item.productId)) {
+      const manualEntryProductId = await resolveManualEntryProductId(storeId);
+      items = items.map((item) =>
+        item.productId ? item : { ...item, productId: manualEntryProductId },
+      );
+    }
+
+    const productIds = [...new Set(items.map((item) => item.productId))];
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds }, storeId },
+      select: { id: true },
+    });
+    if (products.length !== productIds.length) {
+      return { success: false, message: "One or more selected products are invalid" };
+    }
+
+    const stockCodes: string[] = [];
+    for (let i = 0; i < items.length; i++) {
+      stockCodes.push(await generateStockCode(storeId, i));
+    }
+
+    const perLineGstRateSnapshots = await resolvePerLineGstRateSnapshots(storeId, items);
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Drop every old line (unlinks each stock row's FK) then the
+      //    now-orphaned stock rows themselves — cascades their
+      //    InventoryTransaction rows. Safe only because stockUntouched was
+      //    just verified above: nothing else references these rows.
+      await tx.purchaseItem.deleteMany({ where: { purchaseId: id } });
+      if (oldStockIds.length) {
+        await tx.inventoryStock.deleteMany({ where: { id: { in: oldStockIds }, storeId } });
+      }
+
+      // 2. Recreate stock, one dedicated row per new line — identical to
+      //    createPurchase's own step 1.
+      const newStockIds: string[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const stock = await tx.inventoryStock.create({
+          data: {
+            storeId,
+            productId: item.productId,
+            stockCode: stockCodes[i],
+            metalTypeId: item.metalTypeId ?? undefined,
+            purity: item.purity ?? undefined,
+            quantity: item.quantity || 1,
+            status: InventoryStockStatus.IN_STOCK,
+            finish: InventoryFinish.PAKKA,
+            grossWeight: toDecimal(item.grossWeight),
+            netWeight: toDecimal(item.netWeight),
+            dmoWeight: toDecimal(item.dmoWeight),
+            stoneWeight: toDecimal(item.stoneWeight),
+            caratWeight: toDecimal(item.caratWeight),
+            purchaseRate: toDecimal(item.rate),
+            purchaseAmount: toDecimal(lineTotal(item)),
+            makingCharge: toDecimal(item.makingCharge),
+            makingChargeType: toChargeType(item.makingChargeType),
+            stoneCharge: toDecimal(item.stoneCharge),
+            stoneRate: toDecimal(item.stoneRate),
+            stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
+            stoneTypeNames: item.stoneTypeNames ?? undefined,
+            vendorId: purchase.vendorId,
+            vendorName: vendor.name,
+            purchaseDate,
+            locationId: resolvedLocationId ?? undefined,
+          },
+          select: { id: true },
+        });
+        newStockIds.push(stock.id);
+      }
+
+      // 3. Update the Purchase's own fields/totals and recreate its items,
+      //    each linked to the freshly created stock row for it.
+      await tx.purchase.update({
+        where: { id },
+        data: {
+          purchaseDate,
+          vendorInvoiceNumber,
+          notes,
+          locationId: resolvedLocationId ?? null,
+          status,
+          subtotal,
+          makingCharges,
+          stoneCharges,
+          discount,
+          taxAmount,
+          sgstAmount,
+          cgstAmount,
+          igstAmount,
+          totalAmount,
+          roundOffAmount,
+          balanceAmount,
+          gstRateId: gstRateSnapshot?.gstRateId ?? null,
+          gstRateName: gstRateSnapshot?.gstRateName ?? null,
+          gstRatePercent: gstRateSnapshot?.gstRatePercent ?? null,
+          items: {
+            create: items.map((item, i) => ({
+              productId: item.productId,
+              itemName: item.itemName,
+              metalTypeId: item.metalTypeId ?? undefined,
+              purity: item.purity ?? undefined,
+              quantity: item.quantity || 1,
+              grossWeight: item.grossWeight ?? undefined,
+              netWeight: item.netWeight ?? undefined,
+              stoneWeight: item.stoneWeight ?? undefined,
+              caratWeight: item.caratWeight ?? undefined,
+              rate: item.rate ?? undefined,
+              makingCharge: item.makingCharge,
+              makingChargeType: toChargeType(item.makingChargeType),
+              stoneCharge: item.stoneCharge,
+              stoneRate: item.stoneRate ?? undefined,
+              stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
+              stoneTypeNames: item.stoneTypeNames ?? undefined,
+              dmoWeight: item.dmoWeight ?? undefined,
+              hsnCode: item.hsnCode ?? undefined,
+              sgstAmount: item.sgstAmount ?? 0,
+              cgstAmount: item.cgstAmount ?? 0,
+              igstAmount: item.igstAmount ?? 0,
+              gstRateId: item.gstRateId
+                ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRateId ?? undefined
+                : undefined,
+              gstRateName: item.gstRateId
+                ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRateName ?? undefined
+                : undefined,
+              gstRatePercent: item.gstRateId
+                ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRatePercent ?? undefined
+                : undefined,
+              lineTotal: lineTotalWithTax(item),
+              inventoryStockId: newStockIds[i],
+            })),
+          },
+        },
+      });
+
+      // 4. One inventory transaction per new stock row.
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryStockId: newStockIds[i],
+            transactionType: InventoryTransactionType.PURCHASE,
+            quantity: item.quantity || 1,
+            grossWeight: toDecimal(item.grossWeight),
+            netWeight: toDecimal(item.netWeight),
+            referenceType: "Purchase",
+            referenceId: id,
+          },
+        });
+      }
+
+      // 5. One offsetting ledger entry for the balance delta — existing
+      //    payment entries are never touched or rewritten, same as
+      //    updateInvoice's own reconciliation. CREDIT means the shop now
+      //    owes the vendor more, DEBIT means less — opposite sense from
+      //    Invoice's customer-owes-shop convention, matching createPurchase's
+      //    own ledger direction above.
+      const delta = balanceAmount - Number(purchase.balanceAmount);
+      if (delta !== 0) {
+        await tx.ledgerEntry.create({
+          data: {
+            storeId,
+            type: delta > 0 ? LedgerEntryType.CREDIT : LedgerEntryType.DEBIT,
+            sourceType: LedgerSourceType.PURCHASE,
+            vendorId: purchase.vendorId,
+            purchaseId: id,
+            amount: Math.abs(delta),
+            description: `Purchase ${purchase.purchaseNumber} revised — balance ${delta > 0 ? "increased" : "decreased"}`,
+            locationId: resolvedLocationId ?? undefined,
+          },
+        });
+      }
+    }, { timeout: 15000 });
 
     revalidatePath("/purchases");
     revalidatePath(`/purchases/${id}`);
+    revalidatePath("/inventory/stock");
 
     return { success: true, message: "Purchase updated" };
   } catch (error) {

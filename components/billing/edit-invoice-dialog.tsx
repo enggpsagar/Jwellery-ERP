@@ -44,9 +44,11 @@ type EditInvoiceDialogProps = {
   vehicleNumber?: string | null
   transportMode?: string | null
   distanceKm?: number | null
-  /** Icon-only trigger (solid indigo square, matching PurchaseRowActions'
-   * Edit icon) for a table row's Actions column, instead of the full
-   * labeled button used in InvoiceActionsBar. */
+  /** Smaller trigger (still labeled "E-way Bill", not just a bare pencil)
+   * for a table row's Actions column — distinguishes it from "Edit Items"
+   * (also a pencil icon, but full line-item editing) sitting elsewhere in
+   * the same action bar, instead of two unlabeled pencils that look
+   * identical but do different things. */
   compact?: boolean
 }
 
@@ -99,14 +101,14 @@ export function EditInvoiceDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {compact ? (
-          <button
-            type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700"
-            aria-label="Edit invoice"
-            title="Edit invoice"
+          <Button
+            size="sm"
+            className="gap-1.5 bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
+            title="Edit Date & E-way Bill"
           >
             <Pencil className="h-4 w-4" />
-          </button>
+            E-way Bill
+          </Button>
         ) : (
           <Button
             className="gap-2 bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"

@@ -24,12 +24,13 @@ type InvoiceRowActionsProps = {
 }
 
 /**
- * Edit + Delete icon buttons for one invoice row — same visual convention
- * as PurchaseRowActions (solid indigo Edit / red-bordered Delete squares), so
- * the Billing list isn't missing what every other master-detail table
- * already has. Both reuse the exact dialogs InvoiceActionsBar uses (just
- * in their compact, icon-only form) so there's only one edit/delete
- * implementation to keep correct.
+ * Edit + Delete for one invoice row. Edit is labeled "E-way Bill" (not a
+ * bare pencil) since "Edit Items" elsewhere in the same action bar is also
+ * a pencil icon but does something different (full line-item editing) —
+ * two identical unlabeled pencils doing different things was the actual
+ * confusion this fixes. Delete stays icon-only, same red-bordered square
+ * PurchaseRowActions uses. Both reuse the exact dialogs InvoiceActionsBar
+ * uses so there's only one edit/delete implementation to keep correct.
  */
 export function InvoiceRowActions({ invoice, locations }: InvoiceRowActionsProps) {
   const isCancelled = invoice.status === "CANCELLED"

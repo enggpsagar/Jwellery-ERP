@@ -60,13 +60,13 @@ export function RedeemCollaborationCodeDialog({
       <DialogTrigger asChild>
         <Button type="button" variant="outline" size="sm" className="gap-2">
           <KeyRound className="size-4" />
-          Enter code
+          Access store
         </Button>
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Enter collaboration code</DialogTitle>
+          <DialogTitle>Please provide the collaboration code to access this store</DialogTitle>
           <DialogDescription>
             Ask {storeName}&apos;s owner for their current code from Settings
             &gt; Collaboration. You get no access to this store&apos;s data

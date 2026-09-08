@@ -49,7 +49,9 @@ function NoStoreAccessNotice() {
       </div>
 
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold">No store access yet</h2>
+        <h2 className="text-lg font-semibold">
+          Please provide the collaboration code to access this store
+        </h2>
         <p className="max-w-md text-sm text-muted-foreground">
           As a Super Admin, you no longer reach a store&apos;s data by
           default. Ask the store owner for their Collaboration Code (Settings

@@ -197,6 +197,15 @@ export function TopBar({
                 </DropdownMenuItem>
               ) : null}
 
+              {/* Same Admin/Super Admin gate as Settings above and the
+                  sidebar's own former /users entry (app-sidebar.tsx) — moved
+                  here instead of its own sidebar item. */}
+              {canAccessSettings ? (
+                <DropdownMenuItem asChild>
+                  <Link href="/users">Users</Link>
+                </DropdownMenuItem>
+              ) : null}
+
               <DropdownMenuItem asChild>
                 <Link href="/contact-faq">Contact & FAQ</Link>
               </DropdownMenuItem>

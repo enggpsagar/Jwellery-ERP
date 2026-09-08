@@ -7,7 +7,6 @@ import { useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   Users,
-  UserCog,
   CircleDollarSign,
   Package,
   ReceiptText,
@@ -161,13 +160,6 @@ const mainNav: NavItem[] = [
     icon: BarChart3,
   },
   {
-    title: "Users",
-    href: "/users",
-    icon: UserCog,
-    countKey: "users",
-    quickAddHref: "/users/new",
-  },
-  {
     title: "Stores",
     href: "/stores",
     icon: Store,
@@ -196,8 +188,6 @@ function getNavForRole(role?: string, permissions: string[] = []) {
     if (item.href === "/stores" || item.href === "/plans") {
       return role === "SUPER_ADMIN";
     }
-    if (item.href === "/users") return role === "SUPER_ADMIN" || role === "ADMIN";
-
     // Empty permissions means "not customized" — falls back to full access,
     // matching getEffectivePermissions() in lib/roles.ts.
     if (role === "STAFF" && permissions.length > 0) {

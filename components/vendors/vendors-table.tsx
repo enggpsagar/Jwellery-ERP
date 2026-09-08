@@ -111,7 +111,6 @@ export function VendorsTable({
               <SortableTableHead label="City" sortKey="city" defaultSortBy="createdAt" />
               <SortableTableHead label="State" sortKey="state" defaultSortBy="createdAt" />
               <th className="px-4 py-3">Outstanding</th>
-              <th className="px-4 py-3" />
             </tr>
           </thead>
 
@@ -198,14 +197,6 @@ export function VendorsTable({
                     </span>
                   </td>
 
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <Link
-                      href={`/payments/out?new=1&vendorId=${vendor.id}`}
-                      className="inline-flex items-center rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-700"
-                    >
-                      Pay Now
-                    </Link>
-                  </td>
                 </tr>
               )
             })}

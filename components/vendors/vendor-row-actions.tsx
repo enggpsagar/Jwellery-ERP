@@ -87,6 +87,13 @@ export function VendorRowActions({
   return (
     <>
       <div className="flex items-center justify-end gap-2">
+        <Link
+          href={`/payments/out?new=1&vendorId=${vendor.id}`}
+          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-700"
+        >
+          Pay Now
+        </Link>
+
         {/* This will now show only the pencil icon trigger */}
         {/* A page, not a dialog — same reasoning as customers. */}
         <Link

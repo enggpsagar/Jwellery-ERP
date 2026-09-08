@@ -122,10 +122,10 @@ export function SalesSummaryCard({ initialData, initialPeriod }: SalesSummaryCar
   return (
     <Card className="h-full gap-0 py-0">
       <CardContent className="flex h-full flex-col gap-3 p-4">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-1">
             <span className="text-sm font-medium text-muted-foreground">Sales</span>
-            <div className="flex items-baseline gap-2">
+            <div className="flex flex-wrap items-baseline gap-2">
               <span className="text-2xl font-semibold tracking-tight tabular-nums">
                 ₹{currentTotal.toLocaleString("en-IN")}
               </span>

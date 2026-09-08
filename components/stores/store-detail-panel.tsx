@@ -15,6 +15,7 @@ import { StoreDetailContent } from "@/components/stores/store-detail-content"
 import { StoreStatusToggle } from "@/components/stores/store-status-toggle"
 import { ChangePlanDialog } from "@/components/stores/change-plan-dialog"
 import { StoreDeleteDialog } from "@/components/stores/store-delete-dialog"
+import { RedeemCollaborationCodeDialog } from "@/components/stores/redeem-collaboration-code-dialog"
 import type { PlanRow } from "@/lib/actions/plan-actions"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -113,6 +114,7 @@ export function StoreDetailPanel({ storeId, plans, currentPlanId }: StoreDetailP
             currentPlanId={currentPlanId}
             plans={plans}
           />
+          <RedeemCollaborationCodeDialog storeId={overview.storeId} storeName={overview.name} />
           <Button asChild variant="outline" size="sm" className="gap-2">
             <Link href={`/stores/${overview.storeId}/edit`}>
               <Pencil className="size-4" />

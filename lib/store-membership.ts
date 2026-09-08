@@ -61,6 +61,50 @@ export async function listMemberships(
 }
 
 /**
+ * A SUPER_ADMIN's equivalent of `listMemberships` — the stores whose
+ * Collaboration Code they've redeemed AND whose code hasn't since been
+ * regenerated (see Store.collaborationCode's own doc comment). Shaped
+ * identically to StoreMembership so `resolveActiveStoreId`/`resolveAccess`
+ * apply the exact same logic to a SUPER_ADMIN as to anyone else — the only
+ * difference is which table backs the list.
+ */
+export async function listCollaborationGrants(
+  superAdminUserId: string,
+): Promise<StoreMembership[]> {
+  const rows = await prisma.storeCollaborationAccess.findMany({
+    where: {
+      superAdminUserId,
+      store: { isActive: true },
+    },
+    orderBy: { store: { name: "asc" } },
+    select: {
+      storeId: true,
+      grantedCodeVersion: true,
+      store: { select: { name: true, code: true, collaborationCodeVersion: true } },
+    },
+  });
+
+  return rows
+    .filter((row) => row.grantedCodeVersion === row.store.collaborationCodeVersion)
+    .map((row) => ({
+      storeId: row.storeId,
+      storeName: row.store.name,
+      storeCode: row.store.code,
+      role: UserRole.SUPER_ADMIN,
+      permissions: [],
+    }));
+}
+
+/** Every redemption row this Super Admin has ever made, live or since
+ * retired by a code regeneration — mirrors `countMemberships`' role in
+ * distinguishing "never redeemed anything" from "redeemed, then revoked." */
+export async function countCollaborationGrants(
+  superAdminUserId: string,
+): Promise<number> {
+  return prisma.storeCollaborationAccess.count({ where: { superAdminUserId } });
+}
+
+/**
  * Which store a request acts on, given the user and whatever the
  * `active_store_id` cookie asked for.
  *
@@ -79,12 +123,12 @@ export function resolveActiveStoreId(
    */
   totalMembershipRows?: number,
 ): string | null {
-  if (user.role === UserRole.SUPER_ADMIN) {
-    // Super Admin is a member of nothing and reaches every store, so their
-    // choice stands on its own.
-    return requestedStoreId;
-  }
-
+  // No SUPER_ADMIN special case here anymore — Store Owner Authorization
+  // means a Super Admin reaches only the stores they've redeemed a
+  // Collaboration Code for, exactly like anyone else's memberships. Callers
+  // pass `listCollaborationGrants`-sourced rows as `memberships` for a
+  // SUPER_ADMIN (see getUserStoreMemberships in store-context.ts), so the
+  // same validate-against-the-list logic below applies unchanged.
   if (memberships.length === 0) {
     // Rows exist but none are usable — every store has deactivated them.
     // That is a revocation, so it must resolve to nothing rather than

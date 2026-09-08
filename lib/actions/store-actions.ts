@@ -8,6 +8,7 @@ import { StorePlanAction, UserRole, UserStatus, InventoryStockStatus } from "@pr
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth/auth";
 import { ACTIVE_STORE_COOKIE } from "@/lib/store-context";
+import { listCollaborationGrants } from "@/lib/store-membership";
 import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import { classifyMetalName } from "@/lib/business-units";
 import { buildUniqueStoreCode } from "@/lib/store-code";
@@ -858,9 +859,19 @@ export async function setActiveStoreAction(storeId: string) {
   // shops picks between them here too. Membership is what authorises it, so
   // the check is "may this user act on this store", not "is this user a
   // Super Admin" — otherwise the cookie could be pointed at any store.
+  //
+  // Store Owner Authorization: a Super Admin is checked against their
+  // redeemed Collaboration Code grants instead of UserStoreMembership —
+  // same "may this user act on this store" question, different table. See
+  // Store.collaborationCode's own doc comment for the full mechanism.
   const user = await requireAuth();
 
-  if (user.role !== UserRole.SUPER_ADMIN) {
+  if (user.role === UserRole.SUPER_ADMIN) {
+    const granted = user.id ? await listCollaborationGrants(user.id) : [];
+    if (!granted.some((entry) => entry.storeId === storeId)) {
+      throw new Error("You do not have access to that store.");
+    }
+  } else {
     const membership = await prisma.userStoreMembership.findFirst({
       where: {
         userId: user.id,

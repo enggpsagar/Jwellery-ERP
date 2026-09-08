@@ -18,6 +18,7 @@ export type StorePlanOverview = {
   storeId: string;
   name: string;
   code: string;
+  email: string | null;
   registeredAt: Date;
   isActive: boolean;
 
@@ -90,6 +91,7 @@ async function loadStorePlanOverview(
       id: true,
       name: true,
       code: true,
+      email: true,
       createdAt: true,
       isActive: true,
       planId: true,
@@ -116,6 +118,7 @@ async function loadStorePlanOverview(
     storeId: store.id,
     name: store.name,
     code: store.code,
+    email: store.email,
     registeredAt: store.createdAt,
     isActive: store.isActive,
 
@@ -166,6 +169,7 @@ export async function getStorePlanOverviews(
       id: true,
       name: true,
       code: true,
+      email: true,
       createdAt: true,
       isActive: true,
       planId: true,
@@ -193,6 +197,7 @@ export async function getStorePlanOverviews(
       storeId: store.id,
       name: store.name,
       code: store.code,
+      email: store.email,
       registeredAt: store.createdAt,
       isActive: store.isActive,
       planName: store.plan?.name ?? null,

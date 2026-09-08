@@ -100,6 +100,9 @@ export function StoreDetailPanel({ storeId, plans, currentPlanId }: StoreDetailP
             <PlanStatusPill status={overview.status} />
           </div>
           <p className="font-mono text-sm text-muted-foreground">{overview.code}</p>
+          {overview.email && (
+            <p className="text-sm text-muted-foreground">{overview.email}</p>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

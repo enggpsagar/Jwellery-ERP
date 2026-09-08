@@ -46,12 +46,12 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled
   const returnEligibility = getReturnEligibility(new Date(invoice.invoiceDate), returnWindowDays)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {!isCancelled && invoice.balanceAmount > 0 && !invoice.dueDate && (
         <InvoiceDueDatePrompt invoiceId={invoice.id} balanceAmount={invoice.balanceAmount} />
       )}
 
-      <div className="rounded-xl border bg-card p-6 space-y-4">
+      <div className="rounded-xl border bg-card p-5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground">Status</p>
@@ -148,7 +148,7 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled
       </div>
 
       {isCancelled && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 space-y-3">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-5 space-y-3">
           <div>
             <p className="font-medium text-red-700">This invoice was cancelled</p>
             <p className="text-sm text-red-700/80">
@@ -171,7 +171,7 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled
       )}
 
       {creditNotes.length > 0 && (
-        <div className="rounded-xl border bg-card p-6 space-y-3">
+        <div className="rounded-xl border bg-card p-5 space-y-3">
           <p className="font-medium">Credit Notes against this invoice</p>
           <div className="space-y-2">
             {creditNotes.map((creditNote) => (
@@ -196,7 +196,7 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled
 
       <InvoiceItemsTable invoiceId={invoice.id} items={invoice.items} canEdit={canFullyEdit} />
 
-      <div className="ml-auto max-w-sm space-y-1 rounded-xl border bg-card p-6 text-sm">
+      <div className="ml-auto max-w-sm space-y-1 rounded-xl border bg-card p-5 text-sm">
         <div className="flex justify-between">
           <span>Subtotal</span>
           <span>₹{invoice.subtotal.toFixed(2)}</span>
@@ -236,7 +236,7 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled
         invoice.vehicleNumber ||
         invoice.transportMode ||
         invoice.distanceKm) && (
-        <div className="rounded-xl border bg-card p-6">
+        <div className="rounded-xl border bg-card p-5">
           <p className="mb-3 text-sm font-medium">E-way Bill</p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             {invoice.ewayBillNumber && (
@@ -280,7 +280,7 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled
       )}
 
       {invoice.notes && (
-        <div className="rounded-xl border bg-card p-6">
+        <div className="rounded-xl border bg-card p-5">
           <p className="text-sm text-muted-foreground">Notes</p>
           <p className="font-medium">{invoice.notes}</p>
         </div>

@@ -16,39 +16,72 @@ import { DeleteInvoiceDialog } from "@/components/billing/delete-invoice-dialog"
 import { Button } from "@/components/ui/button"
 import type { LocationOption } from "@/components/shared/location-select"
 
-type InvoiceActionsBarProps = {
+type InvoiceQuickActionsProps = {
   invoice: Invoice
   businessName: string
+}
+
+/**
+ * The small icon-only "send/output" cluster — WhatsApp, Email, Print, and
+ * Delete (DRAFT only) — that always sits top-right next to the invoice
+ * title, regardless of how many labeled buttons InvoiceActionsBar below is
+ * showing. Split out from InvoiceActionsBar specifically so its position
+ * never depends on the labeled-button count: it renders in the title row
+ * itself, not inside the wrapping button group.
+ */
+export function InvoiceQuickActions({ invoice, businessName }: InvoiceQuickActionsProps) {
+  const whatsappMessage = `Hi! Here is your invoice ${invoice.invoiceNumber} from ${businessName}. Total: ₹${invoice.totalAmount.toFixed(2)}. Balance due: ₹${invoice.balanceAmount.toFixed(2)}.\n\nSent via ${APP_NAME}`
+
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <ShareWhatsAppButton
+        phone={invoice.customer?.phone}
+        message={whatsappMessage}
+        invoiceId={invoice.id}
+        invoiceNumber={invoice.invoiceNumber}
+      />
+      <EmailInvoiceButton invoiceId={invoice.id} />
+      <Link
+        href={`/billing/${invoice.id}/print`}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
+        aria-label="Print invoice"
+        title="Print"
+      >
+        <Printer className="h-4 w-4" />
+      </Link>
+      {invoice.status === "DRAFT" && (
+        <DeleteInvoiceDialog compact invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
+      )}
+    </div>
+  )
+}
+
+type InvoiceActionsBarProps = {
+  invoice: Invoice
   returnWindowEnabled: boolean
   returnWindowDays: number
   locations: LocationOption[]
 }
 
 /**
- * Every action available on an invoice — Print, WhatsApp, Email, the
- * metadata-only Edit/E-way Bill dialog, Edit Items (full line-item edit,
- * its own route), Cancel (plain and Cancel+Replace), Return Items, Record
- * Payment, Delete. Shared between the standalone /billing/[id] page and the
- * Billing list's inline detail panel so the two can never drift apart.
+ * The labeled decision/record-keeping buttons for an invoice — Edit Items,
+ * Return & Exchange, Cancel Invoice, Return Items, Record Payment, E-way
+ * Bill. Left-aligned and left to wrap onto as many lines as the available
+ * width needs, since the live set varies a lot by status (a PAID invoice
+ * might show only Return Items + E-way Bill; a DRAFT one shows five). The
+ * icon-only send/output cluster is deliberately NOT in here — see
+ * InvoiceQuickActions, rendered in the title row instead so its position
+ * never shifts with this group's count.
  *
- * Laid out as three fixed rows rather than one long wrapping flex line —
- * with 4-8 buttons live at once depending on status, a single row forced
- * odd mid-word wraps at narrower widths (the inline panel) and a
- * `ml-auto`-pushed icon cluster that could still land anywhere depending on
- * how the row broke. Row 1 is the set of decisions about the document
- * itself; row 2 the two "record something against it" actions; row 3 the
- * icon-only send/output/delete cluster, right-aligned in its own row so it
- * never competes for space with the labeled buttons above it.
- *
- * Each action's own visibility rule (see the status flags below) is
- * unchanged from what the standalone page always enforced — a fully PAID
- * invoice's total can't silently change without a real refund decision,
- * so it only ever gets the basic date/location/notes edit, never Cancel or
- * line-item editing.
+ * Shared between the standalone /billing/[id] page and the Billing list's
+ * inline detail panel so the two can never drift apart. Each action's own
+ * visibility rule is unchanged from what the standalone page always
+ * enforced — a fully PAID invoice's total can't silently change without a
+ * real refund decision, so it only ever gets the basic date/location/notes
+ * edit, never Cancel or line-item editing.
  */
 export function InvoiceActionsBar({
   invoice,
-  businessName,
   returnWindowEnabled,
   returnWindowDays,
   locations,
@@ -64,79 +97,56 @@ export function InvoiceActionsBar({
   const returnEligibility = getReturnEligibility(new Date(invoice.invoiceDate), returnWindowDays)
   const canReturnItems = isReturnable && returnEligibility.eligible
 
-  const whatsappMessage = `Hi! Here is your invoice ${invoice.invoiceNumber} from ${businessName}. Total: ₹${invoice.totalAmount.toFixed(2)}. Balance due: ₹${invoice.balanceAmount.toFixed(2)}.\n\nSent via ${APP_NAME}`
+  if (isCancelled && !canReturnItems) return null
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {canFullyEdit && (
-          <Button asChild variant="outline" className="gap-2">
-            <Link href={`/billing/${invoice.id}/edit`}>
-              <Pencil className="h-4 w-4" />
-              Edit Items
-            </Link>
-          </Button>
-        )}
-        {isCancellable && (
-          <>
-            <CancelInvoiceDialog
-              invoiceId={invoice.id}
-              invoiceNumber={invoice.invoiceNumber}
-              balanceAmount={invoice.balanceAmount}
-              mode="returnExchange"
-            />
-            <CancelInvoiceDialog
-              invoiceId={invoice.id}
-              invoiceNumber={invoice.invoiceNumber}
-              balanceAmount={invoice.balanceAmount}
-            />
-          </>
-        )}
-        {canReturnItems && (
-          <ReturnItemsDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {!isCancelled && (
-          <>
-            <RecordPaymentDialog invoiceId={invoice.id} balanceAmount={invoice.balanceAmount} />
-            <EditInvoiceDialog
-              compact
-              invoiceId={invoice.id}
-              invoiceDate={invoice.invoiceDate}
-              dueDate={invoice.dueDate}
-              notes={invoice.notes}
-              locationId={invoice.locationId}
-              locations={locations}
-              ewayBillNumber={invoice.ewayBillNumber}
-              ewayBillDate={invoice.ewayBillDate}
-              transporterName={invoice.transporterName}
-              vehicleNumber={invoice.vehicleNumber}
-              transportMode={invoice.transportMode}
-              distanceKm={invoice.distanceKm}
-            />
-          </>
-        )}
-        <ShareWhatsAppButton
-          phone={invoice.customer?.phone}
-          message={whatsappMessage}
-          invoiceId={invoice.id}
-          invoiceNumber={invoice.invoiceNumber}
-        />
-        <EmailInvoiceButton invoiceId={invoice.id} />
-        <Link
-          href={`/billing/${invoice.id}/print`}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
-          aria-label="Print invoice"
-          title="Print"
-        >
-          <Printer className="h-4 w-4" />
-        </Link>
-        {invoice.status === "DRAFT" && (
-          <DeleteInvoiceDialog compact invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
-        )}
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      {canFullyEdit && (
+        <Button asChild variant="outline" className="gap-2">
+          <Link href={`/billing/${invoice.id}/edit`}>
+            <Pencil className="h-4 w-4" />
+            Edit Items
+          </Link>
+        </Button>
+      )}
+      {isCancellable && (
+        <>
+          <CancelInvoiceDialog
+            invoiceId={invoice.id}
+            invoiceNumber={invoice.invoiceNumber}
+            balanceAmount={invoice.balanceAmount}
+            mode="returnExchange"
+          />
+          <CancelInvoiceDialog
+            invoiceId={invoice.id}
+            invoiceNumber={invoice.invoiceNumber}
+            balanceAmount={invoice.balanceAmount}
+          />
+        </>
+      )}
+      {canReturnItems && (
+        <ReturnItemsDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
+      )}
+      {!isCancelled && (
+        <>
+          <RecordPaymentDialog invoiceId={invoice.id} balanceAmount={invoice.balanceAmount} />
+          <EditInvoiceDialog
+            compact
+            invoiceId={invoice.id}
+            invoiceDate={invoice.invoiceDate}
+            dueDate={invoice.dueDate}
+            notes={invoice.notes}
+            locationId={invoice.locationId}
+            locations={locations}
+            ewayBillNumber={invoice.ewayBillNumber}
+            ewayBillDate={invoice.ewayBillDate}
+            transporterName={invoice.transporterName}
+            vehicleNumber={invoice.vehicleNumber}
+            transportMode={invoice.transportMode}
+            distanceKm={invoice.distanceKm}
+          />
+        </>
+      )}
     </div>
   )
 }

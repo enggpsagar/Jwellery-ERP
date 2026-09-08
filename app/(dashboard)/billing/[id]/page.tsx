@@ -8,7 +8,7 @@ import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { toTitleCase } from "@/lib/utils"
-import { InvoiceActionsBar } from "@/components/billing/invoice-actions-bar"
+import { InvoiceActionsBar, InvoiceQuickActions } from "@/components/billing/invoice-actions-bar"
 import { InvoiceDetailContent } from "@/components/billing/invoice-detail-content"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
@@ -51,21 +51,20 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   const creditNotes = await getCreditNotesForInvoice(invoice.id)
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-6">
+    <main className="mx-auto max-w-5xl space-y-4 p-6">
       <PageBackHeader
         title={invoice.invoiceNumber}
         description={invoice.customer?.name ? toTitleCase(invoice.customer.name) : ""}
         backHref={backTo.href}
         backLabel={backTo.label}
-        action={
-          <InvoiceActionsBar
-            invoice={invoice}
-            businessName={settings.businessName}
-            returnWindowEnabled={settings.returnWindowEnabled}
-            returnWindowDays={settings.returnWindowDays}
-            locations={locations}
-          />
-        }
+        action={<InvoiceQuickActions invoice={invoice} businessName={settings.businessName} />}
+      />
+
+      <InvoiceActionsBar
+        invoice={invoice}
+        returnWindowEnabled={settings.returnWindowEnabled}
+        returnWindowDays={settings.returnWindowDays}
+        locations={locations}
       />
 
       <InvoiceDetailContent

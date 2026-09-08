@@ -124,7 +124,7 @@ export default async function EditInvoicePage({ params }: Props) {
   })
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-6xl space-y-6 p-6">
       <PageBackHeader
         title={`Edit ${invoice.invoiceNumber}`}
         description="Change quantities, rates, making/stone charges, or any line item — stock and the party's ledger are reconciled automatically."

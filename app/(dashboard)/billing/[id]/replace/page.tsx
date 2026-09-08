@@ -133,7 +133,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
   })
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-6xl space-y-6 p-6">
       <PageBackHeader
         title={`Replace ${cancelledInvoice.invoiceNumber}`}
         description="Review and adjust before saving as a new invoice."

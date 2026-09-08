@@ -94,7 +94,9 @@ export function RecordPaymentDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Record Payment</Button>
+        <Button className="gap-2 bg-emerald-600 text-white shadow-sm hover:bg-emerald-700">
+          Record Payment
+        </Button>
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">

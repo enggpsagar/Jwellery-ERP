@@ -43,7 +43,7 @@ export default async function PuritySettingsPage() {
         backLabel="Back to Dashboard"
       />
 
-      <SettingsTabs active="purity" />
+      <SettingsTabs active="purity" role={currentUser?.role} />
 
       <PuritySettingsForm rows={rows} canEdit={canEdit} />
 

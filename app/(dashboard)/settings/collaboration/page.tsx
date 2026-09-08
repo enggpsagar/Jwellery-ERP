@@ -33,7 +33,7 @@ export default async function CollaborationSettingsPage() {
         backLabel="Back to Dashboard"
       />
 
-      <SettingsTabs active="collaboration" />
+      <SettingsTabs active="collaboration" role={currentUser.role} />
 
       <CollaborationCodeSettingsForm initial={settings} />
     </main>

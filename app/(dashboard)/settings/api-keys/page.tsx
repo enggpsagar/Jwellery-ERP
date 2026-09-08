@@ -33,7 +33,7 @@ export default async function ApiKeysSettingsPage() {
         backLabel="Back to Dashboard"
       />
 
-      <SettingsTabs active="api-keys" />
+      <SettingsTabs active="api-keys" role={currentUser?.role} />
 
       <ApiKeySettingsForm keys={keys} canEdit={canEdit} />
     </main>

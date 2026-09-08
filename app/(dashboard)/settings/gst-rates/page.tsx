@@ -33,7 +33,7 @@ export default async function GstRateSettingsPage() {
         backLabel="Back to Dashboard"
       />
 
-      <SettingsTabs active="gst-rates" />
+      <SettingsTabs active="gst-rates" role={currentUser?.role} />
 
       <GstRateSettingsForm rates={rates} canEdit={canEdit} />
     </main>

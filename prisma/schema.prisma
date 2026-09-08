@@ -75,6 +75,7 @@ model Store {
   collaborationCodeVersion     Int                        @default(0)
   collaborationCodeGeneratedAt DateTime?
   collaborationAccess          StoreCollaborationAccess[]
+  accessRequests               StoreAccessRequest[]
 
   users                User[]
   userMemberships      UserStoreMembership[]
@@ -1979,6 +1980,8 @@ model User {
   // Only ever populated for a SUPER_ADMIN — which stores they've redeemed a
   // Collaboration Code for. See StoreCollaborationAccess.
   collaborationAccess   StoreCollaborationAccess[]
+  accessRequestsMade    StoreAccessRequest[]       @relation("StoreAccessRequestedBy")
+  accessRequestsHandled StoreAccessRequest[]       @relation("StoreAccessRequestRespondedBy")
 
   @@index([storeId])
 }
@@ -2364,5 +2367,39 @@ model StoreCollaborationAccess {
 
   @@unique([storeId, superAdminUserId])
   @@index([storeId])
+  @@index([superAdminUserId])
+}
+
+/**
+ * The reverse direction of Store Owner Authorization: instead of the owner
+ * generating a Collaboration Code and sharing it out-of-band, a Super Admin
+ * can ask for access directly from the Platform Stores console, and the
+ * owner approves or denies it from Settings > Collaboration — no code
+ * changes hands on this path at all. Approving one upserts a
+ * StoreCollaborationAccess row the exact same way redeeming a code does
+ * (grantedCodeVersion snapshotted from the store's CURRENT
+ * collaborationCodeVersion), so access granted this way is revoked by the
+ * owner regenerating their code, same as any other grant — there is only
+ * ever one access-revocation mechanism, regardless of which path created
+ * the grant.
+ * At most one row may be PENDING per (storeId, superAdminUserId) at a time
+ * — enforced in requestStoreAccess, not a DB constraint, since a denied or
+ * approved request must stay in history rather than block a future
+ * re-request.
+ */
+model StoreAccessRequest {
+  id                String    @id @default(cuid())
+  storeId           String
+  superAdminUserId  String
+  status            String    @default("PENDING")
+  message           String?
+  requestedAt       DateTime  @default(now())
+  respondedAt       DateTime?
+  respondedByUserId String?
+  store             Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  superAdminUser    User      @relation("StoreAccessRequestedBy", fields: [superAdminUserId], references: [id], onDelete: Cascade)
+  respondedBy       User?     @relation("StoreAccessRequestRespondedBy", fields: [respondedByUserId], references: [id])
+
+  @@index([storeId, status])
   @@index([superAdminUserId])
 }

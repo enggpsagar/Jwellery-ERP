@@ -181,3 +181,176 @@ export async function redeemCollaborationCode(
     return { success: false, message: "Failed to redeem code" };
   }
 }
+
+// ---------------------------------------------------------------------
+// Access requests — the reverse direction of Store Owner Authorization.
+// A Super Admin asks directly instead of waiting for the owner to generate
+// and share a code; the owner approves or denies it from Settings >
+// Collaboration. Approving grants access exactly the way redeeming a code
+// does (see respondToAccessRequest), so there is still only ever one
+// access-revocation mechanism regardless of which path created the grant.
+// ---------------------------------------------------------------------
+
+export type MyAccessRequestStatus = "NONE" | "PENDING" | "DENIED";
+
+/**
+ * What the CURRENT Super Admin should see on a given store's "Request
+ * Access" control — whether they already have a live request in flight (or
+ * a past denial) for it, so the button can say the right thing instead of
+ * always offering to send a fresh request.
+ */
+export async function getMyAccessRequestStatus(storeId: string): Promise<MyAccessRequestStatus> {
+  const user = await requireAuth();
+  if (user.role !== UserRole.SUPER_ADMIN) return "NONE";
+
+  const latest = await prisma.storeAccessRequest.findFirst({
+    where: { storeId, superAdminUserId: user.id! },
+    orderBy: { requestedAt: "desc" },
+    select: { status: true },
+  });
+
+  if (!latest) return "NONE";
+  if (latest.status === "PENDING") return "PENDING";
+  if (latest.status === "DENIED") return "DENIED";
+  return "NONE";
+}
+
+/**
+ * A Super Admin asking a store's owner directly for access, instead of
+ * waiting for a Collaboration Code to be shared. At most one PENDING
+ * request may exist per (store, super admin) at a time — enforced here,
+ * not a DB constraint, so a denied or approved request stays in history
+ * rather than blocking a future re-request.
+ */
+export async function requestStoreAccess(
+  storeId: string,
+  prevState: CollaborationActionState,
+  formData: FormData,
+): Promise<CollaborationActionState> {
+  try {
+    const user = await requireAuth();
+    if (user.role !== UserRole.SUPER_ADMIN) {
+      return { success: false, message: "Only a Super Admin can request store access." };
+    }
+
+    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { name: true } });
+    if (!store) return { success: false, message: "Store not found" };
+
+    const existingPending = await prisma.storeAccessRequest.findFirst({
+      where: { storeId, superAdminUserId: user.id!, status: "PENDING" },
+      select: { id: true },
+    });
+    if (existingPending) {
+      return { success: false, message: `You already have a pending request for ${store.name}.` };
+    }
+
+    const message = String(formData.get("message") || "").trim() || null;
+
+    await prisma.storeAccessRequest.create({
+      data: { storeId, superAdminUserId: user.id!, message },
+    });
+
+    revalidatePath("/stores");
+    revalidatePath("/settings/collaboration");
+
+    return { success: true, message: `Request sent to ${store.name}'s owner` };
+  } catch (error) {
+    console.error("requestStoreAccess error:", error);
+    return { success: false, message: "Failed to send request" };
+  }
+}
+
+export type PendingAccessRequestRow = {
+  id: string;
+  superAdminName: string | null;
+  superAdminEmail: string | null;
+  message: string | null;
+  requestedAt: string;
+};
+
+/**
+ * The store owner's inbox — every PENDING request against their own store.
+ * ADMIN only, same reasoning as getCollaborationCodeSettings: only the
+ * owner decides who gets in.
+ */
+export async function getPendingAccessRequests(): Promise<PendingAccessRequestRow[]> {
+  await requireRole(UserRole.ADMIN);
+  const storeId = await requireStoreScope();
+
+  const requests = await prisma.storeAccessRequest.findMany({
+    where: { storeId, status: "PENDING" },
+    orderBy: { requestedAt: "desc" },
+    select: {
+      id: true,
+      message: true,
+      requestedAt: true,
+      superAdminUser: { select: { name: true, email: true } },
+    },
+  });
+
+  return requests.map((r) => ({
+    id: r.id,
+    superAdminName: r.superAdminUser.name,
+    superAdminEmail: r.superAdminUser.email,
+    message: r.message,
+    requestedAt: r.requestedAt.toISOString(),
+  }));
+}
+
+/**
+ * The store owner approving or denying one request. Approving upserts a
+ * StoreCollaborationAccess grant snapshotted against the store's CURRENT
+ * collaborationCodeVersion — identical mechanism to redeemCollaborationCode
+ * — so a later "Generate new code" revokes this access too, same as any
+ * other grant. Denying just marks the row so a future re-request isn't
+ * blocked by it.
+ */
+export async function respondToAccessRequest(
+  requestId: string,
+  approve: boolean,
+): Promise<CollaborationActionState> {
+  try {
+    const actor = await requireRole(UserRole.ADMIN);
+    const storeId = await requireStoreScope();
+
+    const request = await prisma.storeAccessRequest.findFirst({
+      where: { id: requestId, storeId, status: "PENDING" },
+    });
+    if (!request) return { success: false, message: "Request not found or already handled" };
+
+    if (approve) {
+      const store = await prisma.store.findUniqueOrThrow({
+        where: { id: storeId },
+        select: { collaborationCodeVersion: true },
+      });
+
+      await prisma.$transaction([
+        prisma.storeAccessRequest.update({
+          where: { id: requestId },
+          data: { status: "APPROVED", respondedAt: new Date(), respondedByUserId: actor.id },
+        }),
+        prisma.storeCollaborationAccess.upsert({
+          where: { storeId_superAdminUserId: { storeId, superAdminUserId: request.superAdminUserId } },
+          update: { grantedCodeVersion: store.collaborationCodeVersion },
+          create: {
+            storeId,
+            superAdminUserId: request.superAdminUserId,
+            grantedCodeVersion: store.collaborationCodeVersion,
+          },
+        }),
+      ]);
+    } else {
+      await prisma.storeAccessRequest.update({
+        where: { id: requestId },
+        data: { status: "DENIED", respondedAt: new Date(), respondedByUserId: actor.id },
+      });
+    }
+
+    revalidatePath("/settings/collaboration");
+
+    return { success: true, message: approve ? "Access granted" : "Request denied" };
+  } catch (error) {
+    console.error("respondToAccessRequest error:", error);
+    return { success: false, message: "Failed to respond to request" };
+  }
+}

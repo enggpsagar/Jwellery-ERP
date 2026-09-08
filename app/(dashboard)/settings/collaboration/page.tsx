@@ -2,7 +2,10 @@ import type { Metadata } from "next"
 import { UserRole } from "@prisma/client"
 import { redirect } from "next/navigation"
 
-import { getCollaborationCodeSettings } from "@/lib/actions/store-collaboration-actions"
+import {
+  getCollaborationCodeSettings,
+  getPendingAccessRequests,
+} from "@/lib/actions/store-collaboration-actions"
 import { getCurrentUser } from "@/lib/auth/auth"
 
 import { CollaborationCodeSettingsForm } from "@/components/settings/collaboration-code-settings-form"
@@ -22,7 +25,10 @@ export default async function CollaborationSettingsPage() {
   // authorization — see getCollaborationCodeSettings' own doc comment.
   if (currentUser?.role !== UserRole.ADMIN) redirect("/dashboard")
 
-  const settings = await getCollaborationCodeSettings()
+  const [settings, pendingRequests] = await Promise.all([
+    getCollaborationCodeSettings(),
+    getPendingAccessRequests(),
+  ])
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-6">
@@ -35,7 +41,7 @@ export default async function CollaborationSettingsPage() {
 
       <SettingsTabs active="collaboration" role={currentUser.role} />
 
-      <CollaborationCodeSettingsForm initial={settings} />
+      <CollaborationCodeSettingsForm initial={settings} initialPendingRequests={pendingRequests} />
     </main>
   )
 }

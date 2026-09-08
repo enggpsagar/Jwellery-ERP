@@ -1,11 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import { Check, Copy, RefreshCw, ShieldAlert } from "lucide-react"
+import { Check, Copy, RefreshCw, ShieldAlert, ShieldCheck, ShieldX } from "lucide-react"
 
 import {
   generateCollaborationCode,
+  getCollaborationCodeSettings,
+  respondToAccessRequest,
   type CollaborationCodeSettings,
+  type PendingAccessRequestRow,
 } from "@/lib/actions/store-collaboration-actions"
 import { formatShortDateTime } from "@/lib/utils"
 import { useToast } from "@/components/providers/toast-provider"
@@ -31,14 +34,38 @@ import {
  */
 export function CollaborationCodeSettingsForm({
   initial,
+  initialPendingRequests,
 }: {
   initial: CollaborationCodeSettings
+  initialPendingRequests: PendingAccessRequestRow[]
 }) {
   const toast = useToast()
   const [settings, setSettings] = useState(initial)
   const [copied, setCopied] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [pendingRequests, setPendingRequests] = useState(initialPendingRequests)
+  const [respondingId, setRespondingId] = useState<string | null>(null)
+
+  const handleRespond = async (requestId: string, approve: boolean) => {
+    setRespondingId(requestId)
+    try {
+      const result = await respondToAccessRequest(requestId, approve)
+      if (result.success) {
+        toast.success(result.message)
+        setPendingRequests((rows) => rows.filter((row) => row.id !== requestId))
+        if (approve) {
+          // Approving grants access the same way redeeming a code does —
+          // refresh so "Currently authorized" reflects the new grant too.
+          setSettings(await getCollaborationCodeSettings())
+        }
+      } else {
+        toast.error(result.message)
+      }
+    } finally {
+      setRespondingId(null)
+    }
+  }
 
   const handleCopy = async () => {
     if (!settings.code) return
@@ -125,6 +152,72 @@ export function CollaborationCodeSettingsForm({
               {settings.code ? "Generate new code" : "Generate code"}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Pending access requests</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {pendingRequests.length === 0 ? (
+            <p className="px-4 pb-4 text-sm text-muted-foreground">
+              No Super Admin has asked to access this store right now.
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {pendingRequests.map((request) => {
+                const isResponding = respondingId === request.id
+                return (
+                  <li
+                    key={request.id}
+                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium">{request.superAdminName ?? "Unknown"}</p>
+                      <p className="text-sm text-muted-foreground">{request.superAdminEmail ?? "-"}</p>
+                      {request.message && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          &ldquo;{request.message}&rdquo;
+                        </p>
+                      )}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Requested {formatShortDateTime(request.requestedAt)}
+                      </p>
+                    </div>
+
+                    <div className="flex shrink-0 gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRespond(request.id, false)}
+                        disabled={isResponding}
+                        className="gap-1.5"
+                      >
+                        <ShieldX className="h-4 w-4" />
+                        Deny
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => handleRespond(request.id, true)}
+                        disabled={isResponding}
+                        className="gap-1.5"
+                      >
+                        {isResponding ? (
+                          <Loader className="h-4 w-4" />
+                        ) : (
+                          <ShieldCheck className="h-4 w-4" />
+                        )}
+                        Approve
+                      </Button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </CardContent>
       </Card>
 

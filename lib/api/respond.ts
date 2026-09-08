@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { ApiKeyAuthError } from "@/lib/auth/api-key";
+import { logger } from "@/lib/logger";
 
 export type ApiErrorCode =
   | "UNAUTHORIZED"
@@ -41,6 +42,6 @@ export function apiErrorFromException(error: unknown) {
     return apiError("VALIDATION_ERROR", "Invalid request body", 422, fields);
   }
 
-  console.error("API route error:", error);
+  logger.error("API route error", error);
   return apiError("INTERNAL_ERROR", "Something went wrong", 500);
 }

@@ -35,6 +35,7 @@ import type {
   DataTableExportParams,
   DataTableExportResult,
 } from "@/components/shared/data-table-toolbar";
+import { logger } from "@/lib/logger";
 
 const PURCHASE_SORT_FIELDS = ["purchaseDate", "purchaseNumber", "totalAmount"] as const;
 
@@ -505,7 +506,7 @@ export async function exportPurchasesToExcel(
       fileBase64,
     };
   } catch (error) {
-    console.error("exportPurchasesToExcel error:", error);
+    logger.error("exportPurchasesToExcel error", error);
     return { success: false, message: "Failed to export purchases." };
   }
 }
@@ -974,7 +975,7 @@ export async function createPurchase(
       purchaseId: purchase.id,
     };
   } catch (error) {
-    console.error("createPurchase error:", error);
+    logger.error("createPurchase error", error);
     return { success: false, message: "Failed to create purchase" };
   }
 }
@@ -1054,7 +1055,7 @@ export async function recordPurchasePayment(
 
     return { success: true, message: "Payment recorded" };
   } catch (error) {
-    console.error("recordPurchasePayment error:", error);
+    logger.error("recordPurchasePayment error", error);
     return { success: false, message: "Failed to record payment" };
   }
 }
@@ -1412,7 +1413,7 @@ export async function updatePurchase(
 
     return { success: true, message: "Purchase updated" };
   } catch (error) {
-    console.error("updatePurchase error:", error);
+    logger.error("updatePurchase error", error);
     return { success: false, message: "Failed to update purchase" };
   }
 }
@@ -1500,7 +1501,7 @@ export async function deletePurchase(id: string): Promise<PurchaseFormState> {
 
     return { success: true, message: "Purchase deleted" };
   } catch (error) {
-    console.error("deletePurchase error:", error);
+    logger.error("deletePurchase error", error);
     return { success: false, message: "Failed to delete purchase" };
   }
 }

@@ -8,6 +8,7 @@ import { PERMISSIONS } from "@/lib/permissions";
 import { resolveActingStoreId } from "@/lib/store-context";
 import { verifyQuickSaleToken } from "@/lib/quick-sale-token";
 import { createInvoice } from "@/lib/actions/invoice-actions";
+import { logger } from "@/lib/logger";
 
 /**
  * Scan-to-sell.
@@ -339,7 +340,7 @@ export async function completeQuickSale(
       invoiceId: result.invoiceId,
     };
   } catch (error) {
-    console.error("completeQuickSale error:", error);
+    logger.error("completeQuickSale error", error);
     return { success: false, message: "Could not complete the sale." };
   }
 }

@@ -11,6 +11,7 @@ import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import { requireRole } from "@/lib/auth/auth";
+import { logger } from "@/lib/logger";
 
 export type StoreLocationRow = {
   id: string;
@@ -101,7 +102,7 @@ export async function setDefaultStoreLocation(
 
     return { success: true, message: "Default location updated" };
   } catch (error) {
-    console.error("setDefaultStoreLocation error:", error);
+    logger.error("setDefaultStoreLocation error", error);
     return { success: false, message: "Failed to update default location" };
   }
 }
@@ -177,7 +178,7 @@ export async function upsertStoreLocation(
         errors: { name: ["A location with this name already exists"] },
       };
     }
-    console.error("upsertStoreLocation error:", error);
+    logger.error("upsertStoreLocation error", error);
     return { success: false, message: "Failed to save location" };
   }
 }
@@ -214,7 +215,7 @@ export async function toggleStoreLocationActive(
       message: isActive ? "Location activated" : "Location deactivated",
     };
   } catch (error) {
-    console.error("toggleStoreLocationActive error:", error);
+    logger.error("toggleStoreLocationActive error", error);
     return { success: false, message: "Failed to update location" };
   }
 }

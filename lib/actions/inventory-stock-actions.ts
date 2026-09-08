@@ -18,6 +18,7 @@ import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
 import { getFinenessMap, toFineWeight } from "@/lib/purity";
 import { getCurrentUser } from "@/lib/auth/auth";
+import { logger } from "@/lib/logger";
 
 /**
  * This file covers STOCK MOVEMENTS (reserve, damage, karigar issue/receipt,
@@ -163,7 +164,7 @@ export async function reserveStock(
 
     return { success: true, message: "Stock reserved" };
   } catch (error) {
-    console.error("reserveStock error:", error);
+    logger.error("reserveStock error", error);
     return { success: false, message: "Failed to reserve stock" };
   }
 }
@@ -210,7 +211,7 @@ export async function unreserveStock(
 
     return { success: true, message: "Stock unreserved" };
   } catch (error) {
-    console.error("unreserveStock error:", error);
+    logger.error("unreserveStock error", error);
     return { success: false, message: "Failed to unreserve stock" };
   }
 }
@@ -246,7 +247,7 @@ export async function markStockDamaged(
 
     return { success: true, message: "Stock marked as damaged" };
   } catch (error) {
-    console.error("markStockDamaged error:", error);
+    logger.error("markStockDamaged error", error);
     return { success: false, message: "Failed to update stock" };
   }
 }
@@ -454,7 +455,7 @@ export async function issueMaterialToKarigar(
 
     return { success: true, message: `Material issued — Job ${jobNumber}` };
   } catch (error) {
-    console.error("issueMaterialToKarigar error:", error);
+    logger.error("issueMaterialToKarigar error", error);
     return { success: false, message: "Failed to issue material to artisan" };
   }
 }
@@ -570,7 +571,7 @@ export async function recordMaterialReceiptFromKarigar(
 
     return { success: true, message: "Material received — outstanding balance adjusted" };
   } catch (error) {
-    console.error("recordMaterialReceiptFromKarigar error:", error);
+    logger.error("recordMaterialReceiptFromKarigar error", error);
     return { success: false, message: "Failed to record material receipt" };
   }
 }
@@ -910,7 +911,7 @@ export async function receiveItemsFromKarigar(
 
     return { success: true, message };
   } catch (error) {
-    console.error("receiveItemsFromKarigar error:", error);
+    logger.error("receiveItemsFromKarigar error", error);
     return { success: false, message: "Failed to receive items from artisan" };
   }
 }
@@ -970,7 +971,7 @@ export async function recordKarigarPayment(
 
     return { success: true, message: "Payment recorded" };
   } catch (error) {
-    console.error("recordKarigarPayment error:", error);
+    logger.error("recordKarigarPayment error", error);
     return { success: false, message: "Failed to record payment" };
   }
 }

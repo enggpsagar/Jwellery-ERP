@@ -1,6 +1,7 @@
 import crypto from "crypto";
 
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 const KEY_PREFIX = "sk_live_";
 
@@ -86,7 +87,7 @@ export async function requireApiKey(
   prisma.apiKey
     .update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } })
     .catch((error) => {
-      console.error("Failed to update ApiKey.lastUsedAt:", error);
+      logger.error("Failed to update ApiKey.lastUsedAt", error);
     });
 
   return {

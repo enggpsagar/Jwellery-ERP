@@ -13,6 +13,7 @@ import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/
 import { classifyMetalName } from "@/lib/business-units";
 import { buildUniqueStoreCode } from "@/lib/store-code";
 import { sendInviteEmailSafely } from "@/lib/invite-email";
+import { logger } from "@/lib/logger";
 
 export type StoreFormState = {
   success: boolean;
@@ -179,7 +180,7 @@ export async function exportStoresToExcel(params: ExportStoresParams = {}): Prom
       fileBase64,
     };
   } catch (error) {
-    console.error("exportStoresToExcel error:", error);
+    logger.error("exportStoresToExcel error", error);
     return { success: false, message: "Failed to export stores." };
   }
 }
@@ -344,7 +345,7 @@ export async function createStoreWithAdmin(
         message: "A store with that code, or a user with that email/phone, already exists",
       };
     }
-    console.error("createStoreWithAdmin error:", error);
+    logger.error("createStoreWithAdmin error", error);
     return { success: false, message: "Failed to create store" };
   }
 }
@@ -377,7 +378,7 @@ export async function archiveStore(storeId: string): Promise<StoreFormState> {
 
     return { success: true, message: `Store "${store.name}" archived` };
   } catch (error) {
-    console.error("archiveStore error:", error);
+    logger.error("archiveStore error", error);
     return { success: false, message: "Failed to archive store" };
   }
 }
@@ -434,7 +435,7 @@ export async function restoreStore(storeId: string): Promise<StoreFormState> {
 
     return { success: true, message: `Store "${store.name}" restored` };
   } catch (error) {
-    console.error("restoreStore error:", error);
+    logger.error("restoreStore error", error);
     return { success: false, message: "Failed to restore store" };
   }
 }
@@ -637,7 +638,7 @@ export async function forceDeleteStore(storeId: string): Promise<{ success: bool
 
     return { success: true, message: `Store "${store.name}" and all its data were permanently deleted` };
   } catch (error) {
-    console.error("forceDeleteStore error:", error);
+    logger.error("forceDeleteStore error", error);
     return { success: false, message: "Failed to force-delete store" };
   }
 }
@@ -719,7 +720,7 @@ export async function assignPlanToStore(storeId: string, planId: string): Promis
 
     return { success: true, message: `"${plan.name}" plan assigned to "${store.name}"` };
   } catch (error) {
-    console.error("assignPlanToStore error:", error);
+    logger.error("assignPlanToStore error", error);
     return { success: false, message: "Failed to assign plan" };
   }
 }
@@ -863,7 +864,7 @@ export async function updateStore(
     if (error.code === "P2002") {
       return { success: false, message: "A store with that code already exists" };
     }
-    console.error("updateStore error:", error);
+    logger.error("updateStore error", error);
     return { success: false, message: "Failed to update store" };
   }
 }

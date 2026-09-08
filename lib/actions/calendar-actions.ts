@@ -10,6 +10,7 @@ import { getCurrentUser, hasPermission, requirePermission } from "@/lib/auth/aut
 import { PERMISSIONS } from "@/lib/permissions";
 import { getLocationScope, locationWhere, resolveWritableLocationId } from "@/lib/location-scope";
 import { getIndianHolidays } from "@/lib/india-holidays";
+import { logger } from "@/lib/logger";
 
 export type CalendarEventType =
   | "INVOICE_DUE"
@@ -271,7 +272,7 @@ export async function createReminder(
     revalidatePath("/calendar");
     return { success: true, message: "Reminder added" };
   } catch (error) {
-    console.error("createReminder error:", error);
+    logger.error("createReminder error", error);
     return { success: false, message: "Failed to add reminder" };
   }
 }
@@ -289,7 +290,7 @@ export async function toggleReminderDone(id: string, isDone: boolean): Promise<R
     revalidatePath("/calendar");
     return { success: true, message: "" };
   } catch (error) {
-    console.error("toggleReminderDone error:", error);
+    logger.error("toggleReminderDone error", error);
     return { success: false, message: "Failed to update reminder" };
   }
 }
@@ -304,7 +305,7 @@ export async function deleteReminder(id: string): Promise<ReminderFormState> {
     revalidatePath("/calendar");
     return { success: true, message: "Reminder deleted" };
   } catch (error) {
-    console.error("deleteReminder error:", error);
+    logger.error("deleteReminder error", error);
     return { success: false, message: "Failed to delete reminder" };
   }
 }

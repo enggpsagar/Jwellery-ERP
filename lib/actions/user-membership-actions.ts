@@ -6,6 +6,7 @@ import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/auth";
 import { MODULE_DEFINITIONS, type ModuleKey } from "@/lib/roles";
+import { logger } from "@/lib/logger";
 
 export type MembershipRow = {
   storeId: string;
@@ -149,7 +150,7 @@ export async function saveUserStoreAccess(
 
     return { success: true, message: "Store access updated." };
   } catch (error) {
-    console.error("saveUserStoreAccess error:", error);
+    logger.error("saveUserStoreAccess error", error);
     return {
       success: false,
       message:
@@ -180,7 +181,7 @@ export async function removeUserStoreAccess(
 
     return { success: true, message: "Store access removed." };
   } catch (error) {
-    console.error("removeUserStoreAccess error:", error);
+    logger.error("removeUserStoreAccess error", error);
     return {
       success: false,
       message:

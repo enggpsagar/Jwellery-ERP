@@ -16,6 +16,7 @@ import {
 } from "@/lib/actions/report-actions"
 import { buildCsvExport, buildExcelExport } from "@/lib/excel-export"
 import { formatShortDate } from "@/lib/utils"
+import { logger } from "@/lib/logger";
 
 type ReportType =
   | "sales"
@@ -201,7 +202,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Report export failed:", error)
+    logger.error("Report export failed", error)
     return NextResponse.json(
       { success: false, message: "Failed to export report" },
       { status: 500 },

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { resolveStoreName } from "@/lib/invite-email";
 import { sendMail } from "@/lib/mailer";
 import { planExpiringReminderEmail } from "@/lib/email-templates";
+import { logger } from "@/lib/logger";
 
 const REMINDER_WINDOW_DAYS = 7;
 
@@ -81,7 +82,7 @@ export async function GET(request: Request) {
       storesReminded: remindersSent,
     });
   } catch (error: any) {
-    console.error("Plan reminder cron error:", error);
+    logger.error("Plan reminder cron error", error);
 
     return NextResponse.json(
       {

@@ -6,6 +6,7 @@ import * as XLSX from "xlsx"
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { formatShortDate } from "@/lib/utils"
+import { logger } from "@/lib/logger";
 
 type VendorSortBy = "name" | "createdAt" | "openingBalance"
 type SortOrder = "asc" | "desc"
@@ -183,7 +184,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Vendor export failed:", error)
+    logger.error("Vendor export failed", error)
     return NextResponse.json(
       { success: false, message: "Failed to export vendors" },
       { status: 500 }

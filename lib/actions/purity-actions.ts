@@ -12,6 +12,7 @@ import {
   DEFAULT_GRAMS_PER_CARAT,
   getGramsPerCaratMap,
 } from "@/lib/purity";
+import { logger } from "@/lib/logger";
 
 export type PurityFinenessRow = {
   purity: PurityType;
@@ -150,7 +151,7 @@ export async function updateMetalSellingRates(
 
     return { success: true, message: "Metal selling rates updated successfully" };
   } catch (error) {
-    console.error("updateMetalSellingRates error:", error);
+    logger.error("updateMetalSellingRates error", error);
     return { success: false, message: "Failed to update metal selling rates" };
   }
 }
@@ -194,7 +195,7 @@ export async function updatePurityFineness(
 
     return { success: true, message: "Purity settings updated successfully" };
   } catch (error) {
-    console.error("updatePurityFineness error:", error);
+    logger.error("updatePurityFineness error", error);
     return { success: false, message: "Failed to update purity settings" };
   }
 }
@@ -242,7 +243,7 @@ export async function updateCaratConversionRates(
 
     return { success: true, message: "Carat conversion rules updated successfully" };
   } catch (error) {
-    console.error("updateCaratConversionRates error:", error);
+    logger.error("updateCaratConversionRates error", error);
     return { success: false, message: "Failed to update carat conversion rules" };
   }
 }

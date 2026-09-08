@@ -9,6 +9,7 @@ import { requireStoreScope } from "@/lib/store-context";
 import { requireRole, getCurrentUser } from "@/lib/auth/auth";
 import { generateApiKey } from "@/lib/auth/api-key";
 import { PERMISSIONS, type Permission } from "@/lib/permissions";
+import { logger } from "@/lib/logger";
 
 export type ApiKeySummary = {
   id: string;
@@ -100,7 +101,7 @@ export async function createApiKey(
 
     return { success: true, message: "API key created", rawKey: raw };
   } catch (error) {
-    console.error("createApiKey error:", error);
+    logger.error("createApiKey error", error);
     return { success: false, message: "Failed to create API key" };
   }
 }
@@ -124,7 +125,7 @@ export async function revokeApiKey(
     revalidatePath("/settings/api-keys");
     return { success: true, message: "API key revoked" };
   } catch (error) {
-    console.error("revokeApiKey error:", error);
+    logger.error("revokeApiKey error", error);
     return { success: false, message: "Failed to revoke API key" };
   }
 }

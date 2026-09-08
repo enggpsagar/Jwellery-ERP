@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth/auth";
 import { listMemberships } from "@/lib/store-membership";
 import { createQuickSaleToken } from "@/lib/quick-sale-token";
 import { addScanToOpenSession } from "@/lib/actions/scan-session-actions";
+import { logger } from "@/lib/logger";
 
 /**
  * The scan entry point. Every printed tag points here.
@@ -119,7 +120,7 @@ export async function GET(
 
     return NextResponse.redirect(destination);
   } catch (error) {
-    console.error("quick-sale entry error:", error);
+    logger.error("quick-sale entry error", error);
     return NextResponse.redirect(saleUrl(MISSING));
   }
 }

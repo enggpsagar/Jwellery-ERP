@@ -1,6 +1,7 @@
 import { put } from "@vercel/blob";
 
 import { requireAuth } from "@/lib/auth/auth";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   try {
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
 
     return Response.json({ url: blob.url });
   } catch (error) {
-    console.error("payment receipt upload error:", error);
+    logger.error("payment receipt upload error", error);
     const message = error instanceof Error ? error.message : String(error);
     return Response.json(
       { error: `Upload failed: ${message}` },

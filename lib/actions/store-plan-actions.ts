@@ -13,6 +13,7 @@ import { sendMail } from "@/lib/mailer";
 import { renewalContactRequestEmail } from "@/lib/email-templates";
 import { getSuperAdminEmails } from "@/lib/super-admin";
 import { APP_NAME } from "@/lib/constants/app";
+import { logger } from "@/lib/logger";
 
 export type StorePlanOverview = {
   storeId: string;
@@ -342,7 +343,7 @@ export async function sendRenewalContactRequestAction(
       message: "Your message has been sent. We'll get back to you shortly.",
     };
   } catch (error) {
-    console.error("sendRenewalContactRequestAction error:", error);
+    logger.error("sendRenewalContactRequestAction error", error);
     return { success: false, message: "Failed to send your message. Please try again." };
   }
 }
@@ -368,7 +369,7 @@ export async function setStoreReminderChannels(
 
     return { success: true, message: "Reminder settings updated." };
   } catch (error) {
-    console.error("setStoreReminderChannels error:", error);
+    logger.error("setStoreReminderChannels error", error);
     return { success: false, message: "Failed to update reminder settings." };
   }
 }

@@ -9,6 +9,7 @@ import { getLocationScope, locationWhere } from "@/lib/location-scope"
 import { requirePermission } from "@/lib/auth/auth"
 import { PERMISSIONS } from "@/lib/permissions"
 import { formatShortDate } from "@/lib/utils"
+import { logger } from "@/lib/logger";
 
 export type PaymentFormState = {
   success: boolean
@@ -327,7 +328,7 @@ export async function recordCustomerPayment(
 
     return { success: true, message: "Payment In recorded" }
   } catch (error) {
-    console.error("recordCustomerPayment error:", error)
+    logger.error("recordCustomerPayment error", error)
     return { success: false, message: "Failed to record payment" }
   }
 }
@@ -447,7 +448,7 @@ export async function recordPaymentOut(
 
     return { success: true, message: "Payment Out recorded" }
   } catch (error) {
-    console.error("recordPaymentOut error:", error)
+    logger.error("recordPaymentOut error", error)
     return { success: false, message: "Failed to record payment" }
   }
 }

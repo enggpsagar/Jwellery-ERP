@@ -16,6 +16,7 @@ import type { PartyGstType } from "@prisma/client";
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
 import { isValidPanNumber, normalizePanNumber, PAN_INVALID_MESSAGE } from "@/lib/pan";
 import { formatShortDate } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 export type CustomerRecord = {
   id: string;
@@ -403,7 +404,7 @@ export async function createCustomerCore(
         errors: { phone: ["A party with this phone number already exists"] },
       };
     }
-    console.error("createCustomerCore error:", error);
+    logger.error("createCustomerCore error", error);
     return { success: false, message: "Failed to add party" };
   }
 }
@@ -473,7 +474,7 @@ export async function updateCustomerCore(
         errors: { phone: ["A party with this phone number already exists"] },
       };
     }
-    console.error("updateCustomerCore error:", error);
+    logger.error("updateCustomerCore error", error);
     return { success: false, message: "Failed to update party" };
   }
 }

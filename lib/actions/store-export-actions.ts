@@ -5,6 +5,7 @@ import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/auth";
+import { logger } from "@/lib/logger";
 
 export type StoreExportResult = {
   success: boolean;
@@ -200,7 +201,7 @@ export async function exportStoreData(storeId: string): Promise<StoreExportResul
       fileName,
     };
   } catch (error) {
-    console.error("exportStoreData error:", error);
+    logger.error("exportStoreData error", error);
     return { success: false, message: "Failed to export store data" };
   }
 }

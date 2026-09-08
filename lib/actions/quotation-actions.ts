@@ -32,6 +32,7 @@ import type {
   DataTableExportParams,
   DataTableExportResult,
 } from "@/components/shared/data-table-toolbar";
+import { logger } from "@/lib/logger";
 
 export type QuotationLineItemInput = {
   itemName: string;
@@ -336,7 +337,7 @@ export async function exportQuotationsToExcel(
       fileBase64,
     };
   } catch (error) {
-    console.error("exportQuotationsToExcel error:", error);
+    logger.error("exportQuotationsToExcel error", error);
     return { success: false, message: "Failed to export quotations." };
   }
 }
@@ -594,7 +595,7 @@ export async function createQuotation(
       quotationId: quotation.id,
     };
   } catch (error) {
-    console.error("createQuotation error:", error);
+    logger.error("createQuotation error", error);
     return { success: false, message: "Failed to create quotation" };
   }
 }
@@ -644,7 +645,7 @@ export async function updateQuotation(
 
     return { success: true, message: "Quotation updated" };
   } catch (error) {
-    console.error("updateQuotation error:", error);
+    logger.error("updateQuotation error", error);
     return { success: false, message: "Failed to update quotation" };
   }
 }
@@ -678,7 +679,7 @@ export async function deleteQuotation(id: string): Promise<QuotationFormState> {
 
     return { success: true, message: "Quotation deleted" };
   } catch (error) {
-    console.error("deleteQuotation error:", error);
+    logger.error("deleteQuotation error", error);
     return { success: false, message: "Failed to delete quotation" };
   }
 }
@@ -933,7 +934,7 @@ export async function convertQuotationToInvoice(
       invoiceId: invoice.id,
     };
   } catch (error) {
-    console.error("convertQuotationToInvoice error:", error);
+    logger.error("convertQuotationToInvoice error", error);
     return { success: false, message: "Failed to convert quotation to invoice" };
   }
 }

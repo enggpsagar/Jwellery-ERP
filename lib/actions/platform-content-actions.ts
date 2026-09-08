@@ -6,6 +6,7 @@ import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/auth";
+import { logger } from "@/lib/logger";
 
 /**
  * Contact Us + FAQ content for Swarna Suite itself — platform-wide, edited
@@ -191,7 +192,7 @@ export async function updatePlatformContactContent(
     revalidateContentSurfaces();
     return { success: true, message: "Contact Us content updated" };
   } catch (error) {
-    console.error("updatePlatformContactContent error:", error);
+    logger.error("updatePlatformContactContent error", error);
     return { success: false, message: "Failed to update Contact Us content" };
   }
 }
@@ -214,7 +215,7 @@ export async function removePlatformContactImage(): Promise<PlatformContentFormS
     revalidateContentSurfaces();
     return { success: true, message: "Image removed" };
   } catch (error) {
-    console.error("removePlatformContactImage error:", error);
+    logger.error("removePlatformContactImage error", error);
     return { success: false, message: "Failed to remove image" };
   }
 }
@@ -272,7 +273,7 @@ export async function createPlatformFaq(
     revalidateContentSurfaces();
     return { success: true, message: "FAQ added" };
   } catch (error) {
-    console.error("createPlatformFaq error:", error);
+    logger.error("createPlatformFaq error", error);
     return { success: false, message: "Failed to add FAQ" };
   }
 }
@@ -308,7 +309,7 @@ export async function updatePlatformFaq(
     revalidateContentSurfaces();
     return { success: true, message: "FAQ updated" };
   } catch (error) {
-    console.error("updatePlatformFaq error:", error);
+    logger.error("updatePlatformFaq error", error);
     return { success: false, message: "Failed to update FAQ" };
   }
 }
@@ -325,7 +326,7 @@ export async function deletePlatformFaq(id: string): Promise<PlatformContentForm
     revalidateContentSurfaces();
     return { success: true, message: "FAQ deleted" };
   } catch (error) {
-    console.error("deletePlatformFaq error:", error);
+    logger.error("deletePlatformFaq error", error);
     return { success: false, message: "Failed to delete FAQ" };
   }
 }
@@ -348,7 +349,7 @@ export async function setPlatformFaqPublished(
       message: isPublished ? "FAQ published" : "FAQ unpublished",
     };
   } catch (error) {
-    console.error("setPlatformFaqPublished error:", error);
+    logger.error("setPlatformFaqPublished error", error);
     return { success: false, message: "Failed to update FAQ" };
   }
 }
@@ -401,7 +402,7 @@ export async function movePlatformFaq(
     revalidateContentSurfaces();
     return { success: true, message: "FAQ order updated" };
   } catch (error) {
-    console.error("movePlatformFaq error:", error);
+    logger.error("movePlatformFaq error", error);
     return { success: false, message: "Failed to reorder FAQs" };
   }
 }

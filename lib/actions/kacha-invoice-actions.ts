@@ -43,6 +43,7 @@ import {
   buildMultiSheetExcelExport,
   parseExcelWorkbook,
 } from "@/lib/excel-export";
+import { logger } from "@/lib/logger";
 
 export type KachaInvoiceLineItemInput = {
   itemName: string;
@@ -382,7 +383,7 @@ export async function exportKachaInvoicesToExcel(
       fileBase64,
     };
   } catch (error) {
-    console.error("exportKachaInvoicesToExcel error:", error);
+    logger.error("exportKachaInvoicesToExcel error", error);
     return { success: false, message: "Failed to export Estimates." };
   }
 }
@@ -706,7 +707,7 @@ export async function createKachaInvoice(
     if (error instanceof OversellError) {
       return { success: false, message: error.message };
     }
-    console.error("createKachaInvoice error:", error);
+    logger.error("createKachaInvoice error", error);
     return { success: false, message: "Failed to create Estimate" };
   }
 }
@@ -763,7 +764,7 @@ export async function recordKachaInvoicePayment(
 
     return { success: true, message: "Payment recorded" };
   } catch (error) {
-    console.error("recordKachaInvoicePayment error:", error);
+    logger.error("recordKachaInvoicePayment error", error);
     return { success: false, message: "Failed to record payment" };
   }
 }
@@ -904,7 +905,7 @@ export async function convertKachaToPakka(
       invoiceId: invoice.id,
     };
   } catch (error) {
-    console.error("convertKachaToPakka error:", error);
+    logger.error("convertKachaToPakka error", error);
     return { success: false, message: "Failed to convert to Tax Invoice" };
   }
 }
@@ -936,7 +937,7 @@ export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormSt
 
     return { success: true, message: "Estimate deleted" };
   } catch (error) {
-    console.error("deleteKachaInvoice error:", error);
+    logger.error("deleteKachaInvoice error", error);
     return { success: false, message: "Failed to delete Estimate" };
   }
 }
@@ -1370,7 +1371,7 @@ export async function importKachaInvoicesFromExcel(
       message: `Imported ${createdCount} Estimate${createdCount === 1 ? "" : "s"}.`,
     };
   } catch (error) {
-    console.error("importKachaInvoicesFromExcel error:", error);
+    logger.error("importKachaInvoicesFromExcel error", error);
     return { success: false, message: "Failed to import Estimates." };
   }
 }
@@ -1584,7 +1585,7 @@ export async function deleteAllKachaInvoices(
       message: `Backup of ${kachaInvoices.length} Estimates sent to ${backupEmail}. ${count} slips deleted.`,
     };
   } catch (error) {
-    console.error("deleteAllKachaInvoices error:", error);
+    logger.error("deleteAllKachaInvoices error", error);
     return {
       success: false,
       message: "Failed to delete Estimates. No slips were deleted.",
@@ -1643,7 +1644,7 @@ export async function emailKachaInvoiceAction(
 
     return { success: result.sent, message: result.message };
   } catch (error) {
-    console.error("emailKachaInvoiceAction error:", error);
+    logger.error("emailKachaInvoiceAction error", error);
     return { success: false, message: "Failed to email Estimate" };
   }
 }

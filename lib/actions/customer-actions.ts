@@ -25,6 +25,7 @@ import {
   type CustomersListResponse as CoreCustomersListResponse,
   type CustomerInput,
 } from "@/lib/core/customer"
+import { logger } from "@/lib/logger";
 
 // Re-declared (not re-exported via `export type {...} from`, which Next's
 // "use server" export transform can't handle) so every existing
@@ -175,7 +176,7 @@ export async function exportCustomersToExcel(
       fileBase64,
     }
   } catch (error) {
-    console.error("exportCustomersToExcel error:", error)
+    logger.error("exportCustomersToExcel error", error)
     return {
       success: false,
       message: "Failed to export parties.",
@@ -242,7 +243,7 @@ export async function archiveCustomer(id: string): Promise<CustomerFormState> {
       message: "Party archived successfully",
     }
   } catch (error) {
-    console.error("archiveCustomer error:", error)
+    logger.error("archiveCustomer error", error)
     return {
       success: false,
       message: "Failed to archive party",
@@ -277,7 +278,7 @@ export async function unarchiveCustomer(id: string): Promise<CustomerFormState> 
       message: "Party restored successfully",
     }
   } catch (error) {
-    console.error("unarchiveCustomer error:", error)
+    logger.error("unarchiveCustomer error", error)
     return {
       success: false,
       message: "Failed to restore party",
@@ -329,7 +330,7 @@ export async function deleteCustomer(id: string): Promise<CustomerFormState> {
       message: "Party deleted successfully",
     }
   } catch (error) {
-    console.error("deleteCustomer error:", error)
+    logger.error("deleteCustomer error", error)
     return {
       success: false,
       message: "Failed to delete party",

@@ -4,6 +4,7 @@ import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/auth";
 import { requireStoreScope } from "@/lib/store-context";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   try {
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
 
     return Response.json({ url: blob.url });
   } catch (error) {
-    console.error("store logo upload error:", error);
+    logger.error("store logo upload error", error);
     // Surfaces the real cause instead of always blaming the token — once
     // that's actually configured, a stale hardcoded message here would
     // hide whatever the new failure actually is.

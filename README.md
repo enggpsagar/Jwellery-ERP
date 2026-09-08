@@ -33,6 +33,7 @@ pnpm dev
 | `GOLD_API_KEY` | Daily gold/silver rate fetch (`/api/cron/metal-rates`) |
 | `CRON_SECRET` | Authorizes the metal-rates cron endpoint |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob storage — payment receipt attachments. Get it from your Vercel project's Storage tab after creating a Blob store. |
+| `BETTER_STACK_SOURCE_TOKEN` | Ships server-side logs (`lib/logger.ts`) to a Better Stack log source for searching/dashboards. Optional — omitted, every log call just falls back to `console.*`. |
 
 ### Database
 

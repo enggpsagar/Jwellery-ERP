@@ -9,6 +9,7 @@ import { requireRole } from "@/lib/auth/auth";
 import { MONEY_UNIT } from "@/lib/business-units";
 import { getAvailableBusinessUnitOptions } from "@/lib/business-units.server";
 import { LEGACY_PLACEHOLDER_BUSINESS_NAME } from "@/lib/constants/app";
+import { logger } from "@/lib/logger";
 
 export type BusinessSettings = {
   storeId: string;
@@ -328,7 +329,7 @@ export async function updateBusinessSettings(
 
     return { success: true, message: "Settings updated successfully" };
   } catch (error) {
-    console.error("updateBusinessSettings error:", error);
+    logger.error("updateBusinessSettings error", error);
     return { success: false, message: "Failed to update settings" };
   }
 }
@@ -356,7 +357,7 @@ export async function removeStoreLogo(): Promise<SettingsFormState> {
 
     return { success: true, message: "Logo removed" };
   } catch (error) {
-    console.error("removeStoreLogo error:", error);
+    logger.error("removeStoreLogo error", error);
     return { success: false, message: "Failed to remove logo" };
   }
 }
@@ -402,7 +403,7 @@ export async function updateSkuFormat(
 
     return { success: true, message: "SKU format updated" };
   } catch (error) {
-    console.error("updateSkuFormat error:", error);
+    logger.error("updateSkuFormat error", error);
     return { success: false, message: "Failed to update SKU format" };
   }
 }

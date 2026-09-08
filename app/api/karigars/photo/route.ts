@@ -1,6 +1,7 @@
 import { put } from "@vercel/blob";
 
 import { requireStoreScope } from "@/lib/store-context";
+import { logger } from "@/lib/logger";
 
 // Uploads a Karigar (Artisan) profile photo from the Add/Edit Artisan form.
 // Deliberately not tied to a karigar id — a brand-new artisan doesn't have
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
 
     return Response.json({ url: blob.url });
   } catch (error) {
-    console.error("karigar photo upload error:", error);
+    logger.error("karigar photo upload error", error);
     const message = error instanceof Error ? error.message : String(error);
     return Response.json(
       { error: `Upload failed: ${message}` },

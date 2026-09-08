@@ -30,6 +30,7 @@ import { ROLE_LABELS } from "@/lib/roles";
 import { requireStoreScope, getEffectiveStoreId } from "@/lib/store-context";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
 import { buildExcelExport } from "@/lib/excel-export";
+import { logger } from "@/lib/logger";
 
 export type UserActionState = {
   success: boolean;
@@ -164,7 +165,7 @@ export async function createUserAction(
       };
     }
 
-    console.error("createUserAction error:", error);
+    logger.error("createUserAction error", error);
     return { success: false, message: friendlyUserErrorMessage(error, "Failed to create user") };
   }
 }
@@ -208,7 +209,7 @@ export async function grantStoreAccessAction(
 
     return { success: true, message: "Access granted to this store" };
   } catch (error) {
-    console.error("grantStoreAccessAction error:", error);
+    logger.error("grantStoreAccessAction error", error);
     return {
       success: false,
       message: friendlyUserErrorMessage(error, "Failed to grant access"),
@@ -252,7 +253,7 @@ export async function updateUserAction(
 
     return { success: true, message: "User updated successfully" };
   } catch (error) {
-    console.error("updateUserAction error:", error);
+    logger.error("updateUserAction error", error);
     return { success: false, message: friendlyUserErrorMessage(error, "Failed to update user") };
   }
 }
@@ -274,7 +275,7 @@ export async function disableUserAction(id: string): Promise<UserActionState> {
 
     return { success: true, message: "User disabled" };
   } catch (error) {
-    console.error("disableUserAction error:", error);
+    logger.error("disableUserAction error", error);
     return { success: false, message: friendlyUserErrorMessage(error, "Failed to disable user") };
   }
 }
@@ -296,7 +297,7 @@ export async function enableUserAction(id: string): Promise<UserActionState> {
 
     return { success: true, message: "User enabled" };
   } catch (error) {
-    console.error("enableUserAction error:", error);
+    logger.error("enableUserAction error", error);
     return { success: false, message: friendlyUserErrorMessage(error, "Failed to enable user") };
   }
 }
@@ -354,7 +355,7 @@ export async function exportUsersToExcel(params: ExportUsersParams = {}): Promis
       fileBase64,
     };
   } catch (error) {
-    console.error("exportUsersToExcel error:", error);
+    logger.error("exportUsersToExcel error", error);
     return { success: false, message: "Failed to export users." };
   }
 }
@@ -376,7 +377,7 @@ export async function deleteUserAction(id: string): Promise<UserActionState> {
 
     return { success: true, message: "User deleted" };
   } catch (error) {
-    console.error("deleteUserAction error:", error);
+    logger.error("deleteUserAction error", error);
     return { success: false, message: friendlyUserErrorMessage(error, "Failed to delete user") };
   }
 }

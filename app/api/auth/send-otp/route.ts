@@ -9,6 +9,7 @@ import { sendMail } from "@/lib/mailer";
 import { otpEmail } from "@/lib/email-templates";
 import { resolveStoreName } from "@/lib/invite-email";
 import { APP_NAME } from "@/lib/constants/app";
+import { logger } from "@/lib/logger";
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
       message: "OTP sent successfully.",
     });
   } catch (error) {
-    console.error("SEND OTP ERROR:", error);
+    logger.error("SEND OTP ERROR", error);
 
     return NextResponse.json(
       {

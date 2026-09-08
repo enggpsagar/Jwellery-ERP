@@ -12,6 +12,7 @@ import {
   buildDailyReportWorkbook,
   previousIstDay,
 } from "@/lib/daily-report";
+import { logger } from "@/lib/logger";
 
 /**
  * Yesterday's trading, mailed to each store's owners.
@@ -133,7 +134,7 @@ export async function GET(request: Request) {
       } catch (error) {
         // One store's failure must not stop the rest of the run — the next
         // store's owner is still waiting on their morning summary.
-        console.error(`daily-report failed for ${store.name}:`, error);
+        logger.error("daily-report failed for store", error, { storeName: store.name });
         failures.push(
           `${store.name}: ${error instanceof Error ? error.message : "unknown error"}`,
         );
@@ -150,7 +151,7 @@ export async function GET(request: Request) {
       failures,
     });
   } catch (error) {
-    console.error("daily-report cron error:", error);
+    logger.error("daily-report cron error", error);
     return NextResponse.json(
       { error: "Failed to send daily reports" },
       { status: 500 },

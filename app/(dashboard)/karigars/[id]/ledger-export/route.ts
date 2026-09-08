@@ -8,6 +8,7 @@ import {
   buildCsvExport,
   buildMultiSheetExcelExport,
 } from "@/lib/excel-export"
+import { logger } from "@/lib/logger";
 
 type Format = "csv" | "excel"
 
@@ -106,7 +107,7 @@ export async function GET(
       },
     })
   } catch (error) {
-    console.error("Karigar ledger export failed:", error)
+    logger.error("Karigar ledger export failed", error)
     return NextResponse.json(
       { success: false, message: "Failed to export artisan ledger" },
       { status: 500 },

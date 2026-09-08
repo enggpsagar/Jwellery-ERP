@@ -20,6 +20,7 @@ import { amountInWords } from "@/lib/number-to-words";
 import { formatShortDate } from "@/lib/utils";
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst";
 import { APP_NAME } from "@/lib/constants/app";
+import { logger } from "@/lib/logger";
 
 function fmt(value: number) {
   return value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -88,7 +89,7 @@ export async function GET(
           y += 40;
         }
       } catch (error) {
-        console.error("Invoice PDF: failed to embed store logo", error);
+        logger.error("Invoice PDF: failed to embed store logo", error);
       }
     }
 
@@ -234,7 +235,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Invoice PDF generation failed:", error);
+    logger.error("Invoice PDF generation failed", error);
     return NextResponse.json({ error: "Failed to generate invoice PDF" }, { status: 500 });
   }
 }

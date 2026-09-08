@@ -17,6 +17,7 @@ import { requireStoreScope } from "@/lib/store-context";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { getReturnEligibility, type ReturnEligibility } from "@/lib/return-window";
 import { formatShortDate } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 export type CreditNoteFormState = {
   success: boolean;
@@ -439,7 +440,7 @@ export async function createCreditNote(
       creditNoteId: created.id,
     };
   } catch (error) {
-    console.error("createCreditNote error:", error);
+    logger.error("createCreditNote error", error);
     return { success: false, message: "Failed to create credit note" };
   }
 }

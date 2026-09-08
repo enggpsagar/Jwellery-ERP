@@ -47,6 +47,8 @@ pnpm db:seed:kacha          # optional: demo kacha slips
 
 The database is shared between local development and the deployed app (a single Neon instance) — there is no separate dev/staging database, so migrations take effect everywhere immediately.
 
+See [`docs/DATABASE-SCHEMA.md`](docs/DATABASE-SCHEMA.md) for an entity-relationship reference of the full schema, grouped by domain.
+
 ## Roles
 
 | Role | Scope |

@@ -88,15 +88,16 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
     <div className="space-y-4 rounded-xl border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{invoice.invoiceNumber}</h2>
-        <InvoiceRowActions invoice={invoice} locations={locations} />
+        <div className="flex flex-wrap items-center gap-2">
+          <InvoiceActionsBar
+            invoice={invoice}
+            businessName={businessName}
+            returnWindowEnabled={returnWindowEnabled}
+            returnWindowDays={returnWindowDays}
+          />
+          <InvoiceRowActions invoice={invoice} locations={locations} />
+        </div>
       </div>
-
-      <InvoiceActionsBar
-        invoice={invoice}
-        businessName={businessName}
-        returnWindowEnabled={returnWindowEnabled}
-        returnWindowDays={returnWindowDays}
-      />
 
       <InvoiceDetailContent
         invoice={invoice}

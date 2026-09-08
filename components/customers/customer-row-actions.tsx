@@ -101,7 +101,7 @@ export function CustomerRowActions({
         <button
           type="button"
           onClick={() => setConfirmAction("archive")}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-amber-200 text-amber-700 transition hover:bg-amber-50"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-amber-600 text-white shadow-sm transition hover:bg-amber-700"
           aria-label={`Archive ${customer.name}`}
           title="Archive party"
         >

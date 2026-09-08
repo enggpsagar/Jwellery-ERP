@@ -74,8 +74,8 @@ export function SalesSummaryCard({ initialData, initialPeriod }: SalesSummaryCar
   const sparkline = points.slice(-SPARKLINE_LENGTH)
 
   return (
-    <Card className="gap-0 py-0">
-      <CardContent className="flex flex-col gap-3 p-4">
+    <Card className="h-full gap-0 py-0">
+      <CardContent className="flex h-full flex-col gap-3 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
             <span className="text-sm font-medium text-muted-foreground">Sales</span>
@@ -120,7 +120,7 @@ export function SalesSummaryCard({ initialData, initialPeriod }: SalesSummaryCar
           </div>
         </div>
 
-        <div className="h-14 w-full">
+        <div className="min-h-14 w-full flex-1">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={sparkline} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
               <defs>

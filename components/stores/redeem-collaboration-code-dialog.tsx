@@ -60,7 +60,7 @@ export function RedeemCollaborationCodeDialog({
       <DialogTrigger asChild>
         <Button type="button" variant="outline" size="sm" className="gap-2">
           <KeyRound className="size-4" />
-          Access store
+          Access Only
         </Button>
       </DialogTrigger>
 

@@ -9,7 +9,6 @@ import { resolveBackLink } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { toTitleCase } from "@/lib/utils"
 import { InvoiceActionsBar } from "@/components/billing/invoice-actions-bar"
-import { InvoiceRowActions } from "@/components/billing/invoice-row-actions"
 import { InvoiceDetailContent } from "@/components/billing/invoice-detail-content"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
@@ -59,15 +58,13 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         backHref={backTo.href}
         backLabel={backTo.label}
         action={
-          <div className="flex items-center gap-2">
-            <InvoiceActionsBar
-              invoice={invoice}
-              businessName={settings.businessName}
-              returnWindowEnabled={settings.returnWindowEnabled}
-              returnWindowDays={settings.returnWindowDays}
-            />
-            <InvoiceRowActions invoice={invoice} locations={locations} />
-          </div>
+          <InvoiceActionsBar
+            invoice={invoice}
+            businessName={settings.businessName}
+            returnWindowEnabled={settings.returnWindowEnabled}
+            returnWindowDays={settings.returnWindowDays}
+            locations={locations}
+          />
         }
       />
 

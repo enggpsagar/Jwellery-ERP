@@ -17,6 +17,7 @@ import { ChangePlanDialog } from "@/components/stores/change-plan-dialog"
 import { StoreDeleteDialog } from "@/components/stores/store-delete-dialog"
 import { RedeemCollaborationCodeDialog } from "@/components/stores/redeem-collaboration-code-dialog"
 import { RequestStoreAccessButton } from "@/components/stores/request-store-access-button"
+import { ExportStoreDataButton } from "@/components/stores/export-store-data-button"
 import type { PlanRow } from "@/lib/actions/plan-actions"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -120,6 +121,7 @@ export function StoreDetailPanel({ storeId, plans, currentPlanId }: StoreDetailP
           />
           <RedeemCollaborationCodeDialog storeId={overview.storeId} storeName={overview.name} />
           <RequestStoreAccessButton storeId={overview.storeId} storeName={overview.name} />
+          <ExportStoreDataButton storeId={overview.storeId} />
           <Button asChild variant="outline" size="sm" className="gap-2">
             <Link href={`/stores/${overview.storeId}/edit`}>
               <Pencil className="size-4" />

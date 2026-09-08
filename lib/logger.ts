@@ -1,19 +1,26 @@
 // lib/logger.ts
-// Server-only — @logtail/node shells out to Node's http/https modules, so
-// this must never be imported from a "use client" file (e.g.
-// app/(dashboard)/error.tsx's error boundary keeps plain console.error for
-// that reason).
+// Server-only — never import this from a "use client" file. It reads
+// BETTER_STACK_SOURCE_TOKEN, and Next only strips env vars from the client
+// bundle when they're not NEXT_PUBLIC_-prefixed; importing this from client
+// code wouldn't leak the token today, but "server-only" makes that
+// invariant load-bearing instead of accidental.
+//
+// Ships via a plain `fetch` POST to Better Stack's HTTP log-ingestion API
+// (https://betterstack.com/docs/logs/http-rest-api/) rather than the
+// @logtail/node SDK — that SDK batches internally and only ships on flush,
+// which is a real risk on Vercel's serverless functions (an instance can
+// freeze right after the response is sent, before a batch flushes) and it
+// depends on Node's http/https modules, so it can't run on the Edge
+// runtime at all. A single awaited fetch has neither problem: it resolves
+// only once the log has actually been sent, and it works identically in a
+// Node serverless function, Edge middleware, or instrumentation.ts's
+// non-Node runtime branch.
 import "server-only";
-import { Logtail } from "@logtail/node";
 
 type LogContext = Record<string, unknown>;
 
 const sourceToken = process.env.BETTER_STACK_SOURCE_TOKEN;
-
-// Undefined until BETTER_STACK_SOURCE_TOKEN is set in the environment — every
-// call below falls back to plain console output until then, so nothing here
-// depends on Better Stack actually being configured yet.
-const client = sourceToken ? new Logtail(sourceToken) : null;
+const ingestingHost = process.env.BETTER_STACK_INGESTING_HOST;
 
 function serializeError(error: unknown): unknown {
   if (error instanceof Error) {
@@ -22,22 +29,34 @@ function serializeError(error: unknown): unknown {
   return error;
 }
 
+function fallbackToConsole(level: "info" | "warn" | "error", message: string, context?: LogContext) {
+  const log = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
+  log(message, context ?? "");
+}
+
 async function send(level: "info" | "warn" | "error", message: string, context?: LogContext) {
-  if (!client) {
-    const log = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
-    log(message, context ?? "");
+  if (!sourceToken || !ingestingHost) {
+    fallbackToConsole(level, message, context);
     return;
   }
 
   try {
-    await client[level](message, context);
-    // A Vercel function instance can freeze or exit right after the
-    // response is sent — flush forces this log out over the wire now
-    // instead of risking it being dropped along with the batch.
-    await client.flush();
+    const response = await fetch(`https://${ingestingHost}/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sourceToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ dt: new Date().toISOString(), level, message, ...context }),
+    });
+
+    if (!response.ok) {
+      console.error(`logger: Better Stack ingest responded ${response.status}`);
+      fallbackToConsole(level, message, context);
+    }
   } catch (shippingError) {
     console.error("logger: failed to ship log to Better Stack", shippingError);
-    console.error(message, context ?? "");
+    fallbackToConsole(level, message, context);
   }
 }
 

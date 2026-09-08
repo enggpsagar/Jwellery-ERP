@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { reportClientError } from "@/lib/report-client-error";
 
 export default function DashboardError({
   error,
@@ -14,8 +15,8 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log to the server console / your error reporting service of choice
     console.error("Dashboard route error:", error);
+    reportClientError(error);
   }, [error]);
 
   return (

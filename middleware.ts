@@ -85,7 +85,15 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  // Forwarded so app/(dashboard)/layout.tsx can tell which route is
+  // rendering without a store selected — a Super Admin with no
+  // Collaboration Code grants yet still needs /stores (to redeem one),
+  // /profile, and /support-tickets to work normally, none of which depend
+  // on requireStoreScope(); only store-scoped routes should show that
+  // layout's "No store access yet" notice instead of crashing into it.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", pathname);
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {

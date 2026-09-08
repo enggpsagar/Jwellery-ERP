@@ -132,7 +132,7 @@ export function ReturnItemsDialog({
             title="Return Items"
           >
             <Undo2 className="h-4 w-4" />
-            Items
+            Return Items
           </Button>
         </DialogTrigger>
       )}

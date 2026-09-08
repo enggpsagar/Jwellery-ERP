@@ -2,14 +2,15 @@
 
 import { useState, useTransition } from "react"
 import { ArrowDownRight, ArrowUpRight } from "lucide-react"
-import { Bar, BarChart, ResponsiveContainer } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import { cn } from "@/lib/utils"
 import {
-  getSalesTrend,
-  type SalesTrend,
+  getSalesBreakdown,
+  type SalesBreakdown,
   type SalesTrendPeriod,
 } from "@/lib/actions/dashboard-actions"
 
@@ -32,25 +33,63 @@ const PERIOD_SUB_LABELS: Record<SalesTrendPeriod, string> = {
   yearly: "vs last year",
 }
 
+/** What each period drills down into — shown under the chart so the axis's
+ * granularity is never ambiguous. */
+const PERIOD_GRANULARITY: Record<SalesTrendPeriod, string> = {
+  daily: "by hour, today",
+  weekly: "by day, this week",
+  monthly: "by day, this month",
+  quarterly: "by month, this quarter",
+  yearly: "by month, this year",
+}
+
 const PERIOD_OPTIONS = Object.keys(PERIOD_LABELS) as SalesTrendPeriod[]
 
-/** How many trailing buckets the sparkline shows — enough to read a shape
- * without crowding a card this small. */
-const SPARKLINE_LENGTH = 8
+// Same fixed palette/lookup as sales-chart.tsx, duplicated rather than
+// imported since that file is a distinct "use client" component with its
+// own copy of these labels already, by the same convention.
+const METAL_COLORS: Record<string, string> = {
+  gold: "var(--chart-2)",
+  silver: "var(--chart-1)",
+  diamond: "var(--chart-4)",
+  platinum: "var(--chart-1)",
+  unspecified: "var(--chart-5)",
+}
+
+const FALLBACK_COLORS = [
+  "var(--chart-3)",
+  "var(--chart-5)",
+  "var(--chart-4)",
+  "var(--chart-1)",
+  "var(--chart-2)",
+]
+
+function colorFor(metal: string, index: number) {
+  return METAL_COLORS[metal.trim().toLowerCase()] ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length]
+}
+
+const compact = (v: number) =>
+  v >= 100000
+    ? `₹${(v / 100000).toFixed(1)}L`
+    : v >= 1000
+      ? `₹${(v / 1000).toFixed(0)}K`
+      : `₹${v}`
 
 type SalesSummaryCardProps = {
-  initialData: SalesTrend
+  initialData: SalesBreakdown
   initialPeriod: SalesTrendPeriod
 }
 
 /**
  * Replaces the old separate "Today's Sales" and "Monthly Revenue" KPI cards
- * with one Sales section carrying its own Weekly/Monthly/Quarterly/Yearly
- * toggle. Reuses getSalesTrend's own bucketed series rather than a separate
- * query — the last bucket in `points` is always the current, still-in-
- * progress period, and the one before it the prior period, exactly what
- * "Today's Sales" (today vs yesterday) and "Monthly Revenue" (this month vs
- * last) each used to compute individually per period.
+ * with one Sales section carrying its own Daily/Weekly/Monthly/Quarterly/
+ * Yearly toggle. Unlike the big Sales Trend chart (trailing whole periods),
+ * this drills INTO the current period — Daily shows today's hours, Weekly
+ * shows this week's days, and so on — stacked by metal, same breakdown
+ * convention as Sales Trend/Revenue by Metal. currentTotal/previousTotal
+ * come straight from getSalesBreakdown rather than being derived from the
+ * chart's own bars, since the bars are sub-period buckets, not
+ * period-over-period comparison points.
  */
 export function SalesSummaryCard({ initialData, initialPeriod }: SalesSummaryCardProps) {
   const [period, setPeriod] = useState(initialPeriod)
@@ -61,17 +100,20 @@ export function SalesSummaryCard({ initialData, initialPeriod }: SalesSummaryCar
     if (next === period) return
     setPeriod(next)
     startTransition(async () => {
-      setData(await getSalesTrend(next))
+      setData(await getSalesBreakdown(next))
     })
   }
 
-  const { points } = data
-  const current = points[points.length - 1]?.sales ?? 0
-  const previous = points[points.length - 2]?.sales ?? 0
+  const { points, metals, currentTotal, previousTotal } = data
   const change =
-    previous === 0 ? (current === 0 ? 0 : 100) : ((current - previous) / previous) * 100
+    previousTotal === 0 ? (currentTotal === 0 ? 0 : 100) : ((currentTotal - previousTotal) / previousTotal) * 100
   const isUp = change >= 0
-  const sparkline = points.slice(-SPARKLINE_LENGTH)
+
+  const chartConfig = Object.fromEntries(
+    metals.map((metal, index) => [metal, { label: metal, color: colorFor(metal, index) }])
+  ) satisfies ChartConfig
+
+  const hasBreakdown = metals.length > 0
 
   return (
     <Card className="h-full gap-0 py-0">
@@ -81,7 +123,7 @@ export function SalesSummaryCard({ initialData, initialPeriod }: SalesSummaryCar
             <span className="text-sm font-medium text-muted-foreground">Sales</span>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-semibold tracking-tight tabular-nums">
-                ₹{current.toLocaleString("en-IN")}
+                ₹{currentTotal.toLocaleString("en-IN")}
               </span>
               <span
                 className={cn(
@@ -99,7 +141,7 @@ export function SalesSummaryCard({ initialData, initialPeriod }: SalesSummaryCar
               </span>
             </div>
             <span className="text-xs text-muted-foreground">
-              {PERIOD_SUB_LABELS[period]}
+              {PERIOD_SUB_LABELS[period]} · {PERIOD_GRANULARITY[period]}
             </span>
           </div>
 
@@ -120,12 +162,57 @@ export function SalesSummaryCard({ initialData, initialPeriod }: SalesSummaryCar
           </div>
         </div>
 
-        <div className="min-h-14 w-full flex-1">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={sparkline} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-              <Bar dataKey="sales" fill="var(--chart-1)" radius={[2, 2, 0, 0]} />
+        <div className="min-h-[150px] w-full flex-1">
+          <ChartContainer config={chartConfig} className="h-full w-full">
+            <BarChart data={points} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={6}
+                interval="preserveStartEnd"
+                minTickGap={20}
+                tick={{ fontSize: 10 }}
+              />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tickMargin={4}
+                width={38}
+                tick={{ fontSize: 10 }}
+                tickFormatter={compact}
+              />
+              <ChartTooltip
+                cursor={{ fill: "var(--muted)", opacity: 0.4 }}
+                content={
+                  <ChartTooltipContent
+                    formatter={(value, name) => (
+                      <div className="flex w-full items-center justify-between gap-3">
+                        <span className="text-muted-foreground capitalize">{name}</span>
+                        <span className="font-medium tabular-nums">
+                          ₹{Number(value).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    )}
+                  />
+                }
+              />
+              {hasBreakdown ? (
+                metals.map((metal, index) => (
+                  <Bar
+                    key={metal}
+                    dataKey={metal}
+                    stackId="sales"
+                    fill={colorFor(metal, index)}
+                    radius={index === metals.length - 1 ? [2, 2, 0, 0] : 0}
+                  />
+                ))
+              ) : (
+                <Bar dataKey="sales" fill="var(--chart-1)" radius={[2, 2, 0, 0]} />
+              )}
             </BarChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </div>
       </CardContent>
     </Card>

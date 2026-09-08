@@ -446,6 +446,250 @@ export async function getSalesTrend(
   return { points, metals: metalIds.map((id) => labels.get(id) ?? id) };
 }
 
+/**
+ * Drills into the CURRENT period only, one level finer than the period
+ * itself — Daily shows today's 24 hours, Weekly shows this week's 7 days,
+ * Monthly shows this month's days, Quarterly shows this quarter's 3 months,
+ * Yearly shows this year's 12 months. Unlike getSalesTrend (which shows N
+ * trailing whole periods, each bucket the same size as the period), this is
+ * for the compact Sales card's own chart, which needs to answer "where
+ * inside today/this week/etc. did the sales happen," not "how did this
+ * period compare to recent ones."
+ *
+ * `currentTotal`/`previousTotal` are the current vs. immediately-prior
+ * period's totals (today vs yesterday, this week vs last week, ...) — the
+ * same comparison SalesSummaryCard's badge always showed, computed directly
+ * here rather than derived from getSalesTrend's own bucket list.
+ */
+export type SalesBreakdown = SalesTrend & {
+  currentTotal: number;
+  previousTotal: number;
+};
+
+function startOfPeriod(period: SalesTrendPeriod, date: Date): Date {
+  switch (period) {
+    case "daily":
+      return startOfDay(date);
+    case "weekly":
+      return startOfWeekMonday(date);
+    case "monthly":
+      return startOfMonth(date);
+    case "quarterly": {
+      const quarter = Math.floor(date.getMonth() / 3);
+      return new Date(date.getFullYear(), quarter * 3, 1);
+    }
+    case "yearly":
+      return new Date(date.getFullYear(), 0, 1);
+  }
+}
+
+type SubBucket = { key: string; label: string; start: Date };
+
+/** The sub-buckets the current period is drilled into, oldest first. */
+function subBucketsFor(period: SalesTrendPeriod, periodStart: Date): SubBucket[] {
+  switch (period) {
+    case "daily": {
+      const buckets: SubBucket[] = [];
+      for (let h = 0; h < 24; h++) {
+        const start = new Date(
+          periodStart.getFullYear(),
+          periodStart.getMonth(),
+          periodStart.getDate(),
+          h
+        );
+        const suffix = h < 12 ? "AM" : "PM";
+        const displayHour = h % 12 === 0 ? 12 : h % 12;
+        buckets.push({ key: `h${h}`, label: `${displayHour}${suffix}`, start });
+      }
+      return buckets;
+    }
+    case "weekly": {
+      const buckets: SubBucket[] = [];
+      for (let d = 0; d < 7; d++) {
+        const start = new Date(
+          periodStart.getFullYear(),
+          periodStart.getMonth(),
+          periodStart.getDate() + d
+        );
+        buckets.push({
+          key: `d${d}`,
+          label: start.toLocaleDateString("en-US", { weekday: "short" }),
+          start,
+        });
+      }
+      return buckets;
+    }
+    case "monthly": {
+      const daysInMonth = new Date(
+        periodStart.getFullYear(),
+        periodStart.getMonth() + 1,
+        0
+      ).getDate();
+      const buckets: SubBucket[] = [];
+      for (let d = 0; d < daysInMonth; d++) {
+        const start = new Date(periodStart.getFullYear(), periodStart.getMonth(), d + 1);
+        buckets.push({ key: `d${d}`, label: `${d + 1}`, start });
+      }
+      return buckets;
+    }
+    case "quarterly": {
+      const buckets: SubBucket[] = [];
+      for (let m = 0; m < 3; m++) {
+        const start = new Date(periodStart.getFullYear(), periodStart.getMonth() + m, 1);
+        buckets.push({
+          key: `m${m}`,
+          label: start.toLocaleDateString("en-US", { month: "short" }),
+          start,
+        });
+      }
+      return buckets;
+    }
+    case "yearly": {
+      const buckets: SubBucket[] = [];
+      for (let m = 0; m < 12; m++) {
+        const start = new Date(periodStart.getFullYear(), m, 1);
+        buckets.push({
+          key: `m${m}`,
+          label: start.toLocaleDateString("en-US", { month: "short" }),
+          start,
+        });
+      }
+      return buckets;
+    }
+  }
+}
+
+/** Which sub-bucket an invoiceDate inside the current period falls into —
+ * matched by index rather than re-deriving a key, since every sub-bucket
+ * scheme above is evenly spaced within the period. */
+function subBucketIndexFor(period: SalesTrendPeriod, periodStart: Date, date: Date): number {
+  switch (period) {
+    case "daily":
+      return date.getHours();
+    case "weekly":
+      return Math.floor((startOfDay(date).getTime() - periodStart.getTime()) / 86_400_000);
+    case "monthly":
+      return date.getDate() - 1;
+    case "quarterly":
+      return date.getMonth() - periodStart.getMonth();
+    case "yearly":
+      return date.getMonth();
+  }
+}
+
+export async function getSalesBreakdown(
+  period: SalesTrendPeriod = "daily"
+): Promise<SalesBreakdown> {
+  const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
+  const now = new Date();
+
+  const currentStart = startOfPeriod(period, now);
+  const currentEnd = offsetPeriod(period, currentStart, 1);
+  const previousStart = offsetPeriod(period, currentStart, -1);
+
+  const buckets = subBucketsFor(period, currentStart);
+
+  const invoices = await prisma.invoice.findMany({
+    where: {
+      storeId,
+      invoiceDate: { gte: previousStart, lt: currentEnd },
+      status: { not: InvoiceStatus.CANCELLED },
+      ...locationWhere(scope),
+    },
+    select: {
+      invoiceDate: true,
+      totalAmount: true,
+      items: {
+        select: {
+          lineTotal: true,
+          metalType: { select: { name: true } },
+        },
+      },
+    },
+  });
+
+  const totals = new Map<string, number>();
+  const perMetal = new Map<string, Map<string, number>>();
+  const labels = new Map<string, string>();
+
+  for (const bucket of buckets) {
+    totals.set(bucket.key, 0);
+    perMetal.set(bucket.key, new Map());
+  }
+
+  let currentTotal = 0;
+  let previousTotal = 0;
+
+  for (const invoice of invoices) {
+    const invoiceTotal = Number(invoice.totalAmount);
+
+    if (invoice.invoiceDate < currentStart) {
+      previousTotal += invoiceTotal;
+      continue;
+    }
+
+    currentTotal += invoiceTotal;
+
+    const index = subBucketIndexFor(period, currentStart, invoice.invoiceDate);
+    const bucket = buckets[index];
+    if (!bucket) continue;
+
+    totals.set(bucket.key, (totals.get(bucket.key) ?? 0) + invoiceTotal);
+
+    const metalBucket = perMetal.get(bucket.key)!;
+    const lineSum = invoice.items.reduce((sum, item) => sum + Number(item.lineTotal), 0);
+    const factor = lineSum > 0 ? invoiceTotal / lineSum : 0;
+
+    if (lineSum <= 0) {
+      metalBucket.set(UNSPECIFIED_METAL, (metalBucket.get(UNSPECIFIED_METAL) ?? 0) + invoiceTotal);
+      labels.set(UNSPECIFIED_METAL, UNSPECIFIED_METAL);
+      continue;
+    }
+
+    for (const item of invoice.items) {
+      const raw = item.metalType?.name;
+      const id = raw ? metalKey(raw) : UNSPECIFIED_METAL;
+      if (!labels.has(id)) labels.set(id, raw ? metalLabel(raw) : UNSPECIFIED_METAL);
+
+      metalBucket.set(id, (metalBucket.get(id) ?? 0) + Number(item.lineTotal) * factor);
+    }
+  }
+
+  const metalTotals = new Map<string, number>();
+  for (const bucket of perMetal.values()) {
+    for (const [id, value] of bucket) {
+      metalTotals.set(id, (metalTotals.get(id) ?? 0) + value);
+    }
+  }
+
+  const metalIds = [...metalTotals.entries()]
+    .filter(([, value]) => value > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([id]) => id);
+
+  const points: SalesTrendPoint[] = buckets.map((bucket) => {
+    const metalBucket = perMetal.get(bucket.key)!;
+    const point: SalesTrendPoint = {
+      label: bucket.label,
+      sales: totals.get(bucket.key) ?? 0,
+    };
+
+    for (const id of metalIds) {
+      point[labels.get(id) ?? id] = Math.round((metalBucket.get(id) ?? 0) * 100) / 100;
+    }
+
+    return point;
+  });
+
+  return {
+    points,
+    metals: metalIds.map((id) => labels.get(id) ?? id),
+    currentTotal,
+    previousTotal,
+  };
+}
+
 export type CategoryRevenue = { category: string; value: number };
 
 export type RevenueByMetal = {

@@ -97,28 +97,27 @@ export function InvoiceActionsBar({
         )}
       </div>
 
-      {!isCancelled && (
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <RecordPaymentDialog invoiceId={invoice.id} balanceAmount={invoice.balanceAmount} />
-          <EditInvoiceDialog
-            compact
-            invoiceId={invoice.id}
-            invoiceDate={invoice.invoiceDate}
-            dueDate={invoice.dueDate}
-            notes={invoice.notes}
-            locationId={invoice.locationId}
-            locations={locations}
-            ewayBillNumber={invoice.ewayBillNumber}
-            ewayBillDate={invoice.ewayBillDate}
-            transporterName={invoice.transporterName}
-            vehicleNumber={invoice.vehicleNumber}
-            transportMode={invoice.transportMode}
-            distanceKm={invoice.distanceKm}
-          />
-        </div>
-      )}
-
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {!isCancelled && (
+          <>
+            <RecordPaymentDialog invoiceId={invoice.id} balanceAmount={invoice.balanceAmount} />
+            <EditInvoiceDialog
+              compact
+              invoiceId={invoice.id}
+              invoiceDate={invoice.invoiceDate}
+              dueDate={invoice.dueDate}
+              notes={invoice.notes}
+              locationId={invoice.locationId}
+              locations={locations}
+              ewayBillNumber={invoice.ewayBillNumber}
+              ewayBillDate={invoice.ewayBillDate}
+              transporterName={invoice.transporterName}
+              vehicleNumber={invoice.vehicleNumber}
+              transportMode={invoice.transportMode}
+              distanceKm={invoice.distanceKm}
+            />
+          </>
+        )}
         <ShareWhatsAppButton
           phone={invoice.customer?.phone}
           message={whatsappMessage}

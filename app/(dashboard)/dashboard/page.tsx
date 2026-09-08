@@ -9,6 +9,7 @@ import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import {
   getDashboardStats,
   getSalesTrend,
+  getSalesBreakdown,
   getRevenueByCategory,
   getRecentTransactions,
   getRecentActivity,
@@ -25,10 +26,11 @@ const DEFAULT_REVENUE_PERIOD = "daily";
 const DEFAULT_TRANSACTIONS_PERIOD = "daily";
 
 export default async function DashboardPage() {
-  const [stats, salesTrend, revenueByCategory, transactions, activity] =
+  const [stats, salesTrend, salesBreakdown, revenueByCategory, transactions, activity] =
     await Promise.all([
       getDashboardStats(),
       getSalesTrend(DEFAULT_SALES_TREND_PERIOD),
+      getSalesBreakdown(DEFAULT_SALES_TREND_PERIOD),
       getRevenueByCategory(DEFAULT_REVENUE_PERIOD),
       getRecentTransactions(DEFAULT_TRANSACTIONS_PERIOD),
       getRecentActivity(),
@@ -60,7 +62,7 @@ export default async function DashboardPage() {
           page blank, since the sparkline itself only ever plots
           SPARKLINE_LENGTH points and gains nothing from stretching wider. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <SalesSummaryCard initialData={salesTrend} initialPeriod={DEFAULT_SALES_TREND_PERIOD} />
+        <SalesSummaryCard initialData={salesBreakdown} initialPeriod={DEFAULT_SALES_TREND_PERIOD} />
         <div className="lg:col-span-2">
           <StatCards stats={stats} />
         </div>

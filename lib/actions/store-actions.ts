@@ -548,6 +548,19 @@ export async function forceDeleteStore(storeId: string): Promise<{ success: bool
       prisma.user.updateMany({ where: { invitedById: { in: userIds } }, data: { invitedById: null } }),
       prisma.user.updateMany({ where: { id: { in: userIds } }, data: { karigarId: null } }),
 
+      // --- DraftOrder first, before anything it references gets deleted ---
+      // DraftOrder.storeId has no onDelete: Cascade (added to the schema
+      // after this function was written, and missed here — this whole
+      // manual list needs updating whenever a new storeId-bearing model is
+      // added, see the doc comment above). Deleting it here, before
+      // karigarReceiptItem/karigarJob below, also clears the two FKs a
+      // DraftOrder(Item) can hold into THOSE tables
+      // (DraftOrderItem.karigarReceiptItemId, DraftOrder.karigarJobId) —
+      // otherwise deleting a still-referenced KarigarReceiptItem/KarigarJob
+      // row would itself throw. DraftOrderItem cascades automatically once
+      // its own DraftOrder is gone.
+      prisma.draftOrder.deleteMany({ where: { storeId } }),
+
       // --- Deepest line-item / leaf children first ---
       prisma.inventoryTransaction.deleteMany({ where: { inventoryStock: { storeId } } }),
       prisma.scanSessionItem.deleteMany({ where: { session: { storeId } } }),
@@ -586,6 +599,7 @@ export async function forceDeleteStore(storeId: string): Promise<{ success: bool
 
       // --- Store-level singletons / settings tables ---
       prisma.metalRate.deleteMany({ where: { storeId } }),
+      prisma.metalSellingRate.deleteMany({ where: { storeId } }),
       prisma.purityFineness.deleteMany({ where: { storeId } }),
       prisma.caratConversionRate.deleteMany({ where: { storeId } }),
       prisma.businessSettings.deleteMany({ where: { storeId } }),

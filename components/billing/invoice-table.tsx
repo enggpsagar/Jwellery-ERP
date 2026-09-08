@@ -166,10 +166,10 @@ export function InvoiceTable({ invoices, activeInvoiceId, onActivate }: InvoiceT
                     <Link
                       href={`/billing/kacha/${invoice.convertedFromKacha.id}`}
                       className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100"
-                      title={`View Kacha slip ${invoice.convertedFromKacha.slipNumber}`}
+                      title={`View Estimate ${invoice.convertedFromKacha.slipNumber}`}
                     >
                       <ArrowLeftCircle className="h-3.5 w-3.5" />
-                      From Kacha ({invoice.convertedFromKacha.slipNumber})
+                      From Estimate ({invoice.convertedFromKacha.slipNumber})
                     </Link>
                   ) : (
                     <span className="text-xs text-muted-foreground">Direct Sale</span>

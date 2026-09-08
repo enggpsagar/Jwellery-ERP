@@ -10,7 +10,7 @@ import { getCurrentUser } from "@/lib/auth/auth"
 import { Button } from "@/components/ui/button"
 
 export const metadata: Metadata = {
-  title: "Kacha Invoices",
+  title: "Estimates",
 }
 
 type KachaBillingPageProps = {
@@ -53,15 +53,15 @@ export default async function KachaBillingPage({ searchParams }: KachaBillingPag
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
-        title="Kacha Slips"
-        description="Informal, no-GST sale slips — convert to a Pakka invoice once paperwork is ready."
+        title="Estimates"
+        description="Informal, no-GST sale slips — convert to a Tax Invoice once paperwork is ready."
         backHref="/billing"
         backLabel="Back to Billing"
         action={
           <div className="flex flex-wrap items-center gap-2">
             <KachaImportDialog />
             <Link href="/billing/kacha/new">
-              <Button>New Kacha Slip</Button>
+              <Button>New Estimate</Button>
             </Link>
           </div>
         }
@@ -78,7 +78,7 @@ export default async function KachaBillingPage({ searchParams }: KachaBillingPag
           totalPages={pagination.totalPages}
           totalCount={pagination.totalCount}
           pageSize={pagination.pageSize}
-          itemLabel="kacha slips"
+          itemLabel="estimates"
         />
       ) : null}
     </main>

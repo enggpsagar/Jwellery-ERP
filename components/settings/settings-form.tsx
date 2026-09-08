@@ -269,8 +269,8 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               placeholder="owner@example.com"
             />
             <p className="text-xs text-muted-foreground">
-              Where backups are sent before any bulk delete. Deleting all Kacha
-              slips is blocked until this is set, and again if the backup email
+              Where backups are sent before any bulk delete. Deleting all
+              Estimates is blocked until this is set, and again if the backup email
               fails to send.
             </p>
           </div>
@@ -402,7 +402,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             />
             <p className="text-xs text-muted-foreground">
               Applied automatically as the HM Charge on every Gold/Silver line item
-              when creating an Invoice, Kacha Slip, or Quotation — a flat ₹ amount
+              when creating an Invoice, Estimate, or Quotation — a flat ₹ amount
               per piece, not a % or per-gram charge. Not used for Platinum, Diamond,
               or Other purities. BIS hallmarking fees change periodically by
               official notification — confirm this matches what your hallmarking

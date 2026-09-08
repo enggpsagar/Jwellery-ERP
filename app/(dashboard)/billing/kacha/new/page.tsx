@@ -13,7 +13,7 @@ import { KachaInvoiceForm } from "@/components/billing/kacha/kacha-invoice-form"
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
 
 export const metadata: Metadata = {
-  title: "New Kacha Invoice",
+  title: "New Estimate",
 }
 
 export default async function NewKachaInvoicePage() {
@@ -35,10 +35,10 @@ export default async function NewKachaInvoicePage() {
       <ResetFormWrapper
         requireConfirm
         header={{
-          title: "New Kacha Slip",
+          title: "New Estimate",
           description: "Record an informal sale slip for a party, without GST.",
           backHref: "/billing/kacha",
-          backLabel: "Back to Kacha Slips",
+          backLabel: "Back to Estimates",
         }}
       >
         <KachaInvoiceForm

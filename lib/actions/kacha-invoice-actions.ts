@@ -349,7 +349,7 @@ export async function exportKachaInvoicesToExcel(
     });
 
     if (!kachaInvoices.length) {
-      return { success: false, message: "No Kacha slips found to export." };
+      return { success: false, message: "No Estimates found to export." };
     }
 
     const rows = kachaInvoices.map(mapKachaInvoice).map((kachaInvoice, index) => ({
@@ -370,20 +370,20 @@ export async function exportKachaInvoicesToExcel(
 
     const { fileName, fileBase64 } =
       params.format === "csv"
-        ? buildCsvExportBase64(rows, "kacha-slips")
+        ? buildCsvExportBase64(rows, "estimates")
         : params.format === "pdf"
-          ? buildPdfExportBase64(rows, "Kacha Slips", "kacha-slips")
-          : buildExcelExport(rows, "Kacha Slips", "kacha-slips");
+          ? buildPdfExportBase64(rows, "Estimates", "estimates")
+          : buildExcelExport(rows, "Estimates", "estimates");
 
     return {
       success: true,
-      message: "Kacha slips exported successfully.",
+      message: "Estimates exported successfully.",
       fileName,
       fileBase64,
     };
   } catch (error) {
     console.error("exportKachaInvoicesToExcel error:", error);
-    return { success: false, message: "Failed to export Kacha slips." };
+    return { success: false, message: "Failed to export Estimates." };
   }
 }
 
@@ -662,7 +662,7 @@ export async function createKachaInvoice(
             sourceType: LedgerSourceType.SALE,
             customerId,
             amount: balanceAmount,
-            description: `Kacha slip ${slipNumber} balance due`,
+            description: `Estimate ${slipNumber} balance due`,
             locationId: resolvedLocationId ?? undefined,
           },
         });
@@ -699,7 +699,7 @@ export async function createKachaInvoice(
 
     return {
       success: true,
-      message: `Kacha slip ${slipNumber} created`,
+      message: `Estimate ${slipNumber} created`,
       kachaInvoiceId: kachaInvoice.id,
     };
   } catch (error) {
@@ -707,7 +707,7 @@ export async function createKachaInvoice(
       return { success: false, message: error.message };
     }
     console.error("createKachaInvoice error:", error);
-    return { success: false, message: "Failed to create Kacha slip" };
+    return { success: false, message: "Failed to create Estimate" };
   }
 }
 
@@ -733,7 +733,7 @@ export async function recordKachaInvoicePayment(
     const kachaInvoice = await prisma.kachaInvoice.findFirst({
       where: { id: kachaInvoiceId, storeId },
     });
-    if (!kachaInvoice) return { success: false, message: "Kacha slip not found" };
+    if (!kachaInvoice) return { success: false, message: "Estimate not found" };
 
     const newPaid = Number(kachaInvoice.paidAmount) + amount;
     const newBalance = Math.max(0, Number(kachaInvoice.totalAmount) - newPaid);
@@ -790,11 +790,11 @@ export async function convertKachaToPakka(
     });
 
     if (!kachaInvoice) {
-      return { success: false, message: "Kacha slip not found" };
+      return { success: false, message: "Estimate not found" };
     }
 
     if (kachaInvoice.convertedToId) {
-      return { success: false, message: "This Kacha slip has already been converted" };
+      return { success: false, message: "This Estimate has already been converted" };
     }
 
     const taxAmount = toNumber(formData.get("taxAmount"));
@@ -900,12 +900,12 @@ export async function convertKachaToPakka(
 
     return {
       success: true,
-      message: `Converted to Pakka invoice ${invoiceNumber}`,
+      message: `Converted to Tax Invoice ${invoiceNumber}`,
       invoiceId: invoice.id,
     };
   } catch (error) {
     console.error("convertKachaToPakka error:", error);
-    return { success: false, message: "Failed to convert to Pakka invoice" };
+    return { success: false, message: "Failed to convert to Tax Invoice" };
   }
 }
 
@@ -916,28 +916,28 @@ export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormSt
 
     const kachaInvoice = await prisma.kachaInvoice.findFirst({ where: { id, storeId } });
 
-    if (!kachaInvoice) return { success: false, message: "Kacha slip not found" };
+    if (!kachaInvoice) return { success: false, message: "Estimate not found" };
 
     if (kachaInvoice.convertedToId) {
-      return { success: false, message: "Cannot delete a Kacha slip that has been converted" };
+      return { success: false, message: "Cannot delete an Estimate that has been converted" };
     }
 
     if (kachaInvoice.status !== InvoiceStatus.DRAFT || Number(kachaInvoice.paidAmount) > 0) {
       return {
         success: false,
-        message: "Only draft Kacha slips with no payments can be deleted",
+        message: "Only draft Estimates with no payments can be deleted",
       };
     }
 
     const { count } = await prisma.kachaInvoice.deleteMany({ where: { id, storeId } });
-    if (count === 0) return { success: false, message: "Kacha slip not found" };
+    if (count === 0) return { success: false, message: "Estimate not found" };
 
     revalidatePath("/billing/kacha");
 
-    return { success: true, message: "Kacha slip deleted" };
+    return { success: true, message: "Estimate deleted" };
   } catch (error) {
     console.error("deleteKachaInvoice error:", error);
-    return { success: false, message: "Failed to delete Kacha slip" };
+    return { success: false, message: "Failed to delete Estimate" };
   }
 }
 
@@ -1007,8 +1007,8 @@ export async function getKachaImportTemplate(): Promise<{
   };
 
   return buildMultiSheetExcelExport(
-    [{ name: "Kacha Slips", rows: [example], columns: [...KACHA_IMPORT_COLUMNS] }],
-    "kacha-import-template",
+    [{ name: "Estimates", rows: [example], columns: [...KACHA_IMPORT_COLUMNS] }],
+    "estimate-import-template",
   );
 }
 
@@ -1051,8 +1051,8 @@ function parseSheetDate(raw: string): Date | null {
  * Sheet names written by the delete-all backup. A workbook carrying both is
  * treated as a backup to restore rather than a hand-filled template.
  */
-const BACKUP_SLIPS_SHEET = "Kacha Slips";
-const BACKUP_ITEMS_SHEET = "Kacha Slip Items";
+const BACKUP_SLIPS_SHEET = "Estimates";
+const BACKUP_ITEMS_SHEET = "Estimate Items";
 
 /**
  * Flattens a backup workbook into the same one-row-per-line-item shape the
@@ -1126,7 +1126,7 @@ export async function importKachaInvoicesFromExcel(
   try {
     await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.STAFF]);
   } catch {
-    return { success: false, message: "You do not have access to import Kacha slips." };
+    return { success: false, message: "You do not have access to import Estimates." };
   }
 
   try {
@@ -1367,11 +1367,11 @@ export async function importKachaInvoicesFromExcel(
     return {
       success: true,
       createdCount,
-      message: `Imported ${createdCount} Kacha slip${createdCount === 1 ? "" : "s"}.`,
+      message: `Imported ${createdCount} Estimate${createdCount === 1 ? "" : "s"}.`,
     };
   } catch (error) {
     console.error("importKachaInvoicesFromExcel error:", error);
-    return { success: false, message: "Failed to import Kacha slips." };
+    return { success: false, message: "Failed to import Estimates." };
   }
 }
 
@@ -1441,7 +1441,7 @@ export async function deleteAllKachaInvoices(
   } catch {
     return {
       success: false,
-      message: "Only the Store Owner can delete all Kacha slips.",
+      message: "Only the Store Owner can delete all Estimates.",
     };
   }
 
@@ -1460,7 +1460,7 @@ export async function deleteAllKachaInvoices(
       return {
         success: false,
         message:
-          "No backup email is configured. Add one in Settings → Backup email before deleting all Kacha slips.",
+          "No backup email is configured. Add one in Settings → Backup email before deleting all Estimates.",
       };
     }
 
@@ -1485,7 +1485,7 @@ export async function deleteAllKachaInvoices(
         success: false,
         message: selectedIds?.length
           ? "None of the selected slips could be found."
-          : "There are no Kacha slips to delete.",
+          : "There are no Estimates to delete.",
       };
     }
 
@@ -1531,10 +1531,10 @@ export async function deleteAllKachaInvoices(
 
     const { fileName, fileBase64 } = buildMultiSheetExcelExport(
       [
-        { name: "Kacha Slips", rows: slipRows },
-        { name: "Kacha Slip Items", rows: itemRows, columns: ["Slip #", "Item"] },
+        { name: "Estimates", rows: slipRows },
+        { name: "Estimate Items", rows: itemRows, columns: ["Slip #", "Item"] },
       ],
-      "kacha-slips-backup",
+      "estimates-backup",
     );
 
     const storeName = await resolveStoreName(storeId);
@@ -1542,7 +1542,7 @@ export async function deleteAllKachaInvoices(
     const { subject, html, text } = dataBackupEmail({
       storeName,
       appName: APP_NAME,
-      recordLabel: selectedIds?.length ? "selected Kacha slips" : "Kacha slips",
+      recordLabel: selectedIds?.length ? "selected Estimates" : "Estimates",
       recordCount: kachaInvoices.length,
       fileName,
       triggeredBy: user.name || user.email || "Unknown user",
@@ -1567,7 +1567,7 @@ export async function deleteAllKachaInvoices(
     if (!result.sent) {
       return {
         success: false,
-        message: `Backup email could not be sent (${result.message}). No Kacha slips were deleted.`,
+        message: `Backup email could not be sent (${result.message}). No Estimates were deleted.`,
       };
     }
 
@@ -1581,13 +1581,13 @@ export async function deleteAllKachaInvoices(
       success: true,
       deletedCount: count,
       backupSentTo: backupEmail,
-      message: `Backup of ${kachaInvoices.length} Kacha slips sent to ${backupEmail}. ${count} slips deleted.`,
+      message: `Backup of ${kachaInvoices.length} Estimates sent to ${backupEmail}. ${count} slips deleted.`,
     };
   } catch (error) {
     console.error("deleteAllKachaInvoices error:", error);
     return {
       success: false,
-      message: "Failed to delete Kacha slips. No slips were deleted.",
+      message: "Failed to delete Estimates. No slips were deleted.",
     };
   }
 }
@@ -1610,7 +1610,7 @@ export async function emailKachaInvoiceAction(
       resolveStoreName(storeId),
     ]);
 
-    if (!kachaInvoice) return { success: false, message: "Kacha slip not found" };
+    if (!kachaInvoice) return { success: false, message: "Estimate not found" };
 
     if (!kachaInvoice.customer?.email) {
       return { success: false, message: "This party has no email on file" };
@@ -1644,6 +1644,6 @@ export async function emailKachaInvoiceAction(
     return { success: result.sent, message: result.message };
   } catch (error) {
     console.error("emailKachaInvoiceAction error:", error);
-    return { success: false, message: "Failed to email Kacha slip" };
+    return { success: false, message: "Failed to email Estimate" };
   }
 }

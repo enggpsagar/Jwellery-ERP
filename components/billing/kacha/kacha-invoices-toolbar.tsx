@@ -29,7 +29,7 @@ export function KachaInvoicesToolbar({
       sortOptions={SORT_OPTIONS}
       defaultSortBy="invoiceDate"
       statusOptions={STATUS_OPTIONS}
-      entityLabel="kacha slips"
+      entityLabel="estimates"
       selectedIds={selectedIds}
       exportAction={exportKachaInvoicesToExcel}
     />

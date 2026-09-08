@@ -84,7 +84,7 @@ export function KachaImportDialog() {
 
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Import Kacha slips</DialogTitle>
+          <DialogTitle>Import Estimates</DialogTitle>
           <DialogDescription>
             One row per line item. Rows sharing a <strong>Slip Ref</strong>{" "}
             become a single slip. Parties are matched on phone number, then

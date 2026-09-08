@@ -38,8 +38,8 @@ export function resolveBackLink(
   if (!href) return fallback
 
   if (href === "/billing") return { href, label: "Back to Invoices" }
-  if (href === "/billing/kacha") return { href, label: "Back to Kacha Slips" }
-  if (href.startsWith("/billing/kacha/")) return { href, label: "Back to Kacha Slip" }
+  if (href === "/billing/kacha") return { href, label: "Back to Estimates" }
+  if (href.startsWith("/billing/kacha/")) return { href, label: "Back to Estimate" }
   if (href.startsWith("/billing/")) return { href, label: "Back to Invoice" }
   if (href === "/inventory/stock") return { href, label: "Back to Stock" }
   if (href.startsWith("/inventory/stock/")) return { href, label: "Back to Stock Item" }

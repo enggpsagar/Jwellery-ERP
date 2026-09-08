@@ -63,7 +63,7 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled
                   className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100"
                 >
                   <ArrowLeftCircle className="h-3.5 w-3.5" />
-                  Converted from Kacha Slip ({invoice.convertedFromKacha.slipNumber})
+                  Converted from Estimate ({invoice.convertedFromKacha.slipNumber})
                 </Link>
               )}
               {invoice.replaces && (

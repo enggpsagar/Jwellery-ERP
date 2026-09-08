@@ -34,7 +34,7 @@ const COUNT_LABELS: { key: keyof Omit<StoreRecordCounts, "total">; label: string
   { key: "karigars", label: "artisans" },
   { key: "products", label: "products" },
   { key: "invoices", label: "invoices" },
-  { key: "kachaInvoices", label: "kacha slips" },
+  { key: "kachaInvoices", label: "estimates" },
   { key: "purchases", label: "purchases" },
   { key: "quotations", label: "quotations" },
   { key: "users", label: "users" },

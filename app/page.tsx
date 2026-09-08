@@ -70,8 +70,8 @@ const MODULES = [
   },
   {
     icon: ReceiptText,
-    title: "Kacha & Pakka Billing",
-    body: "Raise a provisional Kacha slip now and convert it to a formal Pakka invoice when the paperwork is ready. Both documents stay linked, so the trail is never lost.",
+    title: "Estimate & Tax Invoice Billing",
+    body: "Raise a provisional Estimate now and convert it to a formal Tax Invoice when the paperwork is ready. Both documents stay linked, so the trail is never lost.",
     tint: "var(--chart-2)",
   },
   {
@@ -109,8 +109,8 @@ const MODULES = [
 const FLOW = [
   { label: "Purchase", body: "Buy from a vendor" },
   { label: "Stock", body: "Pieces created automatically" },
-  { label: "Quote or Slip", body: "Kacha slip or quotation" },
-  { label: "Invoice", body: "Pakka invoice raised" },
+  { label: "Quote or Slip", body: "Estimate or quotation" },
+  { label: "Invoice", body: "Tax invoice raised" },
   { label: "Ledger", body: "Balance posted, stock reduced" },
 ]
 
@@ -138,7 +138,7 @@ const JEWELLERY_SPECIFICS = [
   {
     icon: Mail,
     title: "Documents that leave the building",
-    body: "Email an invoice, a Kacha slip or a party statement directly from its page, under your own business name — not a generic template.",
+    body: "Email an invoice, an Estimate or a party statement directly from its page, under your own business name — not a generic template.",
   },
 ]
 
@@ -360,7 +360,7 @@ export default async function LandingPage() {
             <dl className="mt-10 grid max-w-md grid-cols-3 gap-6 border-t pt-6">
               {[
                 { k: String(MODULES.length), v: "modules" },
-                { k: "Kacha → Pakka", v: "billing flow" },
+                { k: "Estimate → Tax Invoice", v: "billing flow" },
                 { k: "Fine-weight", v: "accounting" },
               ].map((stat) => (
                 <div key={stat.v}>

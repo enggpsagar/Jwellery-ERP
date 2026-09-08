@@ -224,7 +224,7 @@ export function KachaInvoiceForm({
 
   useEffect(() => {
     if (state.success && state.kachaInvoiceId) {
-      toast.success(state.message || "Kacha slip created")
+      toast.success(state.message || "Estimate created")
       router.push(`/billing/kacha/${state.kachaInvoiceId}`)
     } else if (!state.success && state.message) {
       toast.error(state.message)
@@ -1052,7 +1052,7 @@ export function KachaInvoiceForm({
 
       <div className="flex justify-end">
         <Button type="submit" disabled={pending || !customerId || paidOverTotal}>
-          {pending ? "Creating..." : "Create Kacha Slip"}
+          {pending ? "Creating..." : "Create Estimate"}
         </Button>
       </div>
     </form>

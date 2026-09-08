@@ -113,10 +113,10 @@ export function TopBar({
                   forms/number series — asking here instead of guessing
                   avoids landing on the wrong one and having to start over. */}
               <DropdownMenuItem asChild>
-                <Link href="/billing/new">Pakka Invoice</Link>
+                <Link href="/billing/new">Tax Invoice</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/billing/kacha/new">Kacha Slip</Link>
+                <Link href="/billing/kacha/new">Estimate</Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

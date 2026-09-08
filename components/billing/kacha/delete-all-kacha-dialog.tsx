@@ -90,8 +90,8 @@ export function DeleteAllKachaDialog({
           <DialogHeader>
             <DialogTitle>
               {selectedIds.length
-                ? `Delete ${selectedIds.length} selected Kacha slip${selectedIds.length === 1 ? "" : "s"}`
-                : "Delete all Kacha slips"}
+                ? `Delete ${selectedIds.length} selected Estimate${selectedIds.length === 1 ? "" : "s"}`
+                : "Delete all Estimates"}
             </DialogTitle>
             <DialogDescription>
               A backup is emailed first. If that email does not send, nothing
@@ -113,7 +113,7 @@ export function DeleteAllKachaDialog({
                 </div>
                 <div className="flex justify-between px-3 py-2">
                   <dt className="text-muted-foreground">
-                    Already converted to Pakka
+                    Already converted to Tax Invoice
                   </dt>
                   <dd className="font-semibold tabular-nums">
                     {summary.converted}
@@ -144,7 +144,7 @@ export function DeleteAllKachaDialog({
 
               {nothingToDelete && (
                 <p className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
-                  There are no Kacha slips to delete.
+                  There are no Estimates to delete.
                 </p>
               )}
 
@@ -156,7 +156,7 @@ export function DeleteAllKachaDialog({
                       <p className="text-amber-900 dark:text-amber-200">
                         This includes converted and paid slips, which the
                         per-slip delete refuses to touch. Converted slips are
-                        the record of how a Pakka invoice came about — once
+                        the record of how a Tax Invoice came about — once
                         deleted, only the emailed backup holds that history.
                       </p>
                     </div>

@@ -768,7 +768,7 @@ export function kachaSlipEmail(params: {
 }) {
   const body = `
     <p>Hi ${params.customerName || "Party"},</p>
-    <p>Here is your Kacha slip <strong>${params.slipNumber}</strong> dated ${formatDate(params.invoiceDate)}.</p>
+    <p>Here is your Estimate <strong>${params.slipNumber}</strong> dated ${formatDate(params.invoiceDate)}.</p>
     ${itemsTable(params.items)}
     <div style="font-size: 13px; max-width: 260px; margin-left: auto;">
       ${summaryRow("Subtotal", formatCurrency(params.subtotal))}
@@ -779,12 +779,12 @@ export function kachaSlipEmail(params: {
       ${summaryRow("Paid", formatCurrency(params.paidAmount))}
       ${summaryRow("Balance Due", formatCurrency(params.balanceAmount), true)}
     </div>
-    <p style="font-size: 12px; color: #6b7280;">This is a provisional Kacha slip, not a tax invoice.</p>
+    <p style="font-size: 12px; color: #6b7280;">This is a provisional Estimate, not a tax invoice.</p>
   `;
 
   return {
-    subject: `Kacha Slip ${params.slipNumber} from ${params.storeName}`,
-    html: wrapEmail(params.storeName, `Kacha Slip ${params.slipNumber}`, body),
+    subject: `Estimate ${params.slipNumber} from ${params.storeName}`,
+    html: wrapEmail(params.storeName, `Estimate ${params.slipNumber}`, body),
   };
 }
 

@@ -60,7 +60,7 @@ export function CaratConversionForm({ rows, canEdit }: CaratConversionFormProps)
             <p className="text-sm text-muted-foreground">
               Grams per carat, used everywhere a Carat Weight is converted to/from a
               gram weight — adding a product, adding stock, and every billing document
-              (Invoice, Purchase, Kacha Slip, Quotation). Defaults to 0.2g/ct, the
+              (Invoice, Purchase, Estimate, Quotation). Defaults to 0.2g/ct, the
               standard diamond carat; override a purity here only if your store uses a
               different convention.
             </p>

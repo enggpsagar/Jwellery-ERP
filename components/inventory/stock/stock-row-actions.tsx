@@ -103,7 +103,7 @@ export function StockRowActions({ stockId, stockCode }: StockRowActionsProps) {
               <br />
               <br />
               <span className="text-red-600">
-                Stock already linked to an invoice, kacha slip, or artisan job
+                Stock already linked to an invoice, estimate, or artisan job
                 can&apos;t be deleted this way.
               </span>
             </DialogDescription>

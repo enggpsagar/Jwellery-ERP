@@ -20,7 +20,7 @@ export default async function PaymentInPage() {
     <main className="space-y-6 p-6">
       <PageBackHeader
         title="Payment In"
-        description="Every payment received from a party — from an invoice, a Kacha slip, or recorded here directly."
+        description="Every payment received from a party — from an invoice, an Estimate, or recorded here directly."
         backHref="/dashboard"
         backLabel="Back to Dashboard"
         action={<PaymentInDialog customers={customers} />}

@@ -68,7 +68,7 @@ export function InvoiceActionsBar({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {canFullyEdit && (
           <Button asChild variant="outline" className="gap-2">
             <Link href={`/billing/${invoice.id}/edit`}>
@@ -98,7 +98,7 @@ export function InvoiceActionsBar({
       </div>
 
       {!isCancelled && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <RecordPaymentDialog invoiceId={invoice.id} balanceAmount={invoice.balanceAmount} />
           <EditInvoiceDialog
             compact

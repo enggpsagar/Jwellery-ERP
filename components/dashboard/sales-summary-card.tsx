@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { ArrowDownRight, ArrowUpRight } from "lucide-react"
-import { Area, AreaChart, ResponsiveContainer } from "recharts"
+import { Bar, BarChart, ResponsiveContainer } from "recharts"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -122,22 +122,9 @@ export function SalesSummaryCard({ initialData, initialPeriod }: SalesSummaryCar
 
         <div className="min-h-14 w-full flex-1">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={sparkline} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-              <defs>
-                <linearGradient id="fillSalesSummary" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <Area
-                dataKey="sales"
-                type="monotone"
-                stroke="var(--chart-1)"
-                strokeWidth={2}
-                fill="url(#fillSalesSummary)"
-                dot={false}
-              />
-            </AreaChart>
+            <BarChart data={sparkline} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+              <Bar dataKey="sales" fill="var(--chart-1)" radius={[2, 2, 0, 0]} />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </CardContent>

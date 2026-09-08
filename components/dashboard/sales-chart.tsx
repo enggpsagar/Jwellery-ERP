@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
 import {
   Card,
@@ -76,6 +76,11 @@ function colorFor(metal: string, index: number) {
   )
 }
 
+/** Recharts keys cannot carry spaces safely in CSS var names. */
+function slug(metal: string) {
+  return metal.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()
+}
+
 const formatLakh = (v: number) => `₹${(v / 100000).toFixed(0)}L`
 
 type SalesChartProps = {
@@ -147,7 +152,38 @@ export function SalesChart({ initialData, initialPeriod }: SalesChartProps) {
           config={hasBreakdown ? chartConfig : totalConfig}
           className="h-[280px] w-full"
         >
-          <BarChart data={points} margin={{ left: 4, right: 8, top: 8 }}>
+          <AreaChart data={points} margin={{ left: 4, right: 8, top: 8 }}>
+            <defs>
+              {hasBreakdown ? (
+                metals.map((metal, index) => (
+                  <linearGradient
+                    key={metal}
+                    id={`fill-${slug(metal)}`}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="5%"
+                      stopColor={colorFor(metal, index)}
+                      stopOpacity={0.55}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor={colorFor(metal, index)}
+                      stopOpacity={0.08}
+                    />
+                  </linearGradient>
+                ))
+              ) : (
+                <linearGradient id="fillSales" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.02} />
+                </linearGradient>
+              )}
+            </defs>
+
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
 
             <XAxis
@@ -190,22 +226,32 @@ export function SalesChart({ initialData, initialPeriod }: SalesChartProps) {
             {hasBreakdown ? (
               <>
                 {metals.map((metal, index) => (
-                  <Bar
+                  <Area
                     key={metal}
                     dataKey={metal}
-                    // One stack, so the bars add up to the period's invoiced
-                    // total rather than sitting side by side.
+                    // One stack, so the bands add up to the month's invoiced
+                    // total rather than overlapping and hiding each other.
                     stackId="sales"
-                    fill={colorFor(metal, index)}
-                    radius={index === metals.length - 1 ? [4, 4, 0, 0] : 0}
+                    type="monotone"
+                    fill={`url(#fill-${slug(metal)})`}
+                    stroke={colorFor(metal, index)}
+                    strokeWidth={2}
+                    dot={false}
                   />
                 ))}
                 <ChartLegend content={<ChartLegendContent />} />
               </>
             ) : (
-              <Bar dataKey="sales" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+              <Area
+                dataKey="sales"
+                type="monotone"
+                fill="url(#fillSales)"
+                stroke="var(--chart-1)"
+                strokeWidth={2.5}
+                dot={false}
+              />
             )}
-          </BarChart>
+          </AreaChart>
         </ChartContainer>
       </CardContent>
     </Card>

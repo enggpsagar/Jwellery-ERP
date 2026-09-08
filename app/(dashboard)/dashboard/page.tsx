@@ -68,8 +68,11 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Existing Dashboard Charts */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {/* Existing Dashboard Charts — items-start so each card keeps its own
+          natural height instead of the shorter one stretching to match its
+          taller row sibling (e.g. an empty "Revenue by Metal" card matching
+          the full height of a populated Sales Trend chart). */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <SalesChart initialData={salesTrend} initialPeriod={DEFAULT_SALES_TREND_PERIOD} />
         </div>
@@ -79,8 +82,8 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Transactions & Activity */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      {/* Transactions & Activity — same items-start reasoning as above. */}
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-3">
         <div className="xl:col-span-2">
           <TransactionsTable
             initialTransactions={transactions}

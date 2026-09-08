@@ -123,7 +123,7 @@ export function SalesChart({ initialData, initialPeriod }: SalesChartProps) {
   } satisfies ChartConfig
 
   return (
-    <Card className="gap-0">
+    <Card className="h-full gap-0">
       <CardHeader className="flex flex-col gap-3 border-b [.border-b]:pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle>Sales Trend</CardTitle>

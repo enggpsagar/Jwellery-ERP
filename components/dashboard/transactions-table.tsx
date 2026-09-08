@@ -63,7 +63,7 @@ export function TransactionsTable({ initialTransactions, initialPeriod }: Transa
   }
 
   return (
-    <Card className="gap-0 overflow-hidden">
+    <Card className="h-full gap-0 overflow-hidden">
       <CardHeader className="flex flex-col gap-3 border-b [.border-b]:pb-5">
         <div>
           <CardTitle>Recent Transactions</CardTitle>

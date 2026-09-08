@@ -6,6 +6,7 @@ import { SalesChart } from "@/components/dashboard/sales-chart";
 import { CategoryChart } from "@/components/dashboard/category-chart";
 import { TransactionsTable } from "@/components/dashboard/transactions-table";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
+import { DashboardGrid } from "@/components/dashboard/dashboard-grid";
 import {
   getDashboardStats,
   getSalesTrend,
@@ -57,44 +58,25 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* Sales summary sits beside the KPI cards in one row instead of its
-          own half-width row above them — that left the other half of the
-          page blank, since the sparkline itself only ever plots
-          SPARKLINE_LENGTH points and gains nothing from stretching wider. */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <SalesSummaryCard initialData={salesBreakdown} initialPeriod={DEFAULT_SALES_TREND_PERIOD} />
-        <div className="lg:col-span-2">
-          <StatCards stats={stats} />
-        </div>
-      </div>
-
-      {/* Existing Dashboard Charts — items-start so each card keeps its own
-          natural height instead of the shorter one stretching to match its
-          taller row sibling (e.g. an empty "Revenue by Metal" card matching
-          the full height of a populated Sales Trend chart). */}
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <SalesChart initialData={salesTrend} initialPeriod={DEFAULT_SALES_TREND_PERIOD} />
-        </div>
-
-        <div>
-          <CategoryChart initialData={revenueByCategory} initialPeriod={DEFAULT_REVENUE_PERIOD} />
-        </div>
-      </div>
-
-      {/* Transactions & Activity — same items-start reasoning as above. */}
-      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-2">
-          <TransactionsTable
-            initialTransactions={transactions}
-            initialPeriod={DEFAULT_TRANSACTIONS_PERIOD}
-          />
-        </div>
-
-        <div>
-          <ActivityFeed activity={activity} />
-        </div>
-      </div>
+      <DashboardGrid
+        widgets={{
+          salesSummary: (
+            <SalesSummaryCard initialData={salesBreakdown} initialPeriod={DEFAULT_SALES_TREND_PERIOD} />
+          ),
+          statCards: <StatCards stats={stats} />,
+          salesChart: <SalesChart initialData={salesTrend} initialPeriod={DEFAULT_SALES_TREND_PERIOD} />,
+          categoryChart: (
+            <CategoryChart initialData={revenueByCategory} initialPeriod={DEFAULT_REVENUE_PERIOD} />
+          ),
+          transactions: (
+            <TransactionsTable
+              initialTransactions={transactions}
+              initialPeriod={DEFAULT_TRANSACTIONS_PERIOD}
+            />
+          ),
+          activityFeed: <ActivityFeed activity={activity} />,
+        }}
+      />
     </main>
   );
 }

@@ -37,7 +37,7 @@ export default async function KarigarDetailPage({ params }: Props) {
   const { karigar, metals, locations, defaultLocationId, materialCounts } = bundle;
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-5xl space-y-6 p-6">
       <PageBackHeader
         title={toTitleCase(karigar.name)}
         description={`Artisan code: ${karigar.code || "-"} · Mobile: ${karigar.mobile || "-"}`}

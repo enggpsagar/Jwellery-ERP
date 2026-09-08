@@ -79,20 +79,6 @@ const mainNav: NavItem[] = [
     icon: LayoutDashboard,
   },
   {
-    title: "Parties",
-    href: "/customers",
-    icon: Users,
-    countKey: "customers",
-    quickAddHref: "/customers/new",
-  },
-  {
-    title: "Vendors",
-    href: "/vendors",
-    icon: Truck,
-    countKey: "vendors",
-    quickAddHref: "/vendors/new",
-  },
-  {
     title: "Billing",
     href: "/billing",
     icon: ReceiptText,
@@ -110,6 +96,26 @@ const mainNav: NavItem[] = [
     icon: PackagePlus,
     countKey: "purchases",
     quickAddHref: "/purchases/new",
+  },
+  {
+    title: "Parties",
+    href: "/customers",
+    icon: Users,
+    countKey: "customers",
+    quickAddHref: "/customers/new",
+  },
+  {
+    title: "Vendors",
+    href: "/vendors",
+    icon: Truck,
+    countKey: "vendors",
+    quickAddHref: "/vendors/new",
+  },
+  {
+    title: "Draft Orders",
+    href: "/orders",
+    icon: Phone,
+    quickAddHref: "/orders/new",
   },
   {
     title: "Ledger",
@@ -147,12 +153,6 @@ const mainNav: NavItem[] = [
     icon: FileText,
     countKey: "quotations",
     quickAddHref: "/quotations/new",
-  },
-  {
-    title: "Draft Orders",
-    href: "/orders",
-    icon: Phone,
-    quickAddHref: "/orders/new",
   },
   {
     title: "Reports",

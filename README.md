@@ -34,6 +34,7 @@ pnpm dev
 | `CRON_SECRET` | Authorizes the metal-rates cron endpoint |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob storage — payment receipt attachments. Get it from your Vercel project's Storage tab after creating a Blob store. |
 | `BETTER_STACK_SOURCE_TOKEN` | Ships server-side logs (`lib/logger.ts`) to a Better Stack log source for searching/dashboards. Optional — omitted, every log call just falls back to `console.*`. |
+| `BETTERSTACK_RUM_TOKEN` | A separate, public client-side token for Better Stack's browser (RUM) monitoring tag (`app/layout.tsx`) — safe to appear in page HTML. Optional — omitted, the tag just isn't rendered. |
 
 ### Database
 

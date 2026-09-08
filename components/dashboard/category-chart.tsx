@@ -51,7 +51,8 @@ const PERIOD_OPTIONS = Object.keys(PERIOD_LABELS) as RevenueByMetalPeriod[]
 /**
  * Fixed slot order, never cycled. These are the validated jewellery hues from
  * globals.css; a 6th category folds into "Other" below rather than inventing
- * a hue, which would land outside the validated set.
+ * a hue, which would land outside the validated set. Used only as the
+ * fallback for a metal name that isn't recognized below.
  */
 const CHART_COLORS = [
   "var(--chart-1)",
@@ -62,6 +63,27 @@ const CHART_COLORS = [
 ]
 
 const MAX_SLICES = CHART_COLORS.length
+
+/**
+ * Real metal/stone hues instead of the generic chart palette, per explicit
+ * request — a reader recognizes "gold" and "diamond" by their own colour
+ * faster than by a legend lookup. Every wedge still carries its own
+ * category+percentage label directly on it (renderPieSliceLabel below,
+ * with a dark outline behind white text), so identity never depends on
+ * getting the exact hue right even for an edge case like a very light
+ * "Silver" wedge.
+ */
+const METAL_COLORS: Record<string, string> = {
+  gold: "#D4AF37",
+  silver: "#B0B7C1",
+  diamond: "#7EC8E3",
+  platinum: "#A8A9AD",
+  unspecified: "#9CA3AF",
+}
+
+function colorFor(category: string, index: number) {
+  return METAL_COLORS[category.trim().toLowerCase()] ?? CHART_COLORS[index % CHART_COLORS.length]
+}
 
 const RADIAN = Math.PI / 180
 
@@ -151,7 +173,7 @@ export function CategoryChart({ initialData, initialPeriod }: CategoryChartProps
 
   const chartData = rows.map((c, i) => ({
     ...c,
-    fill: CHART_COLORS[i % CHART_COLORS.length],
+    fill: colorFor(c.category, i),
   }))
 
   const total = chartData.reduce((acc, c) => acc + c.value, 0)

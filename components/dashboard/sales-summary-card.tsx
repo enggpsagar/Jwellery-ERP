@@ -48,12 +48,16 @@ const PERIOD_OPTIONS = Object.keys(PERIOD_LABELS) as SalesTrendPeriod[]
 // Same fixed palette/lookup as sales-chart.tsx, duplicated rather than
 // imported since that file is a distinct "use client" component with its
 // own copy of these labels already, by the same convention.
+// Same literal hues as CategoryChart's own METAL_COLORS (dashboard/
+// category-chart.tsx) — a metal reads as the same colour on every chart on
+// this page, not a different one depending on which chart you're looking
+// at.
 const METAL_COLORS: Record<string, string> = {
-  gold: "var(--chart-2)",
-  silver: "var(--chart-1)",
-  diamond: "var(--chart-4)",
-  platinum: "var(--chart-1)",
-  unspecified: "var(--chart-5)",
+  gold: "#D4AF37",
+  silver: "#B0B7C1",
+  diamond: "#7EC8E3",
+  platinum: "#A8A9AD",
+  unspecified: "#9CA3AF",
 }
 
 const FALLBACK_COLORS = [

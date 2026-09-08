@@ -83,10 +83,9 @@ export function UserRowActions({ user }: { user: ActionableUser }) {
           module access and location grants, which is more than a dialog
           should hold. */}
       <Button
-        variant="outline"
         size="icon"
         title="Edit user"
-        className="border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+        className="bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
         asChild
       >
         <Link href={`/users/${user.id}/edit`}>

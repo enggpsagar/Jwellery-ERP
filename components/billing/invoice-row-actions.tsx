@@ -25,7 +25,7 @@ type InvoiceRowActionsProps = {
 
 /**
  * Edit + Delete icon buttons for one invoice row — same visual convention
- * as PurchaseRowActions (indigo Edit / red Delete bordered squares), so
+ * as PurchaseRowActions (solid indigo Edit / red-bordered Delete squares), so
  * the Billing list isn't missing what every other master-detail table
  * already has. Both reuse the exact dialogs InvoiceActionsBar uses (just
  * in their compact, icon-only form) so there's only one edit/delete

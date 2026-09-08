@@ -44,7 +44,7 @@ type EditInvoiceDialogProps = {
   vehicleNumber?: string | null
   transportMode?: string | null
   distanceKm?: number | null
-  /** Icon-only trigger (indigo bordered square, matching PurchaseRowActions'
+  /** Icon-only trigger (solid indigo square, matching PurchaseRowActions'
    * Edit icon) for a table row's Actions column, instead of the full
    * labeled button used in InvoiceActionsBar. */
   compact?: boolean
@@ -101,7 +101,7 @@ export function EditInvoiceDialog({
         {compact ? (
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-indigo-200 text-indigo-600 transition hover:bg-indigo-50"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700"
             aria-label="Edit invoice"
             title="Edit invoice"
           >

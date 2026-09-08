@@ -6,8 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Plus } from "lucide-react"
 
 import { recordPaymentOut, type PaymentFormState } from "@/lib/actions/payments-actions"
-import type { PaymentKarigarOption } from "@/lib/actions/payments-actions"
-import { VendorSelect, type VendorOption } from "@/components/vendors/vendor-select"
+import type { PaymentKarigarOption, PaymentVendorOption } from "@/lib/actions/payments-actions"
+import { VendorSelect } from "@/components/vendors/vendor-select"
 import { KarigarSelect } from "@/components/karigars/karigar-select"
 import { useToast } from "@/components/providers/toast-provider"
 
@@ -32,7 +32,7 @@ const initialState: PaymentFormState = { success: false, message: "" }
 type PartyType = "VENDOR" | "KARIGAR"
 
 type PaymentOutDialogProps = {
-  vendors: VendorOption[]
+  vendors: PaymentVendorOption[]
   karigars: PaymentKarigarOption[]
 }
 
@@ -42,16 +42,23 @@ type PaymentOutDialogProps = {
  * "Record Payment" dialogs (purchase, karigar) keep working unchanged and
  * post to the same PAYMENT_OUT ledger sourceType, so this list and those
  * flows never disagree.
+ *
+ * Also reachable pre-filled via ?vendorId=<id> (the Vendors list's own
+ * "Pay Now" link) — same query-param-opens-the-dialog convention as the
+ * sidebar's ?new=1, just naming which vendor too.
  */
 export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
   const searchParams = useSearchParams()
+  const initialVendorId = searchParams.get("vendorId") ?? ""
   // Lets the sidebar's own "+" quick-add (?new=1) open this straight away,
-  // same as PaymentInDialog.
-  const [open, setOpen] = useState(() => searchParams.get("new") === "1")
+  // same as PaymentInDialog — a named ?vendorId= also implies opening.
+  const [open, setOpen] = useState(() => searchParams.get("new") === "1" || !!initialVendorId)
   const [partyType, setPartyType] = useState<PartyType>("VENDOR")
-  const [partyId, setPartyId] = useState("")
+  const [partyId, setPartyId] = useState(initialVendorId)
   const router = useRouter()
   const toast = useToast()
+
+  const selectedVendor = partyType === "VENDOR" ? vendors.find((v) => v.id === partyId) : undefined
 
   const [rows, setRows] = useState<PaymentMethodValue[]>([emptyPaymentMethodValue()])
 
@@ -71,7 +78,7 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
   useEffect(() => {
     if (open) {
       setPartyType("VENDOR")
-      setPartyId("")
+      setPartyId(initialVendorId)
       setRows([emptyPaymentMethodValue()])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,6 +184,20 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
                 defaultValue={partyId}
                 onChange={setPartyId}
               />
+            )}
+            {selectedVendor && (
+              <p className="text-sm text-muted-foreground">
+                Outstanding:{" "}
+                <span
+                  className={
+                    selectedVendor.pendingAmount > 0
+                      ? "font-medium text-red-600"
+                      : "font-medium text-muted-foreground"
+                  }
+                >
+                  ₹{selectedVendor.pendingAmount.toLocaleString("en-IN")}
+                </span>
+              </p>
             )}
           </div>
 

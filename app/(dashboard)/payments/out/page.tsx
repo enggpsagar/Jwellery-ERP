@@ -1,7 +1,10 @@
 import type { Metadata } from "next"
 
-import { getPaymentsOut, getPaymentFormKarigars } from "@/lib/actions/payments-actions"
-import { getPurchaseFormVendors } from "@/lib/actions/purchase-actions"
+import {
+  getPaymentsOut,
+  getPaymentFormKarigars,
+  getPaymentFormVendorsWithBalance,
+} from "@/lib/actions/payments-actions"
 
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { PaymentOutDialog } from "@/components/payments/payment-out-dialog"
@@ -16,7 +19,7 @@ export const dynamic = "force-dynamic"
 export default async function PaymentOutPage() {
   const [rows, vendors, karigars] = await Promise.all([
     getPaymentsOut(),
-    getPurchaseFormVendors(),
+    getPaymentFormVendorsWithBalance(),
     getPaymentFormKarigars(),
   ])
 

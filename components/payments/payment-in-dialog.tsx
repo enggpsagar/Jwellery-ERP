@@ -5,8 +5,12 @@ import { useActionState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Plus } from "lucide-react"
 
-import { recordCustomerPayment, type PaymentFormState } from "@/lib/actions/payments-actions"
-import { CustomerSelect, type CustomerOption } from "@/components/customers/customer-select"
+import {
+  recordCustomerPayment,
+  type PaymentFormState,
+  type PaymentCustomerOption,
+} from "@/lib/actions/payments-actions"
+import { CustomerSelect } from "@/components/customers/customer-select"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { Button } from "@/components/ui/button"
@@ -28,7 +32,7 @@ import {
 const initialState: PaymentFormState = { success: false, message: "" }
 
 type PaymentInDialogProps = {
-  customers: CustomerOption[]
+  customers: PaymentCustomerOption[]
 }
 
 /**
@@ -36,16 +40,23 @@ type PaymentInDialogProps = {
  * independent of any specific invoice, unlike the per-invoice "Record
  * Payment" dialog (which still exists and posts to the same PAYMENT_IN
  * ledger sourceType, so both show up together on the /payments/in list).
+ *
+ * Also reachable pre-filled via ?customerId=<id> — same query-param-opens-
+ * the-dialog convention as the sidebar's ?new=1.
  */
 export function PaymentInDialog({ customers }: PaymentInDialogProps) {
   const searchParams = useSearchParams()
+  const initialCustomerId = searchParams.get("customerId") ?? ""
   // Lets the sidebar's own "+" quick-add (?new=1) open this straight away,
   // same as every other section's quick-add landing on a real /new page —
-  // this dialog is the closest equivalent Payment In has to one.
-  const [open, setOpen] = useState(() => searchParams.get("new") === "1")
-  const [customerId, setCustomerId] = useState("")
+  // this dialog is the closest equivalent Payment In has to one. A named
+  // ?customerId= also implies opening.
+  const [open, setOpen] = useState(() => searchParams.get("new") === "1" || !!initialCustomerId)
+  const [customerId, setCustomerId] = useState(initialCustomerId)
   const router = useRouter()
   const toast = useToast()
+
+  const selectedCustomer = customers.find((c) => c.id === customerId)
 
   const [rows, setRows] = useState<PaymentMethodValue[]>([emptyPaymentMethodValue()])
 
@@ -64,7 +75,7 @@ export function PaymentInDialog({ customers }: PaymentInDialogProps) {
 
   useEffect(() => {
     if (open) {
-      setCustomerId("")
+      setCustomerId(initialCustomerId)
       setRows([emptyPaymentMethodValue()])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,6 +138,20 @@ export function PaymentInDialog({ customers }: PaymentInDialogProps) {
               defaultValue={customerId}
               onChange={setCustomerId}
             />
+            {selectedCustomer && (
+              <p className="text-sm text-muted-foreground">
+                Outstanding:{" "}
+                <span
+                  className={
+                    selectedCustomer.pendingAmount > 0
+                      ? "font-medium text-red-600"
+                      : "font-medium text-muted-foreground"
+                  }
+                >
+                  ₹{selectedCustomer.pendingAmount.toLocaleString("en-IN")}
+                </span>
+              </p>
+            )}
           </div>
 
           <div className="space-y-3">

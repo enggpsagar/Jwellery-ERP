@@ -122,10 +122,15 @@ export function StoreDetailPanel({ storeId, plans, currentPlanId }: StoreDetailP
           <RedeemCollaborationCodeDialog storeId={overview.storeId} storeName={overview.name} />
           <RequestStoreAccessButton storeId={overview.storeId} storeName={overview.name} />
           <ExportStoreDataButton storeId={overview.storeId} />
-          <Button asChild variant="outline" size="sm" className="gap-2">
+          <Button
+            asChild
+            variant="outline"
+            size="icon"
+            aria-label="Edit store"
+            title="Edit store"
+          >
             <Link href={`/stores/${overview.storeId}/edit`}>
               <Pencil className="size-4" />
-              Edit store
             </Link>
           </Button>
           <StoreDeleteDialog storeId={overview.storeId} storeName={overview.name} />

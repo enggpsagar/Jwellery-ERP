@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Gem, Pencil } from "lucide-react"
 
@@ -61,6 +61,16 @@ export function StoreDetailPanel({ storeId, plans, currentPlanId }: StoreDetailP
     }
   }, [storeId])
 
+  // Re-fetches this store's overview in place — used after a sibling
+  // mutation (the Active/Inactive toggle) changes something
+  // getStorePlanOverview reads. router.refresh() alone can't reach this
+  // panel's isActive, since it's client-fetched state, not a Server
+  // Component prop.
+  const refetchOverview = useCallback(() => {
+    if (!storeId) return
+    getStorePlanOverview(storeId).then(setOverview)
+  }, [storeId])
+
   if (!storeId) {
     return (
       <div className="flex h-full min-h-[24rem] flex-col items-center justify-center gap-2 rounded-xl border bg-card p-6 text-center text-muted-foreground">
@@ -92,7 +102,11 @@ export function StoreDetailPanel({ storeId, plans, currentPlanId }: StoreDetailP
         </div>
 
         <div className="flex items-center gap-2">
-          <StoreStatusToggle storeId={overview.storeId} isActive={overview.isActive} />
+          <StoreStatusToggle
+            storeId={overview.storeId}
+            isActive={overview.isActive}
+            onSuccess={refetchOverview}
+          />
           <ChangePlanDialog
             storeId={overview.storeId}
             storeName={overview.name}

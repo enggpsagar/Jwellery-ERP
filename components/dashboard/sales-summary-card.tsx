@@ -76,8 +76,8 @@ export function SalesSummaryCard({ initialData, initialPeriod }: SalesSummaryCar
   return (
     <Card className="h-full gap-0 py-0">
       <CardContent className="flex h-full flex-col gap-3 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-col gap-1">
             <span className="text-sm font-medium text-muted-foreground">Sales</span>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-semibold tracking-tight tabular-nums">
@@ -103,7 +103,7 @@ export function SalesSummaryCard({ initialData, initialPeriod }: SalesSummaryCar
             </span>
           </div>
 
-          <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
+          <div className="flex shrink-0 gap-1 overflow-x-auto rounded-lg border bg-muted/40 p-1">
             {PERIOD_OPTIONS.map((option) => (
               <Button
                 key={option}
@@ -112,7 +112,7 @@ export function SalesSummaryCard({ initialData, initialPeriod }: SalesSummaryCar
                 variant={period === option ? "default" : "ghost"}
                 disabled={isPending}
                 onClick={() => handlePeriodChange(option)}
-                className="h-7 px-2.5 text-xs"
+                className="h-7 shrink-0 whitespace-nowrap px-2.5 text-xs"
               >
                 {PERIOD_LABELS[option]}
               </Button>

@@ -8,6 +8,7 @@ import { Camera } from "lucide-react"
 import {
   createUserAction,
   updateUserAction,
+  grantStoreAccessAction,
 } from "@/app/(dashboard)/users/actions"
 
 import { ROLE_LABELS, MODULE_DEFINITIONS, type ModuleKey } from "@/lib/roles"
@@ -103,6 +104,16 @@ export function UserFormDialog({
   const [imageUrl, setImageUrl] = useState(user?.image ?? "")
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
+
+  // Set when createUserAction reports the email/phone is already active in
+  // a different store — offers "grant access to this store too" instead of
+  // a dead end. Keeps the submitted FormData around so Grant Access reuses
+  // exactly the role/permissions/isActive the admin just chose.
+  const [conflict, setConflict] = useState<{
+    userId: string
+    userName: string | null
+    formData: FormData
+  } | null>(null)
 
   async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -228,6 +239,10 @@ export function UserFormDialog({
             : await updateUserAction(formData)
 
         if (!result.success) {
+          if (mode === "create" && result.conflict) {
+            setConflict({ ...result.conflict, formData })
+            return
+          }
           toast.error(result.message)
           return
         }
@@ -249,8 +264,64 @@ export function UserFormDialog({
     })
   }
 
+  function handleGrantAccess() {
+    if (!conflict) return
+    const grantFormData = conflict.formData
+    grantFormData.set("targetUserId", conflict.userId)
+
+    startTransition(async () => {
+      try {
+        const result = await grantStoreAccessAction(grantFormData)
+
+        if (!result.success) {
+          toast.error(result.message)
+          return
+        }
+
+        toast.success(result.message)
+        setConflict(null)
+
+        if (asPage) {
+          router.push("/users")
+        } else {
+          setOpen(false)
+        }
+
+        router.refresh()
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Something went wrong",
+        )
+      }
+    })
+  }
+
   const formBody = (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <>
+      {conflict && (
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950">
+          <p className="text-amber-900 dark:text-amber-200">
+            <span className="font-medium">{conflict.userName || "This user"}</span>{" "}
+            is already registered in a different store. Do you want to grant
+            access for your store also?
+          </p>
+          <div className="mt-3 flex justify-end gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setConflict(null)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button type="button" size="sm" onClick={handleGrantAccess} disabled={isPending}>
+              {isPending ? "Granting..." : "Grant Access"}
+            </Button>
+          </div>
+        </div>
+      )}
+      <form onSubmit={handleSubmit} className="space-y-6">
       <input type="hidden" name="image" value={imageUrl} />
 
       <div className="flex flex-col items-center gap-3">
@@ -455,7 +526,8 @@ export function UserFormDialog({
           {isPending ? "Saving..." : mode === "create" ? "Create User" : "Save Changes"}
         </Button>
       </DialogFooter>
-    </form>
+      </form>
+    </>
   )
 
   if (asPage) {
@@ -467,7 +539,13 @@ export function UserFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (!next) setConflict(null)
+      }}
+    >
       <DialogTrigger asChild>
         {children ?? (
           <Button variant={mode === "create" ? "default" : "outline"} size={mode === "create" ? "default" : "sm"}>

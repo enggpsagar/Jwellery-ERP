@@ -18,6 +18,8 @@ import {
   enableUser,
   deleteUser,
   getAllUsersForExport,
+  grantStoreAccessToExistingUser,
+  CrossStoreConflictError,
   type UserSortBy,
   type SortOrder,
 } from "@/lib/user";
@@ -32,6 +34,10 @@ import { buildExcelExport } from "@/lib/excel-export";
 export type UserActionState = {
   success: boolean;
   message: string;
+  /** Set only when createUserAction failed because the email/phone is
+   * already active in a different store — lets the dialog offer "grant
+   * access to this store too" instead of a dead-end error. */
+  conflict?: { userId: string; userName: string | null };
 };
 
 function parseJsonStringArrayField(formData: FormData, field: string): string[] {
@@ -147,8 +153,66 @@ export async function createUserAction(
             : `User ${action} successfully`,
     };
   } catch (error) {
+    if (error instanceof CrossStoreConflictError) {
+      return {
+        success: false,
+        message: error.message,
+        conflict: {
+          userId: error.conflictingUserId,
+          userName: error.conflictingUserName,
+        },
+      };
+    }
+
     console.error("createUserAction error:", error);
     return { success: false, message: friendlyUserErrorMessage(error, "Failed to create user") };
+  }
+}
+
+/**
+ * Confirm step after createUserAction returns a `conflict` — grants the
+ * existing (already-active-elsewhere) user access to the CURRENT store via
+ * a UserStoreMembership row, without touching their home store. Gated by
+ * the same USER_CREATE permission createUserAction itself requires, since
+ * this only ever grants access to the caller's own store (storeId is
+ * resolved server-side via requireStoreScope, never client-supplied).
+ */
+export async function grantStoreAccessAction(
+  formData: FormData
+): Promise<UserActionState> {
+  try {
+    await requireAuth();
+
+    const allowed = await hasPermission(PERMISSIONS.USER_CREATE);
+    if (!allowed) {
+      return { success: false, message: "You don't have permission to create users." };
+    }
+
+    const targetUserId = formData.get("targetUserId");
+    if (typeof targetUserId !== "string" || !targetUserId) {
+      return { success: false, message: "Missing user to grant access to." };
+    }
+
+    const role = formData.get("role") as UserRole;
+    const isActive = formData.get("isActive") === "true";
+    const permissions = parsePermissionsField(formData);
+
+    const storeId = await requireStoreScope();
+    await grantStoreAccessToExistingUser(targetUserId, storeId, {
+      role,
+      permissions,
+      isActive,
+    });
+
+    revalidatePath("/users");
+
+    return { success: true, message: "Access granted to this store" };
+  } catch (error) {
+    console.error("grantStoreAccessAction error:", error);
+    return {
+      success: false,
+      message: friendlyUserErrorMessage(error, "Failed to grant access"),
+    };
   }
 }
 

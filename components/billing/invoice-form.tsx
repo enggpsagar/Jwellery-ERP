@@ -1455,8 +1455,17 @@ export function InvoiceForm({
                         checked) still renders as its own row below, since
                         it needs the room. No toggle applies to a carat-
                         weighed line at all (see below), so this cell is
-                        simply empty there. */}
-                    {!isCaratLine(item) && (
+                        simply empty there.
+
+                        Once linked to a real Stock Item that's confirmed to
+                        have no stone, the toggle is hidden entirely rather
+                        than shown locked in the off position — a disabled
+                        "Includes a Stone" control on a plain-metal product
+                        reads as an option that might apply, when it never
+                        can for this specific piece. Still shown (locked on)
+                        when the linked stock does have one, and stays a
+                        normal editable toggle for a manually-entered line. */}
+                    {!isCaratLine(item) && (!isLinked || item.hasStoneComponent) && (
                       <div className="flex items-end pb-2">
                         <IncludesStoneToggle
                           checked={item.hasStoneComponent}

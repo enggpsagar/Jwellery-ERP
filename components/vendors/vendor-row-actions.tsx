@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Archive, Pencil, Trash2 } from "lucide-react"
+import { Pencil, ToggleRight, Trash2 } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 
 import type { Vendor } from "@/lib/actions/vendor-actions"
@@ -101,11 +101,11 @@ export function VendorRowActions({
         <button
           type="button"
           onClick={() => setConfirmAction("archive")}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-amber-600 text-white shadow-sm transition hover:bg-amber-700"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-amber-200 text-amber-700 transition hover:bg-amber-50"
           aria-label={`Archive ${vendor.name}`}
           title="Archive vendor"
         >
-          <Archive className="h-4 w-4" />
+          <ToggleRight className="h-5 w-5" />
         </button>
 
         <button

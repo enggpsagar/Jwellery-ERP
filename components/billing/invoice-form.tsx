@@ -1469,6 +1469,37 @@ export function InvoiceForm({
                       onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
                     />
 
+                    {/* Per-line GST Rate — this line's own selection, no
+                        document-level picker anymore. Options: active
+                        rows, plus this line's own already-selected rate
+                        even if it's since been deactivated (edit/replace).
+                        Sits here, in the same row as Purity/Gross Weight/
+                        Making Charge, rather than down with HSN Code/HM
+                        Charge/Scheme-Discount — it's the one field in that
+                        second row a merchant actually changes per line as
+                        often as these, not a rarely-touched detail. */}
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">GST Rate</Label>
+                      <Select
+                        value={item.gstRateId || undefined}
+                        disabled={gstScheme === "COMPOSITION"}
+                        onValueChange={(value) => updateItem(item.key, { gstRateId: value })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select GST rate" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {gstRates
+                            .filter((r) => r.isActive || r.id === item.gstRateId)
+                            .map((rate) => (
+                              <SelectItem key={rate.id} value={rate.id}>
+                                {rate.name} ({rate.ratePercent}%)
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     {/* Includes-a-Stone toggle sits here, in the same row as
                         Purity/Gross Weight/Making Charge, instead of its own
                         separate full-width row below — it's a single small
@@ -1569,7 +1600,7 @@ export function InvoiceForm({
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">HSN Code</Label>
                       <Input
@@ -1645,32 +1676,6 @@ export function InvoiceForm({
                           updateItem(item.key, { schemeDiscount: Number(e.target.value) || 0 })
                         }
                       />
-                    </div>
-
-                    {/* Per-line GST Rate — this line's own selection, no
-                        document-level picker anymore. Options: active
-                        rows, plus this line's own already-selected rate
-                        even if it's since been deactivated (edit/replace). */}
-                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">GST Rate</Label>
-                      <Select
-                        value={item.gstRateId || undefined}
-                        disabled={gstScheme === "COMPOSITION"}
-                        onValueChange={(value) => updateItem(item.key, { gstRateId: value })}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select GST rate" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {gstRates
-                            .filter((r) => r.isActive || r.id === item.gstRateId)
-                            .map((rate) => (
-                              <SelectItem key={rate.id} value={rate.id}>
-                                {rate.name} ({rate.ratePercent}%)
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
                     </div>
                   </div>
                 </div>

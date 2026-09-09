@@ -523,7 +523,9 @@ export function UserFormDialog({
           Cancel
         </Button>
         <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving..." : mode === "create" ? "Create User" : "Save Changes"}
+          {mode === "create"
+            ? isPending ? "Creating..." : "Create User"
+            : isPending ? "Updating..." : "Update Changes"}
         </Button>
       </DialogFooter>
       </form>

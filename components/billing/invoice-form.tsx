@@ -1808,8 +1808,8 @@ export function InvoiceForm({
         <Button type="submit" disabled={pending || !customerId || hasInvalidStockLink || hasInvalidRate || paidOverTotal}>
           {editInvoiceId
             ? pending
-              ? "Saving..."
-              : "Save Changes"
+              ? "Updating..."
+              : "Update Changes"
             : pending
               ? "Creating..."
               : "Create Invoice"}

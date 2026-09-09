@@ -1513,7 +1513,7 @@ export function PurchaseForm({
       <div className="flex justify-end">
         <Button type="submit" disabled={pending || !canSubmit || paidOverTotal}>
           {editPurchaseId
-            ? pending ? "Saving..." : "Save Changes"
+            ? pending ? "Updating..." : "Update Changes"
             : pending ? "Creating..." : "Create Purchase"}
         </Button>
       </div>

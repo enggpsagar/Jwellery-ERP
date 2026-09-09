@@ -333,7 +333,7 @@ function LocationFormRow({
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
+          {pending ? <Loader className="h-4 w-4" /> : location ? "Update" : "Save"}
         </Button>
       </div>
     </form>

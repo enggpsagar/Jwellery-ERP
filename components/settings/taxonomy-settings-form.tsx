@@ -341,7 +341,7 @@ function MetalFormRow({
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
+          {pending ? <Loader className="h-4 w-4" /> : metal ? "Update" : "Save"}
         </Button>
       </div>
     </form>
@@ -599,7 +599,7 @@ function StoneFormRow({
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
+          {pending ? <Loader className="h-4 w-4" /> : stone ? "Update" : "Save"}
         </Button>
       </div>
     </form>
@@ -889,7 +889,7 @@ function StoneTypeFormRow({
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
+          {pending ? <Loader className="h-4 w-4" /> : option ? "Update" : "Save"}
         </Button>
       </div>
     </form>
@@ -1096,7 +1096,7 @@ function CategoryFormRow({
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
+          {pending ? <Loader className="h-4 w-4" /> : category ? "Update" : "Save"}
         </Button>
       </div>
     </form>
@@ -1387,7 +1387,7 @@ function TypeFormRow({
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
+          {pending ? <Loader className="h-4 w-4" /> : type ? "Update" : "Save"}
         </Button>
       </div>
     </form>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
-import { Pencil } from "lucide-react"
+import { Truck } from "lucide-react"
 
 import { updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
@@ -108,7 +108,7 @@ export function EditInvoiceDialog({
             className="gap-1.5 bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
             title="Edit Date & E-way Bill"
           >
-            <Pencil className="h-4 w-4" />
+            <Truck className="h-4 w-4" />
             {ewayBillLabel}
           </Button>
         ) : (
@@ -116,7 +116,7 @@ export function EditInvoiceDialog({
             className="gap-2 bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
             title="Edit Date & E-way Bill"
           >
-            <Pencil className="h-4 w-4" />
+            <Truck className="h-4 w-4" />
             {ewayBillLabel}
           </Button>
         )}

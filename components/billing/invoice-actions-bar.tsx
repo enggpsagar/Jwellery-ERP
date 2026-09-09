@@ -108,7 +108,7 @@ export function InvoiceActionsBar({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {canFullyEdit && (
-        <Button asChild variant="outline" className="gap-2">
+        <Button asChild className="gap-2 bg-indigo-600 text-white shadow-sm hover:bg-indigo-700">
           <Link href={`/billing/${invoice.id}/edit`}>
             <Pencil className="h-4 w-4" />
             Edit Items

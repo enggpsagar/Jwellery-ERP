@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Pencil, Printer } from "lucide-react"
+import { Pencil, Printer, Undo2 } from "lucide-react"
 
 import type { Invoice } from "@/lib/actions/invoice-actions"
 import { getReturnEligibility } from "@/lib/return-window"
@@ -61,6 +61,11 @@ type InvoiceActionsBarProps = {
   returnWindowEnabled: boolean
   returnWindowDays: number
   locations: LocationOption[]
+  /** Whether any line item still has something left to return — when the
+   * invoice is otherwise return-eligible (status + window) but every item
+   * has already been fully returned, the button reads "Returned" and is
+   * disabled instead of opening a dialog that can only tell the user that. */
+  hasReturnableItems: boolean
 }
 
 /**
@@ -85,6 +90,7 @@ export function InvoiceActionsBar({
   returnWindowEnabled,
   returnWindowDays,
   locations,
+  hasReturnableItems,
 }: InvoiceActionsBarProps) {
   const isCancelled = invoice.status === "CANCELLED"
   const isCancellable = invoice.status === "DRAFT" || invoice.status === "PARTIAL"
@@ -125,7 +131,20 @@ export function InvoiceActionsBar({
         </>
       )}
       {canReturnItems && (
-        <ReturnItemsDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
+        hasReturnableItems ? (
+          <ReturnItemsDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
+        ) : (
+          <Button
+            type="button"
+            variant="secondary"
+            className="gap-2"
+            disabled
+            title="Every item on this invoice has already been returned"
+          >
+            <Undo2 className="h-4 w-4" />
+            Returned
+          </Button>
+        )
       )}
       {!isCancelled && (
         <>

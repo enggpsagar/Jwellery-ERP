@@ -4,7 +4,11 @@ import { useEffect, useState } from "react"
 import { Receipt } from "lucide-react"
 
 import { getInvoiceById, type Invoice } from "@/lib/actions/invoice-actions"
-import { getCreditNotesForInvoice, type CreditNoteView } from "@/lib/actions/credit-note-actions"
+import {
+  getCreditNotesForInvoice,
+  getReturnableInvoiceItems,
+  type CreditNoteView,
+} from "@/lib/actions/credit-note-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { InvoiceActionsBar, InvoiceQuickActions } from "@/components/billing/invoice-actions-bar"
 import { InvoiceDetailContent } from "@/components/billing/invoice-detail-content"
@@ -32,6 +36,7 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
   const [businessName, setBusinessName] = useState("")
   const [returnWindowEnabled, setReturnWindowEnabled] = useState(false)
   const [returnWindowDays, setReturnWindowDays] = useState(0)
+  const [hasReturnableItems, setHasReturnableItems] = useState(false)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -46,14 +51,16 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
       getInvoiceById(invoiceId),
       getCreditNotesForInvoice(invoiceId),
       getBusinessSettings(),
+      getReturnableInvoiceItems(invoiceId),
     ])
-      .then(([invoiceResult, creditNotesResult, settings]) => {
+      .then(([invoiceResult, creditNotesResult, settings, returnableItems]) => {
         if (cancelled) return
         setInvoice(invoiceResult)
         setCreditNotes(creditNotesResult)
         setBusinessName(settings.businessName)
         setReturnWindowEnabled(settings.returnWindowEnabled)
         setReturnWindowDays(settings.returnWindowDays)
+        setHasReturnableItems((returnableItems ?? []).length > 0)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -95,6 +102,7 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
         returnWindowEnabled={returnWindowEnabled}
         returnWindowDays={returnWindowDays}
         locations={locations}
+        hasReturnableItems={hasReturnableItems}
       />
 
       <InvoiceDetailContent

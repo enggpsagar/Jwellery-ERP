@@ -97,6 +97,8 @@ export function EditInvoiceDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 
+  const ewayBillLabel = ewayBillNumber?.trim() ? "Update E-way Bill" : "E-way Bill"
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -107,7 +109,7 @@ export function EditInvoiceDialog({
             title="Edit Date & E-way Bill"
           >
             <Pencil className="h-4 w-4" />
-            E-way Bill
+            {ewayBillLabel}
           </Button>
         ) : (
           <Button
@@ -115,7 +117,7 @@ export function EditInvoiceDialog({
             title="Edit Date & E-way Bill"
           >
             <Pencil className="h-4 w-4" />
-            E-way Bill
+            {ewayBillLabel}
           </Button>
         )}
       </DialogTrigger>

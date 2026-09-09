@@ -95,14 +95,20 @@ function InvoiceItemRowView({
         </td>
         <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
         <td className="px-4 py-3">
-          ₹{item.makingCharge.toFixed(2)}
-          {item.makingChargeType === "PERCENTAGE" && item.rate && quantity ? (
-            <span className="block text-xs text-muted-foreground">
-              ({((item.makingCharge / (item.rate * quantity)) * 100).toFixed(2)}% of metal value)
-            </span>
-          ) : null}
+          {item.makingCharge > 0 ? (
+            <>
+              ₹{item.makingCharge.toFixed(2)}
+              {item.makingChargeType === "PERCENTAGE" && item.rate && quantity ? (
+                <span className="block text-xs text-muted-foreground">
+                  ({((item.makingCharge / (item.rate * quantity)) * 100).toFixed(2)}% of metal value)
+                </span>
+              ) : null}
+            </>
+          ) : (
+            "-"
+          )}
         </td>
-        <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
+        <td className="px-4 py-3">{item.stoneCharge > 0 ? `₹${item.stoneCharge.toFixed(2)}` : "-"}</td>
         <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
         {canEdit && (
           <td className="px-4 py-3 text-right">
@@ -156,8 +162,8 @@ function InvoiceItemRowView({
           disabled={pending}
         />
       </td>
-      <td className="px-4 py-3">₹{item.makingCharge.toFixed(2)}</td>
-      <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
+      <td className="px-4 py-3">{item.makingCharge > 0 ? `₹${item.makingCharge.toFixed(2)}` : "-"}</td>
+      <td className="px-4 py-3">{item.stoneCharge > 0 ? `₹${item.stoneCharge.toFixed(2)}` : "-"}</td>
       <td className="px-4 py-3 font-medium">
         {!state.success && state.message ? (
           <span className="text-xs font-normal text-red-600">{state.message}</span>

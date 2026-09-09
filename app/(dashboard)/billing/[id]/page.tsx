@@ -3,7 +3,7 @@ import { cache } from "react"
 import { notFound } from "next/navigation"
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
-import { getCreditNotesForInvoice } from "@/lib/actions/credit-note-actions"
+import { getCreditNotesForInvoice, getReturnableInvoiceItems } from "@/lib/actions/credit-note-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
@@ -48,7 +48,11 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
 
   if (!invoice) notFound()
 
-  const creditNotes = await getCreditNotesForInvoice(invoice.id)
+  const [creditNotes, returnableItems] = await Promise.all([
+    getCreditNotesForInvoice(invoice.id),
+    getReturnableInvoiceItems(invoice.id),
+  ])
+  const hasReturnableItems = (returnableItems ?? []).length > 0
 
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-6">
@@ -65,6 +69,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         returnWindowEnabled={settings.returnWindowEnabled}
         returnWindowDays={settings.returnWindowDays}
         locations={locations}
+        hasReturnableItems={hasReturnableItems}
       />
 
       <InvoiceDetailContent

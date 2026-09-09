@@ -20,11 +20,10 @@ export const metadata: Metadata = {
   title: "Dashboard",
 };
 
-// Every period-filterable dashboard section defaults to "Daily" — the most
-// immediately relevant view for a store owner checking in on their own day.
-const DEFAULT_SALES_TREND_PERIOD = "daily";
-const DEFAULT_REVENUE_PERIOD = "daily";
-const DEFAULT_TRANSACTIONS_PERIOD = "daily";
+// Every period-filterable dashboard section defaults to "Monthly".
+const DEFAULT_SALES_TREND_PERIOD = "monthly";
+const DEFAULT_REVENUE_PERIOD = "monthly";
+const DEFAULT_TRANSACTIONS_PERIOD = "monthly";
 
 export default async function DashboardPage() {
   const [stats, salesTrend, salesBreakdown, revenueByCategory, transactions, activity] =

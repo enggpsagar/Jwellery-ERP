@@ -187,19 +187,19 @@ function InvoiceItemRowView({
         <div className="flex items-center justify-end gap-1">
           <Button
             type="button"
-            variant="ghost"
             size="icon"
+            className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
             title="Save"
             aria-label="Save"
             onClick={handleSave}
             disabled={pending}
           >
-            <Check className="h-4 w-4 text-emerald-600" />
+            <Check className="h-4 w-4" />
           </Button>
           <Button
             type="button"
-            variant="ghost"
             size="icon"
+            className="bg-slate-800 text-white shadow-sm hover:bg-slate-900"
             title="Cancel"
             aria-label="Cancel"
             onClick={() => setEditing(false)}

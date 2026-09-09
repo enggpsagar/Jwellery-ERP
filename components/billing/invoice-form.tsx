@@ -873,6 +873,28 @@ export function InvoiceForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items, gstRate, gstScheme, storeState, selectedCustomer?.state],
   )
+  // Aggregated once here instead of shown per-line — a line's own SGST/CGST/
+  // IGST split used to render as three extra read-only boxes in every line
+  // item's Details region, which was a lot of repeated information for what
+  // is, document-wide, always the same inter-state/intra-state split (it's
+  // driven by store state vs customer state, not anything line-specific).
+  const gstBreakdownTotal = useMemo(
+    () =>
+      items.reduce(
+        (acc, item) => {
+          const { sgst, cgst, igst, isInterState } = lineGst(item)
+          return {
+            sgst: acc.sgst + sgst,
+            cgst: acc.cgst + cgst,
+            igst: acc.igst + igst,
+            isInterState: acc.isInterState || isInterState,
+          }
+        },
+        { sgst: 0, cgst: 0, igst: 0, isInterState: false },
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, gstRate, gstScheme, storeState, selectedCustomer?.state],
+  )
   const rawTotal =
     subtotal +
     makingChargesTotal +
@@ -1650,39 +1672,6 @@ export function InvoiceForm({
                         </SelectContent>
                       </Select>
                     </div>
-
-                    {/* SGST+CGST for an intra-state sale, a single IGST column
-                        for inter-state instead — never both, see computeGst()
-                        in lib/gst.ts. Composition always lands here at ₹0.00,
-                        since computeGst zeroes every component for it. This is
-                        the full breakdown — the compact row above shows only
-                        the combined total, as a quick summary. Percent shown
-                        is THIS line's own resolved rate, not the document
-                        default. */}
-                    {lineGst(item).isInterState ? (
-                      <div className="space-y-1">
-                        <Label className="text-xs">IGST ({lineGstRatePercent(item).toFixed(2)}%)</Label>
-                        <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                          ₹{lineGst(item).igst.toFixed(2)}
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="space-y-1">
-                          <Label className="text-xs">SGST ({(lineGstRatePercent(item) / 2).toFixed(2)}%)</Label>
-                          <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                            ₹{lineGst(item).sgst.toFixed(2)}
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <Label className="text-xs">CGST ({(lineGstRatePercent(item) / 2).toFixed(2)}%)</Label>
-                          <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                            ₹{lineGst(item).cgst.toFixed(2)}
-                          </div>
-                        </div>
-                      </>
-                    )}
                   </div>
                 </div>
               )}
@@ -1755,10 +1744,23 @@ export function InvoiceForm({
           <span>Scheme / Discount (line items)</span>
           <span>-₹{schemeDiscountTotal.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between">
-          <span>GST (SGST+CGST or IGST)</span>
-          <span>₹{taxAmount.toFixed(2)}</span>
-        </div>
+        {gstBreakdownTotal.isInterState ? (
+          <div className="flex justify-between">
+            <span>Total IGST</span>
+            <span>₹{gstBreakdownTotal.igst.toFixed(2)}</span>
+          </div>
+        ) : (
+          <>
+            <div className="flex justify-between">
+              <span>Total SGST</span>
+              <span>₹{gstBreakdownTotal.sgst.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Total CGST</span>
+              <span>₹{gstBreakdownTotal.cgst.toFixed(2)}</span>
+            </div>
+          </>
+        )}
         {roundOffAmount !== 0 && (
           <div className="flex justify-between">
             <span>Round Off</span>

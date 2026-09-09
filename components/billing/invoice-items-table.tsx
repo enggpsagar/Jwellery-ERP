@@ -229,7 +229,7 @@ export function InvoiceItemsTable({
   const showStone = items.some((item) => item.stoneCharge > 0)
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-card">
+    <div className="overflow-x-auto rounded-xl border bg-card">
       <table className="min-w-full text-sm">
         <thead className="bg-muted/40">
           <tr className="border-b">

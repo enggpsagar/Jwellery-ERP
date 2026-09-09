@@ -19,6 +19,14 @@ type QuotationDetailContentProps = {
  * apart.
  */
 export function QuotationDetailContent({ quotation }: QuotationDetailContentProps) {
+  // A column with nothing to show across every line item is dead weight,
+  // not information — Making also carries the Hallmark charge sub-line, so
+  // it stays visible if any item has that even with makingCharge itself 0.
+  const showMaking = quotation.items.some(
+    (item: QuotationItem) => item.makingCharge > 0 || item.hmCharge > 0,
+  )
+  const showStone = quotation.items.some((item: QuotationItem) => item.stoneCharge > 0)
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border bg-card p-6 space-y-4">
@@ -69,8 +77,8 @@ export function QuotationDetailContent({ quotation }: QuotationDetailContentProp
               <th className="px-4 py-3 text-left font-medium">Qty</th>
               <th className="px-4 py-3 text-left font-medium">Weight</th>
               <th className="px-4 py-3 text-left font-medium">Rate</th>
-              <th className="px-4 py-3 text-left font-medium">Making</th>
-              <th className="px-4 py-3 text-left font-medium">Stone</th>
+              {showMaking && <th className="px-4 py-3 text-left font-medium">Making</th>}
+              {showStone && <th className="px-4 py-3 text-left font-medium">Stone</th>}
               <th className="px-4 py-3 text-left font-medium">Line Total</th>
             </tr>
           </thead>
@@ -93,23 +101,29 @@ export function QuotationDetailContent({ quotation }: QuotationDetailContentProp
                     : item.netWeight != null ? `${item.netWeight.toFixed(3)} g` : "-"}
                 </td>
                 <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
-                <td className="px-4 py-3">
-                  ₹{item.makingCharge.toFixed(2)}
-                  {(() => {
-                    const quantity = item.purity === "DIAMOND" ? item.caratWeight : item.netWeight
-                    return item.makingChargeType === "PERCENTAGE" && item.rate && quantity ? (
+                {showMaking && (
+                  <td className="px-4 py-3">
+                    {item.makingCharge > 0 ? `₹${item.makingCharge.toFixed(2)}` : "-"}
+                    {(() => {
+                      const quantity = item.purity === "DIAMOND" ? item.caratWeight : item.netWeight
+                      return item.makingChargeType === "PERCENTAGE" && item.rate && quantity ? (
+                        <span className="block text-xs text-muted-foreground">
+                          ({((item.makingCharge / (item.rate * quantity)) * 100).toFixed(2)}% of metal value)
+                        </span>
+                      ) : null
+                    })()}
+                    {item.hmCharge > 0 ? (
                       <span className="block text-xs text-muted-foreground">
-                        ({((item.makingCharge / (item.rate * quantity)) * 100).toFixed(2)}% of metal value)
+                        HM ₹{item.hmCharge.toFixed(2)}
                       </span>
-                    ) : null
-                  })()}
-                  {item.hmCharge > 0 ? (
-                    <span className="block text-xs text-muted-foreground">
-                      HM ₹{item.hmCharge.toFixed(2)}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
+                    ) : null}
+                  </td>
+                )}
+                {showStone && (
+                  <td className="px-4 py-3">
+                    {item.stoneCharge > 0 ? `₹${item.stoneCharge.toFixed(2)}` : "-"}
+                  </td>
+                )}
                 <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
               </tr>
             ))}

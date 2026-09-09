@@ -34,6 +34,16 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
 
   if (!kachaInvoice) notFound()
 
+  // A column with nothing to show across every line item is dead weight,
+  // not information — Making also carries the Hallmark charge sub-line, so
+  // it stays visible if any item has that even with makingCharge itself 0.
+  const showMaking = kachaInvoice.items.some(
+    (item: (typeof kachaInvoice.items)[number]) => item.makingCharge > 0 || item.hmCharge > 0,
+  )
+  const showStone = kachaInvoice.items.some(
+    (item: (typeof kachaInvoice.items)[number]) => item.stoneCharge > 0,
+  )
+
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
@@ -118,8 +128,8 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
               <th className="px-4 py-3 text-left font-medium">Qty</th>
               <th className="px-4 py-3 text-left font-medium">Weight</th>
               <th className="px-4 py-3 text-left font-medium">Rate</th>
-              <th className="px-4 py-3 text-left font-medium">Making</th>
-              <th className="px-4 py-3 text-left font-medium">Stone</th>
+              {showMaking && <th className="px-4 py-3 text-left font-medium">Making</th>}
+              {showStone && <th className="px-4 py-3 text-left font-medium">Stone</th>}
               <th className="px-4 py-3 text-left font-medium">Line Total</th>
             </tr>
           </thead>
@@ -142,15 +152,21 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
                     : item.netWeight != null ? `${item.netWeight.toFixed(3)} g` : "-"}
                 </td>
                 <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
-                <td className="px-4 py-3">
-                  ₹{item.makingCharge.toFixed(2)}
-                  {item.hmCharge > 0 ? (
-                    <span className="block text-xs text-muted-foreground">
-                      HM ₹{item.hmCharge.toFixed(2)}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
+                {showMaking && (
+                  <td className="px-4 py-3">
+                    {item.makingCharge > 0 ? `₹${item.makingCharge.toFixed(2)}` : "-"}
+                    {item.hmCharge > 0 ? (
+                      <span className="block text-xs text-muted-foreground">
+                        HM ₹{item.hmCharge.toFixed(2)}
+                      </span>
+                    ) : null}
+                  </td>
+                )}
+                {showStone && (
+                  <td className="px-4 py-3">
+                    {item.stoneCharge > 0 ? `₹${item.stoneCharge.toFixed(2)}` : "-"}
+                  </td>
+                )}
                 <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
               </tr>
             ))}

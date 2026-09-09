@@ -594,6 +594,12 @@ function invoiceLineItemsTable(
   }[],
   isInterState: boolean,
 ) {
+  // A column with nothing to show across every line item is dead weight in
+  // an emailed statement, not information — most invoices are metal-only
+  // with no making/stone component at all.
+  const showMaking = items.some((item) => item.makingCharge > 0);
+  const showStone = items.some((item) => item.stoneCharge > 0);
+
   const rows = items
     .map(
       (item) => `
@@ -603,8 +609,8 @@ function invoiceLineItemsTable(
         <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
         <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.netWeight ? item.netWeight.toFixed(3) + " g" : "-"}</td>
         <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.rate ? formatCurrency(item.rate) : "-"}</td>
-        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.makingCharge)}</td>
-        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.stoneCharge)}</td>
+        ${showMaking ? `<td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.makingCharge > 0 ? formatCurrency(item.makingCharge) : "-"}</td>` : ""}
+        ${showStone ? `<td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.stoneCharge > 0 ? formatCurrency(item.stoneCharge) : "-"}</td>` : ""}
         <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.schemeDiscount)}</td>
         <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(isInterState ? item.igstAmount : item.sgstAmount + item.cgstAmount)}</td>
         <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.lineTotal)}</td>
@@ -621,8 +627,8 @@ function invoiceLineItemsTable(
         <th style="padding: 6px; text-align: center;">Qty</th>
         <th style="padding: 6px; text-align: right;">Net Wt</th>
         <th style="padding: 6px; text-align: right;">Rate</th>
-        <th style="padding: 6px; text-align: right;">Making</th>
-        <th style="padding: 6px; text-align: right;">Stone</th>
+        ${showMaking ? `<th style="padding: 6px; text-align: right;">Making</th>` : ""}
+        ${showStone ? `<th style="padding: 6px; text-align: right;">Stone</th>` : ""}
         <th style="padding: 6px; text-align: right;">Discount</th>
         <th style="padding: 6px; text-align: right;">${isInterState ? "IGST" : "SGST+CGST"}</th>
         <th style="padding: 6px; text-align: right;">Total</th>
@@ -721,8 +727,8 @@ export function invoiceEmail(params: {
 
     <div style="font-size: 13px; max-width: 260px; margin-left: auto;">
       ${summaryRow("Subtotal", formatCurrency(params.subtotal))}
-      ${summaryRow("Making Charges", formatCurrency(params.makingCharges))}
-      ${summaryRow("Stone Charges", formatCurrency(params.stoneCharges))}
+      ${params.makingCharges > 0 ? summaryRow("Making Charges", formatCurrency(params.makingCharges)) : ""}
+      ${params.stoneCharges > 0 ? summaryRow("Stone Charges", formatCurrency(params.stoneCharges)) : ""}
       ${summaryRow("Discount", `-${formatCurrency(params.discount)}`)}
       ${summaryRow("Tax", formatCurrency(params.taxAmount))}
       ${
@@ -772,8 +778,8 @@ export function kachaSlipEmail(params: {
     ${itemsTable(params.items)}
     <div style="font-size: 13px; max-width: 260px; margin-left: auto;">
       ${summaryRow("Subtotal", formatCurrency(params.subtotal))}
-      ${summaryRow("Making Charges", formatCurrency(params.makingCharges))}
-      ${summaryRow("Stone Charges", formatCurrency(params.stoneCharges))}
+      ${params.makingCharges > 0 ? summaryRow("Making Charges", formatCurrency(params.makingCharges)) : ""}
+      ${params.stoneCharges > 0 ? summaryRow("Stone Charges", formatCurrency(params.stoneCharges)) : ""}
       ${summaryRow("Discount", `-${formatCurrency(params.discount)}`)}
       ${summaryRow("Total", formatCurrency(params.totalAmount), true)}
       ${summaryRow("Paid", formatCurrency(params.paidAmount))}

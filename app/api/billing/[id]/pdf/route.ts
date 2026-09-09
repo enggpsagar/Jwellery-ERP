@@ -127,6 +127,11 @@ export async function GET(
 
     // Line items
     const isInterState = invoice.items.some((item) => item.igstAmount > 0);
+    // A column with nothing to show across every line item is dead weight
+    // on a printed page, not information — most invoices are metal-only
+    // with no making/stone component at all.
+    const showMaking = invoice.items.some((item) => item.makingCharge > 0);
+    const showStone = invoice.items.some((item) => item.stoneCharge > 0);
 
     autoTable(doc, {
       startY: y,
@@ -139,8 +144,8 @@ export async function GET(
         "Qty",
         "Net Wt (g)",
         "Rate",
-        "Making",
-        "Stone",
+        ...(showMaking ? ["Making"] : []),
+        ...(showStone ? ["Stone"] : []),
         "Discount",
         isInterState ? "IGST" : "SGST+CGST",
         "Total",
@@ -151,8 +156,8 @@ export async function GET(
         `${item.quantity}N`,
         (item.netWeight ?? 0).toFixed(3),
         fmt(item.rate ?? 0),
-        fmt(item.makingCharge),
-        fmt(item.stoneCharge),
+        ...(showMaking ? [fmt(item.makingCharge)] : []),
+        ...(showStone ? [fmt(item.stoneCharge)] : []),
         fmt(item.schemeDiscount),
         fmt(isInterState ? item.igstAmount : item.sgstAmount + item.cgstAmount),
         fmt(item.lineTotal),
@@ -164,16 +169,16 @@ export async function GET(
 
     // Totals — right-aligned block, same figures as the print page's
     // "Additional Other Charges" panel.
-    const totalsRows: [string, string][] = [
-      ["Subtotal", fmt(invoice.subtotal)],
-      ["Making Charges", fmt(invoice.makingCharges)],
-      ["Stone Charges", fmt(invoice.stoneCharges)],
+    const totalsRows: [string, string][] = [["Subtotal", fmt(invoice.subtotal)]];
+    if (invoice.makingCharges > 0) totalsRows.push(["Making Charges", fmt(invoice.makingCharges)]);
+    if (invoice.stoneCharges > 0) totalsRows.push(["Stone Charges", fmt(invoice.stoneCharges)]);
+    totalsRows.push(
       ["Discount", `-${fmt(invoice.discount)}`],
       ["Tax", fmt(invoice.taxAmount)],
       ["Total", fmt(invoice.totalAmount)],
       ["Paid", fmt(invoice.paidAmount)],
       ["Balance Due", fmt(invoice.balanceAmount)],
-    ];
+    );
 
     doc.setFontSize(9);
     for (const [label, value] of totalsRows) {

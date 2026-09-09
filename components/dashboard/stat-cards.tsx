@@ -3,17 +3,21 @@ import {
   TrendingUp,
   Wallet,
   Coins,
+  Medal,
+  Gem,
+  Award,
   Hammer,
   Truck,
   ArrowUpRight,
   ArrowDownRight,
+  type LucideIcon,
 } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import type { DashboardStat } from "@/lib/actions/dashboard-actions"
 
-const iconMap = {
+const iconMap: Record<string, LucideIcon> = {
   rupee: IndianRupee,
   trending: TrendingUp,
   wallet: Wallet,
@@ -27,9 +31,7 @@ const iconMap = {
  * globals.css so the KPI row and the charts below it read as one system.
  *
  * These are decorative: the label beside each icon carries the meaning, so
- * nothing here depends on colour alone. Tints are the hue at low alpha over
- * the card surface, which keeps the icon itself well clear of the 3:1 the
- * hue would fail at full strength on white.
+ * nothing here depends on colour alone.
  */
 const iconTint: Record<string, string> = {
   rupee: "var(--chart-3)",
@@ -40,6 +42,36 @@ const iconTint: Record<string, string> = {
   truck: "var(--chart-1)",
 }
 
+/**
+ * A "Gold Stock"/"Silver Stock"/"Diamond Stock" card used to all render the
+ * same Coins icon in the same tint (icon: "metal" has no per-metal
+ * distinction on its own) — indistinguishable at a glance. Same literal hex
+ * values as METAL_COLORS in category-chart.tsx/sales-chart.tsx/
+ * sales-summary-card.tsx, so a metal reads as the same colour everywhere on
+ * the dashboard.
+ */
+const METAL_ICON_BY_NAME: Record<string, LucideIcon> = {
+  gold: Coins,
+  silver: Medal,
+  diamond: Gem,
+  platinum: Award,
+}
+
+const METAL_COLOR_BY_NAME: Record<string, string> = {
+  gold: "#D4AF37",
+  silver: "#B0B7C1",
+  diamond: "#7EC8E3",
+  platinum: "#A8A9AD",
+}
+
+function metalIconFor(metalName: string | undefined): LucideIcon {
+  return METAL_ICON_BY_NAME[metalName?.trim().toLowerCase() ?? ""] ?? Coins
+}
+
+function metalColorFor(metalName: string | undefined): string {
+  return METAL_COLOR_BY_NAME[metalName?.trim().toLowerCase() ?? ""] ?? "#9CA3AF"
+}
+
 type StatCardsProps = {
   stats: DashboardStat[]
 }
@@ -48,8 +80,9 @@ export function StatCards({ stats }: StatCardsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
       {stats.map((stat) => {
-        const Icon = iconMap[stat.icon as keyof typeof iconMap]
-        const tint = iconTint[stat.icon] ?? "var(--chart-1)"
+        const isMetal = stat.icon === "metal"
+        const Icon = isMetal ? metalIconFor(stat.metalName) : iconMap[stat.icon]
+        const tint = isMetal ? metalColorFor(stat.metalName) : (iconTint[stat.icon] ?? "var(--chart-1)")
         const isUp = stat.trend === "up"
         return (
           <Card key={stat.label} className="gap-0 py-0">
@@ -57,12 +90,9 @@ export function StatCards({ stats }: StatCardsProps) {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2.5">
                   <div
-                    className="flex size-9 items-center justify-center rounded-lg ring-1 ring-inset"
+                    className="flex size-9 items-center justify-center rounded-lg text-white shadow-sm"
                     style={{
-                      backgroundColor: `color-mix(in oklab, ${tint} 12%, transparent)`,
-                      color: tint,
-                      // @ts-expect-error -- CSS custom property
-                      "--tw-ring-color": `color-mix(in oklab, ${tint} 22%, transparent)`,
+                      backgroundColor: `color-mix(in oklab, ${tint} 60%, black)`,
                     }}
                   >
                     <Icon className="size-[18px]" />

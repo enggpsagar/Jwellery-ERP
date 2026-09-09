@@ -50,6 +50,8 @@ export type DashboardStat = {
   icon: "rupee" | "trending" | "wallet" | "metal" | "hammer" | "truck";
   /** Colors the value red/blue for an outstanding-vs-deposited figure — omitted for stats that are neither (revenue, stock weight, etc). */
   tone?: "outstanding" | "deposited";
+  /** Only set when icon is "metal" — lets the card pick a gold/silver/diamond-specific icon and color instead of one generic "metal" look for every configured metal. */
+  metalName?: string;
 };
 
 export type MetalStockStat = {
@@ -191,6 +193,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
       trend: "up" as const,
       sub: `${metal.metalName.toLowerCase()} on hand, excluding sold`,
       icon: "metal" as const,
+      metalName: metal.metalName,
     })),
     {
       label: "Pending Artisan Orders",

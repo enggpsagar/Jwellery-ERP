@@ -886,8 +886,17 @@ export async function createInvoice(
     const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
     // Standard Indian-billing convention: the saved Total is rounded to the
     // nearest rupee, with the (small, signed) adjustment recorded on its own
-    // line rather than silently folded into another figure.
-    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
+    // line rather than silently folded into another figure — unless the
+    // merchant typed their own Round Off directly (invoice-form.tsx always
+    // sends this field, whether auto-calculated or overridden), in which
+    // case that value wins verbatim, same "typed once, used as-is" rule as
+    // Making Charge/Discount. A caller that never sends the field at all
+    // (e.g. the scan-to-sell quick-sale flow) still gets the automatic
+    // behavior, since `null` here falls through to it.
+    const roundOffOverrideRaw = formData.get("roundOffAmount");
+    const roundOffOverride =
+      roundOffOverrideRaw !== null && roundOffOverrideRaw !== "" ? toNumber(roundOffOverrideRaw) : null;
+    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal, roundOffOverride);
     const balanceAmount = Math.max(0, totalAmount - paidAmount);
 
     let status: InvoiceStatus = InvoiceStatus.PAID;
@@ -1533,9 +1542,13 @@ export async function updateInvoice(
       0,
     );
     const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
-    // Same rounding convention as createInvoice — the saved Total is always
-    // a whole rupee, with the adjustment recorded separately.
-    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
+    // Same rounding convention as createInvoice, including the manual
+    // override — see its own comment for why `null` means "let the field's
+    // absence fall through to the automatic behavior."
+    const roundOffOverrideRaw = formData.get("roundOffAmount");
+    const roundOffOverride =
+      roundOffOverrideRaw !== null && roundOffOverrideRaw !== "" ? toNumber(roundOffOverrideRaw) : null;
+    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal, roundOffOverride);
 
     const paidAmount = Number(invoice.paidAmount);
     if (totalAmount < paidAmount) {

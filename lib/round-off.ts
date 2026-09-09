@@ -10,11 +10,27 @@
  * clean number. `roundOffAmount` is the signed adjustment applied: negative
  * when the raw total rounded down, positive when it rounded up, zero when
  * the raw total was already a whole rupee.
+ *
+ * `manualOverride` lets a caller take direct control of that adjustment
+ * instead of accepting the automatic one — same convention as every other
+ * user-editable charge on these documents (Making Charge, Discount, ...):
+ * once set, it's used verbatim rather than recomputed, and the Total is
+ * derived from it (`rawTotal + manualOverride`) so the two can never
+ * disagree. Omitted/null/non-finite falls back to the automatic behavior.
  */
-export function computeRoundOff(rawTotal: number): {
+export function computeRoundOff(
+  rawTotal: number,
+  manualOverride?: number | null,
+): {
   roundOffAmount: number;
   totalAmount: number;
 } {
+  if (manualOverride !== undefined && manualOverride !== null && Number.isFinite(manualOverride)) {
+    const roundOffAmount = Number(manualOverride.toFixed(2));
+    const totalAmount = Number((rawTotal + roundOffAmount).toFixed(2));
+    return { roundOffAmount, totalAmount };
+  }
+
   const totalAmount = Math.round(rawTotal);
   const roundOffAmount = Number((totalAmount - rawTotal).toFixed(2));
   return { roundOffAmount, totalAmount };

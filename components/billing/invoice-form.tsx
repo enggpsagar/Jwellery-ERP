@@ -339,6 +339,11 @@ export function InvoiceForm({
     })
   }
   const [discount, setDiscount] = useState(0)
+  // null = auto-calculated (the standard "round to nearest rupee" figure);
+  // a number = the merchant typed their own Round Off directly, same
+  // "typed once, used as-is" convention as Discount/Making Charge — see
+  // computeRoundOff's own doc comment for how this reaches the server.
+  const [roundOffOverride, setRoundOffOverride] = useState<number | null>(null)
   // No longer a user-facing control (each line picks its own GST rate in
   // its own Details region) — this is just what a freshly-added line
   // starts on, resolved once from the store's own default/active GstRate
@@ -906,7 +911,7 @@ export function InvoiceForm({
   // the nearest rupee, with the small signed adjustment surfaced as its own
   // line — same computeRoundOff the server uses, so what's previewed here is
   // exactly what createInvoice/updateInvoice will persist.
-  const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal)
+  const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal, roundOffOverride)
   const balanceAmount = Math.max(0, totalAmount - paidAmount)
 
   const itemsJson = JSON.stringify(
@@ -1014,6 +1019,7 @@ export function InvoiceForm({
     >
       <input type="hidden" name="itemsJson" value={itemsJson} />
       <input type="hidden" name="discount" value={discount} />
+      <input type="hidden" name="roundOffAmount" value={roundOffAmount} />
       <input type="hidden" name="taxAmount" value={taxAmount} />
       <input type="hidden" name="gstRateId" value={gstRateId} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
@@ -1766,14 +1772,28 @@ export function InvoiceForm({
             </div>
           </>
         )}
-        {roundOffAmount !== 0 && (
-          <div className="flex justify-between">
-            <span>Round Off</span>
-            <span>
-              {roundOffAmount > 0 ? "+" : "-"}₹{Math.abs(roundOffAmount).toFixed(2)}
-            </span>
+        <div className="flex items-center justify-between gap-3">
+          <span>Round Off</span>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              step="0.01"
+              value={roundOffAmount}
+              onChange={(e) => setRoundOffOverride(Number(e.target.value) || 0)}
+              className="h-7 w-24 text-right"
+            />
+            {roundOffOverride !== null && (
+              <button
+                type="button"
+                onClick={() => setRoundOffOverride(null)}
+                className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+                title="Go back to the automatically-calculated Round Off"
+              >
+                Auto
+              </button>
+            )}
           </div>
-        )}
+        </div>
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
           <span>Total</span>
           <span>₹{totalAmount.toFixed(2)}</span>

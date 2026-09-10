@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { startTransition, useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { PurityType } from "@prisma/client";
 
@@ -90,7 +90,10 @@ export function ProductCreateForm({
         // sidesteps that auto-reset while keeping identical pending/error-
         // state behavior.
         event.preventDefault();
-        formAction(new FormData(event.currentTarget));
+        const formData = new FormData(event.currentTarget);
+        startTransition(async () => {
+          await formAction(formData);
+        });
       }}
     >
       <ProductForm

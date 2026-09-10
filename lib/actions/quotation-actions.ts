@@ -133,6 +133,16 @@ function mapQuotation(quotation: any) {
     stoneCharges: Number(quotation.stoneCharges),
     discount: Number(quotation.discount),
     taxAmount: Number(quotation.taxAmount),
+    // Document-level tax split — Quotation never broke tax into components
+    // per line the way Invoice/InvoiceItem does, so these live only here.
+    // Needed by the print templates' single GST summary line (see
+    // components/quotations/quotation-print-*.tsx).
+    sgstAmount: Number(quotation.sgstAmount ?? 0),
+    cgstAmount: Number(quotation.cgstAmount ?? 0),
+    igstAmount: Number(quotation.igstAmount ?? 0),
+    gstRateId: quotation.gstRateId ?? null,
+    gstRateName: quotation.gstRateName ?? null,
+    gstRatePercent: quotation.gstRatePercent != null ? Number(quotation.gstRatePercent) : null,
     // Signed adjustment computeRoundOff() applied to reach totalAmount —
     // see that helper's doc comment. Persisted at create time, just read
     // back here rather than recomputed, so a saved document's Total never
@@ -146,6 +156,14 @@ function mapQuotation(quotation: any) {
           id: quotation.customer.id,
           name: quotation.customer.name,
           phone: quotation.customer.phone,
+          // Only populated when getQuotationById's own customer select asks
+          // for these (the list-view getQuotations select doesn't) — the
+          // print page's Bill To block is the one consumer that needs them.
+          addressLine1: quotation.customer.addressLine1 ?? null,
+          addressLine2: quotation.customer.addressLine2 ?? null,
+          city: quotation.customer.city ?? null,
+          state: quotation.customer.state ?? null,
+          pincode: quotation.customer.pincode ?? null,
         }
       : null,
     convertedTo: quotation.convertedTo
@@ -348,7 +366,21 @@ export async function getQuotationById(id: string) {
   const quotation = await prisma.quotation.findFirst({
     where: { id, storeId },
     include: {
-      customer: { select: { id: true, name: true, phone: true } },
+      // Address fields ride along here (unlike getQuotations'/
+      // exportQuotationsToExcel's lighter customer select) so the print
+      // page's Bill To block can show a full address, same as Invoice's.
+      customer: {
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          addressLine1: true,
+          addressLine2: true,
+          city: true,
+          state: true,
+          pincode: true,
+        },
+      },
       items: true,
       convertedTo: { select: { id: true, invoiceNumber: true } },
     },

@@ -404,6 +404,8 @@ export async function getKachaInvoiceById(id: string) {
   return mapKachaInvoice(kachaInvoice);
 }
 
+export type KachaInvoice = NonNullable<Awaited<ReturnType<typeof getKachaInvoiceById>>>;
+
 /** Same customer/stock pools as the Pakka invoice form — no need to duplicate the queries. */
 export const getKachaInvoiceFormCustomers = getInvoiceFormCustomers;
 export const getKachaInvoiceFormStockItems = getInvoiceFormStockItems;

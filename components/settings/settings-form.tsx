@@ -19,7 +19,7 @@ import {
 import type { BusinessUnitOption } from "@/lib/business-units.server";
 import { getCitiesByStateId, type StateOption } from "@/lib/actions/location-actions";
 import { GST_SCHEME_OPTIONS } from "@/lib/gst";
-import type { GstScheme, PrintLayout } from "@prisma/client";
+import type { GstScheme, PrintLayout, InvoiceTemplate } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,6 +107,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
   const [loadingCities, setLoadingCities] = useState(false)
   const [returnWindowEnabled, setReturnWindowEnabled] = useState(settings.returnWindowEnabled)
   const [printLayout, setPrintLayout] = useState<PrintLayout>(settings.printLayout)
+  const [invoiceTemplate, setInvoiceTemplate] = useState<InvoiceTemplate>(settings.invoiceTemplate)
   const stateNameMap = useMemo(
     () => new Map(states.map((item) => [item.id, item.name])),
     [states],
@@ -748,6 +749,134 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               </button>
             </div>
           </div>
+
+          {/* Template choice only means anything once A4 is selected — under
+              Thermal there's no template to pick (its layout is fixed), so
+              the picker is hidden entirely rather than shown disabled. */}
+          {printLayout === "A4" && (
+            <div className="space-y-1.5 md:col-span-2">
+              <Label>Invoice Template</Label>
+              <input type="hidden" name="invoiceTemplate" value={invoiceTemplate} />
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <button
+                  type="button"
+                  onClick={() => setInvoiceTemplate("CLASSIC")}
+                  className={cn(
+                    "flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors",
+                    invoiceTemplate === "CLASSIC"
+                      ? "border-primary bg-primary/5 ring-1 ring-primary"
+                      : "hover:bg-accent/40",
+                  )}
+                >
+                  {/* Same mockup shape as the A4 mockup above — violet
+                      header band, dark identity block, boxed total. */}
+                  <div className="h-24 w-full overflow-hidden rounded-sm border border-slate-300 bg-white shadow-sm">
+                    <div className="h-2.5 bg-violet-400" />
+                    <div className="h-4 w-3/5 bg-slate-900" />
+                    <div className="space-y-[3px] p-1.5">
+                      <div className="h-1 w-full rounded-sm bg-slate-200" />
+                      <div className="h-1 w-4/5 rounded-sm bg-slate-200" />
+                      <div className="h-1 w-full rounded-sm bg-slate-200" />
+                    </div>
+                    <div className="ml-auto mr-1.5 mt-1 h-3 w-6 rounded-sm bg-violet-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Classic</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Violet contact bar, dark identity block, boxed totals summary.
+                    </p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInvoiceTemplate("MODERN")}
+                  className={cn(
+                    "flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors",
+                    invoiceTemplate === "MODERN"
+                      ? "border-primary bg-primary/5 ring-1 ring-primary"
+                      : "hover:bg-accent/40",
+                  )}
+                >
+                  {/* No color band at all — a thin indigo underline beneath
+                      a plain header, alternating white/slate rows below. */}
+                  <div className="h-24 w-full overflow-hidden rounded-sm border border-slate-300 bg-white p-1.5 shadow-sm">
+                    <div className="h-1 w-2/5 rounded-sm bg-slate-700" />
+                    <div className="mt-1 h-[2px] w-full bg-indigo-500" />
+                    <div className="mt-1.5 space-y-[3px]">
+                      <div className="h-1.5 w-full bg-white" />
+                      <div className="h-1.5 w-full bg-slate-100" />
+                      <div className="h-1.5 w-full bg-white" />
+                    </div>
+                    <div className="ml-auto mt-1 h-2 w-8 rounded-sm bg-indigo-100" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Modern</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Light and airy, sparing indigo accent, alternating-row items table.
+                    </p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInvoiceTemplate("MINIMAL")}
+                  className={cn(
+                    "flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors",
+                    invoiceTemplate === "MINIMAL"
+                      ? "border-primary bg-primary/5 ring-1 ring-primary"
+                      : "hover:bg-accent/40",
+                  )}
+                >
+                  {/* Pure grayscale — no color anywhere, just hairline
+                      rules stacking the sections. */}
+                  <div className="h-24 w-full overflow-hidden rounded-sm border border-slate-300 bg-white p-1.5 shadow-sm">
+                    <div className="h-1 w-2/5 rounded-sm bg-slate-700" />
+                    <div className="mt-1.5 border-t border-slate-400" />
+                    <div className="mt-1.5 space-y-[3px]">
+                      <div className="h-1 w-full rounded-sm bg-slate-300" />
+                      <div className="h-1 w-4/5 rounded-sm bg-slate-300" />
+                    </div>
+                    <div className="mt-1.5 border-t border-slate-400" />
+                    <div className="ml-auto mt-1 h-1 w-6 rounded-sm bg-slate-700" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Minimal</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Black-and-white, hairline rules only — ink-saving, prints on any printer.
+                    </p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInvoiceTemplate("ELEGANT")}
+                  className={cn(
+                    "flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors",
+                    invoiceTemplate === "ELEGANT"
+                      ? "border-primary bg-primary/5 ring-1 ring-primary"
+                      : "hover:bg-accent/40",
+                  )}
+                >
+                  {/* Centered header bars + a thin amber rule, evoking the
+                      centered/serif boutique layout. */}
+                  <div className="h-24 w-full overflow-hidden rounded-sm border border-slate-300 bg-white p-1.5 shadow-sm">
+                    <div className="mx-auto h-1 w-2/5 rounded-sm bg-slate-700" />
+                    <div className="mx-auto mt-1 h-1 w-1/4 rounded-sm bg-slate-300" />
+                    <div className="mt-1.5 border-t border-amber-400" />
+                    <div className="mt-1.5 space-y-[3px]">
+                      <div className="h-1 w-full rounded-sm bg-slate-200" />
+                      <div className="h-1 w-4/5 rounded-sm bg-slate-200" />
+                    </div>
+                    <div className="ml-auto mt-1 h-1 w-6 rounded-sm bg-amber-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Elegant</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Gold accent, serif headings, centered header — a boutique jewellery feel.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1.5 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="invoiceTerms">Invoice Terms & Conditions</Label>

@@ -1682,7 +1682,11 @@ model BusinessSettings {
   invoiceNotes      String?
   // Which print layout the Invoice print page renders — see PrintLayout's
   // own doc comment. A store-wide default; not per-invoice.
-  printLayout       PrintLayout @default(A4)
+  printLayout       PrintLayout    @default(A4)
+  // Which of the four professionally-designed A4 templates to render when
+  // printLayout is A4 — see InvoiceTemplate's own doc comment. Ignored when
+  // printLayout is THERMAL (that format has no template variants).
+  invoiceTemplate   InvoiceTemplate @default(CLASSIC)
 
   // Bank account the store gets paid into — printed as the invoice's "Pay
   // To" block. All optional and independent of each other: the print page
@@ -2204,6 +2208,30 @@ enum SkuFormat {
 enum PrintLayout {
   A4
   THERMAL
+}
+
+// Which professionally-designed A4 template a store's Invoice/Kacha Slip/
+// Quotation print pages render in — see BusinessSettings.invoiceTemplate.
+// One store-wide choice applied consistently across all three A4 print
+// pages (not per-document), same "one setting, several consumers"
+// convention as PrintLayout/SkuFormat.
+//   CLASSIC - the original design: a violet contact bar, a dark curved
+//             identity block, a violet-header items table, a boxed totals
+//             summary. Unchanged from before this enum existed.
+//   MODERN  - light and airy, an indigo accent used sparingly (a thin
+//             underline + the Total row only), alternating-row items table,
+//             no color bands or curved shapes.
+//   MINIMAL - pure black-and-white/grayscale, hairline rules only, a
+//             stacked (not boxed) layout — ink-saving, formal, prints
+//             cleanly on any printer.
+//   ELEGANT - a gold accent (matching this app's own brand gold) and a
+//             serif display font for headings, generous letter-spacing, a
+//             centered header — a boutique/premium jewellery-store feel.
+enum InvoiceTemplate {
+  CLASSIC
+  MODERN
+  MINIMAL
+  ELEGANT
 }
 
 // The three GST registration types a jewellery business can operate under

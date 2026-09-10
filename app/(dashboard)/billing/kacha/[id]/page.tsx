@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { cache } from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowRightCircle } from "lucide-react"
+import { ArrowRightCircle, Printer } from "lucide-react"
 
 import { getKachaInvoiceById } from "@/lib/actions/kacha-invoice-actions"
 import { formatShortDate } from "@/lib/utils"
@@ -67,6 +67,15 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
             )}
 
             <EmailKachaInvoiceButton kachaInvoiceId={kachaInvoice.id} />
+
+            <Link
+              href={`/billing/kacha/${kachaInvoice.id}/print`}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
+              aria-label="Print slip"
+              title="Print"
+            >
+              <Printer className="h-4 w-4" />
+            </Link>
 
             <RecordKachaPaymentDialog
               kachaInvoiceId={kachaInvoice.id}

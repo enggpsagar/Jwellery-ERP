@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { Printer } from "lucide-react"
 
 import type { Quotation } from "@/lib/actions/quotation-actions"
 import { formatShortDate } from "@/lib/utils"
@@ -38,6 +39,14 @@ export function QuotationActionsBar({ quotation, businessName }: QuotationAction
   return (
     <div className="flex flex-wrap items-center gap-2">
       <ShareWhatsAppButton phone={quotation.customer?.phone} message={whatsappMessage} />
+      <Link
+        href={`/quotations/${quotation.id}/print`}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
+        aria-label="Print quotation"
+        title="Print"
+      >
+        <Printer className="h-4 w-4" />
+      </Link>
       {quotation.status === "open" ? (
         <>
           <EditQuotationDialog

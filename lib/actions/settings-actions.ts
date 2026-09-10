@@ -3,7 +3,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { UserRole, GstScheme, SkuFormat, PrintLayout } from "@prisma/client";
+import { UserRole, GstScheme, SkuFormat, PrintLayout, InvoiceTemplate } from "@prisma/client";
 import { requireStoreScope } from "@/lib/store-context";
 import { requireRole } from "@/lib/auth/auth";
 import { MONEY_UNIT } from "@/lib/business-units";
@@ -36,6 +36,10 @@ export type BusinessSettings = {
   // Which physical format the Invoice print page renders in (A4 or a
   // narrow Thermal receipt) — see PrintLayout's own schema doc comment.
   printLayout: PrintLayout;
+  // Which of the four A4 templates (Classic/Modern/Minimal/Elegant) the
+  // Invoice/Kacha Slip/Quotation print pages render in when printLayout is
+  // A4 — see InvoiceTemplate's own schema doc comment.
+  invoiceTemplate: InvoiceTemplate;
   // Bank account the store gets paid into — printed as the invoice's "Pay
   // To" block, shown only once bankName is set.
   bankName: string;
@@ -111,6 +115,7 @@ function mapSettings(settings: any): BusinessSettings {
     invoiceTerms: settings.invoiceTerms ?? "",
     invoiceNotes: settings.invoiceNotes ?? "",
     printLayout: settings.printLayout ?? PrintLayout.A4,
+    invoiceTemplate: settings.invoiceTemplate ?? InvoiceTemplate.CLASSIC,
     bankName: settings.bankName ?? "",
     bankAccountNumber: settings.bankAccountNumber ?? "",
     bankIfscCode: settings.bankIfscCode ?? "",
@@ -251,6 +256,16 @@ export async function updateBusinessSettings(
     }
     const printLayout = printLayoutRaw as PrintLayout;
 
+    const invoiceTemplateRaw = String(formData.get("invoiceTemplate") || InvoiceTemplate.CLASSIC);
+    if (!Object.values(InvoiceTemplate).includes(invoiceTemplateRaw as InvoiceTemplate)) {
+      return {
+        success: false,
+        message: "Invalid invoice template",
+        errors: { invoiceTemplate: ["Select a valid invoice template"] },
+      };
+    }
+    const invoiceTemplate = invoiceTemplateRaw as InvoiceTemplate;
+
     const storeId = await requireStoreScope();
     const businessUnits = await parseBusinessUnits(formData);
 
@@ -277,6 +292,7 @@ export async function updateBusinessSettings(
         invoiceTerms: toOptionalString(formData.get("invoiceTerms")),
         invoiceNotes: toOptionalString(formData.get("invoiceNotes")),
         printLayout,
+        invoiceTemplate,
         bankName: toOptionalString(formData.get("bankName")),
         bankAccountNumber: toOptionalString(formData.get("bankAccountNumber")),
         bankIfscCode: toOptionalString(formData.get("bankIfscCode")),
@@ -316,6 +332,7 @@ export async function updateBusinessSettings(
         invoiceTerms: toOptionalString(formData.get("invoiceTerms")),
         invoiceNotes: toOptionalString(formData.get("invoiceNotes")),
         printLayout,
+        invoiceTemplate,
         bankName: toOptionalString(formData.get("bankName")),
         bankAccountNumber: toOptionalString(formData.get("bankAccountNumber")),
         bankIfscCode: toOptionalString(formData.get("bankIfscCode")),

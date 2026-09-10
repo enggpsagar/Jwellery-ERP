@@ -685,31 +685,66 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
                 type="button"
                 onClick={() => setPrintLayout("A4")}
                 className={cn(
-                  "rounded-lg border p-3 text-left transition-colors",
+                  "flex items-start gap-3 rounded-lg border p-3 text-left transition-colors",
                   printLayout === "A4"
                     ? "border-primary bg-primary/5 ring-1 ring-primary"
                     : "hover:bg-accent/40",
                 )}
               >
-                <p className="font-medium">A4 (Detailed)</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Full-page layout with logo, GST rate-wise summary, bank details, and terms.
-                </p>
+                {/* Miniature mockup, drawn in CSS — not a real screenshot,
+                    just enough of the A4 layout's own shape (violet header
+                    band, a table's worth of rows, a totals box bottom-right)
+                    for the two options to be visually distinguishable at a
+                    glance rather than judged from the text alone. */}
+                <div className="h-24 w-[68px] shrink-0 overflow-hidden rounded-sm border border-slate-300 bg-white shadow-sm">
+                  <div className="h-2.5 bg-violet-400" />
+                  <div className="space-y-[3px] p-1.5">
+                    <div className="h-1 w-full rounded-sm bg-slate-200" />
+                    <div className="h-1 w-4/5 rounded-sm bg-slate-200" />
+                    <div className="h-1 w-full rounded-sm bg-slate-200" />
+                    <div className="h-1 w-3/5 rounded-sm bg-slate-200" />
+                  </div>
+                  <div className="ml-auto mr-1.5 mt-1 h-3 w-6 rounded-sm bg-violet-400" />
+                </div>
+                <div>
+                  <p className="font-medium">A4 (Detailed)</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Full-page layout with logo, GST rate-wise summary, bank details, and terms.
+                  </p>
+                </div>
               </button>
               <button
                 type="button"
                 onClick={() => setPrintLayout("THERMAL")}
                 className={cn(
-                  "rounded-lg border p-3 text-left transition-colors",
+                  "flex items-start gap-3 rounded-lg border p-3 text-left transition-colors",
                   printLayout === "THERMAL"
                     ? "border-primary bg-primary/5 ring-1 ring-primary"
                     : "hover:bg-accent/40",
                 )}
               >
-                <p className="font-medium">Thermal Receipt (80mm)</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Narrow receipt-printer format — plain item list and totals, no colors or logo.
-                </p>
+                {/* Narrower and taller than the A4 mockup, plain monospace-
+                    style dashes instead of a color band, matching the real
+                    Thermal layout's own look. */}
+                <div className="h-24 w-11 shrink-0 overflow-hidden rounded-sm border border-slate-300 bg-white p-1 shadow-sm">
+                  <div className="space-y-[3px]">
+                    <div className="h-1 w-full rounded-sm bg-slate-300" />
+                    <div className="h-1 w-4/5 rounded-sm bg-slate-300" />
+                    <div className="h-px w-full border-t border-dashed border-slate-400" />
+                    <div className="h-1 w-full rounded-sm bg-slate-200" />
+                    <div className="h-1 w-3/5 rounded-sm bg-slate-200" />
+                    <div className="h-1 w-full rounded-sm bg-slate-200" />
+                    <div className="h-px w-full border-t border-dashed border-slate-400" />
+                    <div className="h-1 w-4/5 rounded-sm bg-slate-300" />
+                    <div className="h-1 w-2/5 rounded-sm bg-slate-300" />
+                  </div>
+                </div>
+                <div>
+                  <p className="font-medium">Thermal Receipt (80mm)</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Narrow receipt-printer format — plain item list and totals, no colors or logo.
+                  </p>
+                </div>
               </button>
             </div>
           </div>

@@ -2,9 +2,10 @@
 
 import { useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Store as StoreIcon } from "lucide-react"
+import { useSession } from "next-auth/react"
+import { Store as StoreIcon, Globe } from "lucide-react"
 
-import { setActiveStoreAction } from "@/lib/actions/store-actions"
+import { setActiveStoreAction, clearActiveStoreAction } from "@/lib/actions/store-actions"
 import {
   Select,
   SelectContent,
@@ -27,9 +28,25 @@ type StoreSwitcherProps = {
   activeStoreId: string | null
 }
 
+/**
+ * Sentinel for "clear the selection" — a real SelectItem (not a bare
+ * button) for the same reason every other sentinel row in this codebase is
+ * (stock-item-select.tsx's CREATE_NEW_VALUE, product-select.tsx's
+ * ADD_NEW_VALUE, ...): Radix owns pointer handling inside SelectContent and
+ * can swallow a plain button's click, and as an item it stays keyboard-
+ * reachable. Cannot collide with a real id — those are cuids.
+ */
+const GLOBAL_VALUE = "__global__"
+
 export function StoreSwitcher({ stores, activeStoreId }: StoreSwitcherProps) {
   const router = useRouter()
   const toast = useToast()
+  const { data: session } = useSession()
+  // Only a Super Admin has a coherent "no store" mode — resolveActiveStoreId
+  // (lib/store-membership.ts) always lands a regular multi-store user back
+  // on a real membership even with the cookie cleared, so offering this to
+  // anyone else would just look like a no-op.
+  const isSuperAdmin = session?.user?.role === "SUPER_ADMIN"
   const [isPending, startTransition] = useTransition()
   const [search, setSearch] = useState("")
 
@@ -47,7 +64,11 @@ export function StoreSwitcher({ stores, activeStoreId }: StoreSwitcherProps) {
   const handleChange = (storeId: string) => {
     startTransition(async () => {
       try {
-        await setActiveStoreAction(storeId)
+        if (storeId === GLOBAL_VALUE) {
+          await clearActiveStoreAction()
+        } else {
+          await setActiveStoreAction(storeId)
+        }
         router.refresh()
       } catch (error) {
         toast.error(
@@ -59,7 +80,7 @@ export function StoreSwitcher({ stores, activeStoreId }: StoreSwitcherProps) {
 
   return (
     <Select
-      value={activeStoreId ?? ""}
+      value={activeStoreId ?? (isSuperAdmin ? GLOBAL_VALUE : "")}
       onValueChange={handleChange}
       disabled={isPending}
       onOpenChange={(open) => {
@@ -86,6 +107,21 @@ export function StoreSwitcher({ stores, activeStoreId }: StoreSwitcherProps) {
             onKeyDown={(event) => event.stopPropagation()}
           />
         </div>
+
+        {/* Pinned above the search-filtered list (same convention as every
+            other sentinel row in this codebase) so a Super Admin can always
+            get back to an unscoped view — including when there's only one
+            store in the list at all, which previously left no way out of it
+            once selected. Super Admin only: see isSuperAdmin's own comment. */}
+        {isSuperAdmin && (
+          <>
+            <SelectItem value={GLOBAL_VALUE} className="font-medium text-primary">
+              <Globe className="mr-1 h-4 w-4" />
+              All Stores (Global View)
+            </SelectItem>
+            <div className="my-1 border-t" />
+          </>
+        )}
 
         <div className="max-h-64 overflow-y-auto">
           {filtered.length === 0 ? (

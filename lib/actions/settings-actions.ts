@@ -3,7 +3,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { UserRole, GstScheme, SkuFormat } from "@prisma/client";
+import { UserRole, GstScheme, SkuFormat, PrintLayout } from "@prisma/client";
 import { requireStoreScope } from "@/lib/store-context";
 import { requireRole } from "@/lib/auth/auth";
 import { MONEY_UNIT } from "@/lib/business-units";
@@ -33,6 +33,9 @@ export type BusinessSettings = {
   invoiceStartingNo: number;
   invoiceTerms: string;
   invoiceNotes: string;
+  // Which physical format the Invoice print page renders in (A4 or a
+  // narrow Thermal receipt) — see PrintLayout's own schema doc comment.
+  printLayout: PrintLayout;
   // Bank account the store gets paid into — printed as the invoice's "Pay
   // To" block, shown only once bankName is set.
   bankName: string;
@@ -107,6 +110,7 @@ function mapSettings(settings: any): BusinessSettings {
     invoiceStartingNo: settings.invoiceStartingNo ?? 1,
     invoiceTerms: settings.invoiceTerms ?? "",
     invoiceNotes: settings.invoiceNotes ?? "",
+    printLayout: settings.printLayout ?? PrintLayout.A4,
     bankName: settings.bankName ?? "",
     bankAccountNumber: settings.bankAccountNumber ?? "",
     bankIfscCode: settings.bankIfscCode ?? "",
@@ -237,6 +241,16 @@ export async function updateBusinessSettings(
     }
     const gstScheme = gstSchemeRaw as GstScheme;
 
+    const printLayoutRaw = String(formData.get("printLayout") || PrintLayout.A4);
+    if (!Object.values(PrintLayout).includes(printLayoutRaw as PrintLayout)) {
+      return {
+        success: false,
+        message: "Invalid print layout",
+        errors: { printLayout: ["Select a valid print layout"] },
+      };
+    }
+    const printLayout = printLayoutRaw as PrintLayout;
+
     const storeId = await requireStoreScope();
     const businessUnits = await parseBusinessUnits(formData);
 
@@ -262,6 +276,7 @@ export async function updateBusinessSettings(
         invoiceStartingNo: toNumber(formData.get("invoiceStartingNo"), 1),
         invoiceTerms: toOptionalString(formData.get("invoiceTerms")),
         invoiceNotes: toOptionalString(formData.get("invoiceNotes")),
+        printLayout,
         bankName: toOptionalString(formData.get("bankName")),
         bankAccountNumber: toOptionalString(formData.get("bankAccountNumber")),
         bankIfscCode: toOptionalString(formData.get("bankIfscCode")),
@@ -300,6 +315,7 @@ export async function updateBusinessSettings(
         invoiceStartingNo: toNumber(formData.get("invoiceStartingNo"), 1),
         invoiceTerms: toOptionalString(formData.get("invoiceTerms")),
         invoiceNotes: toOptionalString(formData.get("invoiceNotes")),
+        printLayout,
         bankName: toOptionalString(formData.get("bankName")),
         bankAccountNumber: toOptionalString(formData.get("bankAccountNumber")),
         bankIfscCode: toOptionalString(formData.get("bankIfscCode")),

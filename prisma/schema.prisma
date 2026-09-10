@@ -1676,10 +1676,13 @@ model BusinessSettings {
   backupEmail String?
 
   // Invoice preferences
-  invoicePrefix     String  @default("INV")
-  invoiceStartingNo Int     @default(1)
+  invoicePrefix     String     @default("INV")
+  invoiceStartingNo Int        @default(1)
   invoiceTerms      String?
   invoiceNotes      String?
+  // Which print layout the Invoice print page renders — see PrintLayout's
+  // own doc comment. A store-wide default; not per-invoice.
+  printLayout       PrintLayout @default(A4)
 
   // Bank account the store gets paid into — printed as the invoice's "Pay
   // To" block. All optional and independent of each other: the print page
@@ -2189,6 +2192,18 @@ enum SkuFormat {
   METAL_CATEGORY_PURITY
   CATEGORY_METAL_PURITY
   STYLE_CATEGORY_METAL_PURITY
+}
+
+// Which physical format the Invoice print page renders in — see
+// app/(dashboard)/billing/[id]/print/page.tsx. A4 is the existing full
+// detailed layout (logo band, GST rate-wise summary, bank details, terms);
+// THERMAL is a narrow 80mm receipt-printer format (plain list, no color
+// bands) for stores that bill at a counter with a receipt printer instead
+// of a full-page one. Store-wide (BusinessSettings.printLayout), not
+// per-invoice — matches SkuFormat's own "one store-wide choice" convention.
+enum PrintLayout {
+  A4
+  THERMAL
 }
 
 // The three GST registration types a jewellery business can operate under

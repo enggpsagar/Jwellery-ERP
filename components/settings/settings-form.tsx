@@ -19,7 +19,7 @@ import {
 import type { BusinessUnitOption } from "@/lib/business-units.server";
 import { getCitiesByStateId, type StateOption } from "@/lib/actions/location-actions";
 import { GST_SCHEME_OPTIONS } from "@/lib/gst";
-import type { GstScheme } from "@prisma/client";
+import type { GstScheme, PrintLayout } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,6 +106,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
   const [cities, setCities] = useState<CityItem[]>([])
   const [loadingCities, setLoadingCities] = useState(false)
   const [returnWindowEnabled, setReturnWindowEnabled] = useState(settings.returnWindowEnabled)
+  const [printLayout, setPrintLayout] = useState<PrintLayout>(settings.printLayout)
   const stateNameMap = useMemo(
     () => new Map(states.map((item) => [item.id, item.name])),
     [states],
@@ -674,6 +675,43 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               max={12}
               defaultValue={settings.financialYearStartMonth}
             />
+          </div>
+
+          <div className="space-y-1.5 md:col-span-2">
+            <Label>Print Layout</Label>
+            <input type="hidden" name="printLayout" value={printLayout} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setPrintLayout("A4")}
+                className={cn(
+                  "rounded-lg border p-3 text-left transition-colors",
+                  printLayout === "A4"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "hover:bg-accent/40",
+                )}
+              >
+                <p className="font-medium">A4 (Detailed)</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Full-page layout with logo, GST rate-wise summary, bank details, and terms.
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintLayout("THERMAL")}
+                className={cn(
+                  "rounded-lg border p-3 text-left transition-colors",
+                  printLayout === "THERMAL"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "hover:bg-accent/40",
+                )}
+              >
+                <p className="font-medium">Thermal Receipt (80mm)</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Narrow receipt-printer format — plain item list and totals, no colors or logo.
+                </p>
+              </button>
+            </div>
           </div>
 
           <div className="space-y-1.5 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">

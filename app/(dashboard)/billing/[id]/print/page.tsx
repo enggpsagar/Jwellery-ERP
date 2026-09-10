@@ -9,6 +9,7 @@ import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { amountInWords } from "@/lib/number-to-words"
 import { formatShortDate } from "@/lib/utils"
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button"
+import { InvoicePrintThermal } from "@/components/billing/invoice-print-thermal"
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst"
 import { APP_NAME } from "@/lib/constants/app"
 
@@ -131,6 +132,28 @@ export default async function InvoicePrintPage({ params }: Props) {
   // "Sub Total" that's silently net-of-discount with no discount line
   // anywhere to explain the difference.
   const subtotal = invoice.subtotal + invoice.makingCharges + invoice.stoneCharges
+
+  // Thermal is a fully separate, narrower layout (own <main>/<style>/@page —
+  // see InvoicePrintThermal's own doc comment) rather than a variant nested
+  // inside the A4 markup below; only the Back/Print header row is
+  // duplicated between the two branches.
+  if (settings.printLayout === "THERMAL") {
+    return (
+      <div className="mx-auto max-w-md space-y-4 p-6 print:p-0">
+        <div className="flex justify-between print:hidden">
+          <Link
+            href={`/billing/${invoice.id}`}
+            className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Invoice
+          </Link>
+          <InvoicePrintButton />
+        </div>
+        <InvoicePrintThermal invoice={invoice} settings={settings} />
+      </div>
+    )
+  }
 
   return (
     <main className="mx-auto max-w-3xl space-y-4 bg-white p-6 text-[13px] text-slate-900 print:max-w-none print:w-full print:p-0 print:text-[10px]">

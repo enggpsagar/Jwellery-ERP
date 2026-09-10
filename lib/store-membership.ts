@@ -123,12 +123,16 @@ export function resolveActiveStoreId(
    */
   totalMembershipRows?: number,
 ): string | null {
-  // No SUPER_ADMIN special case here anymore — Store Owner Authorization
-  // means a Super Admin reaches only the stores they've redeemed a
-  // Collaboration Code for, exactly like anyone else's memberships. Callers
-  // pass `listCollaborationGrants`-sourced rows as `memberships` for a
-  // SUPER_ADMIN (see getUserStoreMemberships in store-context.ts), so the
-  // same validate-against-the-list logic below applies unchanged.
+  // No SUPER_ADMIN bypass of the membership LIST here — Store Owner
+  // Authorization means a Super Admin reaches only the stores they've
+  // redeemed a Collaboration Code for, exactly like anyone else's
+  // memberships (see getUserStoreMemberships in store-context.ts, which
+  // sources `memberships` from `listCollaborationGrants` for them). But a
+  // Super Admin DOES still get one thing no regular member does: the
+  // ability to deliberately request no store at all (StoreSwitcher's "All
+  // Stores (Global View)" item, which clears the cookie) and have that
+  // stick — see the dedicated branch below, after the ordinary
+  // validate-against-the-list check.
   if (memberships.length === 0) {
     // Rows exist but none are usable — every store has deactivated them.
     // That is a revocation, so it must resolve to nothing rather than
@@ -145,6 +149,21 @@ export function resolveActiveStoreId(
     memberships.some((m) => m.storeId === requestedStoreId)
   ) {
     return requestedStoreId;
+  }
+
+  // A blank cookie from a Super Admin is a deliberate "Global View" choice,
+  // not a stale/invalid one — unlike a regular multi-store member (who has
+  // nothing useful to do with "no store" and must always land somewhere
+  // real), every platform-level page a Super Admin needs without a store
+  // (Platform Stores console, Plans, Profile, Support Tickets — see
+  // (dashboard)/layout.tsx's STORE_EXEMPT_PREFIXES) already works fine with
+  // activeStoreId: null, and any store-scoped action they do reach in that
+  // state already fails soft via requireStoreScope()'s own friendly error.
+  // Silently overriding that choice back onto a real store (as the
+  // fallback below would) made the "All Stores" option in StoreSwitcher a
+  // no-op the moment a Super Admin held at least one Collaboration grant.
+  if (user.role === UserRole.SUPER_ADMIN && !requestedStoreId) {
+    return null;
   }
 
   // Land somewhere valid rather than throwing "no store selected": their own

@@ -22,9 +22,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { id } = await params
     const kachaInvoice = await getKachaInvoice(id)
-    return { title: kachaInvoice ? `Kacha Invoice ${kachaInvoice.slipNumber}` : "Kacha Invoice" }
+    return { title: kachaInvoice ? `Estimate ${kachaInvoice.slipNumber}` : "Estimate" }
   } catch {
-    return { title: "Kacha Invoice" }
+    return { title: "Estimate" }
   }
 }
 
@@ -34,25 +34,35 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
 
   if (!kachaInvoice) notFound()
 
+  // A column with nothing to show across every line item is dead weight,
+  // not information — Making also carries the Hallmark charge sub-line, so
+  // it stays visible if any item has that even with makingCharge itself 0.
+  const showMaking = kachaInvoice.items.some(
+    (item: (typeof kachaInvoice.items)[number]) => item.makingCharge > 0 || item.hmCharge > 0,
+  )
+  const showStone = kachaInvoice.items.some(
+    (item: (typeof kachaInvoice.items)[number]) => item.stoneCharge > 0,
+  )
+
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
         title={kachaInvoice.slipNumber}
         description={kachaInvoice.customer?.name ?? ""}
         backHref="/billing/kacha"
-        backLabel="Back to Kacha Slips"
+        backLabel="Back to Estimates"
         action={
           <div className="flex items-center gap-2">
             {kachaInvoice.convertedTo ? (
               <Link href={`/billing/${kachaInvoice.convertedTo.id}`}>
                 <Button variant="outline" className="gap-2">
                   <ArrowRightCircle className="h-4 w-4" />
-                  View Pakka Invoice ({kachaInvoice.convertedTo.invoiceNumber})
+                  View Tax Invoice ({kachaInvoice.convertedTo.invoiceNumber})
                 </Button>
               </Link>
             ) : (
               <Link href={`/billing/kacha/${kachaInvoice.id}/convert`}>
-                <Button variant="outline">Convert to Pakka</Button>
+                <Button variant="outline">Convert to Tax Invoice</Button>
               </Link>
             )}
 
@@ -78,7 +88,7 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
                   className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
                 >
                   <ArrowRightCircle className="h-3.5 w-3.5" />
-                  Converted to Pakka Invoice
+                  Converted to Tax Invoice
                 </Link>
               )}
             </div>
@@ -92,7 +102,7 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
           </div>
 
           <div>
-            <p className="text-sm text-muted-foreground">Customer</p>
+            <p className="text-sm text-muted-foreground">Party</p>
             {kachaInvoice.customer ? (
               <Link
                 href={`/customers/${kachaInvoice.customer.id}?from=${encodeURIComponent(`/billing/kacha/${kachaInvoice.id}`)}`}
@@ -118,8 +128,8 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
               <th className="px-4 py-3 text-left font-medium">Qty</th>
               <th className="px-4 py-3 text-left font-medium">Weight</th>
               <th className="px-4 py-3 text-left font-medium">Rate</th>
-              <th className="px-4 py-3 text-left font-medium">Making</th>
-              <th className="px-4 py-3 text-left font-medium">Stone</th>
+              {showMaking && <th className="px-4 py-3 text-left font-medium">Making</th>}
+              {showStone && <th className="px-4 py-3 text-left font-medium">Stone</th>}
               <th className="px-4 py-3 text-left font-medium">Line Total</th>
             </tr>
           </thead>
@@ -142,15 +152,21 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
                     : item.netWeight != null ? `${item.netWeight.toFixed(3)} g` : "-"}
                 </td>
                 <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
-                <td className="px-4 py-3">
-                  ₹{item.makingCharge.toFixed(2)}
-                  {item.hmCharge > 0 ? (
-                    <span className="block text-xs text-muted-foreground">
-                      HM ₹{item.hmCharge.toFixed(2)}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
+                {showMaking && (
+                  <td className="px-4 py-3">
+                    {item.makingCharge > 0 ? `₹${item.makingCharge.toFixed(2)}` : "-"}
+                    {item.hmCharge > 0 ? (
+                      <span className="block text-xs text-muted-foreground">
+                        HM ₹{item.hmCharge.toFixed(2)}
+                      </span>
+                    ) : null}
+                  </td>
+                )}
+                {showStone && (
+                  <td className="px-4 py-3">
+                    {item.stoneCharge > 0 ? `₹${item.stoneCharge.toFixed(2)}` : "-"}
+                  </td>
+                )}
                 <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
               </tr>
             ))}

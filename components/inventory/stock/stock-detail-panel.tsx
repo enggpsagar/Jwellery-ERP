@@ -94,7 +94,7 @@ export function StockDetailPanel({ stockId }: StockDetailPanelProps) {
         <h2 className="text-lg font-semibold">
           {stock.product?.name ?? stock.stockCode}
         </h2>
-        <StockRowActions stockId={stock.id} />
+        <StockRowActions stockId={stock.id} stockCode={stock.stockCode} />
       </div>
 
       <StockDetailContent

@@ -103,7 +103,7 @@ export function ConvertToPakkaForm({
 
   useEffect(() => {
     if (state.success && state.invoiceId) {
-      toast.success(state.message || "Converted to Pakka invoice")
+      toast.success(state.message || "Converted to Tax Invoice")
       router.push(`/billing/${state.invoiceId}`)
     } else if (!state.success && state.message) {
       toast.error(state.message)
@@ -131,7 +131,7 @@ export function ConvertToPakkaForm({
       <input type="hidden" name="gstRateId" value={gstRateId} />
 
       <div className="rounded-xl border bg-card p-6 space-y-4">
-        <h2 className="text-lg font-semibold">From Kacha Slip {kachaInvoice.slipNumber}</h2>
+        <h2 className="text-lg font-semibold">From Estimate {kachaInvoice.slipNumber}</h2>
 
         <div className="overflow-hidden rounded-lg border">
           <table className="min-w-full text-sm">
@@ -164,14 +164,14 @@ export function ConvertToPakkaForm({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <Label>Customer GSTIN</Label>
+            <Label>Party GSTIN</Label>
             <Input
               defaultValue={kachaInvoice.customer?.gstin ?? ""}
               placeholder="e.g. 27ABCDE1234F1Z5"
               disabled
             />
             <p className="text-xs text-muted-foreground">
-              Managed from the customer&apos;s profile.
+              Managed from the party&apos;s profile.
             </p>
           </div>
 
@@ -233,7 +233,7 @@ export function ConvertToPakkaForm({
 
       <div className="flex justify-end">
         <Button type="submit" disabled={pending}>
-          {pending ? "Converting..." : "Convert to Pakka Invoice"}
+          {pending ? "Converting..." : "Convert to Tax Invoice"}
         </Button>
       </div>
     </form>

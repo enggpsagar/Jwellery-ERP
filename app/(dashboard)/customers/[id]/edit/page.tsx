@@ -24,9 +24,9 @@ export async function generateMetadata({
   try {
     const { id } = await params
     const customer = await getCustomer(id)
-    return { title: customer ? `Edit ${customer.name}` : "Edit Customer" }
+    return { title: customer ? `Edit ${customer.name}` : "Edit Party" }
   } catch {
-    return { title: "Edit Customer" }
+    return { title: "Edit Party" }
   }
 }
 
@@ -50,9 +50,9 @@ export default async function EditCustomerPage({
     <main className="mx-auto max-w-4xl space-y-6 p-6">
       <PageBackHeader
         title={`Edit ${customer.name}`}
-        description="Update this customer's contact and account details."
+        description="Update this party's contact and account details."
         backHref={returnTo ?? "/customers"}
-        backLabel={returnTo ? "Back without saving" : "Back to Customers"}
+        backLabel={returnTo ? "Back without saving" : "Back to Parties"}
       />
 
       {/* Same "is this customer also a vendor" card the detail page shows —

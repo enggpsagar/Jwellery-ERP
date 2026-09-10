@@ -56,7 +56,7 @@ export default async function ReportsPage({ searchParams }: Props) {
     <main className="space-y-6 p-6">
       <PageBackHeader
         title="Reports"
-        description="Sales, inventory, artisan, and customer due summaries."
+        description="Sales, inventory, artisan, and party due summaries."
         backHref="/dashboard"
         backLabel="Back to Dashboard"
       />

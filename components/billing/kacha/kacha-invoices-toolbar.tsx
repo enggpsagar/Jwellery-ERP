@@ -25,11 +25,11 @@ export function KachaInvoicesToolbar({
 }) {
   return (
     <DataTableToolbar
-      searchPlaceholder="Search by slip number, customer..."
+      searchPlaceholder="Search by slip number, party..."
       sortOptions={SORT_OPTIONS}
       defaultSortBy="invoiceDate"
       statusOptions={STATUS_OPTIONS}
-      entityLabel="kacha slips"
+      entityLabel="estimates"
       selectedIds={selectedIds}
       exportAction={exportKachaInvoicesToExcel}
     />

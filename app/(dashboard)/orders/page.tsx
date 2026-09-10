@@ -6,6 +6,8 @@ import {
   type DraftOrderSortBy,
   type SortOrder,
 } from "@/lib/actions/draft-order-actions"
+import { getPaymentFormKarigars } from "@/lib/actions/payments-actions"
+import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 import { DraftOrdersClient } from "@/components/orders/draft-orders-client"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
@@ -37,20 +39,18 @@ export default async function DraftOrdersPage({ searchParams }: DraftOrdersPageP
   const sortOrder = params.sortOrder || "desc"
   const status = params.status || undefined
 
-  const { orders, pagination } = await getDraftOrders({
-    page,
-    pageSize,
-    search,
-    sortBy,
-    sortOrder,
-    status,
-  })
+  const [{ orders, pagination }, karigars, locations, defaultLocationId] = await Promise.all([
+    getDraftOrders({ page, pageSize, search, sortBy, sortOrder, status }),
+    getPaymentFormKarigars(),
+    getStoreLocations(),
+    getDefaultLocationId(),
+  ])
 
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
         title="Draft Orders"
-        description="Phone/counter orders — capture what a customer wants, send it to an artisan, and it becomes real Product & Inventory once received."
+        description="Phone/counter orders — capture what a party wants, send it to an artisan, and it becomes real Product & Inventory once received."
         backHref="/dashboard"
         backLabel="Back to Dashboard"
         action={
@@ -60,7 +60,13 @@ export default async function DraftOrdersPage({ searchParams }: DraftOrdersPageP
         }
       />
 
-      <DraftOrdersClient orders={orders} pagination={pagination} />
+      <DraftOrdersClient
+        orders={orders}
+        pagination={pagination}
+        karigars={karigars}
+        locations={locations}
+        defaultLocationId={defaultLocationId}
+      />
     </main>
   )
 }

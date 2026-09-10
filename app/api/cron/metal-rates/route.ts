@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: Request) {
   try {
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
     console.log("Gold API Response:", data);
 
     if (!response.ok) {
-      console.error("Gold API Error:", data);
+      logger.error("Gold API Error", data);
 
       return NextResponse.json(
         {
@@ -104,7 +105,7 @@ export async function GET(request: Request) {
       data: savedRates,
     });
   } catch (error: any) {
-    console.error("Metal rate cron error:", error);
+    logger.error("Metal rate cron error", error);
 
     return NextResponse.json(
       {

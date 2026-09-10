@@ -8,6 +8,7 @@ import { APP_NAME } from "@/lib/constants/app";
 import { newStoreRegisteredEmail, storeWelcomeEmail } from "@/lib/email-templates";
 import { buildUniqueStoreCode } from "@/lib/store-code";
 import { getSuperAdminEmails } from "@/lib/super-admin";
+import { logger } from "@/lib/logger";
 
 export type RegisterStoreState = {
   success: boolean;
@@ -302,7 +303,7 @@ export async function registerStoreAction(
       signInWith: { email, phone },
     };
   } catch (error) {
-    console.error("registerStoreAction error:", error);
+    logger.error("registerStoreAction error", error);
     return {
       success: false,
       message: "Could not complete registration. Please try again.",

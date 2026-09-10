@@ -14,9 +14,14 @@ import { useToast } from "@/components/providers/toast-provider"
 export function StoreStatusToggle({
   storeId,
   isActive,
+  onSuccess,
 }: {
   storeId: string
   isActive: boolean
+  /** Called after a successful toggle, in addition to router.refresh() —
+   * needed by callers (e.g. StoreDetailPanel) whose own "isActive" comes
+   * from client-fetched state that router.refresh() can't reach. */
+  onSuccess?: () => void
 }) {
   const router = useRouter()
   const toast = useToast()
@@ -32,6 +37,7 @@ export function StoreStatusToggle({
       if (result.success) {
         toast.success(result.message)
         router.refresh()
+        onSuccess?.()
       } else {
         toast.error(result.message)
       }

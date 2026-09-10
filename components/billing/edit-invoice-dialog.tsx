@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
-import { Pencil } from "lucide-react"
+import { Truck } from "lucide-react"
 
 import { updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
@@ -44,6 +44,12 @@ type EditInvoiceDialogProps = {
   vehicleNumber?: string | null
   transportMode?: string | null
   distanceKm?: number | null
+  /** Smaller trigger (still labeled "E-way Bill", not just a bare pencil)
+   * for a table row's Actions column — distinguishes it from "Edit Items"
+   * (also a pencil icon, but full line-item editing) sitting elsewhere in
+   * the same action bar, instead of two unlabeled pencils that look
+   * identical but do different things. */
+  compact?: boolean
 }
 
 /**
@@ -73,6 +79,7 @@ export function EditInvoiceDialog({
   vehicleNumber,
   transportMode,
   distanceKm,
+  compact = false,
 }: EditInvoiceDialogProps) {
   const [open, setOpen] = useState(false)
   const router = useRouter()
@@ -90,16 +97,29 @@ export function EditInvoiceDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 
+  const ewayBillLabel = ewayBillNumber?.trim() ? "Update E-way Bill" : "E-way Bill"
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          className="gap-2 bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
-          title="Edit Date & E-way Bill"
-        >
-          <Pencil className="h-4 w-4" />
-          E-way Bill
-        </Button>
+        {compact ? (
+          <Button
+            size="sm"
+            className="gap-1.5 bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
+            title="Edit Date & E-way Bill"
+          >
+            <Truck className="h-4 w-4" />
+            {ewayBillLabel}
+          </Button>
+        ) : (
+          <Button
+            className="gap-2 bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
+            title="Edit Date & E-way Bill"
+          >
+            <Truck className="h-4 w-4" />
+            {ewayBillLabel}
+          </Button>
+        )}
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-lg">

@@ -32,7 +32,7 @@ export function ProductRowActions({
         <>
           <Link
             href={`/inventory/products/${productId}/edit`}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-indigo-600 hover:bg-indigo-50"
+            className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-sm text-white shadow-sm hover:bg-indigo-700"
             title="Edit product"
           >
             <Pencil className="h-4 w-4" />

@@ -26,12 +26,14 @@ import type { StockFormState } from "@/lib/inventory/stock-types"
 import {
   buildExcelExport,
   buildCsvExportBase64,
+  buildPdfExportBase64,
   buildMultiSheetExcelExport,
   parseExcelUpload,
 } from "@/lib/excel-export"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 import { getFinenessMap, toFineWeight } from "@/lib/purity"
 import { formatShortDate, formatShortDateTime } from "@/lib/utils"
+import { logger } from "@/lib/logger";
 
 function parseNullableString(value: FormDataEntryValue | null) {
   const parsed = String(value || "").trim()
@@ -116,7 +118,7 @@ type ExportInventoryStockParams = {
   sortBy?: string
   sortOrder?: StockSortOrder
   type?: string
-  format?: "csv" | "xlsx"
+  format?: "csv" | "xlsx" | "pdf"
 }
 
 const STOCK_INCLUDE = {
@@ -358,7 +360,9 @@ export async function exportInventoryStockToExcel(
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "inventory-stock")
-        : buildExcelExport(rows, "Inventory Stock", "inventory-stock")
+        : params.format === "pdf"
+          ? buildPdfExportBase64(rows, "Inventory Stock", "inventory-stock")
+          : buildExcelExport(rows, "Inventory Stock", "inventory-stock")
 
     return {
       success: true,
@@ -367,7 +371,7 @@ export async function exportInventoryStockToExcel(
       fileBase64,
     }
   } catch (error) {
-    console.error("exportInventoryStockToExcel error:", error)
+    logger.error("exportInventoryStockToExcel error", error)
     return {
       success: false,
       message: "Failed to export stock.",
@@ -784,7 +788,7 @@ export async function createInventoryStock(
       errors: {},
     }
   } catch (error) {
-    console.error("createInventoryStock error:", error)
+    logger.error("createInventoryStock error", error)
     return {
       success: false,
       message: "Failed to add stock",
@@ -1105,7 +1109,7 @@ export async function updateInventoryStock(
       errors: {},
     }
   } catch (error) {
-    console.error("updateInventoryStock error:", error)
+    logger.error("updateInventoryStock error", error)
     return {
       success: false,
       message: "Failed to update stock",
@@ -1172,7 +1176,7 @@ export async function deleteInventoryStock(id: string): Promise<StockFormState> 
       errors: {},
     }
   } catch (error) {
-    console.error("deleteInventoryStock error:", error)
+    logger.error("deleteInventoryStock error", error)
     return {
       success: false,
       message: "Failed to delete stock",
@@ -1420,7 +1424,7 @@ export async function importInventoryStockFromExcel(
       createdCount: toCreate.length,
     }
   } catch (error) {
-    console.error("importInventoryStockFromExcel error:", error)
+    logger.error("importInventoryStockFromExcel error", error)
     return { success: false, message: "Failed to import stock." }
   }
 }

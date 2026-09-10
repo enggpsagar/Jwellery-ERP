@@ -63,11 +63,11 @@ export function StockQrCard({
 
         <Button
           type="button"
-          variant="secondary"
           size="icon"
           title="Print"
           aria-label="Print"
           onClick={() => window.print()}
+          className="bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
         >
           <Printer className="h-4 w-4" />
         </Button>

@@ -7,7 +7,7 @@ import { Trash2 } from "lucide-react"
 
 import { DraftOrderStatusBadge } from "@/components/orders/draft-order-status-badge"
 import { deleteDraftOrder } from "@/lib/actions/draft-order-actions"
-import { formatShortDate } from "@/lib/utils"
+import { formatShortDate, cn } from "@/lib/utils"
 import type { DraftOrderRow } from "@/lib/actions/draft-order-actions"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import { useToast } from "@/components/providers/toast-provider"
@@ -25,6 +25,9 @@ type DraftOrdersTableProps = {
   orders: DraftOrderRow[]
   selectedIds: string[]
   onSelectionChange: (ids: string[]) => void
+  /** Which row's detail is showing in the panel alongside this table — omit to keep every row's order number as a plain navigation link. */
+  activeOrderId?: string | null
+  onActivate?: (id: string) => void
 }
 
 /** Only a DRAFT or already-CANCELLED order can be deleted — mirrors
@@ -34,7 +37,13 @@ function isDeletable(status: string) {
   return status === "DRAFT" || status === "CANCELLED"
 }
 
-export function DraftOrdersTable({ orders, selectedIds, onSelectionChange }: DraftOrdersTableProps) {
+export function DraftOrdersTable({
+  orders,
+  selectedIds,
+  onSelectionChange,
+  activeOrderId,
+  onActivate,
+}: DraftOrdersTableProps) {
   const router = useRouter()
   const toast = useToast()
   const [confirmOrder, setConfirmOrder] = React.useState<DraftOrderRow | null>(null)
@@ -97,7 +106,7 @@ export function DraftOrdersTable({ orders, selectedIds, onSelectionChange }: Dra
                 </th>
                 <SortableTableHead label="Order #" sortKey="orderNumber" defaultSortBy="orderDate" />
                 <SortableTableHead label="Date" sortKey="orderDate" defaultSortBy="orderDate" />
-                <th className="px-4 py-3 text-left font-medium">Customer</th>
+                <th className="px-4 py-3 text-left font-medium">Party</th>
                 <th className="px-4 py-3 text-left font-medium">Items</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Artisan Job</th>
@@ -113,8 +122,18 @@ export function DraftOrdersTable({ orders, selectedIds, onSelectionChange }: Dra
                   </td>
                 </tr>
               ) : (
-                orders.map((order) => (
-                  <tr key={order.id} className="border-b last:border-0 hover:bg-muted/20">
+                orders.map((order) => {
+                  const isActive = activeOrderId === order.id
+                  return (
+                  <tr
+                    key={order.id}
+                    onClick={() => onActivate?.(order.id)}
+                    className={cn(
+                      "border-b last:border-0 hover:bg-muted/20",
+                      onActivate && "cursor-pointer",
+                      isActive && "bg-accent",
+                    )}
+                  >
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
@@ -125,9 +144,13 @@ export function DraftOrdersTable({ orders, selectedIds, onSelectionChange }: Dra
                       />
                     </td>
                     <td className="px-4 py-3 font-medium">
-                      <Link href={`/orders/${order.id}`} className="text-primary hover:underline">
-                        {order.orderNumber}
-                      </Link>
+                      {onActivate ? (
+                        order.orderNumber
+                      ) : (
+                        <Link href={`/orders/${order.id}`} className="text-primary hover:underline">
+                          {order.orderNumber}
+                        </Link>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {formatShortDate(order.orderDate)}
@@ -140,12 +163,12 @@ export function DraftOrdersTable({ orders, selectedIds, onSelectionChange }: Dra
                     <td className="px-4 py-3 text-muted-foreground">
                       {order.karigarJob?.jobNumber ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       {isDeletable(order.status) ? (
                         <button
                           type="button"
                           onClick={() => setConfirmOrder(order)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700"
                           aria-label={`Delete ${order.orderNumber}`}
                           title="Delete draft order"
                         >
@@ -154,7 +177,8 @@ export function DraftOrdersTable({ orders, selectedIds, onSelectionChange }: Dra
                       ) : null}
                     </td>
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -183,6 +207,7 @@ export function DraftOrdersTable({ orders, selectedIds, onSelectionChange }: Dra
             <Button
               type="button"
               variant="destructive"
+              className="bg-red-600 text-white hover:bg-red-700"
               onClick={handleDelete}
               disabled={deleting}
             >

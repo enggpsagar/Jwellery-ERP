@@ -95,7 +95,7 @@ export async function globalSearch(
       type: "customer" as const,
       id: c.id,
       title: c.name,
-      subtitle: [c.phone, c.city].filter(Boolean).join(" · ") || "Customer",
+      subtitle: [c.phone, c.city].filter(Boolean).join(" · ") || "Party",
       href: `/customers/${c.id}`,
     })),
     ...products.map((p) => ({

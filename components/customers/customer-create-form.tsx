@@ -85,7 +85,7 @@ export function CustomerCreateForm({
 
   useEffect(() => {
     if (state.success) {
-      toast.success(state.message || "Customer added successfully")
+      toast.success(state.message || "Party added successfully")
 
       // Hand the new id back to whoever sent us here so it can be selected
       // straight away, rather than making the user hunt for it in the list.
@@ -170,7 +170,7 @@ export function CustomerCreateForm({
               <User className="h-4 w-4 text-muted-foreground" />
               Name <RequiredMark />
             </label>
-            <input name="name" className={FIELD} placeholder="Customer name" required autoFocus />
+            <input name="name" className={FIELD} placeholder="Party name" required autoFocus />
             <FieldError errors={state.errors?.name} />
           </div>
 
@@ -321,7 +321,7 @@ export function CustomerCreateForm({
 
           <div className="flex justify-end gap-3 pt-2 md:col-span-2">
             <Button type="submit" disabled={pending} size="lg">
-              {pending ? "Saving..." : "Save customer"}
+              {pending ? "Saving..." : "Save party"}
             </Button>
           </div>
         </form>

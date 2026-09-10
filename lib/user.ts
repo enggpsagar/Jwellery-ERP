@@ -9,6 +9,24 @@ import type {
   UpdateUserInput,
 } from "@/lib/validation/user";
 
+/**
+ * Thrown by createUser when the given email/phone belongs to a User active
+ * in a different store. Carries the conflicting user's identity so the
+ * caller (createUserAction) can offer "grant access to this store too"
+ * instead of just a dead-end error — see grantStoreAccessToExistingUser.
+ */
+export class CrossStoreConflictError extends Error {
+  constructor(
+    public readonly conflictingUserId: string,
+    public readonly conflictingUserName: string | null
+  ) {
+    super(
+      "This email or phone is already registered in a different store."
+    );
+    this.name = "CrossStoreConflictError";
+  }
+}
+
 export type UserSortBy = "name" | "email" | "createdAt" | "role";
 export type SortOrder = "asc" | "desc";
 
@@ -198,6 +216,36 @@ async function upsertMembership(
   });
 }
 
+/**
+ * Grants a user who is already active in a different store access to this
+ * store too — the confirm path after createUser's CrossStoreConflictError.
+ * Unlike createUser's "claim" branch, this never touches the user's own
+ * `storeId`/role/permissions/locationAccess: their home store keeps working
+ * exactly as it did, and a UserStoreMembership row is what adds this store
+ * on top, same mechanism super-admin's saveUserStoreAccess uses.
+ */
+export async function grantStoreAccessToExistingUser(
+  userId: string,
+  storeId: string,
+  data: Pick<CreateUserInput, "role" | "permissions" | "isActive">
+) {
+  const existing = await prisma.user.findUnique({ where: { id: userId } });
+
+  if (!existing) {
+    throw new Error("User not found.");
+  }
+
+  if (existing.role === UserRole.SUPER_ADMIN) {
+    throw new Error(
+      "This email belongs to a Super Admin account and can't be added as a store user."
+    );
+  }
+
+  await upsertMembership(userId, storeId, data);
+
+  return existing;
+}
+
 export async function createUser(
   data: CreateUserInput,
   storeId: string
@@ -241,9 +289,7 @@ export async function createUser(
       // still active elsewhere is never taken, so one store cannot quietly
       // pull another store's staff — or their store context — across.
       if (existing.isActive) {
-        throw new Error(
-          "This email or phone is active in another store. Ask that store to deactivate the user first, then add them here."
-        );
+        throw new CrossStoreConflictError(existing.id, existing.name);
       }
     }
 

@@ -10,6 +10,7 @@ import {
 import { APP_NAME } from "@/lib/constants/app";
 import { ROLE_LABELS } from "@/lib/roles";
 import { LEGACY_PLACEHOLDER_BUSINESS_NAME } from "@/lib/constants/app";
+import { logger } from "@/lib/logger";
 
 /**
  * The display name to use for a store in outgoing email. Prefers the
@@ -73,7 +74,7 @@ export async function sendInviteEmailSafely(params: {
     const result = await sendMail({ to: params.email, subject, html });
     return result.sent;
   } catch (error) {
-    console.error("sendInviteEmailSafely error:", error);
+    logger.error("sendInviteEmailSafely error", error);
     return false;
   }
 }
@@ -111,7 +112,7 @@ export async function sendDisabledAccountEmailSafely(params: {
     const result = await sendMail({ to: params.email, subject, html });
     return result.sent;
   } catch (error) {
-    console.error("sendDisabledAccountEmailSafely error:", error);
+    logger.error("sendDisabledAccountEmailSafely error", error);
     return false;
   }
 }
@@ -199,7 +200,7 @@ export async function sendStoreArchivedNoticeSafely(params: {
 
     return results.some((result) => result.sent);
   } catch (error) {
-    console.error("sendStoreArchivedNoticeSafely error:", error);
+    logger.error("sendStoreArchivedNoticeSafely error", error);
     return false;
   }
 }

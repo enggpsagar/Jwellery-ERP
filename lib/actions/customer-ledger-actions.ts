@@ -13,6 +13,7 @@ import { resolveStoreName } from "@/lib/invite-email"
 import { formatShortDate } from "@/lib/utils"
 import { MONEY_UNIT } from "@/lib/business-units"
 import { getActiveBusinessUnits } from "@/lib/business-units.server"
+import { logger } from "@/lib/logger";
 
 export type CustomerLedgerFormState = {
   success: boolean
@@ -220,11 +221,11 @@ export async function emailLedgerStatementAction(
     })
 
     if (!customer) {
-      return { success: false, message: "Customer not found" }
+      return { success: false, message: "Party not found" }
     }
 
     if (!customer.email) {
-      return { success: false, message: "This customer has no email on file" }
+      return { success: false, message: "This party has no email on file" }
     }
 
     const [entries, summary, storeName] = await Promise.all([
@@ -234,7 +235,7 @@ export async function emailLedgerStatementAction(
     ])
 
     if (!summary) {
-      return { success: false, message: "Customer not found" }
+      return { success: false, message: "Party not found" }
     }
 
     const { subject, html } = ledgerStatementEmail({
@@ -258,7 +259,7 @@ export async function emailLedgerStatementAction(
 
     return { success: result.sent, message: result.message }
   } catch (error) {
-    console.error("emailLedgerStatementAction error:", error)
+    logger.error("emailLedgerStatementAction error", error)
     return { success: false, message: "Failed to email statement" }
   }
 }

@@ -985,7 +985,7 @@ export async function getItemLedgerReport(): Promise<ItemLedgerReport> {
       }
       events.push({
         date: item.kachaInvoice.invoiceDate,
-        label: `Sold (Qty ${item.quantity}) to ${item.kachaInvoice.customer.name} — Kacha Slip ${item.kachaInvoice.slipNumber}`,
+        label: `Sold (Qty ${item.quantity}) to ${item.kachaInvoice.customer.name} — Estimate ${item.kachaInvoice.slipNumber}`,
       });
     }
 

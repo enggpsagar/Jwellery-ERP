@@ -243,7 +243,7 @@ export default async function QuickSalePage({
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Quick sale</h1>
         <p className="text-sm text-muted-foreground">
-          Pick the customer, enter the price, confirm — the invoice and stock
+          Pick the party, enter the price, confirm — the invoice and stock
           entry are handled for you.
         </p>
       </div>

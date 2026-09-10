@@ -8,10 +8,12 @@ import { StorePlanAction, UserRole, UserStatus, InventoryStockStatus } from "@pr
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth/auth";
 import { ACTIVE_STORE_COOKIE } from "@/lib/store-context";
-import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export";
+import { listCollaborationGrants } from "@/lib/store-membership";
+import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import { classifyMetalName } from "@/lib/business-units";
 import { buildUniqueStoreCode } from "@/lib/store-code";
 import { sendInviteEmailSafely } from "@/lib/invite-email";
+import { logger } from "@/lib/logger";
 
 export type StoreFormState = {
   success: boolean;
@@ -46,7 +48,7 @@ type ExportStoresParams = {
   sortBy?: string;
   sortOrder?: SortOrder;
   status?: string;
-  format?: "csv" | "xlsx";
+  format?: "csv" | "xlsx" | "pdf";
 };
 
 const STORE_INCLUDE = {
@@ -159,7 +161,7 @@ export async function exportStoresToExcel(params: ExportStoresParams = {}): Prom
       Email: store.email || "",
       Status: store.isActive ? "Active" : "Inactive",
       Users: store._count.users,
-      Customers: store._count.customers,
+      Parties: store._count.customers,
       Invoices: store._count.invoices,
       "Created At": store.createdAt.toLocaleString("en-IN"),
     }));
@@ -167,7 +169,9 @@ export async function exportStoresToExcel(params: ExportStoresParams = {}): Prom
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "stores")
-        : buildExcelExport(rows, "Stores", "stores");
+        : params.format === "pdf"
+          ? buildPdfExportBase64(rows, "Stores", "stores")
+          : buildExcelExport(rows, "Stores", "stores");
 
     return {
       success: true,
@@ -176,7 +180,7 @@ export async function exportStoresToExcel(params: ExportStoresParams = {}): Prom
       fileBase64,
     };
   } catch (error) {
-    console.error("exportStoresToExcel error:", error);
+    logger.error("exportStoresToExcel error", error);
     return { success: false, message: "Failed to export stores." };
   }
 }
@@ -341,7 +345,7 @@ export async function createStoreWithAdmin(
         message: "A store with that code, or a user with that email/phone, already exists",
       };
     }
-    console.error("createStoreWithAdmin error:", error);
+    logger.error("createStoreWithAdmin error", error);
     return { success: false, message: "Failed to create store" };
   }
 }
@@ -374,7 +378,7 @@ export async function archiveStore(storeId: string): Promise<StoreFormState> {
 
     return { success: true, message: `Store "${store.name}" archived` };
   } catch (error) {
-    console.error("archiveStore error:", error);
+    logger.error("archiveStore error", error);
     return { success: false, message: "Failed to archive store" };
   }
 }
@@ -431,7 +435,7 @@ export async function restoreStore(storeId: string): Promise<StoreFormState> {
 
     return { success: true, message: `Store "${store.name}" restored` };
   } catch (error) {
-    console.error("restoreStore error:", error);
+    logger.error("restoreStore error", error);
     return { success: false, message: "Failed to restore store" };
   }
 }
@@ -545,6 +549,19 @@ export async function forceDeleteStore(storeId: string): Promise<{ success: bool
       prisma.user.updateMany({ where: { invitedById: { in: userIds } }, data: { invitedById: null } }),
       prisma.user.updateMany({ where: { id: { in: userIds } }, data: { karigarId: null } }),
 
+      // --- DraftOrder first, before anything it references gets deleted ---
+      // DraftOrder.storeId has no onDelete: Cascade (added to the schema
+      // after this function was written, and missed here — this whole
+      // manual list needs updating whenever a new storeId-bearing model is
+      // added, see the doc comment above). Deleting it here, before
+      // karigarReceiptItem/karigarJob below, also clears the two FKs a
+      // DraftOrder(Item) can hold into THOSE tables
+      // (DraftOrderItem.karigarReceiptItemId, DraftOrder.karigarJobId) —
+      // otherwise deleting a still-referenced KarigarReceiptItem/KarigarJob
+      // row would itself throw. DraftOrderItem cascades automatically once
+      // its own DraftOrder is gone.
+      prisma.draftOrder.deleteMany({ where: { storeId } }),
+
       // --- Deepest line-item / leaf children first ---
       prisma.inventoryTransaction.deleteMany({ where: { inventoryStock: { storeId } } }),
       prisma.scanSessionItem.deleteMany({ where: { session: { storeId } } }),
@@ -583,6 +600,7 @@ export async function forceDeleteStore(storeId: string): Promise<{ success: bool
 
       // --- Store-level singletons / settings tables ---
       prisma.metalRate.deleteMany({ where: { storeId } }),
+      prisma.metalSellingRate.deleteMany({ where: { storeId } }),
       prisma.purityFineness.deleteMany({ where: { storeId } }),
       prisma.caratConversionRate.deleteMany({ where: { storeId } }),
       prisma.businessSettings.deleteMany({ where: { storeId } }),
@@ -620,7 +638,7 @@ export async function forceDeleteStore(storeId: string): Promise<{ success: bool
 
     return { success: true, message: `Store "${store.name}" and all its data were permanently deleted` };
   } catch (error) {
-    console.error("forceDeleteStore error:", error);
+    logger.error("forceDeleteStore error", error);
     return { success: false, message: "Failed to force-delete store" };
   }
 }
@@ -702,7 +720,7 @@ export async function assignPlanToStore(storeId: string, planId: string): Promis
 
     return { success: true, message: `"${plan.name}" plan assigned to "${store.name}"` };
   } catch (error) {
-    console.error("assignPlanToStore error:", error);
+    logger.error("assignPlanToStore error", error);
     return { success: false, message: "Failed to assign plan" };
   }
 }
@@ -846,7 +864,7 @@ export async function updateStore(
     if (error.code === "P2002") {
       return { success: false, message: "A store with that code already exists" };
     }
-    console.error("updateStore error:", error);
+    logger.error("updateStore error", error);
     return { success: false, message: "Failed to update store" };
   }
 }
@@ -856,9 +874,19 @@ export async function setActiveStoreAction(storeId: string) {
   // shops picks between them here too. Membership is what authorises it, so
   // the check is "may this user act on this store", not "is this user a
   // Super Admin" — otherwise the cookie could be pointed at any store.
+  //
+  // Store Owner Authorization: a Super Admin is checked against their
+  // redeemed Collaboration Code grants instead of UserStoreMembership —
+  // same "may this user act on this store" question, different table. See
+  // Store.collaborationCode's own doc comment for the full mechanism.
   const user = await requireAuth();
 
-  if (user.role !== UserRole.SUPER_ADMIN) {
+  if (user.role === UserRole.SUPER_ADMIN) {
+    const granted = user.id ? await listCollaborationGrants(user.id) : [];
+    if (!granted.some((entry) => entry.storeId === storeId)) {
+      throw new Error("You do not have access to that store.");
+    }
+  } else {
     const membership = await prisma.userStoreMembership.findFirst({
       where: {
         userId: user.id,

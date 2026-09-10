@@ -192,13 +192,18 @@ export function CustomerVendorLinkCard({
           ) : (
             <div className="flex flex-wrap items-center gap-3">
               <p className="min-w-64 flex-1 text-sm text-muted-foreground">
-                Also buy stock back from this customer? Connect them to a vendor record.
+                Also buy stock back from this party? Connect them to a vendor record.
               </p>
               <Button size="sm" className="gap-2" onClick={handleRegisterAsVendor} disabled={loading}>
                 <Link2 className="h-4 w-4" />
                 {loading ? "Registering..." : "Register as Vendor"}
               </Button>
-              <Button variant="outline" size="sm" onClick={openPicker} disabled={loading}>
+              <Button
+                size="sm"
+                onClick={openPicker}
+                disabled={loading}
+                className="bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
+              >
                 Link to Existing Vendor
               </Button>
             </div>
@@ -270,7 +275,7 @@ export function CustomerVendorLinkCard({
           <DialogHeader>
             <DialogTitle>Remove vendor link?</DialogTitle>
             <DialogDescription>
-              This only disconnects the two records — neither the customer
+              This only disconnects the two records — neither the party
               nor the vendor themselves are changed or deleted.
             </DialogDescription>
           </DialogHeader>

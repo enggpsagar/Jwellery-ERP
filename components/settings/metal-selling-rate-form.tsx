@@ -58,7 +58,7 @@ export function MetalSellingRateForm({ rows, canEdit }: MetalSellingRateFormProp
             <CardTitle>Metal Selling Rates</CardTitle>
             <p className="text-sm text-muted-foreground">
               The selling price per gram for each Gold/Silver/Platinum purity —
-              used to prefill a line's Rate on Invoice, Kacha Slip, and
+              used to prefill a line's Rate on Invoice, Estimate, and
               Quotation. Leave a purity blank to fall back to that metal's
               flat Selling Price (Settings &gt; Metals, Stones &amp; Categories).
             </p>

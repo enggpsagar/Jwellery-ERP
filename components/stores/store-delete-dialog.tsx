@@ -29,12 +29,12 @@ type StoreDeleteDialogProps = {
 }
 
 const COUNT_LABELS: { key: keyof Omit<StoreRecordCounts, "total">; label: string }[] = [
-  { key: "customers", label: "customers" },
+  { key: "customers", label: "parties" },
   { key: "vendors", label: "vendors" },
   { key: "karigars", label: "artisans" },
   { key: "products", label: "products" },
   { key: "invoices", label: "invoices" },
-  { key: "kachaInvoices", label: "kacha slips" },
+  { key: "kachaInvoices", label: "estimates" },
   { key: "purchases", label: "purchases" },
   { key: "quotations", label: "quotations" },
   { key: "users", label: "users" },
@@ -110,7 +110,7 @@ export function StoreDeleteDialog({ storeId, storeName }: StoreDeleteDialogProps
       <button
         type="button"
         onClick={handleOpen}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700"
         aria-label={`Delete ${storeName}`}
         title="Delete store"
       >
@@ -153,7 +153,7 @@ export function StoreDeleteDialog({ storeId, storeName }: StoreDeleteDialogProps
                 <p className="font-semibold">Force Delete — permanent, no undo</p>
                 <p className="mt-1">
                   This will permanently delete <strong>every record</strong> associated
-                  with this store — customers, vendors, invoices, purchases, ledger
+                  with this store — parties, vendors, invoices, purchases, ledger
                   entries, users, and everything else listed above. This cannot be
                   reversed.
                 </p>
@@ -175,7 +175,7 @@ export function StoreDeleteDialog({ storeId, storeName }: StoreDeleteDialogProps
           ) : (
             <DialogDescription>
               <span className="font-medium text-foreground">{storeName}</span> has no
-              customers, vendors, artisans, products, invoices, purchases, quotations,
+              parties, vendors, artisans, products, invoices, purchases, quotations,
               or other users on file. Deleting it removes the store itself — this
               cannot be undone.
             </DialogDescription>
@@ -194,6 +194,7 @@ export function StoreDeleteDialog({ storeId, storeName }: StoreDeleteDialogProps
             <Button
               type="button"
               variant="destructive"
+              className="bg-red-600 text-white hover:bg-red-700"
               onClick={handleDelete}
               disabled={!canDelete || deleting}
             >

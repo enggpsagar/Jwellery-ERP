@@ -13,19 +13,19 @@ export const GST_SCHEME_OPTIONS: { value: GstScheme; label: string; description:
     value: "REGULAR_B2C",
     label: "Retailer (B2C)",
     description:
-      "Selling mostly to end consumers. Full GST charged and shown on every invoice. New customers/vendors default to Not GST Registered — override this per record for the odd registered-business buyer.",
+      "Selling mostly to end consumers. Full GST charged and shown on every invoice. New parties/vendors default to Not GST Registered — override this per record for the odd registered-business buyer.",
   },
   {
     value: "REGULAR_B2B",
     label: "Wholesaler & Manufacturer (B2B)",
     description:
-      "Selling mostly to other GST-registered businesses. Full GST charged and shown, same as B2C. New customers/vendors default to Regular (GSTIN required) — override this per record for the odd walk-in/individual buyer.",
+      "Selling mostly to other GST-registered businesses. Full GST charged and shown, same as B2C. New parties/vendors default to Regular (GSTIN required) — override this per record for the odd walk-in/individual buyer.",
   },
   {
     value: "COMPOSITION",
     label: "Small Local Jeweler (Composition Scheme)",
     description:
-      "Simplified scheme for small businesses under the turnover threshold. GST can never be shown or collected as a line item on any document - documents print as a Bill of Supply with the mandatory disclaimer instead of a Tax Invoice, and purchases are never eligible for input tax credit. This is the one setting here that's genuinely store-wide, regardless of any individual customer/vendor's own GST registration.",
+      "Simplified scheme for small businesses under the turnover threshold. GST can never be shown or collected as a line item on any document - documents print as a Bill of Supply with the mandatory disclaimer instead of a Tax Invoice, and purchases are never eligible for input tax credit. This is the one setting here that's genuinely store-wide, regardless of any individual party/vendor's own GST registration.",
   },
 ]
 

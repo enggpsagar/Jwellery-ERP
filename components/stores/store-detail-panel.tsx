@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Gem, Pencil } from "lucide-react"
 
@@ -15,6 +15,9 @@ import { StoreDetailContent } from "@/components/stores/store-detail-content"
 import { StoreStatusToggle } from "@/components/stores/store-status-toggle"
 import { ChangePlanDialog } from "@/components/stores/change-plan-dialog"
 import { StoreDeleteDialog } from "@/components/stores/store-delete-dialog"
+import { RedeemCollaborationCodeDialog } from "@/components/stores/redeem-collaboration-code-dialog"
+import { RequestStoreAccessButton } from "@/components/stores/request-store-access-button"
+import { ExportStoreDataButton } from "@/components/stores/export-store-data-button"
 import type { PlanRow } from "@/lib/actions/plan-actions"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -61,6 +64,16 @@ export function StoreDetailPanel({ storeId, plans, currentPlanId }: StoreDetailP
     }
   }, [storeId])
 
+  // Re-fetches this store's overview in place — used after a sibling
+  // mutation (the Active/Inactive toggle) changes something
+  // getStorePlanOverview reads. router.refresh() alone can't reach this
+  // panel's isActive, since it's client-fetched state, not a Server
+  // Component prop.
+  const refetchOverview = useCallback(() => {
+    if (!storeId) return
+    getStorePlanOverview(storeId).then(setOverview)
+  }, [storeId])
+
   if (!storeId) {
     return (
       <div className="flex h-full min-h-[24rem] flex-col items-center justify-center gap-2 rounded-xl border bg-card p-6 text-center text-muted-foreground">
@@ -89,20 +102,35 @@ export function StoreDetailPanel({ storeId, plans, currentPlanId }: StoreDetailP
             <PlanStatusPill status={overview.status} />
           </div>
           <p className="font-mono text-sm text-muted-foreground">{overview.code}</p>
+          {overview.email && (
+            <p className="text-sm text-muted-foreground">{overview.email}</p>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
-          <StoreStatusToggle storeId={overview.storeId} isActive={overview.isActive} />
+          <StoreStatusToggle
+            storeId={overview.storeId}
+            isActive={overview.isActive}
+            onSuccess={refetchOverview}
+          />
           <ChangePlanDialog
             storeId={overview.storeId}
             storeName={overview.name}
             currentPlanId={currentPlanId}
             plans={plans}
           />
-          <Button asChild variant="outline" size="sm" className="gap-2">
+          <RedeemCollaborationCodeDialog storeId={overview.storeId} storeName={overview.name} />
+          <RequestStoreAccessButton storeId={overview.storeId} storeName={overview.name} />
+          <ExportStoreDataButton storeId={overview.storeId} />
+          <Button
+            asChild
+            variant="outline"
+            size="icon"
+            aria-label="Edit store"
+            title="Edit store"
+          >
             <Link href={`/stores/${overview.storeId}/edit`}>
               <Pencil className="size-4" />
-              Edit store
             </Link>
           </Button>
           <StoreDeleteDialog storeId={overview.storeId} storeName={overview.name} />

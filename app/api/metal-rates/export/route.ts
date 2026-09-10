@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { formatShortDate } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
         );
     }
   } catch (error) {
-    console.error(error);
+    logger.error("GET /api/metal-rates/export error", error);
 
     return NextResponse.json(
       {

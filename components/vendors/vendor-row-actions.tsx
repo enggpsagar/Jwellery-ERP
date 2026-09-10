@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Archive, Pencil, Trash2 } from "lucide-react"
+import { Pencil, ToggleRight, Trash2 } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 
 import type { Vendor } from "@/lib/actions/vendor-actions"
@@ -87,11 +87,18 @@ export function VendorRowActions({
   return (
     <>
       <div className="flex items-center justify-end gap-2">
+        <Link
+          href={`/payments/out?new=1&vendorId=${vendor.id}`}
+          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-700"
+        >
+          Pay Now
+        </Link>
+
         {/* This will now show only the pencil icon trigger */}
         {/* A page, not a dialog — same reasoning as customers. */}
         <Link
           href={`/vendors/${vendor.id}/edit?returnTo=${encodeURIComponent("/vendors")}`}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-indigo-200 text-indigo-600 transition hover:bg-indigo-50"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700"
           aria-label={`Edit ${vendor.name}`}
           title="Edit vendor"
         >
@@ -105,13 +112,13 @@ export function VendorRowActions({
           aria-label={`Archive ${vendor.name}`}
           title="Archive vendor"
         >
-          <Archive className="h-4 w-4" />
+          <ToggleRight className="h-5 w-5" />
         </button>
 
         <button
           type="button"
           onClick={() => setConfirmAction("delete")}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700"
           aria-label={`Delete ${vendor.name}`}
           title="Delete vendor"
         >
@@ -207,6 +214,7 @@ export function VendorRowActions({
                 <Button
                   type="button"
                   variant="destructive"
+                  className="bg-red-600 text-white hover:bg-red-700"
                   onClick={handleDelete}
                   disabled={loading}
                 >

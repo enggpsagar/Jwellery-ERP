@@ -3,6 +3,7 @@ import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/auth";
+import { logger } from "@/lib/logger";
 
 /**
  * Image upload for the platform-wide Contact Us content. Same shape as
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
 
     return Response.json({ url: blob.url });
   } catch (error) {
-    console.error("platform contact image upload error:", error);
+    logger.error("platform contact image upload error", error);
     const message = error instanceof Error ? error.message : String(error);
     return Response.json(
       { error: `Upload failed: ${message}` },

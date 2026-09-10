@@ -8,7 +8,7 @@ import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, locationWhere, type LocationScope } from "@/lib/location-scope";
 import { UserRole, UserStatus, type PartyGstType } from "@prisma/client";
 import * as XLSX from "xlsx";
-import { buildCsvExportBase64 } from "@/lib/excel-export";
+import { buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
@@ -24,6 +24,7 @@ import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions";
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions";
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions";
+import { logger } from "@/lib/logger";
 
 export type Karigar = {
   id: string;
@@ -104,7 +105,7 @@ export type ExportKarigarsParams = {
   sortBy?: KarigarSortBy;
   sortOrder?: SortOrder;
   type?: string;
-  format?: "csv" | "xlsx";
+  format?: "csv" | "xlsx" | "pdf";
 };
 
 export type ExportResult = {
@@ -577,7 +578,7 @@ export async function createKarigar(
         message: "Artisan code, mobile, or email already exists",
       };
     }
-    console.error("createKarigar error:", error);
+    logger.error("createKarigar error", error);
     return { success: false, message: "Failed to create artisan" };
   }
 }
@@ -730,7 +731,7 @@ export async function updateKarigar(
         message: "Artisan code, mobile, or email already exists",
       };
     }
-    console.error("updateKarigar error:", error);
+    logger.error("updateKarigar error", error);
     return { success: false, message: "Failed to update artisan" };
   }
 }
@@ -763,7 +764,7 @@ export async function disableKarigar(id: string): Promise<KarigarFormState> {
 
     return { success: true, message: "Artisan disabled" };
   } catch (error) {
-    console.error("disableKarigar error:", error);
+    logger.error("disableKarigar error", error);
     return { success: false, message: "Failed to disable artisan" };
   }
 }
@@ -787,7 +788,7 @@ export async function enableKarigar(id: string): Promise<KarigarFormState> {
 
     return { success: true, message: "Artisan re-enabled" };
   } catch (error) {
-    console.error("enableKarigar error:", error);
+    logger.error("enableKarigar error", error);
     return { success: false, message: "Failed to re-enable artisan" };
   }
 }
@@ -848,7 +849,7 @@ export async function deleteKarigar(id: string): Promise<KarigarFormState> {
 
     return { success: true, message };
   } catch (error) {
-    console.error("deleteKarigar error:", error);
+    logger.error("deleteKarigar error", error);
     return { success: false, message: "Failed to delete artisan" };
   }
 }
@@ -956,6 +957,16 @@ export async function exportKarigarsToExcel(
       };
     }
 
+    if (params.format === "pdf") {
+      const { fileName, fileBase64 } = buildPdfExportBase64(rows, "Artisans", "artisans");
+      return {
+        success: true,
+        message: `Exported ${karigars.length} artisan(s) successfully.`,
+        fileBase64,
+        fileName,
+      };
+    }
+
     const worksheet = XLSX.utils.json_to_sheet(rows);
 
     worksheet["!cols"] = [
@@ -992,7 +1003,7 @@ export async function exportKarigarsToExcel(
       fileName,
     };
   } catch (error) {
-    console.error("exportKarigarsToExcel error:", error);
+    logger.error("exportKarigarsToExcel error", error);
     return { success: false, message: "Failed to export artisans." };
   }
 }

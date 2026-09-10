@@ -92,7 +92,7 @@ export function CancelInvoiceDialog({
       {!hideTrigger && (
         <DialogTrigger asChild>
           {isReturnExchange ? (
-            <Button variant="outline" className="gap-2">
+            <Button className="gap-2 bg-amber-600 text-white shadow-sm hover:bg-amber-700">
               <RotateCcw className="h-4 w-4" />
               Return &amp; Exchange
             </Button>
@@ -117,7 +117,7 @@ export function CancelInvoiceDialog({
               : ""}
             . This can't be undone.
             {isReturnExchange
-              ? " This invoice will be marked cancelled, and you'll go straight to creating its replacement — same customer, ready to fill in with the exchanged item(s)."
+              ? " This invoice will be marked cancelled, and you'll go straight to creating its replacement — same party, ready to fill in with the exchanged item(s)."
               : " To correct the invoice afterward, create a replacement referencing it."}
           </DialogDescription>
         </DialogHeader>

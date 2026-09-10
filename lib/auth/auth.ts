@@ -9,6 +9,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import {
   countMemberships,
+  listCollaborationGrants,
   listMemberships,
   resolveAccess,
   resolveActiveStoreId,
@@ -112,9 +113,18 @@ export async function requirePermissionInStore(
 ) {
   const user = await requireAuth();
 
-  // Super Admin reaches every store and is a member of none, so membership
-  // cannot be the test for them.
-  if (user.role === UserRole.SUPER_ADMIN) return user;
+  // Store Owner Authorization: a Super Admin needs a redeemed Collaboration
+  // Code for THIS store too — no more unconditional reach. Checked against
+  // the same grant list listCollaborationGrants backs, not a raw table
+  // query, so a regenerated code retires this the same way it retires the
+  // store switcher's own access.
+  if (user.role === UserRole.SUPER_ADMIN) {
+    const granted = user.id ? await listCollaborationGrants(user.id) : [];
+    if (!granted.some((entry) => entry.storeId === storeId)) {
+      throw new Error("Forbidden");
+    }
+    return user;
+  }
 
   const memberships = user.id ? await listMemberships(user.id) : [];
   const membership = memberships.find((entry) => entry.storeId === storeId);

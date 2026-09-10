@@ -9,6 +9,7 @@ import { getLocationScope, locationWhere } from "@/lib/location-scope"
 import { requirePermission } from "@/lib/auth/auth"
 import { PERMISSIONS } from "@/lib/permissions"
 import { formatShortDate } from "@/lib/utils"
+import { logger } from "@/lib/logger";
 
 export type PaymentFormState = {
   success: boolean
@@ -185,6 +186,82 @@ export async function getPaymentFormKarigars(): Promise<PaymentKarigarOption[]> 
   })
 }
 
+export type PaymentVendorOption = {
+  id: string
+  name: string
+  phone: string | null
+  vendorCode: string | null
+  /** Sum of every unpaid/partial purchase's own balanceAmount — same
+   * convention as vendor-actions.ts' mapVendor pendingAmount, so this
+   * figure never disagrees with what the Vendors list itself shows. Shown
+   * once a vendor is picked here so whoever is paying knows how much is
+   * actually owed, rather than having to look it up separately first. */
+  pendingAmount: number
+}
+
+/** Vendor list for the Payment Out party picker, carrying each vendor's
+ * outstanding balance alongside the usual name/phone. */
+export async function getPaymentFormVendorsWithBalance(): Promise<PaymentVendorOption[]> {
+  const storeId = await requireStoreScope()
+
+  const vendors = await prisma.vendor.findMany({
+    where: { storeId, isActive: true, isArchived: false },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      vendorCode: true,
+      purchases: { select: { balanceAmount: true } },
+    },
+  })
+
+  return vendors.map((vendor) => ({
+    id: vendor.id,
+    name: vendor.name,
+    phone: vendor.phone,
+    vendorCode: vendor.vendorCode,
+    pendingAmount: vendor.purchases.reduce((sum, p) => sum + Number(p.balanceAmount || 0), 0),
+  }))
+}
+
+export type PaymentCustomerOption = {
+  id: string
+  name: string
+  phone: string | null
+  customerCode: string | null
+  /** Sum of every unpaid/partial invoice's own balanceAmount. Same
+   * reasoning as PaymentVendorOption.pendingAmount, mirrored for the
+   * customer side. */
+  pendingAmount: number
+}
+
+/** Customer list for the Payment In party picker, carrying each customer's
+ * outstanding balance alongside the usual name/phone. */
+export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCustomerOption[]> {
+  const storeId = await requireStoreScope()
+
+  const customers = await prisma.customer.findMany({
+    where: { storeId, isActive: true, isArchived: false },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      customerCode: true,
+      invoices: { select: { balanceAmount: true } },
+    },
+  })
+
+  return customers.map((customer) => ({
+    id: customer.id,
+    name: customer.name,
+    phone: customer.phone,
+    customerCode: customer.customerCode,
+    pendingAmount: customer.invoices.reduce((sum, i) => sum + Number(i.balanceAmount || 0), 0),
+  }))
+}
+
 /**
  * Record a standalone "Payment In" against a customer — not tied to any
  * specific invoice/Kacha slip (an on-account receipt). Same CREDIT/
@@ -207,7 +284,7 @@ export async function recordCustomerPayment(
 
     const customerId = String(formData.get("customerId") || "").trim()
     if (!customerId) {
-      return { success: false, message: "Select a customer" }
+      return { success: false, message: "Select a party" }
     }
 
     const paymentsRaw = String(formData.get("paymentsJson") || "[]")
@@ -224,7 +301,7 @@ export async function recordCustomerPayment(
       where: { id: customerId, storeId },
       select: { id: true, name: true },
     })
-    if (!customer) return { success: false, message: "Customer not found" }
+    if (!customer) return { success: false, message: "Party not found" }
 
     await prisma.$transaction(
       payments.map((payment, index) =>
@@ -251,7 +328,7 @@ export async function recordCustomerPayment(
 
     return { success: true, message: "Payment In recorded" }
   } catch (error) {
-    console.error("recordCustomerPayment error:", error)
+    logger.error("recordCustomerPayment error", error)
     return { success: false, message: "Failed to record payment" }
   }
 }
@@ -371,7 +448,7 @@ export async function recordPaymentOut(
 
     return { success: true, message: "Payment Out recorded" }
   } catch (error) {
-    console.error("recordPaymentOut error:", error)
+    logger.error("recordPaymentOut error", error)
     return { success: false, message: "Failed to record payment" }
   }
 }

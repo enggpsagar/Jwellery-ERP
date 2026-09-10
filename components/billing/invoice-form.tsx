@@ -339,6 +339,11 @@ export function InvoiceForm({
     })
   }
   const [discount, setDiscount] = useState(0)
+  // null = auto-calculated (the standard "round to nearest rupee" figure);
+  // a number = the merchant typed their own Round Off directly, same
+  // "typed once, used as-is" convention as Discount/Making Charge — see
+  // computeRoundOff's own doc comment for how this reaches the server.
+  const [roundOffOverride, setRoundOffOverride] = useState<number | null>(null)
   // No longer a user-facing control (each line picks its own GST rate in
   // its own Details region) — this is just what a freshly-added line
   // starts on, resolved once from the store's own default/active GstRate
@@ -873,6 +878,28 @@ export function InvoiceForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items, gstRate, gstScheme, storeState, selectedCustomer?.state],
   )
+  // Aggregated once here instead of shown per-line — a line's own SGST/CGST/
+  // IGST split used to render as three extra read-only boxes in every line
+  // item's Details region, which was a lot of repeated information for what
+  // is, document-wide, always the same inter-state/intra-state split (it's
+  // driven by store state vs customer state, not anything line-specific).
+  const gstBreakdownTotal = useMemo(
+    () =>
+      items.reduce(
+        (acc, item) => {
+          const { sgst, cgst, igst, isInterState } = lineGst(item)
+          return {
+            sgst: acc.sgst + sgst,
+            cgst: acc.cgst + cgst,
+            igst: acc.igst + igst,
+            isInterState: acc.isInterState || isInterState,
+          }
+        },
+        { sgst: 0, cgst: 0, igst: 0, isInterState: false },
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, gstRate, gstScheme, storeState, selectedCustomer?.state],
+  )
   const rawTotal =
     subtotal +
     makingChargesTotal +
@@ -884,7 +911,7 @@ export function InvoiceForm({
   // the nearest rupee, with the small signed adjustment surfaced as its own
   // line — same computeRoundOff the server uses, so what's previewed here is
   // exactly what createInvoice/updateInvoice will persist.
-  const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal)
+  const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal, roundOffOverride)
   const balanceAmount = Math.max(0, totalAmount - paidAmount)
 
   const itemsJson = JSON.stringify(
@@ -992,6 +1019,7 @@ export function InvoiceForm({
     >
       <input type="hidden" name="itemsJson" value={itemsJson} />
       <input type="hidden" name="discount" value={discount} />
+      <input type="hidden" name="roundOffAmount" value={roundOffAmount} />
       <input type="hidden" name="taxAmount" value={taxAmount} />
       <input type="hidden" name="gstRateId" value={gstRateId} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
@@ -1007,7 +1035,7 @@ export function InvoiceForm({
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <Label>Customer {!editInvoiceId && <RequiredMark />}</Label>
+          <Label>Party {!editInvoiceId && <RequiredMark />}</Label>
           {editInvoiceId ? (
             // The customer isn't editable here — this changes line items
             // and amounts, not who's billed. Moving an invoice's ledger
@@ -1447,6 +1475,37 @@ export function InvoiceForm({
                       onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
                     />
 
+                    {/* Per-line GST Rate — this line's own selection, no
+                        document-level picker anymore. Options: active
+                        rows, plus this line's own already-selected rate
+                        even if it's since been deactivated (edit/replace).
+                        Sits here, in the same row as Purity/Gross Weight/
+                        Making Charge, rather than down with HSN Code/HM
+                        Charge/Scheme-Discount — it's the one field in that
+                        second row a merchant actually changes per line as
+                        often as these, not a rarely-touched detail. */}
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">GST Rate</Label>
+                      <Select
+                        value={item.gstRateId || undefined}
+                        disabled={gstScheme === "COMPOSITION"}
+                        onValueChange={(value) => updateItem(item.key, { gstRateId: value })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select GST rate" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {gstRates
+                            .filter((r) => r.isActive || r.id === item.gstRateId)
+                            .map((rate) => (
+                              <SelectItem key={rate.id} value={rate.id}>
+                                {rate.name} ({rate.ratePercent}%)
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     {/* Includes-a-Stone toggle sits here, in the same row as
                         Purity/Gross Weight/Making Charge, instead of its own
                         separate full-width row below — it's a single small
@@ -1455,8 +1514,17 @@ export function InvoiceForm({
                         checked) still renders as its own row below, since
                         it needs the room. No toggle applies to a carat-
                         weighed line at all (see below), so this cell is
-                        simply empty there. */}
-                    {!isCaratLine(item) && (
+                        simply empty there.
+
+                        Once linked to a real Stock Item that's confirmed to
+                        have no stone, the toggle is hidden entirely rather
+                        than shown locked in the off position — a disabled
+                        "Includes a Stone" control on a plain-metal product
+                        reads as an option that might apply, when it never
+                        can for this specific piece. Still shown (locked on)
+                        when the linked stock does have one, and stays a
+                        normal editable toggle for a manually-entered line. */}
+                    {!isCaratLine(item) && (!isLinked || item.hasStoneComponent) && (
                       <div className="flex items-end pb-2">
                         <IncludesStoneToggle
                           checked={item.hasStoneComponent}
@@ -1538,7 +1606,7 @@ export function InvoiceForm({
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">HSN Code</Label>
                       <Input
@@ -1615,65 +1683,6 @@ export function InvoiceForm({
                         }
                       />
                     </div>
-
-                    {/* Per-line GST Rate — this line's own selection, no
-                        document-level picker anymore. Options: active
-                        rows, plus this line's own already-selected rate
-                        even if it's since been deactivated (edit/replace). */}
-                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">GST Rate</Label>
-                      <Select
-                        value={item.gstRateId || undefined}
-                        disabled={gstScheme === "COMPOSITION"}
-                        onValueChange={(value) => updateItem(item.key, { gstRateId: value })}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select GST rate" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {gstRates
-                            .filter((r) => r.isActive || r.id === item.gstRateId)
-                            .map((rate) => (
-                              <SelectItem key={rate.id} value={rate.id}>
-                                {rate.name} ({rate.ratePercent}%)
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* SGST+CGST for an intra-state sale, a single IGST column
-                        for inter-state instead — never both, see computeGst()
-                        in lib/gst.ts. Composition always lands here at ₹0.00,
-                        since computeGst zeroes every component for it. This is
-                        the full breakdown — the compact row above shows only
-                        the combined total, as a quick summary. Percent shown
-                        is THIS line's own resolved rate, not the document
-                        default. */}
-                    {lineGst(item).isInterState ? (
-                      <div className="space-y-1">
-                        <Label className="text-xs">IGST ({lineGstRatePercent(item).toFixed(2)}%)</Label>
-                        <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                          ₹{lineGst(item).igst.toFixed(2)}
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="space-y-1">
-                          <Label className="text-xs">SGST ({(lineGstRatePercent(item) / 2).toFixed(2)}%)</Label>
-                          <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                            ₹{lineGst(item).sgst.toFixed(2)}
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <Label className="text-xs">CGST ({(lineGstRatePercent(item) / 2).toFixed(2)}%)</Label>
-                          <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                            ₹{lineGst(item).cgst.toFixed(2)}
-                          </div>
-                        </div>
-                      </>
-                    )}
                   </div>
                 </div>
               )}
@@ -1746,18 +1755,45 @@ export function InvoiceForm({
           <span>Scheme / Discount (line items)</span>
           <span>-₹{schemeDiscountTotal.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between">
-          <span>GST (SGST+CGST or IGST)</span>
-          <span>₹{taxAmount.toFixed(2)}</span>
-        </div>
-        {roundOffAmount !== 0 && (
+        {gstBreakdownTotal.isInterState ? (
           <div className="flex justify-between">
-            <span>Round Off</span>
-            <span>
-              {roundOffAmount > 0 ? "+" : "-"}₹{Math.abs(roundOffAmount).toFixed(2)}
-            </span>
+            <span>Total IGST</span>
+            <span>₹{gstBreakdownTotal.igst.toFixed(2)}</span>
           </div>
+        ) : (
+          <>
+            <div className="flex justify-between">
+              <span>Total SGST</span>
+              <span>₹{gstBreakdownTotal.sgst.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Total CGST</span>
+              <span>₹{gstBreakdownTotal.cgst.toFixed(2)}</span>
+            </div>
+          </>
         )}
+        <div className="flex items-center justify-between gap-3">
+          <span>Round Off</span>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              step="0.01"
+              value={roundOffAmount}
+              onChange={(e) => setRoundOffOverride(Number(e.target.value) || 0)}
+              className="h-7 w-24 text-right"
+            />
+            {roundOffOverride !== null && (
+              <button
+                type="button"
+                onClick={() => setRoundOffOverride(null)}
+                className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+                title="Go back to the automatically-calculated Round Off"
+              >
+                Auto
+              </button>
+            )}
+          </div>
+        </div>
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
           <span>Total</span>
           <span>₹{totalAmount.toFixed(2)}</span>
@@ -1772,8 +1808,8 @@ export function InvoiceForm({
         <Button type="submit" disabled={pending || !customerId || hasInvalidStockLink || hasInvalidRate || paidOverTotal}>
           {editInvoiceId
             ? pending
-              ? "Saving..."
-              : "Save Changes"
+              ? "Updating..."
+              : "Update Changes"
             : pending
               ? "Creating..."
               : "Create Invoice"}

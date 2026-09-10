@@ -33,6 +33,8 @@ pnpm dev
 | `GOLD_API_KEY` | Daily gold/silver rate fetch (`/api/cron/metal-rates`) |
 | `CRON_SECRET` | Authorizes the metal-rates cron endpoint |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob storage — payment receipt attachments. Get it from your Vercel project's Storage tab after creating a Blob store. |
+| `BETTER_STACK_SOURCE_TOKEN` / `BETTER_STACK_INGESTING_HOST` | Ships server-side logs (`lib/logger.ts`) to a Better Stack log source for searching/dashboards, via its plain HTTP ingestion API. Both come from that source's setup page in Better Stack — the host is unique per source/region, there's no single fixed value. Optional — omitted, every log call just falls back to `console.*`. |
+| `BETTERSTACK_RUM_TOKEN` | A separate, public client-side token for Better Stack's browser (RUM) monitoring tag (`app/layout.tsx`) — safe to appear in page HTML. Optional — omitted, the tag just isn't rendered. |
 
 ### Database
 
@@ -46,6 +48,8 @@ pnpm db:seed:kacha          # optional: demo kacha slips
 ```
 
 The database is shared between local development and the deployed app (a single Neon instance) — there is no separate dev/staging database, so migrations take effect everywhere immediately.
+
+See [`docs/DATABASE-SCHEMA.md`](docs/DATABASE-SCHEMA.md) for an entity-relationship reference of the full schema, grouped by domain.
 
 ## Roles
 

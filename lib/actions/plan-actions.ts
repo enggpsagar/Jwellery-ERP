@@ -5,6 +5,7 @@ import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/auth";
+import { logger } from "@/lib/logger";
 
 export type PlanRow = {
   id: string;
@@ -89,7 +90,7 @@ export async function createPlan(prevState: PlanFormState, formData: FormData): 
     revalidatePath(PLANS_PATH);
     return { success: true, message: `Plan "${name}" created` };
   } catch (error) {
-    console.error("createPlan error:", error);
+    logger.error("createPlan error", error);
     return { success: false, message: "Failed to create plan" };
   }
 }
@@ -122,7 +123,7 @@ export async function updatePlan(prevState: PlanFormState, formData: FormData): 
     revalidatePath(PLANS_PATH);
     return { success: true, message: `Plan "${name}" updated` };
   } catch (error) {
-    console.error("updatePlan error:", error);
+    logger.error("updatePlan error", error);
     return { success: false, message: "Failed to update plan" };
   }
 }
@@ -152,7 +153,7 @@ export async function setPlanActive(id: string, isActive: boolean): Promise<Plan
       message: `Plan "${plan.name}" ${isActive ? "reactivated" : "deactivated"}`,
     };
   } catch (error) {
-    console.error("setPlanActive error:", error);
+    logger.error("setPlanActive error", error);
     return { success: false, message: "Failed to update plan status" };
   }
 }

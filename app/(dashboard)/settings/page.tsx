@@ -42,7 +42,7 @@ export default async function SettingsPage() {
         backLabel="Back to Dashboard"
       />
 
-      <SettingsTabs active="business" />
+      <SettingsTabs active="business" role={currentUser?.role} />
 
       <SettingsForm
         settings={settings}

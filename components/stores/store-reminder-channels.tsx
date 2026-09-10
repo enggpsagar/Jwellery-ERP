@@ -63,6 +63,7 @@ export function StoreReminderChannels({
           checked={email}
           disabled={pending}
           onCheckedChange={(checked) => save({ email: checked, whatsapp })}
+          className="data-checked:bg-emerald-500 data-unchecked:bg-red-400"
         />
       </div>
 
@@ -79,6 +80,7 @@ export function StoreReminderChannels({
           checked={whatsapp}
           disabled={pending}
           onCheckedChange={(checked) => save({ email, whatsapp: checked })}
+          className="data-checked:bg-emerald-500 data-unchecked:bg-red-400"
         />
       </div>
 

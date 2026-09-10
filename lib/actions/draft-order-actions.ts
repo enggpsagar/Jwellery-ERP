@@ -9,11 +9,12 @@ import { requireStoreScope } from "@/lib/store-context";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
 import { getFinenessMap, toFineWeight } from "@/lib/purity";
-import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export";
+import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import {
   assertKarigarAssignedMetal,
   generateJobNumber,
 } from "@/lib/actions/inventory-stock-actions";
+import { logger } from "@/lib/logger";
 
 /**
  * A phone/counter order captured before the physical piece exists — see
@@ -188,7 +189,7 @@ type ExportDraftOrdersParams = {
   sortBy?: string;
   sortOrder?: SortOrder;
   status?: string;
-  format?: "csv" | "xlsx";
+  format?: "csv" | "xlsx" | "pdf";
 };
 
 export async function exportDraftOrdersToExcel(params: ExportDraftOrdersParams = {}): Promise<{
@@ -227,7 +228,7 @@ export async function exportDraftOrdersToExcel(params: ExportDraftOrdersParams =
       "Sr. No.": index + 1,
       "Order #": order.orderNumber,
       Date: order.orderDate.toISOString().slice(0, 10),
-      Customer: order.customer?.name ?? "",
+      Party: order.customer?.name ?? "",
       Phone: order.customer?.phone ?? "",
       Items: order._count.items,
       Status: order.status,
@@ -237,11 +238,13 @@ export async function exportDraftOrdersToExcel(params: ExportDraftOrdersParams =
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "draft-orders")
-        : buildExcelExport(rows, "Draft Orders", "draft-orders");
+        : params.format === "pdf"
+          ? buildPdfExportBase64(rows, "Draft Orders", "draft-orders")
+          : buildExcelExport(rows, "Draft Orders", "draft-orders");
 
     return { success: true, message: "Draft orders exported successfully", fileName, fileBase64 };
   } catch (error) {
-    console.error("exportDraftOrdersToExcel error:", error);
+    logger.error("exportDraftOrdersToExcel error", error);
     return { success: false, message: "Failed to export draft orders" };
   }
 }
@@ -274,7 +277,7 @@ export async function deleteDraftOrder(orderId: string): Promise<DraftOrderFormS
 
     return { success: true, message: `Draft Order ${order.orderNumber} deleted` };
   } catch (error) {
-    console.error("deleteDraftOrder error:", error);
+    logger.error("deleteDraftOrder error", error);
     return { success: false, message: "Failed to delete order" };
   }
 }
@@ -379,7 +382,7 @@ export async function createDraftOrder(
 
     const customerId = String(formData.get("customerId") || "").trim();
     if (!customerId) {
-      return { success: false, message: "Please select a customer" };
+      return { success: false, message: "Please select a party" };
     }
 
     const customer = await prisma.customer.findFirst({
@@ -387,7 +390,7 @@ export async function createDraftOrder(
       select: { id: true },
     });
     if (!customer) {
-      return { success: false, message: "Please select a valid customer" };
+      return { success: false, message: "Please select a valid party" };
     }
 
     const itemsRaw = String(formData.get("itemsJson") || "[]");
@@ -455,7 +458,7 @@ export async function createDraftOrder(
 
     return { success: true, message: `Draft Order ${orderNumber} created`, orderId: order.id };
   } catch (error) {
-    console.error("createDraftOrder error:", error);
+    logger.error("createDraftOrder error", error);
     return { success: false, message: "Failed to create draft order" };
   }
 }
@@ -483,8 +486,59 @@ export async function cancelDraftOrder(orderId: string): Promise<DraftOrderFormS
 
     return { success: true, message: "Order cancelled" };
   } catch (error) {
-    console.error("cancelDraftOrder error:", error);
+    logger.error("cancelDraftOrder error", error);
     return { success: false, message: "Failed to cancel order" };
+  }
+}
+
+/**
+ * Metadata-only edit — Order Date, Expected Date, Notes. Never the
+ * customer or items: those are what the order's items/artisan-job flow is
+ * actually built around, so changing them needs the real create/send flow,
+ * not a quiet in-place edit (same reasoning as EditInvoiceDialog/
+ * EditPurchaseDialog elsewhere in this app). Only allowed while still
+ * DRAFT — once sent to an artisan or received, the order is a record of
+ * what actually happened.
+ */
+export async function updateDraftOrder(
+  orderId: string,
+  prevState: DraftOrderFormState = initialState,
+  formData: FormData,
+): Promise<DraftOrderFormState> {
+  try {
+    const storeId = await requireStoreScope();
+
+    const order = await prisma.draftOrder.findFirst({
+      where: { id: orderId, storeId },
+      select: { id: true, status: true },
+    });
+    if (!order) return { success: false, message: "Order not found" };
+    if (order.status !== "DRAFT") {
+      return { success: false, message: "Only a draft (not yet sent to an artisan) order can be edited" };
+    }
+
+    const orderDateRaw = String(formData.get("orderDate") || "");
+    if (!orderDateRaw) return { success: false, message: "Order Date is required" };
+
+    const expectedDateRaw = String(formData.get("expectedDate") || "");
+    const notes = String(formData.get("notes") || "").trim() || null;
+
+    await prisma.draftOrder.update({
+      where: { id: orderId },
+      data: {
+        orderDate: new Date(orderDateRaw),
+        expectedDate: expectedDateRaw ? new Date(expectedDateRaw) : null,
+        notes,
+      },
+    });
+
+    revalidatePath("/orders");
+    revalidatePath(`/orders/${orderId}`);
+
+    return { success: true, message: "Order updated" };
+  } catch (error) {
+    logger.error("updateDraftOrder error", error);
+    return { success: false, message: "Failed to update order" };
   }
 }
 
@@ -649,7 +703,7 @@ export async function sendDraftOrderToKarigar(
 
     return { success: true, message: `Sent to artisan — Job ${jobNumber}` };
   } catch (error) {
-    console.error("sendDraftOrderToKarigar error:", error);
+    logger.error("sendDraftOrderToKarigar error", error);
     return { success: false, message: "Failed to send order to artisan" };
   }
 }

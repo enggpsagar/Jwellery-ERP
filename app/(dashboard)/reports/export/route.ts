@@ -16,6 +16,7 @@ import {
 } from "@/lib/actions/report-actions"
 import { buildCsvExport, buildExcelExport } from "@/lib/excel-export"
 import { formatShortDate } from "@/lib/utils"
+import { logger } from "@/lib/logger";
 
 type ReportType =
   | "sales"
@@ -35,7 +36,7 @@ const REPORT_LABELS: Record<ReportType, string> = {
   vendorPurchase: "Vendor Purchase",
   inventory: "Inventory Valuation",
   karigar: "Artisan Outstanding",
-  dues: "Customer Dues",
+  dues: "Party Dues",
   goldFlow: "Gold Flow",
   metalWise: "By Metal",
   itemLedger: "Item Ledger",
@@ -48,7 +49,7 @@ async function buildRows(type: ReportType, range: DateRange) {
       return report.invoices.map((invoice) => ({
         "Invoice #": invoice.invoiceNumber,
         Date: formatShortDate(invoice.invoiceDate),
-        Customer: invoice.customerName,
+        Party: invoice.customerName,
         Status: invoice.status,
         "Total (₹)": invoice.totalAmount,
         "Balance (₹)": invoice.balanceAmount,
@@ -103,7 +104,7 @@ async function buildRows(type: ReportType, range: DateRange) {
     case "dues": {
       const report = await getCustomerDuesReport()
       return report.customers.map((customer) => ({
-        Customer: customer.name,
+        Party: customer.name,
         Phone: customer.phone ?? "",
         Invoices: customer.invoiceCount,
         "Total Due (₹)": customer.totalDue,
@@ -201,7 +202,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Report export failed:", error)
+    logger.error("Report export failed", error)
     return NextResponse.json(
       { success: false, message: "Failed to export report" },
       { status: 500 },

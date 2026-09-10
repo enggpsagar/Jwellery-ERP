@@ -53,21 +53,21 @@ export function CustomersClient({
     <main className="space-y-6 p-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Customers</h1>
+          <h1 className="text-2xl font-semibold">Parties</h1>
           <p className="text-sm text-muted-foreground">
-            Showing {customers.length} of {pagination.totalCount} customers
+            Showing {customers.length} of {pagination.totalCount} parties
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <Link href="/customers/archived">
-            <Button variant="outline">Archived Customers</Button>
+            <Button variant="outline">Archived Parties</Button>
           </Link>
 
           {/* A page, not a dialog — same as Vendors. The form is long enough
               that a modal fights the on-screen keyboard on a phone. */}
           <Link href="/customers/new">
-            <Button>Add Customer</Button>
+            <Button>Add Party</Button>
           </Link>
         </div>
       </div>
@@ -85,8 +85,8 @@ export function CustomersClient({
             bulkActions={
               <BulkDeleteButton
                 selectedIds={selectedCustomerIds}
-                itemLabelSingular="customer"
-                itemLabelPlural="customers"
+                itemLabelSingular="party"
+                itemLabelPlural="parties"
                 getDisplayName={(id) => customers.find((customer) => customer.id === id)?.name ?? id}
                 onDelete={bulkDeleteCustomers}
                 onDone={() => setSelectedCustomerIds([])}

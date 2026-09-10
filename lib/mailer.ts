@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { logger } from "@/lib/logger";
 
 let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
 
@@ -79,7 +80,7 @@ export async function sendMail({
 
     return { sent: true, message: `Email sent to ${to}` };
   } catch (error) {
-    console.error("sendMail error:", error);
+    logger.error("sendMail error", error);
     return { sent: false, message: "Failed to send email. Please try again." };
   }
 }

@@ -88,7 +88,7 @@ export function KachaInvoiceTable({
   if (!kachaInvoices.length) {
     return (
       <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
-        No Kacha slips found yet.
+        No Estimates found yet.
       </div>
     )
   }
@@ -105,13 +105,13 @@ export function KachaInvoiceTable({
                   type="checkbox"
                   checked={allSelected}
                   onChange={(event) => toggleAll(event.target.checked)}
-                  aria-label="Select all kacha slips on this page"
+                  aria-label="Select all estimates on this page"
                   className="h-4 w-4 rounded border-input"
                 />
               </th>
               <SortableTableHead label="Slip #" sortKey="slipNumber" defaultSortBy="invoiceDate" />
               <SortableTableHead label="Date" sortKey="invoiceDate" defaultSortBy="invoiceDate" />
-              <th className="px-4 py-3 text-left font-medium">Customer</th>
+              <th className="px-4 py-3 text-left font-medium">Party</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <SortableTableHead label="Total" sortKey="totalAmount" defaultSortBy="invoiceDate" />
               <th className="px-4 py-3 text-left font-medium">Balance</th>
@@ -148,7 +148,7 @@ export function KachaInvoiceTable({
                             label: "Date",
                             value: formatShortDate(kachaInvoice.invoiceDate),
                           },
-                          { label: "Customer", value: kachaInvoice.customer?.name },
+                          { label: "Party", value: kachaInvoice.customer?.name },
                           { label: "Phone", value: kachaInvoice.customer?.phone },
                           { label: "Status", value: kachaInvoice.status },
                         ],
@@ -184,7 +184,7 @@ export function KachaInvoiceTable({
                       href={`/customers/${kachaInvoice.customer.id}?from=${encodeURIComponent("/billing/kacha")}`}
                       title={kachaInvoice.customer.name}
                       subtitle={kachaInvoice.customer.phone ?? undefined}
-                      footerLabel="View customer"
+                      footerLabel="View party"
                       className="text-primary underline-offset-4 hover:underline"
                       sections={[
                         {
@@ -237,10 +237,10 @@ export function KachaInvoiceTable({
                     <Link
                       href={`/billing/${kachaInvoice.convertedTo.id}`}
                       className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
-                      title={`View Pakka Invoice ${kachaInvoice.convertedTo.invoiceNumber}`}
+                      title={`View Tax Invoice ${kachaInvoice.convertedTo.invoiceNumber}`}
                     >
                       <ArrowRightCircle className="h-3.5 w-3.5" />
-                      Converted to Pakka Invoice ({kachaInvoice.convertedTo.invoiceNumber})
+                      Converted to Tax Invoice ({kachaInvoice.convertedTo.invoiceNumber})
                     </Link>
                   ) : (
                     <span className="text-xs text-muted-foreground">Not converted</span>
@@ -250,7 +250,7 @@ export function KachaInvoiceTable({
                   <Link
                     href={`/billing/kacha/${kachaInvoice.id}`}
                     className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
-                    title="View Kacha slip"
+                    title="View Estimate"
                   >
                     <Eye className="h-4 w-4" />
                   </Link>

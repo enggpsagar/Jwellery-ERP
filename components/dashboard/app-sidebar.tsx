@@ -7,7 +7,6 @@ import { useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   Users,
-  UserCog,
   CircleDollarSign,
   Package,
   ReceiptText,
@@ -80,7 +79,26 @@ const mainNav: NavItem[] = [
     icon: LayoutDashboard,
   },
   {
-    title: "Customers",
+    title: "Billing",
+    href: "/billing",
+    icon: ReceiptText,
+    items: [
+      { title: "Tax Invoices", href: "/billing", quickAddHref: "/billing/new", countKey: "invoices" },
+      { title: "Estimates", href: "/billing/kacha", quickAddHref: "/billing/kacha/new", countKey: "kachaInvoices" },
+      // No quickAddHref — a Credit Note is always issued from an existing
+      // invoice's return flow, there is no standalone "new" page for one.
+      { title: "Credit Notes", href: "/billing/credit-notes", countKey: "creditNotes" },
+    ],
+  },
+  {
+    title: "Purchases",
+    href: "/purchases",
+    icon: PackagePlus,
+    countKey: "purchases",
+    quickAddHref: "/purchases/new",
+  },
+  {
+    title: "Parties",
     href: "/customers",
     icon: Users,
     countKey: "customers",
@@ -94,23 +112,10 @@ const mainNav: NavItem[] = [
     quickAddHref: "/vendors/new",
   },
   {
-    title: "Billing",
-    href: "/billing",
-    icon: ReceiptText,
-    items: [
-      { title: "Pakka Invoices", href: "/billing", quickAddHref: "/billing/new", countKey: "invoices" },
-      { title: "Kacha Slips", href: "/billing/kacha", quickAddHref: "/billing/kacha/new", countKey: "kachaInvoices" },
-      // No quickAddHref — a Credit Note is always issued from an existing
-      // invoice's return flow, there is no standalone "new" page for one.
-      { title: "Credit Notes", href: "/billing/credit-notes", countKey: "creditNotes" },
-    ],
-  },
-  {
-    title: "Purchases",
-    href: "/purchases",
-    icon: PackagePlus,
-    countKey: "purchases",
-    quickAddHref: "/purchases/new",
+    title: "Draft Orders",
+    href: "/orders",
+    icon: Phone,
+    quickAddHref: "/orders/new",
   },
   {
     title: "Ledger",
@@ -150,22 +155,9 @@ const mainNav: NavItem[] = [
     quickAddHref: "/quotations/new",
   },
   {
-    title: "Draft Orders",
-    href: "/orders",
-    icon: Phone,
-    quickAddHref: "/orders/new",
-  },
-  {
     title: "Reports",
     href: "/reports",
     icon: BarChart3,
-  },
-  {
-    title: "Users",
-    href: "/users",
-    icon: UserCog,
-    countKey: "users",
-    quickAddHref: "/users/new",
   },
   {
     title: "Stores",
@@ -196,8 +188,6 @@ function getNavForRole(role?: string, permissions: string[] = []) {
     if (item.href === "/stores" || item.href === "/plans") {
       return role === "SUPER_ADMIN";
     }
-    if (item.href === "/users") return role === "SUPER_ADMIN" || role === "ADMIN";
-
     // Empty permissions means "not customized" — falls back to full access,
     // matching getEffectivePermissions() in lib/roles.ts.
     if (role === "STAFF" && permissions.length > 0) {

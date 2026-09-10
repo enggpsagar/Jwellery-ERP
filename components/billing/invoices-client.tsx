@@ -66,7 +66,7 @@ export function InvoicesClient({ invoices, locations, pagination }: InvoicesClie
 
         <div className="flex items-center gap-2">
           <Link href="/billing/kacha">
-            <Button variant="outline">Kacha Slips</Button>
+            <Button variant="secondary">Estimates</Button>
           </Link>
           <Link href="/billing/new">
             <Button>New Invoice</Button>

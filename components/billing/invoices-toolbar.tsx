@@ -20,7 +20,7 @@ const STATUS_OPTIONS = [
 export function InvoicesToolbar() {
   return (
     <DataTableToolbar
-      searchPlaceholder="Search by invoice number, customer..."
+      searchPlaceholder="Search by invoice number, party..."
       sortOptions={SORT_OPTIONS}
       defaultSortBy="invoiceDate"
       hideSort

@@ -130,7 +130,7 @@ export async function getNotifications(): Promise<NotificationsResponse> {
       items: dueInvoices.map((invoice) => ({
         id: invoice.id,
         title: `${invoice.invoiceNumber} — ₹${Number(invoice.balanceAmount).toLocaleString("en-IN")} due`,
-        description: invoice.customer?.name ?? "Walk-in customer",
+        description: invoice.customer?.name ?? "Walk-in party",
         href: `/billing/${invoice.id}`,
       })),
     });

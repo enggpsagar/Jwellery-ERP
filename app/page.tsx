@@ -46,7 +46,7 @@ export const metadata: Metadata = {
 const MODULES = [
   {
     icon: Users,
-    title: "Customers & Vendors",
+    title: "Parties & Vendors",
     body: "Separate masters for who you sell to and who you buy from, each with its own running ledger, balance and statement you can email straight from their page.",
     tint: "var(--chart-1)",
   },
@@ -65,13 +65,13 @@ const MODULES = [
   {
     icon: FileText,
     title: "Quotations",
-    body: "Quote a customer without touching stock or the ledger. Nothing moves until you convert it to an invoice — that single step marks the stock sold and posts the balance.",
+    body: "Quote a party without touching stock or the ledger. Nothing moves until you convert it to an invoice — that single step marks the stock sold and posts the balance.",
     tint: "var(--chart-5)",
   },
   {
     icon: ReceiptText,
-    title: "Kacha & Pakka Billing",
-    body: "Raise a provisional Kacha slip now and convert it to a formal Pakka invoice when the paperwork is ready. Both documents stay linked, so the trail is never lost.",
+    title: "Estimate & Tax Invoice Billing",
+    body: "Raise a provisional Estimate now and convert it to a formal Tax Invoice when the paperwork is ready. Both documents stay linked, so the trail is never lost.",
     tint: "var(--chart-2)",
   },
   {
@@ -83,7 +83,7 @@ const MODULES = [
   {
     icon: CircleDollarSign,
     title: "Ledger",
-    body: "Every movement across customers, vendors and artisans in one place, plus a metal-wise view showing what was bought and sold each day with a running closing balance.",
+    body: "Every movement across parties, vendors and artisans in one place, plus a metal-wise view showing what was bought and sold each day with a running closing balance.",
     tint: "var(--chart-3)",
   },
   {
@@ -95,7 +95,7 @@ const MODULES = [
   {
     icon: ScanLine,
     title: "Scan to Sell",
-    body: "Scan a piece's QR label with a phone camera and its details are already filled in. Pick the customer, enter the price, confirm — the invoice is raised and the stock marked sold in one step at the counter.",
+    body: "Scan a piece's QR label with a phone camera and its details are already filled in. Pick the party, enter the price, confirm — the invoice is raised and the stock marked sold in one step at the counter.",
     tint: "var(--chart-2)",
   },
   {
@@ -109,8 +109,8 @@ const MODULES = [
 const FLOW = [
   { label: "Purchase", body: "Buy from a vendor" },
   { label: "Stock", body: "Pieces created automatically" },
-  { label: "Quote or Slip", body: "Kacha slip or quotation" },
-  { label: "Invoice", body: "Pakka invoice raised" },
+  { label: "Quote or Slip", body: "Estimate or quotation" },
+  { label: "Invoice", body: "Tax invoice raised" },
   { label: "Ledger", body: "Balance posted, stock reduced" },
 ]
 
@@ -138,7 +138,7 @@ const JEWELLERY_SPECIFICS = [
   {
     icon: Mail,
     title: "Documents that leave the building",
-    body: "Email an invoice, a Kacha slip or a customer statement directly from its page, under your own business name — not a generic template.",
+    body: "Email an invoice, an Estimate or a party statement directly from its page, under your own business name — not a generic template.",
   },
 ]
 
@@ -360,7 +360,7 @@ export default async function LandingPage() {
             <dl className="mt-10 grid max-w-md grid-cols-3 gap-6 border-t pt-6">
               {[
                 { k: String(MODULES.length), v: "modules" },
-                { k: "Kacha → Pakka", v: "billing flow" },
+                { k: "Estimate → Tax Invoice", v: "billing flow" },
                 { k: "Fine-weight", v: "accounting" },
               ].map((stat) => (
                 <div key={stat.v}>

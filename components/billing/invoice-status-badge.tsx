@@ -8,7 +8,7 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
 };
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
-  DRAFT: "bg-muted text-foreground",
+  DRAFT: "bg-blue-100 text-blue-700",
   PAID: "bg-green-100 text-green-700",
   PARTIAL: "bg-yellow-100 text-yellow-700",
   CANCELLED: "bg-red-100 text-red-700",

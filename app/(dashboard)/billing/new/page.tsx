@@ -56,7 +56,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
         requireConfirm
         header={{
           title: "New Invoice",
-          description: "Bill a customer for jewellery items.",
+          description: "Bill a party for jewellery items.",
           backHref: backTo.href,
           backLabel: backTo.label,
         }}

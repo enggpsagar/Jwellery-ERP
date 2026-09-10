@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import * as React from "react"
 import type { Vendor } from "@/lib/actions/vendor-actions"
@@ -106,10 +107,10 @@ export function VendorsTable({
                 />
               </th>
               <SortableTableHead label="Vendor Name" sortKey="name" defaultSortBy="createdAt" />
-              <th className="px-4 py-3 font-medium">Phone</th>
-              <th className="px-4 py-3 font-medium">City</th>
-              <th className="px-4 py-3 font-medium">State</th>
-              <SortableTableHead label="Balance" sortKey="openingBalance" defaultSortBy="createdAt" />
+              <SortableTableHead label="Phone" sortKey="phone" defaultSortBy="createdAt" />
+              <SortableTableHead label="City" sortKey="city" defaultSortBy="createdAt" />
+              <SortableTableHead label="State" sortKey="state" defaultSortBy="createdAt" />
+              <th className="px-4 py-3">Outstanding</th>
             </tr>
           </thead>
 
@@ -183,9 +184,19 @@ export function VendorsTable({
                     {vendor.state || "-"}
                   </td>
 
-                  <td className="px-4 py-3 text-foreground">
-                    ₹ {Number(vendor.openingBalance || 0).toLocaleString("en-IN")}
+                  <td className="px-4 py-3">
+                    <span
+                      className={cn(
+                        "font-medium",
+                        Number(String(vendor.pendingAmount ?? "").replace(/[^0-9.-]/g, "")) > 0
+                          ? "text-red-600"
+                          : "text-foreground",
+                      )}
+                    >
+                      {vendor.pendingAmount || "₹ 0"}
+                    </span>
                   </td>
+
                 </tr>
               )
             })}

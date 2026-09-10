@@ -42,7 +42,7 @@ export default async function TaxonomySettingsPage() {
         backLabel="Back to Dashboard"
       />
 
-      <SettingsTabs active="taxonomy" />
+      <SettingsTabs active="taxonomy" role={currentUser?.role} />
 
       <TaxonomySettingsForm
         metals={metals}

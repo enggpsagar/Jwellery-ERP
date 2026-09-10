@@ -15,9 +15,9 @@ type ActivityFeedProps = {
 
 export function ActivityFeed({ activity }: ActivityFeedProps) {
   return (
-    <Card className="gap-0">
+    <Card className="h-full gap-0">
       <CardHeader className="border-b [.border-b]:pb-5">
-        <CardTitle>Recent Customer Activity</CardTitle>
+        <CardTitle>Recent Party Activity</CardTitle>
         <CardDescription>Live updates across the store</CardDescription>
       </CardHeader>
       <CardContent className="pt-2">

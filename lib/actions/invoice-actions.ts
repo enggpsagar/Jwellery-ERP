@@ -34,9 +34,10 @@ import { resolveGstRateSnapshot, type GstRateSnapshot } from "@/lib/actions/gst-
 import { getReturnEligibility } from "@/lib/return-window";
 import { amountInWords } from "@/lib/number-to-words";
 import { resolveStoreName } from "@/lib/invite-email";
-import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export";
+import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import { OversellError } from "@/lib/inventory/oversell-error";
 import { formatShortDate } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 export type InvoiceLineItemInput = {
   itemName: string;
@@ -481,7 +482,7 @@ export type ExportInvoicesParams = {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   status?: string;
-  format?: "csv" | "xlsx";
+  format?: "csv" | "xlsx" | "pdf";
 };
 
 export type ExportInvoicesResult = {
@@ -517,7 +518,7 @@ export async function exportInvoicesToExcel(
       "Sr. No.": index + 1,
       "Invoice #": invoice.invoiceNumber,
       Date: formatShortDate(invoice.invoiceDate),
-      Customer: invoice.customer?.name || "",
+      Party: invoice.customer?.name || "",
       Status: invoice.status,
       Subtotal: invoice.subtotal,
       "Making Charges": invoice.makingCharges,
@@ -532,11 +533,13 @@ export async function exportInvoicesToExcel(
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "invoices")
-        : buildExcelExport(rows, "Invoices", "invoices");
+        : params.format === "pdf"
+          ? buildPdfExportBase64(rows, "Invoices", "invoices")
+          : buildExcelExport(rows, "Invoices", "invoices");
 
     return { success: true, message: "Invoices exported successfully.", fileName, fileBase64 };
   } catch (error) {
-    console.error("exportInvoicesToExcel error:", error);
+    logger.error("exportInvoicesToExcel error", error);
     return { success: false, message: "Failed to export invoices." };
   }
 }
@@ -796,7 +799,7 @@ export async function createInvoice(
     const itemsRaw = String(formData.get("itemsJson") || "[]");
 
     if (!customerId) {
-      return { success: false, message: "Please select a customer" };
+      return { success: false, message: "Please select a party" };
     }
 
     let items: InvoiceLineItemInput[] = [];
@@ -883,8 +886,17 @@ export async function createInvoice(
     const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
     // Standard Indian-billing convention: the saved Total is rounded to the
     // nearest rupee, with the (small, signed) adjustment recorded on its own
-    // line rather than silently folded into another figure.
-    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
+    // line rather than silently folded into another figure — unless the
+    // merchant typed their own Round Off directly (invoice-form.tsx always
+    // sends this field, whether auto-calculated or overridden), in which
+    // case that value wins verbatim, same "typed once, used as-is" rule as
+    // Making Charge/Discount. A caller that never sends the field at all
+    // (e.g. the scan-to-sell quick-sale flow) still gets the automatic
+    // behavior, since `null` here falls through to it.
+    const roundOffOverrideRaw = formData.get("roundOffAmount");
+    const roundOffOverride =
+      roundOffOverrideRaw !== null && roundOffOverrideRaw !== "" ? toNumber(roundOffOverrideRaw) : null;
+    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal, roundOffOverride);
     const balanceAmount = Math.max(0, totalAmount - paidAmount);
 
     let status: InvoiceStatus = InvoiceStatus.PAID;
@@ -929,7 +941,7 @@ export async function createInvoice(
       select: { id: true },
     });
     if (!customer) {
-      return { success: false, message: "Please select a customer" };
+      return { success: false, message: "Please select a party" };
     }
 
     // A Composition-scheme store is legally barred from charging any GST at
@@ -1224,7 +1236,7 @@ export async function createInvoice(
     if (error instanceof OversellError) {
       return { success: false, message: error.message };
     }
-    console.error("createInvoice error:", error);
+    logger.error("createInvoice error", error);
     return { success: false, message: "Failed to create invoice" };
   }
 }
@@ -1303,7 +1315,7 @@ export async function recordInvoicePayment(
 
     return { success: true, message: "Payment recorded" };
   } catch (error) {
-    console.error("recordInvoicePayment error:", error);
+    logger.error("recordInvoicePayment error", error);
     return { success: false, message: "Failed to record payment" };
   }
 }
@@ -1372,7 +1384,7 @@ export async function setInvoiceDueDate(
 
     return { success: true, message: "Due date set" };
   } catch (error) {
-    console.error("setInvoiceDueDate error:", error);
+    logger.error("setInvoiceDueDate error", error);
     return { success: false, message: "Failed to set due date" };
   }
 }
@@ -1530,9 +1542,13 @@ export async function updateInvoice(
       0,
     );
     const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
-    // Same rounding convention as createInvoice — the saved Total is always
-    // a whole rupee, with the adjustment recorded separately.
-    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
+    // Same rounding convention as createInvoice, including the manual
+    // override — see its own comment for why `null` means "let the field's
+    // absence fall through to the automatic behavior."
+    const roundOffOverrideRaw = formData.get("roundOffAmount");
+    const roundOffOverride =
+      roundOffOverrideRaw !== null && roundOffOverrideRaw !== "" ? toNumber(roundOffOverrideRaw) : null;
+    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal, roundOffOverride);
 
     const paidAmount = Number(invoice.paidAmount);
     if (totalAmount < paidAmount) {
@@ -1754,7 +1770,7 @@ export async function updateInvoice(
     if (error instanceof OversellError) {
       return { success: false, message: error.message };
     }
-    console.error("updateInvoice error:", error);
+    logger.error("updateInvoice error", error);
     return { success: false, message: "Failed to update invoice" };
   }
 }
@@ -1924,7 +1940,7 @@ export async function updateInvoiceLineItem(
 
     return { success: true, message: "Line item updated" };
   } catch (error) {
-    console.error("updateInvoiceLineItem error:", error);
+    logger.error("updateInvoiceLineItem error", error);
     return { success: false, message: "Failed to update line item" };
   }
 }
@@ -2055,7 +2071,7 @@ export async function cancelInvoice(
 
     return { success: true, message: `Invoice ${invoice.invoiceNumber} cancelled` };
   } catch (error) {
-    console.error("cancelInvoice error:", error);
+    logger.error("cancelInvoice error", error);
     return { success: false, message: "Failed to cancel invoice" };
   }
 }
@@ -2075,7 +2091,10 @@ export async function deleteInvoice(id: string): Promise<InvoiceFormState> {
 
     const invoice = await prisma.invoice.findFirst({
       where: { id, storeId },
-      include: { ledgerEntries: { select: { id: true }, take: 1 } },
+      include: {
+        ledgerEntries: { select: { id: true }, take: 1 },
+        items: true,
+      },
     });
 
     if (!invoice) return { success: false, message: "Invoice not found" };
@@ -2087,12 +2106,59 @@ export async function deleteInvoice(id: string): Promise<InvoiceFormState> {
       };
     }
 
-    await prisma.invoice.delete({ where: { id } });
+    // createInvoice decrements InventoryStock for every linked line item
+    // regardless of status, including DRAFT — deleting the invoice without
+    // restoring that quantity would silently leave stock counts short.
+    // Same restore-and-flip-status logic cancelInvoice already uses, just
+    // inside a hard delete instead of a status change.
+    await prisma.$transaction(async (tx) => {
+      for (const item of invoice.items) {
+        if (!item.inventoryStockId) continue;
+
+        const restoreQty = Math.max(1, item.quantity || 1);
+
+        await tx.inventoryStock.updateMany({
+          where: { id: item.inventoryStockId, storeId },
+          data: { quantity: { increment: restoreQty } },
+        });
+
+        const updatedStock = await tx.inventoryStock.findUnique({
+          where: { id: item.inventoryStockId },
+          select: { quantity: true, status: true },
+        });
+        if (
+          updatedStock &&
+          updatedStock.quantity > 0 &&
+          updatedStock.status === InventoryStockStatus.SOLD
+        ) {
+          await tx.inventoryStock.update({
+            where: { id: item.inventoryStockId },
+            data: { status: InventoryStockStatus.IN_STOCK },
+          });
+        }
+
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryStockId: item.inventoryStockId,
+            transactionType: InventoryTransactionType.SALE_RETURN,
+            quantity: restoreQty,
+            netWeight: item.netWeight ?? undefined,
+            referenceType: "Invoice",
+            referenceId: invoice.id,
+            notes: "Stock restored — draft invoice deleted",
+          },
+        });
+      }
+
+      await tx.invoice.delete({ where: { id } });
+    }, { timeout: 15000 });
+
     revalidatePath("/billing");
+    revalidatePath("/inventory/stock");
 
     return { success: true, message: "Invoice deleted" };
   } catch (error) {
-    console.error("deleteInvoice error:", error);
+    logger.error("deleteInvoice error", error);
     return { success: false, message: "Failed to delete invoice" };
   }
 }
@@ -2135,7 +2201,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
     if (!invoice) return { success: false, message: "Invoice not found" };
 
     if (!invoice.customer?.email) {
-      return { success: false, message: "This customer has no email on file" };
+      return { success: false, message: "This party has no email on file" };
     }
 
     const { subject, html } = invoiceEmail({
@@ -2194,7 +2260,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
 
     return { success: result.sent, message: result.message };
   } catch (error) {
-    console.error("emailInvoiceAction error:", error);
+    logger.error("emailInvoiceAction error", error);
     return { success: false, message: "Failed to email invoice" };
   }
 }

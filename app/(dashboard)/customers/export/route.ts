@@ -6,6 +6,7 @@ import * as XLSX from "xlsx"
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { formatShortDate } from "@/lib/utils"
+import { logger } from "@/lib/logger";
 
 type CustomerSortBy = "name" | "createdAt" | "openingBalance"
 type SortOrder = "asc" | "desc"
@@ -28,7 +29,7 @@ function getTimestampedFileName() {
   const minutes = String(now.getMinutes()).padStart(2, "0")
   const seconds = String(now.getSeconds()).padStart(2, "0")
 
-  return `customers-${year}-${month}-${day}-${hours}-${minutes}-${seconds}.xlsx`
+  return `parties-${year}-${month}-${day}-${hours}-${minutes}-${seconds}.xlsx`
 }
 
 export async function GET(request: NextRequest) {
@@ -117,7 +118,7 @@ export async function GET(request: NextRequest) {
 
       return {
         "Sr No": index + 1,
-        "Customer Name": customer.name,
+        "Party Name": customer.name,
         Phone: customer.phone ?? "",
         "Alternate Phone": customer.alternatePhone ?? "",
         Email: customer.email ?? "",
@@ -165,7 +166,7 @@ export async function GET(request: NextRequest) {
     worksheet["!cols"] = columnWidths
 
     const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Customers")
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Parties")
 
     const buffer = XLSX.write(workbook, {
       type: "buffer",
@@ -183,9 +184,9 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Customer export failed:", error)
+    logger.error("Customer export failed", error)
     return NextResponse.json(
-      { success: false, message: "Failed to export customers" },
+      { success: false, message: "Failed to export parties" },
       { status: 500 }
     )
   }

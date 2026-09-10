@@ -88,7 +88,7 @@ export function VendorCustomerLinkCard({
       }
     } catch (error) {
       console.error(error)
-      toast.error("Failed to register as customer")
+      toast.error("Failed to register as party")
     } finally {
       setLoading(false)
     }
@@ -122,7 +122,7 @@ export function VendorCustomerLinkCard({
       }
     } catch (error) {
       console.error(error)
-      toast.error("Failed to link customer")
+      toast.error("Failed to link party")
     } finally {
       setLoading(false)
     }
@@ -155,7 +155,7 @@ export function VendorCustomerLinkCard({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
-            Customer Relationship
+            Party Relationship
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -172,10 +172,14 @@ export function VendorCustomerLinkCard({
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button asChild variant="outline" size="sm" className="gap-2">
+                <Button
+                  asChild
+                  size="sm"
+                  className="gap-2 bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
+                >
                   <Link href={`/customers/${linkedCustomer.id}`}>
                     <ExternalLink className="h-4 w-4" />
-                    View Customer
+                    View Party
                   </Link>
                 </Button>
                 <Button
@@ -193,14 +197,19 @@ export function VendorCustomerLinkCard({
           ) : (
             <div className="flex flex-wrap items-center gap-3">
               <p className="min-w-64 flex-1 text-sm text-muted-foreground">
-                Does this vendor also buy from you as a customer? Connect them to a customer record.
+                Does this vendor also buy from you as a party? Connect them to a party record.
               </p>
               <Button size="sm" className="gap-2" onClick={handleRegisterAsCustomer} disabled={loading}>
                 <Link2 className="h-4 w-4" />
-                {loading ? "Registering..." : "Register as Customer"}
+                {loading ? "Registering..." : "Register as Party"}
               </Button>
-              <Button variant="outline" size="sm" onClick={openPicker} disabled={loading}>
-                Link to Existing Customer
+              <Button
+                size="sm"
+                onClick={openPicker}
+                disabled={loading}
+                className="bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
+              >
+                Link to Existing Party
               </Button>
             </div>
           )}
@@ -215,20 +224,20 @@ export function VendorCustomerLinkCard({
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Link to an existing Customer</DialogTitle>
+            <DialogTitle>Link to an existing Party</DialogTitle>
             <DialogDescription>
-              Pick the Customer record for the same person or business.
+              Pick the Party record for the same person or business.
             </DialogDescription>
           </DialogHeader>
 
           <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder={loadingOptions ? "Loading customers..." : "Select a customer"} />
+              <SelectValue placeholder={loadingOptions ? "Loading parties..." : "Select a party"} />
             </SelectTrigger>
             <SelectContent>
               {options.length === 0 && !loadingOptions ? (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
-                  No unlinked customers available.
+                  No unlinked parties available.
                 </div>
               ) : (
                 options.map((option) => (
@@ -255,7 +264,7 @@ export function VendorCustomerLinkCard({
               onClick={handleLinkExisting}
               disabled={loading || !selectedCustomerId}
             >
-              {loading ? "Linking..." : "Link Customer"}
+              {loading ? "Linking..." : "Link Party"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -269,10 +278,10 @@ export function VendorCustomerLinkCard({
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Remove customer link?</DialogTitle>
+            <DialogTitle>Remove party link?</DialogTitle>
             <DialogDescription>
               This only disconnects the two records — neither the vendor
-              nor the customer themselves are changed or deleted.
+              nor the party themselves are changed or deleted.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

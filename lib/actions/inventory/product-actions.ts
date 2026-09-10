@@ -9,7 +9,8 @@ import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scop
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import type { ProductFormState } from "@/lib/inventory/product-types";
 import { buildSkuPrefix } from "@/lib/inventory/product-sku";
-import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export";
+import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
+import { logger } from "@/lib/logger";
 
 function parseNullableString(value: FormDataEntryValue | null) {
   const parsed = String(value || "").trim();
@@ -166,7 +167,7 @@ type ExportProductsParams = {
   sortOrder?: ProductSortOrder;
   type?: string;
   status?: string;
-  format?: "csv" | "xlsx";
+  format?: "csv" | "xlsx" | "pdf";
 };
 
 function getProductWhere(
@@ -434,7 +435,9 @@ export async function exportProductsToExcel(
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "products")
-        : buildExcelExport(rows, "Products", "products");
+        : params.format === "pdf"
+          ? buildPdfExportBase64(rows, "Products", "products")
+          : buildExcelExport(rows, "Products", "products");
 
     return {
       success: true,
@@ -443,7 +446,7 @@ export async function exportProductsToExcel(
       fileBase64,
     };
   } catch (error) {
-    console.error("exportProductsToExcel error:", error);
+    logger.error("exportProductsToExcel error", error);
     return {
       success: false,
       message: "Failed to export products.",
@@ -846,7 +849,7 @@ export async function createProduct(
       product: createdProduct,
     };
   } catch (error) {
-    console.error("createProduct error:", error);
+    logger.error("createProduct error", error);
 
     return {
       success: false,
@@ -1011,7 +1014,7 @@ export async function updateProduct(
       errors: {},
     };
   } catch (error) {
-    console.error("updateProduct error:", error);
+    logger.error("updateProduct error", error);
     return {
       success: false,
       message: "Failed to update product",
@@ -1099,7 +1102,7 @@ export async function deleteProduct(id: string): Promise<ProductFormState> {
       errors: {},
     };
   } catch (error) {
-    console.error("deleteProduct error:", error);
+    logger.error("deleteProduct error", error);
     return {
       success: false,
       message: "Failed to delete product",
@@ -1129,7 +1132,7 @@ export async function disableProduct(id: string): Promise<ProductFormState> {
 
     return { success: true, message: "Product marked inactive", errors: {} };
   } catch (error) {
-    console.error("disableProduct error:", error);
+    logger.error("disableProduct error", error);
     return { success: false, message: "Failed to update product", errors: {} };
   }
 }
@@ -1152,7 +1155,7 @@ export async function enableProduct(id: string): Promise<ProductFormState> {
 
     return { success: true, message: "Product marked active", errors: {} };
   } catch (error) {
-    console.error("enableProduct error:", error);
+    logger.error("enableProduct error", error);
     return { success: false, message: "Failed to update product", errors: {} };
   }
 }

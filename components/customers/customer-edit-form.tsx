@@ -83,7 +83,7 @@ export function CustomerEditForm({
 
   useEffect(() => {
     if (state.success) {
-      toast.success(state.message || "Customer updated")
+      toast.success(state.message || "Party updated")
       router.push(returnTo ?? `/customers/${customer.id}`)
       router.refresh()
       return

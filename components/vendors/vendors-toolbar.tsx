@@ -6,7 +6,7 @@ import { Download, Search, X } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { exportVendorsToExcel } from "@/lib/actions/vendor-actions"
+import { exportVendorsToExcel, type VendorSortBy } from "@/lib/actions/vendor-actions"
 import { useToast } from "@/components/providers/toast-provider"
 
 type VendorsToolbarProps = {
@@ -51,10 +51,7 @@ export function VendorsToolbar({
   const toast = useToast()
 
   const currentSearch = searchParams.get("search") ?? ""
-  const currentSortBy = (searchParams.get("sortBy") ?? "createdAt") as
-    | "name"
-    | "createdAt"
-    | "openingBalance"
+  const currentSortBy = (searchParams.get("sortBy") ?? "createdAt") as VendorSortBy
   const currentSortOrder = (searchParams.get("sortOrder") ?? "desc") as
     | "asc"
     | "desc"
@@ -159,27 +156,6 @@ export function VendorsToolbar({
       <div className="flex flex-1 flex-wrap items-center gap-3">
         <select
           className="rounded-md border px-3 py-2 text-sm"
-          value={currentSortBy}
-          onChange={(e) => updateParam("sortBy", e.target.value)}
-          disabled={isPending}
-        >
-          <option value="createdAt">Sort by Created Date</option>
-          <option value="name">Sort by Name</option>
-          <option value="openingBalance">Sort by Opening Balance</option>
-        </select>
-
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
-          value={currentSortOrder}
-          onChange={(e) => updateParam("sortOrder", e.target.value)}
-          disabled={isPending}
-        >
-          <option value="desc">Descending</option>
-          <option value="asc">Ascending</option>
-        </select>
-
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
           value={currentPageSize}
           onChange={(e) => updateParam("pageSize", e.target.value)}
           disabled={isPending}
@@ -195,12 +171,12 @@ export function VendorsToolbar({
 
         <Button
           type="button"
-          variant="secondary"
           size="icon"
           onClick={handleExport}
           disabled={isExporting}
           title={hasSelection ? `Export selected vendors (${selectedVendorIds.length})` : "Export vendors"}
           aria-label={hasSelection ? `Export selected vendors (${selectedVendorIds.length})` : "Export vendors"}
+          className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
         >
           {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}
         </Button>

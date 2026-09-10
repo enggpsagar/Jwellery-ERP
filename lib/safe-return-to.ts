@@ -38,8 +38,8 @@ export function resolveBackLink(
   if (!href) return fallback
 
   if (href === "/billing") return { href, label: "Back to Invoices" }
-  if (href === "/billing/kacha") return { href, label: "Back to Kacha Slips" }
-  if (href.startsWith("/billing/kacha/")) return { href, label: "Back to Kacha Slip" }
+  if (href === "/billing/kacha") return { href, label: "Back to Estimates" }
+  if (href.startsWith("/billing/kacha/")) return { href, label: "Back to Estimate" }
   if (href.startsWith("/billing/")) return { href, label: "Back to Invoice" }
   if (href === "/inventory/stock") return { href, label: "Back to Stock" }
   if (href.startsWith("/inventory/stock/")) return { href, label: "Back to Stock Item" }
@@ -47,7 +47,7 @@ export function resolveBackLink(
   if (href.startsWith("/purchases")) return { href, label: "Back to Purchase" }
   if (href.startsWith("/quotations")) return { href, label: "Back to Quotation" }
   if (href.startsWith("/ledger")) return { href, label: "Back to Ledger" }
-  if (href.startsWith("/customers")) return { href, label: "Back to Customers" }
+  if (href.startsWith("/customers")) return { href, label: "Back to Parties" }
   if (href.startsWith("/reports")) return { href, label: "Back to Reports" }
 
   return { href, label: "Back" }

@@ -204,7 +204,7 @@ function MetalsSection({
                     type="button"
                     onClick={() => handleDelete(metal.id, metal.name)}
                     disabled={deletingId === metal.id}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-50"
                     aria-label={`Delete ${metal.name}`}
                     title="Delete metal (only if unused)"
                   >
@@ -341,7 +341,7 @@ function MetalFormRow({
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
+          {pending ? <Loader className="h-4 w-4" /> : metal ? "Update" : "Save"}
         </Button>
       </div>
     </form>
@@ -476,7 +476,7 @@ function StonesSection({
                     type="button"
                     onClick={() => handleDelete(stone.id, stone.name)}
                     disabled={deletingId === stone.id}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-50"
                     aria-label={`Delete ${stone.name}`}
                     title="Delete stone (only if unused)"
                   >
@@ -599,7 +599,7 @@ function StoneFormRow({
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
+          {pending ? <Loader className="h-4 w-4" /> : stone ? "Update" : "Save"}
         </Button>
       </div>
     </form>
@@ -788,7 +788,7 @@ function StoneTypesSection({
                         type="button"
                         onClick={() => handleDelete(option.id, option.name)}
                         disabled={deletingId === option.id}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-50"
                         aria-label={`Delete ${option.name}`}
                         title="Delete Stone Type (only if unused)"
                       >
@@ -889,7 +889,7 @@ function StoneTypeFormRow({
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
+          {pending ? <Loader className="h-4 w-4" /> : option ? "Update" : "Save"}
         </Button>
       </div>
     </form>
@@ -1001,7 +1001,7 @@ function CategoriesSection({
                     type="button"
                     onClick={() => handleDelete(category.id, category.name)}
                     disabled={deletingId === category.id}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-50"
                     aria-label={`Delete ${category.name}`}
                     title="Delete category (only if unused)"
                   >
@@ -1096,7 +1096,7 @@ function CategoryFormRow({
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
+          {pending ? <Loader className="h-4 w-4" /> : category ? "Update" : "Save"}
         </Button>
       </div>
     </form>
@@ -1282,7 +1282,7 @@ function TypesSection({
                         type="button"
                         onClick={() => handleDelete(type.id, type.name)}
                         disabled={deletingId === type.id}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-50"
                         aria-label={`Delete ${type.name}`}
                         title="Delete type (only if unused)"
                       >
@@ -1387,7 +1387,7 @@ function TypeFormRow({
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? <Loader className="h-4 w-4" /> : "Save"}
+          {pending ? <Loader className="h-4 w-4" /> : type ? "Update" : "Save"}
         </Button>
       </div>
     </form>

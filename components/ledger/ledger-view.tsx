@@ -191,7 +191,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
           {
             label: "Total Debit",
             value: formatCurrency(totals.totalDebit),
-            sub: "Amount owed by customers",
+            sub: "Amount owed by parties",
             icon: ArrowUpCircle,
             accent: "text-destructive bg-destructive/10",
             polarity: "debit" as const,
@@ -301,7 +301,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
             <div className="flex flex-col gap-1">
               <CardTitle>Ledger Entries</CardTitle>
               <CardDescription>
-                Money movement across all customer and artisan accounts.
+                Money movement across all party and artisan accounts.
               </CardDescription>
             </div>
             <ExportMenu href="/ledger/export?scope=entries" label="Export" iconOnly />

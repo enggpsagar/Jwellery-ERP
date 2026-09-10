@@ -37,10 +37,14 @@ function InvoiceItemRowView({
   invoiceId,
   item,
   canEdit,
+  showMaking,
+  showStone,
 }: {
   invoiceId: string
   item: InvoiceItemRow
   canEdit: boolean
+  showMaking: boolean
+  showStone: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const router = useRouter()
@@ -94,15 +98,25 @@ function InvoiceItemRowView({
           {quantity != null ? `${quantity.toFixed(3)} ${isDiamond ? "ct" : "g"}` : "-"}
         </td>
         <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
-        <td className="px-4 py-3">
-          ₹{item.makingCharge.toFixed(2)}
-          {item.makingChargeType === "PERCENTAGE" && item.rate && quantity ? (
-            <span className="block text-xs text-muted-foreground">
-              ({((item.makingCharge / (item.rate * quantity)) * 100).toFixed(2)}% of metal value)
-            </span>
-          ) : null}
-        </td>
-        <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
+        {showMaking && (
+          <td className="px-4 py-3">
+            {item.makingCharge > 0 ? (
+              <>
+                ₹{item.makingCharge.toFixed(2)}
+                {item.makingChargeType === "PERCENTAGE" && item.rate && quantity ? (
+                  <span className="block text-xs text-muted-foreground">
+                    ({((item.makingCharge / (item.rate * quantity)) * 100).toFixed(2)}% of metal value)
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              "-"
+            )}
+          </td>
+        )}
+        {showStone && (
+          <td className="px-4 py-3">{item.stoneCharge > 0 ? `₹${item.stoneCharge.toFixed(2)}` : "-"}</td>
+        )}
         <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
         {canEdit && (
           <td className="px-4 py-3 text-right">
@@ -156,8 +170,12 @@ function InvoiceItemRowView({
           disabled={pending}
         />
       </td>
-      <td className="px-4 py-3">₹{item.makingCharge.toFixed(2)}</td>
-      <td className="px-4 py-3">₹{item.stoneCharge.toFixed(2)}</td>
+      {showMaking && (
+        <td className="px-4 py-3">{item.makingCharge > 0 ? `₹${item.makingCharge.toFixed(2)}` : "-"}</td>
+      )}
+      {showStone && (
+        <td className="px-4 py-3">{item.stoneCharge > 0 ? `₹${item.stoneCharge.toFixed(2)}` : "-"}</td>
+      )}
       <td className="px-4 py-3 font-medium">
         {!state.success && state.message ? (
           <span className="text-xs font-normal text-red-600">{state.message}</span>
@@ -169,19 +187,19 @@ function InvoiceItemRowView({
         <div className="flex items-center justify-end gap-1">
           <Button
             type="button"
-            variant="ghost"
             size="icon"
+            className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
             title="Save"
             aria-label="Save"
             onClick={handleSave}
             disabled={pending}
           >
-            <Check className="h-4 w-4 text-emerald-600" />
+            <Check className="h-4 w-4" />
           </Button>
           <Button
             type="button"
-            variant="ghost"
             size="icon"
+            className="bg-slate-800 text-white shadow-sm hover:bg-slate-900"
             title="Cancel"
             aria-label="Cancel"
             onClick={() => setEditing(false)}
@@ -204,8 +222,14 @@ export function InvoiceItemsTable({
   items: InvoiceItemRow[]
   canEdit: boolean
 }) {
+  // A column with nothing to show across every line item is dead weight,
+  // not information — most invoices are metal-only with no making/stone
+  // component at all, so this is the common case, not an edge case.
+  const showMaking = items.some((item) => item.makingCharge > 0)
+  const showStone = items.some((item) => item.stoneCharge > 0)
+
   return (
-    <div className="overflow-hidden rounded-xl border bg-card">
+    <div className="overflow-x-auto rounded-xl border bg-card">
       <table className="min-w-full text-sm">
         <thead className="bg-muted/40">
           <tr className="border-b">
@@ -213,15 +237,22 @@ export function InvoiceItemsTable({
             <th className="px-4 py-3 text-left font-medium">Qty</th>
             <th className="px-4 py-3 text-left font-medium">Weight</th>
             <th className="px-4 py-3 text-left font-medium">Rate</th>
-            <th className="px-4 py-3 text-left font-medium">Making</th>
-            <th className="px-4 py-3 text-left font-medium">Stone</th>
+            {showMaking && <th className="px-4 py-3 text-left font-medium">Making</th>}
+            {showStone && <th className="px-4 py-3 text-left font-medium">Stone</th>}
             <th className="px-4 py-3 text-left font-medium">Line Total</th>
             {canEdit && <th className="px-4 py-3 text-right font-medium">Edit</th>}
           </tr>
         </thead>
         <tbody>
           {items.map((item) => (
-            <InvoiceItemRowView key={item.id} invoiceId={invoiceId} item={item} canEdit={canEdit} />
+            <InvoiceItemRowView
+              key={item.id}
+              invoiceId={invoiceId}
+              item={item}
+              canEdit={canEdit}
+              showMaking={showMaking}
+              showStone={showStone}
+            />
           ))}
         </tbody>
       </table>

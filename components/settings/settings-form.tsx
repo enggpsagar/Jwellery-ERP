@@ -269,8 +269,8 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               placeholder="owner@example.com"
             />
             <p className="text-xs text-muted-foreground">
-              Where backups are sent before any bulk delete. Deleting all Kacha
-              slips is blocked until this is set, and again if the backup email
+              Where backups are sent before any bulk delete. Deleting all
+              Estimates is blocked until this is set, and again if the backup email
               fails to send.
             </p>
           </div>
@@ -402,7 +402,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
             />
             <p className="text-xs text-muted-foreground">
               Applied automatically as the HM Charge on every Gold/Silver line item
-              when creating an Invoice, Kacha Slip, or Quotation — a flat ₹ amount
+              when creating an Invoice, Estimate, or Quotation — a flat ₹ amount
               per piece, not a % or per-gram charge. Not used for Platinum, Diamond,
               or Other purities. BIS hallmarking fees change periodically by
               official notification — confirm this matches what your hallmarking
@@ -421,7 +421,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               <Label htmlFor="returnWindowEnabled">Enable Return Window</Label>
             </div>
             <p className="text-xs text-muted-foreground">
-              Whether customers can return sold items at all. Turning this off
+              Whether parties can return sold items at all. Turning this off
               hides Return Window/Return Items everywhere in the app without
               losing the day count below — turn it back on later and the same
               number of days applies again.
@@ -575,7 +575,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
             What does this business transact and settle balances in? This
-            drives which totals the Ledger and customer statements show.
+            drives which totals the Ledger and party statements show.
             Select one or more.
           </p>
 
@@ -584,7 +584,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               const checked = businessUnits.includes(option.value);
               const description =
                 option.value === "MONEY"
-                  ? "Track customer/artisan dues and payments in rupees."
+                  ? "Track party/artisan dues and payments in rupees."
                   : option.isGemstone
                     ? `Track dues and payments in carats of ${option.label.toLowerCase()} weight.`
                     : `Track dues and payments in grams of fine ${option.label.toLowerCase()}.`;

@@ -32,7 +32,7 @@ export function IncludesStoneToggle({
   return (
     <label
       className={cn(
-        "inline-flex select-none items-center gap-2 text-sm font-semibold",
+        "inline-flex flex-wrap select-none items-center gap-2 text-sm font-semibold",
         disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
         className
       )}

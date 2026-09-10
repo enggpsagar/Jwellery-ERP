@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { RotateCcw } from "lucide-react"
+import { ToggleLeft } from "lucide-react"
 
 import { unarchiveVendor } from "@/lib/actions/vendor-actions"
 import { Button } from "@/components/ui/button"
@@ -55,12 +55,13 @@ export function ArchivedVendorRestoreButton({
       <Button
         type="button"
         variant="outline"
-        size="sm"
-        className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+        size="icon"
+        className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
         onClick={() => setOpen(true)}
+        title="Restore vendor"
+        aria-label={`Restore ${vendorName}`}
       >
-        <RotateCcw className="h-4 w-4" />
-        Restore
+        <ToggleLeft className="h-5 w-5" />
       </Button>
 
       <Dialog

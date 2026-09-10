@@ -113,10 +113,10 @@ export function TopBar({
                   forms/number series — asking here instead of guessing
                   avoids landing on the wrong one and having to start over. */}
               <DropdownMenuItem asChild>
-                <Link href="/billing/new">Pakka Invoice</Link>
+                <Link href="/billing/new">Tax Invoice</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/billing/kacha/new">Kacha Slip</Link>
+                <Link href="/billing/kacha/new">Estimate</Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -194,6 +194,15 @@ export function TopBar({
               {canAccessSettings ? (
                 <DropdownMenuItem asChild>
                   <Link href="/settings">Store Settings</Link>
+                </DropdownMenuItem>
+              ) : null}
+
+              {/* Same Admin/Super Admin gate as Settings above and the
+                  sidebar's own former /users entry (app-sidebar.tsx) — moved
+                  here instead of its own sidebar item. */}
+              {canAccessSettings ? (
+                <DropdownMenuItem asChild>
+                  <Link href="/users">Users</Link>
                 </DropdownMenuItem>
               ) : null}
 

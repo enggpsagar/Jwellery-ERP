@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 
-import { getPaymentsIn } from "@/lib/actions/payments-actions"
-import { getInvoiceFormCustomers } from "@/lib/actions/invoice-actions"
+import { getPaymentsIn, getPaymentFormCustomersWithBalance } from "@/lib/actions/payments-actions"
 
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { PaymentInDialog } from "@/components/payments/payment-in-dialog"
@@ -14,13 +13,13 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function PaymentInPage() {
-  const [rows, customers] = await Promise.all([getPaymentsIn(), getInvoiceFormCustomers()])
+  const [rows, customers] = await Promise.all([getPaymentsIn(), getPaymentFormCustomersWithBalance()])
 
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
         title="Payment In"
-        description="Every payment received from a customer — from an invoice, a Kacha slip, or recorded here directly."
+        description="Every payment received from a party — from an invoice, an Estimate, or recorded here directly."
         backHref="/dashboard"
         backLabel="Back to Dashboard"
         action={<PaymentInDialog customers={customers} />}

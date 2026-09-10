@@ -3,7 +3,9 @@ import { UserRole } from "@prisma/client";
 
 import { getCurrentUser } from "@/lib/auth/auth";
 import {
+  countCollaborationGrants,
   countMemberships,
+  listCollaborationGrants,
   listMemberships,
   resolveAccess,
   resolveActiveStoreId,
@@ -20,14 +22,23 @@ async function requestedStoreId(): Promise<string | null> {
 }
 
 /**
- * Stores the signed-in user may act on. Empty for a Super Admin — they are a
- * member of nothing and instead reach every store, so callers handle that
- * case separately.
+ * Stores the signed-in user may act on. For a SUPER_ADMIN this is the set
+ * of stores whose Collaboration Code they've redeemed (Store Owner
+ * Authorization) — see listCollaborationGrants — never every store in the
+ * system, unlike the old unconditional-access model.
  */
 export async function getUserStoreMemberships(): Promise<StoreMembership[]> {
   const user = await getCurrentUser();
-  if (!user?.id || user.role === UserRole.SUPER_ADMIN) return [];
+  if (!user?.id) return [];
+  if (user.role === UserRole.SUPER_ADMIN) return listCollaborationGrants(user.id);
   return listMemberships(user.id);
+}
+
+async function totalMembershipRowsFor(user: { id?: string; role?: string | null }): Promise<number> {
+  if (!user.id) return 0;
+  return user.role === UserRole.SUPER_ADMIN
+    ? countCollaborationGrants(user.id)
+    : countMemberships(user.id);
 }
 
 /**
@@ -45,10 +56,7 @@ export async function getEffectiveStoreId(): Promise<string | null> {
 
   // The row count separates "predates this table" from "all revoked"; only
   // the former may fall back to User.storeId.
-  const total =
-    user.id && user.role !== "SUPER_ADMIN"
-      ? await countMemberships(user.id)
-      : 0;
+  const total = await totalMembershipRowsFor(user);
 
   return resolveActiveStoreId(
     user,
@@ -79,10 +87,7 @@ export async function getEffectiveAccess(): Promise<{
   if (!user) return null;
 
   const memberships = await getUserStoreMemberships();
-  const total =
-    user.id && user.role !== "SUPER_ADMIN"
-      ? await countMemberships(user.id)
-      : 0;
+  const total = await totalMembershipRowsFor(user);
   const activeStoreId = resolveActiveStoreId(
     user,
     await requestedStoreId(),
@@ -122,8 +127,10 @@ export async function resolveActingStoreId(
   const user = await getCurrentUser();
   if (!user) throw new Error("Unauthorized");
 
-  if (user.role === UserRole.SUPER_ADMIN) return requested;
-
+  // No SUPER_ADMIN bypass here anymore — Store Owner Authorization means a
+  // Super Admin needs a redeemed Collaboration Code for `requested` too;
+  // getUserStoreMemberships() already returns that grant list for them, so
+  // the same check below applies uniformly.
   const memberships = await getUserStoreMemberships();
 
   if (!memberships.some((membership) => membership.storeId === requested)) {

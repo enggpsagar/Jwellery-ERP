@@ -15,7 +15,7 @@ import {
 import { useToast } from "@/components/providers/toast-provider"
 import { downloadBase64File } from "@/lib/download-file"
 
-export type DataTableExportFormat = "csv" | "xlsx"
+export type DataTableExportFormat = "csv" | "xlsx" | "pdf"
 
 export type DataTableExportParams = {
   selectedIds?: string[]
@@ -178,7 +178,9 @@ export function DataTableToolbar({
         result.fileName,
         format === "csv"
           ? "text/csv"
-          : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          : format === "pdf"
+            ? "application/pdf"
+            : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       )
       toast.success(result.message || `${entityLabel} exported successfully.`)
     } catch (error) {
@@ -191,7 +193,7 @@ export function DataTableToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 shadow-sm">
-      <div className="relative w-full sm:w-64">
+      <div className="relative w-full sm:w-80">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={search}
@@ -305,6 +307,7 @@ export function DataTableToolbar({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => handleExport("csv")}>CSV</DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExport("xlsx")}>Excel</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("pdf")}>PDF</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

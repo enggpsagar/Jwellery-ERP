@@ -20,11 +20,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const kachaInvoice = await getKachaInvoice(id)
     return {
       title: kachaInvoice
-        ? `Convert Kacha Invoice ${kachaInvoice.slipNumber}`
-        : "Convert Kacha Invoice",
+        ? `Convert Estimate ${kachaInvoice.slipNumber}`
+        : "Convert Estimate",
     }
   } catch {
-    return { title: "Convert Kacha Invoice" }
+    return { title: "Convert Estimate" }
   }
 }
 
@@ -46,10 +46,10 @@ export default async function ConvertKachaToPakkaPage({ params }: Props) {
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
-        title={`Convert ${kachaInvoice.slipNumber} to Pakka`}
+        title={`Convert ${kachaInvoice.slipNumber} to Tax Invoice`}
         description="Add GST details to issue a formal tax invoice for this sale."
         backHref={`/billing/kacha/${id}`}
-        backLabel="Back to Kacha Slip"
+        backLabel="Back to Estimate"
       />
 
       <ConvertToPakkaForm

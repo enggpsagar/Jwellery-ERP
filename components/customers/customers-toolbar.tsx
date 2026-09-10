@@ -118,15 +118,15 @@ export function CustomersToolbar({
       )
 
       if (!result.success || !result.fileBase64 || !result.fileName) {
-        toast.error(result.message || "Failed to export customers.")
+        toast.error(result.message || "Failed to export parties.")
         return
       }
 
       downloadBase64File(result.fileBase64, result.fileName)
-      toast.success(result.message || "Customers exported successfully.")
+      toast.success(result.message || "Parties exported successfully.")
     } catch (error) {
       console.error(error)
-      toast.error("Failed to export customers.")
+      toast.error("Failed to export parties.")
     } finally {
       setIsExporting(false)
     }
@@ -194,12 +194,12 @@ export function CustomersToolbar({
 
         <Button
           type="button"
-          variant="secondary"
           size="icon"
           onClick={handleExport}
           disabled={isExporting}
-          title={hasSelection ? `Export selected customers (${selectedCustomerIds.length})` : "Export customers"}
-          aria-label={hasSelection ? `Export selected customers (${selectedCustomerIds.length})` : "Export customers"}
+          title={hasSelection ? `Export selected parties (${selectedCustomerIds.length})` : "Export parties"}
+          aria-label={hasSelection ? `Export selected parties (${selectedCustomerIds.length})` : "Export parties"}
+          className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
         >
           {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}
         </Button>

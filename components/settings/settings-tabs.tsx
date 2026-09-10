@@ -1,10 +1,28 @@
 import Link from "next/link";
-import { Building2, Gem, Layers, MapPin, KeyRound, Percent } from "lucide-react";
+import { UserRole } from "@prisma/client";
+import { Building2, Gem, Layers, MapPin, KeyRound, Percent, ShieldCheck } from "lucide-react";
 
-type SettingsTab = "business" | "purity" | "taxonomy" | "locations" | "api-keys" | "gst-rates";
+type SettingsTab =
+  | "business"
+  | "purity"
+  | "taxonomy"
+  | "locations"
+  | "api-keys"
+  | "gst-rates"
+  | "collaboration";
 
 type SettingsTabsProps = {
   active: SettingsTab;
+  /**
+   * Collaboration is ADMIN-only (see its own page's doc comment — a Super
+   * Admin generating their own access code would defeat the point). A
+   * Super Admin can still reach every other settings page while working in
+   * a store they've been granted access to, so without this the tab would
+   * sit there next to ones that work, only to redirect straight back to
+   * /dashboard the moment it's clicked. Every settings page already
+   * computes `currentUser` and must pass its role here.
+   */
+  role?: UserRole;
 };
 
 const TABS: {
@@ -23,12 +41,15 @@ const TABS: {
   { id: "locations", href: "/settings/locations", label: "Locations", icon: MapPin, tint: "var(--chart-4)" },
   { id: "api-keys", href: "/settings/api-keys", label: "API Keys", icon: KeyRound, tint: "var(--chart-5)" },
   { id: "gst-rates", href: "/settings/gst-rates", label: "GST Rates", icon: Percent, tint: "#0891b2" },
+  { id: "collaboration", href: "/settings/collaboration", label: "Collaboration", icon: ShieldCheck, tint: "#be123c" },
 ];
 
-export function SettingsTabs({ active }: SettingsTabsProps) {
+export function SettingsTabs({ active, role }: SettingsTabsProps) {
+  const visibleTabs = TABS.filter((tab) => tab.id !== "collaboration" || role === UserRole.ADMIN);
+
   return (
     <div className="flex flex-wrap gap-1 border-b">
-      {TABS.map((tab) => {
+      {visibleTabs.map((tab) => {
         const Icon = tab.icon;
         const isActive = tab.id === active;
 

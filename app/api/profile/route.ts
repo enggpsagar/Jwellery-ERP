@@ -3,6 +3,7 @@ import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/auth";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
   try {
@@ -41,7 +42,7 @@ export async function GET() {
 
     return NextResponse.json(profile);
   } catch (err) {
-    console.error(err);
+    logger.error("GET /api/profile error", err);
 
     return NextResponse.json(
       { message: "Unauthorized" },
@@ -117,7 +118,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json(updated);
   } catch (err) {
-    console.error(err);
+    logger.error("PATCH /api/profile error", err);
 
     return NextResponse.json(
       {
@@ -168,7 +169,7 @@ export async function DELETE() {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error(err);
+    logger.error("DELETE /api/profile error", err);
 
     return NextResponse.json(
       { message: "Unable to delete account." },

@@ -132,7 +132,7 @@ export function ReturnItemsDialog({
             title="Return Items"
           >
             <Undo2 className="h-4 w-4" />
-            Items
+            Return Items
           </Button>
         </DialogTrigger>
       )}
@@ -141,7 +141,7 @@ export function ReturnItemsDialog({
         <DialogHeader>
           <DialogTitle>Return items from {invoiceNumber}</DialogTitle>
           <DialogDescription>
-            Selected items are restored to inventory and refunded to the customer's
+            Selected items are restored to inventory and refunded to the party's
             ledger as a Credit Note. This can't be undone from here.
           </DialogDescription>
         </DialogHeader>

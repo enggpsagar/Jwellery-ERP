@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts"
+import { Cell, Pie, PieChart } from "recharts"
 
 import {
   Card,
@@ -51,7 +51,8 @@ const PERIOD_OPTIONS = Object.keys(PERIOD_LABELS) as RevenueByMetalPeriod[]
 /**
  * Fixed slot order, never cycled. These are the validated jewellery hues from
  * globals.css; a 6th category folds into "Other" below rather than inventing
- * a hue, which would land outside the validated set.
+ * a hue, which would land outside the validated set. Used only as the
+ * fallback for a metal name that isn't recognized below.
  */
 const CHART_COLORS = [
   "var(--chart-1)",
@@ -63,12 +64,68 @@ const CHART_COLORS = [
 
 const MAX_SLICES = CHART_COLORS.length
 
-const compact = (v: number) =>
-  v >= 100000
-    ? `₹${(v / 100000).toFixed(1)}L`
-    : v >= 1000
-      ? `₹${(v / 1000).toFixed(0)}K`
-      : `₹${v}`
+/**
+ * Real metal/stone hues instead of the generic chart palette, per explicit
+ * request — a reader recognizes "gold" and "diamond" by their own colour
+ * faster than by a legend lookup. Every wedge still carries its own
+ * category+percentage label directly on it (renderPieSliceLabel below,
+ * with a dark outline behind white text), so identity never depends on
+ * getting the exact hue right even for an edge case like a very light
+ * "Silver" wedge.
+ */
+const METAL_COLORS: Record<string, string> = {
+  gold: "#D4AF37",
+  silver: "#B0B7C1",
+  diamond: "#7EC8E3",
+  platinum: "#A8A9AD",
+  unspecified: "#9CA3AF",
+}
+
+function colorFor(category: string, index: number) {
+  return METAL_COLORS[category.trim().toLowerCase()] ?? CHART_COLORS[index % CHART_COLORS.length]
+}
+
+const RADIAN = Math.PI / 180
+
+/**
+ * Percentage only, drawn inside the wedge rather than outside it — an
+ * outside label on a large slice (e.g. 68%) can sit far enough left/up to
+ * clip against the chart's own bounding box. Category names stay in the
+ * tooltip and the legend table below instead of risking that overflow.
+ * Skipped for slivers too small to hold readable text.
+ */
+function renderPieSliceLabel(props: {
+  cx?: number
+  cy?: number
+  midAngle?: number
+  innerRadius?: number
+  outerRadius?: number
+  percent?: number
+}) {
+  const { cx = 0, cy = 0, midAngle = 0, innerRadius = 0, outerRadius = 0, percent = 0 } = props
+  if (percent < 0.05) return null
+
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.6
+  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor="middle"
+      dominantBaseline="central"
+      fill="#fff"
+      fontSize={12}
+      fontWeight={600}
+      paintOrder="stroke"
+      stroke="rgba(0,0,0,0.35)"
+      strokeWidth={3}
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  )
+}
 
 type CategoryChartProps = {
   initialData: RevenueByMetal
@@ -76,18 +133,13 @@ type CategoryChartProps = {
 }
 
 /**
- * Horizontal bar, not the donut this used to be.
- *
- * Two reasons. A donut compares every slice against every other, and on that
- * all-pairs test the palette fails outright (normal-vision ΔE 12.9 between two
- * of the five, below the 15 floor) — a bar chart only needs adjacent pairs to
- * separate, which the palette passes at 8.4. And part-to-whole across several
- * named categories reads better as a bar: lengths are directly comparable,
- * where slice angles are not.
- *
- * Category names sit on the axis, so identity never depends on colour, and the
- * value labels are also the "relief" the palette's gold slot requires — it
- * falls below 3:1 against the light surface.
+ * Pie chart, per explicit request. An earlier pass moved this to a
+ * horizontal bar because the 5-colour palette fails an all-pairs contrast
+ * test a donut's adjacent-and-opposite slices both rely on (two colours sit
+ * below the ΔE 15 floor). Back on a pie now, every slice still carries its
+ * own category + percentage label directly on the wedge — and the table
+ * below repeats category/percentage in text — so identity never depends on
+ * colour alone even though the chart form does.
  */
 export function CategoryChart({ initialData, initialPeriod }: CategoryChartProps) {
   const [period, setPeriod] = useState(initialPeriod)
@@ -121,7 +173,7 @@ export function CategoryChart({ initialData, initialPeriod }: CategoryChartProps
 
   const chartData = rows.map((c, i) => ({
     ...c,
-    fill: CHART_COLORS[i % CHART_COLORS.length],
+    fill: colorFor(c.category, i),
   }))
 
   const total = chartData.reduce((acc, c) => acc + c.value, 0)
@@ -168,32 +220,11 @@ export function CategoryChart({ initialData, initialPeriod }: CategoryChartProps
           <>
             <ChartContainer
               config={chartConfig}
-              className="h-[240px] w-full"
+              className="mx-auto aspect-square h-[240px]"
             >
-              <BarChart
-                data={chartData}
-                layout="vertical"
-                margin={{ left: 4, right: 56, top: 4, bottom: 4 }}
-                barCategoryGap={10}
-              >
-                {/* Recessive grid: reference, not furniture. */}
-                <CartesianGrid
-                  horizontal={false}
-                  strokeDasharray="3 3"
-                  stroke="var(--border)"
-                />
-                <XAxis type="number" hide />
-                <YAxis
-                  type="category"
-                  dataKey="category"
-                  tickLine={false}
-                  axisLine={false}
-                  width={104}
-                  tickMargin={8}
-                  tick={{ fontSize: 12 }}
-                />
+              <PieChart>
                 <ChartTooltip
-                  cursor={{ fill: "var(--muted)", opacity: 0.5 }}
+                  cursor={false}
                   content={
                     <ChartTooltipContent
                       hideLabel
@@ -210,18 +241,19 @@ export function CategoryChart({ initialData, initialPeriod }: CategoryChartProps
                     />
                   }
                 />
-                {/* 4px rounded data-end, square against the baseline. */}
-                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                  <LabelList
-                    dataKey="value"
-                    position="right"
-                    offset={8}
-                    className="fill-foreground"
-                    fontSize={11}
-                    formatter={(v: unknown) => compact(Number(v))}
-                  />
-                </Bar>
-              </BarChart>
+                <Pie
+                  data={chartData}
+                  dataKey="value"
+                  nameKey="category"
+                  outerRadius={95}
+                  labelLine={false}
+                  label={renderPieSliceLabel}
+                >
+                  {chartData.map((entry) => (
+                    <Cell key={entry.category} fill={entry.fill} />
+                  ))}
+                </Pie>
+              </PieChart>
             </ChartContainer>
 
             {/* Table view: the share each category holds, which lengths alone

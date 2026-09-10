@@ -1,8 +1,9 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Pencil, Trash2 } from "lucide-react"
+import { ListChecks, Pencil, Trash2 } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 
 import type { Purchase } from "@/lib/actions/purchase-actions"
@@ -28,6 +29,11 @@ type PurchaseRowActionsProps = {
 export function PurchaseRowActions({ purchase, locations }: PurchaseRowActionsProps) {
   const router = useRouter()
   const toast = useToast()
+
+  // Full line-item editing is only offered for DRAFT/PARTIAL — updatePurchase
+  // itself re-checks this (and whether the stock it created has since moved)
+  // server-side regardless, same defense-in-depth as Invoice's canFullyEdit.
+  const canEditItems = purchase.status === "DRAFT" || purchase.status === "PARTIAL"
 
   const [editOpen, setEditOpen] = React.useState(false)
   const [confirmDelete, setConfirmDelete] = React.useState(false)
@@ -56,10 +62,19 @@ export function PurchaseRowActions({ purchase, locations }: PurchaseRowActionsPr
   return (
     <>
       <div className="flex items-center justify-end gap-2">
+        {canEditItems && (
+          <Button asChild variant="outline" className="gap-2">
+            <Link href={`/purchases/${purchase.id}/edit`}>
+              <ListChecks className="h-4 w-4" />
+              Edit Items
+            </Link>
+          </Button>
+        )}
+
         <button
           type="button"
           onClick={() => setEditOpen(true)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-indigo-200 text-indigo-600 transition hover:bg-indigo-50"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700"
           aria-label={`Edit ${purchase.purchaseNumber}`}
           title="Edit purchase"
         >
@@ -69,7 +84,7 @@ export function PurchaseRowActions({ purchase, locations }: PurchaseRowActionsPr
         <button
           type="button"
           onClick={() => setConfirmDelete(true)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700"
           aria-label={`Delete ${purchase.purchaseNumber}`}
           title="Delete purchase"
         >
@@ -121,7 +136,13 @@ export function PurchaseRowActions({ purchase, locations }: PurchaseRowActionsPr
             >
               Cancel
             </Button>
-            <Button type="button" variant="destructive" onClick={handleDelete} disabled={loading}>
+            <Button
+              type="button"
+              variant="destructive"
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={handleDelete}
+              disabled={loading}
+            >
               {loading ? (
                 <>
                   <Loader className="mr-2 h-4 w-4" />

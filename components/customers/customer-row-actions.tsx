@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Archive, Pencil, Trash2 } from "lucide-react"
+import { Pencil, ToggleRight, Trash2 } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 
 import type { Customer } from "@/lib/actions/customer-actions"
@@ -58,7 +58,7 @@ export function CustomerRowActions({
       }
     } catch (error) {
       console.error(error)
-      toast.error("Failed to archive customer")
+      toast.error("Failed to archive party")
     } finally {
       setLoading(false)
     }
@@ -78,7 +78,7 @@ export function CustomerRowActions({
       }
     } catch (error) {
       console.error(error)
-      toast.error("Failed to delete customer")
+      toast.error("Failed to delete party")
     } finally {
       setLoading(false)
     }
@@ -91,9 +91,9 @@ export function CustomerRowActions({
             record holds and does not fit a modal on a phone. */}
         <Link
           href={`/customers/${customer.id}/edit?returnTo=${encodeURIComponent("/customers")}`}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-indigo-200 text-indigo-600 transition hover:bg-indigo-50"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700"
           aria-label={`Edit ${customer.name}`}
-          title="Edit customer"
+          title="Edit party"
         >
           <Pencil className="h-4 w-4" />
         </Link>
@@ -103,17 +103,17 @@ export function CustomerRowActions({
           onClick={() => setConfirmAction("archive")}
           className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-amber-200 text-amber-700 transition hover:bg-amber-50"
           aria-label={`Archive ${customer.name}`}
-          title="Archive customer"
+          title="Archive party"
         >
-          <Archive className="h-4 w-4" />
+          <ToggleRight className="h-5 w-5" />
         </button>
 
         <button
           type="button"
           onClick={() => setConfirmAction("delete")}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700"
           aria-label={`Delete ${customer.name}`}
-          title="Delete customer"
+          title="Delete party"
         >
           <Trash2 className="h-4 w-4" />
         </button>
@@ -129,7 +129,7 @@ export function CustomerRowActions({
           {confirmAction === "archive" && (
             <>
               <DialogHeader>
-                <DialogTitle>Archive Customer</DialogTitle>
+                <DialogTitle>Archive Party</DialogTitle>
                 <DialogDescription>
                   Are you sure you want to archive{" "}
                   <span className="font-medium text-foreground">
@@ -138,7 +138,7 @@ export function CustomerRowActions({
                   ?
                   <br />
                   <br />
-                  Archived customers are removed from the active customer list,
+                  Archived parties are removed from the active party list,
                   but their historical records remain in the system.
                 </DialogDescription>
               </DialogHeader>
@@ -165,7 +165,7 @@ export function CustomerRowActions({
                       Archiving...
                     </>
                   ) : (
-                    "Archive Customer"
+                    "Archive Party"
                   )}
                 </Button>
               </DialogFooter>
@@ -175,7 +175,7 @@ export function CustomerRowActions({
           {confirmAction === "delete" && (
             <>
               <DialogHeader>
-                <DialogTitle>Delete Customer</DialogTitle>
+                <DialogTitle>Delete Party</DialogTitle>
                 <DialogDescription>
                   Are you sure you want to permanently delete{" "}
                   <span className="font-medium text-foreground">
@@ -188,7 +188,7 @@ export function CustomerRowActions({
                   <br />
                   <br />
                   <span className="text-red-600">
-                    Note: deletion is allowed only if this customer has no
+                    Note: deletion is allowed only if this party has no
                     invoice or ledger history.
                   </span>
                 </DialogDescription>
@@ -207,6 +207,7 @@ export function CustomerRowActions({
                 <Button
                   type="button"
                   variant="destructive"
+                  className="bg-red-600 text-white hover:bg-red-700"
                   onClick={handleDelete}
                   disabled={loading}
                 >
@@ -216,7 +217,7 @@ export function CustomerRowActions({
                       Deleting...
                     </>
                   ) : (
-                    "Delete Customer"
+                    "Delete Party"
                   )}
                 </Button>
               </DialogFooter>

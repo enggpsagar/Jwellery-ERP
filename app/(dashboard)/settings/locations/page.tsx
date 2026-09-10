@@ -37,7 +37,7 @@ export default async function LocationsSettingsPage() {
         backLabel="Back to Dashboard"
       />
 
-      <SettingsTabs active="locations" />
+      <SettingsTabs active="locations" role={currentUser?.role} />
 
       <LocationSettingsForm locations={locations} states={states} canEdit={canEdit} />
     </main>

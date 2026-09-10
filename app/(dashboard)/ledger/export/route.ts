@@ -7,6 +7,7 @@ import {
   getMetalDailyLedger,
 } from "@/lib/actions/ledger-actions"
 import { buildCsvExport, buildExcelExport } from "@/lib/excel-export"
+import { logger } from "@/lib/logger";
 
 type Scope = "entries" | "metal-wise"
 type Format = "csv" | "excel"
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Ledger export failed:", error)
+    logger.error("Ledger export failed", error)
     return NextResponse.json(
       { success: false, message: "Failed to export ledger" },
       { status: 500 },

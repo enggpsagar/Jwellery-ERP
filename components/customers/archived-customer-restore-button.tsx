@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { RotateCcw } from "lucide-react"
+import { ToggleLeft } from "lucide-react"
 
 import { unarchiveCustomer } from "@/lib/actions/customer-actions"
 import { Button } from "@/components/ui/button"
@@ -47,7 +47,7 @@ export function ArchivedCustomerRestoreButton({
       }
     } catch (error) {
       console.error(error)
-      toast.error("Failed to restore customer")
+      toast.error("Failed to restore party")
     } finally {
       setLoading(false)
     }
@@ -58,12 +58,13 @@ export function ArchivedCustomerRestoreButton({
       <Button
         type="button"
         variant="outline"
-        size="sm"
-        className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+        size="icon"
+        className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
         onClick={() => setOpen(true)}
+        title="Restore party"
+        aria-label={`Restore ${customerName}`}
       >
-        <RotateCcw className="h-4 w-4" />
-        Restore
+        <ToggleLeft className="h-5 w-5" />
       </Button>
 
       <Dialog
@@ -74,10 +75,10 @@ export function ArchivedCustomerRestoreButton({
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Restore Customer</DialogTitle>
+            <DialogTitle>Restore Party</DialogTitle>
             <DialogDescription>
               Restore <span className="font-medium text-foreground">{customerName}</span>{" "}
-              to the active customer list?
+              to the active party list?
             </DialogDescription>
           </DialogHeader>
 
@@ -98,7 +99,7 @@ export function ArchivedCustomerRestoreButton({
                   Restoring...
                 </>
               ) : (
-                "Restore Customer"
+                "Restore Party"
               )}
             </Button>
           </DialogFooter>

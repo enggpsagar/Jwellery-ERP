@@ -16,6 +16,7 @@ import {
   newSupportTicketEmail,
   supportTicketReplyEmail,
 } from "@/lib/email-templates";
+import { logger } from "@/lib/logger";
 
 /**
  * The "Contact Us becomes a support ticket" workflow — see
@@ -248,7 +249,7 @@ async function notifySuperAdminsOfNewTicket(params: {
       ),
     );
   } catch (error) {
-    console.error("notifySuperAdminsOfNewTicket error:", error);
+    logger.error("notifySuperAdminsOfNewTicket error", error);
   }
 }
 
@@ -281,7 +282,7 @@ async function notifySubmitterOfReply(params: {
       text: mail.text,
     });
   } catch (error) {
-    console.error("notifySubmitterOfReply error:", error);
+    logger.error("notifySubmitterOfReply error", error);
   }
 }
 
@@ -315,7 +316,7 @@ async function notifySuperAdminsOfReply(params: {
       ),
     );
   } catch (error) {
-    console.error("notifySuperAdminsOfReply error:", error);
+    logger.error("notifySuperAdminsOfReply error", error);
   }
 }
 
@@ -417,7 +418,7 @@ export async function submitPublicSupportTicket(
       message: "Thanks — your message has been received. We'll get back to you at the email you provided.",
     };
   } catch (error) {
-    console.error("submitPublicSupportTicket error:", error);
+    logger.error("submitPublicSupportTicket error", error);
     return { success: false, message: "Failed to submit your message. Please try again." };
   }
 }
@@ -501,7 +502,7 @@ export async function submitAuthenticatedSupportTicket(
       message: "Your ticket has been submitted. You can track its status below.",
     };
   } catch (error) {
-    console.error("submitAuthenticatedSupportTicket error:", error);
+    logger.error("submitAuthenticatedSupportTicket error", error);
     return { success: false, message: "Failed to submit your ticket. Please try again." };
   }
 }
@@ -694,7 +695,7 @@ export async function replySupportTicket(
 
     return { success: true, message: "Reply sent" };
   } catch (error) {
-    console.error("replySupportTicket error:", error);
+    logger.error("replySupportTicket error", error);
     return { success: false, message: "Failed to send your reply. Please try again." };
   }
 }
@@ -726,7 +727,7 @@ export async function updateSupportTicketStatus(
 
     return { success: true, message: "Status updated" };
   } catch (error) {
-    console.error("updateSupportTicketStatus error:", error);
+    logger.error("updateSupportTicketStatus error", error);
     return { success: false, message: "Failed to update status" };
   }
 }

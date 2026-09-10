@@ -73,7 +73,6 @@ export function UserDetailContent({
             }
           />
           <DetailField label="Status" value={<StatusBadge status={user.status} />} />
-          <DetailField label="Account" value={user.isActive ? "Active" : "Deactivated"} />
           <DetailField
             label="Added"
             value={formatShortDate(user.createdAt)}

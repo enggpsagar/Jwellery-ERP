@@ -9,7 +9,8 @@ import { formatLedgerSource } from "@/lib/ledger-format"
 import { partyGstTypeLabel } from "@/lib/gst"
 import { formatShortDate } from "@/lib/utils"
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar"
-import { buildExcelExport, buildCsvExportBase64 } from "@/lib/excel-export"
+import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export"
+import { logger } from "@/lib/logger";
 
 export type Vendor = {
   id: string
@@ -69,7 +70,7 @@ export type VendorFormState = {
   }
 }
 
-export type VendorSortBy = "name" | "createdAt" | "openingBalance"
+export type VendorSortBy = "name" | "createdAt" | "openingBalance" | "phone" | "city" | "state"
 export type SortOrder = "asc" | "desc"
 
 export type GetVendorsParams = {
@@ -99,7 +100,7 @@ type ExportVendorsParams = {
   search?: string
   sortBy?: VendorSortBy
   sortOrder?: SortOrder
-  format?: "csv" | "xlsx"
+  format?: "csv" | "xlsx" | "pdf"
 }
 
 export type VendorLedgerEntryItem = {
@@ -159,6 +160,9 @@ function getVendorOrderBy(
 ) {
   if (sortBy === "name") return { name: sortOrder }
   if (sortBy === "openingBalance") return { openingBalance: sortOrder }
+  if (sortBy === "phone") return { phone: sortOrder }
+  if (sortBy === "city") return { city: sortOrder }
+  if (sortBy === "state") return { state: sortOrder }
   return { createdAt: sortOrder }
 }
 
@@ -451,7 +455,9 @@ export async function exportVendorsToExcel(
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "vendors")
-        : buildExcelExport(rows, "Vendors", "vendors")
+        : params.format === "pdf"
+          ? buildPdfExportBase64(rows, "Vendors", "vendors")
+          : buildExcelExport(rows, "Vendors", "vendors")
 
     return {
       success: true,
@@ -460,7 +466,7 @@ export async function exportVendorsToExcel(
       fileBase64,
     }
   } catch (error) {
-    console.error("exportVendorsToExcel error:", error)
+    logger.error("exportVendorsToExcel error", error)
     return {
       success: false,
       message: "Failed to export vendors.",
@@ -532,7 +538,7 @@ export async function addVendor(
       vendor: created,
     }
   } catch (error) {
-    console.error("addVendor error:", error)
+    logger.error("addVendor error", error)
     return {
       success: false,
       message: "Failed to add vendor",
@@ -611,7 +617,7 @@ export async function updateVendor(
       message: "Vendor updated successfully",
     }
   } catch (error) {
-    console.error("updateVendor error:", error)
+    logger.error("updateVendor error", error)
     return {
       success: false,
       message: "Failed to update vendor",
@@ -646,7 +652,7 @@ export async function archiveVendor(id: string): Promise<VendorFormState> {
       message: "Vendor archived successfully",
     }
   } catch (error) {
-    console.error("archiveVendor error:", error)
+    logger.error("archiveVendor error", error)
     return {
       success: false,
       message: "Failed to archive vendor",
@@ -681,7 +687,7 @@ export async function unarchiveVendor(id: string): Promise<VendorFormState> {
       message: "Vendor restored successfully",
     }
   } catch (error) {
-    console.error("unarchiveVendor error:", error)
+    logger.error("unarchiveVendor error", error)
     return {
       success: false,
       message: "Failed to restore vendor",
@@ -733,7 +739,7 @@ export async function deleteVendor(id: string): Promise<VendorFormState> {
       message: "Vendor deleted successfully",
     }
   } catch (error) {
-    console.error("deleteVendor error:", error)
+    logger.error("deleteVendor error", error)
     return {
       success: false,
       message: "Failed to delete vendor",

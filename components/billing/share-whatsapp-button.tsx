@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { MessageCircle } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 
 import { Button } from "@/components/ui/button"
+import { WhatsAppIcon } from "@/components/shared/whatsapp-icon"
 import { useToast } from "@/components/providers/toast-provider"
 
 type ShareWhatsAppButtonProps = {
@@ -101,17 +101,14 @@ export function ShareWhatsAppButton({
 
   return (
     <Button
+      size="icon"
       onClick={handleClick}
       disabled={!digits || loading}
-      title={!digits ? "This customer has no phone number on file" : "Share on WhatsApp"}
+      title={!digits ? "This party has no phone number on file" : "Share on WhatsApp"}
+      aria-label="Share on WhatsApp"
       className="bg-[var(--chart-3)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-3)_88%,black)]"
     >
-      {loading ? (
-        <Loader className="h-4 w-4 mr-1" />
-      ) : (
-        <MessageCircle className="h-4 w-4 mr-1" />
-      )}
-      WhatsApp
+      {loading ? <Loader className="h-4 w-4" /> : <WhatsAppIcon className="h-4 w-4" />}
     </Button>
   )
 }

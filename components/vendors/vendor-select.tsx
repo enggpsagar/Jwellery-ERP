@@ -97,7 +97,7 @@ export function VendorSelect({
           onChange?.(value, vendors.find((vendor) => vendor.id === value))
         }}
       >
-        <SelectTrigger>
+        <SelectTrigger className="w-full">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
 

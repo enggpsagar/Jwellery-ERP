@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
   try {
@@ -45,7 +46,7 @@ export async function GET() {
         : null,
     });
   } catch (error) {
-    console.error("Metal rate API error:", error);
+    logger.error("Metal rate API error", error);
 
     return NextResponse.json(
       {

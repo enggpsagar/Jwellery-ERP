@@ -93,7 +93,7 @@ export function PaymentsInTable({ rows }: { rows: PaymentInRow[] }) {
           <div className="relative sm:max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search customer, invoice, notes..."
+              placeholder="Search party, invoice, notes..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value)
@@ -109,7 +109,7 @@ export function PaymentsInTable({ rows }: { rows: PaymentInRow[] }) {
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
-                <TableHead>Customer</TableHead>
+                <TableHead>Party</TableHead>
                 <TableHead>Method</TableHead>
                 <TableHead>Invoice</TableHead>
                 <TableHead>Description</TableHead>

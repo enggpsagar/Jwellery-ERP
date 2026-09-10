@@ -15,7 +15,7 @@ export function CancelDraftOrderButton({ orderId }: { orderId: string }) {
 
   if (!confirming) {
     return (
-      <Button type="button" variant="outline" onClick={() => setConfirming(true)}>
+      <Button type="button" variant="destructive" onClick={() => setConfirming(true)}>
         Cancel Order
       </Button>
     )

@@ -103,7 +103,7 @@ export function BulkDeleteButton({
         type="button"
         variant="destructive"
         size="sm"
-        className="gap-2"
+        className="gap-2 bg-red-600 text-white hover:bg-red-700"
         onClick={() => setOpen(true)}
       >
         <Trash2 className="h-4 w-4" />
@@ -152,7 +152,12 @@ export function BulkDeleteButton({
                 <Button variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
                   Cancel
                 </Button>
-                <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
+                <Button
+                  variant="destructive"
+                  className="bg-red-600 text-white hover:bg-red-700"
+                  onClick={handleDelete}
+                  disabled={isPending}
+                >
                   {isPending ? "Deleting..." : "Delete"}
                 </Button>
               </>

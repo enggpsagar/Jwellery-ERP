@@ -94,7 +94,7 @@ export function StoreTable({
             />
             <TableHead>City</TableHead>
             <TableHead>Users</TableHead>
-            <TableHead>Customers</TableHead>
+            <TableHead>Parties</TableHead>
             <TableHead>Invoices</TableHead>
           </TableRow>
         </TableHeader>

@@ -20,12 +20,12 @@ export default async function NewDraftOrderPage() {
   ])
 
   return (
-    <main className="space-y-6 p-6">
+    <main className="mx-auto max-w-5xl space-y-6 p-6">
       <ResetFormWrapper
         requireConfirm
         header={{
           title: "New Draft Order",
-          description: "Capture a phone/counter order — what the customer wants, before it exists as a real piece.",
+          description: "Capture a phone/counter order — what the party wants, before it exists as a real piece.",
           backHref: "/orders",
           backLabel: "Back to Draft Orders",
         }}

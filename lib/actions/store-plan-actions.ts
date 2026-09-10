@@ -13,11 +13,13 @@ import { sendMail } from "@/lib/mailer";
 import { renewalContactRequestEmail } from "@/lib/email-templates";
 import { getSuperAdminEmails } from "@/lib/super-admin";
 import { APP_NAME } from "@/lib/constants/app";
+import { logger } from "@/lib/logger";
 
 export type StorePlanOverview = {
   storeId: string;
   name: string;
   code: string;
+  email: string | null;
   registeredAt: Date;
   isActive: boolean;
 
@@ -90,6 +92,7 @@ async function loadStorePlanOverview(
       id: true,
       name: true,
       code: true,
+      email: true,
       createdAt: true,
       isActive: true,
       planId: true,
@@ -116,6 +119,7 @@ async function loadStorePlanOverview(
     storeId: store.id,
     name: store.name,
     code: store.code,
+    email: store.email,
     registeredAt: store.createdAt,
     isActive: store.isActive,
 
@@ -166,6 +170,7 @@ export async function getStorePlanOverviews(
       id: true,
       name: true,
       code: true,
+      email: true,
       createdAt: true,
       isActive: true,
       planId: true,
@@ -193,6 +198,7 @@ export async function getStorePlanOverviews(
       storeId: store.id,
       name: store.name,
       code: store.code,
+      email: store.email,
       registeredAt: store.createdAt,
       isActive: store.isActive,
       planName: store.plan?.name ?? null,
@@ -337,7 +343,7 @@ export async function sendRenewalContactRequestAction(
       message: "Your message has been sent. We'll get back to you shortly.",
     };
   } catch (error) {
-    console.error("sendRenewalContactRequestAction error:", error);
+    logger.error("sendRenewalContactRequestAction error", error);
     return { success: false, message: "Failed to send your message. Please try again." };
   }
 }
@@ -363,7 +369,7 @@ export async function setStoreReminderChannels(
 
     return { success: true, message: "Reminder settings updated." };
   } catch (error) {
-    console.error("setStoreReminderChannels error:", error);
+    logger.error("setStoreReminderChannels error", error);
     return { success: false, message: "Failed to update reminder settings." };
   }
 }

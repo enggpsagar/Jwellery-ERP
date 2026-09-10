@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { UserRole } from "@prisma/client";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Store as StoreIcon } from "lucide-react";
 
 import { authOptions } from "@/lib/auth/auth-options";
 import { prisma } from "@/lib/prisma";
@@ -63,6 +63,36 @@ function NoStoreAccessNotice() {
       <Link href="/stores">
         <Button>Go to Stores</Button>
       </Link>
+    </div>
+  );
+}
+
+/**
+ * A Super Admin who DOES hold at least one Collaboration Code grant, but
+ * has deliberately cleared the switcher back to "All Stores (Global View)"
+ * — see StoreSwitcher's own doc comment on that option and
+ * resolveActiveStoreId's Super-Admin-only null branch. Every store-scoped
+ * page's own server action still calls requireStoreScope() and throws in
+ * this state (unchanged, and correctly so — it's the real, final guard);
+ * without this notice that throw only surfaced as the generic error.tsx
+ * boundary's "Something went wrong", which reads as a crash rather than the
+ * expected, common result of an intentional choice. This renders instead of
+ * {children} for exactly that case, on every route a store is actually
+ * needed for.
+ */
+function SelectStoreNotice() {
+  return (
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-6 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+        <StoreIcon className="h-6 w-6 text-blue-600" />
+      </div>
+
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold">No store selected</h2>
+        <p className="max-w-md text-sm text-muted-foreground">
+          Please select a store from the dropdown above to continue.
+        </p>
+      </div>
     </div>
   );
 }
@@ -131,8 +161,10 @@ export default async function DashboardLayout({
         />
 
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50 p-6">
-          {isSuperAdmin && stores.length === 0 && !isStoreExemptRoute ? (
+          {isSuperAdmin && !isStoreExemptRoute && stores.length === 0 ? (
             <NoStoreAccessNotice />
+          ) : isSuperAdmin && !isStoreExemptRoute && !activeStoreId ? (
+            <SelectStoreNotice />
           ) : (
             children
           )}

@@ -12,6 +12,11 @@ import { ExportMenu } from "@/components/shared/export-menu"
 import { ReportDateFilter } from "@/components/reports/report-date-filter"
 import { useReportTable } from "@/components/reports/use-report-table"
 import { ReportSearchBar, SortableTh, ReportPagination } from "@/components/reports/report-table-controls"
+import { emailReportToMe } from "@/lib/actions/report-email-actions"
+import { useToast } from "@/components/providers/toast-provider"
+import { Button } from "@/components/ui/button"
+import { Loader } from "@/components/ui/loader"
+import { Mail } from "lucide-react"
 
 type SalesReport = {
   invoiceCount: number
@@ -242,17 +247,37 @@ export function ReportsTabs({
 }: ReportsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("sales")
   const searchParams = useSearchParams()
+  const toast = useToast()
+  const [emailingReport, setEmailingReport] = useState(false)
+
+  const activeRange = useMemo(() => {
+    if (!DATE_AWARE_TABS.has(activeTab)) return {}
+    const from = searchParams.get("from")
+    const to = searchParams.get("to")
+    return { from: from ?? undefined, to: to ?? undefined }
+  }, [activeTab, searchParams])
 
   const exportHref = useMemo(() => {
     const params = new URLSearchParams({ type: activeTab })
-    const from = searchParams.get("from")
-    const to = searchParams.get("to")
-    if (DATE_AWARE_TABS.has(activeTab)) {
-      if (from) params.set("from", from)
-      if (to) params.set("to", to)
-    }
+    if (activeRange.from) params.set("from", activeRange.from)
+    if (activeRange.to) params.set("to", activeRange.to)
     return `/reports/export?${params.toString()}`
-  }, [activeTab, searchParams])
+  }, [activeTab, activeRange])
+
+  // Item Ledger and Gold Flow especially can be too slow/heavy to
+  // comfortably wait on in the browser (unbounded, deeply-joined queries) —
+  // this delivers the same data as an Excel attachment instead, without
+  // making the merchant wait on the page at all.
+  const handleEmailReport = async () => {
+    setEmailingReport(true)
+    try {
+      const result = await emailReportToMe(activeTab, activeRange)
+      if (result.success) toast.success(result.message)
+      else toast.error(result.message)
+    } finally {
+      setEmailingReport(false)
+    }
+  }
 
   // One useReportTable per tab's row list, called unconditionally (hooks
   // can't be conditional on activeTab) — each is cheap client-side memo
@@ -401,7 +426,18 @@ export function ReportsTabs({
           ))}
         </div>
 
-        <div className="pb-2">
+        <div className="flex items-center gap-2 pb-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleEmailReport}
+            disabled={emailingReport}
+            className="gap-1.5"
+          >
+            {emailingReport ? <Loader className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+            Email this report
+          </Button>
           <ExportMenu
             href={exportHref}
             label={`Export ${TABS.find((tab) => tab.key === activeTab)?.label}`}

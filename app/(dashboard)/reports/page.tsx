@@ -20,6 +20,13 @@ export const metadata: Metadata = {
   title: "Reports",
 }
 
+/** All 9 reports run in parallel on every load (see the Promise.all below) —
+ *  Item Ledger and Gold Flow especially can exceed the platform's default
+ *  budget as data grows. Also covers "Email this report"/"Email all
+ *  reports" (lib/actions/report-email-actions.ts), which Next.js runs
+ *  under this same route segment's config when invoked from this page. */
+export const maxDuration = 60
+
 type Props = {
   searchParams: Promise<{ from?: string; to?: string }>
 }

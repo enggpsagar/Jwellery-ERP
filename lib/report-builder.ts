@@ -1,33 +1,36 @@
-import { LedgerEntryType } from "@prisma/client";
+import { LedgerEntryType, ReportFrequency } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { buildMultiSheetExcelExport } from "@/lib/excel-export";
 import { formatShortDate } from "@/lib/utils";
 
 /**
- * The previous day's transactions for one store: credits, debits, sales and
- * purchases, summarised in the email body and itemised in an attached
- * workbook.
+ * One store's trading activity over an arbitrary period — day, month,
+ * quarter or year — summarised in the email body and itemised in an
+ * attached workbook. Generalized from what was originally a daily-only
+ * report (see git history: lib/daily-report.ts) once Reports & Notifications
+ * settings added Monthly/Quarterly/Annual cadence — none of the aggregation
+ * queries below were ever day-specific, only the window passed in was.
  */
 
 /**
  * India Standard Time, as a fixed offset.
  *
- * The business day this report covers is a shop's day, which ends at midnight
- * in the shop — not at midnight UTC. India has no daylight saving, so a fixed
- * +5:30 is exact rather than an approximation, and avoids depending on the
- * server's own timezone (Vercel runs in UTC).
+ * The business period this report covers is a shop's day/month/quarter/year,
+ * which ends at midnight in the shop — not at midnight UTC. India has no
+ * daylight saving, so a fixed +5:30 is exact rather than an approximation,
+ * and avoids depending on the server's own timezone (Vercel runs in UTC).
  */
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
-export type DayWindow = {
-  /** Inclusive UTC instant the business day starts. */
+export type ReportWindow = {
+  /** Inclusive UTC instant the period starts. */
   start: Date;
   /** Exclusive UTC instant it ends. */
   end: Date;
-  /** The date being reported on, e.g. "27 August 2026". */
+  /** The period being reported on, e.g. "27 August 2026", "August 2026", "Q3 2026", "2026". */
   label: string;
-  /** The same date as YYYY-MM-DD, for file names. */
+  /** A filename-safe identifier for the period, e.g. "2026-08-27", "2026-08", "2026-Q3", "2026". */
   isoDate: string;
 };
 
@@ -38,7 +41,7 @@ export type DayWindow = {
  * beginning, and `lt` rather than `lte` is what stops it being counted twice
  * across two consecutive reports.
  */
-export function previousIstDay(now: Date = new Date()): DayWindow {
+export function previousIstDay(now: Date = new Date()): ReportWindow {
   const istNow = new Date(now.getTime() + IST_OFFSET_MS);
 
   // Read the shifted instant with UTC getters: they now describe IST wall
@@ -70,6 +73,133 @@ export function previousIstDay(now: Date = new Date()): DayWindow {
   };
 }
 
+/** The last fully completed IST calendar month before `now`. */
+export function previousIstMonth(now: Date = new Date()): ReportWindow {
+  const istNow = new Date(now.getTime() + IST_OFFSET_MS);
+  const year = istNow.getUTCFullYear();
+  const month = istNow.getUTCMonth();
+
+  const startOfThisMonthIst = Date.UTC(year, month, 1);
+  const startOfPrevMonthIst = Date.UTC(year, month - 1, 1);
+
+  const start = new Date(startOfPrevMonthIst - IST_OFFSET_MS);
+  const end = new Date(startOfThisMonthIst - IST_OFFSET_MS);
+  const prevMonthDate = new Date(startOfPrevMonthIst);
+
+  return {
+    start,
+    end,
+    label: prevMonthDate.toLocaleDateString("en-IN", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }),
+    isoDate: prevMonthDate.toISOString().slice(0, 7),
+  };
+}
+
+/** The last fully completed IST calendar quarter (Jan-Mar/Apr-Jun/Jul-Sep/Oct-Dec) before `now`. */
+export function previousIstQuarter(now: Date = new Date()): ReportWindow {
+  const istNow = new Date(now.getTime() + IST_OFFSET_MS);
+  const year = istNow.getUTCFullYear();
+  const currentQuarterStartMonth = Math.floor(istNow.getUTCMonth() / 3) * 3;
+
+  const startOfThisQuarterIst = Date.UTC(year, currentQuarterStartMonth, 1);
+  const startOfPrevQuarterIst = Date.UTC(year, currentQuarterStartMonth - 3, 1);
+
+  const start = new Date(startOfPrevQuarterIst - IST_OFFSET_MS);
+  const end = new Date(startOfThisQuarterIst - IST_OFFSET_MS);
+
+  const prevQuarterDate = new Date(startOfPrevQuarterIst);
+  const prevQuarterNumber = Math.floor(prevQuarterDate.getUTCMonth() / 3) + 1;
+  const prevQuarterYear = prevQuarterDate.getUTCFullYear();
+
+  return {
+    start,
+    end,
+    label: `Q${prevQuarterNumber} ${prevQuarterYear}`,
+    isoDate: `${prevQuarterYear}-Q${prevQuarterNumber}`,
+  };
+}
+
+/** The last fully completed IST calendar year before `now`. */
+export function previousIstYear(now: Date = new Date()): ReportWindow {
+  const istNow = new Date(now.getTime() + IST_OFFSET_MS);
+  const year = istNow.getUTCFullYear();
+
+  const startOfThisYearIst = Date.UTC(year, 0, 1);
+  const startOfPrevYearIst = Date.UTC(year - 1, 0, 1);
+
+  const start = new Date(startOfPrevYearIst - IST_OFFSET_MS);
+  const end = new Date(startOfThisYearIst - IST_OFFSET_MS);
+
+  return {
+    start,
+    end,
+    label: String(year - 1),
+    isoDate: String(year - 1),
+  };
+}
+
+/**
+ * Which window a store on this frequency is due to be sent right now, given
+ * IST-`now` — or `null` if today isn't that frequency's due day. DAILY is
+ * always due (the cron itself only runs once a day); MONTHLY/QUARTERLY/
+ * ANNUAL are due only on the 1st of their respective period, mirroring how
+ * a calendar month/quarter/year is only just complete on that day.
+ *
+ * Not used by `generateAndSendReportNow` (a manual click is due by
+ * definition) — only by the scheduled cron, which needs to decide this for
+ * every active store on every run.
+ */
+export function dueWindowForFrequency(
+  frequency: ReportFrequency,
+  now: Date = new Date(),
+): ReportWindow | null {
+  const istNow = new Date(now.getTime() + IST_OFFSET_MS);
+  const dayOfMonth = istNow.getUTCDate();
+  const month = istNow.getUTCMonth();
+
+  switch (frequency) {
+    case ReportFrequency.DAILY:
+      return previousIstDay(now);
+    case ReportFrequency.MONTHLY:
+      return dayOfMonth === 1 ? previousIstMonth(now) : null;
+    case ReportFrequency.QUARTERLY:
+      return dayOfMonth === 1 && month % 3 === 0 ? previousIstQuarter(now) : null;
+    case ReportFrequency.ANNUAL:
+      return dayOfMonth === 1 && month === 0 ? previousIstYear(now) : null;
+    default:
+      return null;
+  }
+}
+
+/** The window to use for a manual "Generate & Email Now" click — the most
+ *  recently completed period for the store's configured frequency, same as
+ *  what the schedule would have sent had today been its due day. */
+export function currentWindowForFrequency(
+  frequency: ReportFrequency,
+  now: Date = new Date(),
+): ReportWindow {
+  switch (frequency) {
+    case ReportFrequency.DAILY:
+      return previousIstDay(now);
+    case ReportFrequency.MONTHLY:
+      return previousIstMonth(now);
+    case ReportFrequency.QUARTERLY:
+      return previousIstQuarter(now);
+    case ReportFrequency.ANNUAL:
+      return previousIstYear(now);
+  }
+}
+
+export const FREQUENCY_LABELS: Record<ReportFrequency, string> = {
+  [ReportFrequency.DAILY]: "Daily",
+  [ReportFrequency.MONTHLY]: "Monthly",
+  [ReportFrequency.QUARTERLY]: "Quarterly",
+  [ReportFrequency.ANNUAL]: "Annual",
+};
+
 function money(value: unknown) {
   return Number(value ?? 0);
 }
@@ -94,15 +224,15 @@ export type ReportSection = {
   count: number;
 };
 
-export type DailyReport = {
+export type PeriodReport = {
   storeId: string;
   storeName: string;
-  day: DayWindow;
+  period: ReportWindow;
   credit: ReportSection;
   debit: ReportSection;
   sale: ReportSection;
   purchase: ReportSection;
-  /** True when nothing at all was recorded that day. */
+  /** True when nothing at all was recorded in the period. */
   isEmpty: boolean;
 };
 
@@ -166,18 +296,19 @@ function ledgerParty(entry: {
 }
 
 /**
- * Gather one store's day.
+ * Gather one store's activity over `period`.
  *
- * Deliberately not store-scoped through `requireStoreScope()`: this runs from
- * a cron with no session, so the store is passed in and every query filters
- * on it explicitly.
+ * Deliberately not store-scoped through `requireStoreScope()`: this runs
+ * from a cron with no session, so the store is passed in and every query
+ * filters on it explicitly. The manual "Generate & Email Now" action
+ * resolves storeId via requireStoreScope() itself before calling this.
  */
-export async function buildDailyReport(
+export async function buildPeriodReport(
   storeId: string,
   storeName: string,
-  day: DayWindow,
-): Promise<DailyReport> {
-  const range = { gte: day.start, lt: day.end };
+  period: ReportWindow,
+): Promise<PeriodReport> {
+  const range = { gte: period.start, lt: period.end };
 
   const [ledgerEntries, invoices, purchases] = await Promise.all([
     prisma.ledgerEntry.findMany({
@@ -263,7 +394,7 @@ export async function buildDailyReport(
   return {
     storeId,
     storeName,
-    day,
+    period,
     credit: ledgerSection(LedgerEntryType.CREDIT, "Credit"),
     debit: ledgerSection(LedgerEntryType.DEBIT, "Debit"),
     sale: {
@@ -324,7 +455,7 @@ export async function buildDailyReport(
  * so the figure in the email and the figure in the file are the same number
  * and cannot disagree.
  */
-export function buildDailyReportWorkbook(report: DailyReport) {
+export function buildPeriodReportWorkbook(report: PeriodReport, frequency: ReportFrequency) {
   const sections = [report.credit, report.debit, report.sale, report.purchase];
 
   const sheets = sections.map((section) => {
@@ -347,15 +478,16 @@ export function buildDailyReportWorkbook(report: DailyReport) {
     return { name: section.title, rows, columns: section.columns };
   });
 
-  const workbook = buildMultiSheetExcelExport(sheets, "daily-report");
+  const workbook = buildMultiSheetExcelExport(sheets, "report");
 
   // The shared builder timestamps its filenames to the moment of export,
-  // which is right for an ad-hoc download but wrong here: these arrive daily
-  // and get filed by the day they cover, so the date in the name is the
-  // business day, and two runs for the same day produce the same name.
+  // which is right for an ad-hoc download but wrong here: these arrive on a
+  // schedule and get filed by the period they cover, so the date in the name
+  // is the business period, and two runs for the same period produce the
+  // same name.
   return {
     ...workbook,
-    fileName: `daily-report-${report.day.isoDate}.xlsx`,
+    fileName: `report-${frequency.toLowerCase()}-${report.period.isoDate}.xlsx`,
   };
 }
 

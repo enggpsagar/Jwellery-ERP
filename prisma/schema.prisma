@@ -1775,8 +1775,12 @@ model ReportSettings {
   storeId String @id
   store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
-  enabled   Boolean         @default(false)
-  frequency ReportFrequency @default(DAILY)
+  enabled Boolean @default(false)
+
+  /** Independent checkboxes, not a single choice — a store can enable e.g.
+   *  both MONTHLY and ANNUAL at once and gets a separate email for each
+   *  when they're due. */
+  frequencies ReportFrequency[] @default([])
 
   /** Explicit, store-chosen recipients — deliberately not derived from
    *  ADMIN users/BusinessSettings.backupEmail (the old daily-report cron's
@@ -1784,13 +1788,16 @@ model ReportSettings {
   recipientEmails String[] @default([])
 
   /**
-   * Set after every send (manual or scheduled). The cron skips a store
-   * whose current period didn't start after this — the same "sent once per
-   * cycle" gate Store.planReminderSentAt already uses for plan reminders,
-   * applied here so a manual "Generate & Email Now" doesn't get duplicated
-   * by that day's automatic run.
+   * One "sent once per cycle" gate per frequency (same idea as
+   * Store.planReminderSentAt), not a single shared timestamp — with
+   * multiple frequencies enabled, sending the monthly report must not
+   * accidentally mark the annual one as already sent too. Each is set
+   * after every send (manual or scheduled) of that specific frequency.
    */
-  lastSentAt DateTime?
+  dailyLastSentAt     DateTime?
+  monthlyLastSentAt   DateTime?
+  quarterlyLastSentAt DateTime?
+  annualLastSentAt    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

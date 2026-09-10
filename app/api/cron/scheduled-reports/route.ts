@@ -11,21 +11,24 @@ import {
   buildPeriodReportWorkbook,
   dueWindowForFrequency,
   FREQUENCY_LABELS,
+  LAST_SENT_FIELD,
 } from "@/lib/report-builder";
 import { logger } from "@/lib/logger";
 
 /**
- * Replaces the old daily-only `/api/cron/daily-report` — one store's report
- * (Daily/Monthly/Quarterly/Annual, per its own Reports & Notifications
- * settings) mailed to the recipients it configured, when its period is due.
+ * Replaces the old daily-only `/api/cron/daily-report` — one email per
+ * store per *enabled* frequency (Daily/Monthly/Quarterly/Annual — a store
+ * can have several checked at once, per its own Reports & Notifications
+ * settings), sent to the recipients it configured, when that frequency's
+ * period is due.
  *
  * Runs once a day (see vercel.json) just after midnight IST (19:00 UTC) —
- * dueWindowForFrequency decides per store whether *today* is actually that
- * store's due day (always true for DAILY; only the 1st of the
+ * dueWindowForFrequency decides per store+frequency whether *today* is
+ * actually due (always true for DAILY; only the 1st of the
  * month/quarter/year for the others).
  */
 
-/** Building a workbook per store takes longer than the default budget. */
+/** Building a workbook per store/frequency takes longer than the default budget. */
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
@@ -51,7 +54,14 @@ export async function GET(request: Request) {
         id: true,
         name: true,
         reportSettings: {
-          select: { frequency: true, recipientEmails: true, lastSentAt: true },
+          select: {
+            frequencies: true,
+            recipientEmails: true,
+            dailyLastSentAt: true,
+            monthlyLastSentAt: true,
+            quarterlyLastSentAt: true,
+            annualLastSentAt: true,
+          },
         },
       },
     });
@@ -67,91 +77,99 @@ export async function GET(request: Request) {
       const settings = store.reportSettings;
       if (!settings) continue; // filtered by the query's `where` above; keeps TS honest.
 
-      try {
-        const window = dueWindowForFrequency(settings.frequency, now);
-        if (!window) {
-          skippedNotDue += 1;
-          continue;
-        }
+      const recipients = [...new Set(settings.recipientEmails)];
 
-        // Guards against double-sending the same period — the same gate a
-        // manual "Generate & Email Now" click updates too, so an earlier
-        // manual send today stops this run from repeating it.
-        if (settings.lastSentAt && settings.lastSentAt >= window.start) {
-          skippedAlreadySent += 1;
-          continue;
-        }
+      for (const frequency of settings.frequencies) {
+        const label = `${store.name} (${FREQUENCY_LABELS[frequency]})`;
 
-        const recipients = [...new Set(settings.recipientEmails)];
-        if (recipients.length === 0) {
-          skippedNoRecipient += 1;
-          continue;
-        }
+        try {
+          const window = dueWindowForFrequency(frequency, now);
+          if (!window) {
+            skippedNotDue += 1;
+            continue;
+          }
 
-        const report = await buildPeriodReport(store.id, store.name, window);
+          const lastSentField = LAST_SENT_FIELD[frequency];
+          const lastSentAt = settings[lastSentField];
 
-        // Nothing traded, nothing to report. A shop that was shut that
-        // period should not get an email saying so — an empty report every
-        // cycle is how a useful report becomes one nobody opens.
-        if (report.isEmpty) {
-          skippedNoActivity += 1;
-          continue;
-        }
+          // Guards against double-sending the same period — the same gate a
+          // manual "Generate & Email Now" click updates too, so an earlier
+          // manual send today stops this run from repeating it.
+          if (lastSentAt && lastSentAt >= window.start) {
+            skippedAlreadySent += 1;
+            continue;
+          }
 
-        const workbook = buildPeriodReportWorkbook(report, settings.frequency);
+          if (recipients.length === 0) {
+            skippedNoRecipient += 1;
+            continue;
+          }
 
-        const sections = [
-          report.credit,
-          report.debit,
-          report.sale,
-          report.purchase,
-        ].map((section) => ({
-          title: section.title,
-          count: section.count,
-          total: section.total,
-        }));
+          const report = await buildPeriodReport(store.id, store.name, window);
 
-        const mail = scheduledReportEmail({
-          storeName: store.name,
-          appName: APP_NAME,
-          frequencyLabel: FREQUENCY_LABELS[settings.frequency],
-          periodLabel: window.label,
-          fileName: workbook.fileName,
-          sections,
-          netPosition: report.sale.total - report.purchase.total,
-        });
+          // Nothing traded, nothing to report. A shop that was shut that
+          // period should not get an email saying so — an empty report every
+          // cycle is how a useful report becomes one nobody opens.
+          if (report.isEmpty) {
+            skippedNoActivity += 1;
+            continue;
+          }
 
-        const result = await sendMail({
-          to: recipients.join(", "),
-          subject: mail.subject,
-          html: mail.html,
-          text: mail.text,
-          attachments: [
-            {
-              filename: workbook.fileName,
-              contentBase64: workbook.fileBase64,
-              contentType:
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            },
-          ],
-        });
+          const workbook = buildPeriodReportWorkbook(report, frequency);
 
-        if (result.sent) {
-          sent += 1;
-          await prisma.reportSettings.update({
-            where: { storeId: store.id },
-            data: { lastSentAt: now },
+          const sections = [
+            report.credit,
+            report.debit,
+            report.sale,
+            report.purchase,
+          ].map((section) => ({
+            title: section.title,
+            count: section.count,
+            total: section.total,
+          }));
+
+          const mail = scheduledReportEmail({
+            storeName: store.name,
+            appName: APP_NAME,
+            frequencyLabel: FREQUENCY_LABELS[frequency],
+            periodLabel: window.label,
+            fileName: workbook.fileName,
+            sections,
+            netPosition: report.sale.total - report.purchase.total,
           });
-        } else {
-          failures.push(`${store.name}: ${result.message}`);
+
+          const result = await sendMail({
+            to: recipients.join(", "),
+            subject: mail.subject,
+            html: mail.html,
+            text: mail.text,
+            attachments: [
+              {
+                filename: workbook.fileName,
+                contentBase64: workbook.fileBase64,
+                contentType:
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              },
+            ],
+          });
+
+          if (result.sent) {
+            sent += 1;
+            await prisma.reportSettings.update({
+              where: { storeId: store.id },
+              data: { [lastSentField]: now },
+            });
+          } else {
+            failures.push(`${label}: ${result.message}`);
+          }
+        } catch (error) {
+          // One store/frequency's failure must not stop the rest of the run
+          // — the next one is still waiting on its report.
+          logger.error("scheduled-report failed", error, { storeName: store.name, frequency });
+          failures.push(
+            `${label}: ${error instanceof Error ? error.message : "unknown error"}`,
+          );
         }
-      } catch (error) {
-        // One store's failure must not stop the rest of the run — the next
-        // store's owner is still waiting on their report.
-        logger.error("scheduled-report failed for store", error, { storeName: store.name });
-        failures.push(
-          `${store.name}: ${error instanceof Error ? error.message : "unknown error"}`,
-        );
       }
     }
 

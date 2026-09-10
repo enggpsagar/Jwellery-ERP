@@ -200,6 +200,32 @@ export const FREQUENCY_LABELS: Record<ReportFrequency, string> = {
   [ReportFrequency.ANNUAL]: "Annual",
 };
 
+/** Every frequency, in the fixed display order used across the settings
+ *  form and email/report content. */
+export const ALL_FREQUENCIES: ReportFrequency[] = [
+  ReportFrequency.DAILY,
+  ReportFrequency.MONTHLY,
+  ReportFrequency.QUARTERLY,
+  ReportFrequency.ANNUAL,
+];
+
+export type LastSentField =
+  | "dailyLastSentAt"
+  | "monthlyLastSentAt"
+  | "quarterlyLastSentAt"
+  | "annualLastSentAt";
+
+/** Which ReportSettings column gates double-sending for a given frequency —
+ *  each of Daily/Monthly/Quarterly/Annual has its own, since a store can
+ *  have several enabled at once and sending one must not mark another as
+ *  already sent. */
+export const LAST_SENT_FIELD: Record<ReportFrequency, LastSentField> = {
+  [ReportFrequency.DAILY]: "dailyLastSentAt",
+  [ReportFrequency.MONTHLY]: "monthlyLastSentAt",
+  [ReportFrequency.QUARTERLY]: "quarterlyLastSentAt",
+  [ReportFrequency.ANNUAL]: "annualLastSentAt",
+};
+
 function money(value: unknown) {
   return Number(value ?? 0);
 }

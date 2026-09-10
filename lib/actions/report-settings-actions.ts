@@ -14,14 +14,15 @@ import {
   buildPeriodReportWorkbook,
   currentWindowForFrequency,
   FREQUENCY_LABELS,
+  LAST_SENT_FIELD,
 } from "@/lib/report-builder";
 import { logger } from "@/lib/logger";
 
 export type ReportSettingsData = {
   enabled: boolean;
-  frequency: ReportFrequency;
+  frequencies: ReportFrequency[];
   recipientEmails: string[];
-  lastSentAt: string | null;
+  lastSentAt: Partial<Record<ReportFrequency, string | null>>;
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -32,14 +33,27 @@ export async function getReportSettings(): Promise<ReportSettingsData> {
 
   const settings = await prisma.reportSettings.findUnique({
     where: { storeId },
-    select: { enabled: true, frequency: true, recipientEmails: true, lastSentAt: true },
+    select: {
+      enabled: true,
+      frequencies: true,
+      recipientEmails: true,
+      dailyLastSentAt: true,
+      monthlyLastSentAt: true,
+      quarterlyLastSentAt: true,
+      annualLastSentAt: true,
+    },
   });
 
   return {
     enabled: settings?.enabled ?? false,
-    frequency: settings?.frequency ?? ReportFrequency.DAILY,
+    frequencies: settings?.frequencies ?? [],
     recipientEmails: settings?.recipientEmails ?? [],
-    lastSentAt: settings?.lastSentAt?.toISOString() ?? null,
+    lastSentAt: {
+      [ReportFrequency.DAILY]: settings?.dailyLastSentAt?.toISOString() ?? null,
+      [ReportFrequency.MONTHLY]: settings?.monthlyLastSentAt?.toISOString() ?? null,
+      [ReportFrequency.QUARTERLY]: settings?.quarterlyLastSentAt?.toISOString() ?? null,
+      [ReportFrequency.ANNUAL]: settings?.annualLastSentAt?.toISOString() ?? null,
+    },
   };
 }
 
@@ -50,7 +64,7 @@ export type ReportSettingsActionState = {
 
 export async function updateReportSettings(input: {
   enabled: boolean;
-  frequency: ReportFrequency;
+  frequencies: ReportFrequency[];
   recipientEmails: string[];
 }): Promise<ReportSettingsActionState> {
   try {
@@ -65,10 +79,12 @@ export async function updateReportSettings(input: {
       return { success: false, message: `Not a valid email address: ${invalid.join(", ")}` };
     }
 
+    const frequencies = [...new Set(input.frequencies)];
+
     await prisma.reportSettings.upsert({
       where: { storeId },
-      create: { storeId, enabled: input.enabled, frequency: input.frequency, recipientEmails },
-      update: { enabled: input.enabled, frequency: input.frequency, recipientEmails },
+      create: { storeId, enabled: input.enabled, frequencies, recipientEmails },
+      update: { enabled: input.enabled, frequencies, recipientEmails },
     });
 
     revalidatePath("/settings/reports");
@@ -80,12 +96,14 @@ export async function updateReportSettings(input: {
 }
 
 /**
- * "Generate & Email Now" — unlike the scheduled cron, this always sends
- * even when the period turned out empty: a merchant clicking this button is
+ * "Generate & Email Now" — sends one email per currently-enabled frequency
+ * (a store may have several checked at once), each covering its own most
+ * recently completed period. Unlike the scheduled cron, this always sends
+ * even when a period turned out empty: a merchant clicking this button is
  * deliberately asking for a report right now, not receiving an unsolicited
- * daily/monthly check-in that should stay quiet when there's nothing to say.
- * Still updates lastSentAt on success, so the automatic cron won't re-send
- * the same period again later.
+ * check-in that should stay quiet when there's nothing to say. Still
+ * updates each frequency's own lastSentAt on success, so the automatic
+ * cron won't re-send the same period again later.
  */
 export async function generateAndSendReportNow(): Promise<ReportSettingsActionState> {
   try {
@@ -95,7 +113,7 @@ export async function generateAndSendReportNow(): Promise<ReportSettingsActionSt
       prisma.store.findUniqueOrThrow({ where: { id: storeId }, select: { name: true } }),
       prisma.reportSettings.findUnique({
         where: { storeId },
-        select: { frequency: true, recipientEmails: true },
+        select: { frequencies: true, recipientEmails: true },
       }),
     ]);
 
@@ -104,49 +122,76 @@ export async function generateAndSendReportNow(): Promise<ReportSettingsActionSt
       return { success: false, message: "Add at least one recipient email first." };
     }
 
-    const frequency = settings?.frequency ?? ReportFrequency.DAILY;
-    const window = currentWindowForFrequency(frequency);
-
-    const report = await buildPeriodReport(storeId, store.name, window);
-    const workbook = buildPeriodReportWorkbook(report, frequency);
-
-    const sections = [report.credit, report.debit, report.sale, report.purchase].map((section) => ({
-      title: section.title,
-      count: section.count,
-      total: section.total,
-    }));
-
-    const mail = scheduledReportEmail({
-      storeName: store.name,
-      appName: APP_NAME,
-      frequencyLabel: FREQUENCY_LABELS[frequency],
-      periodLabel: window.label,
-      fileName: workbook.fileName,
-      sections,
-      netPosition: report.sale.total - report.purchase.total,
-    });
-
-    const result = await sendMail({
-      to: recipients.join(", "),
-      subject: mail.subject,
-      html: mail.html,
-      text: mail.text,
-      attachments: [
-        {
-          filename: workbook.fileName,
-          contentBase64: workbook.fileBase64,
-          contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        },
-      ],
-    });
-
-    if (!result.sent) {
-      return { success: false, message: result.message };
+    const frequencies = settings?.frequencies ?? [];
+    if (frequencies.length === 0) {
+      return { success: false, message: "Select at least one report frequency first." };
     }
 
-    await prisma.reportSettings.update({ where: { storeId }, data: { lastSentAt: new Date() } });
+    const sentLabels: string[] = [];
+    const failures: string[] = [];
+
+    for (const frequency of frequencies) {
+      try {
+        const window = currentWindowForFrequency(frequency);
+        const report = await buildPeriodReport(storeId, store.name, window);
+        const workbook = buildPeriodReportWorkbook(report, frequency);
+
+        const sections = [report.credit, report.debit, report.sale, report.purchase].map((section) => ({
+          title: section.title,
+          count: section.count,
+          total: section.total,
+        }));
+
+        const mail = scheduledReportEmail({
+          storeName: store.name,
+          appName: APP_NAME,
+          frequencyLabel: FREQUENCY_LABELS[frequency],
+          periodLabel: window.label,
+          fileName: workbook.fileName,
+          sections,
+          netPosition: report.sale.total - report.purchase.total,
+        });
+
+        const result = await sendMail({
+          to: recipients.join(", "),
+          subject: mail.subject,
+          html: mail.html,
+          text: mail.text,
+          attachments: [
+            {
+              filename: workbook.fileName,
+              contentBase64: workbook.fileBase64,
+              contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            },
+          ],
+        });
+
+        if (result.sent) {
+          await prisma.reportSettings.update({
+            where: { storeId },
+            data: { [LAST_SENT_FIELD[frequency]]: new Date() },
+          });
+          sentLabels.push(FREQUENCY_LABELS[frequency]);
+        } else {
+          failures.push(`${FREQUENCY_LABELS[frequency]}: ${result.message}`);
+        }
+      } catch (error) {
+        logger.error("generateAndSendReportNow failed for frequency", error, { frequency });
+        failures.push(`${FREQUENCY_LABELS[frequency]}: could not generate this report`);
+      }
+    }
+
     revalidatePath("/settings/reports");
-    return { success: true, message: `Report emailed to ${recipients.join(", ")}.` };
+
+    if (sentLabels.length === 0) {
+      return { success: false, message: failures.join("; ") || "Could not generate and send the report." };
+    }
+
+    const summary = `${sentLabels.join(", ")} report${sentLabels.length === 1 ? "" : "s"} emailed to ${recipients.join(", ")}.`;
+    return {
+      success: true,
+      message: failures.length > 0 ? `${summary} Failed: ${failures.join("; ")}` : summary,
+    };
   } catch (error) {
     logger.error("generateAndSendReportNow failed", error);
     return { success: false, message: "Could not generate and send the report." };

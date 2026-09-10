@@ -58,14 +58,67 @@ function effectiveGstPercent(quotation: Quotation) {
   return null
 }
 
+/** Shared class list for the gold-gradient text effect used on the
+ * business name and the "Quotation" heading. The inline style duplicates
+ * the Tailwind gradient-clip utilities via literal CSS properties since
+ * `background-clip: text` needs to actually reach the rendered element —
+ * the utility classes alone don't reliably carry through in every print/
+ * PDF renderer. */
+const GOLD_TEXT_CLASS =
+  "bg-gradient-to-r from-amber-700 via-amber-500 to-amber-700 bg-clip-text text-transparent"
+const GOLD_TEXT_STYLE: React.CSSProperties = {
+  WebkitBackgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+  backgroundClip: "text",
+}
+
+/** One corner of the double-line ornamental gold bracket that frames the
+ * printable card. */
+function CornerFlourish({ position }: { position: "tl" | "tr" | "bl" | "br" }) {
+  const outer: Record<string, string> = {
+    tl: "left-0 top-0 border-l-2 border-t-2",
+    tr: "right-0 top-0 border-r-2 border-t-2",
+    bl: "left-0 bottom-0 border-l-2 border-b-2",
+    br: "right-0 bottom-0 border-r-2 border-b-2",
+  }
+  const inner: Record<string, string> = {
+    tl: "left-1.5 top-1.5 border-l border-t",
+    tr: "right-1.5 top-1.5 border-r border-t",
+    bl: "left-1.5 bottom-1.5 border-l border-b",
+    br: "right-1.5 bottom-1.5 border-r border-b",
+  }
+  return (
+    <span className="pointer-events-none absolute z-10 h-5 w-5">
+      <span className={`absolute h-5 w-5 border-amber-400 ${outer[position]}`} />
+      <span className={`absolute h-3 w-3 border-amber-300 ${inner[position]}`} />
+    </span>
+  )
+}
+
+/** A small centered ornament — thin amber rule, a rotated diamond dot,
+ * thin amber rule — used between major sections instead of a plain line. */
+function SectionOrnament() {
+  return (
+    <div className="flex items-center justify-center gap-2">
+      <span className="h-px flex-1 bg-amber-200" />
+      <span className="h-1 w-1 rotate-45 bg-amber-400" />
+      <span className="h-px flex-1 bg-amber-200" />
+    </div>
+  )
+}
+
 /**
- * The Quotation document's Elegant template — a boutique/premium feel per
- * InvoiceTemplate's own schema doc comment: a plain Tailwind amber-600/700
- * gold accent (not this app's own --chart-2 brand-gold var), font-serif
- * with tracking-wide on headings only, a centered header block, thin amber
- * rules between sections. Items table stays plain white with only a
- * bottom border under the header (no fill); totals sit in a thin-amber-
- * bordered box with the Total row in bold amber text on white.
+ * The Quotation document's Elegant template — a genuine boutique/luxury
+ * jewellery-store print piece, matching Invoice's own Elegant for visual
+ * consistency across the two documents: business name and the "Quotation"
+ * heading render in gold-gradient serif text, the printable card sits in
+ * a double-line gold border frame with ornamental corner brackets, major
+ * sections are separated by a small centered rule-diamond-rule ornament
+ * instead of a plain line, and the totals box carries a warm ivory tint
+ * with the Total row in bold gradient-gold text. An optional faint,
+ * print-safe logoUrl watermark sits behind the whole card. Same document-
+ * level-GST-only / no-payment-rows differences from Invoice's own Elegant
+ * as quotation-print-classic.tsx has from Invoice's Classic.
  */
 export function QuotationPrintElegant({ quotation, settings }: QuotationPrintElegantProps) {
   const businessAddressLines = [
@@ -95,193 +148,246 @@ export function QuotationPrintElegant({ quotation, settings }: QuotationPrintEle
           }`}
       </style>
 
-      <div className="border border-amber-200 bg-white print:border-amber-300">
-        {/* Centered business identity + heading. */}
-        <div className="space-y-1 border-b border-amber-300 p-6 text-center">
-          <p className="font-serif text-2xl font-bold tracking-wide text-slate-900">{settings.businessName}</p>
-          {settings.gstNumber && <p className="text-[11px] text-slate-600">GSTIN: {settings.gstNumber}</p>}
-          {settings.state && (
-            <p className="text-[11px] text-slate-600">
-              State: {settings.stateCode ? `${settings.stateCode}-` : ""}
-              {settings.state}
-            </p>
-          )}
-          {businessAddressLines.length > 0 && (
-            <p className="text-[11px] text-slate-600">{businessAddressLines.join(", ")}</p>
-          )}
-          {(settings.phone || settings.email) && (
-            <p className="text-[11px] text-slate-600">
-              {[settings.phone, settings.email].filter(Boolean).join(" · ")}
-            </p>
-          )}
-          <p className="pt-2 font-serif text-xl font-bold tracking-wide text-amber-700">Quotation</p>
-          {settings.gstScheme === "COMPOSITION" && (
-            <p className="mx-auto max-w-[320px] text-[10px] italic text-slate-600">{COMPOSITION_DISCLAIMER}</p>
-          )}
-        </div>
+      {/* Double-line gold border frame with ornamental corner brackets. */}
+      <div className="relative border-2 border-amber-300 p-1.5 print:border-amber-300">
+        <CornerFlourish position="tl" />
+        <CornerFlourish position="tr" />
+        <CornerFlourish position="bl" />
+        <CornerFlourish position="br" />
 
-        {/* Bill To / quotation meta */}
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-amber-200 p-5">
-          <div className="space-y-0.5">
-            <p className="font-serif font-semibold tracking-wide text-amber-700">Bill To</p>
-            <p className="text-base font-bold">{quotation.customer?.name ?? "-"}</p>
-            {customerAddressLines.map((line, index) => (
-              <p key={index}>{line}</p>
-            ))}
-            {quotation.customer?.phone && <p>Contact No.: {quotation.customer.phone}</p>}
-          </div>
-          <div className="space-y-0.5 text-right">
-            <p>
-              <span className="font-semibold">Quotation No.:</span> {quotation.quotationNumber}
-            </p>
-            <p>
-              <span className="font-semibold">Date:</span> {fmtDate(quotation.quotationDate)}
-            </p>
-            {quotation.validUntil && (
-              <p>
-                <span className="font-semibold">Valid Until:</span> {fmtDate(quotation.validUntil)}
+        <div className="relative overflow-hidden border border-amber-200 bg-white">
+          {settings.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={settings.logoUrl}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-0 m-auto h-[360px] w-[360px] object-contain opacity-[0.14]"
+            />
+          )}
+
+          <div className="relative z-10">
+            {/* Centered business identity + heading, gold-gradient text. */}
+            <div className="space-y-1 p-6 text-center">
+              <p
+                className={`font-serif text-2xl font-bold tracking-wide ${GOLD_TEXT_CLASS}`}
+                style={GOLD_TEXT_STYLE}
+              >
+                {settings.businessName}
               </p>
-            )}
-            <p>
-              <span className="font-semibold">Status:</span> {STATUS_LABELS[quotation.status] ?? quotation.status}
-            </p>
-          </div>
-        </div>
+              {settings.gstNumber && <p className="text-[11px] text-slate-600">GSTIN: {settings.gstNumber}</p>}
+              {settings.state && (
+                <p className="text-[11px] text-slate-600">
+                  State: {settings.stateCode ? `${settings.stateCode}-` : ""}
+                  {settings.state}
+                </p>
+              )}
+              {businessAddressLines.length > 0 && (
+                <p className="text-[11px] text-slate-600">{businessAddressLines.join(", ")}</p>
+              )}
+              {(settings.phone || settings.email) && (
+                <p className="text-[11px] text-slate-600">
+                  {[settings.phone, settings.email].filter(Boolean).join(" · ")}
+                </p>
+              )}
+              <p
+                className={`pt-2 font-serif text-xl font-bold tracking-wide ${GOLD_TEXT_CLASS}`}
+                style={GOLD_TEXT_STYLE}
+              >
+                Quotation
+              </p>
+              {settings.gstScheme === "COMPOSITION" && (
+                <p className="mx-auto max-w-[320px] text-[10px] italic text-slate-600">{COMPOSITION_DISCLAIMER}</p>
+              )}
+            </div>
 
-        {/* Line items — plain white, only a bottom border under the header. */}
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b-2 border-amber-300 [&>th]:p-2 [&>th]:text-left [&>th]:align-middle [&>th]:text-[11px] [&>th]:font-semibold [&>th]:normal-case [&>th]:tracking-normal [&>th]:whitespace-normal [&>th]:text-slate-800">
-              <th className="w-6">#</th>
-              <th>Item name</th>
-              <th className="text-right">Quantity</th>
-              <th>Unit</th>
-              <th className="text-right">Price/ Unit</th>
-              <th className="text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {quotation.items.map((item: QuotationItem, index: number) => {
-              const { qty, unit, pricePerUnit } = lineQuantity(item)
-              return (
-                <tr key={item.id} className="border-b border-amber-100 [&>td]:p-2 align-top">
-                  <td>{index + 1}</td>
-                  <td className="font-medium">{item.itemName}</td>
-                  <td className="text-right whitespace-nowrap">{unit === "Pcs" ? qty : qty.toFixed(3)}</td>
-                  <td>{unit}</td>
-                  <td className="text-right whitespace-nowrap">₹{fmt(pricePerUnit)}</td>
-                  <td className="text-right whitespace-nowrap font-medium">₹{fmt(item.lineTotal)}</td>
-                </tr>
-              )
-            })}
-            <tr className="border-t-2 border-amber-300 font-semibold [&>td]:p-2">
-              <td colSpan={2} className="text-right">
-                Total
-              </td>
-              <td className="text-right whitespace-nowrap">
-                {(quotation.items.map(lineQuantity) as LineQuantity[])
-                  .filter((line) => line.isWeighed)
-                  .reduce((sum, line) => sum + line.qty, 0)
-                  .toFixed(3)}
-              </td>
-              <td />
-              <td />
-              <td className="text-right whitespace-nowrap">₹{fmt(quotation.totalAmount)}</td>
-            </tr>
-          </tbody>
-        </table>
+            <div className="px-6">
+              <SectionOrnament />
+            </div>
 
-        {quotation.convertedToId && quotation.convertedTo && (
-          <div className="border-b border-amber-200 bg-amber-50 p-3 text-amber-800">
-            This quotation has been converted to Invoice {quotation.convertedTo.invoiceNumber}.
-          </div>
-        )}
-
-        {/* Pay To (left) / totals (right) */}
-        <div className="grid grid-cols-2 gap-6 p-5">
-          <div className="space-y-4">
-            {hasBankDetails && (
-              <div>
-                <p className="font-serif font-medium tracking-wide text-amber-700">Pay To</p>
-                {settings.bankName && <p>Bank Name : {settings.bankName}</p>}
-                {settings.bankAccountNumber && <p>Bank Account No. : {settings.bankAccountNumber}</p>}
-                {settings.bankIfscCode && <p>Bank IFSC code : {settings.bankIfscCode}</p>}
-                {settings.bankAccountHolderName && (
-                  <p>Account holder&apos;s name : {settings.bankAccountHolderName}</p>
+            {/* Bill To / quotation meta */}
+            <div className="flex flex-wrap items-start justify-between gap-4 p-5">
+              <div className="space-y-0.5">
+                <p className="font-serif font-semibold tracking-wide text-amber-700">Bill To</p>
+                <p className="text-base font-bold">{quotation.customer?.name ?? "-"}</p>
+                {customerAddressLines.map((line, index) => (
+                  <p key={index}>{line}</p>
+                ))}
+                {quotation.customer?.phone && <p>Contact No.: {quotation.customer.phone}</p>}
+              </div>
+              <div className="space-y-0.5 text-right">
+                <p>
+                  <span className="font-semibold">Quotation No.:</span> {quotation.quotationNumber}
+                </p>
+                <p>
+                  <span className="font-semibold">Date:</span> {fmtDate(quotation.quotationDate)}
+                </p>
+                {quotation.validUntil && (
+                  <p>
+                    <span className="font-semibold">Valid Until:</span> {fmtDate(quotation.validUntil)}
+                  </p>
                 )}
+                <p>
+                  <span className="font-semibold">Status:</span>{" "}
+                  {STATUS_LABELS[quotation.status] ?? quotation.status}
+                </p>
+              </div>
+            </div>
+
+            {/* Line items — plain white, only a bottom border under the header. */}
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b-2 border-amber-300 [&>th]:p-2 [&>th]:text-left [&>th]:align-middle [&>th]:text-[11px] [&>th]:font-semibold [&>th]:normal-case [&>th]:tracking-normal [&>th]:whitespace-normal [&>th]:text-slate-800">
+                  <th className="w-6">#</th>
+                  <th>Item name</th>
+                  <th className="text-right">Quantity</th>
+                  <th>Unit</th>
+                  <th className="text-right">Price/ Unit</th>
+                  <th className="text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quotation.items.map((item: QuotationItem, index: number) => {
+                  const { qty, unit, pricePerUnit } = lineQuantity(item)
+                  return (
+                    <tr key={item.id} className="border-b border-amber-100 [&>td]:p-2 align-top">
+                      <td>{index + 1}</td>
+                      <td className="font-medium">{item.itemName}</td>
+                      <td className="text-right whitespace-nowrap">{unit === "Pcs" ? qty : qty.toFixed(3)}</td>
+                      <td>{unit}</td>
+                      <td className="text-right whitespace-nowrap">₹{fmt(pricePerUnit)}</td>
+                      <td className="text-right whitespace-nowrap font-medium">₹{fmt(item.lineTotal)}</td>
+                    </tr>
+                  )
+                })}
+                <tr className="border-t-2 border-amber-300 font-semibold [&>td]:p-2">
+                  <td colSpan={2} className="text-right">
+                    Total
+                  </td>
+                  <td className="text-right whitespace-nowrap">
+                    {(quotation.items.map(lineQuantity) as LineQuantity[])
+                      .filter((line) => line.isWeighed)
+                      .reduce((sum, line) => sum + line.qty, 0)
+                      .toFixed(3)}
+                  </td>
+                  <td />
+                  <td />
+                  <td className="text-right whitespace-nowrap">₹{fmt(quotation.totalAmount)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            {quotation.convertedToId && quotation.convertedTo && (
+              <div className="bg-amber-50 p-3 text-amber-800">
+                This quotation has been converted to Invoice {quotation.convertedTo.invoiceNumber}.
               </div>
             )}
 
-            <div>
-              <p className="font-serif font-medium tracking-wide text-amber-700">Quotation Amount In Words</p>
-              <p>{amountInWords(quotation.totalAmount)}</p>
+            <div className="px-6 pt-5">
+              <SectionOrnament />
             </div>
 
-            <div className="pt-6">
-              <p>For : {settings.businessName}</p>
-              <div className="mt-10 w-40 border-t border-black pt-1 text-[10px] font-medium">
-                Authorized Signatory
-              </div>
-            </div>
-          </div>
-
-          <div className="justify-self-end w-full max-w-[260px] overflow-hidden rounded-sm border border-amber-300">
-            <div className="flex justify-between border-b border-amber-200 p-1.5">
-              <span>Sub Total</span>
-              <span>₹{fmt(subtotal)}</span>
-            </div>
-            {quotation.discount > 0 && (
-              <div className="flex justify-between border-b border-amber-200 p-1.5">
-                <span>Discount</span>
-                <span>-₹{fmt(quotation.discount)}</span>
-              </div>
-            )}
-            {hasGst &&
-              (isInterState ? (
-                <div className="flex justify-between border-b border-amber-200 p-1.5">
-                  <span>IGST{gstPercent != null ? `@${gstPercent}%` : ""}</span>
-                  <span>₹{fmt(quotation.igstAmount)}</span>
-                </div>
-              ) : (
-                <div className="flex flex-col border-b border-amber-200">
-                  <div className="flex justify-between p-1.5">
-                    <span>SGST{gstPercent != null ? `@${(gstPercent / 2).toFixed(2)}%` : ""}</span>
-                    <span>₹{fmt(quotation.sgstAmount)}</span>
+            {/* Pay To (left) / totals (right) */}
+            <div className="grid grid-cols-2 gap-6 p-5">
+              <div className="space-y-4">
+                {hasBankDetails && (
+                  <div>
+                    <p className="font-serif font-medium tracking-wide text-amber-700">Pay To</p>
+                    {settings.bankName && <p>Bank Name : {settings.bankName}</p>}
+                    {settings.bankAccountNumber && <p>Bank Account No. : {settings.bankAccountNumber}</p>}
+                    {settings.bankIfscCode && <p>Bank IFSC code : {settings.bankIfscCode}</p>}
+                    {settings.bankAccountHolderName && (
+                      <p>Account holder&apos;s name : {settings.bankAccountHolderName}</p>
+                    )}
                   </div>
-                  <div className="flex justify-between border-t border-amber-200 p-1.5">
-                    <span>CGST{gstPercent != null ? `@${(gstPercent / 2).toFixed(2)}%` : ""}</span>
-                    <span>₹{fmt(quotation.cgstAmount)}</span>
+                )}
+
+                <div>
+                  <p className="font-serif font-medium tracking-wide text-amber-700">Quotation Amount In Words</p>
+                  <p>{amountInWords(quotation.totalAmount)}</p>
+                </div>
+
+                <div className="pt-6">
+                  <p>For : {settings.businessName}</p>
+                  <div className="mt-10 w-40 border-t border-black pt-1 text-[10px] font-medium">
+                    Authorized Signatory
                   </div>
                 </div>
-              ))}
-            {quotation.roundOffAmount !== 0 && (
-              <div className="flex justify-between border-b border-amber-200 p-1.5">
-                <span>Round Off</span>
-                <span>
-                  {quotation.roundOffAmount > 0 ? "+" : "-"}₹{fmt(Math.abs(quotation.roundOffAmount))}
-                </span>
               </div>
-            )}
-            <div className="flex justify-between bg-white p-1.5 font-bold text-amber-700">
-              <span>Total</span>
-              <span>₹{fmt(quotation.totalAmount)}</span>
+
+              <div className="justify-self-end w-full max-w-[260px] overflow-hidden rounded-sm border border-amber-200 bg-amber-50/40">
+                <div className="flex justify-between border-b border-amber-200/70 p-1.5">
+                  <span>Sub Total</span>
+                  <span>₹{fmt(subtotal)}</span>
+                </div>
+                {quotation.discount > 0 && (
+                  <div className="flex justify-between border-b border-amber-200/70 p-1.5">
+                    <span>Discount</span>
+                    <span>-₹{fmt(quotation.discount)}</span>
+                  </div>
+                )}
+                {hasGst &&
+                  (isInterState ? (
+                    <div className="flex justify-between border-b border-amber-200/70 p-1.5">
+                      <span>IGST{gstPercent != null ? `@${gstPercent}%` : ""}</span>
+                      <span>₹{fmt(quotation.igstAmount)}</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col border-b border-amber-200/70">
+                      <div className="flex justify-between p-1.5">
+                        <span>SGST{gstPercent != null ? `@${(gstPercent / 2).toFixed(2)}%` : ""}</span>
+                        <span>₹{fmt(quotation.sgstAmount)}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-amber-200/70 p-1.5">
+                        <span>CGST{gstPercent != null ? `@${(gstPercent / 2).toFixed(2)}%` : ""}</span>
+                        <span>₹{fmt(quotation.cgstAmount)}</span>
+                      </div>
+                    </div>
+                  ))}
+                {quotation.roundOffAmount !== 0 && (
+                  <div className="flex justify-between border-b border-amber-200/70 p-1.5">
+                    <span>Round Off</span>
+                    <span>
+                      {quotation.roundOffAmount > 0 ? "+" : "-"}₹{fmt(Math.abs(quotation.roundOffAmount))}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between p-1.5 font-bold">
+                  <span className={GOLD_TEXT_CLASS} style={GOLD_TEXT_STYLE}>
+                    Total
+                  </span>
+                  <span className={GOLD_TEXT_CLASS} style={GOLD_TEXT_STYLE}>
+                    ₹{fmt(quotation.totalAmount)}
+                  </span>
+                </div>
+              </div>
             </div>
+
+            {quotation.notes && (
+              <>
+                <div className="px-6">
+                  <SectionOrnament />
+                </div>
+                <div className="p-5">
+                  <p className="font-semibold">Notes</p>
+                  <p className="whitespace-pre-wrap">{quotation.notes}</p>
+                </div>
+              </>
+            )}
+
+            {settings.invoiceTerms && (
+              <>
+                <div className="px-6">
+                  <SectionOrnament />
+                </div>
+                <div className="p-5">
+                  <p className="font-semibold">Terms & Conditions</p>
+                  <p className="whitespace-pre-wrap">{settings.invoiceTerms}</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
-
-        {quotation.notes && (
-          <div className="border-t border-amber-200 p-5">
-            <p className="font-semibold">Notes</p>
-            <p className="whitespace-pre-wrap">{quotation.notes}</p>
-          </div>
-        )}
-
-        {settings.invoiceTerms && (
-          <div className="border-t border-amber-200 p-5">
-            <p className="font-semibold">Terms & Conditions</p>
-            <p className="whitespace-pre-wrap">{settings.invoiceTerms}</p>
-          </div>
-        )}
       </div>
 
       <p className="text-center text-[9px] text-gray-500 print:text-[7px]">Generated with {APP_NAME}</p>

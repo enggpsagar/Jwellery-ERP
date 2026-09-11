@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 
@@ -16,11 +16,70 @@ import {
 
 export const ACTIVE_STORE_COOKIE = "active_store_id";
 
+export const EXPIRED_PLAN_MESSAGE =
+  "This store's plan has expired. Contact your administrator to renew.";
+
 export type { StoreMembership };
 
 async function requestedStoreId(): Promise<string | null> {
   const cookieStore = await cookies();
   return cookieStore.get(ACTIVE_STORE_COOKIE)?.value ?? null;
+}
+
+/**
+ * The Next.js client runtime marks every Server Action invocation (a form
+ * submit, a button's onClick calling a "use server" function) with a
+ * `Next-Action` request header — a real framework signal, not a guess, and
+ * one a plain page render (a read: Server Components fetching data during
+ * SSR) never carries. Lets an expired store's data stay viewable while
+ * blocking the thing that's actually a new entry or an update.
+ */
+async function isMutationRequest(): Promise<boolean> {
+  const headerList = await headers();
+  return headerList.has("next-action");
+}
+
+async function isStorePlanExpired(storeId: string): Promise<boolean> {
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { planExpiresAt: true },
+  });
+  return Boolean(store?.planExpiresAt && store.planExpiresAt < new Date());
+}
+
+/**
+ * Blocks a store-scoped mutation once its plan has expired — applies to
+ * everyone acting on the store, Super Admin included (a Super Admin
+ * switched into an expired store is still "acting on the store's data",
+ * same as its own owner; only the Stores console's own plan-management
+ * actions, which never call this, are exempt by construction). Never
+ * called for a read: see isMutationRequest's own doc comment.
+ *
+ * A thrown Error, not redirect() — this must not navigate the caller away
+ * from the page they're viewing (that would defeat "still able to view"),
+ * and every mutation across this app already wraps its own body in
+ * try/catch to turn a thrown error into a {success:false, message} toast.
+ */
+async function assertPlanActiveForMutation(storeId: string): Promise<void> {
+  if (!(await isMutationRequest())) return;
+  if (await isStorePlanExpired(storeId)) {
+    throw new Error(EXPIRED_PLAN_MESSAGE);
+  }
+}
+
+/**
+ * The export-route equivalent of assertPlanActiveForMutation — unconditional
+ * rather than mutation-gated, since a CSV/Excel export is a GET request
+ * (a Route Handler, not a Server Action) and so never carries the
+ * `Next-Action` header that check relies on, but is still something the
+ * confirmed requirement says should stop working on an expired plan (only
+ * *viewing* the data in the app itself should keep working). Call at the
+ * top of an export route.ts, after resolving storeId the normal way.
+ */
+export async function assertPlanActiveForExport(storeId: string): Promise<void> {
+  if (await isStorePlanExpired(storeId)) {
+    throw new Error(EXPIRED_PLAN_MESSAGE);
+  }
 }
 
 /**
@@ -93,29 +152,12 @@ export async function requireStoreScope(): Promise<string> {
     redirect("/stores");
   }
 
-  // Real-time check, not JWT-cached: this app's SessionProvider disables
-  // both refetchOnWindowFocus and refetchInterval
-  // (components/providers/session-provider.tsx), so a session's JWT
-  // cookie is effectively frozen at whatever it was signed with at
-  // login, for the entire session. Confirmed the hard way — testing found
-  // an already-signed-in session could keep creating invoices/purchases
-  // indefinitely after its store's plan expired, because
-  // middleware.ts's token-based check never actually saw an updated
-  // planExpired claim; nothing ever re-signs the cookie to carry one. A
-  // direct query here is what actually catches this, on every
-  // store-scoped mutation, rather than depending on whatever incidentally
-  // refreshes the cookie. Never applies to a Super Admin, who isn't tied
-  // to any one store's plan.
-  const user = await getCurrentUser();
-  if (user?.role !== UserRole.SUPER_ADMIN) {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { planExpiresAt: true },
-    });
-    if (store?.planExpiresAt && store.planExpiresAt < new Date()) {
-      redirect("/login?error=plan_expired");
-    }
-  }
+  // Real-time check, not JWT-cached (see assertPlanActiveForMutation's own
+  // doc comment for why relying on the session token doesn't work in this
+  // app), and only for a mutation — viewing an expired store's existing
+  // data stays available, matching the confirmed requirement: view is
+  // fine, new entries/updates/exports are not.
+  await assertPlanActiveForMutation(storeId);
 
   return storeId;
 }
@@ -179,23 +221,15 @@ export async function resolveActingStoreId(
     throw new Error("You do not have access to that store.");
   }
 
-  // Same real-time plan check as requireStoreScope(), and for the same
-  // reason (see that function's own comment) — this is a genuinely
+  // Same real-time, mutation-only plan check as requireStoreScope() (see
+  // assertPlanActiveForMutation's own doc comment) — this is a genuinely
   // separate code path, not a wrapper around it, when a caller passes an
   // explicit requestedStoreId (e.g. createInvoice's hidden storeId form
   // field): the early `if (!requested) return requireStoreScope()` above
   // only covers the *other* branch. Missing this here is exactly how an
   // expired store could still create invoices after the requireStoreScope()
   // fix shipped — confirmed the hard way, testing found it.
-  if (user.role !== UserRole.SUPER_ADMIN) {
-    const store = await prisma.store.findUnique({
-      where: { id: requested },
-      select: { planExpiresAt: true },
-    });
-    if (store?.planExpiresAt && store.planExpiresAt < new Date()) {
-      redirect("/login?error=plan_expired");
-    }
-  }
+  await assertPlanActiveForMutation(requested);
 
   return requested;
 }

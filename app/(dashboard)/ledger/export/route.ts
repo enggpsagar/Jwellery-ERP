@@ -6,6 +6,7 @@ import {
   getLedgerEntries,
   getMetalDailyLedger,
 } from "@/lib/actions/ledger-actions"
+import { requireStoreScope, assertPlanActiveForExport } from "@/lib/store-context"
 import { buildCsvExport, buildExcelExport } from "@/lib/excel-export"
 import { logger } from "@/lib/logger";
 
@@ -51,6 +52,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const scope = (searchParams.get("scope") ?? "entries") as Scope
     const format = (searchParams.get("format") ?? "csv") as Format
+
+    const storeId = await requireStoreScope()
+    await assertPlanActiveForExport(storeId)
 
     const rows =
       scope === "metal-wise" ? await buildMetalWiseRows() : await buildEntriesRows()

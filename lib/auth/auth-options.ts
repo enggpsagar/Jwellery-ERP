@@ -188,12 +188,6 @@ export const authOptions: NextAuthOptions = {
         token.permissions = dbUser.permissions ?? []
         token.locationIds = locationGrants.map((grant) => grant.locationId)
         token.disabled = false
-        // Always false at fresh sign-in: the signIn callback above already
-        // rejects an expired-plan login outright, so reaching here at all
-        // guarantees the store wasn't expired a moment ago. Only the
-        // re-validation path below can ever flip this true — for a plan
-        // that expires *while* someone is already signed in.
-        token.planExpired = false
         token.checkedAt = Date.now()
         // Recorded only here, at sign-in — never touched on the re-read
         // path below, unlike checkedAt. This is what middleware.ts compares
@@ -230,13 +224,6 @@ export const authOptions: NextAuthOptions = {
           isActive: true,
           permissions: true,
           locationAccess: { select: { locationId: true } },
-          // Only ever meaningful for a non-Super-Admin (storeId non-null) -
-          // this is what closes the gap a thrown-Error-based check at
-          // sign-in alone leaves open: a plan that lapses *while* someone
-          // is already signed in previously kept working uninterrupted
-          // until their session naturally expired (was 30 days; now 24h),
-          // since nothing re-checked it after the initial login.
-          store: { select: { planExpiresAt: true } },
         },
       })
 
@@ -256,7 +243,6 @@ export const authOptions: NextAuthOptions = {
       token.karigarId = fresh.karigarId
       token.permissions = fresh.permissions ?? []
       token.locationIds = fresh.locationAccess.map((grant) => grant.locationId)
-      token.planExpired = fresh.store?.planExpiresAt ? fresh.store.planExpiresAt < new Date() : false
 
       return token
     },

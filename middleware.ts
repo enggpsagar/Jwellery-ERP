@@ -48,22 +48,21 @@ export async function middleware(request: NextRequest) {
 
   const role = token.role as string | undefined;
 
-  // Closes a real gap found by testing: the signIn callback in
-  // auth-options.ts already refuses a fresh login once a store's plan has
-  // expired, but that alone only ever stopped a *new* sign-in - a session
-  // that was already active when the plan lapsed kept working
-  // uninterrupted (Add Purchase, New Invoice, everything) until it expired
-  // on its own. token.planExpired is re-derived from the store's real
-  // planExpiresAt on the same throttled timer as token.disabled (see the
-  // jwt callback's re-validation block), so this now closes that loop for
-  // an already-signed-in session too, not just new logins. Never applies
-  // to a Super Admin - they aren't tied to any one store's plan.
-  if (role !== "SUPER_ADMIN" && token.planExpired === true) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
-    loginUrl.searchParams.set("error", "plan_expired");
-    return NextResponse.redirect(loginUrl);
-  }
+  // Plan-expiry is deliberately NOT enforced here anymore. It was
+  // originally (token.planExpired, redirecting on every request) — removed
+  // once testing established two things: (1) it couldn't work as written,
+  // since this app's SessionProvider disables both refetchOnWindowFocus
+  // and refetchInterval (components/providers/session-provider.tsx), so
+  // the JWT cookie this reads is never re-signed with a fresh value after
+  // login; and (2) the actual, confirmed requirement is narrower than "log
+  // the whole session out" anyway — viewing an expired store's existing
+  // data should keep working, only new entries/updates/exports should be
+  // blocked. Real-time enforcement for that now lives in
+  // lib/store-context.ts's assertPlanActiveForMutation, called from
+  // requireStoreScope()/resolveActingStoreId() and gated on the request
+  // actually being a Server Action mutation (Next.js's own `Next-Action`
+  // header), which a lightweight middleware token check can't distinguish
+  // from a plain page view.
 
   if (pathname.startsWith("/stores") && role !== "SUPER_ADMIN") {
     return NextResponse.redirect(new URL("/dashboard", request.url));

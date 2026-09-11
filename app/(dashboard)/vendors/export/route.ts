@@ -4,7 +4,7 @@ export const runtime = "nodejs"
 import { NextRequest, NextResponse } from "next/server"
 import * as XLSX from "xlsx"
 import { prisma } from "@/lib/prisma"
-import { requireStoreScope } from "@/lib/store-context"
+import { requireStoreScope, assertPlanActiveForExport } from "@/lib/store-context"
 import { formatShortDate } from "@/lib/utils"
 import { logger } from "@/lib/logger";
 
@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
     const sortOrder = (searchParams.get("sortOrder") || "desc") as SortOrder
 
     const storeId = await requireStoreScope()
+    await assertPlanActiveForExport(storeId)
 
     const where = {
       storeId,

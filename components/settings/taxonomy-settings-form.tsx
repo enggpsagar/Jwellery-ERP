@@ -43,6 +43,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/providers/toast-provider";
+import { MetalCategoryImportDialog } from "@/components/settings/metal-category-import-dialog";
+import { StoneTypeImportDialog } from "@/components/settings/stone-type-import-dialog";
 // Note: StoneTypesSection below still uses the plain Select above for the
 // *parent stone* picker (unchanged) — only the child Stone Type value
 // itself moved from a fixed Select to a free-text Input, mirroring
@@ -222,14 +224,17 @@ function MetalsSection({
           showAdd ? (
             <MetalFormRow onDone={() => setShowAdd(false)} />
           ) : (
-            <Button
-              type="button"
-              className="gap-2"
-              onClick={() => setShowAdd(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Add Metal
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                className="gap-2"
+                onClick={() => setShowAdd(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Add Metal
+              </Button>
+              <MetalCategoryImportDialog />
+            </div>
           )
         ) : null}
       </CardContent>
@@ -494,14 +499,17 @@ function StonesSection({
           showAdd ? (
             <StoneFormRow onDone={() => setShowAdd(false)} />
           ) : (
-            <Button
-              type="button"
-              className="gap-2"
-              onClick={() => setShowAdd(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Add Stone
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                className="gap-2"
+                onClick={() => setShowAdd(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Add Stone
+              </Button>
+              <StoneTypeImportDialog />
+            </div>
           )
         ) : null}
       </CardContent>

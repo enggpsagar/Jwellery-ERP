@@ -1,13 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { UserRole, WeightUnit } from "@prisma/client";
+import { UserRole, WeightUnit, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
+import { buildMultiSheetExcelExport, parseExcelWorkbook } from "@/lib/excel-export";
 
 export type StoreMetalRow = {
   id: string;
@@ -896,5 +897,412 @@ export async function deleteStoreCategoryType(id: string): Promise<TaxonomyFormS
   } catch (error) {
     logger.error("deleteStoreCategoryType error", error);
     return { success: false, message: actionErrorMessage(error, "Failed to delete type") };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bulk import — Metals & Categories in one file, Stones & Stone Types in
+// another. Same contract as every other bulk import in this app:
+// requireRole gate (matching every other write in this file), all-or-nothing
+// validation across BOTH sheets combined (an error anywhere in either sheet
+// blocks the whole file, not just its own sheet), Row N error messages.
+// ---------------------------------------------------------------------------
+
+export type TaxonomyImportResult = {
+  success: boolean;
+  message: string;
+  createdCount?: number;
+  errors?: string[];
+};
+
+function taxonomyImportCell(row: Record<string, unknown>, key: string): string {
+  return String(row[key] ?? "").trim();
+}
+
+function taxonomyImportYesNo(row: Record<string, unknown>, key: string, fallback: boolean): boolean {
+  const raw = taxonomyImportCell(row, key).toLowerCase();
+  if (raw === "yes" || raw === "true") return true;
+  if (raw === "no" || raw === "false") return false;
+  return fallback;
+}
+
+async function requireTaxonomyEditor(): Promise<TaxonomyImportResult | null> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+    return null;
+  } catch {
+    return { success: false, message: "Only the Store Owner can update these settings." };
+  }
+}
+
+/**
+ * A downloadable .xlsx with two sheets — "Metals" and "Categories" — each
+ * with one filled-in example row. Metal names must not already exist as a
+ * metal (not a stone); Category Types is an optional convenience column
+ * (comma-separated) so a category's sub-types can be seeded in the same
+ * pass instead of a second trip to the Types section.
+ */
+export async function getMetalCategoryImportTemplate(): Promise<{
+  fileName: string;
+  fileBase64: string;
+}> {
+  await requireStoreScope();
+
+  const metalExample = { Name: "Gold", "Has Purity": "Yes", "Selling Price": "" };
+  const categoryExample = { "Category Name": "Ring", "Category Types": "Casting, Handmade" };
+
+  return buildMultiSheetExcelExport(
+    [
+      { name: "Metals", rows: [metalExample], columns: Object.keys(metalExample) },
+      { name: "Categories", rows: [categoryExample], columns: Object.keys(categoryExample) },
+    ],
+    "metals-categories-import-template",
+  );
+}
+
+/**
+ * A downloadable .xlsx with "Stones" and "Stone Types" sheets. A Stone Type
+ * row's Stone Name may refer to either an existing stone or one being
+ * created by the Stones sheet in this same file.
+ */
+export async function getStoneTypeImportTemplate(): Promise<{
+  fileName: string;
+  fileBase64: string;
+}> {
+  await requireStoreScope();
+
+  const stoneExample = { Name: "Diamond", "Selling Price": "" };
+  const stoneTypeExample = { "Stone Name": "Diamond", "Type Name": "Natural" };
+
+  return buildMultiSheetExcelExport(
+    [
+      { name: "Stones", rows: [stoneExample], columns: Object.keys(stoneExample) },
+      { name: "Stone Types", rows: [stoneTypeExample], columns: Object.keys(stoneTypeExample) },
+    ],
+    "stones-stone-types-import-template",
+  );
+}
+
+/**
+ * Bulk-adds Metals and Categories from one two-sheet spreadsheet. The two
+ * sheets are structurally independent (no cross-references), but share one
+ * all-or-nothing validation pass and one revalidate — this is "one file,
+ * one import," not two imports that happen to share a dialog.
+ */
+export async function importMetalsAndCategoriesFromExcel(
+  formData: FormData,
+): Promise<TaxonomyImportResult> {
+  const roleError = await requireTaxonomyEditor();
+  if (roleError) return roleError;
+
+  try {
+    const storeId = await requireStoreScope();
+    const file = formData.get("file");
+
+    if (!(file instanceof File) || file.size === 0) {
+      return { success: false, message: "Choose a .xlsx or .csv file to import." };
+    }
+
+    const workbook = parseExcelWorkbook(await file.arrayBuffer());
+    const metalRows = workbook["Metals"] ?? [];
+    const categoryRows = workbook["Categories"] ?? [];
+
+    if (!metalRows.length && !categoryRows.length) {
+      return { success: false, message: "That file has no rows to import — check it has Metals and/or Categories sheets." };
+    }
+
+    const [existingMetals, existingCategories] = await Promise.all([
+      prisma.storeMetal.findMany({ where: { storeId, isGemstone: false }, select: { name: true } }),
+      prisma.storeCategory.findMany({ where: { storeId }, select: { name: true } }),
+    ]);
+
+    const existingMetalNames = new Set(existingMetals.map((m) => m.name.trim().toLowerCase()));
+    const existingCategoryNames = new Set(existingCategories.map((c) => c.name.trim().toLowerCase()));
+
+    const errors: string[] = [];
+    const seenMetalNames = new Set<string>();
+    const seenCategoryNames = new Set<string>();
+    const metalsToCreate: Prisma.StoreMetalCreateManyInput[] = [];
+    const categoriesToCreate: { name: string; categoryTypeNames: string[] }[] = [];
+
+    for (const [index, row] of metalRows.entries()) {
+      const line = index + 2;
+      const name = taxonomyImportCell(row, "Name");
+      const key = name.toLowerCase();
+
+      if (!name) {
+        errors.push(`Metals Row ${line}: Name is required`);
+        continue;
+      }
+      if (existingMetalNames.has(key)) {
+        errors.push(`Metals Row ${line}: A metal named "${name}" already exists`);
+        continue;
+      }
+      if (seenMetalNames.has(key)) {
+        errors.push(`Metals Row ${line}: "${name}" is duplicated in this sheet`);
+        continue;
+      }
+
+      const rawSellingPrice = taxonomyImportCell(row, "Selling Price");
+      const sellingPrice = rawSellingPrice === "" ? null : Number(rawSellingPrice);
+      if (rawSellingPrice !== "" && (!Number.isFinite(sellingPrice) || (sellingPrice ?? 0) < 0)) {
+        errors.push(`Metals Row ${line}: Selling Price must be 0 or more`);
+        continue;
+      }
+
+      seenMetalNames.add(key);
+      metalsToCreate.push({
+        storeId,
+        name,
+        hasPurity: taxonomyImportYesNo(row, "Has Purity", true),
+        isGemstone: false,
+        primaryUnit: WeightUnit.GRAM,
+        sellingPrice,
+      });
+    }
+
+    for (const [index, row] of categoryRows.entries()) {
+      const line = index + 2;
+      const name = taxonomyImportCell(row, "Category Name");
+      const key = name.toLowerCase();
+
+      if (!name) {
+        errors.push(`Categories Row ${line}: Category Name is required`);
+        continue;
+      }
+      if (existingCategoryNames.has(key)) {
+        errors.push(`Categories Row ${line}: A category named "${name}" already exists`);
+        continue;
+      }
+      if (seenCategoryNames.has(key)) {
+        errors.push(`Categories Row ${line}: "${name}" is duplicated in this sheet`);
+        continue;
+      }
+
+      const rawTypes = taxonomyImportCell(row, "Category Types");
+      const categoryTypeNames = [...new Set(
+        rawTypes
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+      )];
+
+      seenCategoryNames.add(key);
+      categoriesToCreate.push({ name, categoryTypeNames });
+    }
+
+    if (errors.length > 0) {
+      return {
+        success: false,
+        message: "Nothing was imported. Fix these rows and try again.",
+        errors,
+      };
+    }
+
+    if (!metalsToCreate.length && !categoriesToCreate.length) {
+      return { success: false, message: "That file has no rows to import." };
+    }
+
+    let createdCount = 0;
+
+    if (metalsToCreate.length) {
+      await prisma.storeMetal.createMany({ data: metalsToCreate });
+      createdCount += metalsToCreate.length;
+    }
+
+    if (categoriesToCreate.length) {
+      const createdCategories = await prisma.storeCategory.createManyAndReturn({
+        data: categoriesToCreate.map((c) => ({ storeId, name: c.name })),
+        select: { id: true, name: true },
+      });
+      const categoryIdByName = new Map(createdCategories.map((c) => [c.name, c.id]));
+
+      const categoryTypeRows: Prisma.StoreCategoryTypeCreateManyInput[] = [];
+      for (const category of categoriesToCreate) {
+        const categoryId = categoryIdByName.get(category.name);
+        if (!categoryId) continue;
+        for (const typeName of category.categoryTypeNames) {
+          categoryTypeRows.push({ storeId, categoryId, name: typeName });
+        }
+      }
+      if (categoryTypeRows.length) {
+        await prisma.storeCategoryType.createMany({ data: categoryTypeRows });
+      }
+      createdCount += createdCategories.length;
+    }
+
+    revalidatePath(TAXONOMY_PATH);
+
+    return {
+      success: true,
+      message: `Added ${metalsToCreate.length} ${metalsToCreate.length === 1 ? "metal" : "metals"} and ${categoriesToCreate.length} ${categoriesToCreate.length === 1 ? "category" : "categories"}.`,
+      createdCount,
+    };
+  } catch (error) {
+    logger.error("importMetalsAndCategoriesFromExcel error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to import metals/categories.") };
+  }
+}
+
+/**
+ * Bulk-adds Stones and Stone Types from one two-sheet spreadsheet. A Stone
+ * Type row's Stone Name is resolved against existing stones AND stones
+ * created by the Stones sheet in this same file, so both sheets can be
+ * filled in together without a round trip.
+ */
+export async function importStonesAndStoneTypesFromExcel(
+  formData: FormData,
+): Promise<TaxonomyImportResult> {
+  const roleError = await requireTaxonomyEditor();
+  if (roleError) return roleError;
+
+  try {
+    const storeId = await requireStoreScope();
+    const file = formData.get("file");
+
+    if (!(file instanceof File) || file.size === 0) {
+      return { success: false, message: "Choose a .xlsx or .csv file to import." };
+    }
+
+    const workbook = parseExcelWorkbook(await file.arrayBuffer());
+    const stoneRows = workbook["Stones"] ?? [];
+    const stoneTypeRows = workbook["Stone Types"] ?? [];
+
+    if (!stoneRows.length && !stoneTypeRows.length) {
+      return { success: false, message: "That file has no rows to import — check it has Stones and/or Stone Types sheets." };
+    }
+
+    const existingStones = await prisma.storeMetal.findMany({
+      where: { storeId, isGemstone: true },
+      select: { id: true, name: true },
+    });
+    const existingStoneNames = new Set(existingStones.map((s) => s.name.trim().toLowerCase()));
+    // Name -> id for stones already in the DB, used to resolve Stone Types
+    // whose Stone Name isn't also being created in this same file.
+    const existingStoneIdByName = new Map(existingStones.map((s) => [s.name.trim().toLowerCase(), s.id]));
+
+    const errors: string[] = [];
+    const seenStoneNames = new Set<string>();
+    const stonesToCreate: Prisma.StoreMetalCreateManyInput[] = [];
+
+    for (const [index, row] of stoneRows.entries()) {
+      const line = index + 2;
+      const name = taxonomyImportCell(row, "Name");
+      const key = name.toLowerCase();
+
+      if (!name) {
+        errors.push(`Stones Row ${line}: Name is required`);
+        continue;
+      }
+      if (existingStoneNames.has(key)) {
+        errors.push(`Stones Row ${line}: A stone named "${name}" already exists`);
+        continue;
+      }
+      if (seenStoneNames.has(key)) {
+        errors.push(`Stones Row ${line}: "${name}" is duplicated in this sheet`);
+        continue;
+      }
+
+      const rawSellingPrice = taxonomyImportCell(row, "Selling Price");
+      const sellingPrice = rawSellingPrice === "" ? null : Number(rawSellingPrice);
+      if (rawSellingPrice !== "" && (!Number.isFinite(sellingPrice) || (sellingPrice ?? 0) < 0)) {
+        errors.push(`Stones Row ${line}: Selling Price must be 0 or more`);
+        continue;
+      }
+
+      seenStoneNames.add(key);
+      stonesToCreate.push({
+        storeId,
+        name,
+        hasPurity: false,
+        isGemstone: true,
+        primaryUnit: WeightUnit.CARAT,
+        sellingPrice,
+      });
+    }
+
+    // Stone Type validation happens after the Stones sheet is fully known
+    // (but before anything is written) — a Stone Name can refer to either
+    // an existing stone or one this same file is about to create.
+    const stoneTypesToCreate: { stoneName: string; typeName: string }[] = [];
+    const seenStoneTypePairs = new Set<string>();
+
+    for (const [index, row] of stoneTypeRows.entries()) {
+      const line = index + 2;
+      const stoneName = taxonomyImportCell(row, "Stone Name");
+      const typeName = taxonomyImportCell(row, "Type Name");
+
+      if (!stoneName) {
+        errors.push(`Stone Types Row ${line}: Stone Name is required`);
+        continue;
+      }
+      if (!typeName) {
+        errors.push(`Stone Types Row ${line}: Type Name is required`);
+        continue;
+      }
+
+      const stoneKey = stoneName.toLowerCase();
+      const knownStone = existingStoneNames.has(stoneKey) || seenStoneNames.has(stoneKey);
+      if (!knownStone) {
+        errors.push(`Stone Types Row ${line}: No stone found named "${stoneName}" (add it to the Stones sheet or check the spelling)`);
+        continue;
+      }
+
+      const pairKey = `${stoneKey}::${typeName.toLowerCase()}`;
+      if (seenStoneTypePairs.has(pairKey)) {
+        errors.push(`Stone Types Row ${line}: "${typeName}" is duplicated for "${stoneName}" in this sheet`);
+        continue;
+      }
+      seenStoneTypePairs.add(pairKey);
+
+      stoneTypesToCreate.push({ stoneName, typeName });
+    }
+
+    if (errors.length > 0) {
+      return {
+        success: false,
+        message: "Nothing was imported. Fix these rows and try again.",
+        errors,
+      };
+    }
+
+    if (!stonesToCreate.length && !stoneTypesToCreate.length) {
+      return { success: false, message: "That file has no rows to import." };
+    }
+
+    let createdCount = 0;
+    const stoneIdByName = new Map(existingStoneIdByName);
+
+    if (stonesToCreate.length) {
+      const createdStones = await prisma.storeMetal.createManyAndReturn({
+        data: stonesToCreate,
+        select: { id: true, name: true },
+      });
+      for (const stone of createdStones) {
+        stoneIdByName.set(stone.name.trim().toLowerCase(), stone.id);
+      }
+      createdCount += createdStones.length;
+    }
+
+    if (stoneTypesToCreate.length) {
+      const stoneTypeData: Prisma.StoreMetalOriginCreateManyInput[] = stoneTypesToCreate.map((t) => ({
+        storeId,
+        storeMetalId: stoneIdByName.get(t.stoneName.toLowerCase())!,
+        name: t.typeName,
+      }));
+      await prisma.storeMetalOrigin.createMany({ data: stoneTypeData });
+      createdCount += stoneTypeData.length;
+    }
+
+    revalidatePath(TAXONOMY_PATH);
+
+    return {
+      success: true,
+      message: `Added ${stonesToCreate.length} ${stonesToCreate.length === 1 ? "stone" : "stones"} and ${stoneTypesToCreate.length} stone ${stoneTypesToCreate.length === 1 ? "type" : "types"}.`,
+      createdCount,
+    };
+  } catch (error) {
+    logger.error("importStonesAndStoneTypesFromExcel error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to import stones/stone types.") };
   }
 }

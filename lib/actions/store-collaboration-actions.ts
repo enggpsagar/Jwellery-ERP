@@ -216,6 +216,43 @@ export async function getMyAccessRequestStatus(storeId: string): Promise<MyAcces
   return "NONE";
 }
 
+export type MyStoreAccessState =
+  | { hasAccess: true; code: string | null }
+  | { hasAccess: false; requestStatus: MyAccessRequestStatus };
+
+/**
+ * The CURRENT Super Admin's actual standing with a given store — the
+ * "Request Access" control shouldn't offer to request access at all once
+ * they already hold a live grant (redeemed code or an approved request);
+ * it should show that store's collaboration code instead. Mirrors
+ * listCollaborationGrants' own version check (lib/store-membership.ts) so
+ * this agrees with what the store switcher already treats as "has access":
+ * a grant only counts while grantedCodeVersion still matches the store's
+ * current collaborationCodeVersion — a "Generate new code" on the owner's
+ * side silently drops out of this check with no separate revoke step.
+ */
+export async function getMyStoreAccess(storeId: string): Promise<MyStoreAccessState> {
+  const user = await requireAuth();
+  if (user.role !== UserRole.SUPER_ADMIN) return { hasAccess: false, requestStatus: "NONE" };
+
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { collaborationCode: true, collaborationCodeVersion: true },
+  });
+  if (!store) return { hasAccess: false, requestStatus: "NONE" };
+
+  const grant = await prisma.storeCollaborationAccess.findUnique({
+    where: { storeId_superAdminUserId: { storeId, superAdminUserId: user.id! } },
+    select: { grantedCodeVersion: true },
+  });
+
+  if (grant && grant.grantedCodeVersion === store.collaborationCodeVersion) {
+    return { hasAccess: true, code: store.collaborationCode };
+  }
+
+  return { hasAccess: false, requestStatus: await getMyAccessRequestStatus(storeId) };
+}
+
 /**
  * A Super Admin asking a store's owner directly for access, instead of
  * waiting for a Collaboration Code to be shared. At most one PENDING

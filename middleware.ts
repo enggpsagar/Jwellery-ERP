@@ -92,6 +92,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
+  // The design-system reference (colors, components, established
+  // conventions) is a platform-operator tool, not something a store's own
+  // staff has a use for — same SUPER_ADMIN-only gate as /stores and /plans.
+  if (pathname.startsWith("/brand-guide") && role !== "SUPER_ADMIN") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
   if (
     role === "KARIGAR" &&
     !KARIGAR_ALLOWED_PREFIXES.some((prefix) => pathname.startsWith(prefix))

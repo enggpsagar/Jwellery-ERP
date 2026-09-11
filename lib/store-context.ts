@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 
 import { getCurrentUser } from "@/lib/auth/auth";
@@ -70,9 +71,25 @@ export async function requireStoreScope(): Promise<string> {
   const storeId = await getEffectiveStoreId();
 
   if (!storeId) {
-    throw new Error(
-      "No store selected. Choose a store from the switcher before continuing."
-    );
+    // Deliberately a redirect(), not a thrown Error: a store-scoped page's
+    // render (e.g. /reports's Promise.all of report-actions.ts getters)
+    // ends up calling this deep inside its OWN data-fetching, which
+    // app/(dashboard)/layout.tsx's SelectStoreNotice branch cannot actually
+    // prevent — Next.js's App Router renders a page segment's data
+    // fetching independently of whether the parent layout's returned JSX
+    // ends up referencing {children}, so a plain thrown Error here still
+    // reaches the user as the generic "Something went wrong" crash screen
+    // (confirmed via production logs: /reports crashed this way for a
+    // Super Admin in "All Stores (Global)" view, despite layout.tsx's own
+    // guard appearing to cover it). redirect() is the one signal Next.js's
+    // router does intercept regardless of render depth, so this fixes
+    // every caller across the app in one place, not just /reports.
+    // /stores is always reachable for a Super Admin (the intended way to
+    // fix this); for a non-Super-Admin (who should never actually hit this
+    // — they always have a real storeId — but might via some edge case),
+    // middleware's own SUPER_ADMIN-only gate on /stores bounces them
+    // onward to /dashboard, which works for them since they have a store.
+    redirect("/stores");
   }
 
   return storeId;

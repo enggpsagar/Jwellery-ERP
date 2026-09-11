@@ -62,7 +62,7 @@ export function EditQuotationDialog({
       <DialogTrigger asChild>
         <Button
           variant="outline"
-          className="gap-2 border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+          className="gap-2 border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
           title="Edit Quotation"
         >
           <Pencil className="h-4 w-4" />

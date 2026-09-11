@@ -62,7 +62,7 @@ export function RedeemCollaborationCodeDialog({
           type="button"
           variant="outline"
           size="sm"
-          className="gap-2 border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+          className="gap-2 border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
         >
           <KeyRound className="size-4" />
           Access Only

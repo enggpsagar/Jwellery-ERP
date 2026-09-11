@@ -31,7 +31,7 @@ export function EmailInvoiceButton({ invoiceId }: { invoiceId: string }) {
       title="Email Invoice"
       aria-label="Email Invoice"
       variant="outline"
-      className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+      className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
     >
       {pending ? <Loader className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
     </Button>

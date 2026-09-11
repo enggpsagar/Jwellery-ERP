@@ -77,7 +77,7 @@ export function ChangePlanDialog({
         // already uses (bg-destructive/10 text-destructive) — shared across
         // every action in this row (see ExtendPlanDialog, ExportStoreDataButton,
         // etc.) so they read as one consistent set.
-        className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+        className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
         onClick={() => setOpen(true)}
         aria-label={`Change plan for ${storeName}`}
         title="Change plan"

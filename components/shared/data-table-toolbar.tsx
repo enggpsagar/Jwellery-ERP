@@ -299,7 +299,7 @@ export function DataTableToolbar({
               disabled={isExporting}
               title={hasSelection ? `Export selected ${entityLabel} (${selectedIds!.length})` : `Export ${entityLabel}`}
               aria-label={hasSelection ? `Export selected ${entityLabel} (${selectedIds!.length})` : `Export ${entityLabel}`}
-              className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+              className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
             >
               {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}
             </Button>

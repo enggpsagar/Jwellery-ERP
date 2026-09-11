@@ -62,7 +62,7 @@ export function StockRowActions({ stockId, stockCode }: StockRowActionsProps) {
       <div className="flex items-center gap-2">
         <Link
           href={`/inventory/stock/${stockId}`}
-          className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-sm text-primary hover:bg-primary/20"
+          className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-sm text-blue-700 hover:bg-blue-100"
           title="View stock item"
         >
           <Eye className="h-4 w-4" />
@@ -70,7 +70,7 @@ export function StockRowActions({ stockId, stockCode }: StockRowActionsProps) {
 
         <Link
           href={`/inventory/stock/${stockId}/edit`}
-          className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-sm text-primary hover:bg-primary/20"
+          className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-sm text-blue-700 hover:bg-blue-100"
           title="Edit stock item"
         >
           <Pencil className="h-4 w-4" />

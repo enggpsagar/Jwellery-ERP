@@ -177,7 +177,7 @@ export function MetalRatesTable({ data }: Props) {
                 title="Export metal rates"
                 aria-label="Export metal rates"
                 variant="outline"
-                className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+                className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
               >
                 <Download className="h-4 w-4" />
               </Button>

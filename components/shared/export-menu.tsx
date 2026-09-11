@@ -31,7 +31,7 @@ export function ExportMenu({ href, label = "Export", iconOnly = false }: ExportM
             size="icon-sm"
             title={label}
             aria-label={label}
-            className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+            className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
           >
             <Download />
           </Button>
@@ -39,7 +39,7 @@ export function ExportMenu({ href, label = "Export", iconOnly = false }: ExportM
           <Button
             variant="outline"
             size="sm"
-            className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+            className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
           >
             <Download data-icon="inline-start" />
             {label}

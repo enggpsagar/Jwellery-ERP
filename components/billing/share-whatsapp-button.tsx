@@ -107,7 +107,7 @@ export function ShareWhatsAppButton({
       title={!digits ? "This party has no phone number on file" : "Share on WhatsApp"}
       aria-label="Share on WhatsApp"
       variant="outline"
-      className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+      className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
     >
       {loading ? <Loader className="h-4 w-4" /> : <WhatsAppIcon className="h-4 w-4" />}
     </Button>

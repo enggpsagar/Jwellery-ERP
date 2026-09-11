@@ -43,7 +43,7 @@ export function InvoiceQuickActions({ invoice, businessName }: InvoiceQuickActio
       <EmailInvoiceButton invoiceId={invoice.id} />
       <Link
         href={`/billing/${invoice.id}/print`}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-primary/10 text-primary transition hover:bg-primary/20"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
         aria-label="Print invoice"
         title="Print"
       >
@@ -111,7 +111,7 @@ export function InvoiceActionsBar({
         <Button
           asChild
           variant="outline"
-          className="gap-2 border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+          className="gap-2 border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
         >
           <Link href={`/billing/${invoice.id}/edit`}>
             <Pencil className="h-4 w-4" />

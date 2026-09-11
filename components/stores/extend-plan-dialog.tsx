@@ -72,7 +72,7 @@ export function ExtendPlanDialog({ storeId, storeName, currentExpiresAt }: Exten
         type="button"
         variant="outline"
         size="icon"
-        className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+        className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
         onClick={() => setOpen(true)}
         aria-label={`Extend plan for ${storeName}`}
         title="Extend plan"

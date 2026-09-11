@@ -106,7 +106,7 @@ export function EditInvoiceDialog({
           <Button
             size="sm"
             variant="outline"
-            className="gap-1.5 border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+            className="gap-1.5 border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
             title="Edit Date & E-way Bill"
           >
             <Truck className="h-4 w-4" />
@@ -115,7 +115,7 @@ export function EditInvoiceDialog({
         ) : (
           <Button
             variant="outline"
-            className="gap-2 border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+            className="gap-2 border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
             title="Edit Date & E-way Bill"
           >
             <Truck className="h-4 w-4" />

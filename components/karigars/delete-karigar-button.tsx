@@ -53,7 +53,6 @@ export function DeleteKarigarButton({
         type="button"
         variant="destructive"
         size="icon"
-        className="bg-red-600 text-white hover:bg-red-700"
         onClick={() => setOpen(true)}
         aria-label={`Delete ${karigarName}`}
         title="Delete artisan"
@@ -86,7 +85,6 @@ export function DeleteKarigarButton({
 
             <Button
               variant="destructive"
-              className="bg-red-600 text-white hover:bg-red-700"
               onClick={handleDelete}
               disabled={isPending}
             >

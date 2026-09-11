@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { VendorsTable } from "@/components/vendors/vendors-table"
 import { VendorsToolbar } from "@/components/vendors/vendors-toolbar"
+import { VendorImportDialog } from "@/components/vendors/vendor-import-dialog"
 import { Button } from "@/components/ui/button"
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
 import { VendorDetailPanel } from "@/components/vendors/vendor-detail-panel"
@@ -67,6 +68,8 @@ export function VendorsClient({
               Archived Vendors
             </Button>
           </Link>
+
+          <VendorImportDialog />
 
           <Link href="/vendors/new">
             <Button>Add Vendor</Button>

@@ -325,7 +325,7 @@ export async function getCustomerByIdCore(
   return mapCustomer(customer);
 }
 
-function validateCustomerInput(input: CustomerInput) {
+export function validateCustomerInput(input: CustomerInput) {
   const errors: Record<string, string[]> = {};
   if (!input.name?.trim()) errors.name = ["Party name is required"];
   if (input.aadhaarNumber?.trim() && !isValidAadhaarNumber(input.aadhaarNumber)) {

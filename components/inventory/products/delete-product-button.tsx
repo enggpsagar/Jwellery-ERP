@@ -53,7 +53,6 @@ export function DeleteProductButton({
         type="button"
         variant="destructive"
         size="icon"
-        className="bg-red-600 text-white hover:bg-red-700"
         onClick={() => setOpen(true)}
         title="Delete product"
         aria-label={`Delete ${productName}`}
@@ -86,7 +85,6 @@ export function DeleteProductButton({
 
             <Button
               variant="destructive"
-              className="bg-red-600 text-white hover:bg-red-700"
               onClick={handleDelete}
               disabled={isPending}
             >

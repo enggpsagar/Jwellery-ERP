@@ -165,15 +165,16 @@ export function DraftOrdersTable({
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       {isDeletable(order.status) ? (
-                        <button
+                        <Button
                           type="button"
+                          variant="destructive"
+                          size="icon"
                           onClick={() => setConfirmOrder(order)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700"
                           aria-label={`Delete ${order.orderNumber}`}
                           title="Delete draft order"
                         >
                           <Trash2 className="h-4 w-4" />
-                        </button>
+                        </Button>
                       ) : null}
                     </td>
                   </tr>
@@ -207,7 +208,6 @@ export function DraftOrdersTable({
             <Button
               type="button"
               variant="destructive"
-              className="bg-red-600 text-white hover:bg-red-700"
               onClick={handleDelete}
               disabled={deleting}
             >

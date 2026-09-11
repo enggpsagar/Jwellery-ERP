@@ -84,22 +84,18 @@ export function KarigarRowActions({
     <>
       <div className="flex items-center gap-2">
         {showView && (
-          <Link
-            href={`/karigars/${karigarId}`}
-            className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-sm text-blue-700 hover:bg-blue-100"
-            title="View artisan"
-          >
-            <Eye className="h-4 w-4" />
-          </Link>
+          <Button variant="info" size="icon" asChild title="View artisan">
+            <Link href={`/karigars/${karigarId}`}>
+              <Eye className="h-4 w-4" />
+            </Link>
+          </Button>
         )}
 
-        <Link
-          href={`/karigars/${karigarId}/edit`}
-          className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-sm text-blue-700 hover:bg-blue-100"
-          title="Edit artisan"
-        >
-          <Pencil className="h-4 w-4" />
-        </Link>
+        <Button variant="edit" size="icon" asChild title="Edit artisan">
+          <Link href={`/karigars/${karigarId}/edit`}>
+            <Pencil className="h-4 w-4" />
+          </Link>
+        </Button>
 
         {showIssueMaterial && (
           <IssueMaterialDialog
@@ -112,14 +108,15 @@ export function KarigarRowActions({
           />
         )}
 
-        <button
+        <Button
           type="button"
+          variant="warning"
+          size="icon"
           onClick={() => setConfirmDisable(true)}
-          className="inline-flex items-center gap-1 rounded-md border border-amber-200 px-2 py-1 text-sm text-amber-700 hover:bg-amber-50"
           title="Disable artisan"
         >
-          <ToggleRight className="h-5 w-5" />
-        </button>
+          <ToggleRight className="h-4 w-4" />
+        </Button>
 
         <DeleteKarigarButton karigarId={karigarId} karigarName={karigarName} />
       </div>
@@ -154,7 +151,7 @@ export function KarigarRowActions({
               Cancel
             </Button>
 
-            <Button type="button" variant="destructive" onClick={handleDisable} disabled={loading}>
+            <Button type="button" variant="warning" onClick={handleDisable} disabled={loading}>
               {loading ? (
                 <>
                   <Loader className="mr-2 h-4 w-4" />

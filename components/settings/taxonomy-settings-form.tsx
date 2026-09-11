@@ -43,6 +43,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/providers/toast-provider";
+import { MetalCategoryImportDialog } from "@/components/settings/metal-category-import-dialog";
+import { StoneTypeImportDialog } from "@/components/settings/stone-type-import-dialog";
 // Note: StoneTypesSection below still uses the plain Select above for the
 // *parent stone* picker (unchanged) — only the child Stone Type value
 // itself moved from a fixed Select to a free-text Input, mirroring
@@ -194,7 +196,7 @@ function MetalsSection({
                   <button
                     type="button"
                     onClick={() => setEditingId(metal.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
                     aria-label={`Edit ${metal.name}`}
                     title="Edit metal"
                   >
@@ -204,7 +206,7 @@ function MetalsSection({
                     type="button"
                     onClick={() => handleDelete(metal.id, metal.name)}
                     disabled={deletingId === metal.id}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-50"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
                     aria-label={`Delete ${metal.name}`}
                     title="Delete metal (only if unused)"
                   >
@@ -222,14 +224,17 @@ function MetalsSection({
           showAdd ? (
             <MetalFormRow onDone={() => setShowAdd(false)} />
           ) : (
-            <Button
-              type="button"
-              className="gap-2"
-              onClick={() => setShowAdd(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Add Metal
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                className="gap-2"
+                onClick={() => setShowAdd(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Add Metal
+              </Button>
+              <MetalCategoryImportDialog />
+            </div>
           )
         ) : null}
       </CardContent>
@@ -466,7 +471,7 @@ function StonesSection({
                   <button
                     type="button"
                     onClick={() => setEditingId(stone.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
                     aria-label={`Edit ${stone.name}`}
                     title="Edit stone"
                   >
@@ -476,7 +481,7 @@ function StonesSection({
                     type="button"
                     onClick={() => handleDelete(stone.id, stone.name)}
                     disabled={deletingId === stone.id}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-50"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
                     aria-label={`Delete ${stone.name}`}
                     title="Delete stone (only if unused)"
                   >
@@ -494,14 +499,17 @@ function StonesSection({
           showAdd ? (
             <StoneFormRow onDone={() => setShowAdd(false)} />
           ) : (
-            <Button
-              type="button"
-              className="gap-2"
-              onClick={() => setShowAdd(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Add Stone
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                className="gap-2"
+                onClick={() => setShowAdd(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Add Stone
+              </Button>
+              <StoneTypeImportDialog />
+            </div>
           )
         ) : null}
       </CardContent>
@@ -778,7 +786,7 @@ function StoneTypesSection({
                       <button
                         type="button"
                         onClick={() => setEditingId(option.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
                         aria-label={`Edit ${option.name}`}
                         title="Edit Stone Type"
                       >
@@ -788,7 +796,7 @@ function StoneTypesSection({
                         type="button"
                         onClick={() => handleDelete(option.id, option.name)}
                         disabled={deletingId === option.id}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-50"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
                         aria-label={`Delete ${option.name}`}
                         title="Delete Stone Type (only if unused)"
                       >
@@ -991,7 +999,7 @@ function CategoriesSection({
                   <button
                     type="button"
                     onClick={() => setEditingId(category.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
                     aria-label={`Edit ${category.name}`}
                     title="Edit category"
                   >
@@ -1001,7 +1009,7 @@ function CategoriesSection({
                     type="button"
                     onClick={() => handleDelete(category.id, category.name)}
                     disabled={deletingId === category.id}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-50"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
                     aria-label={`Delete ${category.name}`}
                     title="Delete category (only if unused)"
                   >
@@ -1272,7 +1280,7 @@ function TypesSection({
                       <button
                         type="button"
                         onClick={() => setEditingId(type.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
                         aria-label={`Edit ${type.name}`}
                         title="Edit type"
                       >
@@ -1282,7 +1290,7 @@ function TypesSection({
                         type="button"
                         onClick={() => handleDelete(type.id, type.name)}
                         disabled={deletingId === type.id}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-50"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
                         aria-label={`Delete ${type.name}`}
                         title="Delete type (only if unused)"
                       >

@@ -2,7 +2,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { requireStoreScope } from "@/lib/store-context";
+import { getStoreIdForRead } from "@/lib/store-context";
 
 export type GlobalSearchResultType =
   | "customer"
@@ -33,7 +33,7 @@ export async function globalSearch(
     return { results: [] };
   }
 
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const [customers, products, invoices, karigars] = await Promise.all([
     prisma.customer.findMany({

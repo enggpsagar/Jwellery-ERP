@@ -7,6 +7,7 @@ import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { Eye, ArrowRightCircle } from "lucide-react"
 
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
+import { Button } from "@/components/ui/button"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import { formatShortDate } from "@/lib/utils"
 
@@ -247,13 +248,11 @@ export function KachaInvoiceTable({
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <Link
-                    href={`/billing/kacha/${kachaInvoice.id}`}
-                    className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-sm text-blue-700 hover:bg-blue-100"
-                    title="View Estimate"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Link>
+                  <Button variant="info" size="icon" asChild title="View Estimate">
+                    <Link href={`/billing/kacha/${kachaInvoice.id}`}>
+                      <Eye className="h-4 w-4" />
+                    </Link>
+                  </Button>
                 </td>
               </tr>
             ))}

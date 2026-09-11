@@ -39,14 +39,11 @@ export function QuotationActionsBar({ quotation, businessName }: QuotationAction
   return (
     <div className="flex flex-wrap items-center gap-2">
       <ShareWhatsAppButton phone={quotation.customer?.phone} message={whatsappMessage} />
-      <Link
-        href={`/quotations/${quotation.id}/print`}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
-        aria-label="Print quotation"
-        title="Print"
-      >
-        <Printer className="h-4 w-4" />
-      </Link>
+      <Button variant="info" size="icon" asChild aria-label="Print quotation" title="Print">
+        <Link href={`/quotations/${quotation.id}/print`}>
+          <Printer className="h-4 w-4" />
+        </Link>
+      </Button>
       {quotation.status === "open" ? (
         <>
           <EditQuotationDialog

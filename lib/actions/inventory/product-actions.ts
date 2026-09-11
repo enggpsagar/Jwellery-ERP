@@ -9,8 +9,15 @@ import { actionErrorMessage } from "@/lib/action-error";
 import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scope";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import type { ProductFormState } from "@/lib/inventory/product-types";
-import { buildSkuPrefix } from "@/lib/inventory/product-sku";
-import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
+import { buildSkuPrefix, TARGET_STYLE_LABEL } from "@/lib/inventory/product-sku";
+import { PURITY_LABELS } from "@/lib/purity";
+import {
+  buildExcelExport,
+  buildCsvExportBase64,
+  buildPdfExportBase64,
+  buildMultiSheetExcelExport,
+  parseExcelUpload,
+} from "@/lib/excel-export";
 import { logger } from "@/lib/logger";
 
 function parseNullableString(value: FormDataEntryValue | null) {
@@ -1187,4 +1194,507 @@ export async function bulkDeleteProducts(ids: string[]): Promise<BulkDeleteResul
   }
 
   return { deletedCount, failures };
+}
+
+export type ProductImportResult = {
+  success: boolean;
+  message: string;
+  createdCount?: number;
+  /** Row-level problems. Populated only when nothing was created — nothing
+   * is written until the whole file is clean. */
+  errors?: string[];
+};
+
+const CHARGE_TYPE_LABELS: Record<string, ChargeType> = {
+  fixed: ChargeType.FIXED,
+  percentage: ChargeType.PERCENTAGE,
+};
+
+/**
+ * A downloadable .xlsx showing the expected columns and one filled-in
+ * example row. Category/Metal Type/Style/Purity are entered as the same
+ * human-readable names shown throughout the app (not ids or enum keys) —
+ * importProductsFromExcel resolves them against this store's own Settings >
+ * Taxonomy entries. No SKU column: it's auto-generated on import exactly
+ * like the single "Add Product" form generates it. Stock Quantity/Location
+ * are the bulk equivalent of "Add Product"'s own "create a stock entry too"
+ * checkbox — leave Stock Quantity blank to import the product alone.
+ */
+export async function getProductImportTemplate(): Promise<{
+  fileName: string;
+  fileBase64: string;
+}> {
+  await requireStoreScope();
+
+  const example = {
+    "Product Name": "Classic Gold Ring",
+    Category: "Ring",
+    "Metal Type": "Gold",
+    Style: "Ladies",
+    "Category Type": "",
+    "Stone Type": "",
+    Purity: "Gold 22K",
+    "Making Charge": 500,
+    "Making Charge Type": "Fixed",
+    "Stone Charge": "",
+    "Stone Charge Type": "Fixed",
+    "Gross Weight": 8.5,
+    "Net Weight": 8.2,
+    "Stone Weight": "",
+    "Carat Weight": "",
+    "Has Stone Component": "No",
+    "Stone Rate": "",
+    "Stone Metal Type Name": "",
+    "Stone Type Names": "",
+    "Design Code": "RG-001",
+    "HSN Code": "7113",
+    Description: "22K gold ladies ring",
+    Notes: "",
+    Active: "Yes",
+    "Stock Quantity": "",
+    Location: "",
+  };
+
+  return buildMultiSheetExcelExport(
+    [{ name: "Products Import", rows: [example], columns: Object.keys(example) }],
+    "products-import-template",
+  );
+}
+
+function productImportCell(row: Record<string, unknown>, key: string): string {
+  return String(row[key] ?? "").trim();
+}
+
+/** Parses a required decimal cell: "" is valid (→ null), anything else that
+ * isn't a finite number is an error. Returns `undefined` as a sentinel for
+ * "this row already has an error, skip further checks on it" — callers
+ * check `error` first. */
+function productImportDecimal(
+  row: Record<string, unknown>,
+  key: string,
+): { value: number | null; error: string | null } {
+  const raw = productImportCell(row, key);
+  if (raw === "") return { value: null, error: null };
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    return { value: null, error: `${key} must be a number` };
+  }
+  return { value, error: null };
+}
+
+function productImportYesNo(row: Record<string, unknown>, key: string, fallback: boolean): boolean {
+  const raw = productImportCell(row, key).toLowerCase();
+  if (raw === "yes" || raw === "true") return true;
+  if (raw === "no" || raw === "false") return false;
+  return fallback;
+}
+
+/**
+ * Bulk-adds products from one spreadsheet — mirrors importInventoryStockFromExcel's
+ * contract exactly, but with the added complexity of resolving Category/
+ * Metal Type/Category Type/Stone Type names to ids and auto-generating each
+ * row's SKU, same as the single "Add Product" form does (see createProduct
+ * above) — just computed as one batch instead of N sequential DB round
+ * trips. Validation happens in a first pass with zero DB writes; SKU
+ * sequence numbers are only assigned once every row in the file is known to
+ * be valid, so a bad row never even reaches the sequence-numbering step.
+ */
+export async function importProductsFromExcel(
+  formData: FormData,
+): Promise<ProductImportResult> {
+  try {
+    const storeId = await requireStoreScope();
+    const file = formData.get("file");
+
+    if (!(file instanceof File) || file.size === 0) {
+      return { success: false, message: "Choose a .xlsx or .csv file to import." };
+    }
+
+    const rows = parseExcelUpload(await file.arrayBuffer());
+
+    if (!rows.length) {
+      return { success: false, message: "That file has no rows to import." };
+    }
+
+    const [categories, metals, categoryTypes, metalOrigins, locations, businessSettings] = await Promise.all([
+      prisma.storeCategory.findMany({ where: { storeId }, select: { id: true, name: true } }),
+      prisma.storeMetal.findMany({ where: { storeId }, select: { id: true, name: true } }),
+      prisma.storeCategoryType.findMany({
+        where: { storeId },
+        select: { id: true, name: true, categoryId: true },
+      }),
+      prisma.storeMetalOrigin.findMany({
+        where: { storeId },
+        select: { id: true, name: true, storeMetalId: true },
+      }),
+      prisma.storeLocation.findMany({ where: { storeId }, select: { id: true, name: true } }),
+      prisma.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true } }),
+    ]);
+
+    const categoryByName = new Map(categories.map((c) => [c.name.trim().toLowerCase(), c]));
+    const metalByName = new Map(metals.map((m) => [m.name.trim().toLowerCase(), m]));
+    const locationByName = new Map(locations.map((l) => [l.name.trim().toLowerCase(), l.id]));
+    const locationScope = await getLocationScope();
+
+    const categoryTypesByCategory = new Map<string, Map<string, { id: string; name: string }>>();
+    for (const type of categoryTypes) {
+      if (!categoryTypesByCategory.has(type.categoryId)) {
+        categoryTypesByCategory.set(type.categoryId, new Map());
+      }
+      categoryTypesByCategory.get(type.categoryId)!.set(type.name.trim().toLowerCase(), type);
+    }
+
+    const metalOriginsByMetal = new Map<string, Map<string, { id: string; name: string }>>();
+    for (const origin of metalOrigins) {
+      if (!metalOriginsByMetal.has(origin.storeMetalId)) {
+        metalOriginsByMetal.set(origin.storeMetalId, new Map());
+      }
+      metalOriginsByMetal.get(origin.storeMetalId)!.set(origin.name.trim().toLowerCase(), origin);
+    }
+
+    const purityByLabel = new Map(
+      (Object.entries(PURITY_LABELS) as [PurityType, string][]).map(([value, label]) => [
+        label.toLowerCase(),
+        value,
+      ]),
+    );
+    const styleByLabel = new Map(
+      (Object.entries(TARGET_STYLE_LABEL) as [TargetStyle, string][]).map(([value, label]) => [
+        label.toLowerCase(),
+        value,
+      ]),
+    );
+
+    type ResolvedRow = {
+      skuPrefix: string;
+      fields: Omit<Prisma.ProductCreateManyInput, "storeId" | "productCode">;
+      /** The bulk equivalent of "Add Product"'s own "create a stock entry
+       * too" checkbox — null means this row is product-only. */
+      stockQuantity: number | null;
+      stockLocationId: string | null;
+    };
+
+    const errors: string[] = [];
+    const resolvedRows: ResolvedRow[] = [];
+
+    for (const [index, row] of rows.entries()) {
+      // +2 = one for the header row, one for 1-based spreadsheet numbering.
+      const line = index + 2;
+      const rowErrors: string[] = [];
+
+      const name = productImportCell(row, "Product Name");
+      if (!name) rowErrors.push("Product Name is required");
+
+      const categoryName = productImportCell(row, "Category");
+      const category = categoryName ? categoryByName.get(categoryName.toLowerCase()) : undefined;
+      if (!categoryName) rowErrors.push("Category is required");
+      else if (!category) rowErrors.push(`No category found named "${categoryName}"`);
+
+      const metalName = productImportCell(row, "Metal Type");
+      const metal = metalName ? metalByName.get(metalName.toLowerCase()) : undefined;
+      if (!metalName) rowErrors.push("Metal Type is required");
+      else if (!metal) rowErrors.push(`No metal type found named "${metalName}"`);
+
+      const styleRaw = productImportCell(row, "Style");
+      const targetStyle = styleRaw ? styleByLabel.get(styleRaw.toLowerCase()) : undefined;
+      if (!styleRaw) rowErrors.push("Style is required");
+      else if (!targetStyle) {
+        rowErrors.push(`"${styleRaw}" is not a valid Style — use Ladies, Gents, Kids, or Unisex`);
+      }
+
+      const categoryTypeName = productImportCell(row, "Category Type");
+      let categoryType: { id: string; name: string } | undefined;
+      if (categoryTypeName && category) {
+        categoryType = categoryTypesByCategory.get(category.id)?.get(categoryTypeName.toLowerCase());
+        if (!categoryType) {
+          rowErrors.push(`Category Type "${categoryTypeName}" does not belong to category "${categoryName}"`);
+        }
+      }
+
+      const stoneTypeName = productImportCell(row, "Stone Type");
+      let stoneOrigin: { id: string; name: string } | undefined;
+      if (stoneTypeName && metal) {
+        stoneOrigin = metalOriginsByMetal.get(metal.id)?.get(stoneTypeName.toLowerCase());
+        if (!stoneOrigin) {
+          rowErrors.push(`Stone Type "${stoneTypeName}" does not belong to metal type "${metalName}"`);
+        }
+      }
+
+      const purityRaw = productImportCell(row, "Purity");
+      let defaultPurity: PurityType | null = null;
+      if (purityRaw) {
+        const matched = purityByLabel.get(purityRaw.toLowerCase());
+        if (!matched) {
+          rowErrors.push(`"${purityRaw}" is not a valid Purity — see the template's Purity column for valid values`);
+        } else {
+          defaultPurity = matched;
+        }
+      }
+
+      const makingChargeTypeRaw = productImportCell(row, "Making Charge Type");
+      let defaultMakingChargeType: ChargeType = ChargeType.FIXED;
+      if (makingChargeTypeRaw) {
+        const matched = CHARGE_TYPE_LABELS[makingChargeTypeRaw.toLowerCase()];
+        if (!matched) {
+          rowErrors.push(`"${makingChargeTypeRaw}" is not a valid Making Charge Type — use Fixed or Percentage`);
+        } else {
+          defaultMakingChargeType = matched;
+        }
+      }
+
+      const stoneChargeTypeRaw = productImportCell(row, "Stone Charge Type");
+      let defaultStoneChargeType: ChargeType = ChargeType.FIXED;
+      if (stoneChargeTypeRaw) {
+        const matched = CHARGE_TYPE_LABELS[stoneChargeTypeRaw.toLowerCase()];
+        if (!matched) {
+          rowErrors.push(`"${stoneChargeTypeRaw}" is not a valid Stone Charge Type — use Fixed or Percentage`);
+        } else {
+          defaultStoneChargeType = matched;
+        }
+      }
+
+      const numericFields: Record<string, number | null> = {};
+      let numericError = false;
+      for (const key of [
+        "Making Charge",
+        "Stone Charge",
+        "Gross Weight",
+        "Net Weight",
+        "Stone Weight",
+        "Carat Weight",
+        "Stone Rate",
+      ]) {
+        const { value, error } = productImportDecimal(row, key);
+        if (error) {
+          rowErrors.push(error);
+          numericError = true;
+        }
+        numericFields[key] = value;
+      }
+
+      // The bulk equivalent of "Add Product"'s own "create a stock entry
+      // too" checkbox — blank Stock Quantity means this row is product-only,
+      // matching the single form's opt-in default.
+      const rawStockQuantity = productImportCell(row, "Stock Quantity");
+      let stockQuantity: number | null = null;
+      if (rawStockQuantity !== "") {
+        const parsed = Number(rawStockQuantity);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          rowErrors.push("Stock Quantity must be 0 or more");
+        } else {
+          stockQuantity = Math.trunc(parsed);
+        }
+      }
+
+      let stockLocationId: string | null = null;
+      if (stockQuantity !== null) {
+        const locationName = productImportCell(row, "Location");
+        const requestedLocationId = locationName
+          ? (locationByName.get(locationName.toLowerCase()) ?? null)
+          : null;
+
+        if (locationName && !requestedLocationId) {
+          rowErrors.push(`No location found named "${locationName}"`);
+        } else {
+          const resolution = await resolveWritableLocationId(storeId, requestedLocationId, locationScope);
+          if (!resolution.ok) {
+            rowErrors.push(resolution.message);
+          } else {
+            stockLocationId = resolution.locationId;
+          }
+        }
+      }
+
+      if (rowErrors.length > 0) {
+        for (const message of rowErrors) errors.push(`Row ${line}: ${message}`);
+        continue;
+      }
+
+      // Every check above passed, so category/metal/targetStyle are
+      // guaranteed non-null here even though TypeScript can't tell from the
+      // control flow alone.
+      const resolvedCategory = category!;
+      const resolvedMetal = metal!;
+      const resolvedTargetStyle = targetStyle!;
+      const hasStoneComponent = productImportYesNo(row, "Has Stone Component", false);
+      const isActive = productImportYesNo(row, "Active", true);
+
+      const skuPrefix = buildSkuPrefix({
+        metalName: resolvedMetal.name,
+        purity: defaultPurity,
+        targetStyle: resolvedTargetStyle,
+        categoryTypeName: categoryType?.name ?? null,
+        categoryName: resolvedCategory.name,
+        format: businessSettings?.skuFormat,
+      });
+
+      resolvedRows.push({
+        skuPrefix,
+        stockQuantity,
+        stockLocationId,
+        fields: {
+          name,
+          categoryId: resolvedCategory.id,
+          categoryTypeId: categoryType?.id ?? null,
+          metalTypeId: resolvedMetal.id,
+          targetStyle: resolvedTargetStyle,
+          stoneOriginOptionId: stoneOrigin?.id ?? null,
+          defaultPurity,
+          defaultMakingCharge: numericFields["Making Charge"],
+          defaultMakingChargeType,
+          defaultStoneCharge: numericFields["Stone Charge"],
+          defaultStoneChargeType,
+          defaultGrossWeight: numericFields["Gross Weight"],
+          defaultNetWeight: numericFields["Net Weight"],
+          defaultStoneWeight: numericFields["Stone Weight"],
+          defaultCaratWeight: numericFields["Carat Weight"],
+          hasStoneComponent,
+          defaultStoneRate: hasStoneComponent ? numericFields["Stone Rate"] : null,
+          defaultStoneMetalTypeName: hasStoneComponent
+            ? productImportCell(row, "Stone Metal Type Name") || null
+            : null,
+          defaultStoneTypeNames: hasStoneComponent
+            ? productImportCell(row, "Stone Type Names") || null
+            : null,
+          designCode: productImportCell(row, "Design Code") || null,
+          hsnCode: productImportCell(row, "HSN Code") || null,
+          description: productImportCell(row, "Description") || null,
+          notes: productImportCell(row, "Notes") || null,
+          isActive,
+        },
+      });
+    }
+
+    if (errors.length > 0) {
+      return {
+        success: false,
+        message: "Nothing was imported. Fix these rows and try again.",
+        errors,
+      };
+    }
+
+    if (!resolvedRows.length) {
+      return { success: false, message: "That file has no rows to import." };
+    }
+
+    // Sequence numbers are scoped per exact prefix (e.g. "G22-LR"), same as
+    // createProduct's own single-row generation — a different design starts
+    // back at 001 under its own prefix. Batched into one query across every
+    // distinct prefix this file actually needs, rather than one query per
+    // row or per prefix.
+    const distinctPrefixes = [...new Set(resolvedRows.map((r) => r.skuPrefix))];
+    const existingCodes = await prisma.product.findMany({
+      where: {
+        storeId,
+        OR: distinctPrefixes.map((prefix) => ({ productCode: { startsWith: `${prefix}-` } })),
+      },
+      select: { productCode: true },
+    });
+
+    // Anchored full-match per prefix (same shape createProduct's own
+    // single-row regex uses) rather than a loose "ends with digits" scan —
+    // a productCode only counts toward a prefix's sequence if it's exactly
+    // "<prefix>-<digits>", not merely startsWith(prefix).
+    const prefixPatterns = new Map(
+      distinctPrefixes.map((prefix) => [
+        prefix,
+        new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-(\\d+)$`),
+      ]),
+    );
+    const highestSeqByPrefix = new Map<string, number>(distinctPrefixes.map((p) => [p, 0]));
+    for (const { productCode } of existingCodes) {
+      for (const prefix of distinctPrefixes) {
+        const match = prefixPatterns.get(prefix)!.exec(productCode);
+        if (match) {
+          highestSeqByPrefix.set(prefix, Math.max(highestSeqByPrefix.get(prefix)!, Number(match[1])));
+          break;
+        }
+      }
+    }
+
+    const toCreate: (Prisma.ProductCreateManyInput & {
+      stockQuantity: number | null;
+      stockLocationId: string | null;
+    })[] = resolvedRows.map((row) => {
+      const nextSeq = (highestSeqByPrefix.get(row.skuPrefix) ?? 0) + 1;
+      highestSeqByPrefix.set(row.skuPrefix, nextSeq);
+      return {
+        storeId,
+        productCode: `${row.skuPrefix}-${String(nextSeq).padStart(3, "0")}`,
+        stockQuantity: row.stockQuantity,
+        stockLocationId: row.stockLocationId,
+        ...row.fields,
+      };
+    });
+
+    // createManyAndReturn (not plain createMany) because a row that also
+    // asked for a stock entry needs this product's generated id to link
+    // InventoryStock.productId — matched back by productCode rather than by
+    // trusting the returned rows' order, which Prisma doesn't guarantee
+    // matches the input array's order.
+    const createdProducts = await prisma.product.createManyAndReturn({
+      data: toCreate.map(({ stockQuantity, stockLocationId, ...productData }) => productData),
+      select: { id: true, productCode: true },
+    });
+    const productIdByCode = new Map(createdProducts.map((p) => [p.productCode, p.id]));
+
+    const rowsWantingStock = toCreate.filter((row) => row.stockQuantity !== null);
+    let stockCreatedCount = 0;
+
+    if (rowsWantingStock.length) {
+      const existingStockCodes = await prisma.inventoryStock.findMany({
+        where: { storeId, stockCode: { startsWith: "STK-" } },
+        select: { stockCode: true },
+      });
+      let highestStockSeq = existingStockCodes.reduce((max, row) => {
+        const match = /^STK-(?:\d{4}-)?(\d+)$/.exec(row.stockCode);
+        return match ? Math.max(max, Number(match[1])) : max;
+      }, 0);
+      const year = new Date().getFullYear();
+
+      const stockToCreate: Prisma.InventoryStockCreateManyInput[] = rowsWantingStock.map((row) => {
+        highestStockSeq += 1;
+        return {
+          storeId,
+          productId: productIdByCode.get(row.productCode)!,
+          stockCode: `STK-${year}-${String(highestStockSeq).padStart(4, "0")}`,
+          quantity: row.stockQuantity!,
+          locationId: row.stockLocationId,
+          metalTypeId: row.metalTypeId,
+          purity: row.defaultPurity,
+          makingCharge: row.defaultMakingCharge,
+          makingChargeType: row.defaultMakingChargeType,
+          stoneCharge: row.defaultStoneCharge,
+          grossWeight: row.defaultGrossWeight,
+          netWeight: row.defaultNetWeight,
+          stoneWeight: row.defaultStoneWeight,
+          caratWeight: row.defaultCaratWeight,
+          stoneRate: row.defaultStoneRate,
+          stoneMetalTypeName: row.defaultStoneMetalTypeName,
+          stoneTypeNames: row.defaultStoneTypeNames,
+        };
+      });
+
+      await prisma.inventoryStock.createMany({ data: stockToCreate });
+      stockCreatedCount = stockToCreate.length;
+    }
+
+    revalidatePath("/inventory");
+    revalidatePath("/inventory/products");
+    if (stockCreatedCount) revalidatePath("/inventory/stock");
+
+    const productLabel = `${toCreate.length} ${toCreate.length === 1 ? "product" : "products"}`;
+    const message = stockCreatedCount
+      ? `Added ${productLabel}, with ${stockCreatedCount} stock ${stockCreatedCount === 1 ? "entry" : "entries"}.`
+      : `Added ${productLabel}.`;
+
+    return {
+      success: true,
+      message,
+      createdCount: toCreate.length,
+    };
+  } catch (error) {
+    logger.error("importProductsFromExcel error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to import products.") };
+  }
 }

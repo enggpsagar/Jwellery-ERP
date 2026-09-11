@@ -91,8 +91,15 @@ export function TopBar({
       <GlobalSearch />
 
       {/* Shown to a Super Admin, and to any user who belongs to more than
-          one store. A single-store user has nothing to choose. */}
-      {canSwitchStores && stores.length > 0 && (
+          one store. A single-store user has nothing to choose. Deliberately
+          not additionally gated on stores.length > 0 — a Super Admin with
+          zero granted stores still needs this to reach "All Stores (Global
+          View)" and to see (via its own search list) that they have no
+          access yet; StoreSwitcher already renders that state cleanly. For
+          the non-Super-Admin branch, canSwitchStores (stores.length > 1)
+          already guarantees stores.length > 0, so this never hid anything
+          real for that case — only for the Super Admin one. */}
+      {canSwitchStores && (
         <StoreSwitcher stores={stores} activeStoreId={activeStoreId} />
       )}
 

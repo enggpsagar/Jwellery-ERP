@@ -2,18 +2,27 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { PartyGstType } from "@prisma/client"
-import { partyGstTypeLabel } from "@/lib/gst"
+import { Prisma, PartyGstType } from "@prisma/client"
+import { partyGstTypeLabel, PARTY_GST_TYPE_OPTIONS } from "@/lib/gst"
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context"
 import { actionErrorMessage } from "@/lib/action-error";
 import { getCurrentUser } from "@/lib/auth/auth"
-import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export"
+import {
+  buildExcelExport,
+  buildCsvExportBase64,
+  buildPdfExportBase64,
+  buildMultiSheetExcelExport,
+  parseExcelUpload,
+} from "@/lib/excel-export"
+import { normalizePanNumber } from "@/lib/pan"
+import { normalizeAadhaarNumber } from "@/lib/aadhaar"
 import {
   getCustomersCore,
   getCustomerByIdCore,
   createCustomerCore,
   updateCustomerCore,
+  validateCustomerInput,
   getCustomerWhere,
   getCustomerOrderBy,
   mapCustomer,
@@ -375,4 +384,201 @@ export async function bulkDeleteCustomers(ids: string[]): Promise<BulkDeleteResu
   }
 
   return { deletedCount, failures }
+}
+
+export type CustomerImportResult = {
+  success: boolean
+  message: string
+  createdCount?: number
+  /** Row-level problems. Populated only when nothing was created — nothing
+   * is written until the whole file is clean. */
+  errors?: string[]
+}
+
+/**
+ * A downloadable .xlsx showing the expected columns and one filled-in
+ * example row — column names mirror exportCustomersToExcel's own headers
+ * ("Party Name", "Alternate Phone") so a party exported from here and
+ * re-imported elsewhere lines up without renaming anything.
+ */
+export async function getCustomerImportTemplate(): Promise<{
+  fileName: string
+  fileBase64: string
+}> {
+  await requireStoreScope()
+
+  const example = {
+    "Party Name": "Walk-in Customer",
+    Phone: "9876543210",
+    "Alternate Phone": "",
+    Email: "customer@example.com",
+    Address: "123 MG Road",
+    City: "Mumbai",
+    State: "Maharashtra",
+    Pincode: "400001",
+    "GST Number": "",
+    "GST Type": "Not GST Registered",
+    "PAN Number": "",
+    "Aadhaar Number": "",
+    "Registration Id": "",
+    Notes: "",
+    "Opening Balance": 0,
+  }
+
+  return buildMultiSheetExcelExport(
+    [{ name: "Parties Import", rows: [example], columns: Object.keys(example) }],
+    "parties-import-template",
+  )
+}
+
+function customerImportCell(row: Record<string, unknown>, key: string): string {
+  return String(row[key] ?? "").trim()
+}
+
+function parsePartyGstTypeLabel(raw: string): PartyGstType {
+  const match = PARTY_GST_TYPE_OPTIONS.find(
+    (option) => option.label.toLowerCase() === raw.toLowerCase(),
+  )
+  return match?.value ?? PartyGstType.UNREGISTERED
+}
+
+/**
+ * Bulk-adds parties from one spreadsheet — the multi-row-form alternative
+ * for Customers, mirroring importInventoryStockFromExcel's own contract
+ * exactly. Reuses validateCustomerInput (lib/core/customer.ts) so the
+ * name/PAN/Aadhaar rules can never drift from the single "Add Party" form.
+ * Row-level problems come back as a list and nothing is created until the
+ * whole file is clean — a two-pass approach (validate everything first,
+ * only then write) rather than createCustomerCore-per-row, since a partial
+ * import would leave earlier rows committed if a later row failed.
+ */
+export async function importCustomersFromExcel(
+  formData: FormData,
+): Promise<CustomerImportResult> {
+  try {
+    const storeId = await requireStoreScope()
+    const currentUser = await getCurrentUser()
+    const file = formData.get("file")
+
+    if (!(file instanceof File) || file.size === 0) {
+      return { success: false, message: "Choose a .xlsx or .csv file to import." }
+    }
+
+    const rows = parseExcelUpload(await file.arrayBuffer())
+
+    if (!rows.length) {
+      return { success: false, message: "That file has no rows to import." }
+    }
+
+    const existingPhoneRows = await prisma.customer.findMany({
+      where: { storeId, phone: { not: null } },
+      select: { phone: true },
+    })
+    const existingPhones = new Set(
+      existingPhoneRows.map((row) => (row.phone ?? "").trim()).filter(Boolean),
+    )
+    const seenPhonesInFile = new Set<string>()
+
+    const errors: string[] = []
+    const toCreate: Prisma.CustomerCreateManyInput[] = []
+
+    for (const [index, row] of rows.entries()) {
+      // +2 = one for the header row, one for 1-based spreadsheet numbering.
+      const line = index + 2
+
+      const input: CustomerInput = {
+        name: customerImportCell(row, "Party Name"),
+        phone: customerImportCell(row, "Phone"),
+        altPhone: customerImportCell(row, "Alternate Phone"),
+        email: customerImportCell(row, "Email"),
+        address: customerImportCell(row, "Address"),
+        city: customerImportCell(row, "City"),
+        state: customerImportCell(row, "State"),
+        pincode: customerImportCell(row, "Pincode"),
+        gstNumber: customerImportCell(row, "GST Number"),
+        gstType: parsePartyGstTypeLabel(customerImportCell(row, "GST Type")),
+        panNumber: customerImportCell(row, "PAN Number"),
+        aadhaarNumber: customerImportCell(row, "Aadhaar Number"),
+        registrationId: customerImportCell(row, "Registration Id"),
+        notes: customerImportCell(row, "Notes"),
+      }
+
+      const fieldErrors = validateCustomerInput(input)
+      if (Object.keys(fieldErrors).length > 0) {
+        for (const messages of Object.values(fieldErrors)) {
+          for (const message of messages) errors.push(`Row ${line}: ${message}`)
+        }
+        continue
+      }
+
+      const phone = input.phone.trim()
+      if (phone) {
+        if (seenPhonesInFile.has(phone)) {
+          errors.push(`Row ${line}: Phone number "${phone}" is duplicated in this file`)
+          continue
+        }
+        if (existingPhones.has(phone)) {
+          errors.push(`Row ${line}: A party with phone number "${phone}" already exists`)
+          continue
+        }
+      }
+
+      const rawOpeningBalance = customerImportCell(row, "Opening Balance")
+      const openingBalance = rawOpeningBalance === "" ? 0 : Number(rawOpeningBalance)
+      if (!Number.isFinite(openingBalance)) {
+        errors.push(`Row ${line}: Opening Balance must be a number`)
+        continue
+      }
+
+      if (phone) seenPhonesInFile.add(phone)
+
+      toCreate.push({
+        storeId,
+        name: input.name.trim(),
+        phone: phone || null,
+        alternatePhone: input.altPhone?.trim() || null,
+        email: input.email?.trim() || null,
+        addressLine1: input.address?.trim() || null,
+        city: input.city?.trim() || null,
+        state: input.state?.trim() || null,
+        pincode: input.pincode?.trim() || null,
+        gstin: input.gstNumber?.trim() || null,
+        gstType: input.gstType ?? PartyGstType.UNREGISTERED,
+        panNumber: input.panNumber?.trim() ? normalizePanNumber(input.panNumber) : null,
+        aadhaarNumber: input.aadhaarNumber?.trim()
+          ? normalizeAadhaarNumber(input.aadhaarNumber)
+          : null,
+        registrationId: input.registrationId?.trim() || null,
+        notes: input.notes?.trim() || null,
+        openingBalance,
+        createdById: currentUser?.id ?? undefined,
+        createdByName: currentUser?.name ?? undefined,
+      })
+    }
+
+    if (errors.length > 0) {
+      return {
+        success: false,
+        message: "Nothing was imported. Fix these rows and try again.",
+        errors,
+      }
+    }
+
+    if (!toCreate.length) {
+      return { success: false, message: "That file has no rows to import." }
+    }
+
+    await prisma.customer.createMany({ data: toCreate })
+
+    revalidatePath("/customers")
+
+    return {
+      success: true,
+      message: `Added ${toCreate.length} ${toCreate.length === 1 ? "party" : "parties"}.`,
+      createdCount: toCreate.length,
+    }
+  } catch (error) {
+    logger.error("importCustomersFromExcel error", error)
+    return { success: false, message: actionErrorMessage(error, "Failed to import parties.") }
+  }
 }

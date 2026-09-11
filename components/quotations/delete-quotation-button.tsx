@@ -39,7 +39,6 @@ export function DeleteQuotationButton({
   return (
     <Button
       variant="destructive"
-      className="bg-red-600 text-white hover:bg-red-700"
       onClick={handleClick}
       disabled={pending}
     >

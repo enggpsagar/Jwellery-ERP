@@ -9,6 +9,7 @@ import { DataTableToolbar } from "@/components/shared/data-table-toolbar"
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
 import { ProductsTable } from "@/components/inventory/products/products-table"
 import { ProductDetailPanel } from "@/components/inventory/products/product-detail-panel"
+import { ProductImportDialog } from "@/components/inventory/products/product-import-dialog"
 import {
   exportProductsToExcel,
   bulkDeleteProducts,
@@ -75,6 +76,7 @@ export function ProductsClient({
             <Link href="/inventory/products/archived">
               <Button variant="outline">Archived Products</Button>
             </Link>
+            {canCreate ? <ProductImportDialog /> : null}
             {canCreate ? (
               <Link href="/inventory/products/new">
                 <Button>Add Product</Button>

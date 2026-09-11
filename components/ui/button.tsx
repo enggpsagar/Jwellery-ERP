@@ -16,9 +16,28 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
+        // Solid fill, reserved for a permanent/irreversible action (Delete).
+        // A reversible action (Archive, Disable, a non-destructive Cancel
+        // confirm) belongs on `warning` instead — see its own comment below.
         destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
+        // Pay Now / Record Payment / Mark Paid / Approve — an explicit
+        // positive-outcome confirmation, not every form's Save/Submit
+        // (those stay on `default`, the brand primary color).
+        success:
+          "bg-success text-success-foreground hover:bg-success/90 focus-visible:border-success/40 focus-visible:ring-success/20",
+        // Edit actions (Pencil icon). Kept as the same light-blue chip this
+        // app already used ad-hoc everywhere for Edit, just centralized.
+        edit: "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60",
+        // View/Details/informational actions (Eye icon) — a distinct hue
+        // from `edit` so the two no longer render identically.
+        info: "bg-info/10 text-info hover:bg-info/20 focus-visible:border-info/40 focus-visible:ring-info/20",
+        // Archive/Disable/Restore-adjacent reversible toggles, and any
+        // "confirm this non-destructive change" dialog button that used to
+        // share `destructive`'s old light-tint look under the same name.
+        warning:
+          "bg-warning/10 text-warning hover:bg-warning/20 focus-visible:border-warning/40 focus-visible:ring-warning/20",
       },
       size: {
         default:

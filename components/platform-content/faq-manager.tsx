@@ -154,26 +154,28 @@ export function FaqManager({ faqs }: { faqs: PlatformFaqRow[] }) {
                 aria-label={faq.isPublished ? "Published" : "Draft"}
               />
 
-              <button
+              <Button
                 type="button"
+                variant="edit"
+                size="icon"
                 onClick={() => setEditingId(faq.id)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
                 aria-label={`Edit ${faq.question}`}
                 title="Edit FAQ"
               >
                 <Pencil className="h-4 w-4" />
-              </button>
+              </Button>
 
-              <button
+              <Button
                 type="button"
+                variant="destructive"
+                size="icon"
                 onClick={() => handleDelete(faq)}
                 disabled={busyId === faq.id}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-50"
                 aria-label={`Delete ${faq.question}`}
                 title="Delete FAQ"
               >
                 <Trash2 className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </div>
         ),

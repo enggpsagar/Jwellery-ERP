@@ -4,7 +4,7 @@
 import { LedgerEntryType, InvoiceStatus } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
-import { requireStoreScope } from "@/lib/store-context"
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context"
 import { getLocationScope, locationWhere } from "@/lib/location-scope"
 import { formatLedgerSource } from "@/lib/ledger-format"
 import { MONEY_UNIT } from "@/lib/business-units"
@@ -172,7 +172,7 @@ export async function getKarigarLedger(
   karigarId: string,
   karigarName?: string,
 ): Promise<KarigarLedgerResult> {
-  const storeId = await requireStoreScope()
+  const storeId = await getStoreIdForRead()
 
   const entries = await prisma.ledgerEntry.findMany({
     where: { storeId, karigarId },
@@ -289,7 +289,7 @@ export type KarigarMaterialCounts = {
  *  directly on those buttons — a quick sense of activity without opening
  *  the ledger below. */
 export async function getKarigarMaterialCounts(karigarId: string): Promise<KarigarMaterialCounts> {
-  const storeId = await requireStoreScope()
+  const storeId = await getStoreIdForRead()
 
   const [issuedCount, receivedCount] = await Promise.all([
     prisma.ledgerEntry.count({

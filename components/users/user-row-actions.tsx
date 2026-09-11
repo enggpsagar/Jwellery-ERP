@@ -84,9 +84,8 @@ export function UserRowActions({ user }: { user: ActionableUser }) {
           should hold. */}
       <Button
         size="icon"
-        variant="outline"
+        variant="edit"
         title="Edit user"
-        className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
         asChild
       >
         <Link href={`/users/${user.id}/edit`}>
@@ -95,28 +94,22 @@ export function UserRowActions({ user }: { user: ActionableUser }) {
       </Button>
 
       <Button
-        variant="outline"
+        variant="warning"
         size="icon"
         disabled={isPending}
         onClick={handleToggleStatus}
         title={user.status === "DISABLED" ? "Enable user" : "Disable user"}
-        className={
-          user.status === "DISABLED"
-            ? "border-red-200 text-red-600 hover:bg-red-50"
-            : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-        }
       >
         {user.status === "DISABLED" ? (
-          <ToggleLeft className="h-5 w-5" />
+          <ToggleLeft className="h-4 w-4" />
         ) : (
-          <ToggleRight className="h-5 w-5" />
+          <ToggleRight className="h-4 w-4" />
         )}
       </Button>
 
       <Button
         variant="destructive"
         size="icon"
-        className="bg-red-600 text-white hover:bg-red-700"
         disabled={isPending}
         onClick={handleDelete}
         title="Delete user"

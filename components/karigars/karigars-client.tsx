@@ -10,6 +10,7 @@ import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
 import { KarigarDetailPanel } from "@/components/karigars/karigar-detail-panel"
+import { KarigarImportDialog } from "@/components/karigars/karigar-import-dialog"
 import { bulkDeleteKarigars, type Karigar } from "@/lib/actions/karigar-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 
@@ -64,6 +65,7 @@ export function KarigarsClient({
             <Link href="/karigars/ledger">
               <Button variant="outline">Artisan Ledger</Button>
             </Link>
+            <KarigarImportDialog />
             <Link href="/karigars/new">
               <Button>Add Artisan</Button>
             </Link>

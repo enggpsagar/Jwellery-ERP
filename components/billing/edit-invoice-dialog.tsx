@@ -103,21 +103,12 @@ export function EditInvoiceDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {compact ? (
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5 border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
-            title="Edit Date & E-way Bill"
-          >
+          <Button size="sm" variant="edit" className="gap-1.5" title="Edit Date & E-way Bill">
             <Truck className="h-4 w-4" />
             {ewayBillLabel}
           </Button>
         ) : (
-          <Button
-            variant="outline"
-            className="gap-2 border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
-            title="Edit Date & E-way Bill"
-          >
+          <Button variant="edit" className="gap-2" title="Edit Date & E-way Bill">
             <Truck className="h-4 w-4" />
             {ewayBillLabel}
           </Button>

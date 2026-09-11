@@ -82,7 +82,6 @@ export function DeleteAllKachaDialog({
     <>
       <Button
         variant="destructive"
-        className="bg-red-600 text-white hover:bg-red-700"
         onClick={() => handleOpenChange(true)}
       >
         <Trash2 className="mr-1 h-4 w-4" />
@@ -193,7 +192,6 @@ export function DeleteAllKachaDialog({
             </Button>
             <Button
               variant="destructive"
-              className="bg-red-600 text-white hover:bg-red-700"
               onClick={handleDelete}
               disabled={!canDelete || pending}
             >

@@ -45,7 +45,7 @@ export function DeleteAccountDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="w-full bg-red-600 text-white hover:bg-red-700" variant="destructive">
+        <Button className="w-full" variant="destructive">
           <Trash2 className="mr-2 h-4 w-4" />
           Delete My Account
         </Button>
@@ -71,7 +71,6 @@ export function DeleteAccountDialog() {
           </Button>
           <Button
             variant="destructive"
-            className="bg-red-600 text-white hover:bg-red-700"
             onClick={handleDelete}
             disabled={loading}
           >

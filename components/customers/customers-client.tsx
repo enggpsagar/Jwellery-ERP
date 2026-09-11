@@ -6,6 +6,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { CustomersTable } from "@/components/customers/customers-table"
 import { CustomersToolbar } from "@/components/customers/customers-toolbar"
+import { CustomerImportDialog } from "@/components/customers/customer-import-dialog"
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
 import { CustomerDetailPanel } from "@/components/customers/customer-detail-panel"
 import { bulkDeleteCustomers, type Customer } from "@/lib/actions/customer-actions"
@@ -63,6 +64,8 @@ export function CustomersClient({
           <Link href="/customers/archived">
             <Button variant="outline">Archived Parties</Button>
           </Link>
+
+          <CustomerImportDialog />
 
           {/* A page, not a dialog — same as Vendors. The form is long enough
               that a modal fights the on-screen keyboard on a phone. */}

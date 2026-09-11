@@ -41,14 +41,11 @@ export function InvoiceQuickActions({ invoice, businessName }: InvoiceQuickActio
         invoiceNumber={invoice.invoiceNumber}
       />
       <EmailInvoiceButton invoiceId={invoice.id} />
-      <Link
-        href={`/billing/${invoice.id}/print`}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
-        aria-label="Print invoice"
-        title="Print"
-      >
-        <Printer className="h-4 w-4" />
-      </Link>
+      <Button variant="info" size="icon" asChild aria-label="Print invoice" title="Print">
+        <Link href={`/billing/${invoice.id}/print`}>
+          <Printer className="h-4 w-4" />
+        </Link>
+      </Button>
       {invoice.status === "DRAFT" && (
         <DeleteInvoiceDialog compact invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
       )}
@@ -108,11 +105,7 @@ export function InvoiceActionsBar({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {canFullyEdit && (
-        <Button
-          asChild
-          variant="outline"
-          className="gap-2 border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
-        >
+        <Button asChild variant="edit" className="gap-2">
           <Link href={`/billing/${invoice.id}/edit`}>
             <Pencil className="h-4 w-4" />
             Edit Items

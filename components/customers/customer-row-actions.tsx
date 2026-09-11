@@ -89,34 +89,33 @@ export function CustomerRowActions({
       <div className="flex items-center justify-end gap-2">
         {/* A page, not a dialog — the edit form carries every field the
             record holds and does not fit a modal on a phone. */}
-        <Link
-          href={`/customers/${customer.id}/edit?returnTo=${encodeURIComponent("/customers")}`}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
-          aria-label={`Edit ${customer.name}`}
-          title="Edit party"
-        >
-          <Pencil className="h-4 w-4" />
-        </Link>
+        <Button variant="edit" size="icon" asChild aria-label={`Edit ${customer.name}`} title="Edit party">
+          <Link href={`/customers/${customer.id}/edit?returnTo=${encodeURIComponent("/customers")}`}>
+            <Pencil className="h-4 w-4" />
+          </Link>
+        </Button>
 
-        <button
+        <Button
           type="button"
+          variant="warning"
+          size="icon"
           onClick={() => setConfirmAction("archive")}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-amber-200 text-amber-700 transition hover:bg-amber-50"
           aria-label={`Archive ${customer.name}`}
           title="Archive party"
         >
-          <ToggleRight className="h-5 w-5" />
-        </button>
+          <ToggleRight className="h-4 w-4" />
+        </Button>
 
-        <button
+        <Button
           type="button"
+          variant="destructive"
+          size="icon"
           onClick={() => setConfirmAction("delete")}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700"
           aria-label={`Delete ${customer.name}`}
           title="Delete party"
         >
           <Trash2 className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       <Dialog
@@ -155,7 +154,7 @@ export function CustomerRowActions({
 
                 <Button
                   type="button"
-                  variant="destructive"
+                  variant="warning"
                   onClick={handleArchive}
                   disabled={loading}
                 >
@@ -207,7 +206,6 @@ export function CustomerRowActions({
                 <Button
                   type="button"
                   variant="destructive"
-                  className="bg-red-600 text-white hover:bg-red-700"
                   onClick={handleDelete}
                   disabled={loading}
                 >

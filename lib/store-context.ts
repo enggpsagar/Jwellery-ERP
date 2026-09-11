@@ -179,5 +179,23 @@ export async function resolveActingStoreId(
     throw new Error("You do not have access to that store.");
   }
 
+  // Same real-time plan check as requireStoreScope(), and for the same
+  // reason (see that function's own comment) — this is a genuinely
+  // separate code path, not a wrapper around it, when a caller passes an
+  // explicit requestedStoreId (e.g. createInvoice's hidden storeId form
+  // field): the early `if (!requested) return requireStoreScope()` above
+  // only covers the *other* branch. Missing this here is exactly how an
+  // expired store could still create invoices after the requireStoreScope()
+  // fix shipped — confirmed the hard way, testing found it.
+  if (user.role !== UserRole.SUPER_ADMIN) {
+    const store = await prisma.store.findUnique({
+      where: { id: requested },
+      select: { planExpiresAt: true },
+    });
+    if (store?.planExpiresAt && store.planExpiresAt < new Date()) {
+      redirect("/login?error=plan_expired");
+    }
+  }
+
   return requested;
 }

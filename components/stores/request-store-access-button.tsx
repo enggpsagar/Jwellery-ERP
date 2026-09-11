@@ -92,7 +92,12 @@ export function RequestStoreAccessButton({
     return (
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button type="button" variant="outline" size="sm" className="gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2 border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+          >
             <KeyRound className="size-4" />
             Access granted
           </Button>
@@ -153,7 +158,12 @@ export function RequestStoreAccessButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-2 border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+        >
           <Send className="size-4" />
           {requestStatus === "DENIED" ? "Request access again" : "Request access"}
         </Button>

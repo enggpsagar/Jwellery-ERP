@@ -73,6 +73,11 @@ export function ChangePlanDialog({
         type="button"
         variant="outline"
         size="icon"
+        // Tinted-icon-button treatment, same formula the destructive variant
+        // already uses (bg-destructive/10 text-destructive) — shared across
+        // every action in this row (see ExtendPlanDialog, ExportStoreDataButton,
+        // etc.) so they read as one consistent set.
+        className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
         onClick={() => setOpen(true)}
         aria-label={`Change plan for ${storeName}`}
         title="Change plan"

@@ -132,6 +132,7 @@ export function StoreDetailPanel({ storeId, plans, currentPlanId }: StoreDetailP
             asChild
             variant="outline"
             size="icon"
+            className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
             aria-label="Edit store"
             title="Edit store"
           >

@@ -37,6 +37,7 @@ export function ExportStoreDataButton({
       type="button"
       variant="outline"
       size="icon"
+      className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
       onClick={handleExport}
       disabled={exporting}
       aria-label="Export store data"

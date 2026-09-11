@@ -63,11 +63,7 @@ export function PurchaseRowActions({ purchase, locations }: PurchaseRowActionsPr
     <>
       <div className="flex items-center justify-end gap-2">
         {canEditItems && (
-          <Button
-            asChild
-            variant="outline"
-            className="gap-2 border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
-          >
+          <Button asChild variant="edit" className="gap-2">
             <Link href={`/purchases/${purchase.id}/edit`}>
               <ListChecks className="h-4 w-4" />
               Edit Items
@@ -75,25 +71,27 @@ export function PurchaseRowActions({ purchase, locations }: PurchaseRowActionsPr
           </Button>
         )}
 
-        <button
+        <Button
           type="button"
+          variant="edit"
+          size="icon"
           onClick={() => setEditOpen(true)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
           aria-label={`Edit ${purchase.purchaseNumber}`}
           title="Edit purchase"
         >
           <Pencil className="h-4 w-4" />
-        </button>
+        </Button>
 
-        <button
+        <Button
           type="button"
+          variant="destructive"
+          size="icon"
           onClick={() => setConfirmDelete(true)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700"
           aria-label={`Delete ${purchase.purchaseNumber}`}
           title="Delete purchase"
         >
           <Trash2 className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       <EditPurchaseDialog
@@ -143,7 +141,6 @@ export function PurchaseRowActions({ purchase, locations }: PurchaseRowActionsPr
             <Button
               type="button"
               variant="destructive"
-              className="bg-red-600 text-white hover:bg-red-700"
               onClick={handleDelete}
               disabled={loading}
             >

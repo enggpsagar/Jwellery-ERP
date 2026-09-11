@@ -91,9 +91,9 @@ export function BulkArchiveButton({
     <>
       <Button
         type="button"
-        variant="outline"
+        variant="warning"
         size="sm"
-        className="gap-2 text-amber-700 hover:text-amber-800"
+        className="gap-2"
         onClick={() => setOpen(true)}
       >
         <Archive className="h-4 w-4" />
@@ -143,7 +143,7 @@ export function BulkArchiveButton({
                 <Button variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
                   Cancel
                 </Button>
-                <Button variant="destructive" onClick={handleArchive} disabled={isPending}>
+                <Button variant="warning" onClick={handleArchive} disabled={isPending}>
                   {isPending ? "Archiving..." : "Archive"}
                 </Button>
               </>

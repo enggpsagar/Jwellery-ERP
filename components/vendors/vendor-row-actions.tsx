@@ -87,43 +87,40 @@ export function VendorRowActions({
   return (
     <>
       <div className="flex items-center justify-end gap-2">
-        <Link
-          href={`/payments/out?new=1&vendorId=${vendor.id}`}
-          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-700"
-        >
-          Pay Now
-        </Link>
+        <Button variant="success" size="sm" asChild>
+          <Link href={`/payments/out?new=1&vendorId=${vendor.id}`}>
+            Pay Now
+          </Link>
+        </Button>
 
-        {/* This will now show only the pencil icon trigger */}
         {/* A page, not a dialog — same reasoning as customers. */}
-        <Link
-          href={`/vendors/${vendor.id}/edit?returnTo=${encodeURIComponent("/vendors")}`}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
-          aria-label={`Edit ${vendor.name}`}
-          title="Edit vendor"
-        >
-          <Pencil className="h-4 w-4" />
-        </Link>
+        <Button variant="edit" size="icon" asChild aria-label={`Edit ${vendor.name}`} title="Edit vendor">
+          <Link href={`/vendors/${vendor.id}/edit?returnTo=${encodeURIComponent("/vendors")}`}>
+            <Pencil className="h-4 w-4" />
+          </Link>
+        </Button>
 
-        <button
+        <Button
           type="button"
+          variant="warning"
+          size="icon"
           onClick={() => setConfirmAction("archive")}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-amber-200 text-amber-700 transition hover:bg-amber-50"
           aria-label={`Archive ${vendor.name}`}
           title="Archive vendor"
         >
-          <ToggleRight className="h-5 w-5" />
-        </button>
+          <ToggleRight className="h-4 w-4" />
+        </Button>
 
-        <button
+        <Button
           type="button"
+          variant="destructive"
+          size="icon"
           onClick={() => setConfirmAction("delete")}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-red-600 text-white transition hover:bg-red-700"
           aria-label={`Delete ${vendor.name}`}
           title="Delete vendor"
         >
           <Trash2 className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       <Dialog
@@ -162,7 +159,7 @@ export function VendorRowActions({
 
                 <Button
                   type="button"
-                  variant="destructive"
+                  variant="warning"
                   onClick={handleArchive}
                   disabled={loading}
                 >
@@ -214,7 +211,6 @@ export function VendorRowActions({
                 <Button
                   type="button"
                   variant="destructive"
-                  className="bg-red-600 text-white hover:bg-red-700"
                   onClick={handleDelete}
                   disabled={loading}
                 >

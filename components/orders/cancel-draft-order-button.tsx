@@ -15,7 +15,7 @@ export function CancelDraftOrderButton({ orderId }: { orderId: string }) {
 
   if (!confirming) {
     return (
-      <Button type="button" variant="destructive" onClick={() => setConfirming(true)}>
+      <Button type="button" variant="warning" onClick={() => setConfirming(true)}>
         Cancel Order
       </Button>
     )
@@ -29,7 +29,7 @@ export function CancelDraftOrderButton({ orderId }: { orderId: string }) {
       </Button>
       <Button
         type="button"
-        variant="destructive"
+        variant="warning"
         size="sm"
         disabled={isPending}
         onClick={() => {

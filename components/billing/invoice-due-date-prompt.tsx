@@ -75,11 +75,7 @@ export function InvoiceDueDatePrompt({
           </Button>
         </div>
       ) : (
-        <Button
-          size="sm"
-          onClick={() => setPicking(true)}
-          className="bg-amber-600 text-white hover:bg-amber-700"
-        >
+        <Button size="sm" variant="warning" onClick={() => setPicking(true)}>
           Set Due Date
         </Button>
       )}

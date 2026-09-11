@@ -172,18 +172,14 @@ export function VendorCustomerLinkCard({
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  asChild
-                  size="sm"
-                  className="gap-2 bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
-                >
+                <Button asChild variant="info" size="sm" className="gap-2">
                   <Link href={`/customers/${linkedCustomer.id}`}>
                     <ExternalLink className="h-4 w-4" />
                     View Party
                   </Link>
                 </Button>
                 <Button
-                  variant="destructive"
+                  variant="warning"
                   size="sm"
                   className="gap-2"
                   onClick={() => setConfirmUnlinkOpen(true)}
@@ -293,7 +289,7 @@ export function VendorCustomerLinkCard({
             >
               Cancel
             </Button>
-            <Button type="button" variant="destructive" onClick={handleUnlink} disabled={loading}>
+            <Button type="button" variant="warning" onClick={handleUnlink} disabled={loading}>
               {loading ? "Removing..." : "Remove Link"}
             </Button>
           </DialogFooter>

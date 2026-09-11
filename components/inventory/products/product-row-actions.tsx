@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Eye, Pencil } from "lucide-react"
 
 import { DeleteProductButton } from "@/components/inventory/products/delete-product-button"
+import { Button } from "@/components/ui/button"
 
 type ProductRowActionsProps = {
   productId: string
@@ -20,23 +21,19 @@ export function ProductRowActions({
 }: ProductRowActionsProps) {
   return (
     <div className="flex items-center gap-2">
-      <Link
-        href={`/inventory/products/${productId}`}
-        className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-sm text-blue-700 hover:bg-blue-100"
-        title="View product"
-      >
-        <Eye className="h-4 w-4" />
-      </Link>
+      <Button variant="info" size="icon" asChild title="View product">
+        <Link href={`/inventory/products/${productId}`}>
+          <Eye className="h-4 w-4" />
+        </Link>
+      </Button>
 
       {canEdit && (
         <>
-          <Link
-            href={`/inventory/products/${productId}/edit`}
-            className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-sm text-blue-700 hover:bg-blue-100"
-            title="Edit product"
-          >
-            <Pencil className="h-4 w-4" />
-          </Link>
+          <Button variant="edit" size="icon" asChild title="Edit product">
+            <Link href={`/inventory/products/${productId}/edit`}>
+              <Pencil className="h-4 w-4" />
+            </Link>
+          </Button>
 
           <DeleteProductButton productId={productId} productName={productName} />
         </>

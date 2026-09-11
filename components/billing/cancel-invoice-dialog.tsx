@@ -92,7 +92,7 @@ export function CancelInvoiceDialog({
       {!hideTrigger && (
         <DialogTrigger asChild>
           {isReturnExchange ? (
-            <Button className="gap-2 bg-amber-600 text-white shadow-sm hover:bg-amber-700">
+            <Button variant="warning" className="gap-2">
               <RotateCcw className="h-4 w-4" />
               Return &amp; Exchange
             </Button>
@@ -150,7 +150,7 @@ export function CancelInvoiceDialog({
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={pending}>
               Keep Invoice
             </Button>
-            <Button type="submit" variant="destructive" disabled={pending}>
+            <Button type="submit" variant={isReturnExchange ? "warning" : "destructive"} disabled={pending}>
               {pending
                 ? isReturnExchange
                   ? "Processing..."

@@ -28,6 +28,13 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -72,6 +79,18 @@
   --accent: oklch(0.93 0.03 80);
   --accent-foreground: oklch(0.28 0.02 40);
   --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.98 0.01 75);
+  /* Semantic action colors — Success (Pay/Confirm/Approve), Info (View/
+     Details), Warning (Archive/Disable/reversible toggles). Distinct hues
+     from --primary/--destructive and from each other (green/cyan/amber),
+     canonicalizing the emerald/blue/amber Tailwind classes already used
+     ad-hoc for these same actions across row-actions components. */
+  --success: oklch(0.52 0.14 152);
+  --success-foreground: oklch(0.98 0.01 152);
+  --info: oklch(0.55 0.11 210);
+  --info-foreground: oklch(0.98 0.01 210);
+  --warning: oklch(0.68 0.15 75);
+  --warning-foreground: oklch(0.25 0.04 75);
   --border: oklch(0.78 0.02 70);
   --input: oklch(0.8 0.018 70);
   --ring: oklch(0.75 0.12 80);
@@ -129,6 +148,13 @@
   --accent: oklch(0.28 0.03 60);
   --accent-foreground: oklch(0.96 0.01 75);
   --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.98 0.01 75);
+  --success: oklch(0.68 0.15 152);
+  --success-foreground: oklch(0.15 0.02 152);
+  --info: oklch(0.7 0.12 210);
+  --info-foreground: oklch(0.15 0.02 210);
+  --warning: oklch(0.78 0.15 75);
+  --warning-foreground: oklch(0.2 0.03 75);
   --border: oklch(0.9 0.02 70 / 20%);
   --input: oklch(0.9 0.02 70 / 24%);
   --ring: oklch(0.7 0.12 80);
@@ -172,6 +198,13 @@
     --accent: oklch(0.28 0.03 60);
     --accent-foreground: oklch(0.96 0.01 75);
     --destructive: oklch(0.704 0.191 22.216);
+    --destructive-foreground: oklch(0.98 0.01 75);
+    --success: oklch(0.68 0.15 152);
+    --success-foreground: oklch(0.15 0.02 152);
+    --info: oklch(0.7 0.12 210);
+    --info-foreground: oklch(0.15 0.02 210);
+    --warning: oklch(0.78 0.15 75);
+    --warning-foreground: oklch(0.2 0.03 75);
     --border: oklch(0.9 0.02 70 / 20%);
     --input: oklch(0.9 0.02 70 / 24%);
     --ring: oklch(0.7 0.12 80);

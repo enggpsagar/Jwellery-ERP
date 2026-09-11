@@ -105,7 +105,8 @@ export function PaymentInDialog({ customers }: PaymentInDialogProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <Button
         type="button"
-        className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+        variant="success"
+        className="gap-2"
         onClick={() => setOpen(true)}
       >
         <Plus className="h-4 w-4" />

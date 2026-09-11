@@ -188,7 +188,7 @@ function InvoiceItemRowView({
           <Button
             type="button"
             size="icon"
-            className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
+            variant="success"
             title="Save"
             aria-label="Save"
             onClick={handleSave}

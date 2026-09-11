@@ -108,7 +108,7 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <Button
         type="button"
-        className="gap-2 bg-red-600 text-white hover:bg-red-700"
+        className="gap-2"
         onClick={() => setOpen(true)}
       >
         <Plus className="h-4 w-4" />

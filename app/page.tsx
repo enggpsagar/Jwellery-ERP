@@ -26,6 +26,7 @@ import {
 import { authOptions } from "@/lib/auth/auth-options"
 import { APP_NAME } from "@/lib/constants/app"
 import { getStates } from "@/lib/actions/location-actions"
+import { getPlans } from "@/lib/actions/plan-actions"
 import { Button } from "@/components/ui/button"
 import { RegisterStoreForm } from "@/components/auth/register-store-form"
 
@@ -162,6 +163,13 @@ const ROLES = [
   },
 ]
 
+/** Same rule as the Plans console's own formatPrice (plans-client.tsx) —
+ * kept in sync by convention rather than a shared import, since one lives
+ * in a Super-Admin-only client component and this in a public server one. */
+function formatPlanPrice(price: number) {
+  return price > 0 ? `₹${price.toLocaleString("en-IN")}` : "Free"
+}
+
 function TintedIcon({
   icon: Icon,
   tint,
@@ -270,7 +278,10 @@ export default async function LandingPage() {
     redirect("/dashboard")
   }
 
-  const states = await getStates()
+  const [states, plans] = await Promise.all([
+    getStates(),
+    getPlans({ activeOnly: true }),
+  ])
 
   return (
     <div className="min-h-svh bg-background">
@@ -530,6 +541,62 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ---------------- pricing ---------------- */}
+      {plans.length > 0 && (
+        <section id="pricing" className="border-b py-16 lg:py-24">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="max-w-2xl">
+              <h2 className="text-3xl font-semibold tracking-tight text-balance">
+                Simple pricing
+              </h2>
+              <p className="mt-3 text-muted-foreground">
+                Every plan includes all {MODULES.length} modules on this page
+                — nothing is held back for a higher tier. Pricing is about how
+                long you&apos;re billed for, not what you can use.
+              </p>
+            </div>
+
+            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {plans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className="flex flex-col rounded-xl border bg-card p-6"
+                >
+                  <h3 className="font-semibold">{plan.name}</h3>
+
+                  <p className="mt-4">
+                    <span className="text-3xl font-semibold tracking-tight">
+                      {formatPlanPrice(plan.price)}
+                    </span>
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {plan.durationDays}-day plan
+                  </p>
+
+                  <p className="mt-6 text-sm text-muted-foreground">
+                    All {MODULES.length} modules, every role, every feature on{" "}
+                    <Link
+                      href="#features"
+                      className="font-medium text-[var(--chart-2)] underline-offset-4 hover:underline"
+                    >
+                      this page
+                    </Link>
+                    .
+                  </p>
+
+                  <Button
+                    asChild
+                    className="mt-6 bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
+                  >
+                    <Link href="#register">Register your store</Link>
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ---------------- closing CTA ---------------- */}
       <section className="py-16 lg:py-24">

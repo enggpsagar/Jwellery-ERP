@@ -105,7 +105,8 @@ export function EditInvoiceDialog({
         {compact ? (
           <Button
             size="sm"
-            className="gap-1.5 bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
+            variant="outline"
+            className="gap-1.5 border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
             title="Edit Date & E-way Bill"
           >
             <Truck className="h-4 w-4" />
@@ -113,7 +114,8 @@ export function EditInvoiceDialog({
           </Button>
         ) : (
           <Button
-            className="gap-2 bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
+            variant="outline"
+            className="gap-2 border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
             title="Edit Date & E-way Bill"
           >
             <Truck className="h-4 w-4" />

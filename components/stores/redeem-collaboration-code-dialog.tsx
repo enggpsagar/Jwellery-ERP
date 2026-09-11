@@ -58,7 +58,12 @@ export function RedeemCollaborationCodeDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-2 border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
+        >
           <KeyRound className="size-4" />
           Access Only
         </Button>

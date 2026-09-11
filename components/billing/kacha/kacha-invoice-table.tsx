@@ -249,7 +249,7 @@ export function KachaInvoiceTable({
                 <td className="px-4 py-3">
                   <Link
                     href={`/billing/kacha/${kachaInvoice.id}`}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
+                    className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-sm text-blue-700 hover:bg-blue-100"
                     title="View Estimate"
                   >
                     <Eye className="h-4 w-4" />

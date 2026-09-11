@@ -63,7 +63,11 @@ export function PurchaseRowActions({ purchase, locations }: PurchaseRowActionsPr
     <>
       <div className="flex items-center justify-end gap-2">
         {canEditItems && (
-          <Button asChild variant="outline" className="gap-2">
+          <Button
+            asChild
+            variant="outline"
+            className="gap-2 border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
+          >
             <Link href={`/purchases/${purchase.id}/edit`}>
               <ListChecks className="h-4 w-4" />
               Edit Items
@@ -74,7 +78,7 @@ export function PurchaseRowActions({ purchase, locations }: PurchaseRowActionsPr
         <button
           type="button"
           onClick={() => setEditOpen(true)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
           aria-label={`Edit ${purchase.purchaseNumber}`}
           title="Edit purchase"
         >

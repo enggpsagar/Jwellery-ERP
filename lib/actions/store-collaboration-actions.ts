@@ -8,7 +8,8 @@ import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth/auth";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { logger } from "@/lib/logger";
 
 export type CollaborationActionState = {
@@ -59,7 +60,7 @@ export type CollaborationCodeSettings = {
  */
 export async function getCollaborationCodeSettings(): Promise<CollaborationCodeSettings> {
   await requireRole(UserRole.ADMIN);
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const store = await prisma.store.findUniqueOrThrow({
     where: { id: storeId },
@@ -127,7 +128,7 @@ export async function generateCollaborationCode(): Promise<CollaborationActionSt
     return { success: true, message: "New collaboration code generated", code };
   } catch (error) {
     logger.error("generateCollaborationCode error", error);
-    return { success: false, message: "Failed to generate a new code" };
+    return { success: false, message: actionErrorMessage(error, "Failed to generate a new code") };
   }
 }
 
@@ -179,7 +180,7 @@ export async function redeemCollaborationCode(
     return { success: true, message: `Access granted to ${store.name}` };
   } catch (error) {
     logger.error("redeemCollaborationCode error", error);
-    return { success: false, message: "Failed to redeem code" };
+    return { success: false, message: actionErrorMessage(error, "Failed to redeem code") };
   }
 }
 
@@ -214,6 +215,43 @@ export async function getMyAccessRequestStatus(storeId: string): Promise<MyAcces
   if (latest.status === "PENDING") return "PENDING";
   if (latest.status === "DENIED") return "DENIED";
   return "NONE";
+}
+
+export type MyStoreAccessState =
+  | { hasAccess: true; code: string | null }
+  | { hasAccess: false; requestStatus: MyAccessRequestStatus };
+
+/**
+ * The CURRENT Super Admin's actual standing with a given store — the
+ * "Request Access" control shouldn't offer to request access at all once
+ * they already hold a live grant (redeemed code or an approved request);
+ * it should show that store's collaboration code instead. Mirrors
+ * listCollaborationGrants' own version check (lib/store-membership.ts) so
+ * this agrees with what the store switcher already treats as "has access":
+ * a grant only counts while grantedCodeVersion still matches the store's
+ * current collaborationCodeVersion — a "Generate new code" on the owner's
+ * side silently drops out of this check with no separate revoke step.
+ */
+export async function getMyStoreAccess(storeId: string): Promise<MyStoreAccessState> {
+  const user = await requireAuth();
+  if (user.role !== UserRole.SUPER_ADMIN) return { hasAccess: false, requestStatus: "NONE" };
+
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { collaborationCode: true, collaborationCodeVersion: true },
+  });
+  if (!store) return { hasAccess: false, requestStatus: "NONE" };
+
+  const grant = await prisma.storeCollaborationAccess.findUnique({
+    where: { storeId_superAdminUserId: { storeId, superAdminUserId: user.id! } },
+    select: { grantedCodeVersion: true },
+  });
+
+  if (grant && grant.grantedCodeVersion === store.collaborationCodeVersion) {
+    return { hasAccess: true, code: store.collaborationCode };
+  }
+
+  return { hasAccess: false, requestStatus: await getMyAccessRequestStatus(storeId) };
 }
 
 /**
@@ -257,7 +295,7 @@ export async function requestStoreAccess(
     return { success: true, message: `Request sent to ${store.name}'s owner` };
   } catch (error) {
     logger.error("requestStoreAccess error", error);
-    return { success: false, message: "Failed to send request" };
+    return { success: false, message: actionErrorMessage(error, "Failed to send request") };
   }
 }
 
@@ -352,6 +390,6 @@ export async function respondToAccessRequest(
     return { success: true, message: approve ? "Access granted" : "Request denied" };
   } catch (error) {
     logger.error("respondToAccessRequest error", error);
-    return { success: false, message: "Failed to respond to request" };
+    return { success: false, message: actionErrorMessage(error, "Failed to respond to request") };
   }
 }

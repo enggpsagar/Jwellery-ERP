@@ -4,7 +4,8 @@
 import { revalidatePath } from "next/cache"
 import { Prisma, PartyGstType } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { requireStoreScope } from "@/lib/store-context"
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context"
+import { actionErrorMessage } from "@/lib/action-error";
 import { formatLedgerSource } from "@/lib/ledger-format"
 import { partyGstTypeLabel, PARTY_GST_TYPE_OPTIONS } from "@/lib/gst"
 import { formatShortDate } from "@/lib/utils"
@@ -303,7 +304,7 @@ export async function getVendors(
 }
 
 export async function getVendorById(id: string): Promise<Vendor | null> {
-  const storeId = await requireStoreScope()
+  const storeId = await getStoreIdForRead()
 
   const vendor = await prisma.vendor.findFirst({
     where: { id, storeId },
@@ -348,7 +349,7 @@ export async function getVendorById(id: string): Promise<Vendor | null> {
 export async function getVendorLedger(
   vendorId: string
 ): Promise<VendorLedgerEntryItem[]> {
-  const storeId = await requireStoreScope()
+  const storeId = await getStoreIdForRead()
 
   const entries = await prisma.ledgerEntry.findMany({
     where: { vendorId, storeId },
@@ -475,7 +476,7 @@ export async function exportVendorsToExcel(
     logger.error("exportVendorsToExcel error", error)
     return {
       success: false,
-      message: "Failed to export vendors.",
+      message: actionErrorMessage(error, "Failed to export vendors."),
     }
   }
 }
@@ -547,7 +548,7 @@ export async function addVendor(
     logger.error("addVendor error", error)
     return {
       success: false,
-      message: "Failed to add vendor",
+      message: actionErrorMessage(error, "Failed to add vendor"),
     }
   }
 }
@@ -626,7 +627,7 @@ export async function updateVendor(
     logger.error("updateVendor error", error)
     return {
       success: false,
-      message: "Failed to update vendor",
+      message: actionErrorMessage(error, "Failed to update vendor"),
     }
   }
 }
@@ -661,7 +662,7 @@ export async function archiveVendor(id: string): Promise<VendorFormState> {
     logger.error("archiveVendor error", error)
     return {
       success: false,
-      message: "Failed to archive vendor",
+      message: actionErrorMessage(error, "Failed to archive vendor"),
     }
   }
 }
@@ -696,7 +697,7 @@ export async function unarchiveVendor(id: string): Promise<VendorFormState> {
     logger.error("unarchiveVendor error", error)
     return {
       success: false,
-      message: "Failed to restore vendor",
+      message: actionErrorMessage(error, "Failed to restore vendor"),
     }
   }
 }
@@ -748,7 +749,7 @@ export async function deleteVendor(id: string): Promise<VendorFormState> {
     logger.error("deleteVendor error", error)
     return {
       success: false,
-      message: "Failed to delete vendor",
+      message: actionErrorMessage(error, "Failed to delete vendor"),
     }
   }
 }

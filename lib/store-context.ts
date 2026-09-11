@@ -1,6 +1,8 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 
+import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/auth";
 import {
   countCollaborationGrants,
@@ -12,13 +14,87 @@ import {
   type StoreMembership,
 } from "@/lib/store-membership";
 
+import { EXPIRED_PLAN_MESSAGE } from "@/lib/plan-messages";
+
 export const ACTIVE_STORE_COOKIE = "active_store_id";
+
+export { EXPIRED_PLAN_MESSAGE };
+
+/**
+ * Thrown by assertPlanActiveForMutation/assertPlanActiveForExport instead of
+ * a plain Error so a catch block can distinguish "the plan expired" (a
+ * message that should reach the user verbatim, with an Upgrade Plan link)
+ * from a genuinely unexpected failure (which shouldn't leak its detail) —
+ * mirrors this codebase's existing OversellError convention.
+ */
+export class PlanExpiredError extends Error {
+  constructor() {
+    super(EXPIRED_PLAN_MESSAGE);
+    this.name = "PlanExpiredError";
+  }
+}
 
 export type { StoreMembership };
 
 async function requestedStoreId(): Promise<string | null> {
   const cookieStore = await cookies();
   return cookieStore.get(ACTIVE_STORE_COOKIE)?.value ?? null;
+}
+
+/**
+ * The Next.js client runtime marks every Server Action invocation (a form
+ * submit, a button's onClick calling a "use server" function) with a
+ * `Next-Action` request header — a real framework signal, not a guess, and
+ * one a plain page render (a read: Server Components fetching data during
+ * SSR) never carries. Lets an expired store's data stay viewable while
+ * blocking the thing that's actually a new entry or an update.
+ */
+async function isMutationRequest(): Promise<boolean> {
+  const headerList = await headers();
+  return headerList.has("next-action");
+}
+
+async function isStorePlanExpired(storeId: string): Promise<boolean> {
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { planExpiresAt: true },
+  });
+  return Boolean(store?.planExpiresAt && store.planExpiresAt < new Date());
+}
+
+/**
+ * Blocks a store-scoped mutation once its plan has expired — applies to
+ * everyone acting on the store, Super Admin included (a Super Admin
+ * switched into an expired store is still "acting on the store's data",
+ * same as its own owner; only the Stores console's own plan-management
+ * actions, which never call this, are exempt by construction). Never
+ * called for a read: see isMutationRequest's own doc comment.
+ *
+ * A thrown Error, not redirect() — this must not navigate the caller away
+ * from the page they're viewing (that would defeat "still able to view"),
+ * and every mutation across this app already wraps its own body in
+ * try/catch to turn a thrown error into a {success:false, message} toast.
+ */
+async function assertPlanActiveForMutation(storeId: string): Promise<void> {
+  if (!(await isMutationRequest())) return;
+  if (await isStorePlanExpired(storeId)) {
+    throw new PlanExpiredError();
+  }
+}
+
+/**
+ * The export-route equivalent of assertPlanActiveForMutation — unconditional
+ * rather than mutation-gated, since a CSV/Excel export is a GET request
+ * (a Route Handler, not a Server Action) and so never carries the
+ * `Next-Action` header that check relies on, but is still something the
+ * confirmed requirement says should stop working on an expired plan (only
+ * *viewing* the data in the app itself should keep working). Call at the
+ * top of an export route.ts, after resolving storeId the normal way.
+ */
+export async function assertPlanActiveForExport(storeId: string): Promise<void> {
+  if (await isStorePlanExpired(storeId)) {
+    throw new PlanExpiredError();
+  }
 }
 
 /**
@@ -70,9 +146,57 @@ export async function requireStoreScope(): Promise<string> {
   const storeId = await getEffectiveStoreId();
 
   if (!storeId) {
-    throw new Error(
-      "No store selected. Choose a store from the switcher before continuing."
-    );
+    // Deliberately a redirect(), not a thrown Error: a store-scoped page's
+    // render (e.g. /reports's Promise.all of report-actions.ts getters)
+    // ends up calling this deep inside its OWN data-fetching, which
+    // app/(dashboard)/layout.tsx's SelectStoreNotice branch cannot actually
+    // prevent — Next.js's App Router renders a page segment's data
+    // fetching independently of whether the parent layout's returned JSX
+    // ends up referencing {children}, so a plain thrown Error here still
+    // reaches the user as the generic "Something went wrong" crash screen
+    // (confirmed via production logs: /reports crashed this way for a
+    // Super Admin in "All Stores (Global)" view, despite layout.tsx's own
+    // guard appearing to cover it). redirect() is the one signal Next.js's
+    // router does intercept regardless of render depth, so this fixes
+    // every caller across the app in one place, not just /reports.
+    // /stores is always reachable for a Super Admin (the intended way to
+    // fix this); for a non-Super-Admin (who should never actually hit this
+    // — they always have a real storeId — but might via some edge case),
+    // middleware's own SUPER_ADMIN-only gate on /stores bounces them
+    // onward to /dashboard, which works for them since they have a store.
+    redirect("/stores");
+  }
+
+  // Real-time check, not JWT-cached (see assertPlanActiveForMutation's own
+  // doc comment for why relying on the session token doesn't work in this
+  // app), and only for a mutation — viewing an expired store's existing
+  // data stays available, matching the confirmed requirement: view is
+  // fine, new entries/updates/exports are not.
+  await assertPlanActiveForMutation(storeId);
+
+  return storeId;
+}
+
+/**
+ * The same store resolution as requireStoreScope(), without the plan-expiry
+ * gate — for a data-fetching function that is a genuine read but gets
+ * invoked directly from a "use client" component (e.g. inside a useEffect),
+ * not just awaited during a Server Component's own render. Next.js marks
+ * *any* direct call to a "use server" function from client code with the
+ * same Next-Action header a real form submission carries, so such a read
+ * would otherwise trip assertPlanActiveForMutation's isMutationRequest()
+ * check and incorrectly go dark on an expired-plan store — contradicting
+ * the confirmed requirement that viewing stays available. Reach for this
+ * instead of requireStoreScope() only when the function does no writing and
+ * is (or may be) called this way; a page-level read fetched during a Server
+ * Component's own render never needs it, since that path never carries the
+ * header in the first place.
+ */
+export async function getStoreIdForRead(): Promise<string> {
+  const storeId = await getEffectiveStoreId();
+
+  if (!storeId) {
+    redirect("/stores");
   }
 
   return storeId;
@@ -136,6 +260,16 @@ export async function resolveActingStoreId(
   if (!memberships.some((membership) => membership.storeId === requested)) {
     throw new Error("You do not have access to that store.");
   }
+
+  // Same real-time, mutation-only plan check as requireStoreScope() (see
+  // assertPlanActiveForMutation's own doc comment) — this is a genuinely
+  // separate code path, not a wrapper around it, when a caller passes an
+  // explicit requestedStoreId (e.g. createInvoice's hidden storeId form
+  // field): the early `if (!requested) return requireStoreScope()` above
+  // only covers the *other* branch. Missing this here is exactly how an
+  // expired store could still create invoices after the requireStoreScope()
+  // fix shipped — confirmed the hard way, testing found it.
+  await assertPlanActiveForMutation(requested);
 
   return requested;
 }

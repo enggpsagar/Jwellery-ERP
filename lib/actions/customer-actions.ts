@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache"
 import { Prisma, PartyGstType } from "@prisma/client"
 import { partyGstTypeLabel, PARTY_GST_TYPE_OPTIONS } from "@/lib/gst"
 import { prisma } from "@/lib/prisma"
-import { requireStoreScope } from "@/lib/store-context"
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context"
+import { actionErrorMessage } from "@/lib/action-error";
 import { getCurrentUser } from "@/lib/auth/auth"
 import {
   buildExcelExport,
@@ -97,7 +98,7 @@ export async function getCustomers(
 }
 
 export async function getCustomerById(id: string): Promise<Customer | null> {
-  const storeId = await requireStoreScope()
+  const storeId = await getStoreIdForRead()
   return getCustomerByIdCore(id, storeId)
 }
 
@@ -188,7 +189,7 @@ export async function exportCustomersToExcel(
     logger.error("exportCustomersToExcel error", error)
     return {
       success: false,
-      message: "Failed to export parties.",
+      message: actionErrorMessage(error, "Failed to export parties."),
     }
   }
 }
@@ -197,17 +198,22 @@ export async function addCustomer(
   prevState: CustomerFormState,
   formData: FormData
 ): Promise<CustomerFormState> {
-  const storeId = await requireStoreScope()
-  const actor = await getCurrentUser()
+  try {
+    const storeId = await requireStoreScope()
+    const actor = await getCurrentUser()
 
-  const result = await createCustomerCore(formDataToCustomerInput(formData), {
-    storeId,
-    actorId: actor?.id ?? null,
-    actorName: actor?.name ?? actor?.email ?? null,
-  })
+    const result = await createCustomerCore(formDataToCustomerInput(formData), {
+      storeId,
+      actorId: actor?.id ?? null,
+      actorName: actor?.name ?? actor?.email ?? null,
+    })
 
-  if (result.success) revalidatePath("/customers")
-  return result
+    if (result.success) revalidatePath("/customers")
+    return result
+  } catch (error) {
+    logger.error("addCustomer error", error)
+    return { success: false, message: actionErrorMessage(error, "Failed to create party") }
+  }
 }
 
 export async function updateCustomer(
@@ -215,14 +221,19 @@ export async function updateCustomer(
   prevState: CustomerFormState,
   formData: FormData
 ): Promise<CustomerFormState> {
-  const storeId = await requireStoreScope()
-  const result = await updateCustomerCore(id, formDataToCustomerInput(formData), storeId)
+  try {
+    const storeId = await requireStoreScope()
+    const result = await updateCustomerCore(id, formDataToCustomerInput(formData), storeId)
 
-  if (result.success) {
-    revalidatePath("/customers")
-    revalidatePath(`/customers/${id}`)
+    if (result.success) {
+      revalidatePath("/customers")
+      revalidatePath(`/customers/${id}`)
+    }
+    return result
+  } catch (error) {
+    logger.error("updateCustomer error", error)
+    return { success: false, message: actionErrorMessage(error, "Failed to update party") }
   }
-  return result
 }
 
 export async function archiveCustomer(id: string): Promise<CustomerFormState> {
@@ -255,7 +266,7 @@ export async function archiveCustomer(id: string): Promise<CustomerFormState> {
     logger.error("archiveCustomer error", error)
     return {
       success: false,
-      message: "Failed to archive party",
+      message: actionErrorMessage(error, "Failed to archive party"),
     }
   }
 }
@@ -290,7 +301,7 @@ export async function unarchiveCustomer(id: string): Promise<CustomerFormState> 
     logger.error("unarchiveCustomer error", error)
     return {
       success: false,
-      message: "Failed to restore party",
+      message: actionErrorMessage(error, "Failed to restore party"),
     }
   }
 }
@@ -342,7 +353,7 @@ export async function deleteCustomer(id: string): Promise<CustomerFormState> {
     logger.error("deleteCustomer error", error)
     return {
       success: false,
-      message: "Failed to delete party",
+      message: actionErrorMessage(error, "Failed to delete party"),
     }
   }
 }

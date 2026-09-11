@@ -10,6 +10,7 @@ import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
 
@@ -103,7 +104,7 @@ export async function setDefaultStoreLocation(
     return { success: true, message: "Default location updated" };
   } catch (error) {
     logger.error("setDefaultStoreLocation error", error);
-    return { success: false, message: "Failed to update default location" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update default location") };
   }
 }
 
@@ -179,7 +180,7 @@ export async function upsertStoreLocation(
       };
     }
     logger.error("upsertStoreLocation error", error);
-    return { success: false, message: "Failed to save location" };
+    return { success: false, message: actionErrorMessage(error, "Failed to save location") };
   }
 }
 
@@ -216,6 +217,6 @@ export async function toggleStoreLocationActive(
     };
   } catch (error) {
     logger.error("toggleStoreLocationActive error", error);
-    return { success: false, message: "Failed to update location" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update location") };
   }
 }

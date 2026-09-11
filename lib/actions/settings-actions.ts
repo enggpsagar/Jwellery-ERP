@@ -4,7 +4,8 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { UserRole, GstScheme, SkuFormat, PrintLayout, InvoiceTemplate } from "@prisma/client";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { MONEY_UNIT } from "@/lib/business-units";
 import { getAvailableBusinessUnitOptions } from "@/lib/business-units.server";
@@ -156,7 +157,7 @@ async function parseBusinessUnits(formData: FormData): Promise<string[]> {
  * one on first access so the form always has something to render.
  */
 export async function getBusinessSettings(): Promise<BusinessSettings> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   let settings = await prisma.businessSettings.findUnique({
     where: { storeId },
@@ -363,7 +364,7 @@ export async function updateBusinessSettings(
     return { success: true, message: "Settings updated successfully" };
   } catch (error) {
     logger.error("updateBusinessSettings error", error);
-    return { success: false, message: "Failed to update settings" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update settings") };
   }
 }
 
@@ -391,7 +392,7 @@ export async function removeStoreLogo(): Promise<SettingsFormState> {
     return { success: true, message: "Logo removed" };
   } catch (error) {
     logger.error("removeStoreLogo error", error);
-    return { success: false, message: "Failed to remove logo" };
+    return { success: false, message: actionErrorMessage(error, "Failed to remove logo") };
   }
 }
 
@@ -437,6 +438,6 @@ export async function updateSkuFormat(
     return { success: true, message: "SKU format updated" };
   } catch (error) {
     logger.error("updateSkuFormat error", error);
-    return { success: false, message: "Failed to update SKU format" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update SKU format") };
   }
 }

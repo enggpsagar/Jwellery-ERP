@@ -84,8 +84,9 @@ export function UserRowActions({ user }: { user: ActionableUser }) {
           should hold. */}
       <Button
         size="icon"
+        variant="outline"
         title="Edit user"
-        className="bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
+        className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
         asChild
       >
         <Link href={`/users/${user.id}/edit`}>

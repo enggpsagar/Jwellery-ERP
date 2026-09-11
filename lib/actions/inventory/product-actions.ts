@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { ChargeType, PurityType, TargetStyle, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scope";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import type { ProductFormState } from "@/lib/inventory/product-types";
@@ -456,13 +457,13 @@ export async function exportProductsToExcel(
     logger.error("exportProductsToExcel error", error);
     return {
       success: false,
-      message: "Failed to export products.",
+      message: actionErrorMessage(error, "Failed to export products."),
     };
   }
 }
 
 export async function getProductById(id: string) {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const product = await prisma.product.findFirst({
     where: { id, storeId },
@@ -860,7 +861,7 @@ export async function createProduct(
 
     return {
       success: false,
-      message: "Failed to create product.",
+      message: actionErrorMessage(error, "Failed to create product."),
       errors: {},
     };
   }
@@ -1024,7 +1025,7 @@ export async function updateProduct(
     logger.error("updateProduct error", error);
     return {
       success: false,
-      message: "Failed to update product",
+      message: actionErrorMessage(error, "Failed to update product"),
       errors: {},
     };
   }
@@ -1112,7 +1113,7 @@ export async function deleteProduct(id: string): Promise<ProductFormState> {
     logger.error("deleteProduct error", error);
     return {
       success: false,
-      message: "Failed to delete product",
+      message: actionErrorMessage(error, "Failed to delete product"),
       errors: {},
     };
   }
@@ -1140,7 +1141,7 @@ export async function disableProduct(id: string): Promise<ProductFormState> {
     return { success: true, message: "Product marked inactive", errors: {} };
   } catch (error) {
     logger.error("disableProduct error", error);
-    return { success: false, message: "Failed to update product", errors: {} };
+    return { success: false, message: actionErrorMessage(error, "Failed to update product"), errors: {} };
   }
 }
 
@@ -1163,7 +1164,7 @@ export async function enableProduct(id: string): Promise<ProductFormState> {
     return { success: true, message: "Product marked active", errors: {} };
   } catch (error) {
     logger.error("enableProduct error", error);
-    return { success: false, message: "Failed to update product", errors: {} };
+    return { success: false, message: actionErrorMessage(error, "Failed to update product"), errors: {} };
   }
 }
 

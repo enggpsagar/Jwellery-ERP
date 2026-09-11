@@ -24,6 +24,7 @@ import {
   Plus,
   Wallet,
   Phone,
+  Palette,
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
@@ -171,6 +172,11 @@ const mainNav: NavItem[] = [
     href: "/plans",
     icon: CreditCard,
   },
+  {
+    title: "Brand Guide",
+    href: "/brand-guide",
+    icon: Palette,
+  },
 ];
 
 const karigarNav: NavItem[] = [
@@ -185,7 +191,7 @@ function getNavForRole(role?: string, permissions: string[] = []) {
   if (role === "KARIGAR") return karigarNav;
 
   return mainNav.filter((item) => {
-    if (item.href === "/stores" || item.href === "/plans") {
+    if (item.href === "/stores" || item.href === "/plans" || item.href === "/brand-guide") {
       return role === "SUPER_ADMIN";
     }
     // Empty permissions means "not customized" — falls back to full access,

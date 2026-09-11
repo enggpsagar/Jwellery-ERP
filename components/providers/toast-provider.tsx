@@ -1,6 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+
+import { EXPIRED_PLAN_MESSAGE, UPGRADE_PLAN_HREF } from "@/lib/plan-messages";
 
 type ToastType = "success" | "error" | "info" | "warning";
 
@@ -40,9 +43,12 @@ export function ToastProvider({
 
       setToasts((prev) => [...prev, { id, type, message }]);
 
+      // Longer for the plan-expired toast — it carries an Upgrade Plan link,
+      // and 3.5s isn't enough time to read the message and click through.
+      const duration = message === EXPIRED_PLAN_MESSAGE ? 10000 : 3500;
       setTimeout(() => {
         removeToast(id);
-      }, 3500);
+      }, duration);
     },
     [removeToast]
   );
@@ -119,9 +125,20 @@ function ToastCard({
       className={`pointer-events-auto rounded-lg border px-4 py-3 shadow-lg transition-all ${styles[toast.type]}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium">
-          {toast.message}
-        </p>
+        <div>
+          <p className="text-sm font-medium">
+            {toast.message}
+          </p>
+
+          {toast.message === EXPIRED_PLAN_MESSAGE ? (
+            <Link
+              href={UPGRADE_PLAN_HREF}
+              className="mt-1 inline-block text-sm font-semibold underline underline-offset-2"
+            >
+              Upgrade Plan →
+            </Link>
+          ) : null}
+        </div>
 
         <button
           type="button"

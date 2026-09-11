@@ -7,6 +7,7 @@ import { exportStoreData } from "@/lib/actions/store-export-actions"
 import { downloadBase64File } from "@/lib/download-file"
 import { useToast } from "@/components/providers/toast-provider"
 import { Button } from "@/components/ui/button"
+import { Loader } from "@/components/ui/loader"
 
 export function ExportStoreDataButton({
   storeId,
@@ -35,13 +36,14 @@ export function ExportStoreDataButton({
     <Button
       type="button"
       variant="outline"
-      size="sm"
-      className="gap-2"
+      size="icon"
+      className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
       onClick={handleExport}
       disabled={exporting}
+      aria-label="Export store data"
+      title="Export data"
     >
-      <Download className="size-4" />
-      {exporting ? "Exporting..." : "Export data"}
+      {exporting ? <Loader className="size-4" /> : <Download className="size-4" />}
     </Button>
   )
 }

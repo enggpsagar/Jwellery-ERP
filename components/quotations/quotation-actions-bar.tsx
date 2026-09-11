@@ -41,7 +41,7 @@ export function QuotationActionsBar({ quotation, businessName }: QuotationAction
       <ShareWhatsAppButton phone={quotation.customer?.phone} message={whatsappMessage} />
       <Link
         href={`/quotations/${quotation.id}/print`}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
         aria-label="Print quotation"
         title="Print"
       >

@@ -14,6 +14,7 @@ import { PlanStatusPill } from "@/components/stores/plan-presentation"
 import { StoreDetailContent } from "@/components/stores/store-detail-content"
 import { StoreStatusToggle } from "@/components/stores/store-status-toggle"
 import { ChangePlanDialog } from "@/components/stores/change-plan-dialog"
+import { ExtendPlanDialog } from "@/components/stores/extend-plan-dialog"
 import { StoreDeleteDialog } from "@/components/stores/store-delete-dialog"
 import { RedeemCollaborationCodeDialog } from "@/components/stores/redeem-collaboration-code-dialog"
 import { RequestStoreAccessButton } from "@/components/stores/request-store-access-button"
@@ -119,6 +120,11 @@ export function StoreDetailPanel({ storeId, plans, currentPlanId }: StoreDetailP
             currentPlanId={currentPlanId}
             plans={plans}
           />
+          <ExtendPlanDialog
+            storeId={overview.storeId}
+            storeName={overview.name}
+            currentExpiresAt={overview.planExpiresAt}
+          />
           <RedeemCollaborationCodeDialog storeId={overview.storeId} storeName={overview.name} />
           <RequestStoreAccessButton storeId={overview.storeId} storeName={overview.name} />
           <ExportStoreDataButton storeId={overview.storeId} />
@@ -126,6 +132,7 @@ export function StoreDetailPanel({ storeId, plans, currentPlanId }: StoreDetailP
             asChild
             variant="outline"
             size="icon"
+            className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
             aria-label="Edit store"
             title="Edit store"
           >

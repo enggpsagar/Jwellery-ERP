@@ -91,7 +91,7 @@ export function CustomerRowActions({
             record holds and does not fit a modal on a phone. */}
         <Link
           href={`/customers/${customer.id}/edit?returnTo=${encodeURIComponent("/customers")}`}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
           aria-label={`Edit ${customer.name}`}
           title="Edit party"
         >

@@ -86,7 +86,7 @@ export function KarigarRowActions({
         {showView && (
           <Link
             href={`/karigars/${karigarId}`}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-blue-600 hover:bg-blue-50"
+            className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-sm text-blue-700 hover:bg-blue-100"
             title="View artisan"
           >
             <Eye className="h-4 w-4" />
@@ -95,7 +95,7 @@ export function KarigarRowActions({
 
         <Link
           href={`/karigars/${karigarId}/edit`}
-          className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-sm text-white shadow-sm hover:bg-indigo-700"
+          className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-sm text-blue-700 hover:bg-blue-100"
           title="Edit artisan"
         >
           <Pencil className="h-4 w-4" />

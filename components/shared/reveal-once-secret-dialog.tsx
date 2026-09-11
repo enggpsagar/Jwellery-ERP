@@ -59,6 +59,7 @@ export function RevealOnceSecretDialog({
             type="button"
             size="sm"
             variant="outline"
+            className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
             onClick={handleCopy}
             aria-label="Copy secret"
             title="Copy secret"

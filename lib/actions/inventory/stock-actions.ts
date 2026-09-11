@@ -14,7 +14,8 @@ import {
 
 import { prisma } from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth/auth"
-import { requireStoreScope } from "@/lib/store-context"
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context"
+import { actionErrorMessage } from "@/lib/action-error";
 import {
   getLocationScope,
   locationWhere,
@@ -374,7 +375,7 @@ export async function exportInventoryStockToExcel(
     logger.error("exportInventoryStockToExcel error", error)
     return {
       success: false,
-      message: "Failed to export stock.",
+      message: actionErrorMessage(error, "Failed to export stock."),
     }
   }
 }
@@ -424,7 +425,11 @@ export async function getInventoryStockFormProducts() {
 }
 
 export async function getInventoryStockById(id: string) {
-  const storeId = await requireStoreScope()
+  // A read, called directly from the client-side Stock master-detail panel
+  // (components/inventory/stock/stock-detail-panel.tsx) — see
+  // getStoreIdForRead's own doc comment for why requireStoreScope() would
+  // wrongly go dark here on an expired-plan store.
+  const storeId = await getStoreIdForRead()
 
   const row = await prisma.inventoryStock.findFirst({
     where: { id, storeId },
@@ -791,7 +796,7 @@ export async function createInventoryStock(
     logger.error("createInventoryStock error", error)
     return {
       success: false,
-      message: "Failed to add stock",
+      message: actionErrorMessage(error, "Failed to add stock"),
       errors: {},
     }
   }
@@ -1112,7 +1117,7 @@ export async function updateInventoryStock(
     logger.error("updateInventoryStock error", error)
     return {
       success: false,
-      message: "Failed to update stock",
+      message: actionErrorMessage(error, "Failed to update stock"),
       errors: {},
     }
   }
@@ -1179,7 +1184,7 @@ export async function deleteInventoryStock(id: string): Promise<StockFormState> 
     logger.error("deleteInventoryStock error", error)
     return {
       success: false,
-      message: "Failed to delete stock",
+      message: actionErrorMessage(error, "Failed to delete stock"),
       errors: {},
     }
   }
@@ -1236,7 +1241,7 @@ export async function getStockImportTemplate(): Promise<{
   fileName: string
   fileBase64: string
 }> {
-  await requireStoreScope()
+  await getStoreIdForRead()
 
   const example = {
     "Product Code": "PRD-0001",
@@ -1425,6 +1430,6 @@ export async function importInventoryStockFromExcel(
     }
   } catch (error) {
     logger.error("importInventoryStockFromExcel error", error)
-    return { success: false, message: "Failed to import stock." }
+    return { success: false, message: actionErrorMessage(error, "Failed to import stock.") }
   }
 }

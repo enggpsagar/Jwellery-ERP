@@ -63,6 +63,7 @@ export function ResetFormWrapper({ children, requireConfirm = false, header }: R
       type="button"
       variant="outline"
       size="icon"
+      className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
       title="Reset form"
       aria-label="Reset form"
       onClick={() => (requireConfirm ? setConfirmOpen(true) : doReset())}

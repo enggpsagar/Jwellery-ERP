@@ -67,7 +67,8 @@ export function StockQrCard({
           title="Print"
           aria-label="Print"
           onClick={() => window.print()}
-          className="bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
+          variant="outline"
+          className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
         >
           <Printer className="h-4 w-4" />
         </Button>

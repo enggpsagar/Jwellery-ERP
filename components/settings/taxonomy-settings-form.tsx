@@ -194,7 +194,7 @@ function MetalsSection({
                   <button
                     type="button"
                     onClick={() => setEditingId(metal.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
                     aria-label={`Edit ${metal.name}`}
                     title="Edit metal"
                   >
@@ -466,7 +466,7 @@ function StonesSection({
                   <button
                     type="button"
                     onClick={() => setEditingId(stone.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
                     aria-label={`Edit ${stone.name}`}
                     title="Edit stone"
                   >
@@ -778,7 +778,7 @@ function StoneTypesSection({
                       <button
                         type="button"
                         onClick={() => setEditingId(option.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
                         aria-label={`Edit ${option.name}`}
                         title="Edit Stone Type"
                       >
@@ -991,7 +991,7 @@ function CategoriesSection({
                   <button
                     type="button"
                     onClick={() => setEditingId(category.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
                     aria-label={`Edit ${category.name}`}
                     title="Edit category"
                   >
@@ -1272,7 +1272,7 @@ function TypesSection({
                       <button
                         type="button"
                         onClick={() => setEditingId(type.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100"
                         aria-label={`Edit ${type.name}`}
                         title="Edit type"
                       >

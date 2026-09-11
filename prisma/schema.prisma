@@ -91,6 +91,7 @@ model Store {
   karigarJobs          KarigarJob[]
   metalRates           MetalRate[]
   businessSettings     BusinessSettings?
+  reportSettings       ReportSettings?
   inviteTokens         InviteToken[]
   vendors              Vendor[]
   purchases            Purchase[]
@@ -132,6 +133,12 @@ enum StorePlanAction {
   REGISTERED
   ASSIGNED
   RENEWED
+  /** A Super Admin pushed the current plan's expiry forward by N days
+   *  without changing the plan itself — see extendStorePlan in
+   *  lib/actions/store-actions.ts. Covers extending a trial the same way
+   *  as any other plan, since a trial is just whichever active Plan has
+   *  the lowest price (see resolveTrialPlan), not a separate concept. */
+  EXTENDED
 }
 
 /**
@@ -1755,6 +1762,51 @@ model BusinessSettings {
 
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
+}
+
+enum ReportFrequency {
+  DAILY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+/**
+ * A store's automated trading-summary report — see lib/report-builder.ts
+ * (period aggregation) and app/api/cron/scheduled-reports/route.ts (the
+ * cron that reads this to decide who gets a report and when). One row per
+ * store, same 1-to-1 shape as BusinessSettings.
+ */
+model ReportSettings {
+  storeId String @id
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  enabled Boolean @default(false)
+
+  /** Independent checkboxes, not a single choice — a store can enable e.g.
+   *  both MONTHLY and ANNUAL at once and gets a separate email for each
+   *  when they're due. */
+  frequencies ReportFrequency[] @default([])
+
+  /** Explicit, store-chosen recipients — deliberately not derived from
+   *  ADMIN users/BusinessSettings.backupEmail (the old daily-report cron's
+   *  implicit list), so a store can send reports to whoever it wants. */
+  recipientEmails String[] @default([])
+
+  /**
+   * One "sent once per cycle" gate per frequency (same idea as
+   * Store.planReminderSentAt), not a single shared timestamp — with
+   * multiple frequencies enabled, sending the monthly report must not
+   * accidentally mark the annual one as already sent too. Each is set
+   * after every send (manual or scheduled) of that specific frequency.
+   */
+  dailyLastSentAt     DateTime?
+  monthlyLastSentAt   DateTime?
+  quarterlyLastSentAt DateTime?
+  annualLastSentAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /**

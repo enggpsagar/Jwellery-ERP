@@ -27,17 +27,19 @@ export function ExportMenu({ href, label = "Export", iconOnly = false }: ExportM
       <DropdownMenuTrigger asChild>
         {iconOnly ? (
           <Button
+            variant="outline"
             size="icon-sm"
             title={label}
             aria-label={label}
-            className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
+            className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
           >
             <Download />
           </Button>
         ) : (
           <Button
+            variant="outline"
             size="sm"
-            className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
+            className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
           >
             <Download data-icon="inline-start" />
             {label}

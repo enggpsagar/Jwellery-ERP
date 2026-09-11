@@ -5,6 +5,7 @@ import { PurityType, UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import {
   DEFAULT_FINENESS,
@@ -152,7 +153,7 @@ export async function updateMetalSellingRates(
     return { success: true, message: "Metal selling rates updated successfully" };
   } catch (error) {
     logger.error("updateMetalSellingRates error", error);
-    return { success: false, message: "Failed to update metal selling rates" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update metal selling rates") };
   }
 }
 
@@ -196,7 +197,7 @@ export async function updatePurityFineness(
     return { success: true, message: "Purity settings updated successfully" };
   } catch (error) {
     logger.error("updatePurityFineness error", error);
-    return { success: false, message: "Failed to update purity settings" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update purity settings") };
   }
 }
 
@@ -244,6 +245,6 @@ export async function updateCaratConversionRates(
     return { success: true, message: "Carat conversion rules updated successfully" };
   } catch (error) {
     logger.error("updateCaratConversionRates error", error);
-    return { success: false, message: "Failed to update carat conversion rules" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update carat conversion rules") };
   }
 }

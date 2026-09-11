@@ -19,7 +19,8 @@ import { prisma } from "@/lib/prisma";
 import { computeRoundOff } from "@/lib/round-off";
 import { requirePermission, requirePermissionInStore } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
-import { requireStoreScope, resolveActingStoreId } from "@/lib/store-context";
+import { requireStoreScope, resolveActingStoreId, getStoreIdForRead } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import {
   getLocationScope,
   locationWhere,
@@ -540,12 +541,12 @@ export async function exportInvoicesToExcel(
     return { success: true, message: "Invoices exported successfully.", fileName, fileBase64 };
   } catch (error) {
     logger.error("exportInvoicesToExcel error", error);
-    return { success: false, message: "Failed to export invoices." };
+    return { success: false, message: actionErrorMessage(error, "Failed to export invoices.") };
   }
 }
 
 export async function getInvoiceById(id: string) {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const invoice = await prisma.invoice.findFirst({
     where: { id, storeId },
@@ -623,7 +624,7 @@ export type CustomerReturnableInvoices = {
 export async function getCustomerReturnableInvoices(
   customerId: string,
 ): Promise<CustomerReturnableInvoices> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const [invoices, settings] = await Promise.all([
     prisma.invoice.findMany({
@@ -1237,7 +1238,7 @@ export async function createInvoice(
       return { success: false, message: error.message };
     }
     logger.error("createInvoice error", error);
-    return { success: false, message: "Failed to create invoice" };
+    return { success: false, message: actionErrorMessage(error, "Failed to create invoice") };
   }
 }
 
@@ -1316,7 +1317,7 @@ export async function recordInvoicePayment(
     return { success: true, message: "Payment recorded" };
   } catch (error) {
     logger.error("recordInvoicePayment error", error);
-    return { success: false, message: "Failed to record payment" };
+    return { success: false, message: actionErrorMessage(error, "Failed to record payment") };
   }
 }
 
@@ -1385,7 +1386,7 @@ export async function setInvoiceDueDate(
     return { success: true, message: "Due date set" };
   } catch (error) {
     logger.error("setInvoiceDueDate error", error);
-    return { success: false, message: "Failed to set due date" };
+    return { success: false, message: actionErrorMessage(error, "Failed to set due date") };
   }
 }
 
@@ -1771,7 +1772,7 @@ export async function updateInvoice(
       return { success: false, message: error.message };
     }
     logger.error("updateInvoice error", error);
-    return { success: false, message: "Failed to update invoice" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update invoice") };
   }
 }
 
@@ -1941,7 +1942,7 @@ export async function updateInvoiceLineItem(
     return { success: true, message: "Line item updated" };
   } catch (error) {
     logger.error("updateInvoiceLineItem error", error);
-    return { success: false, message: "Failed to update line item" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update line item") };
   }
 }
 
@@ -2072,7 +2073,7 @@ export async function cancelInvoice(
     return { success: true, message: `Invoice ${invoice.invoiceNumber} cancelled` };
   } catch (error) {
     logger.error("cancelInvoice error", error);
-    return { success: false, message: "Failed to cancel invoice" };
+    return { success: false, message: actionErrorMessage(error, "Failed to cancel invoice") };
   }
 }
 
@@ -2159,7 +2160,7 @@ export async function deleteInvoice(id: string): Promise<InvoiceFormState> {
     return { success: true, message: "Invoice deleted" };
   } catch (error) {
     logger.error("deleteInvoice error", error);
-    return { success: false, message: "Failed to delete invoice" };
+    return { success: false, message: actionErrorMessage(error, "Failed to delete invoice") };
   }
 }
 
@@ -2261,6 +2262,6 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
     return { success: result.sent, message: result.message };
   } catch (error) {
     logger.error("emailInvoiceAction error", error);
-    return { success: false, message: "Failed to email invoice" };
+    return { success: false, message: actionErrorMessage(error, "Failed to email invoice") };
   }
 }

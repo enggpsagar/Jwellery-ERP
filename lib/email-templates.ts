@@ -859,15 +859,24 @@ export function ledgerStatementEmail(params: {
  * phone without opening anything; the attached workbook carries every line
  * behind those totals for when they want to check one.
  */
-export function dailyReportEmail(params: {
+/**
+ * Generalized from what was originally dailyReportEmail (daily-only) once
+ * Reports & Notifications settings added Monthly/Quarterly/Annual cadence —
+ * `frequencyLabel` ("Daily"/"Monthly"/"Quarterly"/"Annual") replaces the 3
+ * places this used to hardcode "Daily"/"each day"; `periodLabel` is what
+ * `dayLabel` used to be, just no longer assumed to be a single day
+ * ("August 2026", "Q3 2026", "2026", ...).
+ */
+export function scheduledReportEmail(params: {
   storeName: string;
   appName: string;
-  dayLabel: string;
+  frequencyLabel: string;
+  periodLabel: string;
   fileName: string;
   sections: { title: string; count: number; total: number }[];
   netPosition: number;
 }) {
-  const { storeName, appName, dayLabel, fileName, sections, netPosition } =
+  const { storeName, appName, frequencyLabel, periodLabel, fileName, sections, netPosition } =
     params;
 
   const inr = (value: number) =>
@@ -897,13 +906,13 @@ export function dailyReportEmail(params: {
   const nothingHappened = sections.every((section) => section.count === 0);
 
   const body = `
-    <p style="margin-top: 0;">Here is the summary for <strong>${dayLabel}</strong> at <strong>${storeName}</strong>.</p>
+    <p style="margin-top: 0;">Here is the ${frequencyLabel.toLowerCase()} summary for <strong>${periodLabel}</strong> at <strong>${storeName}</strong>.</p>
 
     ${
       nothingHappened
         ? `<div style="padding: 14px 16px; background: #f9fafb; border-left: 3px solid #9ca3af; border-radius: 0 6px 6px 0;">
              <p style="margin: 0; font-size: 13px; color: #4b5563; line-height: 1.6;">
-               No transactions were recorded on this date.
+               No transactions were recorded in this period.
              </p>
            </div>`
         : ""
@@ -932,13 +941,13 @@ export function dailyReportEmail(params: {
     </p>
 
     <p style="font-size: 12px; color: #6b7280; line-height: 1.6;">
-      Sent automatically each day by ${appName}. Figures cover ${dayLabel},
+      Sent automatically by ${appName} on your ${frequencyLabel.toLowerCase()} report schedule. Figures cover ${periodLabel},
       midnight to midnight IST.
     </p>
   `;
 
   const text = [
-    `Daily summary for ${dayLabel} — ${storeName}`,
+    `${frequencyLabel} summary for ${periodLabel} — ${storeName}`,
     "",
     ...sections.map(
       (section) =>
@@ -950,12 +959,12 @@ export function dailyReportEmail(params: {
     "",
     `Attached: ${fileName} — one sheet each for Credit, Debit, Sale and Purchase.`,
     "",
-    `Sent automatically by ${appName}. Figures cover ${dayLabel}, midnight to midnight IST.`,
+    `Sent automatically by ${appName} on your ${frequencyLabel.toLowerCase()} report schedule. Figures cover ${periodLabel}, midnight to midnight IST.`,
   ].join("\n");
 
   return {
-    subject: `Daily summary — ${dayLabel} — ${storeName}`,
-    html: wrapEmail(storeName, `Daily summary · ${dayLabel}`, body),
+    subject: `${frequencyLabel} summary — ${periodLabel} — ${storeName}`,
+    html: wrapEmail(storeName, `${frequencyLabel} summary · ${periodLabel}`, body),
     text,
   };
 }

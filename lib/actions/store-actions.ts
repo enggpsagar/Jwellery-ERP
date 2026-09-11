@@ -725,6 +725,101 @@ export async function assignPlanToStore(storeId: string, planId: string): Promis
   }
 }
 
+/**
+ * Pushes a store's current plan expiry forward (or, with a negative `days`,
+ * backward) without changing the plan itself. Forward is the normal
+ * courtesy-extension case; backward is deliberately supported too, so a
+ * Super Admin can force a store into "expired" right now to test that
+ * behavior, instead of waiting for a real plan to lapse. There's no
+ * separate "trial" concept in this schema (see resolveTrialPlan's own doc
+ * comment) — a trial is just whichever active Plan is currently assigned,
+ * so this works identically for extending a trial or a paid plan.
+ */
+export async function extendStorePlan(storeId: string, days: number): Promise<StoreFormState> {
+  try {
+    const actor = await requireRole(UserRole.SUPER_ADMIN);
+
+    if (!Number.isInteger(days) || days === 0) {
+      return { success: false, message: "Enter a non-zero whole number of days (negative to test an expired plan)" };
+    }
+
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { name: true, planId: true, planExpiresAt: true },
+    });
+
+    if (!store) {
+      return { success: false, message: "Store not found" };
+    }
+    if (!store.planId || !store.planExpiresAt) {
+      return { success: false, message: "This store has no active plan to extend" };
+    }
+
+    const plan = await prisma.plan.findUnique({
+      where: { id: store.planId },
+      select: { name: true, durationDays: true, price: true },
+    });
+    if (!plan) {
+      return { success: false, message: "This store's plan could not be found" };
+    }
+
+    // A positive extension adds on top of the later of "now" or the current
+    // expiry — a store that's already expired gets `days` from today, not
+    // from a past date that would leave it still expired afterward. A
+    // negative "extension" (testing an expired plan) is deliberately always
+    // relative to *now*, never the current expiry: the point is "make this
+    // expire N days ago as of today", which basing off a possibly-far-future
+    // current expiry would not reliably produce.
+    const base = days > 0 && store.planExpiresAt > new Date() ? store.planExpiresAt : new Date();
+    const expiresAt = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+
+    await prisma.$transaction([
+      prisma.store.update({
+        where: { id: storeId },
+        data: {
+          planExpiresAt: expiresAt,
+          // Same reasoning as assignPlanToStore: re-enters the reminder
+          // window against the new expiry instead of possibly firing
+          // immediately against the old one.
+          planReminderSentAt: null,
+        },
+      }),
+      prisma.storePlanHistory.create({
+        data: {
+          storeId,
+          planId: store.planId,
+          planName: plan.name,
+          price: plan.price,
+          durationDays: plan.durationDays,
+          startedAt: new Date(),
+          expiresAt,
+          action: StorePlanAction.EXTENDED,
+          actorId: actor.id ?? null,
+          actorName: actor.name ?? null,
+          note:
+            days > 0
+              ? `Extended by ${days} day${days === 1 ? "" : "s"}`
+              : `Backdated by ${Math.abs(days)} day${days === -1 ? "" : "s"} to test an expired plan`,
+        },
+      }),
+    ]);
+
+    revalidatePath("/stores");
+    revalidatePath(`/stores/${storeId}`);
+
+    return {
+      success: true,
+      message:
+        days > 0
+          ? `Extended "${store.name}"'s plan by ${days} day${days === 1 ? "" : "s"}`
+          : `"${store.name}"'s plan now expired ${Math.abs(days)} day${days === -1 ? "" : "s"} ago (for testing)`,
+    };
+  } catch (error) {
+    logger.error("extendStorePlan error", error);
+    return { success: false, message: "Failed to extend plan" };
+  }
+}
+
 export type StoreDetail = {
   id: string;
   name: string;

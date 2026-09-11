@@ -5,6 +5,11 @@ import { MODULE_DEFINITIONS } from "@/lib/roles";
 
 const KARIGAR_ALLOWED_PREFIXES = ["/my-jobs", "/profile", "/contact-faq"];
 
+/** Hard cutoff from sign-in, not an idle timeout — see token.loginAt's own
+ *  doc comment in lib/auth/auth-options.ts for why this can't just be
+ *  NextAuth's session.maxAge on its own. */
+const SESSION_ABSOLUTE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -28,7 +33,36 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Security requirement: a session must not outlive 24 hours from sign-in,
+  // active or not. token.loginAt is stamped once at sign-in and never
+  // refreshed, unlike the JWT's own `iat` claim (next-auth re-stamps that on
+  // every token refresh) or session.maxAge alone (a sliding window that an
+  // active user would never actually hit).
+  const loginAt = typeof token.loginAt === "number" ? token.loginAt : undefined;
+  if (loginAt && Date.now() - loginAt > SESSION_ABSOLUTE_MAX_AGE_MS) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("callbackUrl", pathname);
+    loginUrl.searchParams.set("error", "session_expired");
+    return NextResponse.redirect(loginUrl);
+  }
+
   const role = token.role as string | undefined;
+
+  // Plan-expiry is deliberately NOT enforced here anymore. It was
+  // originally (token.planExpired, redirecting on every request) — removed
+  // once testing established two things: (1) it couldn't work as written,
+  // since this app's SessionProvider disables both refetchOnWindowFocus
+  // and refetchInterval (components/providers/session-provider.tsx), so
+  // the JWT cookie this reads is never re-signed with a fresh value after
+  // login; and (2) the actual, confirmed requirement is narrower than "log
+  // the whole session out" anyway — viewing an expired store's existing
+  // data should keep working, only new entries/updates/exports should be
+  // blocked. Real-time enforcement for that now lives in
+  // lib/store-context.ts's assertPlanActiveForMutation, called from
+  // requireStoreScope()/resolveActingStoreId() and gated on the request
+  // actually being a Server Action mutation (Next.js's own `Next-Action`
+  // header), which a lightweight middleware token check can't distinguish
+  // from a plain page view.
 
   if (pathname.startsWith("/stores") && role !== "SUPER_ADMIN") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
@@ -55,6 +89,13 @@ export async function middleware(request: NextRequest) {
   // one's own (/contact-faq) stays open to every role; only the inbox that
   // sees every ticket across every store is restricted here.
   if (pathname.startsWith("/support-tickets") && role !== "SUPER_ADMIN") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // The design-system reference (colors, components, established
+  // conventions) is a platform-operator tool, not something a store's own
+  // staff has a use for — same SUPER_ADMIN-only gate as /stores and /plans.
+  if (pathname.startsWith("/brand-guide") && role !== "SUPER_ADMIN") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

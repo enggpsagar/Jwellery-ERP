@@ -176,7 +176,8 @@ export function MetalRatesTable({ data }: Props) {
                 size="icon"
                 title="Export metal rates"
                 aria-label="Export metal rates"
-                className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
+                variant="outline"
+                className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
               >
                 <Download className="h-4 w-4" />
               </Button>

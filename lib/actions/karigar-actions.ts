@@ -4,7 +4,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { getLocationScope, locationWhere, type LocationScope } from "@/lib/location-scope";
 import { UserRole, UserStatus, type PartyGstType } from "@prisma/client";
 import * as XLSX from "xlsx";
@@ -291,7 +292,7 @@ export async function getKarigarDetailBundle(id: string): Promise<KarigarDetailB
   const karigar = await getKarigarById(id);
   if (!karigar) return null;
 
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
   const scope = await getLocationScope();
 
   const [ledger, metals, locations, defaultLocationId, openJobsRaw, materialCounts] = await Promise.all([
@@ -579,7 +580,7 @@ export async function createKarigar(
       };
     }
     logger.error("createKarigar error", error);
-    return { success: false, message: "Failed to create artisan" };
+    return { success: false, message: actionErrorMessage(error, "Failed to create artisan") };
   }
 }
 
@@ -732,7 +733,7 @@ export async function updateKarigar(
       };
     }
     logger.error("updateKarigar error", error);
-    return { success: false, message: "Failed to update artisan" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update artisan") };
   }
 }
 
@@ -765,7 +766,7 @@ export async function disableKarigar(id: string): Promise<KarigarFormState> {
     return { success: true, message: "Artisan disabled" };
   } catch (error) {
     logger.error("disableKarigar error", error);
-    return { success: false, message: "Failed to disable artisan" };
+    return { success: false, message: actionErrorMessage(error, "Failed to disable artisan") };
   }
 }
 
@@ -789,7 +790,7 @@ export async function enableKarigar(id: string): Promise<KarigarFormState> {
     return { success: true, message: "Artisan re-enabled" };
   } catch (error) {
     logger.error("enableKarigar error", error);
-    return { success: false, message: "Failed to re-enable artisan" };
+    return { success: false, message: actionErrorMessage(error, "Failed to re-enable artisan") };
   }
 }
 
@@ -850,7 +851,7 @@ export async function deleteKarigar(id: string): Promise<KarigarFormState> {
     return { success: true, message };
   } catch (error) {
     logger.error("deleteKarigar error", error);
-    return { success: false, message: "Failed to delete artisan" };
+    return { success: false, message: actionErrorMessage(error, "Failed to delete artisan") };
   }
 }
 
@@ -1004,6 +1005,6 @@ export async function exportKarigarsToExcel(
     };
   } catch (error) {
     logger.error("exportKarigarsToExcel error", error);
-    return { success: false, message: "Failed to export artisans." };
+    return { success: false, message: actionErrorMessage(error, "Failed to export artisans.") };
   }
 }

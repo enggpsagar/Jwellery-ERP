@@ -69,15 +69,21 @@ export function ChangePlanDialog({
 
   return (
     <>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="icon"
+        // Tinted-icon-button treatment, same formula the destructive variant
+        // already uses (bg-destructive/10 text-destructive) — shared across
+        // every action in this row (see ExtendPlanDialog, ExportStoreDataButton,
+        // etc.) so they read as one consistent set.
+        className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
         onClick={() => setOpen(true)}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-accent"
         aria-label={`Change plan for ${storeName}`}
         title="Change plan"
       >
-        <CreditCard className="h-4 w-4" />
-      </button>
+        <CreditCard className="size-4" />
+      </Button>
 
       <Dialog
         open={open}

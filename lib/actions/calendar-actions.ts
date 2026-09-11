@@ -6,6 +6,7 @@ import { InvoiceStatus, UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { getEffectiveStoreId, requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { getCurrentUser, hasPermission, requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { getLocationScope, locationWhere, resolveWritableLocationId } from "@/lib/location-scope";
@@ -273,7 +274,7 @@ export async function createReminder(
     return { success: true, message: "Reminder added" };
   } catch (error) {
     logger.error("createReminder error", error);
-    return { success: false, message: "Failed to add reminder" };
+    return { success: false, message: actionErrorMessage(error, "Failed to add reminder") };
   }
 }
 
@@ -291,7 +292,7 @@ export async function toggleReminderDone(id: string, isDone: boolean): Promise<R
     return { success: true, message: "" };
   } catch (error) {
     logger.error("toggleReminderDone error", error);
-    return { success: false, message: "Failed to update reminder" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update reminder") };
   }
 }
 
@@ -306,6 +307,6 @@ export async function deleteReminder(id: string): Promise<ReminderFormState> {
     return { success: true, message: "Reminder deleted" };
   } catch (error) {
     logger.error("deleteReminder error", error);
-    return { success: false, message: "Failed to delete reminder" };
+    return { success: false, message: actionErrorMessage(error, "Failed to delete reminder") };
   }
 }

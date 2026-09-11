@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 
+import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/auth";
 import {
   countCollaborationGrants,
@@ -90,6 +91,30 @@ export async function requireStoreScope(): Promise<string> {
     // middleware's own SUPER_ADMIN-only gate on /stores bounces them
     // onward to /dashboard, which works for them since they have a store.
     redirect("/stores");
+  }
+
+  // Real-time check, not JWT-cached: this app's SessionProvider disables
+  // both refetchOnWindowFocus and refetchInterval
+  // (components/providers/session-provider.tsx), so a session's JWT
+  // cookie is effectively frozen at whatever it was signed with at
+  // login, for the entire session. Confirmed the hard way — testing found
+  // an already-signed-in session could keep creating invoices/purchases
+  // indefinitely after its store's plan expired, because
+  // middleware.ts's token-based check never actually saw an updated
+  // planExpired claim; nothing ever re-signs the cookie to carry one. A
+  // direct query here is what actually catches this, on every
+  // store-scoped mutation, rather than depending on whatever incidentally
+  // refreshes the cookie. Never applies to a Super Admin, who isn't tied
+  // to any one store's plan.
+  const user = await getCurrentUser();
+  if (user?.role !== UserRole.SUPER_ADMIN) {
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { planExpiresAt: true },
+    });
+    if (store?.planExpiresAt && store.planExpiresAt < new Date()) {
+      redirect("/login?error=plan_expired");
+    }
   }
 
   return storeId;

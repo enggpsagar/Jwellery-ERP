@@ -1588,6 +1588,6 @@ export async function importProductsFromExcel(
     };
   } catch (error) {
     logger.error("importProductsFromExcel error", error);
-    return { success: false, message: "Failed to import products." };
+    return { success: false, message: actionErrorMessage(error, "Failed to import products.") };
   }
 }

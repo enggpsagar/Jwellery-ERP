@@ -579,6 +579,6 @@ export async function importCustomersFromExcel(
     }
   } catch (error) {
     logger.error("importCustomersFromExcel error", error)
-    return { success: false, message: "Failed to import parties." }
+    return { success: false, message: actionErrorMessage(error, "Failed to import parties.") }
   }
 }

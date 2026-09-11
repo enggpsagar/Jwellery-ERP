@@ -929,6 +929,6 @@ export async function importVendorsFromExcel(
     }
   } catch (error) {
     logger.error("importVendorsFromExcel error", error)
-    return { success: false, message: "Failed to import vendors." }
+    return { success: false, message: actionErrorMessage(error, "Failed to import vendors.") }
   }
 }

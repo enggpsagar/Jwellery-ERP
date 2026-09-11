@@ -14,11 +14,15 @@ import { safeReturnTo } from "@/lib/safe-return-to";
 
 type Mode = "phone" | "email";
 
-// Mirrors RESEND_COOLDOWN_MS in app/api/auth/send-otp/route.ts — the server
-// is the real enforcement (a 429 with the actual seconds left overrides
-// this on mismatch), this is just what the button counts down from right
-// after a send succeeds, before that response would even matter.
-const RESEND_COOLDOWN_SECONDS = 30;
+// Mirrors PHONE_RESEND_COOLDOWN_MS / EMAIL_RESEND_COOLDOWN_MS in
+// app/api/auth/send-otp/route.ts — the server is the real enforcement (a 429
+// with the actual seconds left overrides this on mismatch), this is just
+// what the button counts down from right after a send succeeds, before that
+// response would even matter.
+const RESEND_COOLDOWN_SECONDS: Record<Mode, number> = {
+  phone: 120,
+  email: 30,
+};
 
 type Notice = { tone: "error" | "info"; title: string; body: string };
 
@@ -155,7 +159,7 @@ export default function LoginPage() {
       if (response.status === 429) {
         // The server's own cooldown, not just this tab's — could be shorter
         // or longer than what's left here (a second tab, a page refresh).
-        setResendCooldown(data.retryAfterSeconds ?? RESEND_COOLDOWN_SECONDS);
+        setResendCooldown(data.retryAfterSeconds ?? RESEND_COOLDOWN_SECONDS[mode]);
         setResendNotice(data.error);
         return;
       }
@@ -166,7 +170,7 @@ export default function LoginPage() {
       }
 
       setOtpSent(true);
-      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      setResendCooldown(RESEND_COOLDOWN_SECONDS[mode]);
       if (wasAlreadySent) {
         setResendNotice("A new code has been sent.");
       } else {

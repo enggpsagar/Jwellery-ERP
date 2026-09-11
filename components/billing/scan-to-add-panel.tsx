@@ -64,8 +64,10 @@ export function ScanToAddPanel({
       sinceRef.current = undefined
       setCount(0)
       setSessionId(session.sessionId)
-    } catch {
-      setError("Could not start scanning. Check you can create invoices here.")
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Could not start scanning. Check you can create invoices here."
+      )
     } finally {
       setStarting(false)
     }

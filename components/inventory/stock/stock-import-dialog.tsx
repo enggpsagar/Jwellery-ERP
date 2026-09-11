@@ -40,8 +40,12 @@ export function StockImportDialog() {
 
   const handleTemplate = () => {
     startDownload(async () => {
-      const template = await getStockImportTemplate()
-      downloadBase64File(template.fileBase64, template.fileName)
+      try {
+        const template = await getStockImportTemplate()
+        downloadBase64File(template.fileBase64, template.fileName)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to download template")
+      }
     })
   }
 

@@ -39,8 +39,12 @@ export function KachaImportDialog() {
 
   const handleTemplate = () => {
     startDownload(async () => {
-      const template = await getKachaImportTemplate()
-      downloadBase64File(template.fileBase64, template.fileName)
+      try {
+        const template = await getKachaImportTemplate()
+        downloadBase64File(template.fileBase64, template.fileName)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to download template")
+      }
     })
   }
 

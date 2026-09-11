@@ -14,7 +14,7 @@ import {
 
 import { prisma } from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth/auth"
-import { requireStoreScope } from "@/lib/store-context"
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context"
 import { actionErrorMessage } from "@/lib/action-error";
 import {
   getLocationScope,
@@ -425,7 +425,11 @@ export async function getInventoryStockFormProducts() {
 }
 
 export async function getInventoryStockById(id: string) {
-  const storeId = await requireStoreScope()
+  // A read, called directly from the client-side Stock master-detail panel
+  // (components/inventory/stock/stock-detail-panel.tsx) — see
+  // getStoreIdForRead's own doc comment for why requireStoreScope() would
+  // wrongly go dark here on an expired-plan store.
+  const storeId = await getStoreIdForRead()
 
   const row = await prisma.inventoryStock.findFirst({
     where: { id, storeId },

@@ -177,6 +177,31 @@ export async function requireStoreScope(): Promise<string> {
   return storeId;
 }
 
+/**
+ * The same store resolution as requireStoreScope(), without the plan-expiry
+ * gate — for a data-fetching function that is a genuine read but gets
+ * invoked directly from a "use client" component (e.g. inside a useEffect),
+ * not just awaited during a Server Component's own render. Next.js marks
+ * *any* direct call to a "use server" function from client code with the
+ * same Next-Action header a real form submission carries, so such a read
+ * would otherwise trip assertPlanActiveForMutation's isMutationRequest()
+ * check and incorrectly go dark on an expired-plan store — contradicting
+ * the confirmed requirement that viewing stays available. Reach for this
+ * instead of requireStoreScope() only when the function does no writing and
+ * is (or may be) called this way; a page-level read fetched during a Server
+ * Component's own render never needs it, since that path never carries the
+ * header in the first place.
+ */
+export async function getStoreIdForRead(): Promise<string> {
+  const storeId = await getEffectiveStoreId();
+
+  if (!storeId) {
+    redirect("/stores");
+  }
+
+  return storeId;
+}
+
 /** Role and permissions that apply in the store currently being acted on. */
 export async function getEffectiveAccess(): Promise<{
   role: UserRole;

@@ -189,17 +189,22 @@ export async function addCustomer(
   prevState: CustomerFormState,
   formData: FormData
 ): Promise<CustomerFormState> {
-  const storeId = await requireStoreScope()
-  const actor = await getCurrentUser()
+  try {
+    const storeId = await requireStoreScope()
+    const actor = await getCurrentUser()
 
-  const result = await createCustomerCore(formDataToCustomerInput(formData), {
-    storeId,
-    actorId: actor?.id ?? null,
-    actorName: actor?.name ?? actor?.email ?? null,
-  })
+    const result = await createCustomerCore(formDataToCustomerInput(formData), {
+      storeId,
+      actorId: actor?.id ?? null,
+      actorName: actor?.name ?? actor?.email ?? null,
+    })
 
-  if (result.success) revalidatePath("/customers")
-  return result
+    if (result.success) revalidatePath("/customers")
+    return result
+  } catch (error) {
+    logger.error("addCustomer error", error)
+    return { success: false, message: actionErrorMessage(error, "Failed to create party") }
+  }
 }
 
 export async function updateCustomer(
@@ -207,14 +212,19 @@ export async function updateCustomer(
   prevState: CustomerFormState,
   formData: FormData
 ): Promise<CustomerFormState> {
-  const storeId = await requireStoreScope()
-  const result = await updateCustomerCore(id, formDataToCustomerInput(formData), storeId)
+  try {
+    const storeId = await requireStoreScope()
+    const result = await updateCustomerCore(id, formDataToCustomerInput(formData), storeId)
 
-  if (result.success) {
-    revalidatePath("/customers")
-    revalidatePath(`/customers/${id}`)
+    if (result.success) {
+      revalidatePath("/customers")
+      revalidatePath(`/customers/${id}`)
+    }
+    return result
+  } catch (error) {
+    logger.error("updateCustomer error", error)
+    return { success: false, message: actionErrorMessage(error, "Failed to update party") }
   }
-  return result
 }
 
 export async function archiveCustomer(id: string): Promise<CustomerFormState> {

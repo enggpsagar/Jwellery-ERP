@@ -47,6 +47,9 @@ export function StockDetailPanel({ stockId }: StockDetailPanelProps) {
       .then((result) => {
         if (!cancelled) setStock(result)
       })
+      .catch(() => {
+        if (!cancelled) setStock(null)
+      })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })

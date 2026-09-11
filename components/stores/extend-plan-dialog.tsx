@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { CalendarPlus } from "lucide-react"
+import { Hourglass } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 
 import { extendStorePlan } from "@/lib/actions/store-actions"
@@ -66,15 +66,16 @@ export function ExtendPlanDialog({ storeId, storeName, currentExpiresAt }: Exten
 
   return (
     <>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="icon"
         onClick={() => setOpen(true)}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-accent"
         aria-label={`Extend plan for ${storeName}`}
         title="Extend plan"
       >
-        <CalendarPlus className="h-4 w-4" />
-      </button>
+        <Hourglass className="size-4" />
+      </Button>
 
       <Dialog
         open={open}

@@ -5,6 +5,11 @@ import { MODULE_DEFINITIONS } from "@/lib/roles";
 
 const KARIGAR_ALLOWED_PREFIXES = ["/my-jobs", "/profile", "/contact-faq"];
 
+/** Hard cutoff from sign-in, not an idle timeout — see token.loginAt's own
+ *  doc comment in lib/auth/auth-options.ts for why this can't just be
+ *  NextAuth's session.maxAge on its own. */
+const SESSION_ABSOLUTE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -25,6 +30,19 @@ export async function middleware(request: NextRequest) {
   if (token.disabled === true) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Security requirement: a session must not outlive 24 hours from sign-in,
+  // active or not. token.loginAt is stamped once at sign-in and never
+  // refreshed, unlike the JWT's own `iat` claim (next-auth re-stamps that on
+  // every token refresh) or session.maxAge alone (a sliding window that an
+  // active user would never actually hit).
+  const loginAt = typeof token.loginAt === "number" ? token.loginAt : undefined;
+  if (loginAt && Date.now() - loginAt > SESSION_ABSOLUTE_MAX_AGE_MS) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("callbackUrl", pathname);
+    loginUrl.searchParams.set("error", "session_expired");
     return NextResponse.redirect(loginUrl);
   }
 

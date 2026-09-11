@@ -81,7 +81,13 @@ export const authOptions: NextAuthOptions = {
 
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
+    // 24 hours. This alone only bounds the JWT's own default lifetime — by
+    // itself, NextAuth's JWT strategy is a *sliding* session (each read
+    // within maxAge can extend it), which would let an active user stay
+    // signed in indefinitely. token.loginAt (set below) + the matching
+    // check in middleware.ts is what actually enforces a hard 24h cutoff
+    // from sign-in, regardless of activity.
+    maxAge: 24 * 60 * 60,
   },
 
   callbacks: {
@@ -183,6 +189,13 @@ export const authOptions: NextAuthOptions = {
         token.locationIds = locationGrants.map((grant) => grant.locationId)
         token.disabled = false
         token.checkedAt = Date.now()
+        // Recorded only here, at sign-in — never touched on the re-read
+        // path below, unlike checkedAt. This is what middleware.ts compares
+        // against for the hard 24h session cutoff; if it were reset on
+        // every refresh (as the JWT's own standard `iat` claim is, since
+        // next-auth's encode() re-stamps that on every re-sign), an active
+        // user would never actually hit the limit.
+        token.loginAt = Date.now()
 
         return token
       }

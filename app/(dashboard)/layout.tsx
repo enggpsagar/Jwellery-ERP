@@ -126,6 +126,16 @@ export default async function DashboardLayout({
     getEffectiveStoreId(),
   ]);
 
+  // /my-plan is "a store owner's own plan" (see its own doc comment) — it
+  // has no meaning for a Super Admin, who owns no store of their own.
+  // Exempting it like the routes above would just move the crash into the
+  // page itself (getOwnStorePlan() has nothing to resolve without an active
+  // store); sending them to the Stores console instead is where a Super
+  // Admin actually manages every store's plan.
+  if (isSuperAdmin && !activeStoreId && pathname.startsWith("/my-plan")) {
+    redirect("/stores");
+  }
+
   const stores = memberships.map((m) => ({
     id: m.storeId,
     name: m.storeName,

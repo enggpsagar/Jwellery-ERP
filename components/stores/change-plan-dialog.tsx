@@ -69,15 +69,16 @@ export function ChangePlanDialog({
 
   return (
     <>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="icon"
         onClick={() => setOpen(true)}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-accent"
         aria-label={`Change plan for ${storeName}`}
         title="Change plan"
       >
-        <CreditCard className="h-4 w-4" />
-      </button>
+        <CreditCard className="size-4" />
+      </Button>
 
       <Dialog
         open={open}

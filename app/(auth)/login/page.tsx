@@ -43,6 +43,11 @@ const SIGN_IN_NOTICES: Record<string, Notice> = {
     body:
       "Sign-in is paused until the plan is renewed. Contact the application owner to renew or upgrade, and everything returns exactly as it was.",
   },
+  session_expired: {
+    tone: "info",
+    title: "Your session has expired",
+    body: "For security, you're signed out after 24 hours. Please sign in again to continue.",
+  },
   CredentialsSignin: {
     tone: "error",
     title: "That code did not work",

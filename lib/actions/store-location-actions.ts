@@ -9,7 +9,7 @@ import { revalidatePath } from "next/cache";
 import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
@@ -34,7 +34,7 @@ export type LocationFormState = {
 const LOCATIONS_PATH = "/settings/locations";
 
 export async function getStoreLocations(): Promise<StoreLocationRow[]> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const [locations, store] = await Promise.all([
     prisma.storeLocation.findMany({
@@ -60,7 +60,7 @@ export async function getStoreLocations(): Promise<StoreLocationRow[]> {
 /** Just the id, for the many create forms that only need to know what to
  * pre-select — cheaper than fetching the whole location list. */
 export async function getDefaultLocationId(): Promise<string | null> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const store = await prisma.store.findUnique({
     where: { id: storeId },

@@ -390,7 +390,7 @@ export async function exportKachaInvoicesToExcel(
 }
 
 export async function getKachaInvoiceById(id: string) {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const kachaInvoice = await prisma.kachaInvoice.findFirst({
     where: { id, storeId },

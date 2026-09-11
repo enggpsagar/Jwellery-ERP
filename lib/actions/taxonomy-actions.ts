@@ -69,7 +69,7 @@ const TAXONOMY_PATH = "/settings/taxonomy";
 // ---------------------------------------------------------------------------
 
 export async function getStoreMetals(): Promise<StoreMetalRow[]> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const metals = await prisma.storeMetal.findMany({
     where: { storeId },

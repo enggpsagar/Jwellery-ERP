@@ -248,7 +248,7 @@ export async function getKarigars(
 }
 
 export async function getKarigarById(id: string): Promise<Karigar | null> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
   const scope = await getLocationScope();
   const karigar = await prisma.karigar.findFirst({
     where: { id, storeId, ...locationWhere(scope) },

@@ -91,7 +91,8 @@ export function ProductImportDialog() {
             <strong>Style</strong> are required — Category and Metal Type
             names must match what's already set up under Settings &gt;
             Taxonomy. Product codes are generated automatically, same as the
-            "Add Product" form.
+            "Add Product" form. Fill in <strong>Stock Quantity</strong> on a
+            row to also create an opening stock entry for that product.
           </DialogDescription>
         </DialogHeader>
 

@@ -1216,7 +1216,9 @@ const CHARGE_TYPE_LABELS: Record<string, ChargeType> = {
  * human-readable names shown throughout the app (not ids or enum keys) —
  * importProductsFromExcel resolves them against this store's own Settings >
  * Taxonomy entries. No SKU column: it's auto-generated on import exactly
- * like the single "Add Product" form generates it.
+ * like the single "Add Product" form generates it. Stock Quantity/Location
+ * are the bulk equivalent of "Add Product"'s own "create a stock entry too"
+ * checkbox — leave Stock Quantity blank to import the product alone.
  */
 export async function getProductImportTemplate(): Promise<{
   fileName: string;
@@ -1249,6 +1251,8 @@ export async function getProductImportTemplate(): Promise<{
     Description: "22K gold ladies ring",
     Notes: "",
     Active: "Yes",
+    "Stock Quantity": "",
+    Location: "",
   };
 
   return buildMultiSheetExcelExport(
@@ -1312,7 +1316,7 @@ export async function importProductsFromExcel(
       return { success: false, message: "That file has no rows to import." };
     }
 
-    const [categories, metals, categoryTypes, metalOrigins, businessSettings] = await Promise.all([
+    const [categories, metals, categoryTypes, metalOrigins, locations, businessSettings] = await Promise.all([
       prisma.storeCategory.findMany({ where: { storeId }, select: { id: true, name: true } }),
       prisma.storeMetal.findMany({ where: { storeId }, select: { id: true, name: true } }),
       prisma.storeCategoryType.findMany({
@@ -1323,11 +1327,14 @@ export async function importProductsFromExcel(
         where: { storeId },
         select: { id: true, name: true, storeMetalId: true },
       }),
+      prisma.storeLocation.findMany({ where: { storeId }, select: { id: true, name: true } }),
       prisma.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true } }),
     ]);
 
     const categoryByName = new Map(categories.map((c) => [c.name.trim().toLowerCase(), c]));
     const metalByName = new Map(metals.map((m) => [m.name.trim().toLowerCase(), m]));
+    const locationByName = new Map(locations.map((l) => [l.name.trim().toLowerCase(), l.id]));
+    const locationScope = await getLocationScope();
 
     const categoryTypesByCategory = new Map<string, Map<string, { id: string; name: string }>>();
     for (const type of categoryTypes) {
@@ -1361,6 +1368,10 @@ export async function importProductsFromExcel(
     type ResolvedRow = {
       skuPrefix: string;
       fields: Omit<Prisma.ProductCreateManyInput, "storeId" | "productCode">;
+      /** The bulk equivalent of "Add Product"'s own "create a stock entry
+       * too" checkbox — null means this row is product-only. */
+      stockQuantity: number | null;
+      stockLocationId: string | null;
     };
 
     const errors: string[] = [];
@@ -1461,6 +1472,39 @@ export async function importProductsFromExcel(
         numericFields[key] = value;
       }
 
+      // The bulk equivalent of "Add Product"'s own "create a stock entry
+      // too" checkbox — blank Stock Quantity means this row is product-only,
+      // matching the single form's opt-in default.
+      const rawStockQuantity = productImportCell(row, "Stock Quantity");
+      let stockQuantity: number | null = null;
+      if (rawStockQuantity !== "") {
+        const parsed = Number(rawStockQuantity);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          rowErrors.push("Stock Quantity must be 0 or more");
+        } else {
+          stockQuantity = Math.trunc(parsed);
+        }
+      }
+
+      let stockLocationId: string | null = null;
+      if (stockQuantity !== null) {
+        const locationName = productImportCell(row, "Location");
+        const requestedLocationId = locationName
+          ? (locationByName.get(locationName.toLowerCase()) ?? null)
+          : null;
+
+        if (locationName && !requestedLocationId) {
+          rowErrors.push(`No location found named "${locationName}"`);
+        } else {
+          const resolution = await resolveWritableLocationId(storeId, requestedLocationId, locationScope);
+          if (!resolution.ok) {
+            rowErrors.push(resolution.message);
+          } else {
+            stockLocationId = resolution.locationId;
+          }
+        }
+      }
+
       if (rowErrors.length > 0) {
         for (const message of rowErrors) errors.push(`Row ${line}: ${message}`);
         continue;
@@ -1486,6 +1530,8 @@ export async function importProductsFromExcel(
 
       resolvedRows.push({
         skuPrefix,
+        stockQuantity,
+        stockLocationId,
         fields: {
           name,
           categoryId: resolvedCategory.id,
@@ -1566,24 +1612,85 @@ export async function importProductsFromExcel(
       }
     }
 
-    const toCreate: Prisma.ProductCreateManyInput[] = resolvedRows.map((row) => {
+    const toCreate: (Prisma.ProductCreateManyInput & {
+      stockQuantity: number | null;
+      stockLocationId: string | null;
+    })[] = resolvedRows.map((row) => {
       const nextSeq = (highestSeqByPrefix.get(row.skuPrefix) ?? 0) + 1;
       highestSeqByPrefix.set(row.skuPrefix, nextSeq);
       return {
         storeId,
         productCode: `${row.skuPrefix}-${String(nextSeq).padStart(3, "0")}`,
+        stockQuantity: row.stockQuantity,
+        stockLocationId: row.stockLocationId,
         ...row.fields,
       };
     });
 
-    await prisma.product.createMany({ data: toCreate });
+    // createManyAndReturn (not plain createMany) because a row that also
+    // asked for a stock entry needs this product's generated id to link
+    // InventoryStock.productId — matched back by productCode rather than by
+    // trusting the returned rows' order, which Prisma doesn't guarantee
+    // matches the input array's order.
+    const createdProducts = await prisma.product.createManyAndReturn({
+      data: toCreate.map(({ stockQuantity, stockLocationId, ...productData }) => productData),
+      select: { id: true, productCode: true },
+    });
+    const productIdByCode = new Map(createdProducts.map((p) => [p.productCode, p.id]));
+
+    const rowsWantingStock = toCreate.filter((row) => row.stockQuantity !== null);
+    let stockCreatedCount = 0;
+
+    if (rowsWantingStock.length) {
+      const existingStockCodes = await prisma.inventoryStock.findMany({
+        where: { storeId, stockCode: { startsWith: "STK-" } },
+        select: { stockCode: true },
+      });
+      let highestStockSeq = existingStockCodes.reduce((max, row) => {
+        const match = /^STK-(?:\d{4}-)?(\d+)$/.exec(row.stockCode);
+        return match ? Math.max(max, Number(match[1])) : max;
+      }, 0);
+      const year = new Date().getFullYear();
+
+      const stockToCreate: Prisma.InventoryStockCreateManyInput[] = rowsWantingStock.map((row) => {
+        highestStockSeq += 1;
+        return {
+          storeId,
+          productId: productIdByCode.get(row.productCode)!,
+          stockCode: `STK-${year}-${String(highestStockSeq).padStart(4, "0")}`,
+          quantity: row.stockQuantity!,
+          locationId: row.stockLocationId,
+          metalTypeId: row.metalTypeId,
+          purity: row.defaultPurity,
+          makingCharge: row.defaultMakingCharge,
+          makingChargeType: row.defaultMakingChargeType,
+          stoneCharge: row.defaultStoneCharge,
+          grossWeight: row.defaultGrossWeight,
+          netWeight: row.defaultNetWeight,
+          stoneWeight: row.defaultStoneWeight,
+          caratWeight: row.defaultCaratWeight,
+          stoneRate: row.defaultStoneRate,
+          stoneMetalTypeName: row.defaultStoneMetalTypeName,
+          stoneTypeNames: row.defaultStoneTypeNames,
+        };
+      });
+
+      await prisma.inventoryStock.createMany({ data: stockToCreate });
+      stockCreatedCount = stockToCreate.length;
+    }
 
     revalidatePath("/inventory");
     revalidatePath("/inventory/products");
+    if (stockCreatedCount) revalidatePath("/inventory/stock");
+
+    const productLabel = `${toCreate.length} ${toCreate.length === 1 ? "product" : "products"}`;
+    const message = stockCreatedCount
+      ? `Added ${productLabel}, with ${stockCreatedCount} stock ${stockCreatedCount === 1 ? "entry" : "entries"}.`
+      : `Added ${productLabel}.`;
 
     return {
       success: true,
-      message: `Added ${toCreate.length} ${toCreate.length === 1 ? "product" : "products"}.`,
+      message,
       createdCount: toCreate.length,
     };
   } catch (error) {

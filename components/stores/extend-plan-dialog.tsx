@@ -28,9 +28,11 @@ type ExtendPlanDialogProps = {
 
 /** Super Admin courtesy extension — pushes the current plan's (including a
  *  trial's, which is just whichever plan is cheapest) expiry forward by a
- *  number of days, without changing the plan itself. Mirrors
- *  ChangePlanDialog's exact interaction shape (icon trigger, single Dialog,
- *  Cancel/Confirm, toast + router.refresh() on success). */
+ *  number of days, without changing the plan itself. A negative number is
+ *  also accepted, to force a store's plan into "expired" right now for
+ *  testing that behavior, instead of waiting for a real one to lapse.
+ *  Mirrors ChangePlanDialog's exact interaction shape (icon trigger, single
+ *  Dialog, Cancel/Confirm, toast + router.refresh() on success). */
 export function ExtendPlanDialog({ storeId, storeName, currentExpiresAt }: ExtendPlanDialogProps) {
   const router = useRouter()
   const toast = useToast()
@@ -40,7 +42,7 @@ export function ExtendPlanDialog({ storeId, storeName, currentExpiresAt }: Exten
   const [loading, setLoading] = React.useState(false)
 
   const parsedDays = Number(days)
-  const isValid = Number.isInteger(parsedDays) && parsedDays > 0
+  const isValid = Number.isInteger(parsedDays) && parsedDays !== 0
 
   async function handleConfirm() {
     if (!isValid) return
@@ -88,7 +90,7 @@ export function ExtendPlanDialog({ storeId, storeName, currentExpiresAt }: Exten
           <DialogHeader>
             <DialogTitle>Extend Plan</DialogTitle>
             <DialogDescription>
-              Adds days to the current expiry for{" "}
+              Adds (or, with a negative number, subtracts) days from the current expiry for{" "}
               <span className="font-medium text-foreground">{storeName}</span>
               {currentExpiresAt && (
                 <> (currently expires {formatShortDate(currentExpiresAt)})</>
@@ -103,11 +105,13 @@ export function ExtendPlanDialog({ storeId, storeName, currentExpiresAt }: Exten
             <Input
               id="extend-days"
               type="number"
-              min={1}
               step={1}
               value={days}
               onChange={(e) => setDays(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              Use a negative number to set this store as expired right now, for testing.
+            </p>
           </div>
 
           <DialogFooter>
@@ -120,12 +124,19 @@ export function ExtendPlanDialog({ storeId, storeName, currentExpiresAt }: Exten
               Cancel
             </Button>
 
-            <Button type="button" onClick={handleConfirm} disabled={loading || !isValid}>
+            <Button
+              type="button"
+              variant={parsedDays < 0 ? "destructive" : "default"}
+              onClick={handleConfirm}
+              disabled={loading || !isValid}
+            >
               {loading ? (
                 <>
                   <Loader className="mr-2 h-4 w-4" />
-                  Extending...
+                  {parsedDays < 0 ? "Backdating..." : "Extending..."}
                 </>
+              ) : parsedDays < 0 ? (
+                "Set as expired"
               ) : (
                 "Extend"
               )}

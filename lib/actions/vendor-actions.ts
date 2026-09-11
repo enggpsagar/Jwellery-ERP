@@ -2,14 +2,20 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { PartyGstType } from "@prisma/client"
+import { Prisma, PartyGstType } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
 import { formatLedgerSource } from "@/lib/ledger-format"
-import { partyGstTypeLabel } from "@/lib/gst"
+import { partyGstTypeLabel, PARTY_GST_TYPE_OPTIONS } from "@/lib/gst"
 import { formatShortDate } from "@/lib/utils"
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar"
-import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export"
+import {
+  buildExcelExport,
+  buildCsvExportBase64,
+  buildPdfExportBase64,
+  buildMultiSheetExcelExport,
+  parseExcelUpload,
+} from "@/lib/excel-export"
 import { logger } from "@/lib/logger";
 
 export type Vendor = {
@@ -773,4 +779,155 @@ export async function bulkDeleteVendors(ids: string[]): Promise<BulkDeleteResult
   }
 
   return { deletedCount, failures }
+}
+
+export type VendorImportResult = {
+  success: boolean
+  message: string
+  createdCount?: number
+  /** Row-level problems. Populated only when nothing was created — nothing
+   * is written until the whole file is clean. */
+  errors?: string[]
+}
+
+/**
+ * A downloadable .xlsx showing the expected columns and one filled-in
+ * example row — column names mirror exportVendorsToExcel's own headers
+ * ("Vendor Name", "Alternate Phone").
+ */
+export async function getVendorImportTemplate(): Promise<{
+  fileName: string
+  fileBase64: string
+}> {
+  await requireStoreScope()
+
+  const example = {
+    "Vendor Name": "ABC Bullion Suppliers",
+    Phone: "9123456780",
+    "Alternate Phone": "",
+    Email: "vendor@example.com",
+    Address: "45 Zaveri Bazaar",
+    City: "Mumbai",
+    State: "Maharashtra",
+    Pincode: "400002",
+    "GST Number": "27ABCDE1234F1Z5",
+    "GST Type": "Regular",
+    "Aadhaar Number": "",
+    Notes: "",
+    "Opening Balance": 0,
+  }
+
+  return buildMultiSheetExcelExport(
+    [{ name: "Vendors Import", rows: [example], columns: Object.keys(example) }],
+    "vendors-import-template",
+  )
+}
+
+function vendorImportCell(row: Record<string, unknown>, key: string): string {
+  return String(row[key] ?? "").trim()
+}
+
+function parseVendorGstTypeLabel(raw: string): PartyGstType {
+  const match = PARTY_GST_TYPE_OPTIONS.find(
+    (option) => option.label.toLowerCase() === raw.toLowerCase(),
+  )
+  return match?.value ?? PartyGstType.UNREGISTERED
+}
+
+/**
+ * Bulk-adds vendors from one spreadsheet — mirrors importInventoryStockFromExcel's
+ * contract exactly. Unlike Customer import, validation is hand-rolled here
+ * rather than reused from a core function (there's no lib/core/vendor.ts —
+ * addVendor itself validates inline, matching Stock/Kacha's own precedent
+ * of not reusing the single-row form action). Deliberately has NO phone
+ * uniqueness check, in-file or against the DB — addVendor has none either
+ * (Vendor.phone is only @@index'd, not @@unique'd), and bulk import must
+ * not be stricter than the manual form.
+ */
+export async function importVendorsFromExcel(
+  formData: FormData,
+): Promise<VendorImportResult> {
+  try {
+    const storeId = await requireStoreScope()
+    const file = formData.get("file")
+
+    if (!(file instanceof File) || file.size === 0) {
+      return { success: false, message: "Choose a .xlsx or .csv file to import." }
+    }
+
+    const rows = parseExcelUpload(await file.arrayBuffer())
+
+    if (!rows.length) {
+      return { success: false, message: "That file has no rows to import." }
+    }
+
+    const errors: string[] = []
+    const toCreate: Prisma.VendorCreateManyInput[] = []
+
+    for (const [index, row] of rows.entries()) {
+      // +2 = one for the header row, one for 1-based spreadsheet numbering.
+      const line = index + 2
+
+      const name = vendorImportCell(row, "Vendor Name")
+      if (!name) {
+        errors.push(`Row ${line}: Vendor name is required`)
+        continue
+      }
+
+      const aadhaarNumber = vendorImportCell(row, "Aadhaar Number")
+      if (aadhaarNumber && !isValidAadhaarNumber(aadhaarNumber)) {
+        errors.push(`Row ${line}: ${AADHAAR_INVALID_MESSAGE}`)
+        continue
+      }
+
+      const rawOpeningBalance = vendorImportCell(row, "Opening Balance")
+      const openingBalance = rawOpeningBalance === "" ? 0 : Number(rawOpeningBalance)
+      if (!Number.isFinite(openingBalance)) {
+        errors.push(`Row ${line}: Opening Balance must be a number`)
+        continue
+      }
+
+      toCreate.push({
+        storeId,
+        name,
+        phone: vendorImportCell(row, "Phone") || null,
+        alternatePhone: vendorImportCell(row, "Alternate Phone") || null,
+        email: vendorImportCell(row, "Email") || null,
+        addressLine1: vendorImportCell(row, "Address") || null,
+        city: vendorImportCell(row, "City") || null,
+        state: vendorImportCell(row, "State") || null,
+        pincode: vendorImportCell(row, "Pincode") || null,
+        gstin: vendorImportCell(row, "GST Number") || null,
+        gstType: parseVendorGstTypeLabel(vendorImportCell(row, "GST Type")),
+        aadhaarNumber: aadhaarNumber ? normalizeAadhaarNumber(aadhaarNumber) : null,
+        notes: vendorImportCell(row, "Notes") || null,
+        openingBalance,
+      })
+    }
+
+    if (errors.length > 0) {
+      return {
+        success: false,
+        message: "Nothing was imported. Fix these rows and try again.",
+        errors,
+      }
+    }
+
+    if (!toCreate.length) {
+      return { success: false, message: "That file has no rows to import." }
+    }
+
+    await prisma.vendor.createMany({ data: toCreate })
+
+    revalidatePath("/vendors")
+
+    return {
+      success: true,
+      message: `Added ${toCreate.length} ${toCreate.length === 1 ? "vendor" : "vendors"}.`,
+      createdCount: toCreate.length,
+    }
+  } catch (error) {
+    logger.error("importVendorsFromExcel error", error)
+    return { success: false, message: "Failed to import vendors." }
+  }
 }

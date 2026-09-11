@@ -14,6 +14,12 @@ import { safeReturnTo } from "@/lib/safe-return-to";
 
 type Mode = "phone" | "email";
 
+// Mirrors RESEND_COOLDOWN_MS in app/api/auth/send-otp/route.ts — the server
+// is the real enforcement (a 429 with the actual seconds left overrides
+// this on mismatch), this is just what the button counts down from right
+// after a send succeeds, before that response would even matter.
+const RESEND_COOLDOWN_SECONDS = 30;
+
 type Notice = { tone: "error" | "info"; title: string; body: string };
 
 /**
@@ -36,12 +42,6 @@ const SIGN_IN_NOTICES: Record<string, Notice> = {
     title: "Your account is disabled",
     body:
       "This account cannot sign in at the moment. Ask your store owner to re-enable it, then try again.",
-  },
-  plan_expired: {
-    tone: "error",
-    title: "This store's plan has expired",
-    body:
-      "Sign-in is paused until the plan is renewed. Contact the application owner to renew or upgrade, and everything returns exactly as it was.",
   },
   session_expired: {
     tone: "info",
@@ -85,6 +85,15 @@ export default function LoginPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
+
+  // Ticks resendCooldown down to 0, one second at a time, while it's active.
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const id = window.setTimeout(() => setResendCooldown((seconds) => seconds - 1), 1000);
+    return () => window.clearTimeout(id);
+  }, [resendCooldown]);
 
   // Where to go once signed in. Middleware puts the blocked path in
   // `callbackUrl`, and honouring it is what makes a scanned QR work on a
@@ -113,15 +122,24 @@ export default function LoginPage() {
     setIdentifier("");
     setOtp("");
     setOtpSent(false);
+    setResendCooldown(0);
+    setResendNotice(null);
   }
 
+  // Also the "Resend OTP" handler — same request, sent again. `wasAlreadySent`
+  // is read before this call changes anything, so it's the one thing that
+  // tells the two apart: whether to show "OTP sent" (first time) or "A new
+  // code has been sent" (a resend) once it succeeds.
   async function sendOTP() {
     if (!identifier) {
       alert(mode === "phone" ? "Please enter your mobile number." : "Please enter your email.");
       return;
     }
+    if (resendCooldown > 0) return;
 
+    const wasAlreadySent = otpSent;
     setLoading(true);
+    setResendNotice(null);
 
     try {
       const response = await fetch("/api/auth/send-otp", {
@@ -134,13 +152,26 @@ export default function LoginPage() {
 
       const data = await response.json();
 
+      if (response.status === 429) {
+        // The server's own cooldown, not just this tab's — could be shorter
+        // or longer than what's left here (a second tab, a page refresh).
+        setResendCooldown(data.retryAfterSeconds ?? RESEND_COOLDOWN_SECONDS);
+        setResendNotice(data.error);
+        return;
+      }
+
       if (!response.ok) {
         alert(data.error ?? "Failed to send OTP.");
         return;
       }
 
       setOtpSent(true);
-      alert("OTP sent successfully.");
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      if (wasAlreadySent) {
+        setResendNotice("A new code has been sent.");
+      } else {
+        alert("OTP sent successfully.");
+      }
     } catch {
       alert("Unable to send OTP.");
     } finally {

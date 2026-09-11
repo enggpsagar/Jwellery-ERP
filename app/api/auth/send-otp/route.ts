@@ -13,12 +13,29 @@ import { logger } from "@/lib/logger";
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 
+// A "Resend OTP" button has no cooldown on its own — this is what actually
+// stops it being spammed (each resend is a real SMS/email send). Checked
+// against whichever LOGIN-purpose code (consumed or not) for this
+// phone/email was created most recently, before that row gets replaced.
+const RESEND_COOLDOWN_MS = 30 * 1000;
+
 // Shown instead of sending a code when the phone/email has no matching
 // User row — deliberately reveals account existence (a change from this
 // route's earlier anti-enumeration design) so someone isn't left waiting on
 // an OTP that was never going to arrive, and so a code is never wasted /
 // visible in the server log (phone path) for an address with no account.
 const NO_ACCOUNT_MESSAGE = "No account is associated with this application.";
+
+function cooldownResponse(retryAfterMs: number) {
+  const retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+  return NextResponse.json(
+    {
+      error: `Please wait ${retryAfterSeconds}s before requesting another code.`,
+      retryAfterSeconds,
+    },
+    { status: 429 },
+  );
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,6 +57,18 @@ export async function POST(request: NextRequest) {
       });
       if (!recipient) {
         return NextResponse.json({ error: NO_ACCOUNT_MESSAGE }, { status: 404 });
+      }
+
+      const lastCode = await prisma.otpCode.findFirst({
+        where: { phone, purpose: OtpPurpose.LOGIN },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      });
+      if (lastCode) {
+        const elapsed = Date.now() - lastCode.createdAt.getTime();
+        if (elapsed < RESEND_COOLDOWN_MS) {
+          return cooldownResponse(RESEND_COOLDOWN_MS - elapsed);
+        }
       }
 
       await prisma.otpCode.deleteMany({
@@ -71,6 +100,18 @@ export async function POST(request: NextRequest) {
       });
       if (!recipient) {
         return NextResponse.json({ error: NO_ACCOUNT_MESSAGE }, { status: 404 });
+      }
+
+      const lastCode = await prisma.otpCode.findFirst({
+        where: { email: normalizedEmail, purpose: OtpPurpose.LOGIN },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      });
+      if (lastCode) {
+        const elapsed = Date.now() - lastCode.createdAt.getTime();
+        if (elapsed < RESEND_COOLDOWN_MS) {
+          return cooldownResponse(RESEND_COOLDOWN_MS - elapsed);
+        }
       }
 
       await prisma.otpCode.deleteMany({

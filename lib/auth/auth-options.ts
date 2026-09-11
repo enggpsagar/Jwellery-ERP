@@ -117,7 +117,7 @@ export const authOptions: NextAuthOptions = {
       if (dbUser.storeId) {
         const store = await prisma.store.findUnique({
           where: { id: dbUser.storeId },
-          select: { isActive: true, planExpiresAt: true },
+          select: { isActive: true },
         })
 
         if (store && !store.isActive) {
@@ -130,11 +130,10 @@ export const authOptions: NextAuthOptions = {
           return "/login?error=store_archived"
         }
 
-        // planExpiresAt: null means no plan assigned yet (e.g. stores that
-        // predate this feature) — treated as unrestricted, not a lockout.
-        if (store?.planExpiresAt && store.planExpiresAt < new Date()) {
-          return "/login?error=plan_expired"
-        }
+        // A plan expiry is deliberately NOT a sign-in block: viewing existing
+        // data stays available for everyone once expired — only Create/
+        // Update/Export are restricted, enforced centrally in
+        // lib/store-context.ts, not here.
       }
 
       return true

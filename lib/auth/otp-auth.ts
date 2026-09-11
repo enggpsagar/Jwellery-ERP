@@ -48,7 +48,7 @@ async function assertCanSignIn(
   if (user.storeId) {
     const store = await prisma.store.findUnique({
       where: { id: user.storeId },
-      select: { isActive: true, planExpiresAt: true },
+      select: { isActive: true },
     })
 
     if (store && !store.isActive) {
@@ -61,11 +61,10 @@ async function assertCanSignIn(
       )
     }
 
-    // planExpiresAt: null means no plan assigned yet (e.g. stores that
-    // predate this feature) — treated as unrestricted, not a lockout.
-    if (store?.planExpiresAt && store.planExpiresAt < new Date()) {
-      throw new Error("This store's plan has expired. Contact your administrator to renew.")
-    }
+    // A plan expiry is deliberately NOT a sign-in block: viewing existing
+    // data stays available for everyone (including Super Admin support
+    // access) once expired — only Create/Update/Export are restricted, and
+    // those are enforced centrally in lib/store-context.ts, not here.
   }
 
   return user

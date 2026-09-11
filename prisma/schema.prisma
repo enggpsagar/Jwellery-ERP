@@ -133,6 +133,12 @@ enum StorePlanAction {
   REGISTERED
   ASSIGNED
   RENEWED
+  /** A Super Admin pushed the current plan's expiry forward by N days
+   *  without changing the plan itself — see extendStorePlan in
+   *  lib/actions/store-actions.ts. Covers extending a trial the same way
+   *  as any other plan, since a trial is just whichever active Plan has
+   *  the lowest price (see resolveTrialPlan), not a separate concept. */
+  EXTENDED
 }
 
 /**

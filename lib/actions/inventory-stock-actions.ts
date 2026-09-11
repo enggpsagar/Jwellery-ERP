@@ -15,6 +15,7 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
 import { getFinenessMap, toFineWeight } from "@/lib/purity";
 import { getCurrentUser } from "@/lib/auth/auth";
@@ -165,7 +166,7 @@ export async function reserveStock(
     return { success: true, message: "Stock reserved" };
   } catch (error) {
     logger.error("reserveStock error", error);
-    return { success: false, message: "Failed to reserve stock" };
+    return { success: false, message: actionErrorMessage(error, "Failed to reserve stock") };
   }
 }
 
@@ -212,7 +213,7 @@ export async function unreserveStock(
     return { success: true, message: "Stock unreserved" };
   } catch (error) {
     logger.error("unreserveStock error", error);
-    return { success: false, message: "Failed to unreserve stock" };
+    return { success: false, message: actionErrorMessage(error, "Failed to unreserve stock") };
   }
 }
 
@@ -248,7 +249,7 @@ export async function markStockDamaged(
     return { success: true, message: "Stock marked as damaged" };
   } catch (error) {
     logger.error("markStockDamaged error", error);
-    return { success: false, message: "Failed to update stock" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update stock") };
   }
 }
 
@@ -456,7 +457,7 @@ export async function issueMaterialToKarigar(
     return { success: true, message: `Material issued — Job ${jobNumber}` };
   } catch (error) {
     logger.error("issueMaterialToKarigar error", error);
-    return { success: false, message: "Failed to issue material to artisan" };
+    return { success: false, message: actionErrorMessage(error, "Failed to issue material to artisan") };
   }
 }
 
@@ -572,7 +573,7 @@ export async function recordMaterialReceiptFromKarigar(
     return { success: true, message: "Material received — outstanding balance adjusted" };
   } catch (error) {
     logger.error("recordMaterialReceiptFromKarigar error", error);
-    return { success: false, message: "Failed to record material receipt" };
+    return { success: false, message: actionErrorMessage(error, "Failed to record material receipt") };
   }
 }
 
@@ -912,7 +913,7 @@ export async function receiveItemsFromKarigar(
     return { success: true, message };
   } catch (error) {
     logger.error("receiveItemsFromKarigar error", error);
-    return { success: false, message: "Failed to receive items from artisan" };
+    return { success: false, message: actionErrorMessage(error, "Failed to receive items from artisan") };
   }
 }
 
@@ -972,6 +973,6 @@ export async function recordKarigarPayment(
     return { success: true, message: "Payment recorded" };
   } catch (error) {
     logger.error("recordKarigarPayment error", error);
-    return { success: false, message: "Failed to record payment" };
+    return { success: false, message: actionErrorMessage(error, "Failed to record payment") };
   }
 }

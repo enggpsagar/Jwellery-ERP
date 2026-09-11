@@ -9,6 +9,7 @@ import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth/auth";
 import { requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { logger } from "@/lib/logger";
 
 export type CollaborationActionState = {
@@ -127,7 +128,7 @@ export async function generateCollaborationCode(): Promise<CollaborationActionSt
     return { success: true, message: "New collaboration code generated", code };
   } catch (error) {
     logger.error("generateCollaborationCode error", error);
-    return { success: false, message: "Failed to generate a new code" };
+    return { success: false, message: actionErrorMessage(error, "Failed to generate a new code") };
   }
 }
 
@@ -179,7 +180,7 @@ export async function redeemCollaborationCode(
     return { success: true, message: `Access granted to ${store.name}` };
   } catch (error) {
     logger.error("redeemCollaborationCode error", error);
-    return { success: false, message: "Failed to redeem code" };
+    return { success: false, message: actionErrorMessage(error, "Failed to redeem code") };
   }
 }
 
@@ -294,7 +295,7 @@ export async function requestStoreAccess(
     return { success: true, message: `Request sent to ${store.name}'s owner` };
   } catch (error) {
     logger.error("requestStoreAccess error", error);
-    return { success: false, message: "Failed to send request" };
+    return { success: false, message: actionErrorMessage(error, "Failed to send request") };
   }
 }
 
@@ -389,6 +390,6 @@ export async function respondToAccessRequest(
     return { success: true, message: approve ? "Access granted" : "Request denied" };
   } catch (error) {
     logger.error("respondToAccessRequest error", error);
-    return { success: false, message: "Failed to respond to request" };
+    return { success: false, message: actionErrorMessage(error, "Failed to respond to request") };
   }
 }

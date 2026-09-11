@@ -6,6 +6,7 @@ import { PurityType, LedgerEntryType, LedgerSourceType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
 import { getFinenessMap, toFineWeight } from "@/lib/purity";
@@ -245,7 +246,7 @@ export async function exportDraftOrdersToExcel(params: ExportDraftOrdersParams =
     return { success: true, message: "Draft orders exported successfully", fileName, fileBase64 };
   } catch (error) {
     logger.error("exportDraftOrdersToExcel error", error);
-    return { success: false, message: "Failed to export draft orders" };
+    return { success: false, message: actionErrorMessage(error, "Failed to export draft orders") };
   }
 }
 
@@ -278,7 +279,7 @@ export async function deleteDraftOrder(orderId: string): Promise<DraftOrderFormS
     return { success: true, message: `Draft Order ${order.orderNumber} deleted` };
   } catch (error) {
     logger.error("deleteDraftOrder error", error);
-    return { success: false, message: "Failed to delete order" };
+    return { success: false, message: actionErrorMessage(error, "Failed to delete order") };
   }
 }
 
@@ -459,7 +460,7 @@ export async function createDraftOrder(
     return { success: true, message: `Draft Order ${orderNumber} created`, orderId: order.id };
   } catch (error) {
     logger.error("createDraftOrder error", error);
-    return { success: false, message: "Failed to create draft order" };
+    return { success: false, message: actionErrorMessage(error, "Failed to create draft order") };
   }
 }
 
@@ -487,7 +488,7 @@ export async function cancelDraftOrder(orderId: string): Promise<DraftOrderFormS
     return { success: true, message: "Order cancelled" };
   } catch (error) {
     logger.error("cancelDraftOrder error", error);
-    return { success: false, message: "Failed to cancel order" };
+    return { success: false, message: actionErrorMessage(error, "Failed to cancel order") };
   }
 }
 
@@ -538,7 +539,7 @@ export async function updateDraftOrder(
     return { success: true, message: "Order updated" };
   } catch (error) {
     logger.error("updateDraftOrder error", error);
-    return { success: false, message: "Failed to update order" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update order") };
   }
 }
 
@@ -704,7 +705,7 @@ export async function sendDraftOrderToKarigar(
     return { success: true, message: `Sent to artisan — Job ${jobNumber}` };
   } catch (error) {
     logger.error("sendDraftOrderToKarigar error", error);
-    return { success: false, message: "Failed to send order to artisan" };
+    return { success: false, message: actionErrorMessage(error, "Failed to send order to artisan") };
   }
 }
 

@@ -5,6 +5,7 @@ import { LedgerEntryType, LedgerSourceType, PaymentMethod } from "@prisma/client
 
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
+import { actionErrorMessage } from "@/lib/action-error";
 import { getLocationScope, locationWhere } from "@/lib/location-scope"
 import { requirePermission } from "@/lib/auth/auth"
 import { PERMISSIONS } from "@/lib/permissions"
@@ -329,7 +330,7 @@ export async function recordCustomerPayment(
     return { success: true, message: "Payment In recorded" }
   } catch (error) {
     logger.error("recordCustomerPayment error", error)
-    return { success: false, message: "Failed to record payment" }
+    return { success: false, message: actionErrorMessage(error, "Failed to record payment") }
   }
 }
 
@@ -449,6 +450,6 @@ export async function recordPaymentOut(
     return { success: true, message: "Payment Out recorded" }
   } catch (error) {
     logger.error("recordPaymentOut error", error)
-    return { success: false, message: "Failed to record payment" }
+    return { success: false, message: actionErrorMessage(error, "Failed to record payment") }
   }
 }

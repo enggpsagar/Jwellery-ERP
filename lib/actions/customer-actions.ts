@@ -6,6 +6,7 @@ import { PartyGstType } from "@prisma/client"
 import { partyGstTypeLabel } from "@/lib/gst"
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
+import { actionErrorMessage } from "@/lib/action-error";
 import { getCurrentUser } from "@/lib/auth/auth"
 import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export"
 import {
@@ -179,7 +180,7 @@ export async function exportCustomersToExcel(
     logger.error("exportCustomersToExcel error", error)
     return {
       success: false,
-      message: "Failed to export parties.",
+      message: actionErrorMessage(error, "Failed to export parties."),
     }
   }
 }
@@ -246,7 +247,7 @@ export async function archiveCustomer(id: string): Promise<CustomerFormState> {
     logger.error("archiveCustomer error", error)
     return {
       success: false,
-      message: "Failed to archive party",
+      message: actionErrorMessage(error, "Failed to archive party"),
     }
   }
 }
@@ -281,7 +282,7 @@ export async function unarchiveCustomer(id: string): Promise<CustomerFormState> 
     logger.error("unarchiveCustomer error", error)
     return {
       success: false,
-      message: "Failed to restore party",
+      message: actionErrorMessage(error, "Failed to restore party"),
     }
   }
 }
@@ -333,7 +334,7 @@ export async function deleteCustomer(id: string): Promise<CustomerFormState> {
     logger.error("deleteCustomer error", error)
     return {
       success: false,
-      message: "Failed to delete party",
+      message: actionErrorMessage(error, "Failed to delete party"),
     }
   }
 }

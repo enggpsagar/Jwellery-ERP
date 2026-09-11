@@ -6,6 +6,7 @@ import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
 
@@ -120,7 +121,7 @@ export async function upsertGstRate(
       };
     }
     logger.error("upsertGstRate error", error);
-    return { success: false, message: "Failed to save GST rate" };
+    return { success: false, message: actionErrorMessage(error, "Failed to save GST rate") };
   }
 }
 
@@ -167,7 +168,7 @@ export async function setGstRateActive(
     };
   } catch (error) {
     logger.error("setGstRateActive error", error);
-    return { success: false, message: "Failed to update GST rate" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update GST rate") };
   }
 }
 
@@ -249,6 +250,6 @@ export async function setDefaultGstRate(id: string): Promise<GstRateFormState> {
     return { success: true, message: "Default GST rate updated" };
   } catch (error) {
     logger.error("setDefaultGstRate error", error);
-    return { success: false, message: "Failed to update default GST rate" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update default GST rate") };
   }
 }

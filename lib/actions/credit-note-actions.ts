@@ -14,6 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { getReturnEligibility, type ReturnEligibility } from "@/lib/return-window";
 import { formatShortDate } from "@/lib/utils";
@@ -441,6 +442,6 @@ export async function createCreditNote(
     };
   } catch (error) {
     logger.error("createCreditNote error", error);
-    return { success: false, message: "Failed to create credit note" };
+    return { success: false, message: actionErrorMessage(error, "Failed to create credit note") };
   }
 }

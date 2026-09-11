@@ -8,6 +8,7 @@ import { derivePlanStatus } from "@/lib/plan-status";
 import type { PlanStatus } from "@/lib/plan-status";
 import { requireRole } from "@/lib/auth/auth";
 import { requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { resolveStoreName } from "@/lib/invite-email";
 import { sendMail } from "@/lib/mailer";
 import { renewalContactRequestEmail } from "@/lib/email-templates";
@@ -344,7 +345,7 @@ export async function sendRenewalContactRequestAction(
     };
   } catch (error) {
     logger.error("sendRenewalContactRequestAction error", error);
-    return { success: false, message: "Failed to send your message. Please try again." };
+    return { success: false, message: actionErrorMessage(error, "Failed to send your message. Please try again.") };
   }
 }
 
@@ -370,6 +371,6 @@ export async function setStoreReminderChannels(
     return { success: true, message: "Reminder settings updated." };
   } catch (error) {
     logger.error("setStoreReminderChannels error", error);
-    return { success: false, message: "Failed to update reminder settings." };
+    return { success: false, message: actionErrorMessage(error, "Failed to update reminder settings.") };
   }
 }

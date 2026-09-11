@@ -19,6 +19,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst";
 import { computeRoundOff } from "@/lib/round-off";
 import { resolveGstRateSnapshot, type GstRateSnapshot } from "@/lib/actions/gst-rate-actions";
@@ -507,7 +508,7 @@ export async function exportPurchasesToExcel(
     };
   } catch (error) {
     logger.error("exportPurchasesToExcel error", error);
-    return { success: false, message: "Failed to export purchases." };
+    return { success: false, message: actionErrorMessage(error, "Failed to export purchases.") };
   }
 }
 
@@ -976,7 +977,7 @@ export async function createPurchase(
     };
   } catch (error) {
     logger.error("createPurchase error", error);
-    return { success: false, message: "Failed to create purchase" };
+    return { success: false, message: actionErrorMessage(error, "Failed to create purchase") };
   }
 }
 
@@ -1056,7 +1057,7 @@ export async function recordPurchasePayment(
     return { success: true, message: "Payment recorded" };
   } catch (error) {
     logger.error("recordPurchasePayment error", error);
-    return { success: false, message: "Failed to record payment" };
+    return { success: false, message: actionErrorMessage(error, "Failed to record payment") };
   }
 }
 
@@ -1414,7 +1415,7 @@ export async function updatePurchase(
     return { success: true, message: "Purchase updated" };
   } catch (error) {
     logger.error("updatePurchase error", error);
-    return { success: false, message: "Failed to update purchase" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update purchase") };
   }
 }
 
@@ -1502,6 +1503,6 @@ export async function deletePurchase(id: string): Promise<PurchaseFormState> {
     return { success: true, message: "Purchase deleted" };
   } catch (error) {
     logger.error("deletePurchase error", error);
-    return { success: false, message: "Failed to delete purchase" };
+    return { success: false, message: actionErrorMessage(error, "Failed to delete purchase") };
   }
 }

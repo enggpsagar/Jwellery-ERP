@@ -17,6 +17,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { computeRoundOff } from "@/lib/round-off";
 import { requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import {
   getLocationScope,
   locationWhere,
@@ -384,7 +385,7 @@ export async function exportKachaInvoicesToExcel(
     };
   } catch (error) {
     logger.error("exportKachaInvoicesToExcel error", error);
-    return { success: false, message: "Failed to export Estimates." };
+    return { success: false, message: actionErrorMessage(error, "Failed to export Estimates.") };
   }
 }
 
@@ -710,7 +711,7 @@ export async function createKachaInvoice(
       return { success: false, message: error.message };
     }
     logger.error("createKachaInvoice error", error);
-    return { success: false, message: "Failed to create Estimate" };
+    return { success: false, message: actionErrorMessage(error, "Failed to create Estimate") };
   }
 }
 
@@ -767,7 +768,7 @@ export async function recordKachaInvoicePayment(
     return { success: true, message: "Payment recorded" };
   } catch (error) {
     logger.error("recordKachaInvoicePayment error", error);
-    return { success: false, message: "Failed to record payment" };
+    return { success: false, message: actionErrorMessage(error, "Failed to record payment") };
   }
 }
 
@@ -908,7 +909,7 @@ export async function convertKachaToPakka(
     };
   } catch (error) {
     logger.error("convertKachaToPakka error", error);
-    return { success: false, message: "Failed to convert to Tax Invoice" };
+    return { success: false, message: actionErrorMessage(error, "Failed to convert to Tax Invoice") };
   }
 }
 
@@ -940,7 +941,7 @@ export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormSt
     return { success: true, message: "Estimate deleted" };
   } catch (error) {
     logger.error("deleteKachaInvoice error", error);
-    return { success: false, message: "Failed to delete Estimate" };
+    return { success: false, message: actionErrorMessage(error, "Failed to delete Estimate") };
   }
 }
 
@@ -1374,7 +1375,7 @@ export async function importKachaInvoicesFromExcel(
     };
   } catch (error) {
     logger.error("importKachaInvoicesFromExcel error", error);
-    return { success: false, message: "Failed to import Estimates." };
+    return { success: false, message: actionErrorMessage(error, "Failed to import Estimates.") };
   }
 }
 
@@ -1590,7 +1591,7 @@ export async function deleteAllKachaInvoices(
     logger.error("deleteAllKachaInvoices error", error);
     return {
       success: false,
-      message: "Failed to delete Estimates. No slips were deleted.",
+      message: actionErrorMessage(error, "Failed to delete Estimates. No slips were deleted."),
     };
   }
 }
@@ -1647,6 +1648,6 @@ export async function emailKachaInvoiceAction(
     return { success: result.sent, message: result.message };
   } catch (error) {
     logger.error("emailKachaInvoiceAction error", error);
-    return { success: false, message: "Failed to email Estimate" };
+    return { success: false, message: actionErrorMessage(error, "Failed to email Estimate") };
   }
 }

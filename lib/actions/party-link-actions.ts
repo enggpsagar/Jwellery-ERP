@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
+import { actionErrorMessage } from "@/lib/action-error";
 import { logger } from "@/lib/logger";
 
 export type LinkActionResult = {
@@ -93,7 +94,7 @@ export async function linkVendorToCustomer(
       return { success: false, message: "This vendor is already linked to a different party" }
     }
     logger.error("linkVendorToCustomer error", error)
-    return { success: false, message: "Failed to link vendor" }
+    return { success: false, message: actionErrorMessage(error, "Failed to link vendor") }
   }
 }
 
@@ -123,7 +124,7 @@ export async function unlinkCustomerVendor(customerId: string): Promise<LinkActi
     return { success: true, message: "Vendor link removed" }
   } catch (error) {
     logger.error("unlinkCustomerVendor error", error)
-    return { success: false, message: "Failed to remove the link" }
+    return { success: false, message: actionErrorMessage(error, "Failed to remove the link") }
   }
 }
 
@@ -184,7 +185,7 @@ export async function createLinkedVendorFromCustomer(customerId: string): Promis
     }
   } catch (error) {
     logger.error("createLinkedVendorFromCustomer error", error)
-    return { success: false, message: "Failed to register as a vendor" }
+    return { success: false, message: actionErrorMessage(error, "Failed to register as a vendor") }
   }
 }
 
@@ -257,6 +258,6 @@ export async function createLinkedCustomerFromVendor(vendorId: string): Promise<
       }
     }
     logger.error("createLinkedCustomerFromVendor error", error)
-    return { success: false, message: "Failed to register as a party" }
+    return { success: false, message: actionErrorMessage(error, "Failed to register as a party") }
   }
 }

@@ -6,7 +6,7 @@ import {
   getLedgerEntries,
   getMetalDailyLedger,
 } from "@/lib/actions/ledger-actions"
-import { requireStoreScope, assertPlanActiveForExport } from "@/lib/store-context"
+import { requireStoreScope, assertPlanActiveForExport, PlanExpiredError } from "@/lib/store-context"
 import { buildCsvExport, buildExcelExport } from "@/lib/excel-export"
 import { logger } from "@/lib/logger";
 
@@ -80,6 +80,9 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
+    if (error instanceof PlanExpiredError) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 403 })
+    }
     logger.error("Ledger export failed", error)
     return NextResponse.json(
       { success: false, message: "Failed to export ledger" },

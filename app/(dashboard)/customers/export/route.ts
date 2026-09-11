@@ -4,7 +4,7 @@ export const runtime = "nodejs"
 import { NextRequest, NextResponse } from "next/server"
 import * as XLSX from "xlsx"
 import { prisma } from "@/lib/prisma"
-import { requireStoreScope, assertPlanActiveForExport } from "@/lib/store-context"
+import { requireStoreScope, assertPlanActiveForExport, PlanExpiredError } from "@/lib/store-context"
 import { formatShortDate } from "@/lib/utils"
 import { logger } from "@/lib/logger";
 
@@ -185,6 +185,9 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
+    if (error instanceof PlanExpiredError) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 403 })
+    }
     logger.error("Customer export failed", error)
     return NextResponse.json(
       { success: false, message: "Failed to export parties" },

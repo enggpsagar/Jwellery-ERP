@@ -15,6 +15,7 @@ import {
 import { prisma } from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth/auth"
 import { requireStoreScope } from "@/lib/store-context"
+import { actionErrorMessage } from "@/lib/action-error";
 import {
   getLocationScope,
   locationWhere,
@@ -374,7 +375,7 @@ export async function exportInventoryStockToExcel(
     logger.error("exportInventoryStockToExcel error", error)
     return {
       success: false,
-      message: "Failed to export stock.",
+      message: actionErrorMessage(error, "Failed to export stock."),
     }
   }
 }
@@ -791,7 +792,7 @@ export async function createInventoryStock(
     logger.error("createInventoryStock error", error)
     return {
       success: false,
-      message: "Failed to add stock",
+      message: actionErrorMessage(error, "Failed to add stock"),
       errors: {},
     }
   }
@@ -1112,7 +1113,7 @@ export async function updateInventoryStock(
     logger.error("updateInventoryStock error", error)
     return {
       success: false,
-      message: "Failed to update stock",
+      message: actionErrorMessage(error, "Failed to update stock"),
       errors: {},
     }
   }
@@ -1179,7 +1180,7 @@ export async function deleteInventoryStock(id: string): Promise<StockFormState> 
     logger.error("deleteInventoryStock error", error)
     return {
       success: false,
-      message: "Failed to delete stock",
+      message: actionErrorMessage(error, "Failed to delete stock"),
       errors: {},
     }
   }
@@ -1425,6 +1426,6 @@ export async function importInventoryStockFromExcel(
     }
   } catch (error) {
     logger.error("importInventoryStockFromExcel error", error)
-    return { success: false, message: "Failed to import stock." }
+    return { success: false, message: actionErrorMessage(error, "Failed to import stock.") }
   }
 }

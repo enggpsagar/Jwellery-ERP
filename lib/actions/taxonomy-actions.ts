@@ -5,6 +5,7 @@ import { UserRole, WeightUnit } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
 
@@ -192,7 +193,7 @@ export async function upsertStoreMetal(
       };
     }
     logger.error("upsertStoreMetal error", error);
-    return { success: false, message: "Failed to save metal" };
+    return { success: false, message: actionErrorMessage(error, "Failed to save metal") };
   }
 }
 
@@ -229,7 +230,7 @@ export async function toggleStoreMetalActive(
     };
   } catch (error) {
     logger.error("toggleStoreMetalActive error", error);
-    return { success: false, message: "Failed to update metal" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update metal") };
   }
 }
 
@@ -296,7 +297,7 @@ export async function deleteStoreMetal(id: string): Promise<TaxonomyFormState> {
     return { success: true, message: "Metal type deleted" };
   } catch (error) {
     logger.error("deleteStoreMetal error", error);
-    return { success: false, message: "Failed to delete metal type" };
+    return { success: false, message: actionErrorMessage(error, "Failed to delete metal type") };
   }
 }
 
@@ -447,7 +448,7 @@ export async function upsertStoreMetalOrigin(
       };
     }
     logger.error("upsertStoreMetalOrigin error", error);
-    return { success: false, message: "Failed to save Stone Type" };
+    return { success: false, message: actionErrorMessage(error, "Failed to save Stone Type") };
   }
 }
 
@@ -484,7 +485,7 @@ export async function toggleStoreMetalOriginActive(
     };
   } catch (error) {
     logger.error("toggleStoreMetalOriginActive error", error);
-    return { success: false, message: "Failed to update Stone Type" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update Stone Type") };
   }
 }
 
@@ -518,7 +519,7 @@ export async function deleteStoreMetalOrigin(id: string): Promise<TaxonomyFormSt
     return { success: true, message: "Stone Type deleted" };
   } catch (error) {
     logger.error("deleteStoreMetalOrigin error", error);
-    return { success: false, message: "Failed to delete Stone Type" };
+    return { success: false, message: actionErrorMessage(error, "Failed to delete Stone Type") };
   }
 }
 
@@ -618,7 +619,7 @@ export async function upsertStoreCategory(
       };
     }
     logger.error("upsertStoreCategory error", error);
-    return { success: false, message: "Failed to save category" };
+    return { success: false, message: actionErrorMessage(error, "Failed to save category") };
   }
 }
 
@@ -655,7 +656,7 @@ export async function toggleStoreCategoryActive(
     };
   } catch (error) {
     logger.error("toggleStoreCategoryActive error", error);
-    return { success: false, message: "Failed to update category" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update category") };
   }
 }
 
@@ -702,7 +703,7 @@ export async function deleteStoreCategory(id: string): Promise<TaxonomyFormState
     return { success: true, message: "Category deleted" };
   } catch (error) {
     logger.error("deleteStoreCategory error", error);
-    return { success: false, message: "Failed to delete category" };
+    return { success: false, message: actionErrorMessage(error, "Failed to delete category") };
   }
 }
 
@@ -823,7 +824,7 @@ export async function upsertStoreCategoryType(
       };
     }
     logger.error("upsertStoreCategoryType error", error);
-    return { success: false, message: "Failed to save type" };
+    return { success: false, message: actionErrorMessage(error, "Failed to save type") };
   }
 }
 
@@ -860,7 +861,7 @@ export async function toggleStoreCategoryTypeActive(
     };
   } catch (error) {
     logger.error("toggleStoreCategoryTypeActive error", error);
-    return { success: false, message: "Failed to update type" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update type") };
   }
 }
 
@@ -894,6 +895,6 @@ export async function deleteStoreCategoryType(id: string): Promise<TaxonomyFormS
     return { success: true, message: "Type deleted" };
   } catch (error) {
     logger.error("deleteStoreCategoryType error", error);
-    return { success: false, message: "Failed to delete type" };
+    return { success: false, message: actionErrorMessage(error, "Failed to delete type") };
   }
 }

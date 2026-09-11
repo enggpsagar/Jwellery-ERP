@@ -18,6 +18,7 @@ import { computeRoundOff } from "@/lib/round-off";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import {
   getLocationScope,
@@ -356,7 +357,7 @@ export async function exportQuotationsToExcel(
     };
   } catch (error) {
     logger.error("exportQuotationsToExcel error", error);
-    return { success: false, message: "Failed to export quotations." };
+    return { success: false, message: actionErrorMessage(error, "Failed to export quotations.") };
   }
 }
 
@@ -628,7 +629,7 @@ export async function createQuotation(
     };
   } catch (error) {
     logger.error("createQuotation error", error);
-    return { success: false, message: "Failed to create quotation" };
+    return { success: false, message: actionErrorMessage(error, "Failed to create quotation") };
   }
 }
 
@@ -678,7 +679,7 @@ export async function updateQuotation(
     return { success: true, message: "Quotation updated" };
   } catch (error) {
     logger.error("updateQuotation error", error);
-    return { success: false, message: "Failed to update quotation" };
+    return { success: false, message: actionErrorMessage(error, "Failed to update quotation") };
   }
 }
 
@@ -712,7 +713,7 @@ export async function deleteQuotation(id: string): Promise<QuotationFormState> {
     return { success: true, message: "Quotation deleted" };
   } catch (error) {
     logger.error("deleteQuotation error", error);
-    return { success: false, message: "Failed to delete quotation" };
+    return { success: false, message: actionErrorMessage(error, "Failed to delete quotation") };
   }
 }
 
@@ -967,6 +968,6 @@ export async function convertQuotationToInvoice(
     };
   } catch (error) {
     logger.error("convertQuotationToInvoice error", error);
-    return { success: false, message: "Failed to convert quotation to invoice" };
+    return { success: false, message: actionErrorMessage(error, "Failed to convert quotation to invoice") };
   }
 }

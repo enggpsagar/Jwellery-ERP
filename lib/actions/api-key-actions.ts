@@ -6,6 +6,7 @@ import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole, getCurrentUser } from "@/lib/auth/auth";
 import { generateApiKey } from "@/lib/auth/api-key";
 import { PERMISSIONS, type Permission } from "@/lib/permissions";
@@ -102,7 +103,7 @@ export async function createApiKey(
     return { success: true, message: "API key created", rawKey: raw };
   } catch (error) {
     logger.error("createApiKey error", error);
-    return { success: false, message: "Failed to create API key" };
+    return { success: false, message: actionErrorMessage(error, "Failed to create API key") };
   }
 }
 
@@ -126,6 +127,6 @@ export async function revokeApiKey(
     return { success: true, message: "API key revoked" };
   } catch (error) {
     logger.error("revokeApiKey error", error);
-    return { success: false, message: "Failed to revoke API key" };
+    return { success: false, message: actionErrorMessage(error, "Failed to revoke API key") };
   }
 }

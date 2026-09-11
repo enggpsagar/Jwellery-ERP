@@ -14,10 +14,25 @@ import {
   type StoreMembership,
 } from "@/lib/store-membership";
 
+import { EXPIRED_PLAN_MESSAGE } from "@/lib/plan-messages";
+
 export const ACTIVE_STORE_COOKIE = "active_store_id";
 
-export const EXPIRED_PLAN_MESSAGE =
-  "This store's plan has expired. Contact your administrator to renew.";
+export { EXPIRED_PLAN_MESSAGE };
+
+/**
+ * Thrown by assertPlanActiveForMutation/assertPlanActiveForExport instead of
+ * a plain Error so a catch block can distinguish "the plan expired" (a
+ * message that should reach the user verbatim, with an Upgrade Plan link)
+ * from a genuinely unexpected failure (which shouldn't leak its detail) —
+ * mirrors this codebase's existing OversellError convention.
+ */
+export class PlanExpiredError extends Error {
+  constructor() {
+    super(EXPIRED_PLAN_MESSAGE);
+    this.name = "PlanExpiredError";
+  }
+}
 
 export type { StoreMembership };
 
@@ -63,7 +78,7 @@ async function isStorePlanExpired(storeId: string): Promise<boolean> {
 async function assertPlanActiveForMutation(storeId: string): Promise<void> {
   if (!(await isMutationRequest())) return;
   if (await isStorePlanExpired(storeId)) {
-    throw new Error(EXPIRED_PLAN_MESSAGE);
+    throw new PlanExpiredError();
   }
 }
 
@@ -78,7 +93,7 @@ async function assertPlanActiveForMutation(storeId: string): Promise<void> {
  */
 export async function assertPlanActiveForExport(storeId: string): Promise<void> {
   if (await isStorePlanExpired(storeId)) {
-    throw new Error(EXPIRED_PLAN_MESSAGE);
+    throw new PlanExpiredError();
   }
 }
 

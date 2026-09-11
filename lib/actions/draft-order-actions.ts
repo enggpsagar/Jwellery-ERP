@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { PurityType, LedgerEntryType, LedgerSourceType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
@@ -329,7 +329,7 @@ export type DraftOrderDetail = DraftOrderRow & {
 };
 
 export async function getDraftOrderById(id: string): Promise<DraftOrderDetail | null> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const order = await prisma.draftOrder.findFirst({
     where: { id, storeId },

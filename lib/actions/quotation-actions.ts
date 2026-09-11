@@ -17,7 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { computeRoundOff } from "@/lib/round-off";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import {
@@ -362,7 +362,7 @@ export async function exportQuotationsToExcel(
 }
 
 export async function getQuotationById(id: string) {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const quotation = await prisma.quotation.findFirst({
     where: { id, storeId },

@@ -18,7 +18,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst";
 import { computeRoundOff } from "@/lib/round-off";
@@ -513,7 +513,7 @@ export async function exportPurchasesToExcel(
 }
 
 export async function getPurchaseById(id: string) {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const purchase = await prisma.purchase.findFirst({
     where: { id, storeId },

@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache"
 
 import { prisma } from "@/lib/prisma"
-import { requireStoreScope } from "@/lib/store-context"
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context"
 import { actionErrorMessage } from "@/lib/action-error";
 import { logger } from "@/lib/logger";
 
@@ -30,7 +30,7 @@ export type LinkableOption = {
  * archived away would surface a dead-end relationship.
  */
 export async function getLinkableVendors(): Promise<LinkableOption[]> {
-  const storeId = await requireStoreScope()
+  const storeId = await getStoreIdForRead()
 
   const vendors = await prisma.vendor.findMany({
     where: { storeId, isArchived: false, linkedCustomer: null },
@@ -44,7 +44,7 @@ export async function getLinkableVendors(): Promise<LinkableOption[]> {
 /** Mirrors getLinkableVendors for the "Link to existing Customer" picker on
  *  a Vendor's detail page. */
 export async function getLinkableCustomers(): Promise<LinkableOption[]> {
-  const storeId = await requireStoreScope()
+  const storeId = await getStoreIdForRead()
 
   const customers = await prisma.customer.findMany({
     where: { storeId, isArchived: false, linkedVendorId: null },

@@ -8,7 +8,7 @@ import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth/auth";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { logger } from "@/lib/logger";
 
@@ -60,7 +60,7 @@ export type CollaborationCodeSettings = {
  */
 export async function getCollaborationCodeSettings(): Promise<CollaborationCodeSettings> {
   await requireRole(UserRole.ADMIN);
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const store = await prisma.store.findUniqueOrThrow({
     where: { id: storeId },

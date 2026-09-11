@@ -16,7 +16,7 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { computeRoundOff } from "@/lib/round-off";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import {
   getLocationScope,
@@ -988,7 +988,7 @@ export async function getKachaImportTemplate(): Promise<{
   fileName: string;
   fileBase64: string;
 }> {
-  await requireStoreScope();
+  await getStoreIdForRead();
 
   const example = {
     "Slip Ref": "A1",
@@ -1393,7 +1393,7 @@ export async function getKachaDeleteAllSummary(selectedIds?: string[]): Promise<
   withPayments: number;
   backupEmail: string | null;
 }> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   // An explicit selection narrows every count; without one this describes
   // the whole store, as before.

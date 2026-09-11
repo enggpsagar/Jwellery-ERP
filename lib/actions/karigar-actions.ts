@@ -4,7 +4,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getLocationScope, locationWhere, type LocationScope } from "@/lib/location-scope";
 import { UserRole, UserStatus, type PartyGstType } from "@prisma/client";
@@ -292,7 +292,7 @@ export async function getKarigarDetailBundle(id: string): Promise<KarigarDetailB
   const karigar = await getKarigarById(id);
   if (!karigar) return null;
 
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
   const scope = await getLocationScope();
 
   const [ledger, metals, locations, defaultLocationId, openJobsRaw, materialCounts] = await Promise.all([

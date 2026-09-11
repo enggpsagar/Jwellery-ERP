@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { UserRole, WeightUnit } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
@@ -337,7 +337,7 @@ export async function getAllStoreMetalOrigins(): Promise<StoreMetalOriginRow[]> 
 export async function getStoreMetalOrigins(
   storeMetalId: string,
 ): Promise<StoreMetalOriginRow[]> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   if (!storeMetalId) return [];
 
@@ -714,7 +714,7 @@ export async function deleteStoreCategory(id: string): Promise<TaxonomyFormState
 export async function getStoreCategoryTypes(
   categoryId: string,
 ): Promise<StoreCategoryTypeRow[]> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   if (!categoryId) return [];
 

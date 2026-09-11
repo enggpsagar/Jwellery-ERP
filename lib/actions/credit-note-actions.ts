@@ -13,7 +13,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { getReturnEligibility, type ReturnEligibility } from "@/lib/return-window";
@@ -125,7 +125,7 @@ export async function getInvoiceReturnEligibility(invoiceDate: Date | string): P
 
 /** Line items on this invoice that still have something left to return — feeds the Return Items dialog. */
 export async function getReturnableInvoiceItems(invoiceId: string): Promise<ReturnableInvoiceItem[] | null> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
   const invoice = await prisma.invoice.findFirst({
     where: { id: invoiceId, storeId },
     include: { items: true },
@@ -207,7 +207,7 @@ const CREDIT_NOTE_INCLUDE = {
 } as const;
 
 export async function getCreditNoteById(id: string): Promise<CreditNoteView | null> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
   const creditNote = await prisma.creditNote.findFirst({
     where: { id, storeId },
     include: CREDIT_NOTE_INCLUDE,
@@ -218,7 +218,7 @@ export async function getCreditNoteById(id: string): Promise<CreditNoteView | nu
 
 /** Every credit note raised against one invoice — shown on the invoice detail page. */
 export async function getCreditNotesForInvoice(invoiceId: string): Promise<CreditNoteView[]> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
   const creditNotes = await prisma.creditNote.findMany({
     where: { invoiceId, storeId },
     orderBy: { creditNoteDate: "desc" },

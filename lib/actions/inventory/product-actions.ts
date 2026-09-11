@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ChargeType, PurityType, TargetStyle, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scope";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
@@ -456,7 +456,7 @@ export async function exportProductsToExcel(
 }
 
 export async function getProductById(id: string) {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const product = await prisma.product.findFirst({
     where: { id, storeId },

@@ -4,7 +4,7 @@
 import { InventoryStockStatus, InvoiceStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
 import { formatShortDateTime } from "@/lib/utils";
 
@@ -340,7 +340,7 @@ const UNSPECIFIED_METAL = "Unspecified";
 export async function getSalesTrend(
   period: SalesTrendPeriod = "monthly"
 ): Promise<SalesTrend> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
   const scope = await getLocationScope();
   const now = new Date();
   const buckets = salesTrendBuckets(period, now);
@@ -583,7 +583,7 @@ function subBucketIndexFor(period: SalesTrendPeriod, periodStart: Date, date: Da
 export async function getSalesBreakdown(
   period: SalesTrendPeriod = "daily"
 ): Promise<SalesBreakdown> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
   const scope = await getLocationScope();
   const now = new Date();
 
@@ -733,7 +733,7 @@ function revenueByMetalPeriodStart(period: RevenueByMetalPeriod, now: Date): Dat
 export async function getRevenueByCategory(
   period: RevenueByMetalPeriod = "monthly"
 ): Promise<RevenueByMetal> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
   const scope = await getLocationScope();
   const now = new Date();
   const rangeStart = revenueByMetalPeriodStart(period, now);
@@ -806,7 +806,7 @@ export async function getRecentTransactions(
   period: RecentTransactionsPeriod = "daily",
   limit = 6
 ): Promise<DashboardTransaction[]> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
   const scope = await getLocationScope();
   const rangeStart = recentTransactionsPeriodStart(period, new Date());
   const invoices = await prisma.invoice.findMany({

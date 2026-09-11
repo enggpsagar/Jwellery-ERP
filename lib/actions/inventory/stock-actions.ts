@@ -1241,7 +1241,7 @@ export async function getStockImportTemplate(): Promise<{
   fileName: string
   fileBase64: string
 }> {
-  await requireStoreScope()
+  await getStoreIdForRead()
 
   const example = {
     "Product Code": "PRD-0001",

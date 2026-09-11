@@ -149,11 +149,23 @@ export default async function DashboardLayout({
     activeStoreId
       ? prisma.store.findUnique({
           where: { id: activeStoreId },
-          select: { name: true, businessSettings: { select: { logoUrl: true } } },
+          select: {
+            name: true,
+            planExpiresAt: true,
+            businessSettings: { select: { logoUrl: true } },
+          },
         })
       : Promise.resolve(null),
     getSidebarCounts(activeStoreId, session.user.role),
   ]);
+
+  // Resolved fresh on every layout render, not read off the session token —
+  // see lib/store-context.ts's EXPIRED_PLAN_MESSAGE doc comment for why the
+  // JWT can't be trusted for this (it's signed once at login and never
+  // re-signed for the life of the session).
+  const isPlanExpired = Boolean(
+    storeBranding?.planExpiresAt && storeBranding.planExpiresAt < new Date()
+  );
 
   return (
     <SidebarProvider>
@@ -168,6 +180,7 @@ export default async function DashboardLayout({
           stores={stores}
           activeStoreId={activeStoreId}
           canSwitchStores={isSuperAdmin || stores.length > 1}
+          planExpired={isPlanExpired}
         />
 
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50 p-6">

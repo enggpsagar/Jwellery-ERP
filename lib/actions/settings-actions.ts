@@ -4,7 +4,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { UserRole, GstScheme, SkuFormat, PrintLayout, InvoiceTemplate } from "@prisma/client";
-import { requireStoreScope } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { MONEY_UNIT } from "@/lib/business-units";
@@ -157,7 +157,7 @@ async function parseBusinessUnits(formData: FormData): Promise<string[]> {
  * one on first access so the form always has something to render.
  */
 export async function getBusinessSettings(): Promise<BusinessSettings> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   let settings = await prisma.businessSettings.findUnique({
     where: { storeId },

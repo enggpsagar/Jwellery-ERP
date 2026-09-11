@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 import { LedgerEntryType } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
-import { requireStoreScope } from "@/lib/store-context"
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context"
 import { actionErrorMessage } from "@/lib/action-error";
 import { formatLedgerSource } from "@/lib/ledger-format"
 import { sendMail } from "@/lib/mailer"
@@ -77,7 +77,7 @@ function formatDate(date?: Date | null) {
 export async function getCustomerLedgerEntries(
   customerId: string
 ): Promise<CustomerLedgerEntryItem[]> {
-  const storeId = await requireStoreScope()
+  const storeId = await getStoreIdForRead()
 
   const entries = await prisma.ledgerEntry.findMany({
     where: { customerId, storeId },
@@ -119,7 +119,7 @@ export async function getCustomerLedgerEntries(
 export async function getCustomerLedgerSummary(
   customerId: string
 ): Promise<CustomerLedgerSummary | null> {
-  const storeId = await requireStoreScope()
+  const storeId = await getStoreIdForRead()
 
   const customer = await prisma.customer.findFirst({
     where: { id: customerId, storeId },

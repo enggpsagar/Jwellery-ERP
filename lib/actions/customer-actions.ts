@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 import { PartyGstType } from "@prisma/client"
 import { partyGstTypeLabel } from "@/lib/gst"
 import { prisma } from "@/lib/prisma"
-import { requireStoreScope } from "@/lib/store-context"
+import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context"
 import { actionErrorMessage } from "@/lib/action-error";
 import { getCurrentUser } from "@/lib/auth/auth"
 import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export"
@@ -89,7 +89,7 @@ export async function getCustomers(
 }
 
 export async function getCustomerById(id: string): Promise<Customer | null> {
-  const storeId = await requireStoreScope()
+  const storeId = await getStoreIdForRead()
   return getCustomerByIdCore(id, storeId)
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, ChevronDown, LogOut } from "lucide-react";
+import { Plus, ChevronDown, LogOut, AlertTriangle } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 
@@ -35,12 +35,16 @@ type TopBarProps = {
   activeStoreId?: string | null;
   /** Super Admin, or anyone holding more than one store membership. */
   canSwitchStores?: boolean;
+  /** The active store's plan has expired — resolved server-side (never off
+   * the session token, which is frozen for the life of the login). */
+  planExpired?: boolean;
 };
 
 export function TopBar({
   stores = [],
   activeStoreId = null,
   canSwitchStores = false,
+  planExpired = false,
 }: TopBarProps) {
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
@@ -90,6 +94,17 @@ export function TopBar({
           one store. A single-store user has nothing to choose. */}
       {canSwitchStores && stores.length > 0 && (
         <StoreSwitcher stores={stores} activeStoreId={activeStoreId} />
+      )}
+
+      {planExpired && (
+        <Link
+          href="/my-plan"
+          className="flex items-center gap-2 rounded-full border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span className="hidden sm:inline">Your plan has expired —</span>
+          <span className="underline underline-offset-2">Renew now</span>
+        </Link>
       )}
 
       <div className="ml-auto flex items-center gap-1.5">

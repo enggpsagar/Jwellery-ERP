@@ -19,7 +19,7 @@ import { prisma } from "@/lib/prisma";
 import { computeRoundOff } from "@/lib/round-off";
 import { requirePermission, requirePermissionInStore } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
-import { requireStoreScope, resolveActingStoreId } from "@/lib/store-context";
+import { requireStoreScope, resolveActingStoreId, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import {
   getLocationScope,
@@ -546,7 +546,7 @@ export async function exportInvoicesToExcel(
 }
 
 export async function getInvoiceById(id: string) {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const invoice = await prisma.invoice.findFirst({
     where: { id, storeId },
@@ -624,7 +624,7 @@ export type CustomerReturnableInvoices = {
 export async function getCustomerReturnableInvoices(
   customerId: string,
 ): Promise<CustomerReturnableInvoices> {
-  const storeId = await requireStoreScope();
+  const storeId = await getStoreIdForRead();
 
   const [invoices, settings] = await Promise.all([
     prisma.invoice.findMany({

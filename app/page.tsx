@@ -25,7 +25,9 @@ import {
 
 import { authOptions } from "@/lib/auth/auth-options"
 import { APP_NAME } from "@/lib/constants/app"
+import { getStates } from "@/lib/actions/location-actions"
 import { Button } from "@/components/ui/button"
+import { RegisterStoreForm } from "@/components/auth/register-store-form"
 
 export const metadata: Metadata = {
   title: "Home",
@@ -268,6 +270,8 @@ export default async function LandingPage() {
     redirect("/dashboard")
   }
 
+  const states = await getStates()
+
   return (
     <div className="min-h-svh bg-background">
       {/* ---------------- nav ---------------- */}
@@ -290,7 +294,7 @@ export default async function LandingPage() {
               <Link href="/contact">Contact Us</Link>
             </Button>
             <Button asChild variant="ghost" className="hidden sm:inline-flex">
-              <Link href="/register">Register your store</Link>
+              <Link href="#register">Register your store</Link>
             </Button>
 
             <Button
@@ -353,7 +357,7 @@ export default async function LandingPage() {
               </Button>
 
               <Button asChild size="lg" variant="outline">
-                <Link href="/register">Register your store — free trial</Link>
+                <Link href="#register">Register your store — free trial</Link>
               </Button>
             </div>
 
@@ -373,6 +377,29 @@ export default async function LandingPage() {
             </dl>
           </div>
 
+          {/* Registration lives right here rather than behind a link to
+              /register (which still exists as a direct deep link — e.g. the
+              login page's "New here?" links there) — someone reading the
+              pitch can act on it without losing this page. */}
+          <div id="register" className="scroll-mt-20">
+            <RegisterStoreForm states={states} />
+          </div>
+        </div>
+      </section>
+
+      {/* ---------------- dashboard preview ---------------- */}
+      <section className="border-b py-16 lg:py-24">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
+          <h2 className="text-3xl font-semibold tracking-tight text-balance">
+            Your dashboard, from day one
+          </h2>
+          <p className="mt-3 text-muted-foreground">
+            The moment your shop is set up, this is what you open — today's
+            sales, gold on hand and revenue by category, already there.
+          </p>
+        </div>
+
+        <div className="mx-auto mt-10 max-w-xl px-4 sm:px-6">
           <AppPreview />
         </div>
       </section>
@@ -522,7 +549,7 @@ export default async function LandingPage() {
               size="lg"
               className="bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
             >
-              <Link href="/register">Register your store</Link>
+              <Link href="#register">Register your store</Link>
             </Button>
 
             <Button asChild size="lg" variant="outline">
@@ -550,7 +577,7 @@ export default async function LandingPage() {
             <Link href="/contact" className="hover:text-foreground">
               Contact Us
             </Link>
-            <Link href="/register" className="hover:text-foreground">
+            <Link href="#register" className="hover:text-foreground">
               Register
             </Link>
             <Link href="/login" className="hover:text-foreground">

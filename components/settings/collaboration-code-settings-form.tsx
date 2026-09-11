@@ -118,6 +118,7 @@ export function CollaborationCodeSettingsForm({
                 type="button"
                 size="sm"
                 variant="outline"
+                className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
                 onClick={handleCopy}
                 aria-label="Copy code"
                 title="Copy code"

@@ -62,7 +62,8 @@ export function EditDraftOrderDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
-          className="gap-2 bg-[var(--chart-4)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-4)_88%,black)]"
+          variant="outline"
+          className="gap-2 border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
           title="Edit Order"
         >
           <Pencil className="h-4 w-4" />

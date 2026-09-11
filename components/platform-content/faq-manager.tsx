@@ -157,7 +157,7 @@ export function FaqManager({ faqs }: { faqs: PlatformFaqRow[] }) {
               <button
                 type="button"
                 onClick={() => setEditingId(faq.id)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-primary/10 text-primary transition hover:bg-primary/20"
                 aria-label={`Edit ${faq.question}`}
                 title="Edit FAQ"
               >

@@ -294,11 +294,12 @@ export function DataTableToolbar({
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
+              variant="outline"
               size="icon"
               disabled={isExporting}
               title={hasSelection ? `Export selected ${entityLabel} (${selectedIds!.length})` : `Export ${entityLabel}`}
               aria-label={hasSelection ? `Export selected ${entityLabel} (${selectedIds!.length})` : `Export ${entityLabel}`}
-              className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
+              className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
             >
               {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}
             </Button>

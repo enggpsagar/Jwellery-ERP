@@ -106,7 +106,8 @@ export function ShareWhatsAppButton({
       disabled={!digits || loading}
       title={!digits ? "This party has no phone number on file" : "Share on WhatsApp"}
       aria-label="Share on WhatsApp"
-      className="bg-[var(--chart-3)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-3)_88%,black)]"
+      variant="outline"
+      className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
     >
       {loading ? <Loader className="h-4 w-4" /> : <WhatsAppIcon className="h-4 w-4" />}
     </Button>

@@ -24,7 +24,12 @@ export function EmailKachaInvoiceButton({ kachaInvoiceId }: { kachaInvoiceId: st
   }
 
   return (
-    <Button variant="outline" onClick={handleClick} disabled={pending}>
+    <Button
+      variant="outline"
+      className="border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+      onClick={handleClick}
+      disabled={pending}
+    >
       {pending ? (
         <Loader className="h-4 w-4 mr-1" />
       ) : (

@@ -203,6 +203,17 @@ function mapVendor(vendor: any): Vendor {
       ? formatDate(vendor.ledgerEntries[0].entryDate)
       : "-"
 
+  // Reverse of the Customer side's sign: a Purchase is CREDIT (increases
+  // what we owe the vendor) and a Payment made is DEBIT (reduces it) —
+  // confirmed against real ledger rows (PURCHASE sourceType always CREDIT,
+  // PAYMENT_OUT always DEBIT). This used to just copy openingBalance
+  // straight through, same bug as the Customer side's currentBalance.
+  const ledgerBalanceDelta = vendor.ledgerEntries.reduce(
+    (sum: number, entry: any) =>
+      sum + (entry.type === "CREDIT" ? Number(entry.amount ?? 0) : -Number(entry.amount ?? 0)),
+    0,
+  )
+
   return {
     id: vendor.id,
     name: vendor.name,
@@ -215,14 +226,18 @@ function mapVendor(vendor: any): Vendor {
     pincode: vendor.pincode ?? "",
     vendorType: "",
     openingBalance: Number(vendor.openingBalance ?? 0),
-    // Was hardcoded to openingBalance alone — see pendingAmountNumber's own
-    // comment above; this is the same fix (the CSV export's "Current
-    // Balance" column reads this field).
-    currentBalance: pendingAmountNumber,
+    // Ledger-derived (opening balance + CREDIT total - DEBIT total) rather
+    // than pendingAmountNumber above — see mapCustomer's own comment on the
+    // same tradeoff (customer.ts): this is the account's actual running
+    // balance from full transaction history, correct even where a cached
+    // Purchase.balanceAmount write path might not be. pendingAmountNumber
+    // (unpaid Purchases + opening) remains right for "which purchases are
+    // still open," used by the Payment Out picker.
+    currentBalance: Number(vendor.openingBalance ?? 0) + ledgerBalanceDelta,
     // Was hardcoded to "Payable" for every vendor regardless of sign — a
-    // vendor the store has overpaid (pendingAmountNumber < 0) is owed
-    // nothing further; the store is instead owed a refund/credit.
-    balanceType: pendingAmountNumber < 0 ? "Advance" : "Payable",
+    // vendor the store has overpaid (currentBalance < 0) is owed nothing
+    // further; the store is instead owed a refund/credit.
+    balanceType: Number(vendor.openingBalance ?? 0) + ledgerBalanceDelta < 0 ? "Advance" : "Payable",
     goldBalance: 0,
     silverBalance: 0,
     creditLimit: "",
@@ -305,6 +320,7 @@ export async function getVendors(
           select: {
             id: true,
             amount: true,
+            type: true,
             entryDate: true,
           },
           orderBy: {
@@ -353,6 +369,7 @@ export async function getVendorById(id: string): Promise<Vendor | null> {
         select: {
           id: true,
           amount: true,
+          type: true,
           entryDate: true,
         },
         orderBy: {
@@ -434,6 +451,7 @@ async function getAllVendorsForExport(
         select: {
           id: true,
           amount: true,
+          type: true,
           entryDate: true,
         },
         orderBy: {

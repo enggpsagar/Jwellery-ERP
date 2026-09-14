@@ -167,11 +167,22 @@ function toDecimal(value: number | null | undefined): Prisma.Decimal | undefined
 
 /**
  * Diamond items price per carat, not per gram — every other purity still
- * prices off netWeight. Duplicated per action file (same convention as the
+ * prices off netWeight. Net Weight/Carat Weight is a per-piece figure (see
+ * Product.defaultNetWeight and product-form.tsx's own "prefill" comment),
+ * so the actual priced quantity is that per-piece weight times how many
+ * pieces (item.quantity) — this used to ignore quantity entirely, pricing
+ * every line as if exactly one piece were being bought no matter what
+ * Quantity said. Duplicated per action file (same convention as the
  * generateXNumber helpers in this codebase) rather than a shared import.
  */
-function lineQuantity(item: { purity?: PurityType | null; netWeight?: number | null; caratWeight?: number | null }) {
-  return item.purity === PurityType.DIAMOND ? toNumber(item.caratWeight) : toNumber(item.netWeight);
+function lineQuantity(item: {
+  purity?: PurityType | null;
+  netWeight?: number | null;
+  caratWeight?: number | null;
+  quantity?: number | null;
+}) {
+  const perPiece = item.purity === PurityType.DIAMOND ? toNumber(item.caratWeight) : toNumber(item.netWeight);
+  return perPiece * (toNumber(item.quantity, 1) || 1);
 }
 
 // Pre-tax — this is also what feeds InventoryStock.purchaseAmount (the
@@ -925,8 +936,16 @@ export async function createPurchase(
       }
 
       // 4. Outstanding balance owed to the vendor — CREDIT (opposite
-      //    direction from a Sale's customer-owes-shop DEBIT).
-      if (balanceAmount > 0) {
+      //    direction from a Sale's customer-owes-shop DEBIT). Full
+      //    totalAmount, not balanceAmount — same fix and same reasoning as
+      //    invoice-actions.ts's createInvoice: crediting only the
+      //    net-of-paid-at-purchase balanceAmount while *also* debiting that
+      //    same paid-out amount (the loop below) double-counts it, making
+      //    the ledger balance too positive (i.e. understating what's owed
+      //    to the vendor) by the paid-at-purchase amount. Gated on
+      //    totalAmount so a fully-paid-at-purchase purchase still gets this
+      //    CREDIT to offset its own DEBIT rows.
+      if (totalAmount > 0) {
         await tx.ledgerEntry.create({
           data: {
             storeId,
@@ -934,7 +953,7 @@ export async function createPurchase(
             sourceType: LedgerSourceType.PURCHASE,
             vendorId,
             purchaseId: created.id,
-            amount: balanceAmount,
+            amount: totalAmount,
             description: `Purchase ${purchaseNumber} balance due`,
             locationId: resolvedLocationId ?? undefined,
           },

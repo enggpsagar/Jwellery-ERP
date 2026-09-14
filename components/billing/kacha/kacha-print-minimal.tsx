@@ -17,13 +17,14 @@ function fmt(value: number) {
 /** Same per-line qty/unit resolution as KachaPrintClassic's own — duplicated
  * per file rather than shared, matching this codebase's convention. */
 function lineQuantity(item: KachaInvoice["items"][number]) {
+  const pieces = item.quantity || 1
   if (item.purity === "DIAMOND" && item.caratWeight) {
-    return { qty: item.caratWeight, unit: "Ct" }
+    return { qty: item.caratWeight * pieces, unit: "Ct" }
   }
   if (item.netWeight && item.netWeight > 0) {
-    return { qty: item.netWeight, unit: "Gm" }
+    return { qty: item.netWeight * pieces, unit: "Gm" }
   }
-  return { qty: item.quantity || 1, unit: "Pcs" }
+  return { qty: pieces, unit: "Pcs" }
 }
 
 const STATUS_LABELS: Record<string, string> = {

@@ -132,11 +132,22 @@ function toChargeType(value: unknown): ChargeType {
 
 /**
  * Diamond items price per carat, not per gram — every other purity still
- * prices off netWeight. Duplicated per action file (same convention as the
+ * prices off netWeight. Net Weight/Carat Weight is a per-piece figure (see
+ * Product.defaultNetWeight and product-form.tsx's own "prefill" comment),
+ * so the actual priced quantity is that per-piece weight times how many
+ * pieces (item.quantity) — this used to ignore quantity entirely, pricing
+ * every line as if exactly one piece were being bought no matter what
+ * Quantity said. Duplicated per action file (same convention as the
  * generateXNumber helpers in this codebase) rather than a shared import.
  */
-function lineQuantity(item: { purity?: PurityType | null; netWeight?: number | null; caratWeight?: number | null }) {
-  return item.purity === PurityType.DIAMOND ? toNumber(item.caratWeight) : toNumber(item.netWeight);
+function lineQuantity(item: {
+  purity?: PurityType | null;
+  netWeight?: number | null;
+  caratWeight?: number | null;
+  quantity?: number | null;
+}) {
+  const perPiece = item.purity === PurityType.DIAMOND ? toNumber(item.caratWeight) : toNumber(item.netWeight);
+  return perPiece * (toNumber(item.quantity, 1) || 1);
 }
 
 function lineTotal(item: KachaInvoiceLineItemInput) {
@@ -659,14 +670,21 @@ export async function createKachaInvoice(
         });
       }
 
-      if (balanceAmount > 0) {
+      // DEBIT is the full totalAmount, not balanceAmount — same fix and same
+      // reasoning as invoice-actions.ts's createInvoice: debiting only the
+      // net-of-upfront-payment balanceAmount while *also* crediting that same
+      // upfront payment (the loop below) double-counts it, making the ledger
+      // balance too negative by the paid-at-creation amount. Gated on
+      // totalAmount so a fully-paid-at-creation estimate still gets this
+      // DEBIT to offset its own CREDIT rows.
+      if (totalAmount > 0) {
         await tx.ledgerEntry.create({
           data: {
             storeId,
             type: LedgerEntryType.DEBIT,
             sourceType: LedgerSourceType.SALE,
             customerId,
-            amount: balanceAmount,
+            amount: totalAmount,
             description: `Estimate ${slipNumber} balance due`,
             locationId: resolvedLocationId ?? undefined,
           },

@@ -80,11 +80,22 @@ function toChargeType(value: unknown): ChargeType {
 
 /**
  * Diamond items price per carat, not per gram — every other purity still
- * prices off netWeight. Duplicated per action file (same convention as the
+ * prices off netWeight. Net Weight/Carat Weight is a per-piece figure (see
+ * Product.defaultNetWeight and product-form.tsx's own "prefill" comment),
+ * so the actual priced quantity is that per-piece weight times how many
+ * pieces (item.quantity) — this used to ignore quantity entirely, pricing
+ * every line as if exactly one piece were being bought no matter what
+ * Quantity said. Duplicated per action file (same convention as the
  * generateXNumber helpers in this codebase) rather than a shared import.
  */
-function lineQuantity(item: { purity?: PurityType | null; netWeight?: number | null; caratWeight?: number | null }) {
-  return item.purity === PurityType.DIAMOND ? toNumber(item.caratWeight) : toNumber(item.netWeight);
+function lineQuantity(item: {
+  purity?: PurityType | null;
+  netWeight?: number | null;
+  caratWeight?: number | null;
+  quantity?: number | null;
+}) {
+  const perPiece = item.purity === PurityType.DIAMOND ? toNumber(item.caratWeight) : toNumber(item.netWeight);
+  return perPiece * (toNumber(item.quantity, 1) || 1);
 }
 
 function lineTotal(item: QuotationLineItemInput) {
@@ -964,7 +975,15 @@ export async function convertQuotationToInvoice(
         });
       }
 
-      if (balanceAmount > 0) {
+      // DEBIT is the full totalAmount, not balanceAmount — same fix as
+      // createInvoice/createKachaInvoice/createPurchase. Unlike those,
+      // this conversion had a second, separate gap: paidAmount (a bare
+      // number, no payment-method structure — this form never collects
+      // one) got stored on the Invoice row but no corresponding ledger
+      // CREDIT was ever posted for it, so a quotation converted with money
+      // already paid silently dropped that payment from the customer's
+      // ledger entirely (worse than double-counting: not recorded at all).
+      if (totalAmount > 0) {
         await tx.ledgerEntry.create({
           data: {
             storeId,
@@ -972,8 +991,23 @@ export async function convertQuotationToInvoice(
             sourceType: LedgerSourceType.SALE,
             customerId: quotation.customerId,
             invoiceId: created.id,
-            amount: balanceAmount,
+            amount: totalAmount,
             description: `Invoice ${invoiceNumber} balance due (from Quotation ${quotation.quotationNumber})`,
+            locationId: quotation.locationId ?? undefined,
+          },
+        });
+      }
+
+      if (paidAmount > 0) {
+        await tx.ledgerEntry.create({
+          data: {
+            storeId,
+            type: LedgerEntryType.CREDIT,
+            sourceType: LedgerSourceType.PAYMENT_IN,
+            customerId: quotation.customerId,
+            invoiceId: created.id,
+            amount: paidAmount,
+            description: `Payment received for ${invoiceNumber} (from Quotation ${quotation.quotationNumber})`,
             locationId: quotation.locationId ?? undefined,
           },
         });

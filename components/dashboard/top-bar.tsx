@@ -232,6 +232,16 @@ export function TopBar({
                 </DropdownMenuItem>
               ) : null}
 
+              {/* Same Admin/Super Admin gate — moved here from its own
+                  sidebar item (app-sidebar.tsx), same reasoning as Users
+                  above: store-owner configuration, not a daily-use nav
+                  entry. */}
+              {canAccessSettings ? (
+                <DropdownMenuItem asChild>
+                  <Link href="/brand-guide">Branding</Link>
+                </DropdownMenuItem>
+              ) : null}
+
               <DropdownMenuItem asChild>
                 <Link href="/contact-faq">Contact & FAQ</Link>
               </DropdownMenuItem>

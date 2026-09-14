@@ -191,11 +191,22 @@ async function resolvePerLineGstRateSnapshots(
 
 /**
  * Diamond items price per carat, not per gram — every other purity still
- * prices off netWeight. Duplicated per action file (same convention as the
+ * prices off netWeight. Net Weight/Carat Weight is a per-piece figure (see
+ * Product.defaultNetWeight and product-form.tsx's own "prefill" comment),
+ * so the actual priced quantity is that per-piece weight times how many
+ * pieces (item.quantity) — this used to ignore quantity entirely, pricing
+ * every line as if exactly one piece were being bought no matter what
+ * Quantity said. Duplicated per action file (same convention as the
  * generateXNumber helpers in this codebase) rather than a shared import.
  */
-function lineQuantity(item: { purity?: PurityType | null; netWeight?: number | null; caratWeight?: number | null }) {
-  return item.purity === PurityType.DIAMOND ? toNumber(item.caratWeight) : toNumber(item.netWeight);
+function lineQuantity(item: {
+  purity?: PurityType | null;
+  netWeight?: number | null;
+  caratWeight?: number | null;
+  quantity?: number | null;
+}) {
+  const perPiece = item.purity === PurityType.DIAMOND ? toNumber(item.caratWeight) : toNumber(item.netWeight);
+  return perPiece * (toNumber(item.quantity, 1) || 1);
 }
 
 function lineTotal(item: InvoiceLineItemInput) {
@@ -1185,7 +1196,19 @@ export async function createInvoice(
         });
       }
 
-      if (balanceAmount > 0) {
+      // The DEBIT is the invoice's full totalAmount, not balanceAmount — a
+      // sale is owed in full the moment it's made; whatever's paid right now
+      // (the loop below) is a separate CREDIT against that, exactly like a
+      // later top-up payment via recordInvoicePayment. Debiting only
+      // balanceAmount (totalAmount minus what's being paid right now) while
+      // *also* crediting that same paid-right-now amount double-counts it —
+      // netted out of the debit, then subtracted again as a credit — making
+      // the ledger balance too negative by exactly the paid-at-creation
+      // amount on every invoice that collects any payment up front. A
+      // fully-paid-at-creation invoice (balanceAmount === 0) still needs
+      // this DEBIT to offset its own CREDIT rows, hence gating on
+      // totalAmount, not balanceAmount.
+      if (totalAmount > 0) {
         await tx.ledgerEntry.create({
           data: {
             storeId,
@@ -1193,7 +1216,7 @@ export async function createInvoice(
             sourceType: LedgerSourceType.SALE,
             customerId,
             invoiceId: created.id,
-            amount: balanceAmount,
+            amount: totalAmount,
             description: `Invoice ${invoiceNumber} balance due`,
             locationId: resolvedLocationId ?? undefined,
           },

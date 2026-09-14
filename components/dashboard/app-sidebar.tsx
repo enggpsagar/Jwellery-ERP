@@ -24,7 +24,6 @@ import {
   Plus,
   Wallet,
   Phone,
-  Palette,
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
@@ -172,11 +171,6 @@ const mainNav: NavItem[] = [
     href: "/plans",
     icon: CreditCard,
   },
-  {
-    title: "Branding",
-    href: "/brand-guide",
-    icon: Palette,
-  },
 ];
 
 const karigarNav: NavItem[] = [
@@ -193,12 +187,6 @@ function getNavForRole(role?: string, permissions: string[] = []) {
   return mainNav.filter((item) => {
     if (item.href === "/stores" || item.href === "/plans") {
       return role === "SUPER_ADMIN";
-    }
-    // Branding is store-owner configuration now, same Admin/Super Admin
-    // visibility as the Settings link below — not Super-Admin-only like
-    // Stores/Plans above.
-    if (item.href === "/brand-guide") {
-      return role === "SUPER_ADMIN" || role === "ADMIN";
     }
     // Empty permissions means "not customized" — falls back to full access,
     // matching getEffectivePermissions() in lib/roles.ts.

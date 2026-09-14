@@ -20,13 +20,14 @@ function fmt(value: number) {
 type QuotationItem = Quotation["items"][number]
 
 function lineQuantity(item: QuotationItem) {
+  const pieces = item.quantity || 1
   if (item.purity === "DIAMOND" && item.caratWeight) {
-    return { qty: item.caratWeight, unit: "Ct" }
+    return { qty: item.caratWeight * pieces, unit: "Ct" }
   }
   if (item.netWeight && item.netWeight > 0) {
-    return { qty: item.netWeight, unit: "Gm" }
+    return { qty: item.netWeight * pieces, unit: "Gm" }
   }
-  return { qty: item.quantity || 1, unit: "Pcs" }
+  return { qty: pieces, unit: "Pcs" }
 }
 
 /** Same derivation as quotation-print-classic.tsx's own effectiveGstPercent

@@ -193,7 +193,7 @@ export const CUSTOMER_LIST_INCLUDE = {
     select: { id: true, balanceAmount: true, status: true },
   },
   ledgerEntries: {
-    select: { id: true, amount: true, entryDate: true },
+    select: { id: true, amount: true, type: true, entryDate: true },
     orderBy: { entryDate: "desc" as const },
   },
 };
@@ -252,6 +252,18 @@ export function mapCustomer(customer: any): CustomerRecord {
       ? formatDate(customer.ledgerEntries[0].entryDate)
       : "-";
 
+  // Same formula as getCustomerLedgerSummary (customer-ledger-actions.ts):
+  // opening balance plus every DEBIT (sales) minus every CREDIT (payments/
+  // refunds/write-offs) since. This used to just copy openingBalance
+  // straight through here — correct only for a customer with zero activity
+  // since creation, silently wrong (and rendered as the list's "Balance"
+  // column) for every other one.
+  const ledgerBalanceDelta = customer.ledgerEntries.reduce(
+    (sum: number, entry: any) =>
+      sum + (entry.type === "DEBIT" ? Number(entry.amount ?? 0) : -Number(entry.amount ?? 0)),
+    0,
+  );
+
   return {
     id: customer.id,
     name: customer.name,
@@ -264,15 +276,22 @@ export function mapCustomer(customer: any): CustomerRecord {
     pincode: customer.pincode ?? "",
     customerType: "",
     openingBalance: Number(customer.openingBalance ?? 0),
-    // Was hardcoded to openingBalance alone (ignoring every invoice/Kacha
-    // balance) — the only place this fed into was the CSV export's "Current
-    // Balance" column, which as a result never matched the same customer's
-    // "Outstanding" everywhere else in the app.
-    currentBalance: pendingAmountNumber,
+    // Ledger-derived (opening balance + DEBIT total - CREDIT total) rather
+    // than pendingAmountNumber above — this is the account's actual running
+    // balance from its full transaction history, the same figure
+    // getCustomerLedgerSummary computes, and it stays correct even where a
+    // cached document balanceAmount might not (e.g. it already reflects a
+    // Credit Note's return via that return's own ledger CREDIT, with no
+    // dependency on also having fixed every document-balance write path).
+    // pendingAmountNumber (unpaid Invoices/Kacha + opening) remains the
+    // right figure for "which specific documents are still open," used by
+    // the Payment In picker's allocator — a different question that happens
+    // to usually match this one in a fully consistent ledger.
+    currentBalance: Number(customer.openingBalance ?? 0) + ledgerBalanceDelta,
     // Was hardcoded to "Receivable" for every customer regardless of sign —
-    // a customer who has prepaid (pendingAmountNumber < 0) is owed money BY
-    // the store, not the other way around.
-    balanceType: pendingAmountNumber < 0 ? "Advance" : "Receivable",
+    // a customer who has prepaid (currentBalance < 0) is owed money BY the
+    // store, not the other way around.
+    balanceType: Number(customer.openingBalance ?? 0) + ledgerBalanceDelta < 0 ? "Advance" : "Receivable",
     goldBalance: 0,
     silverBalance: 0,
     creditLimit: "",

@@ -41,11 +41,12 @@ type QuotationItem = Quotation["items"][number]
 /** Same three cases as quotation-print-classic.tsx's own lineQuantity —
  * duplicated per this codebase's per-file helper convention. */
 function lineQuantity(item: QuotationItem) {
+  const pieces = item.quantity || 1
   if (item.purity === "DIAMOND" && item.caratWeight) {
-    return { qty: item.caratWeight, unit: "Ct", pricePerUnit: item.rate ?? 0, isWeighed: true }
+    return { qty: item.caratWeight * pieces, unit: "Ct", pricePerUnit: item.rate ?? 0, isWeighed: true }
   }
   if (item.netWeight && item.netWeight > 0) {
-    return { qty: item.netWeight, unit: "Gm", pricePerUnit: item.rate ?? 0, isWeighed: true }
+    return { qty: item.netWeight * pieces, unit: "Gm", pricePerUnit: item.rate ?? 0, isWeighed: true }
   }
   const qty = item.quantity || 1
   return { qty, unit: "Pcs", pricePerUnit: item.rate ?? item.lineTotal / qty, isWeighed: false }

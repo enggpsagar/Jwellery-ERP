@@ -87,7 +87,7 @@ export function RecordKarigarPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button type="button" variant="outline" onClick={() => setOpen(true)}>
+      <Button type="button" variant="success" onClick={() => setOpen(true)}>
         Record Payment
       </Button>
 

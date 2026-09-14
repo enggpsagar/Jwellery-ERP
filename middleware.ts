@@ -92,10 +92,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // The design-system reference (colors, components, established
-  // conventions) is a platform-operator tool, not something a store's own
-  // staff has a use for — same SUPER_ADMIN-only gate as /stores and /plans.
-  if (pathname.startsWith("/brand-guide") && role !== "SUPER_ADMIN") {
+  // Branding (accent color/background/font/corner style) is store-owner
+  // configuration, same Admin/Super Admin gate as /settings — no longer the
+  // Super-Admin-only static design reference this route used to be.
+  if (
+    pathname.startsWith("/brand-guide") &&
+    role !== "ADMIN" &&
+    role !== "SUPER_ADMIN"
+  ) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

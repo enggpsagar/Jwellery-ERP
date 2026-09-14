@@ -5,11 +5,14 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Cancelled",
 };
 
+// Sourced from Branding's five status-bucket colors (see
+// lib/branding.ts/StoreBranding) — SENT_TO_KARIGAR maps to Pending (awaiting
+// the artisan) and RECEIVED to Completed.
 const STATUS_STYLES: Record<string, string> = {
-  DRAFT: "bg-blue-100 text-blue-700",
-  SENT_TO_KARIGAR: "bg-amber-100 text-amber-700",
-  RECEIVED: "bg-green-100 text-green-700",
-  CANCELLED: "bg-muted text-foreground",
+  DRAFT: "bg-[var(--status-draft-bg)] text-[var(--status-draft-text)]",
+  SENT_TO_KARIGAR: "bg-[var(--status-pending-bg)] text-[var(--status-pending-text)]",
+  RECEIVED: "bg-[var(--status-completed-bg)] text-[var(--status-completed-text)]",
+  CANCELLED: "bg-[var(--status-inactive-bg)] text-[var(--status-inactive-text)]",
 };
 
 export function DraftOrderStatusBadge({ status }: { status: string }) {

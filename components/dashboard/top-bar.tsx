@@ -76,7 +76,11 @@ export function TopBar({
     <header
       className={cn(
         "sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 px-4 md:px-6",
-        "bg-background/85 backdrop-blur-md",
+        // --header (globals.css) defaults to var(--background), so an
+        // un-customized store renders this exactly as bg-background/85
+        // always did — Branding's own Header Color field overrides --header
+        // specifically, independent of the page's own background.
+        "bg-[var(--header)]/85 backdrop-blur-md",
         // A gold hairline instead of the default grey rule. Drawn as a
         // gradient border-image so it fades at both ends rather than
         // stopping dead — a hard gold line across the full width reads as a

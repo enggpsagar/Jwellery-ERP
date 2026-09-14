@@ -81,7 +81,7 @@ export function StockImportDialog() {
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="outline">
+        <Button type="button" variant="import">
           <Upload className="mr-2 h-4 w-4" />
           Import from Excel
         </Button>

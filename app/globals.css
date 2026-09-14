@@ -91,6 +91,50 @@
   --info-foreground: oklch(0.98 0.01 210);
   --warning: oklch(0.68 0.15 75);
   --warning-foreground: oklch(0.25 0.04 75);
+
+  /* Per-action button colors — see StoreBranding's own schema doc comment
+     for why these five (not Add/Save, which stay on --chart-2) and for why
+     each is one swatch rather than a bg/border/hover/text group: the *-text
+     value below is only ever this un-customized default; a store's own
+     customized bg gets its own auto-picked readable text color computed
+     server-side (lib/branding.ts's pickReadableTextColor()), not read from
+     these tokens. Defaults match each button's exact pre-Branding look:
+     edit was a hardcoded blue-50/blue-700 chip, delete/export/import were
+     solid fills off --destructive/--chart-1/--chart-4 respectively, cancel
+     had no fill at all (transparent, matching the plain `outline` variant
+     it used to just reuse). */
+  --btn-edit-bg: #eff6ff;
+  --btn-edit-text: #1d4ed8;
+  --btn-delete-bg: var(--destructive);
+  --btn-delete-text: var(--destructive-foreground);
+  --btn-cancel-bg: transparent;
+  --btn-cancel-text: var(--foreground);
+  --btn-cancel-border: var(--input);
+  --btn-export-bg: var(--chart-1);
+  --btn-export-text: #ffffff;
+  --btn-import-bg: var(--chart-4);
+  --btn-import-text: #ffffff;
+
+  /* Per-status-bucket colors — every status badge across every module maps
+     its own specific value onto one of these five (see e.g.
+     invoice-status-badge.tsx). Defaults match this app's existing
+     bg-{color}-100/text-{color}-700 badge convention exactly. */
+  --status-draft-bg: #dbeafe;
+  --status-draft-text: #1d4ed8;
+  --status-pending-bg: #fef9c3;
+  --status-pending-text: #a16207;
+  --status-completed-bg: #dcfce7;
+  --status-completed-text: #15803d;
+  --status-active-bg: #dcfce7;
+  --status-active-text: #15803d;
+  --status-inactive-bg: #fee2e2;
+  --status-inactive-text: #b91c1c;
+
+  /* The top bar's own background, independent of --background (the page's
+     own base surface) — see TopBar's own comment on why this exists as a
+     separate token even though it defaults to a tint of --background. */
+  --header: var(--background);
+
   --border: oklch(0.78 0.02 70);
   --input: oklch(0.8 0.018 70);
   --ring: oklch(0.75 0.12 80);
@@ -255,6 +299,19 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Branding's "Show icons on buttons" toggle (lib/actions/branding-actions.ts,
+   StoreBranding.showIcons) — set [data-hide-icons] on the (dashboard)
+   layout's theme wrapper when a store has switched it off. Scoped to an svg
+   carrying one of this codebase's own icon-beside-text margin classes
+   (mr-1/mr-1.5/mr-2 — see e.g. payment-in-dialog.tsx's <Plus
+   className="mr-2 h-4 w-4" />), never a bare icon-only control (row-action
+   Edit/View/Delete, the sidebar collapse toggle, ...), which have no text
+   fallback and would otherwise go visually empty. */
+[data-hide-icons] svg[class*="mr-1"],
+[data-hide-icons] svg[class*="mr-2"] {
+  display: none;
 }
 
 /* ---------------------------------------------------------------------------

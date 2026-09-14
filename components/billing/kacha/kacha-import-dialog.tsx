@@ -80,7 +80,7 @@ export function KachaImportDialog() {
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline">
+        <Button variant="import">
           <Upload className="mr-1 h-4 w-4" />
           Import from Excel
         </Button>

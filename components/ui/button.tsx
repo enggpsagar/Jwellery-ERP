@@ -19,17 +19,25 @@ const buttonVariants = cva(
         // Solid fill, reserved for a permanent/irreversible action (Delete).
         // A reversible action (Archive, Disable, a non-destructive Cancel
         // confirm) belongs on `warning` instead — see its own comment below.
+        // Reads from --btn-delete-bg/-text (Branding's Delete color, see
+        // lib/branding.ts) rather than --destructive directly, defaulted to
+        // exactly --destructive's own value so an un-customized store is
+        // unaffected — --destructive itself stays the fixed token every
+        // *non*-Branding-aware destructive UI (aria-invalid rings, etc.)
+        // still keys off.
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
+          "bg-[var(--btn-delete-bg)] text-[var(--btn-delete-text)] hover:brightness-90 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
         // Pay Now / Record Payment / Mark Paid / Approve — an explicit
         // positive-outcome confirmation, not every form's Save/Submit
         // (those stay on `default`, the brand primary color).
         success:
           "bg-success text-success-foreground hover:bg-success/90 focus-visible:border-success/40 focus-visible:ring-success/20",
-        // Edit actions (Pencil icon). Kept as the same light-blue chip this
-        // app already used ad-hoc everywhere for Edit, just centralized.
-        edit: "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60",
+        // Edit actions (Pencil icon). Reads from --btn-edit-bg/-text
+        // (Branding's Edit color), defaulted to the same light-blue chip
+        // this app already used ad-hoc everywhere for Edit before either
+        // this variant or Branding existed.
+        edit: "bg-[var(--btn-edit-bg)] text-[var(--btn-edit-text)] hover:brightness-95",
         // View/Details/informational actions (Eye icon) — a distinct hue
         // from `edit` so the two no longer render identically.
         info: "bg-info/10 text-info hover:bg-info/20 focus-visible:border-info/40 focus-visible:ring-info/20",
@@ -38,6 +46,29 @@ const buttonVariants = cva(
         // share `destructive`'s old light-tint look under the same name.
         warning:
           "bg-warning/10 text-warning hover:bg-warning/20 focus-visible:border-warning/40 focus-visible:ring-warning/20",
+        // Cancel — reads from --btn-cancel-bg/-text/-border (Branding's
+        // Cancel color). Defaults to transparent/border-only (identical to
+        // `outline`, which every Cancel button used before this variant
+        // existed); once a store customizes Cancel, it renders as a solid
+        // fill instead, same rule every other action color here follows.
+        // hover:bg-muted covers the un-customized (transparent-bg,
+        // outline-like) look; hover:brightness-95 is what actually shows
+        // once a store customizes Cancel to a solid fill — the two don't
+        // conflict since a `transparent` background is unaffected by a
+        // brightness filter, so only whichever is actually visible reacts.
+        cancel:
+          "border-[var(--btn-cancel-border)] bg-[var(--btn-cancel-bg)] text-[var(--btn-cancel-text)] hover:bg-muted hover:brightness-95",
+        // Export — reads from --btn-export-bg/-text, defaulted to this
+        // app's existing --chart-1 (sapphire) Export convention.
+        export:
+          "bg-[var(--btn-export-bg)] text-[var(--btn-export-text)] hover:brightness-90",
+        // Import — reads from --btn-import-bg/-text. Standardizes what was,
+        // before this variant existed, an inconsistent mix of secondary/
+        // info/warning across different import dialogs, onto one look
+        // (defaulted to --chart-4/amethyst — a distinct hue from Export's
+        // sapphire).
+        import:
+          "bg-[var(--btn-import-bg)] text-[var(--btn-import-text)] hover:brightness-90",
       },
       size: {
         default:

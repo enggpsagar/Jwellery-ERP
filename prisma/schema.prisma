@@ -1772,12 +1772,12 @@ enum ReportFrequency {
   ANNUAL
 }
 
-// Which of the six curated Google Fonts a store's Branding page has picked
-// for its own staff-facing UI — see app/layout.tsx (all six loaded once,
-// each under its own CSS variable) and the (dashboard) layout, which
-// overrides --font-sans to whichever one this resolves to. INTER matches
-// the app's un-customized default, so a store that never opens Branding
-// renders byte-identical to before this feature existed.
+// Which of the curated Google Fonts a store's Branding page has picked for
+// its own staff-facing UI — see app/layout.tsx (all loaded once, each under
+// its own CSS variable) and the (dashboard) layout, which overrides
+// --font-sans to whichever one this resolves to. INTER matches the app's
+// un-customized default, so a store that never opens Branding renders
+// byte-identical to before this feature existed.
 enum BrandFontFamily {
   INTER
   ROBOTO
@@ -1785,6 +1785,12 @@ enum BrandFontFamily {
   MERRIWEATHER
   PLAYFAIR_DISPLAY
   LATO
+  MONTSERRAT
+  NUNITO
+  OPEN_SANS
+  RALEWAY
+  WORK_SANS
+  OSWALD
 }
 
 // Sharp/Default/Rounded — a store-wide multiplier on the app's single
@@ -1805,19 +1811,35 @@ enum BrandRadius {
  * Every color field is nullable and means "use the app's built-in default"
  * when unset — deliberately not backfilled with the current default hex at
  * creation, so a store that never customizes a field keeps tracking
- * whatever the app's own base theme is if that ever changes later.
+ * whatever the app's own base theme is if that ever changes later. Every
+ * customizable color is a single swatch, not a bg/border/hover/text group —
+ * border and hover shade are always auto-derived from it (color-mix, same
+ * convention --chart-2 already used before this field existed), and text
+ * color is auto-picked (near-white or near-black) by relative luminance —
+ * see lib/branding.ts's pickReadableTextColor(). This is a deliberate
+ * simplification: it turns "choose 4 related colors that still have to work
+ * together" into "choose 1 color," at the cost of not offering independent
+ * border-color/hover-color pickers, which would mostly just let a store
+ * accidentally produce an unreadable combination.
  *
- * Deliberately NOT customizable here (see (dashboard)/brand-guide/page.tsx's
- * own doc comment for the full reasoning): the semantic status colors
- * (success/warning/danger/info), the chart-1/3/4/5 module tint rotation
- * (color-blind-safety validated as a set), and the sidebar's own fixed dark
- * chrome — a store re-coloring "Delete" or breaking the chart palette's
- * validated contrast would undermine the app-wide conventions those exist
- * for, and the sidebar is deliberately constant brand chrome regardless of
- * a store's own accent choice. Dark mode also always uses the app's own
- * built-in dark palette, never a store's light-mode customization blended
- * into it — auto-deriving a coherent dark variant from an arbitrary chosen
- * color is its own hard problem, out of scope here.
+ * Two things stated as NOT customizable per-action, even though they're
+ * genuinely per-action requests: **Add and Save both stay tied to
+ * accentColor below**, not split into their own fields — today's codebase
+ * has exactly one "primary CTA" convention (the same gold used everywhere,
+ * see accentColor's own doc comment) with nothing in any of those buttons'
+ * markup distinguishing "this one's an Add" from "this one's a Save"; the
+ * only way to split them would be manually re-classifying ~40 already-
+ * correct buttons file by file for a result that's identical by default in
+ * both new fields. Genuinely new, distinct sources exist for the other five
+ * requested action types (Edit/Delete/Cancel/Export/Import — see each
+ * field's own comment), which is what actually made those worth adding.
+ *
+ * Still fixed, not customizable: the chart-1/3/4/5 categorical module-tint
+ * rotation (color-blind-safety validated as a set — see globals.css's own
+ * comment on it) and dark mode (always the app's own built-in dark palette,
+ * never a store's light-mode choices blended into it — auto-deriving a
+ * coherent dark variant from an arbitrary color is its own hard problem,
+ * out of scope here).
  */
 model StoreBranding {
   storeId String @id
@@ -1827,6 +1849,8 @@ model StoreBranding {
   // primary action/active state/focus ring app-wide (see brand-guide's own
   // long-standing note that --primary/shadcn's default is NOT what's really
   // used) — not the shadcn --primary token, which stays the fixed burgundy.
+  // Also what "Add" and "Save" buttons render in — see this model's own
+  // doc comment for why those two aren't independent fields.
   accentColor String?
 
   // Hex (#rrggbb). Replaces --background (the page's own base surface).
@@ -1841,6 +1865,59 @@ model StoreBranding {
   // and avoid a store creating a readable body / unreadable card (or vice
   // versa) by only remembering to change one of the two.
   foregroundColor String?
+
+  // Hex (#rrggbb). The sidebar's own background — a fixed dark surface
+  // regardless of light/dark mode today (see app-sidebar.tsx's own comment
+  // on why it can't use the theme's sidebar-* tokens as-is); this overrides
+  // that fixed color specifically for a store that wants its own sidebar
+  // hue. Text/icons inside the sidebar auto-pick white or near-black by
+  // luminance against whatever this resolves to, same as every other
+  // surface color here.
+  sidebarColor String?
+
+  // Hex (#rrggbb). The top bar's own background — independent of
+  // backgroundColor above (the top bar is a distinct "header" surface, not
+  // literally the page background, even though it defaults to a tint of it
+  // today via bg-background/85).
+  headerColor String?
+
+  // Hex (#rrggbb) each. Five specific requested actions, each with its own
+  // existing-but-previously-fixed source: Edit was a hardcoded blue chip,
+  // Delete was the fixed --destructive red, Cancel reused the neutral
+  // outline look with no color of its own, Export was fixed --chart-1,
+  // Import was inconsistent across different import dialogs (secondary/
+  // info/warning depending which one) — standardized onto this one field as
+  // part of adding it. See components/ui/button.tsx's edit/delete/cancel/
+  // export/import variants.
+  editColor   String?
+  deleteColor String?
+  cancelColor String?
+  exportColor String?
+  importColor String?
+
+  // Hex (#rrggbb) each. A status badge's specific value (e.g. Invoice's
+  // PARTIAL, a DraftOrder's PENDING, InventoryStock's SOLD) is mapped onto
+  // whichever of these five generic buckets it means, in each status
+  // badge's own component (see e.g. invoice-status-badge.tsx) — there's no
+  // per-exact-value override, only per-bucket, so "every kind of pending
+  // state across every module" moves together rather than needing to be
+  // set N times.
+  statusDraftColor     String?
+  statusPendingColor   String?
+  statusCompletedColor String?
+  statusActiveColor    String?
+  statusInactiveColor  String?
+
+  // Whether an icon that sits beside a text label on a button is shown at
+  // all (Export/Import/Save's leading icon, etc.) — true (shown) is the
+  // app's un-customized default. Deliberately does NOT hide an icon-only
+  // button's icon (row-action Edit/View/Delete, the sidebar collapse
+  // toggle, ...) — that icon IS the button's entire content, so hiding it
+  // would leave a dead-looking empty control with no text fallback. See
+  // globals.css's [data-hide-icons] rule, which targets only an svg with a
+  // margin utility class — this codebase's own consistent tell for "this
+  // icon sits next to text," never used on an icon-only control.
+  showIcons Boolean @default(true)
 
   fontFamily BrandFontFamily @default(INTER)
   radius     BrandRadius     @default(DEFAULT)

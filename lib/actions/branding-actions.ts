@@ -9,6 +9,7 @@ import { getStoreIdForRead, requireStoreScope } from "@/lib/store-context";
 import { requireRole } from "@/lib/auth/auth";
 import { actionErrorMessage } from "@/lib/action-error";
 import { logger } from "@/lib/logger";
+import { BRAND_ACTION_KEYS, BRAND_STATUS_KEYS } from "@/lib/branding";
 
 export type StoreBrandingSettings = {
   storeId: string;
@@ -16,6 +17,19 @@ export type StoreBrandingSettings = {
   backgroundColor: string | null;
   cardColor: string | null;
   foregroundColor: string | null;
+  sidebarColor: string | null;
+  headerColor: string | null;
+  editColor: string | null;
+  deleteColor: string | null;
+  cancelColor: string | null;
+  exportColor: string | null;
+  importColor: string | null;
+  statusDraftColor: string | null;
+  statusPendingColor: string | null;
+  statusCompletedColor: string | null;
+  statusActiveColor: string | null;
+  statusInactiveColor: string | null;
+  showIcons: boolean;
   fontFamily: BrandFontFamily;
   radius: BrandRadius;
 };
@@ -25,6 +39,21 @@ export type BrandingFormState = {
   message: string;
   errors?: Record<string, string[]>;
 };
+
+// Every color field this form can submit, in one place so update/reset stay
+// in sync with StoreBrandingSettings above without repeating the list three
+// times over.
+const COLOR_FIELDS = [
+  "accentColor",
+  "backgroundColor",
+  "cardColor",
+  "foregroundColor",
+  "sidebarColor",
+  "headerColor",
+  ...BRAND_ACTION_KEYS,
+  ...BRAND_STATUS_KEYS,
+] as const;
+type ColorField = (typeof COLOR_FIELDS)[number];
 
 // #rgb, #rrggbb, or empty/omitted (cleared back to the app default).
 const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -80,6 +109,19 @@ export async function getStoreBranding(): Promise<StoreBrandingSettings> {
     backgroundColor: branding.backgroundColor,
     cardColor: branding.cardColor,
     foregroundColor: branding.foregroundColor,
+    sidebarColor: branding.sidebarColor,
+    headerColor: branding.headerColor,
+    editColor: branding.editColor,
+    deleteColor: branding.deleteColor,
+    cancelColor: branding.cancelColor,
+    exportColor: branding.exportColor,
+    importColor: branding.importColor,
+    statusDraftColor: branding.statusDraftColor,
+    statusPendingColor: branding.statusPendingColor,
+    statusCompletedColor: branding.statusCompletedColor,
+    statusActiveColor: branding.statusActiveColor,
+    statusInactiveColor: branding.statusInactiveColor,
+    showIcons: branding.showIcons,
     fontFamily: branding.fontFamily,
     radius: branding.radius,
   };
@@ -96,10 +138,10 @@ export async function updateStoreBranding(
     const storeId = await requireStoreScope();
 
     const errors: Record<string, string[]> = {};
-    const accentColor = parseOptionalColor(formData.get("accentColor"), "accentColor", errors);
-    const backgroundColor = parseOptionalColor(formData.get("backgroundColor"), "backgroundColor", errors);
-    const cardColor = parseOptionalColor(formData.get("cardColor"), "cardColor", errors);
-    const foregroundColor = parseOptionalColor(formData.get("foregroundColor"), "foregroundColor", errors);
+    const colors = {} as Record<ColorField, string | null>;
+    for (const field of COLOR_FIELDS) {
+      colors[field] = parseOptionalColor(formData.get(field), field, errors);
+    }
 
     const fontFamilyRaw = String(formData.get("fontFamily") || "INTER");
     const fontFamily = Object.values(BrandFontFamily).includes(fontFamilyRaw as BrandFontFamily)
@@ -111,14 +153,18 @@ export async function updateStoreBranding(
       ? (radiusRaw as BrandRadius)
       : BrandRadius.DEFAULT;
 
+    const showIcons = String(formData.get("showIcons") || "true") !== "false";
+
     if (Object.keys(errors).length > 0) {
       return { success: false, message: "Fix the highlighted fields", errors };
     }
 
+    const data = { ...colors, fontFamily, radius, showIcons };
+
     await prisma.storeBranding.upsert({
       where: { storeId },
-      create: { storeId, accentColor, backgroundColor, cardColor, foregroundColor, fontFamily, radius },
-      update: { accentColor, backgroundColor, cardColor, foregroundColor, fontFamily, radius },
+      create: { storeId, ...data },
+      update: data,
     });
 
     // Every page in the dashboard reads branding in its shared layout, so a
@@ -141,16 +187,18 @@ export async function resetStoreBranding(): Promise<BrandingFormState> {
   try {
     const storeId = await requireStoreScope();
 
+    const clearedColors = Object.fromEntries(
+      COLOR_FIELDS.map((field) => [field, null]),
+    ) as Record<ColorField, null>;
+
     await prisma.storeBranding.upsert({
       where: { storeId },
       create: { storeId },
       update: {
-        accentColor: null,
-        backgroundColor: null,
-        cardColor: null,
-        foregroundColor: null,
+        ...clearedColors,
         fontFamily: BrandFontFamily.INTER,
         radius: BrandRadius.DEFAULT,
+        showIcons: true,
       },
     });
 

@@ -4,10 +4,13 @@ const STATUS_LABELS: Record<string, string> = {
   expired: "Expired",
 };
 
+// Sourced from Branding's five status-bucket colors (see
+// lib/branding.ts/StoreBranding) — open maps to Pending (awaiting a
+// decision), converted to Completed, expired to Inactive.
 const STATUS_STYLES: Record<string, string> = {
-  open: "bg-blue-100 text-blue-700",
-  converted: "bg-green-100 text-green-700",
-  expired: "bg-muted text-foreground",
+  open: "bg-[var(--status-pending-bg)] text-[var(--status-pending-text)]",
+  converted: "bg-[var(--status-completed-bg)] text-[var(--status-completed-text)]",
+  expired: "bg-[var(--status-inactive-bg)] text-[var(--status-inactive-text)]",
 };
 
 export function QuotationStatusBadge({ status }: { status: string }) {

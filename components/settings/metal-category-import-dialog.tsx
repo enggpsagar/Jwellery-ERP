@@ -76,7 +76,7 @@ export function MetalCategoryImportDialog() {
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="info" size="sm">
+        <Button type="button" variant="import" size="sm">
           <Upload className="mr-2 h-4 w-4" />
           Import Metals &amp; Categories
         </Button>

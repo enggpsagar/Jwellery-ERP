@@ -109,7 +109,14 @@ export function CustomersTable({
               <th className="px-4 py-3 font-medium">Phone</th>
               <th className="px-4 py-3 font-medium">City</th>
               <th className="px-4 py-3 font-medium">State</th>
-              <SortableTableHead label="Balance" sortKey="openingBalance" defaultSortBy="createdAt" />
+              {/* Outstanding (pendingAmount), not Opening Balance — plain
+                  <th>, not SortableTableHead: pendingAmount is a live sum of
+                  each customer's unpaid invoice balances computed after the
+                  page's own rows are fetched (see getCustomers()), not a
+                  real column the database can ORDER BY, so there's no sort
+                  key for it to wire up (openingBalance's own sortKey would
+                  sort by a different number than what this column shows). */}
+              <th className="px-4 py-3 font-medium">Outstanding</th>
             </tr>
           </thead>
 
@@ -191,8 +198,8 @@ export function CustomersTable({
                     {customer.state || "-"}
                   </td>
 
-                  <td className="px-4 py-3 text-foreground">
-                    ₹ {Number(customer.openingBalance || 0).toLocaleString("en-IN")}
+                  <td className="px-4 py-3">
+                    <span className="text-red-600">{customer.pendingAmount}</span>
                   </td>
                 </tr>
               )

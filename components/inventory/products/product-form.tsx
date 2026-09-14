@@ -1063,7 +1063,7 @@ export function ProductForm({
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div>
-            <Label htmlFor="defaultGrossWeight">Gross Weight</Label>
+            <Label htmlFor="defaultGrossWeight">Gross Weight <RequiredMark /></Label>
 
             <input type="hidden" name="defaultGrossWeight" value={submittedWeight(grossWeight)} />
             <Input
@@ -1093,7 +1093,7 @@ export function ProductForm({
           )}
 
           <div>
-            <Label htmlFor="defaultNetWeight">Net Weight</Label>
+            <Label htmlFor="defaultNetWeight">Net Weight <RequiredMark /></Label>
 
             <input type="hidden" name="defaultNetWeight" value={submittedWeight(netWeight)} />
             <Input

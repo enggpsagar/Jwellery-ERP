@@ -77,7 +77,7 @@ export function StoneTypeImportDialog() {
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="secondary" size="sm">
+        <Button type="button" variant="warning" size="sm">
           <Upload className="mr-2 h-4 w-4" />
           Import Stones &amp; Stone Types
         </Button>

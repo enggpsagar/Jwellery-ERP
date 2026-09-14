@@ -3,9 +3,11 @@
 
 import { InvoiceStatus } from "@prisma/client";
 
+import { UserRole } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import { getEffectiveStoreId } from "@/lib/store-context";
-import { hasPermission } from "@/lib/auth/auth";
+import { getCurrentUser, hasPermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
 import { formatShortDate } from "@/lib/utils";
@@ -18,7 +20,7 @@ export type NotificationItem = {
 };
 
 export type NotificationGroup = {
-  key: "invoices" | "karigar-jobs" | "out-of-stock";
+  key: "invoices" | "karigar-jobs" | "out-of-stock" | "access-requests";
   label: string;
   count: number;
   items: NotificationItem[];
@@ -48,12 +50,31 @@ export async function getNotifications(): Promise<NotificationsResponse> {
 
   const now = new Date();
 
-  const [canViewBilling, canViewKarigars, canViewInventory, scope] = await Promise.all([
+  const [currentUser, canViewBilling, canViewKarigars, canViewInventory, scope] = await Promise.all([
+    getCurrentUser(),
     hasPermission(PERMISSIONS.BILLING_VIEW),
     hasPermission(PERMISSIONS.KARIGAR_VIEW),
     hasPermission(PERMISSIONS.INVENTORY_VIEW),
     getLocationScope(),
   ]);
+
+  // Store-owner-only, same gate as getPendingAccessRequests (the actual
+  // approve/deny screen this links to) — a Super Admin asking to get into a
+  // store previously only surfaced if the owner happened to visit
+  // /settings/collaboration on their own; nothing ever told them a request
+  // was waiting.
+  const [accessRequests, accessRequestCount] =
+    currentUser?.role === UserRole.ADMIN
+      ? await Promise.all([
+          prisma.storeAccessRequest.findMany({
+            where: { storeId, status: "PENDING" },
+            orderBy: { requestedAt: "desc" },
+            take: 5,
+            select: { id: true, requestedAt: true, superAdminUser: { select: { name: true, email: true } } },
+          }),
+          prisma.storeAccessRequest.count({ where: { storeId, status: "PENDING" } }),
+        ])
+      : [[], 0];
 
   const [dueInvoices, dueInvoiceCount] = canViewBilling
     ? await Promise.all([
@@ -164,7 +185,21 @@ export async function getNotifications(): Promise<NotificationsResponse> {
     });
   }
 
-  const totalCount = dueInvoiceCount + overdueJobCount + outOfStockCount;
+  if (accessRequestCount > 0) {
+    groups.push({
+      key: "access-requests",
+      label: "Store access requests",
+      count: accessRequestCount,
+      items: accessRequests.map((request) => ({
+        id: request.id,
+        title: request.superAdminUser.name ?? request.superAdminUser.email ?? "A Super Admin",
+        description: `Requested access ${formatShortDate(request.requestedAt)}`,
+        href: "/settings/collaboration",
+      })),
+    });
+  }
+
+  const totalCount = dueInvoiceCount + overdueJobCount + outOfStockCount + accessRequestCount;
 
   return { totalCount, groups };
 }

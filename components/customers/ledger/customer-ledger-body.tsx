@@ -67,11 +67,16 @@ export function CustomerLedgerBody({
           appears when there's actually an address to send it to. Sale
           jumps straight to a real invoice with this customer already
           selected — no more separate lightweight "just note a sale
-          happened" entry unlinked to any actual invoice. Refund/Replace
-          route into the existing invoice-level Return Items / Return &
-          Exchange mechanisms (see CustomerReturnActions), and hide
-          themselves entirely when this customer has no prior sale to act
-          against. */}
+          happened" entry unlinked to any actual invoice. Receive Payment
+          mirrors Vendor's own "Pay Now" shortcut (same variant="success",
+          same ?customerId= pre-fill convention into /payments/in — see
+          payment-in-dialog.tsx's own doc comment) — this used to have no
+          equivalent at all, so recording money received meant leaving this
+          page and re-picking the customer from a dropdown on /payments/in.
+          Refund/Replace route into the existing invoice-level Return Items
+          / Return & Exchange mechanisms (see CustomerReturnActions), and
+          hide themselves entirely when this customer has no prior sale to
+          act against. */}
       <div className="flex flex-wrap gap-3">
         {hasEmail ? <EmailLedgerStatementButton customerId={customerId} /> : null}
         <Button asChild className="gap-2">
@@ -80,6 +85,11 @@ export function CustomerLedgerBody({
           >
             <Receipt className="h-4 w-4" />
             Sale
+          </Link>
+        </Button>
+        <Button variant="success" asChild>
+          <Link href={`/payments/in?customerId=${customerId}`}>
+            Receive Payment
           </Link>
         </Button>
         <CustomerReturnActions customerId={customerId} />

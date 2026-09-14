@@ -12,10 +12,19 @@ import {
   type BrandingFormState,
 } from "@/lib/actions/branding-actions";
 import {
+  BRAND_ACTION_DEFAULT,
+  BRAND_ACTION_KEYS,
+  BRAND_ACTION_LABEL,
   BRAND_FONT_LABEL,
   BRAND_FONT_VARIABLE,
   BRAND_RADIUS_LABEL,
   BRAND_RADIUS_VALUE,
+  BRAND_STATUS_DEFAULT,
+  BRAND_STATUS_KEYS,
+  BRAND_STATUS_LABEL,
+  contrastRatio,
+  type BrandActionKey,
+  type BrandStatusKey,
 } from "@/lib/branding";
 import { useToast } from "@/components/providers/toast-provider";
 
@@ -23,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader } from "@/components/ui/loader";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -37,59 +47,39 @@ import {
 // initial form value (a store that hasn't customized a field submits it
 // as empty/null, not this hex, so a future default-palette change is
 // inherited automatically — see StoreBranding's own schema doc comment).
-const DEFAULT_ACCENT = "#c4901f";
-const DEFAULT_BACKGROUND = "#fbfaf7";
-const DEFAULT_CARD = "#fefdfb";
-const DEFAULT_FOREGROUND = "#2c2620";
+const SURFACE_DEFAULTS = {
+  accentColor: "#c4901f",
+  backgroundColor: "#fbfaf7",
+  cardColor: "#fefdfb",
+  foregroundColor: "#2c2620",
+  sidebarColor: "#291f14",
+  headerColor: "#fbfaf7",
+} as const;
+type SurfaceKey = keyof typeof SURFACE_DEFAULTS;
+
+const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 const FONT_FAMILY_OPTIONS = Object.keys(BRAND_FONT_LABEL) as BrandFontFamily[];
 const RADIUS_OPTIONS = Object.keys(BRAND_RADIUS_LABEL) as BrandRadius[];
 
-function normalizeHex(hex: string): string {
-  if (hex.length === 4) {
-    // #rgb -> #rrggbb
-    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`;
-  }
-  return hex;
-}
-
-function relativeLuminance(hex: string): number | null {
-  if (!/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) return null;
-  const full = normalizeHex(hex);
-  const r = parseInt(full.slice(1, 3), 16) / 255;
-  const g = parseInt(full.slice(3, 5), 16) / 255;
-  const b = parseInt(full.slice(5, 7), 16) / 255;
-  const [rl, gl, bl] = [r, g, b].map((c) =>
-    c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4),
-  );
-  return 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
-}
-
-// Standard WCAG contrast ratio, 1-21. 4.5 is the "normal text" AA floor —
-// used here only as a soft warning (a store can still save a lower-contrast
-// pair if that's genuinely what they want), not a hard block.
-function contrastRatio(hexA: string, hexB: string): number | null {
-  const lA = relativeLuminance(hexA);
-  const lB = relativeLuminance(hexB);
-  if (lA === null || lB === null) return null;
-  const lighter = Math.max(lA, lB);
-  const darker = Math.min(lA, lB);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
-type ColorFieldProps = {
+function ColorField({
+  id,
+  label,
+  helper,
+  value,
+  defaultHex,
+  onChange,
+  error,
+}: {
   id: string;
-  name: string;
   label: string;
-  helper: string;
+  helper?: string;
   value: string;
   defaultHex: string;
   onChange: (value: string) => void;
   error?: string;
-};
-
-function ColorField({ id, name, label, helper, value, defaultHex, onChange, error }: ColorFieldProps) {
-  const swatchValue = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value) ? value : defaultHex;
+}) {
+  const swatchValue = HEX_RE.test(value) ? value : defaultHex;
 
   return (
     <div className="space-y-1.5">
@@ -104,18 +94,29 @@ function ColorField({ id, name, label, helper, value, defaultHex, onChange, erro
         />
         <Input
           id={id}
-          name={name}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={defaultHex}
           className="font-mono"
         />
       </div>
-      <p className="text-xs text-muted-foreground">{helper}</p>
+      {helper && <p className="text-xs text-muted-foreground">{helper}</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
+
+const SURFACE_META: Record<SurfaceKey, { label: string; helper: string }> = {
+  accentColor: {
+    label: "Brand Accent Color",
+    helper: "Primary/Save/Add buttons, links, active navigation, focus rings.",
+  },
+  backgroundColor: { label: "Page Background", helper: "The base surface behind every page." },
+  cardColor: { label: "Card / Surface Color", helper: "Cards, dialogs, dropdowns, and other raised panels." },
+  foregroundColor: { label: "Text Color", helper: "Body text on both the page and card surfaces." },
+  sidebarColor: { label: "Sidebar Background", helper: "The left navigation panel." },
+  headerColor: { label: "Header Background", helper: "The top bar, independent of the page background." },
+};
 
 const initialState: BrandingFormState = { success: false, message: "" };
 
@@ -125,17 +126,46 @@ export function BrandingForm({ settings, canEdit }: { settings: StoreBrandingSet
   const [state, formAction, isPending] = useActionState(updateStoreBranding, initialState);
   const [resetting, setResetting] = useState(false);
 
-  const [accentColor, setAccentColor] = useState(settings.accentColor ?? "");
-  const [backgroundColor, setBackgroundColor] = useState(settings.backgroundColor ?? "");
-  const [cardColor, setCardColor] = useState(settings.cardColor ?? "");
-  const [foregroundColor, setForegroundColor] = useState(settings.foregroundColor ?? "");
+  const [surface, setSurface] = useState<Record<SurfaceKey, string>>({
+    accentColor: settings.accentColor ?? "",
+    backgroundColor: settings.backgroundColor ?? "",
+    cardColor: settings.cardColor ?? "",
+    foregroundColor: settings.foregroundColor ?? "",
+    sidebarColor: settings.sidebarColor ?? "",
+    headerColor: settings.headerColor ?? "",
+  });
+  const [actionColors, setActionColors] = useState<Record<BrandActionKey, string>>({
+    editColor: settings.editColor ?? "",
+    deleteColor: settings.deleteColor ?? "",
+    cancelColor: settings.cancelColor ?? "",
+    exportColor: settings.exportColor ?? "",
+    importColor: settings.importColor ?? "",
+  });
+  const [statusColors, setStatusColors] = useState<Record<BrandStatusKey, string>>({
+    statusDraftColor: settings.statusDraftColor ?? "",
+    statusPendingColor: settings.statusPendingColor ?? "",
+    statusCompletedColor: settings.statusCompletedColor ?? "",
+    statusActiveColor: settings.statusActiveColor ?? "",
+    statusInactiveColor: settings.statusInactiveColor ?? "",
+  });
+  const [showIcons, setShowIcons] = useState(settings.showIcons);
   const [fontFamily, setFontFamily] = useState<BrandFontFamily>(settings.fontFamily);
   const [radius, setRadius] = useState<BrandRadius>(settings.radius);
 
-  const previewBackground = backgroundColor || DEFAULT_BACKGROUND;
-  const previewCard = cardColor || DEFAULT_CARD;
-  const previewForeground = foregroundColor || DEFAULT_FOREGROUND;
-  const previewAccent = accentColor || DEFAULT_ACCENT;
+  function setSurfaceField(key: SurfaceKey, value: string) {
+    setSurface((prev) => ({ ...prev, [key]: value }));
+  }
+  function setActionField(key: BrandActionKey, value: string) {
+    setActionColors((prev) => ({ ...prev, [key]: value }));
+  }
+  function setStatusField(key: BrandStatusKey, value: string) {
+    setStatusColors((prev) => ({ ...prev, [key]: value }));
+  }
+
+  const previewBackground = surface.backgroundColor || SURFACE_DEFAULTS.backgroundColor;
+  const previewCard = surface.cardColor || SURFACE_DEFAULTS.cardColor;
+  const previewForeground = surface.foregroundColor || SURFACE_DEFAULTS.foregroundColor;
+  const previewAccent = surface.accentColor || SURFACE_DEFAULTS.accentColor;
 
   const bodyContrast = useMemo(
     () => contrastRatio(previewBackground, previewForeground),
@@ -163,10 +193,23 @@ export function BrandingForm({ settings, canEdit }: { settings: StoreBrandingSet
     try {
       const result = await resetStoreBranding();
       if (result.success) {
-        setAccentColor("");
-        setBackgroundColor("");
-        setCardColor("");
-        setForegroundColor("");
+        setSurface({
+          accentColor: "",
+          backgroundColor: "",
+          cardColor: "",
+          foregroundColor: "",
+          sidebarColor: "",
+          headerColor: "",
+        });
+        setActionColors({ editColor: "", deleteColor: "", cancelColor: "", exportColor: "", importColor: "" });
+        setStatusColors({
+          statusDraftColor: "",
+          statusPendingColor: "",
+          statusCompletedColor: "",
+          statusActiveColor: "",
+          statusInactiveColor: "",
+        });
+        setShowIcons(true);
         setFontFamily("INTER");
         setRadius("DEFAULT");
         toast.success(result.message);
@@ -185,52 +228,27 @@ export function BrandingForm({ settings, canEdit }: { settings: StoreBrandingSet
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Colors</CardTitle>
+            <CardTitle>Page Colors</CardTitle>
             <p className="text-sm text-muted-foreground">
               Leave any field blank to keep the app&apos;s own default for it.
             </p>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <ColorField
-              id="accentColor"
-              name="accentColor"
-              label="Brand Accent Color"
-              helper="Primary buttons, links, active navigation, focus rings."
-              value={accentColor}
-              defaultHex={DEFAULT_ACCENT}
-              onChange={setAccentColor}
-              error={state.errors?.accentColor?.[0]}
-            />
-            <ColorField
-              id="backgroundColor"
-              name="backgroundColor"
-              label="Page Background"
-              helper="The base surface behind every page."
-              value={backgroundColor}
-              defaultHex={DEFAULT_BACKGROUND}
-              onChange={setBackgroundColor}
-              error={state.errors?.backgroundColor?.[0]}
-            />
-            <ColorField
-              id="cardColor"
-              name="cardColor"
-              label="Card / Surface Color"
-              helper="Cards, dialogs, dropdowns, and other raised panels."
-              value={cardColor}
-              defaultHex={DEFAULT_CARD}
-              onChange={setCardColor}
-              error={state.errors?.cardColor?.[0]}
-            />
-            <ColorField
-              id="foregroundColor"
-              name="foregroundColor"
-              label="Text Color"
-              helper="Body text on both the page and card surfaces."
-              value={foregroundColor}
-              defaultHex={DEFAULT_FOREGROUND}
-              onChange={setForegroundColor}
-              error={state.errors?.foregroundColor?.[0]}
-            />
+            {(Object.keys(SURFACE_DEFAULTS) as SurfaceKey[]).map((key) => (
+              <ColorField
+                key={key}
+                id={key}
+                label={SURFACE_META[key].label}
+                helper={SURFACE_META[key].helper}
+                value={surface[key]}
+                defaultHex={SURFACE_DEFAULTS[key]}
+                onChange={(v) => setSurfaceField(key, v)}
+                error={state.errors?.[key]?.[0]}
+              />
+            ))}
+            {Object.keys(SURFACE_DEFAULTS).map((key) => (
+              <input key={key} type="hidden" name={key} value={surface[key as SurfaceKey]} />
+            ))}
           </CardContent>
           {lowContrast && (
             <CardContent className="pt-0">
@@ -244,6 +262,84 @@ export function BrandingForm({ settings, canEdit }: { settings: StoreBrandingSet
               </div>
             </CardContent>
           )}
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Button Colors</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Add and Save both use the Brand Accent Color above — these five
+              have their own existing look today, so each gets its own field.
+              Border and hover shade are worked out automatically from
+              whichever color is chosen.
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            {BRAND_ACTION_KEYS.map((key) => (
+              <ColorField
+                key={key}
+                id={key}
+                label={BRAND_ACTION_LABEL[key]}
+                value={actionColors[key]}
+                defaultHex={BRAND_ACTION_DEFAULT[key]}
+                onChange={(v) => setActionField(key, v)}
+                error={state.errors?.[key]?.[0]}
+              />
+            ))}
+            {BRAND_ACTION_KEYS.map((key) => (
+              <input key={key} type="hidden" name={key} value={actionColors[key]} />
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Status Colors</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Every status across every module (invoices, purchases, draft
+              orders, quotations, users, support tickets, ...) maps onto
+              whichever of these five it means, so one change here moves
+              every kind of &quot;pending&quot; (or Draft/Completed/Active/
+              Inactive) state together.
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            {BRAND_STATUS_KEYS.map((key) => (
+              <ColorField
+                key={key}
+                id={key}
+                label={BRAND_STATUS_LABEL[key]}
+                value={statusColors[key]}
+                defaultHex={BRAND_STATUS_DEFAULT[key]}
+                onChange={(v) => setStatusField(key, v)}
+                error={state.errors?.[key]?.[0]}
+              />
+            ))}
+            {BRAND_STATUS_KEYS.map((key) => (
+              <input key={key} type="hidden" name={key} value={statusColors[key]} />
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Icons</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-medium">Show icons on buttons</p>
+                <p className="text-xs text-muted-foreground">
+                  Hides the small icon beside a button&apos;s text (Export,
+                  Import, Save, ...). Icon-only controls, like a row&apos;s
+                  Edit/View/Delete buttons, always keep their icon — it&apos;s
+                  their only content.
+                </p>
+              </div>
+              <Switch checked={showIcons} onCheckedChange={setShowIcons} />
+            </div>
+            <input type="hidden" name="showIcons" value={showIcons ? "true" : "false"} />
+          </CardContent>
         </Card>
 
         <Card>
@@ -343,19 +439,63 @@ export function BrandingForm({ settings, canEdit }: { settings: StoreBrandingSet
                   borderRadius: BRAND_RADIUS_VALUE[radius],
                 }}
               >
-                <p className="text-sm font-semibold">Classic Gold Ring</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">Classic Gold Ring</p>
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    style={{
+                      backgroundColor: statusColors.statusActiveColor || BRAND_STATUS_DEFAULT.statusActiveColor,
+                      color: "#fff",
+                    }}
+                  >
+                    Active
+                  </span>
+                </div>
                 <p className="text-xs opacity-70">PRD-RING-001 · Ornament</p>
-                <button
-                  type="button"
-                  className="px-3 py-1.5 text-sm font-medium text-white shadow-sm"
-                  style={{ backgroundColor: previewAccent, borderRadius: BRAND_RADIUS_VALUE[radius] }}
-                >
-                  Save
-                </button>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    className="px-3 py-1.5 text-xs font-medium text-white shadow-sm"
+                    style={{ backgroundColor: previewAccent, borderRadius: BRAND_RADIUS_VALUE[radius] }}
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-1.5 text-xs font-medium text-white shadow-sm"
+                    style={{
+                      backgroundColor: actionColors.editColor || BRAND_ACTION_DEFAULT.editColor,
+                      borderRadius: BRAND_RADIUS_VALUE[radius],
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-1.5 text-xs font-medium text-white shadow-sm"
+                    style={{
+                      backgroundColor: actionColors.deleteColor || BRAND_ACTION_DEFAULT.deleteColor,
+                      borderRadius: BRAND_RADIUS_VALUE[radius],
+                    }}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    className="border px-3 py-1.5 text-xs font-medium shadow-sm"
+                    style={{
+                      backgroundColor: HEX_RE.test(actionColors.cancelColor) ? actionColors.cancelColor : "transparent",
+                      color: HEX_RE.test(actionColors.cancelColor) ? "#fff" : previewForeground,
+                      borderRadius: BRAND_RADIUS_VALUE[radius],
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
               <p className="text-xs opacity-70">
-                This card and button preview the colors, font, and corner
-                style chosen at left.
+                This preview reflects colors, font, and corner style as
+                they&apos;re chosen at left, before Save.
               </p>
             </div>
           </CardContent>

@@ -299,7 +299,12 @@ export function DataTableToolbar({
               disabled={isExporting}
               title={hasSelection ? `Export selected ${entityLabel} (${selectedIds!.length})` : `Export ${entityLabel}`}
               aria-label={hasSelection ? `Export selected ${entityLabel} (${selectedIds!.length})` : `Export ${entityLabel}`}
-              className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
+              // Sourced from --btn-export-bg (Branding's Export color, see
+              // lib/branding.ts) as a light tint chip rather than the solid
+              // fill the `export` Button variant uses elsewhere — this is an
+              // icon-only control, and a small solid-filled square read as
+              // heavier than the rest of this toolbar's icon buttons.
+              className="border-transparent bg-[var(--btn-export-bg)]/10 text-[var(--btn-export-bg)] hover:bg-[var(--btn-export-bg)]/20"
             >
               {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}
             </Button>

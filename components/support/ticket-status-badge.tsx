@@ -9,18 +9,23 @@ const STATUS_LABEL: Record<TicketStatus, string> = {
   CLOSED: "Closed",
 }
 
-// Matches this app's existing status-badge convention (see e.g.
-// InvoiceStatus badges elsewhere): default (dark) for the state needing
-// attention, outline for a settled one.
-const STATUS_VARIANT: Record<TicketStatus, "default" | "secondary" | "outline"> = {
-  OPEN: "default",
-  IN_PROGRESS: "secondary",
-  RESOLVED: "outline",
-  CLOSED: "outline",
+// Sourced from Branding's five status-bucket colors (see
+// lib/branding.ts/StoreBranding) — OPEN maps to Pending (awaiting a first
+// response), IN_PROGRESS to Active (being worked on), RESOLVED to
+// Completed, CLOSED to Inactive.
+const STATUS_STYLES: Record<TicketStatus, string> = {
+  OPEN: "bg-[var(--status-pending-bg)] text-[var(--status-pending-text)]",
+  IN_PROGRESS: "bg-[var(--status-active-bg)] text-[var(--status-active-text)]",
+  RESOLVED: "bg-[var(--status-completed-bg)] text-[var(--status-completed-text)]",
+  CLOSED: "bg-[var(--status-inactive-bg)] text-[var(--status-inactive-text)]",
 }
 
 export function TicketStatusBadge({ status }: { status: TicketStatus }) {
-  return <Badge variant={STATUS_VARIANT[status]}>{STATUS_LABEL[status]}</Badge>
+  return (
+    <Badge className={`border-transparent ${STATUS_STYLES[status]}`}>
+      {STATUS_LABEL[status]}
+    </Badge>
+  )
 }
 
 export { STATUS_LABEL as TICKET_STATUS_LABEL }

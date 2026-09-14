@@ -12,7 +12,15 @@ import {
   getUserStoreMemberships,
 } from "@/lib/store-context";
 import { getSidebarCounts } from "@/lib/actions/sidebar-actions";
-import { BRAND_FONT_VARIABLE, BRAND_RADIUS_VALUE } from "@/lib/branding";
+import {
+  BRAND_ACTION_CSS_PREFIX,
+  BRAND_ACTION_KEYS,
+  BRAND_FONT_VARIABLE,
+  BRAND_RADIUS_VALUE,
+  BRAND_STATUS_CSS_PREFIX,
+  BRAND_STATUS_KEYS,
+  pickReadableTextColor,
+} from "@/lib/branding";
 
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { TopBar } from "@/components/dashboard/top-bar";
@@ -199,6 +207,41 @@ export default async function DashboardLayout({
     brandingStyle["--foreground"] = brandingSettings.foregroundColor;
     brandingStyle["--card-foreground"] = brandingSettings.foregroundColor;
   }
+  if (brandingSettings?.sidebarColor) {
+    brandingStyle["--sidebar"] = brandingSettings.sidebarColor;
+    brandingStyle["--sidebar-foreground"] = pickReadableTextColor(brandingSettings.sidebarColor);
+  }
+  if (brandingSettings?.headerColor) {
+    brandingStyle["--header"] = brandingSettings.headerColor;
+  }
+
+  // Edit/Delete/Cancel/Export/Import — each an independent bg swatch with
+  // an auto-picked readable text color (see pickReadableTextColor's own
+  // comment), applied only for the ones a store actually customized.
+  for (const key of BRAND_ACTION_KEYS) {
+    const value = brandingSettings?.[key];
+    if (!value) continue;
+    const prefix = BRAND_ACTION_CSS_PREFIX[key];
+    brandingStyle[`--${prefix}-bg`] = value;
+    brandingStyle[`--${prefix}-text`] = pickReadableTextColor(value);
+    // Cancel's own border tracks its bg once customized, so a solid fill
+    // doesn't show the old neutral outline-style border around it — see
+    // button.tsx's `cancel` variant, which always renders this border.
+    if (key === "cancelColor") {
+      brandingStyle["--btn-cancel-border"] = value;
+    }
+  }
+
+  // Draft/Pending/Completed/Active/Inactive status-bucket colors — same
+  // auto-text-color rule as the action colors above.
+  for (const key of BRAND_STATUS_KEYS) {
+    const value = brandingSettings?.[key];
+    if (!value) continue;
+    const prefix = BRAND_STATUS_CSS_PREFIX[key];
+    brandingStyle[`--${prefix}-bg`] = value;
+    brandingStyle[`--${prefix}-text`] = pickReadableTextColor(value);
+  }
+
   if (brandingSettings && brandingSettings.fontFamily !== "INTER") {
     brandingStyle["--font-sans"] = BRAND_FONT_VARIABLE[brandingSettings.fontFamily];
   }
@@ -212,7 +255,11 @@ export default async function DashboardLayout({
     // below it via plain CSS custom-property inheritance, without touching
     // SidebarProvider's own root element or duplicating these onto each of
     // AppSidebar/TopBar/main individually.
-    <div className="contents" style={brandingStyle as React.CSSProperties}>
+    <div
+      className="contents"
+      style={brandingStyle as React.CSSProperties}
+      data-hide-icons={brandingSettings?.showIcons === false ? "true" : undefined}
+    >
       <SidebarProvider>
         <AppSidebar
           storeName={storeInfo?.name}

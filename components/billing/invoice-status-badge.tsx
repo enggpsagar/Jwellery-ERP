@@ -7,11 +7,16 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
   CANCELLED: "Cancelled",
 };
 
+// Sourced from Branding's five status-bucket colors (see
+// lib/branding.ts/StoreBranding) rather than hardcoded Tailwind classes —
+// DRAFT/PAID/PARTIAL/CANCELLED each map onto whichever bucket they mean
+// (Draft/Completed/Pending/Inactive), so a store recoloring "Pending"
+// moves every kind of pending state across every module together.
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
-  DRAFT: "bg-blue-100 text-blue-700",
-  PAID: "bg-green-100 text-green-700",
-  PARTIAL: "bg-yellow-100 text-yellow-700",
-  CANCELLED: "bg-red-100 text-red-700",
+  DRAFT: "bg-[var(--status-draft-bg)] text-[var(--status-draft-text)]",
+  PAID: "bg-[var(--status-completed-bg)] text-[var(--status-completed-text)]",
+  PARTIAL: "bg-[var(--status-pending-bg)] text-[var(--status-pending-text)]",
+  CANCELLED: "bg-[var(--status-inactive-bg)] text-[var(--status-inactive-text)]",
 };
 
 export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {

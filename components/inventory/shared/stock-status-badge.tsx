@@ -11,6 +11,14 @@ const STATUS_LABELS: Record<InventoryStockStatus, string> = {
   ARCHIVED: "Archived",
 };
 
+// Deliberately NOT wired to Branding's five status-bucket colors the way
+// invoice/purchase/draft-order/quotation/user/ticket status badges are —
+// six real states here (vs. those five buckets) with meaningfully different
+// urgency that would blur together under a generic mapping: Sold's loud
+// solid-red "notice this" treatment is deliberately louder than Damaged's
+// pastel red, and Issued-to-Artisan's purple has no equivalent bucket at
+// all. Forcing all six into Draft/Pending/Completed/Active/Inactive would
+// lose real distinctions this app's own stock table relies on.
 const STATUS_STYLES: Record<InventoryStockStatus, string> = {
   IN_STOCK: "bg-green-100 text-green-700",
   // Solid red + white, not the pastel red-100/red-700 DAMAGED uses below —

@@ -58,7 +58,7 @@ export function RecordKachaPaymentDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Record Payment</Button>
+        <Button variant="success">Record Payment</Button>
       </DialogTrigger>
 
       <DialogContent>

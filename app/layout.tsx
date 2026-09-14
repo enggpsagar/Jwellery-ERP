@@ -1,6 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Roboto, Poppins, Merriweather, Playfair_Display, Lato } from "next/font/google";
 import Script from "next/script";
 import { getServerSession } from "next-auth";
 
@@ -15,11 +15,28 @@ import { authOptions } from "@/lib/auth/auth-options";
 // utilitarian look of business apps like Vyapar. Previously paired with
 // Playfair Display for a "premium jewellery" serif-heading look; that
 // pairing is gone, --font-heading in globals.css now just points back at
-// this same font.
+// this same font. Still the app's un-customized default: --font-sans is
+// set to this on <html> below, exactly as before this file grew the five
+// fonts under it.
 const bodyFont = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
 });
+
+// The rest of the curated Branding font picker (see lib/actions/
+// branding-actions.ts's BrandFontFamily) — each under its own distinct CSS
+// variable, never touching --font-sans itself. All six load unconditionally
+// (a store's font choice can't gate what's fetched at the root layout,
+// which renders before any store context exists), but next/font/google
+// self-hosts and subsets these at build time, so this is a fixed, small
+// asset cost, not a runtime fetch per visitor. The (dashboard) layout picks
+// one of these six by overriding --font-sans to point at it for that
+// store's own pages only.
+const robotoFont = Roboto({ subsets: ["latin"], weight: ["400", "500", "700"], variable: "--font-roboto" });
+const poppinsFont = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-poppins" });
+const merriweatherFont = Merriweather({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-merriweather" });
+const playfairFont = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" });
+const latoFont = Lato({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-lato" });
 
 export const metadata: Metadata = {
   title: {
@@ -49,7 +66,15 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={cn("font-sans", bodyFont.variable)}
+      className={cn(
+        "font-sans",
+        bodyFont.variable,
+        robotoFont.variable,
+        poppinsFont.variable,
+        merriweatherFont.variable,
+        playfairFont.variable,
+        latoFont.variable,
+      )}
     >
       {betterStackRumToken && (
         <Script

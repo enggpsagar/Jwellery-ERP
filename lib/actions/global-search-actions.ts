@@ -57,7 +57,12 @@ export async function globalSearch(
           { designCode: { contains: term, mode: "insensitive" } },
         ],
       },
-      select: { id: true, name: true, productCode: true, category: true },
+      select: {
+        id: true,
+        name: true,
+        productCode: true,
+        category: { select: { name: true } },
+      },
       take: RESULTS_PER_TYPE,
     }),
     prisma.invoice.findMany({
@@ -102,7 +107,7 @@ export async function globalSearch(
       type: "product" as const,
       id: p.id,
       title: p.name,
-      subtitle: [p.productCode, p.category].filter(Boolean).join(" · "),
+      subtitle: [p.productCode, p.category?.name].filter(Boolean).join(" · "),
       href: `/inventory/products/${p.id}`,
     })),
     ...invoices.map((inv) => ({

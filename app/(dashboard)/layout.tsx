@@ -12,6 +12,7 @@ import {
   getUserStoreMemberships,
 } from "@/lib/store-context";
 import { getSidebarCounts } from "@/lib/actions/sidebar-actions";
+import { BRAND_FONT_VARIABLE, BRAND_RADIUS_VALUE } from "@/lib/branding";
 
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { TopBar } from "@/components/dashboard/top-bar";
@@ -145,7 +146,7 @@ export default async function DashboardLayout({
 
   // Brand the sidebar with the store actually being worked in, not the one
   // on the User row — those differ the moment someone switches.
-  const [storeBranding, sidebarCounts] = await Promise.all([
+  const [storeInfo, sidebarCounts, brandingSettings] = await Promise.all([
     activeStoreId
       ? prisma.store.findUnique({
           where: { id: activeStoreId },
@@ -157,6 +158,12 @@ export default async function DashboardLayout({
         })
       : Promise.resolve(null),
     getSidebarCounts(activeStoreId, session.user.role),
+    // Store-customized theme (see /brand-guide, lib/actions/branding-actions.ts)
+    // — a store that's never opened Branding has no row at all, which is
+    // exactly "use every app default," same as a null field on one that does.
+    activeStoreId
+      ? prisma.storeBranding.findUnique({ where: { storeId: activeStoreId } })
+      : Promise.resolve(null),
   ]);
 
   // Resolved fresh on every layout render, not read off the session token —
@@ -164,35 +171,78 @@ export default async function DashboardLayout({
   // JWT can't be trusted for this (it's signed once at login and never
   // re-signed for the life of the session).
   const isPlanExpired = Boolean(
-    storeBranding?.planExpiresAt && storeBranding.planExpiresAt < new Date()
+    storeInfo?.planExpiresAt && storeInfo.planExpiresAt < new Date()
   );
 
-  return (
-    <SidebarProvider>
-      <AppSidebar
-        storeName={storeBranding?.name}
-        storeLogoUrl={storeBranding?.businessSettings?.logoUrl}
-        counts={sidebarCounts}
-      />
+  // Every field below is independently optional, so a store that has only
+  // ever changed (say) the font gets exactly one override here — everything
+  // else keeps inheriting the app's real default from globals.css untouched.
+  // `display: contents` on the wrapper below means this carries zero layout
+  // footprint of its own; it exists purely to put these custom properties
+  // somewhere in the tree above the sidebar/topbar/page content that reads
+  // them, without duplicating them onto each.
+  const brandingStyle: Record<string, string> = {};
+  if (brandingSettings?.accentColor) {
+    brandingStyle["--chart-2"] = brandingSettings.accentColor;
+    // Keeps the focus ring matching a customized accent instead of the
+    // app's fixed gold-ish default — only when an accent is actually
+    // customized, so an un-customized store's ring is unaffected.
+    brandingStyle["--ring"] = "var(--chart-2)";
+  }
+  if (brandingSettings?.backgroundColor) {
+    brandingStyle["--background"] = brandingSettings.backgroundColor;
+  }
+  if (brandingSettings?.cardColor) {
+    brandingStyle["--card"] = brandingSettings.cardColor;
+  }
+  if (brandingSettings?.foregroundColor) {
+    brandingStyle["--foreground"] = brandingSettings.foregroundColor;
+    brandingStyle["--card-foreground"] = brandingSettings.foregroundColor;
+  }
+  if (brandingSettings && brandingSettings.fontFamily !== "INTER") {
+    brandingStyle["--font-sans"] = BRAND_FONT_VARIABLE[brandingSettings.fontFamily];
+  }
+  if (brandingSettings && brandingSettings.radius !== "DEFAULT") {
+    brandingStyle["--radius"] = BRAND_RADIUS_VALUE[brandingSettings.radius];
+  }
 
-      <SidebarInset>
-        <TopBar
-          stores={stores}
-          activeStoreId={activeStoreId}
-          canSwitchStores={isSuperAdmin || stores.length > 1}
-          planExpired={isPlanExpired}
+  return (
+    // display: contents — zero layout footprint of its own. Exists only to
+    // carry a customized store's theme overrides (if any) to everything
+    // below it via plain CSS custom-property inheritance, without touching
+    // SidebarProvider's own root element or duplicating these onto each of
+    // AppSidebar/TopBar/main individually.
+    <div className="contents" style={brandingStyle as React.CSSProperties}>
+      <SidebarProvider>
+        <AppSidebar
+          storeName={storeInfo?.name}
+          storeLogoUrl={storeInfo?.businessSettings?.logoUrl}
+          counts={sidebarCounts}
         />
 
-        <main className="flex min-w-0 flex-1 flex-col bg-slate-50 p-6">
-          {isSuperAdmin && !isStoreExemptRoute && stores.length === 0 ? (
-            <NoStoreAccessNotice />
-          ) : isSuperAdmin && !isStoreExemptRoute && !activeStoreId ? (
-            <SelectStoreNotice />
-          ) : (
-            children
-          )}
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+        <SidebarInset>
+          <TopBar
+            stores={stores}
+            activeStoreId={activeStoreId}
+            canSwitchStores={isSuperAdmin || stores.length > 1}
+            planExpired={isPlanExpired}
+          />
+
+          {/* bg-background, not a hardcoded slate — this is the one thing
+              the whole page area actually shows a customized backgroundColor
+              on; a fixed color here would make that Branding option
+              silently do nothing for most of the visible screen. */}
+          <main className="flex min-w-0 flex-1 flex-col bg-background p-6">
+            {isSuperAdmin && !isStoreExemptRoute && stores.length === 0 ? (
+              <NoStoreAccessNotice />
+            ) : isSuperAdmin && !isStoreExemptRoute && !activeStoreId ? (
+              <SelectStoreNotice />
+            ) : (
+              children
+            )}
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
+    </div>
   );
 }

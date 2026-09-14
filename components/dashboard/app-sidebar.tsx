@@ -173,7 +173,7 @@ const mainNav: NavItem[] = [
     icon: CreditCard,
   },
   {
-    title: "Brand Guide",
+    title: "Branding",
     href: "/brand-guide",
     icon: Palette,
   },
@@ -191,8 +191,14 @@ function getNavForRole(role?: string, permissions: string[] = []) {
   if (role === "KARIGAR") return karigarNav;
 
   return mainNav.filter((item) => {
-    if (item.href === "/stores" || item.href === "/plans" || item.href === "/brand-guide") {
+    if (item.href === "/stores" || item.href === "/plans") {
       return role === "SUPER_ADMIN";
+    }
+    // Branding is store-owner configuration now, same Admin/Super Admin
+    // visibility as the Settings link below — not Super-Admin-only like
+    // Stores/Plans above.
+    if (item.href === "/brand-guide") {
+      return role === "SUPER_ADMIN" || role === "ADMIN";
     }
     // Empty permissions means "not customized" — falls back to full access,
     // matching getEffectivePermissions() in lib/roles.ts.

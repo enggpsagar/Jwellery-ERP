@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { LedgerEntryType, LedgerSourceType, PaymentMethod } from "@prisma/client"
+import { LedgerEntryType, LedgerSourceType, PaymentMethod, InvoiceStatus, Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope } from "@/lib/store-context"
@@ -24,6 +24,58 @@ type PaymentEntryInput = {
   reference?: string | null
   bankName?: string | null
   attachmentUrl?: string | null
+}
+
+type OutstandingDoc = {
+  date: Date
+  paidAmount: number
+  balanceAmount: number
+  totalAmount: number
+  buildUpdate: (data: {
+    paidAmount: number
+    balanceAmount: number
+    status: InvoiceStatus
+  }) => Prisma.PrismaPromise<unknown>
+}
+
+/**
+ * A general "Payment In"/"Payment Out" here isn't tied to one specific
+ * invoice/purchase (see recordCustomerPayment/recordPaymentOut's own doc
+ * comments) — but leaving every outstanding document's balanceAmount
+ * untouched meant the money never actually reduced what the app considers
+ * "owed," so Outstanding Receivables (getDashboardStats, which sums
+ * Invoice/KachaInvoice balanceAmount directly) and every Customer/Vendor
+ * pendingAmount display stayed wrong even after a real payment. This
+ * applies the amount oldest-document-first — the standard reconciliation
+ * rule real accounting software uses for an unallocated on-account payment
+ * — same paidAmount/balanceAmount/status update recordInvoicePayment and
+ * recordPurchasePayment already do per-document, just spread across
+ * however many oldest documents the amount reaches. Any amount left over
+ * once every outstanding document is fully paid (an overpayment / advance)
+ * is deliberately left unapplied — it still shows up as the ledger entry
+ * this function's caller creates, same as before this fix.
+ */
+function allocatePaymentOldestFirst(
+  amount: number,
+  docs: OutstandingDoc[],
+): Prisma.PrismaPromise<unknown>[] {
+  const updates: Prisma.PrismaPromise<unknown>[] = []
+  let remaining = amount
+
+  for (const doc of [...docs].sort((a, b) => a.date.getTime() - b.date.getTime())) {
+    if (remaining <= 0) break
+    const applied = Math.min(remaining, doc.balanceAmount)
+    if (applied <= 0) continue
+
+    const newPaid = doc.paidAmount + applied
+    const newBalance = Math.max(0, doc.totalAmount - newPaid)
+    const status = newBalance === 0 ? InvoiceStatus.PAID : InvoiceStatus.PARTIAL
+
+    updates.push(doc.buildUpdate({ paidAmount: newPaid, balanceAmount: newBalance, status }))
+    remaining -= applied
+  }
+
+  return updates
 }
 
 /** Same shape/validation as every other "Record Payment" action in this
@@ -304,8 +356,47 @@ export async function recordCustomerPayment(
     })
     if (!customer) return { success: false, message: "Party not found" }
 
-    await prisma.$transaction(
-      payments.map((payment, index) =>
+    const totalAmount = payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
+
+    // Same "outstanding" definition getDashboardStats' Outstanding
+    // Receivables card uses — an unallocated payment settling this
+    // customer's oldest bills first is what actually makes that figure (and
+    // every Customer pendingAmount display) move.
+    const [outstandingInvoices, outstandingKacha] = await Promise.all([
+      prisma.invoice.findMany({
+        where: { storeId, customerId, balanceAmount: { gt: 0 }, status: { not: InvoiceStatus.CANCELLED } },
+        select: { id: true, invoiceDate: true, paidAmount: true, balanceAmount: true, totalAmount: true },
+      }),
+      prisma.kachaInvoice.findMany({
+        where: { storeId, customerId, balanceAmount: { gt: 0 } },
+        select: { id: true, invoiceDate: true, paidAmount: true, balanceAmount: true, totalAmount: true },
+      }),
+    ])
+
+    const outstandingDocs = [
+      ...outstandingInvoices.map((invoice) => ({
+        date: invoice.invoiceDate,
+        paidAmount: Number(invoice.paidAmount),
+        balanceAmount: Number(invoice.balanceAmount),
+        totalAmount: Number(invoice.totalAmount),
+        buildUpdate: (data: { paidAmount: number; balanceAmount: number; status: InvoiceStatus }) =>
+          prisma.invoice.update({ where: { id: invoice.id }, data }),
+      })),
+      ...outstandingKacha.map((kacha) => ({
+        date: kacha.invoiceDate,
+        paidAmount: Number(kacha.paidAmount),
+        balanceAmount: Number(kacha.balanceAmount),
+        totalAmount: Number(kacha.totalAmount),
+        buildUpdate: (data: { paidAmount: number; balanceAmount: number; status: InvoiceStatus }) =>
+          prisma.kachaInvoice.update({ where: { id: kacha.id }, data }),
+      })),
+    ]
+
+    const balanceUpdates = allocatePaymentOldestFirst(totalAmount, outstandingDocs)
+
+    await prisma.$transaction([
+      ...balanceUpdates,
+      ...payments.map((payment, index) =>
         prisma.ledgerEntry.create({
           data: {
             storeId,
@@ -321,11 +412,14 @@ export async function recordCustomerPayment(
           },
         }),
       ),
-    )
+    ])
 
     revalidatePath("/payments/in")
     revalidatePath("/ledger")
     revalidatePath(`/customers/${customerId}`)
+    revalidatePath("/dashboard")
+    revalidatePath("/billing")
+    revalidatePath("/billing/kacha")
 
     return { success: true, message: "Payment In recorded" }
   } catch (error) {
@@ -388,8 +482,31 @@ export async function recordPaymentOut(
       })
       if (!vendor) return { success: false, message: "Vendor not found" }
 
-      await prisma.$transaction(
-        payments.map((payment, index) =>
+      const totalAmount = payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
+
+      // Same fix as recordCustomerPayment's own — an unallocated Payment Out
+      // must still pay down this vendor's oldest outstanding purchases, or
+      // their balance never reflects it.
+      const outstandingPurchases = await prisma.purchase.findMany({
+        where: { storeId, vendorId, balanceAmount: { gt: 0 }, status: { not: InvoiceStatus.CANCELLED } },
+        select: { id: true, purchaseDate: true, paidAmount: true, balanceAmount: true, totalAmount: true },
+      })
+
+      const balanceUpdates = allocatePaymentOldestFirst(
+        totalAmount,
+        outstandingPurchases.map((purchase) => ({
+          date: purchase.purchaseDate,
+          paidAmount: Number(purchase.paidAmount),
+          balanceAmount: Number(purchase.balanceAmount),
+          totalAmount: Number(purchase.totalAmount),
+          buildUpdate: (data: { paidAmount: number; balanceAmount: number; status: InvoiceStatus }) =>
+            prisma.purchase.update({ where: { id: purchase.id }, data }),
+        })),
+      )
+
+      await prisma.$transaction([
+        ...balanceUpdates,
+        ...payments.map((payment, index) =>
           prisma.ledgerEntry.create({
             data: {
               storeId,
@@ -405,11 +522,13 @@ export async function recordPaymentOut(
             },
           }),
         ),
-      )
+      ])
 
       revalidatePath("/payments/out")
       revalidatePath("/ledger")
       revalidatePath(`/vendors/${vendorId}`)
+      revalidatePath("/dashboard")
+      revalidatePath("/purchases")
 
       return { success: true, message: "Payment Out recorded" }
     }

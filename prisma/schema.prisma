@@ -92,6 +92,7 @@ model Store {
   metalRates           MetalRate[]
   businessSettings     BusinessSettings?
   reportSettings       ReportSettings?
+  branding             StoreBranding?
   inviteTokens         InviteToken[]
   vendors              Vendor[]
   purchases            Purchase[]
@@ -1769,6 +1770,83 @@ enum ReportFrequency {
   MONTHLY
   QUARTERLY
   ANNUAL
+}
+
+// Which of the six curated Google Fonts a store's Branding page has picked
+// for its own staff-facing UI — see app/layout.tsx (all six loaded once,
+// each under its own CSS variable) and the (dashboard) layout, which
+// overrides --font-sans to whichever one this resolves to. INTER matches
+// the app's un-customized default, so a store that never opens Branding
+// renders byte-identical to before this feature existed.
+enum BrandFontFamily {
+  INTER
+  ROBOTO
+  POPPINS
+  MERRIWEATHER
+  PLAYFAIR_DISPLAY
+  LATO
+}
+
+// Sharp/Default/Rounded — a store-wide multiplier on the app's single
+// --radius token (globals.css derives --radius-sm..4xl from it), not a
+// new scale of its own.
+enum BrandRadius {
+  SHARP
+  DEFAULT
+  ROUNDED
+}
+
+/**
+ * Per-store visual customization — the Branding page (app/(dashboard)/
+ * brand-guide/page.tsx, née the Super-Admin-only static design reference).
+ * One row per store, same 1-to-1 shape as BusinessSettings, created lazily
+ * on first visit to Branding (see getStoreBranding()).
+ *
+ * Every color field is nullable and means "use the app's built-in default"
+ * when unset — deliberately not backfilled with the current default hex at
+ * creation, so a store that never customizes a field keeps tracking
+ * whatever the app's own base theme is if that ever changes later.
+ *
+ * Deliberately NOT customizable here (see (dashboard)/brand-guide/page.tsx's
+ * own doc comment for the full reasoning): the semantic status colors
+ * (success/warning/danger/info), the chart-1/3/4/5 module tint rotation
+ * (color-blind-safety validated as a set), and the sidebar's own fixed dark
+ * chrome — a store re-coloring "Delete" or breaking the chart palette's
+ * validated contrast would undermine the app-wide conventions those exist
+ * for, and the sidebar is deliberately constant brand chrome regardless of
+ * a store's own accent choice. Dark mode also always uses the app's own
+ * built-in dark palette, never a store's light-mode customization blended
+ * into it — auto-deriving a coherent dark variant from an arbitrary chosen
+ * color is its own hard problem, out of scope here.
+ */
+model StoreBranding {
+  storeId String @id
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  // Hex (#rrggbb). Replaces --chart-2 — the color actually used for every
+  // primary action/active state/focus ring app-wide (see brand-guide's own
+  // long-standing note that --primary/shadcn's default is NOT what's really
+  // used) — not the shadcn --primary token, which stays the fixed burgundy.
+  accentColor String?
+
+  // Hex (#rrggbb). Replaces --background (the page's own base surface).
+  backgroundColor String?
+
+  // Hex (#rrggbb). Replaces --card (raised surfaces: cards, dialogs,
+  // popovers, dropdowns).
+  cardColor String?
+
+  // Hex (#rrggbb). Replaces --foreground AND --card-foreground — one text
+  // color for both surfaces, not a separate pair, to keep the picker simple
+  // and avoid a store creating a readable body / unreadable card (or vice
+  // versa) by only remembering to change one of the two.
+  foregroundColor String?
+
+  fontFamily BrandFontFamily @default(INTER)
+  radius     BrandRadius     @default(DEFAULT)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 }
 
 /**

@@ -182,7 +182,7 @@ export const CUSTOMER_LIST_INCLUDE = {
     orderBy: { invoiceDate: "desc" as const },
   },
   ledgerEntries: {
-    select: { id: true, amount: true, entryDate: true },
+    select: { id: true, amount: true, type: true, entryDate: true },
     orderBy: { entryDate: "desc" as const },
   },
 };
@@ -226,6 +226,18 @@ export function mapCustomer(customer: any): CustomerRecord {
       ? formatDate(customer.ledgerEntries[0].entryDate)
       : "-";
 
+  // Same formula as getCustomerLedgerSummary (customer-ledger-actions.ts):
+  // opening balance plus every DEBIT (sales) minus every CREDIT (payments/
+  // refunds/write-offs) since. This used to just copy openingBalance
+  // straight through here — correct only for a customer with zero activity
+  // since creation, silently wrong (and rendered as the list's "Balance"
+  // column) for every other one.
+  const ledgerBalanceDelta = customer.ledgerEntries.reduce(
+    (sum: number, entry: any) =>
+      sum + (entry.type === "DEBIT" ? Number(entry.amount ?? 0) : -Number(entry.amount ?? 0)),
+    0,
+  );
+
   return {
     id: customer.id,
     name: customer.name,
@@ -238,7 +250,7 @@ export function mapCustomer(customer: any): CustomerRecord {
     pincode: customer.pincode ?? "",
     customerType: "",
     openingBalance: Number(customer.openingBalance ?? 0),
-    currentBalance: Number(customer.openingBalance ?? 0),
+    currentBalance: Number(customer.openingBalance ?? 0) + ledgerBalanceDelta,
     balanceType: "Receivable",
     goldBalance: 0,
     silverBalance: 0,

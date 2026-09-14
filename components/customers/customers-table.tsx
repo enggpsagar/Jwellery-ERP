@@ -191,8 +191,17 @@ export function CustomersTable({
                     {customer.state || "-"}
                   </td>
 
-                  <td className="px-4 py-3 text-foreground">
-                    ₹ {Number(customer.openingBalance || 0).toLocaleString("en-IN")}
+                  <td
+                    className={cn(
+                      "px-4 py-3",
+                      (customer.currentBalance ?? 0) > 0
+                        ? "text-red-600"
+                        : (customer.currentBalance ?? 0) < 0
+                          ? "text-blue-600"
+                          : "text-foreground",
+                    )}
+                  >
+                    ₹ {Number(customer.currentBalance ?? 0).toLocaleString("en-IN")}
                   </td>
                 </tr>
               )

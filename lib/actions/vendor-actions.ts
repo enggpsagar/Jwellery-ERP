@@ -196,6 +196,17 @@ function mapVendor(vendor: any): Vendor {
       ? formatDate(vendor.ledgerEntries[0].entryDate)
       : "-"
 
+  // Reverse of the Customer side's sign: a Purchase is CREDIT (increases
+  // what we owe the vendor) and a Payment made is DEBIT (reduces it) —
+  // confirmed against real ledger rows (PURCHASE sourceType always CREDIT,
+  // PAYMENT_OUT always DEBIT). This used to just copy openingBalance
+  // straight through, same bug as the Customer side's currentBalance.
+  const ledgerBalanceDelta = vendor.ledgerEntries.reduce(
+    (sum: number, entry: any) =>
+      sum + (entry.type === "CREDIT" ? Number(entry.amount ?? 0) : -Number(entry.amount ?? 0)),
+    0,
+  )
+
   return {
     id: vendor.id,
     name: vendor.name,
@@ -208,7 +219,7 @@ function mapVendor(vendor: any): Vendor {
     pincode: vendor.pincode ?? "",
     vendorType: "",
     openingBalance: Number(vendor.openingBalance ?? 0),
-    currentBalance: Number(vendor.openingBalance ?? 0),
+    currentBalance: Number(vendor.openingBalance ?? 0) + ledgerBalanceDelta,
     balanceType: "Payable",
     goldBalance: 0,
     silverBalance: 0,
@@ -277,6 +288,7 @@ export async function getVendors(
           select: {
             id: true,
             amount: true,
+            type: true,
             entryDate: true,
           },
           orderBy: {
@@ -324,6 +336,7 @@ export async function getVendorById(id: string): Promise<Vendor | null> {
         select: {
           id: true,
           amount: true,
+          type: true,
           entryDate: true,
         },
         orderBy: {
@@ -403,6 +416,7 @@ async function getAllVendorsForExport(
         select: {
           id: true,
           amount: true,
+          type: true,
           entryDate: true,
         },
         orderBy: {

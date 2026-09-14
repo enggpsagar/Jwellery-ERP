@@ -7,13 +7,10 @@ import { prisma } from "@/lib/prisma"
 import { requireStoreScope, assertPlanActiveForExport, PlanExpiredError } from "@/lib/store-context"
 import { formatShortDate } from "@/lib/utils"
 import { logger } from "@/lib/logger";
+import { CUSTOMER_LIST_INCLUDE, mapCustomer } from "@/lib/core/customer"
 
 type CustomerSortBy = "name" | "createdAt" | "openingBalance"
 type SortOrder = "asc" | "desc"
-
-function formatCurrency(value: number) {
-  return `₹ ${value.toLocaleString("en-IN")}`
-}
 
 function formatDate(date?: Date | null) {
   return formatShortDate(date)
@@ -66,56 +63,18 @@ export async function GET(request: NextRequest) {
           ? { openingBalance: sortOrder }
           : { createdAt: sortOrder }
 
+    // Same include + mapCustomer() this app's every other customer list/
+    // detail view uses (lib/core/customer.ts) — this route used to run its
+    // own separate, drifted copy of the pendingAmount/currentBalance math
+    // (missing Kacha invoices and openingBalance, same bug fixed there).
     const customers = await prisma.customer.findMany({
       where,
       orderBy,
-      include: {
-        invoices: {
-          select: {
-            id: true,
-            totalAmount: true,
-            balanceAmount: true,
-            invoiceDate: true,
-          },
-          orderBy: {
-            invoiceDate: "desc",
-          },
-        },
-        ledgerEntries: {
-          select: {
-            id: true,
-            amount: true,
-            entryDate: true,
-          },
-          orderBy: {
-            entryDate: "desc",
-          },
-        },
-      },
+      include: CUSTOMER_LIST_INCLUDE,
     })
 
     const rows = customers.map((customer, index) => {
-      const totalOrders = customer.invoices.length
-
-      const totalPurchaseValueNumber = customer.invoices.reduce(
-        (sum, invoice) => sum + Number(invoice.totalAmount || 0),
-        0
-      )
-
-      const pendingAmountNumber = customer.invoices.reduce(
-        (sum, invoice) => sum + Number(invoice.balanceAmount || 0),
-        0
-      )
-
-      const lastPurchaseDate =
-        customer.invoices.length > 0
-          ? formatDate(customer.invoices[0].invoiceDate)
-          : "-"
-
-      const lastPaymentDate =
-        customer.ledgerEntries.length > 0
-          ? formatDate(customer.ledgerEntries[0].entryDate)
-          : "-"
+      const mapped = mapCustomer(customer)
 
       return {
         "Sr No": index + 1,
@@ -128,13 +87,13 @@ export async function GET(request: NextRequest) {
         State: customer.state ?? "",
         Pincode: customer.pincode ?? "",
         GSTIN: customer.gstin ?? "",
-        "Opening Balance": Number(customer.openingBalance ?? 0),
-        "Current Balance": Number(customer.openingBalance ?? 0),
-        "Total Orders": totalOrders,
-        "Total Purchase Value": formatCurrency(totalPurchaseValueNumber),
-        "Pending Amount": formatCurrency(pendingAmountNumber),
-        "Last Purchase Date": lastPurchaseDate,
-        "Last Payment Date": lastPaymentDate,
+        "Opening Balance": mapped.openingBalance,
+        "Current Balance": mapped.currentBalance,
+        "Total Orders": mapped.totalOrders,
+        "Total Purchase Value": mapped.totalPurchaseValue,
+        "Pending Amount": mapped.pendingAmount,
+        "Last Purchase Date": mapped.lastPurchaseDate,
+        "Last Payment Date": mapped.lastPaymentDate,
         Notes: customer.notes ?? "",
         "Created At": formatDate(customer.createdAt),
       }

@@ -181,10 +181,17 @@ function mapVendor(vendor: any): Vendor {
     0
   )
 
-  const pendingAmountNumber = vendor.purchases.reduce(
-    (sum: number, purchase: any) => sum + Number(purchase.balanceAmount || 0),
-    0
-  )
+  // Outstanding = unpaid Purchases + opening balance — same fix as
+  // mapCustomer's own pendingAmount (lib/core/customer.ts): this used to
+  // ignore openingBalance entirely, so a vendor with an opening balance and
+  // zero purchases showed ₹0 owed everywhere except the (correct) figure
+  // nowhere actually displayed it against.
+  const pendingAmountNumber =
+    vendor.purchases.reduce(
+      (sum: number, purchase: any) =>
+        purchase.status === "CANCELLED" ? sum : sum + Number(purchase.balanceAmount || 0),
+      0,
+    ) + Number(vendor.openingBalance ?? 0)
 
   const lastPurchaseDate =
     vendor.purchases.length > 0
@@ -208,8 +215,14 @@ function mapVendor(vendor: any): Vendor {
     pincode: vendor.pincode ?? "",
     vendorType: "",
     openingBalance: Number(vendor.openingBalance ?? 0),
-    currentBalance: Number(vendor.openingBalance ?? 0),
-    balanceType: "Payable",
+    // Was hardcoded to openingBalance alone — see pendingAmountNumber's own
+    // comment above; this is the same fix (the CSV export's "Current
+    // Balance" column reads this field).
+    currentBalance: pendingAmountNumber,
+    // Was hardcoded to "Payable" for every vendor regardless of sign — a
+    // vendor the store has overpaid (pendingAmountNumber < 0) is owed
+    // nothing further; the store is instead owed a refund/credit.
+    balanceType: pendingAmountNumber < 0 ? "Advance" : "Payable",
     goldBalance: 0,
     silverBalance: 0,
     creditLimit: "",
@@ -230,15 +243,29 @@ function mapVendor(vendor: any): Vendor {
           name: vendor.linkedCustomer.name,
           customerCode: vendor.linkedCustomer.customerCode,
           isActive: vendor.linkedCustomer.isActive,
+          // Same fix as this file's own mapVendor pendingAmount — was
+          // ignoring openingBalance and any CANCELLED invoice.
           pendingAmount: formatCurrency(
             vendor.linkedCustomer.invoices.reduce(
-              (sum: number, invoice: any) => sum + Number(invoice.balanceAmount || 0),
+              (sum: number, invoice: any) =>
+                invoice.status === "CANCELLED" ? sum : sum + Number(invoice.balanceAmount || 0),
               0,
-            ),
+            ) + Number(vendor.linkedCustomer.openingBalance ?? 0),
           ),
         }
       : null,
   }
+}
+
+// A thin async wrapper around mapVendor — this file is a "use server"
+// module (every export must be an async function), and mapVendor itself is
+// a plain sync mapper reused internally throughout this file. Exists only
+// so the Vendors export route can share the exact same pendingAmount/
+// currentBalance calculation instead of keeping its own separate copy that
+// had drifted from it (missing openingBalance and any CANCELLED-purchase
+// filter — see mapVendor's own comments).
+export async function mapVendorForExport(vendor: any): Promise<Vendor> {
+  return mapVendor(vendor)
 }
 
 export async function getVendors(
@@ -268,6 +295,7 @@ export async function getVendors(
             totalAmount: true,
             balanceAmount: true,
             purchaseDate: true,
+            status: true,
           },
           orderBy: {
             purchaseDate: "desc",
@@ -315,6 +343,7 @@ export async function getVendorById(id: string): Promise<Vendor | null> {
           totalAmount: true,
           balanceAmount: true,
           purchaseDate: true,
+          status: true,
         },
         orderBy: {
           purchaseDate: "desc",
@@ -336,7 +365,8 @@ export async function getVendorById(id: string): Promise<Vendor | null> {
           name: true,
           customerCode: true,
           isActive: true,
-          invoices: { select: { balanceAmount: true } },
+          openingBalance: true,
+          invoices: { select: { balanceAmount: true, status: true } },
         },
       },
     },
@@ -394,6 +424,7 @@ async function getAllVendorsForExport(
           totalAmount: true,
           balanceAmount: true,
           purchaseDate: true,
+          status: true,
         },
         orderBy: {
           purchaseDate: "desc",

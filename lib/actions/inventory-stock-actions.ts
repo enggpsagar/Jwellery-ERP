@@ -672,6 +672,26 @@ export async function receiveItemsFromKarigar(
       }
     }
 
+    // A karigar can't physically return more raw metal than was issued to
+    // them — nothing previously checked this, so a mis-typed net weight
+    // (e.g. an extra digit) was accepted silently, closed the job as fully
+    // received, and drove the karigar's fine-metal ledger balance negative
+    // (getKarigarLedger's finalFineBalance), flipping the UI to "you owe
+    // the artisan" for a physically impossible state.
+    if (job.issueWeight) {
+      const issueWeightNum = Number(job.issueWeight);
+      const alreadyReceivedWeight = job.receiveWeight ? Number(job.receiveWeight) : 0;
+      const thisReceiptWeight = items.reduce((sum, item) => sum + (item.netWeight ?? 0), 0);
+      const WEIGHT_TOLERANCE = 0.001; // absorbs float noise only, see below
+      if (alreadyReceivedWeight + thisReceiptWeight > issueWeightNum + WEIGHT_TOLERANCE) {
+        const remaining = Math.max(0, issueWeightNum - alreadyReceivedWeight);
+        return {
+          success: false,
+          message: `This receipt totals ${thisReceiptWeight.toFixed(3)}g, but only ${remaining.toFixed(3)}g is still outstanding on this job (${issueWeightNum.toFixed(3)}g issued, ${alreadyReceivedWeight.toFixed(3)}g already received). Check the weight entered.`,
+        };
+      }
+    }
+
     const labourCharge = toDecimalOrNull(formData.get("labourCharge")) ?? 0;
 
     const fineness = await getFinenessMap(storeId);

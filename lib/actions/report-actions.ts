@@ -45,13 +45,35 @@ export async function getAvailableFinancialYears(): Promise<number[]> {
   return Array.from(years).sort((a, b) => b - a);
 }
 
+// India has no daylight saving, so a fixed +5:30 is exact — same
+// convention lib/report-builder.ts already uses for its own IST day/month
+// boundaries. `range.from`/`range.to` are plain "YYYY-MM-DD" strings (see
+// lib/date-range.ts), which `new Date(...)` parses as UTC midnight — 5:30
+// AM IST, not midnight IST. Left uncorrected, a range ending "today" (every
+// quick-range preset does) silently dropped everything from midnight to
+// 5:30 AM IST on its last day.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The UTC instant "00:00 IST" on this calendar date actually falls at. */
+function istDayStart(dateStr: string): Date {
+  return new Date(new Date(dateStr).getTime() - IST_OFFSET_MS);
+}
+
+/** The UTC instant "00:00 IST the following day" falls at — an exclusive
+ * upper bound, so the whole of `dateStr` itself (all 24 IST hours) is
+ * included. */
+function istDayEndExclusive(dateStr: string): Date {
+  return new Date(new Date(dateStr).getTime() + DAY_MS - IST_OFFSET_MS);
+}
+
 function toDateRangeWhere(range: DateRange, field: string) {
   if (!range.from && !range.to) return {};
 
   return {
     [field]: {
-      ...(range.from ? { gte: new Date(range.from) } : {}),
-      ...(range.to ? { lte: new Date(range.to) } : {}),
+      ...(range.from ? { gte: istDayStart(range.from) } : {}),
+      ...(range.to ? { lt: istDayEndExclusive(range.to) } : {}),
     },
   };
 }
@@ -143,7 +165,12 @@ export async function getInventoryValuationReport() {
       estimatedValue: 0,
     };
     entry.count += 1;
-    entry.netWeight += stock.netWeight ? Number(stock.netWeight) : 0;
+    // netWeight is documented as per-unit (see dashboard-actions.ts's own
+    // comment on InventoryStock.netWeight) — this summed the raw per-unit
+    // figure with no × quantity, undercounting every stock row that isn't
+    // exactly 1 piece. estimatedValue two lines below already multiplies
+    // correctly; this was the one figure on this report that didn't.
+    entry.netWeight += stock.netWeight ? Number(stock.netWeight) * stock.quantity : 0;
     entry.estimatedValue += stock.saleRate
       ? Number(stock.saleRate) * stock.quantity
       : Number(stock.purchaseAmount ?? 0);
@@ -227,27 +254,42 @@ export async function getKarigarOutstandingReport() {
  */
 export async function getCustomerDuesReport() {
   const storeId = await requireStoreScope();
+  // Was missing entirely — every other query in this file scopes by
+  // location; this one let a location-restricted Staff user see every
+  // customer's dues summed across the whole store, not just their own
+  // location's invoices.
+  const scope = await getLocationScope();
   const customers = await prisma.customer.findMany({
     where: { storeId, isActive: true, isArchived: false },
     include: {
       invoices: {
-        where: { balanceAmount: { gt: 0 } },
+        where: { balanceAmount: { gt: 0 }, status: { not: InvoiceStatus.CANCELLED }, ...locationWhere(scope) },
         select: { id: true, invoiceNumber: true, balanceAmount: true },
+      },
+      // Outstanding here has to mean the same thing it means everywhere
+      // else (mapCustomer, the Dashboard's Outstanding Receivables) — this
+      // used to count only Invoices, silently under-reporting any customer
+      // whose actual debt was sitting on an unpaid Kacha slip instead.
+      kachaInvoices: {
+        where: { balanceAmount: { gt: 0 }, status: { not: InvoiceStatus.CANCELLED }, ...locationWhere(scope) },
+        select: { id: true, slipNumber: true, balanceAmount: true },
       },
     },
   });
 
   const withDues = customers
-    .map((customer) => ({
-      id: customer.id,
-      name: customer.name,
-      phone: customer.phone,
-      totalDue: customer.invoices.reduce(
-        (sum, inv) => sum + Number(inv.balanceAmount),
-        0,
-      ),
-      invoiceCount: customer.invoices.length,
-    }))
+    .map((customer) => {
+      const invoiceDue = customer.invoices.reduce((sum, inv) => sum + Number(inv.balanceAmount), 0);
+      const kachaDue = customer.kachaInvoices.reduce((sum, k) => sum + Number(k.balanceAmount), 0);
+
+      return {
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        totalDue: invoiceDue + kachaDue,
+        invoiceCount: customer.invoices.length + customer.kachaInvoices.length,
+      };
+    })
     .filter((customer) => customer.totalDue > 0)
     .sort((a, b) => b.totalDue - a.totalDue);
 
@@ -370,10 +412,18 @@ export async function getGoldFlowReport(range: DateRange = {}) {
       status: { in: [InventoryStockStatus.IN_STOCK, InventoryStockStatus.RESERVED] },
       ...locationWhere(scope),
     },
-    select: { netWeight: true, purity: true },
+    select: { netWeight: true, purity: true, quantity: true },
   });
+  // netWeight is per-unit — didn't select or multiply by quantity at all,
+  // undercounting any stock row with more than 1 piece and inflating
+  // reconciliationGap below with false "missing gold" for exactly that
+  // undercounted weight (this function's own doc comment claims it and
+  // the Dashboard's Gold Stock card "cannot disagree" on remaining stock —
+  // dashboard-actions.ts does multiply by quantity, so this was the one
+  // that actually disagreed).
   const remainingStockFine = remainingStock.reduce(
-    (sum, stock) => sum + toFineWeight(Number(stock.netWeight ?? 0), stock.purity, fineness),
+    (sum, stock) =>
+      sum + toFineWeight(Number(stock.netWeight ?? 0), stock.purity, fineness) * stock.quantity,
     0,
   );
 
@@ -536,7 +586,11 @@ export async function getMetalWiseReport(range: DateRange = {}) {
   for (const stock of stockRows) {
     const row = getRow(stock.metalTypeId);
     row.inStockCount += 1;
-    row.inStockWeight += Number(stock.netWeight ?? 0);
+    // netWeight is per-unit — inStockValue two lines below already
+    // multiplies by quantity; this didn't, undercounting any stock row
+    // with more than 1 piece (and skewing reconciliationGap below to look
+    // like unexplained shrinkage that was actually just this bug).
+    row.inStockWeight += Number(stock.netWeight ?? 0) * stock.quantity;
     row.inStockValue += stock.saleRate
       ? Number(stock.saleRate) * stock.quantity
       : Number(stock.purchaseAmount ?? 0);

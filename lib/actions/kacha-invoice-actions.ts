@@ -37,6 +37,7 @@ import {
 } from "@/lib/actions/invoice-actions";
 import { OversellError } from "@/lib/inventory/oversell-error";
 import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
+import { computeGst } from "@/lib/gst";
 import {
   buildExcelExport,
   buildCsvExportBase64,
@@ -739,6 +740,16 @@ export async function recordKachaInvoicePayment(
     });
     if (!kachaInvoice) return { success: false, message: "Estimate not found" };
 
+    // Reject rather than silently clamp — see recordInvoicePayment's own
+    // comment on this exact check.
+    const currentBalance = Number(kachaInvoice.balanceAmount);
+    if (amount > currentBalance) {
+      return {
+        success: false,
+        message: `Amount exceeds the outstanding balance of ₹${currentBalance.toLocaleString("en-IN")}`,
+      };
+    }
+
     const newPaid = Number(kachaInvoice.paidAmount) + amount;
     const newBalance = Math.max(0, Number(kachaInvoice.totalAmount) - newPaid);
     const status: InvoiceStatus =
@@ -790,7 +801,7 @@ export async function convertKachaToPakka(
 
     const kachaInvoice = await prisma.kachaInvoice.findFirst({
       where: { id: kachaInvoiceId, storeId },
-      include: { items: true },
+      include: { items: true, customer: { select: { state: true } } },
     });
 
     if (!kachaInvoice) {
@@ -801,7 +812,6 @@ export async function convertKachaToPakka(
       return { success: false, message: "This Estimate has already been converted" };
     }
 
-    const taxAmount = toNumber(formData.get("taxAmount"));
     const dueDateRaw = String(formData.get("dueDate") || "");
     const notes = String(formData.get("notes") || "").trim() || kachaInvoice.notes;
     const gstRateId = String(formData.get("gstRateId") || "").trim() || null;
@@ -809,6 +819,38 @@ export async function convertKachaToPakka(
     // trusted from the client — see resolveGstRateSnapshot's own doc
     // comment.
     const gstRateSnapshot = await resolveGstRateSnapshot(storeId, gstRateId);
+
+    const invoiceSettings = await prisma.businessSettings.findUnique({
+      where: { storeId },
+      select: { invoicePrefix: true, invoiceStartingNo: true, gstScheme: true, state: true },
+    });
+
+    // Recomputed per line via the same computeGst() every other invoice
+    // creation path uses (createInvoice/updateInvoiceLineItem) — this used
+    // to trust a single flat `taxAmount` the client computed as
+    // `taxableAmount * gstRate / 100` with no SGST/CGST/IGST split at all
+    // and no Composition check, so InvoiceItem.sgstAmount/cgstAmount/
+    // igstAmount stayed 0 on every converted invoice (the printed tax
+    // table showed ₹0 despite a nonzero Total) and a Composition-scheme
+    // store — legally barred from charging any GST — could still convert a
+    // slip and pick a real GST rate for it. computeGst() itself zeroes the
+    // breakdown unconditionally for COMPOSITION regardless of rate picked,
+    // so deriving taxAmount from it here closes both gaps at once.
+    const gstRatePercent = gstRateSnapshot?.gstRatePercent ? Number(gstRateSnapshot.gstRatePercent) : 0;
+    const gstScheme = invoiceSettings?.gstScheme ?? "REGULAR_B2C";
+    const storeState = invoiceSettings?.state ?? null;
+    const customerState = kachaInvoice.customer?.state ?? null;
+
+    const itemTaxableValue = (item: (typeof kachaInvoice.items)[number]) =>
+      Number(item.rate ?? 0) * Number((item.purity === "DIAMOND" ? item.caratWeight : item.netWeight) ?? 0) +
+      Number(item.makingCharge) +
+      Number(item.hmCharge) +
+      Number(item.stoneCharge);
+
+    const itemGst = kachaInvoice.items.map((item) =>
+      computeGst(itemTaxableValue(item), gstRatePercent, gstScheme, storeState, customerState),
+    );
+    const taxAmount = itemGst.reduce((sum, g) => sum + g.sgst + g.cgst + g.igst, 0);
 
     const subtotal = Number(kachaInvoice.subtotal);
     const makingCharges = Number(kachaInvoice.makingCharges);
@@ -827,7 +869,6 @@ export async function convertKachaToPakka(
     if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
     else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
 
-    const invoiceSettings = await prisma.businessSettings.findUnique({ where: { storeId } });
     const invoicePrefix = invoiceSettings?.invoicePrefix?.trim() || "INV";
     const invoiceStartingNo = invoiceSettings?.invoiceStartingNo ?? 1;
     const year = new Date().getFullYear();
@@ -864,7 +905,7 @@ export async function convertKachaToPakka(
           gstRateName: gstRateSnapshot?.gstRateName ?? undefined,
           gstRatePercent: gstRateSnapshot?.gstRatePercent ?? undefined,
           items: {
-            create: kachaInvoice.items.map((item) => ({
+            create: kachaInvoice.items.map((item, index) => ({
               itemName: item.itemName,
               metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
@@ -884,14 +925,27 @@ export async function convertKachaToPakka(
               hmCharge: item.hmCharge,
               lineTotal: item.lineTotal,
               inventoryStockId: item.inventoryStockId ?? undefined,
+              sgstAmount: itemGst[index].sgst,
+              cgstAmount: itemGst[index].cgst,
+              igstAmount: itemGst[index].igst,
+              gstRateId: gstRateSnapshot?.gstRateId ?? undefined,
+              gstRateName: gstRateSnapshot?.gstRateName ?? undefined,
+              gstRatePercent: gstRateSnapshot?.gstRatePercent ?? undefined,
             })),
           },
         },
       });
 
+      // Zero the source slip's own balanceAmount (and mark it PAID) once its
+      // debt has moved onto the new Invoice — every outstanding-balance
+      // aggregate in this app (Dashboard's Outstanding Receivables, the
+      // general Payment In FIFO allocator, mapCustomer's pendingAmount, ...)
+      // sums KachaInvoice.balanceAmount alongside Invoice.balanceAmount with
+      // no convertedToId filter, so leaving this nonzero after conversion
+      // double-counted the same debt under both rows.
       await tx.kachaInvoice.updateMany({
         where: { id: kachaInvoiceId, storeId },
-        data: { convertedToId: created.id },
+        data: { convertedToId: created.id, balanceAmount: 0, status: InvoiceStatus.PAID },
       });
 
       return created;

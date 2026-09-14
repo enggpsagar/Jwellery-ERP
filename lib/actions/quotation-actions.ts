@@ -29,6 +29,7 @@ import {
 } from "@/lib/location-scope";
 import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import { formatShortDate } from "@/lib/utils";
+import { computeGst } from "@/lib/gst";
 import type {
   DataTableExportParams,
   DataTableExportResult,
@@ -778,7 +779,7 @@ export async function convertQuotationToInvoice(
 
     const quotation = await prisma.quotation.findFirst({
       where: { id: quotationId, storeId },
-      include: { items: true },
+      include: { items: true, customer: { select: { state: true } } },
     });
 
     if (!quotation) {
@@ -789,7 +790,6 @@ export async function convertQuotationToInvoice(
       return { success: false, message: "This quotation has already been converted" };
     }
 
-    const taxAmount = toNumber(formData.get("taxAmount"));
     const paidAmount = toNumber(formData.get("paidAmount"));
     const dueDateRaw = String(formData.get("dueDate") || "");
     const notes = String(formData.get("notes") || "").trim() || quotation.notes;
@@ -799,20 +799,45 @@ export async function convertQuotationToInvoice(
     // comment.
     const gstRateSnapshot = await resolveGstRateSnapshot(storeId, gstRateId);
 
-    // A Composition-scheme store is legally barred from charging any GST at
-    // all — this form re-asks for a fresh tax amount rather than reusing
-    // the quotation's own (see this function's doc comment), so it needs
-    // its own guard rather than inheriting createQuotation's.
     const businessSettings = await prisma.businessSettings.findUnique({
       where: { storeId },
-      select: { gstScheme: true },
+      select: { gstScheme: true, state: true },
     });
-    if (businessSettings?.gstScheme === "COMPOSITION" && taxAmount !== 0) {
+
+    // Recomputed per line via the same computeGst() every other invoice
+    // creation path uses (createInvoice/updateInvoiceLineItem), rather than
+    // trusting a single flat `taxAmount` the client computed with no SGST/
+    // CGST/IGST split — this form re-asks for a fresh tax amount rather
+    // than reusing the quotation's own (see this function's doc comment),
+    // and the previous flat number left InvoiceItem.sgstAmount/cgstAmount/
+    // igstAmount at 0 on every converted invoice, so the printed tax table
+    // showed ₹0 despite a nonzero Total. computeGst() itself zeroes the
+    // breakdown unconditionally for a Composition-scheme store, which is
+    // what the standalone check below already enforced — kept as an
+    // explicit rejection (rather than silently zeroing) so the store owner
+    // sees why, same as createQuotation's own guard.
+    const gstRatePercent = gstRateSnapshot?.gstRatePercent ? Number(gstRateSnapshot.gstRatePercent) : 0;
+    const gstScheme = businessSettings?.gstScheme ?? "REGULAR_B2C";
+    const storeState = businessSettings?.state ?? null;
+    const customerState = quotation.customer?.state ?? null;
+
+    if (gstScheme === "COMPOSITION" && gstRatePercent !== 0) {
       return {
         success: false,
         message: "This store is on the Composition Scheme and cannot charge GST on an invoice.",
       };
     }
+
+    const itemTaxableValue = (item: (typeof quotation.items)[number]) =>
+      Number(item.rate ?? 0) * Number((item.purity === "DIAMOND" ? item.caratWeight : item.netWeight) ?? 0) +
+      Number(item.makingCharge) +
+      Number(item.hmCharge) +
+      Number(item.stoneCharge);
+
+    const itemGst = quotation.items.map((item) =>
+      computeGst(itemTaxableValue(item), gstRatePercent, gstScheme, storeState, customerState),
+    );
+    const taxAmount = itemGst.reduce((sum, g) => sum + g.sgst + g.cgst + g.igst, 0);
 
     const subtotal = Number(quotation.subtotal);
     const makingCharges = Number(quotation.makingCharges);
@@ -867,7 +892,7 @@ export async function convertQuotationToInvoice(
           createdById: actor.id ?? null,
           createdByName: actor.name ?? actor.email ?? null,
           items: {
-            create: quotation.items.map((item) => ({
+            create: quotation.items.map((item, index) => ({
               itemName: item.itemName,
               metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
@@ -886,6 +911,12 @@ export async function convertQuotationToInvoice(
               hmCharge: item.hmCharge,
               lineTotal: item.lineTotal,
               inventoryStockId: item.inventoryStockId ?? undefined,
+              sgstAmount: itemGst[index].sgst,
+              cgstAmount: itemGst[index].cgst,
+              igstAmount: itemGst[index].igst,
+              gstRateId: gstRateSnapshot?.gstRateId ?? undefined,
+              gstRateName: gstRateSnapshot?.gstRateName ?? undefined,
+              gstRatePercent: gstRateSnapshot?.gstRatePercent ?? undefined,
             })),
           },
         },

@@ -1019,6 +1019,16 @@ export async function recordPurchasePayment(
     const purchase = await prisma.purchase.findFirst({ where: { id: purchaseId, storeId } });
     if (!purchase) return { success: false, message: "Purchase not found" };
 
+    // Reject rather than silently clamp — see recordInvoicePayment's own
+    // comment on this exact check.
+    const currentBalance = Number(purchase.balanceAmount);
+    if (amount > currentBalance) {
+      return {
+        success: false,
+        message: `Amount exceeds the outstanding balance of ₹${currentBalance.toLocaleString("en-IN")}`,
+      };
+    }
+
     const newPaid = Number(purchase.paidAmount) + amount;
     const newBalance = Math.max(0, Number(purchase.totalAmount) - newPaid);
     const status: InvoiceStatus =

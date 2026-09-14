@@ -1196,7 +1196,19 @@ export async function createInvoice(
         });
       }
 
-      if (balanceAmount > 0) {
+      // The DEBIT is the invoice's full totalAmount, not balanceAmount — a
+      // sale is owed in full the moment it's made; whatever's paid right now
+      // (the loop below) is a separate CREDIT against that, exactly like a
+      // later top-up payment via recordInvoicePayment. Debiting only
+      // balanceAmount (totalAmount minus what's being paid right now) while
+      // *also* crediting that same paid-right-now amount double-counts it —
+      // netted out of the debit, then subtracted again as a credit — making
+      // the ledger balance too negative by exactly the paid-at-creation
+      // amount on every invoice that collects any payment up front. A
+      // fully-paid-at-creation invoice (balanceAmount === 0) still needs
+      // this DEBIT to offset its own CREDIT rows, hence gating on
+      // totalAmount, not balanceAmount.
+      if (totalAmount > 0) {
         await tx.ledgerEntry.create({
           data: {
             storeId,
@@ -1204,7 +1216,7 @@ export async function createInvoice(
             sourceType: LedgerSourceType.SALE,
             customerId,
             invoiceId: created.id,
-            amount: balanceAmount,
+            amount: totalAmount,
             description: `Invoice ${invoiceNumber} balance due`,
             locationId: resolvedLocationId ?? undefined,
           },

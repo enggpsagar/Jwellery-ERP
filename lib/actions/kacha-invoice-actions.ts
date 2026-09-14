@@ -669,14 +669,21 @@ export async function createKachaInvoice(
         });
       }
 
-      if (balanceAmount > 0) {
+      // DEBIT is the full totalAmount, not balanceAmount — same fix and same
+      // reasoning as invoice-actions.ts's createInvoice: debiting only the
+      // net-of-upfront-payment balanceAmount while *also* crediting that same
+      // upfront payment (the loop below) double-counts it, making the ledger
+      // balance too negative by the paid-at-creation amount. Gated on
+      // totalAmount so a fully-paid-at-creation estimate still gets this
+      // DEBIT to offset its own CREDIT rows.
+      if (totalAmount > 0) {
         await tx.ledgerEntry.create({
           data: {
             storeId,
             type: LedgerEntryType.DEBIT,
             sourceType: LedgerSourceType.SALE,
             customerId,
-            amount: balanceAmount,
+            amount: totalAmount,
             description: `Estimate ${slipNumber} balance due`,
             locationId: resolvedLocationId ?? undefined,
           },

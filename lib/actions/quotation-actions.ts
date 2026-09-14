@@ -944,7 +944,15 @@ export async function convertQuotationToInvoice(
         });
       }
 
-      if (balanceAmount > 0) {
+      // DEBIT is the full totalAmount, not balanceAmount — same fix as
+      // createInvoice/createKachaInvoice/createPurchase. Unlike those,
+      // this conversion had a second, separate gap: paidAmount (a bare
+      // number, no payment-method structure — this form never collects
+      // one) got stored on the Invoice row but no corresponding ledger
+      // CREDIT was ever posted for it, so a quotation converted with money
+      // already paid silently dropped that payment from the customer's
+      // ledger entirely (worse than double-counting: not recorded at all).
+      if (totalAmount > 0) {
         await tx.ledgerEntry.create({
           data: {
             storeId,
@@ -952,8 +960,23 @@ export async function convertQuotationToInvoice(
             sourceType: LedgerSourceType.SALE,
             customerId: quotation.customerId,
             invoiceId: created.id,
-            amount: balanceAmount,
+            amount: totalAmount,
             description: `Invoice ${invoiceNumber} balance due (from Quotation ${quotation.quotationNumber})`,
+            locationId: quotation.locationId ?? undefined,
+          },
+        });
+      }
+
+      if (paidAmount > 0) {
+        await tx.ledgerEntry.create({
+          data: {
+            storeId,
+            type: LedgerEntryType.CREDIT,
+            sourceType: LedgerSourceType.PAYMENT_IN,
+            customerId: quotation.customerId,
+            invoiceId: created.id,
+            amount: paidAmount,
+            description: `Payment received for ${invoiceNumber} (from Quotation ${quotation.quotationNumber})`,
             locationId: quotation.locationId ?? undefined,
           },
         });

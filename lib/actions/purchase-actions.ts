@@ -936,8 +936,16 @@ export async function createPurchase(
       }
 
       // 4. Outstanding balance owed to the vendor — CREDIT (opposite
-      //    direction from a Sale's customer-owes-shop DEBIT).
-      if (balanceAmount > 0) {
+      //    direction from a Sale's customer-owes-shop DEBIT). Full
+      //    totalAmount, not balanceAmount — same fix and same reasoning as
+      //    invoice-actions.ts's createInvoice: crediting only the
+      //    net-of-paid-at-purchase balanceAmount while *also* debiting that
+      //    same paid-out amount (the loop below) double-counts it, making
+      //    the ledger balance too positive (i.e. understating what's owed
+      //    to the vendor) by the paid-at-purchase amount. Gated on
+      //    totalAmount so a fully-paid-at-purchase purchase still gets this
+      //    CREDIT to offset its own DEBIT rows.
+      if (totalAmount > 0) {
         await tx.ledgerEntry.create({
           data: {
             storeId,
@@ -945,7 +953,7 @@ export async function createPurchase(
             sourceType: LedgerSourceType.PURCHASE,
             vendorId,
             purchaseId: created.id,
-            amount: balanceAmount,
+            amount: totalAmount,
             description: `Purchase ${purchaseNumber} balance due`,
             locationId: resolvedLocationId ?? undefined,
           },

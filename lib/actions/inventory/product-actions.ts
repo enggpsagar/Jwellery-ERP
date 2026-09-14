@@ -582,9 +582,10 @@ export async function createProduct(
         Object.values(ChargeType),
       ) ?? ChargeType.FIXED;
 
-    // Typical weights for the design. Optional: plenty of products (coins,
-    // bars, loose stones) are sold by count, and a blank must stay unknown
-    // rather than becoming zero.
+    // Typical weights for the design. Required as of the 2026 tightening —
+    // every product master now records a real Gross/Net Weight (validated
+    // below), even a coin/bar/loose stone previously left blank under the
+    // old "sold by count" allowance.
     const defaultGrossWeight = parseNullableDecimal(
       formData.get("defaultGrossWeight"),
     );
@@ -622,6 +623,14 @@ export async function createProduct(
 
     if (!targetStyle) {
       errors.targetStyle = ["Style is required"];
+    }
+
+    if (defaultGrossWeight === null) {
+      errors.defaultGrossWeight = ["Gross weight is required"];
+    }
+
+    if (defaultNetWeight === null) {
+      errors.defaultNetWeight = ["Net weight is required"];
     }
 
     const storeId = await requireStoreScope();
@@ -914,9 +923,10 @@ export async function updateProduct(
         Object.values(ChargeType),
       ) ?? ChargeType.FIXED;
 
-    // Typical weights for the design. Optional: plenty of products (coins,
-    // bars, loose stones) are sold by count, and a blank must stay unknown
-    // rather than becoming zero.
+    // Typical weights for the design. Required as of the 2026 tightening —
+    // every product master now records a real Gross/Net Weight (validated
+    // below), even a coin/bar/loose stone previously left blank under the
+    // old "sold by count" allowance.
     const defaultGrossWeight = parseNullableDecimal(
       formData.get("defaultGrossWeight"),
     );
@@ -950,6 +960,14 @@ export async function updateProduct(
 
     if (!name) {
       errors.name = ["Product name is required"];
+    }
+
+    if (defaultGrossWeight === null) {
+      errors.defaultGrossWeight = ["Gross weight is required"];
+    }
+
+    if (defaultNetWeight === null) {
+      errors.defaultNetWeight = ["Net weight is required"];
     }
 
     const storeId = await requireStoreScope();
@@ -1471,6 +1489,12 @@ export async function importProductsFromExcel(
         }
         numericFields[key] = value;
       }
+
+      // Required as of the 2026 tightening — same rule the single "Add
+      // Product"/"Edit Product" form now enforces, so a bulk import can't
+      // slip a product past it with a blank weight column.
+      if (numericFields["Gross Weight"] === null) rowErrors.push("Gross Weight is required");
+      if (numericFields["Net Weight"] === null) rowErrors.push("Net Weight is required");
 
       // The bulk equivalent of "Add Product"'s own "create a stock entry
       // too" checkbox — blank Stock Quantity means this row is product-only,

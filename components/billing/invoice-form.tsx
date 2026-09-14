@@ -808,9 +808,11 @@ export function InvoiceForm({
   // invoice-actions.ts so the live-preview total here never disagrees with
   // what the server actually saves. Stone lines keep pricing off Net Weight
   // (unchanged) — only the Carat Weight field's conversion convenience
-  // extends to Stone, not the pricing quantity itself.
+  // extends to Stone, not the pricing quantity itself. Net/Carat Weight is
+  // per piece, so the priced quantity is that times how many pieces (Qty) —
+  // this used to ignore Qty entirely.
   const lineQuantity = (item: LineItem) =>
-    item.purity === "DIAMOND" ? item.caratWeight : item.netWeight
+    (item.purity === "DIAMOND" ? item.caratWeight : item.netWeight) * (item.quantity || 1)
 
   // Taxable value per line: metal + making + HM + stone, less any per-line
   // scheme discount — the same base the reference format's SGST/CGST/IGST

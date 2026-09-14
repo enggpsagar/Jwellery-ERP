@@ -49,11 +49,12 @@ const TRANSPORT_MODE_LABELS: Record<string, string> = {
  * duplicated rather than shared, matching this codebase's convention of a
  * small pure per-file helper over a shared import for print-page logic. */
 function lineQuantity(item: Invoice["items"][number]) {
+  const pieces = Number(item.quantity) || 1
   if (item.purity === "DIAMOND" && item.caratWeight) {
-    return { qty: Number(item.caratWeight), unit: "Ct", pricePerUnit: Number(item.rate ?? 0), isWeighed: true }
+    return { qty: Number(item.caratWeight) * pieces, unit: "Ct", pricePerUnit: Number(item.rate ?? 0), isWeighed: true }
   }
   if (item.netWeight && Number(item.netWeight) > 0) {
-    return { qty: Number(item.netWeight), unit: "Gm", pricePerUnit: Number(item.rate ?? 0), isWeighed: true }
+    return { qty: Number(item.netWeight) * pieces, unit: "Gm", pricePerUnit: Number(item.rate ?? 0), isWeighed: true }
   }
   const qty = item.quantity || 1
   return { qty, unit: "Pcs", pricePerUnit: Number(item.rate ?? (item.lineTotal / qty)), isWeighed: false }

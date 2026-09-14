@@ -19,13 +19,14 @@ function fmt(value: number) {
  * duplicated rather than shared, matching this codebase's convention of a
  * small pure per-file helper over a shared import for print-page logic. */
 function lineQuantity(item: KachaInvoice["items"][number]) {
+  const pieces = item.quantity || 1
   if (item.purity === "DIAMOND" && item.caratWeight) {
-    return { qty: item.caratWeight, unit: "Ct" }
+    return { qty: item.caratWeight * pieces, unit: "Ct" }
   }
   if (item.netWeight && item.netWeight > 0) {
-    return { qty: item.netWeight, unit: "Gm" }
+    return { qty: item.netWeight * pieces, unit: "Gm" }
   }
-  return { qty: item.quantity || 1, unit: "Pcs" }
+  return { qty: pieces, unit: "Pcs" }
 }
 
 const STATUS_LABELS: Record<string, string> = {

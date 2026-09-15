@@ -144,12 +144,16 @@ export function PaymentInDialog({ customers }: PaymentInDialogProps) {
                 Outstanding:{" "}
                 <span
                   className={
-                    selectedCustomer.pendingAmount > 0
-                      ? "font-medium text-red-600"
-                      : "font-medium text-muted-foreground"
+                    selectedCustomer.balanceType === "Advance"
+                      ? "font-medium text-blue-600"
+                      : selectedCustomer.currentBalance > 0
+                        ? "font-medium text-red-600"
+                        : "font-medium text-muted-foreground"
                   }
                 >
-                  ₹{selectedCustomer.pendingAmount.toLocaleString("en-IN")}
+                  {selectedCustomer.balanceType === "Advance"
+                    ? `₹${Math.abs(selectedCustomer.currentBalance).toLocaleString("en-IN")} Advance`
+                    : `₹${selectedCustomer.currentBalance.toLocaleString("en-IN")}`}
                 </span>
               </p>
             )}

@@ -244,12 +244,21 @@ export type PaymentVendorOption = {
   name: string
   phone: string | null
   vendorCode: string | null
-  /** Sum of every unpaid/partial purchase's own balanceAmount — same
-   * convention as vendor-actions.ts' mapVendor pendingAmount, so this
-   * figure never disagrees with what the Vendors list itself shows. Shown
-   * once a vendor is picked here so whoever is paying knows how much is
-   * actually owed, rather than having to look it up separately first. */
+  /** Sum of every unpaid/partial purchase's own balanceAmount — used only
+   * to decide which purchases a specific payment applies against
+   * (allocatePaymentOldestFirst), NOT for display — see currentBalance for
+   * that (this can be ₹0 for a vendor with real money outstanding purely
+   * on the ledger, e.g. a linked-party advance with no open purchase to
+   * apply it to). */
   pendingAmount: number
+  /** The real, ledger-derived outstanding shown to whoever is paying —
+   * same figure and same linked-Customer blend as vendor-actions.ts'
+   * mapVendor, so this picker can never disagree with the Vendors list for
+   * the exact same vendor (it used to, back when this showed pendingAmount
+   * instead: a vendor whose every purchase was settled but who also held a
+   * standalone advance via a linked Customer showed a flatly wrong ₹0). */
+  currentBalance: number
+  balanceType: "Advance" | "Payable"
 }
 
 /** Vendor list for the Payment Out party picker, carrying each vendor's
@@ -267,24 +276,53 @@ export async function getPaymentFormVendorsWithBalance(): Promise<PaymentVendorO
       vendorCode: true,
       openingBalance: true,
       purchases: { select: { balanceAmount: true, status: true } },
+      ledgerEntries: { select: { amount: true, type: true } },
+      linkedCustomer: {
+        select: {
+          openingBalance: true,
+          ledgerEntries: { select: { amount: true, type: true } },
+        },
+      },
     },
   })
 
-  // Same fix as mapVendor's own pendingAmount (vendor-actions.ts) — this
-  // used to ignore openingBalance and any CANCELLED purchase entirely,
-  // so this picker could show a different "owed" figure than the Vendors
-  // list for the exact same vendor.
-  return vendors.map((vendor) => ({
-    id: vendor.id,
-    name: vendor.name,
-    phone: vendor.phone,
-    vendorCode: vendor.vendorCode,
-    pendingAmount:
+  return vendors.map((vendor) => {
+    // Same fix as mapVendor's own pendingAmount (vendor-actions.ts) — this
+    // used to ignore openingBalance and any CANCELLED purchase entirely.
+    const pendingAmount =
       vendor.purchases.reduce(
         (sum, p) => (p.status === "CANCELLED" ? sum : sum + Number(p.balanceAmount || 0)),
         0,
-      ) + Number(vendor.openingBalance ?? 0),
-  }))
+      ) + Number(vendor.openingBalance ?? 0)
+
+    // Identical formula to mapVendor's combinedBalance — see that
+    // function's own comment for why the linked Customer's balance factors
+    // in here too.
+    const ownBalance =
+      Number(vendor.openingBalance ?? 0) +
+      vendor.ledgerEntries.reduce(
+        (sum, e) => sum + (e.type === "CREDIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
+        0,
+      )
+    const linkedCustomerBalance = vendor.linkedCustomer
+      ? Number(vendor.linkedCustomer.openingBalance ?? 0) +
+        vendor.linkedCustomer.ledgerEntries.reduce(
+          (sum, e) => sum + (e.type === "DEBIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
+          0,
+        )
+      : 0
+    const currentBalance = ownBalance - linkedCustomerBalance
+
+    return {
+      id: vendor.id,
+      name: vendor.name,
+      phone: vendor.phone,
+      vendorCode: vendor.vendorCode,
+      pendingAmount,
+      currentBalance,
+      balanceType: currentBalance < 0 ? "Advance" : "Payable",
+    }
+  })
 }
 
 export type PaymentCustomerOption = {
@@ -292,10 +330,15 @@ export type PaymentCustomerOption = {
   name: string
   phone: string | null
   customerCode: string | null
-  /** Sum of every unpaid/partial invoice's own balanceAmount. Same
-   * reasoning as PaymentVendorOption.pendingAmount, mirrored for the
-   * customer side. */
+  /** Sum of every unpaid/partial invoice's own balanceAmount — used only
+   * for FIFO allocation, not display. See PaymentVendorOption.pendingAmount
+   * for why, mirrored for the customer side. */
   pendingAmount: number
+  /** The real, ledger-derived outstanding shown to whoever is recording the
+   * payment — same figure and linked-Vendor blend as lib/core/customer.ts'
+   * mapCustomer. See PaymentVendorOption.currentBalance's own comment. */
+  currentBalance: number
+  balanceType: "Advance" | "Receivable"
 }
 
 /** Customer list for the Payment In party picker, carrying each customer's
@@ -314,19 +357,21 @@ export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCusto
       openingBalance: true,
       invoices: { select: { balanceAmount: true, status: true } },
       kachaInvoices: { select: { balanceAmount: true, status: true } },
+      ledgerEntries: { select: { amount: true, type: true } },
+      linkedVendor: {
+        select: {
+          openingBalance: true,
+          ledgerEntries: { select: { amount: true, type: true } },
+        },
+      },
     },
   })
 
-  // Same fix as mapCustomer's own pendingAmount (lib/core/customer.ts) —
-  // this used to ignore Kacha slips, any CANCELLED invoice, and
-  // openingBalance entirely, so this picker could show a different "owed"
-  // figure than the Parties list for the exact same customer.
-  return customers.map((customer) => ({
-    id: customer.id,
-    name: customer.name,
-    phone: customer.phone,
-    customerCode: customer.customerCode,
-    pendingAmount:
+  return customers.map((customer) => {
+    // Same fix as mapCustomer's own pendingAmount (lib/core/customer.ts) —
+    // this used to ignore Kacha slips, any CANCELLED invoice, and
+    // openingBalance entirely.
+    const pendingAmount =
       customer.invoices.reduce(
         (sum, i) => (i.status === "CANCELLED" ? sum : sum + Number(i.balanceAmount || 0)),
         0,
@@ -335,8 +380,36 @@ export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCusto
         (sum, k) => (k.status === "CANCELLED" ? sum : sum + Number(k.balanceAmount || 0)),
         0,
       ) +
-      Number(customer.openingBalance ?? 0),
-  }))
+      Number(customer.openingBalance ?? 0)
+
+    // Identical formula to mapCustomer's combinedBalance — see that
+    // function's own comment for why the linked Vendor's balance factors
+    // in here too.
+    const ownBalance =
+      Number(customer.openingBalance ?? 0) +
+      customer.ledgerEntries.reduce(
+        (sum, e) => sum + (e.type === "DEBIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
+        0,
+      )
+    const linkedVendorBalance = customer.linkedVendor
+      ? Number(customer.linkedVendor.openingBalance ?? 0) +
+        customer.linkedVendor.ledgerEntries.reduce(
+          (sum, e) => sum + (e.type === "CREDIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
+          0,
+        )
+      : 0
+    const currentBalance = ownBalance - linkedVendorBalance
+
+    return {
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      customerCode: customer.customerCode,
+      pendingAmount,
+      currentBalance,
+      balanceType: currentBalance < 0 ? "Advance" : "Receivable",
+    }
+  })
 }
 
 /**

@@ -190,12 +190,16 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
                 Outstanding:{" "}
                 <span
                   className={
-                    selectedVendor.pendingAmount > 0
-                      ? "font-medium text-red-600"
-                      : "font-medium text-muted-foreground"
+                    selectedVendor.balanceType === "Advance"
+                      ? "font-medium text-blue-600"
+                      : selectedVendor.currentBalance > 0
+                        ? "font-medium text-red-600"
+                        : "font-medium text-muted-foreground"
                   }
                 >
-                  ₹{selectedVendor.pendingAmount.toLocaleString("en-IN")}
+                  {selectedVendor.balanceType === "Advance"
+                    ? `₹${Math.abs(selectedVendor.currentBalance).toLocaleString("en-IN")} Advance`
+                    : `₹${selectedVendor.currentBalance.toLocaleString("en-IN")}`}
                 </span>
               </p>
             )}

@@ -63,6 +63,8 @@ type StockOption = {
   stoneMetalTypeName: string | null
   stoneTypeNames: string | null
   saleRate: number | null
+  makingCharge: number | null
+  makingChargeType: "FIXED" | "PERCENTAGE"
   quantity: number
 }
 
@@ -484,6 +486,12 @@ export function InvoiceForm({
       stoneTypeNames: stock.stoneTypeNames
         ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
         : [],
+      // Recorded on the stock row at Add Stock time — carried over here so
+      // a piece's own making charge doesn't have to be re-typed on every
+      // sale (previously always reset to 0/FIXED regardless of what was
+      // set on the stock item).
+      makingCharge: stock.makingCharge ?? 0,
+      makingChargeType: stock.makingChargeType,
       // InventoryStock carries no hmCharge field of its own — there's
       // nothing authoritative here to protect (same reasoning as
       // netStoneWeightTouched above when a stock row has no recorded stone
@@ -622,6 +630,10 @@ export function InvoiceForm({
           stoneTypeNames: stock.stoneTypeNames
             ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
             : [],
+          // Same reasoning as applyStockToItem — carry over the stock
+          // item's own recorded making charge instead of resetting to 0.
+          makingCharge: stock.makingCharge ?? 0,
+          makingChargeType: stock.makingChargeType,
           // Same reasoning as applyStockToItem — InventoryStock has no
           // hmCharge of its own, so this is left untouched.
           hmCharge: isHallmarkablePurity(stock.purity) ? hallmarkChargePerPiece : 0,

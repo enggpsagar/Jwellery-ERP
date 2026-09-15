@@ -121,10 +121,10 @@ export function VendorDetailContent({
             <DetailField
               label="Current Balance"
               value={
-                vendor.pendingAmount ? (
-                  <span className="text-red-600">{vendor.pendingAmount}</span>
+                vendor.currentBalance ? (
+                  <span className="text-red-600">{money(vendor.currentBalance)}</span>
                 ) : (
-                  vendor.pendingAmount
+                  money(0)
                 )
               }
             />

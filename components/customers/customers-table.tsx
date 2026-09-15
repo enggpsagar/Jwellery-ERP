@@ -4,7 +4,6 @@ import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import * as React from "react"
 import type { Customer } from "@/lib/actions/customer-actions"
 import { CustomersPagination } from "@/components/customers/customers-pagination"
-import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import { cn, toTitleCase } from "@/lib/utils"
 
 /** Money as it reads on a jewellery ledger. */
@@ -105,7 +104,7 @@ export function CustomersTable({
                   className="h-4 w-4 rounded border-input"
                 />
               </th>
-              <SortableTableHead label="Party Name" sortKey="name" defaultSortBy="createdAt" />
+              <th className="px-4 py-3 font-medium">Party Name</th>
               <th className="px-4 py-3 font-medium">Phone</th>
               <th className="px-4 py-3 font-medium">City</th>
               <th className="px-4 py-3 font-medium">State</th>

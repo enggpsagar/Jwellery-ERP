@@ -130,10 +130,10 @@ export function CustomerDetailContent({
           <DetailField
             label="Current Balance"
             value={
-              customer.pendingAmount ? (
-                <span className="text-red-600">{customer.pendingAmount}</span>
+              customer.currentBalance ? (
+                <span className="text-red-600">{money(customer.currentBalance)}</span>
               ) : (
-                customer.pendingAmount
+                money(0)
               )
             }
           />

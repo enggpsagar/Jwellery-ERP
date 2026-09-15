@@ -22,14 +22,27 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { MenuIcon, PanelLeftIcon } from "lucide-react"
+import { MenuIcon, PanelLeftIcon, PanelRightIcon } from "lucide-react"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "16rem"
+const SIDEBAR_WIDTH_DEFAULT_PX = 256 // 16rem at the standard 16px root
+const SIDEBAR_WIDTH_MIN_PX = 200
+const SIDEBAR_WIDTH_MAX_PX = 420
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+// Personal, not a store setting (unlike StoreBranding.sidebarPosition) —
+// same idea as VS Code remembering *your* panel width on *your* machine,
+// not a team-shared value. Plain localStorage rather than a cookie: this
+// never needs to be read server-side (there's no SSR-time layout that
+// depends on it, unlike the collapsed/expanded state's own cookie above),
+// so there's no reason to pay for it on every request.
+const SIDEBAR_WIDTH_STORAGE_KEY = "sidebar_width_px"
+
+function clampSidebarWidthPx(px: number): number {
+  return Math.min(SIDEBAR_WIDTH_MAX_PX, Math.max(SIDEBAR_WIDTH_MIN_PX, px))
+}
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -39,6 +52,20 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  /** Which physical edge the sidebar renders against — a store-level
+   *  preference (see StoreBranding.sidebarPosition), threaded through
+   *  context rather than a prop on every consumer so SidebarTrigger (used
+   *  from the TopBar, nowhere near where <Sidebar side=...> itself is set)
+   *  can still pick the matching collapse-icon direction. */
+  side: "left" | "right"
+  /** The user's own dragged width (see SidebarRail), in px — always the
+   *  *expanded* width; collapsed/icon mode has its own fixed
+   *  --sidebar-width-icon and isn't user-resizable. */
+  sidebarWidthPx: number
+  /** Updates the width (clamped) and persists it to localStorage —
+   *  cheap enough to call on every pointermove during a drag rather than
+   *  splitting "live preview" from "commit on release." */
+  setSidebarWidthPx: (px: number) => void
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
@@ -56,6 +83,7 @@ function SidebarProvider({
   defaultOpen = true,
   open: openProp,
   onOpenChange: setOpenProp,
+  side = "left",
   className,
   style,
   children,
@@ -64,9 +92,41 @@ function SidebarProvider({
   defaultOpen?: boolean
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  side?: "left" | "right"
 }) {
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
+
+  // Starts at the fixed default on every render (including the server's),
+  // then corrects itself from localStorage once mounted — localStorage
+  // doesn't exist during SSR, so reading it any earlier would either throw
+  // or desync from what the server rendered. The one-time correction below
+  // causes a brief, harmless flash back to a returning user's own width
+  // rather than a hydration mismatch.
+  const [sidebarWidthPx, setSidebarWidthPxState] = React.useState(SIDEBAR_WIDTH_DEFAULT_PX)
+
+  React.useEffect(() => {
+    try {
+      const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY))
+      if (Number.isFinite(stored) && stored > 0) {
+        setSidebarWidthPxState(clampSidebarWidthPx(stored))
+      }
+    } catch {
+      // localStorage can throw in a locked-down/private browsing context —
+      // the fixed default is a perfectly fine fallback, not worth surfacing.
+    }
+  }, [])
+
+  const setSidebarWidthPx = React.useCallback((px: number) => {
+    const clamped = clampSidebarWidthPx(px)
+    setSidebarWidthPxState(clamped)
+    try {
+      window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(clamped))
+    } catch {
+      // Same as above — a failed write just means this session's resize
+      // doesn't stick, not worth surfacing over.
+    }
+  }, [])
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -121,8 +181,22 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      side,
+      sidebarWidthPx,
+      setSidebarWidthPx,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [
+      state,
+      open,
+      setOpen,
+      isMobile,
+      openMobile,
+      setOpenMobile,
+      toggleSidebar,
+      side,
+      sidebarWidthPx,
+      setSidebarWidthPx,
+    ]
   )
 
   return (
@@ -131,7 +205,7 @@ function SidebarProvider({
         data-slot="sidebar-wrapper"
         style={
           {
-            "--sidebar-width": SIDEBAR_WIDTH,
+            "--sidebar-width": `${sidebarWidthPx}px`,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
             ...style,
           } as React.CSSProperties
@@ -260,7 +334,8 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, side } = useSidebar()
+  const PanelIcon = side === "right" ? PanelRightIcon : PanelLeftIcon
 
   return (
     <Button
@@ -282,25 +357,83 @@ function SidebarTrigger({
           use `lg:` to match MOBILE_BREAKPOINT (1024) in hooks/use-mobile —
           with `md:` the icon would flip at 768 while the drawer behaviour
           flipped at 1024, showing a collapse icon that actually opens a
-          drawer. */}
+          drawer. Which panel icon (left/right) matches the sidebar's own
+          side, so a right-positioned sidebar doesn't show an icon pointing
+          the wrong way. */}
       <MenuIcon className="lg:hidden" />
-      <PanelLeftIcon className="hidden lg:block" />
+      <PanelIcon className="hidden lg:block" />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   )
 }
 
 function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, side, state, sidebarWidthPx, setSidebarWidthPx } = useSidebar()
+
+  // A plain click still toggles collapse/expand (existing behavior,
+  // preserved) — dragging resizes instead, distinguished by whether the
+  // pointer actually moved past a small threshold between down and up.
+  // Kept in a ref, not state: every value here only matters to the
+  // in-progress gesture itself, never to a render.
+  const dragRef = React.useRef<{
+    startClientX: number
+    startWidthPx: number
+    dragged: boolean
+    lastWidthPx: number
+  } | null>(null)
+
+  function handlePointerDown(event: React.PointerEvent<HTMLButtonElement>) {
+    // Collapsed/icon mode has its own fixed width (--sidebar-width-icon,
+    // not user-resizable) — a pointer-down there falls through to the
+    // click-to-expand behavior on release, same as before this existed.
+    if (state !== "expanded") return
+    dragRef.current = {
+      startClientX: event.clientX,
+      startWidthPx: sidebarWidthPx,
+      dragged: false,
+      lastWidthPx: sidebarWidthPx,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLButtonElement>) {
+    const drag = dragRef.current
+    if (!drag) return
+    const delta = event.clientX - drag.startClientX
+    if (Math.abs(delta) > 3) drag.dragged = true
+    // The rail sits on the sidebar's OUTER edge (right edge for a left
+    // sidebar, left edge for a right one — see this button's own
+    // group-data-[side=...] positioning classes below), so which drag
+    // direction widens it is mirrored for the two sides.
+    const signedDelta = side === "right" ? -delta : delta
+    const next = drag.startWidthPx + signedDelta
+    drag.lastWidthPx = next
+    setSidebarWidthPx(next)
+  }
+
+  function handlePointerUp(event: React.PointerEvent<HTMLButtonElement>) {
+    const drag = dragRef.current
+    dragRef.current = null
+    event.currentTarget.releasePointerCapture(event.pointerId)
+    if (!drag) return
+    if (drag.dragged) {
+      // setSidebarWidthPx already persisted the clamped width on every
+      // move above — nothing further to commit here.
+      return
+    }
+    toggleSidebar()
+  }
 
   return (
     <button
       data-sidebar="rail"
       data-slot="sidebar-rail"
-      aria-label="Toggle Sidebar"
+      aria-label="Resize sidebar (drag) or toggle it (click)"
       tabIndex={-1}
-      onClick={toggleSidebar}
-      title="Toggle Sidebar"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      title="Drag to resize, click to collapse"
       className={cn(
         "absolute inset-y-0 z-20 hidden w-4 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:start-1/2 after:w-[2px] hover:after:bg-sidebar-border sm:flex ltr:-translate-x-1/2 rtl:-translate-x-1/2",
         "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",

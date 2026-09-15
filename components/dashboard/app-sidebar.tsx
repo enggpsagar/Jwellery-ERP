@@ -29,6 +29,7 @@ import {
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
 import { APP_NAME } from "@/lib/constants/app";
 import { avatarColor, initialsOf } from "@/lib/avatar-color";
+import { cn } from "@/lib/utils";
 
 import {
   Sidebar,
@@ -409,6 +410,12 @@ type AppSidebarProps = {
   storeName?: string | null;
   storeLogoUrl?: string | null;
   counts?: SidebarCounts;
+  /** See StoreBranding.sidebarPosition — which physical edge this renders
+   *  against. Passed explicitly from the (dashboard) layout (which also
+   *  needs it to decide the DOM order of AppSidebar vs. SidebarInset)
+   *  rather than read from useSidebar()'s context here, since <Sidebar
+   *  side=...> itself takes it as a direct prop, not from context. */
+  side?: "left" | "right";
 };
 
 const EMPTY_COUNTS: SidebarCounts = {
@@ -428,7 +435,7 @@ const EMPTY_COUNTS: SidebarCounts = {
   stores: 0,
 };
 
-export function AppSidebar({ storeName, storeLogoUrl, counts = EMPTY_COUNTS }: AppSidebarProps = {}) {
+export function AppSidebar({ storeName, storeLogoUrl, counts = EMPTY_COUNTS, side = "left" }: AppSidebarProps = {}) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const role = session?.user?.role;
@@ -450,10 +457,19 @@ export function AppSidebar({ storeName, storeLogoUrl, counts = EMPTY_COUNTS }: A
   return (
     <Sidebar
       collapsible="icon"
+      side={side}
       // A warm near-black rather than flat zinc: zinc is a cool grey, which
-      // fights the gold accent. The right edge carries the same gold hairline
-      // as the top bar so the two chrome surfaces agree.
-      className="border-r border-r-transparent bg-[#12100d] text-white [border-image:linear-gradient(180deg,color-mix(in_oklab,var(--chart-2)_34%,transparent),transparent_60%)_1]"
+      // fights the gold accent. The edge facing the main content carries the
+      // same gold hairline as the top bar so the two chrome surfaces agree —
+      // that's the right edge for a left-positioned sidebar, the left edge
+      // for a right-positioned one, so both the border side and which way
+      // the gradient direction reads flip together with `side`.
+      className={cn(
+        "bg-[#12100d] text-white",
+        side === "right"
+          ? "border-l border-l-transparent [border-image:linear-gradient(180deg,color-mix(in_oklab,var(--chart-2)_34%,transparent),transparent_60%)_1]"
+          : "border-r border-r-transparent [border-image:linear-gradient(180deg,color-mix(in_oklab,var(--chart-2)_34%,transparent),transparent_60%)_1]",
+      )}
     >
       <SidebarHeader className="border-b border-white/10">
         <div className="flex items-center gap-3 px-2 py-2">

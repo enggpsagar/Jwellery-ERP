@@ -249,6 +249,60 @@ export default async function DashboardLayout({
     brandingStyle["--radius"] = BRAND_RADIUS_VALUE[brandingSettings.radius];
   }
 
+  // Groundwork for a store owner's own screen-layout preference (which
+  // physical edge the nav sidebar renders against) — <Sidebar side=...>
+  // already fully supports "right" (it's the same primitive the mobile
+  // drawer already relies on), and AppSidebar/SidebarProvider both already
+  // accept it. Hardcoded to "left" for now: the per-store setting itself
+  // (a new StoreBranding.sidebarPosition column) needs a database migration
+  // that hasn't been applied yet, so reading it here would break every
+  // dashboard page the moment this deploys. Swap this for the real read
+  // once that migration is live.
+  const sidebarSide = "left" as "left" | "right";
+
+  const sidebar = (
+    <AppSidebar
+      storeName={storeInfo?.name}
+      storeLogoUrl={storeInfo?.businessSettings?.logoUrl}
+      counts={sidebarCounts}
+      side={sidebarSide}
+    />
+  );
+
+  const content = (
+    <SidebarInset>
+      <TopBar
+        stores={stores}
+        activeStoreId={activeStoreId}
+        canSwitchStores={isSuperAdmin || stores.length > 1}
+        planExpired={isPlanExpired}
+      />
+
+      {/* bg-background, not a hardcoded slate — this is the one thing
+          the whole page area actually shows a customized backgroundColor
+          on; a fixed color here would make that Branding option
+          silently do nothing for most of the visible screen. */}
+      {/* overflow-x-hidden here (not just min-w-0, which alone didn't
+          stop it — see the billing/new page investigation) is what
+          actually enforces this column's width as a hard boundary, so
+          a deeply nested fixed-min-width element (e.g. invoice-form.tsx's
+          compact line-items grid, min-w-[900px] in its own
+          overflow-x-auto) scrolls within that boundary instead of
+          silently growing the whole page past the viewport. Every page
+          in the app renders through this one wrapper, so this is a
+          single, app-wide fix rather than one per page. */}
+      <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden bg-background p-6">
+        {isSuperAdmin && !isStoreExemptRoute && stores.length === 0 ? (
+          <NoStoreAccessNotice />
+        ) : isSuperAdmin && !isStoreExemptRoute && !activeStoreId ? (
+          <SelectStoreNotice />
+        ) : (
+          children
+        )}
+      </main>
+    </SidebarInset>
+  );
+
   return (
     // display: contents — zero layout footprint of its own. Exists only to
     // carry a customized store's theme overrides (if any) to everything
@@ -260,44 +314,20 @@ export default async function DashboardLayout({
       style={brandingStyle as React.CSSProperties}
       data-hide-icons={brandingSettings?.showIcons === false ? "true" : undefined}
     >
-      <SidebarProvider>
-        <AppSidebar
-          storeName={storeInfo?.name}
-          storeLogoUrl={storeInfo?.businessSettings?.logoUrl}
-          counts={sidebarCounts}
-        />
-
-        <SidebarInset>
-          <TopBar
-            stores={stores}
-            activeStoreId={activeStoreId}
-            canSwitchStores={isSuperAdmin || stores.length > 1}
-            planExpired={isPlanExpired}
-          />
-
-          {/* bg-background, not a hardcoded slate — this is the one thing
-              the whole page area actually shows a customized backgroundColor
-              on; a fixed color here would make that Branding option
-              silently do nothing for most of the visible screen. */}
-          {/* overflow-x-hidden here (not just min-w-0, which alone didn't
-              stop it — see the billing/new page investigation) is what
-              actually enforces this column's width as a hard boundary, so
-              a deeply nested fixed-min-width element (e.g. invoice-form.tsx's
-              compact line-items grid, min-w-[900px] in its own
-              overflow-x-auto) scrolls within that boundary instead of
-              silently growing the whole page past the viewport. Every page
-              in the app renders through this one wrapper, so this is a
-              single, app-wide fix rather than one per page. */}
-          <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden bg-background p-6">
-            {isSuperAdmin && !isStoreExemptRoute && stores.length === 0 ? (
-              <NoStoreAccessNotice />
-            ) : isSuperAdmin && !isStoreExemptRoute && !activeStoreId ? (
-              <SelectStoreNotice />
-            ) : (
-              children
-            )}
-          </main>
-        </SidebarInset>
+      <SidebarProvider side={sidebarSide}>
+        {/* DOM order, not just <Sidebar side=...>, is what actually moves
+            the sidebar to the right — see sidebarSide's own comment above. */}
+        {sidebarSide === "right" ? (
+          <>
+            {content}
+            {sidebar}
+          </>
+        ) : (
+          <>
+            {sidebar}
+            {content}
+          </>
+        )}
       </SidebarProvider>
     </div>
   );

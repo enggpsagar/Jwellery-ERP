@@ -121,7 +121,14 @@ export function VendorDetailContent({
             <DetailField
               label="Current Balance"
               value={
-                vendor.currentBalance ? (
+                // Was `money(vendor.currentBalance)` verbatim — for a
+                // negative balance (we've paid this vendor more than
+                // they've billed us, an advance) that rendered as the
+                // confusing "₹ -36,000" in the same red used for money
+                // owed, when a negative balance here means the opposite.
+                vendor.balanceType === "Advance" ? (
+                  <span className="text-blue-600">{money(Math.abs(vendor.currentBalance ?? 0))} Advance</span>
+                ) : vendor.currentBalance ? (
                   <span className="text-red-600">{money(vendor.currentBalance)}</span>
                 ) : (
                   money(0)

@@ -130,7 +130,14 @@ export function CustomerDetailContent({
           <DetailField
             label="Current Balance"
             value={
-              customer.currentBalance ? (
+              // Was `money(customer.currentBalance)` verbatim — for a
+              // negative balance (the customer has paid more than they've
+              // been billed, an advance) that rendered as the confusing
+              // "₹ -X" in the same red used for money owed, when a
+              // negative balance here means the opposite.
+              customer.balanceType === "Advance" ? (
+                <span className="text-blue-600">{money(Math.abs(customer.currentBalance ?? 0))} Advance</span>
+              ) : customer.currentBalance ? (
                 <span className="text-red-600">{money(customer.currentBalance)}</span>
               ) : (
                 money(0)

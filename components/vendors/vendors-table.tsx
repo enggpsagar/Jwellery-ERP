@@ -185,15 +185,29 @@ export function VendorsTable({
                   </td>
 
                   <td className="px-4 py-3">
+                    {/* currentBalance (ledger-derived: opening + every
+                        CREDIT purchase - every DEBIT payment), not
+                        pendingAmount — pendingAmount only sums unpaid
+                        Purchase.balanceAmount, so a vendor whose every
+                        purchase is fully paid but has also received a
+                        standalone advance payment (no purchase to apply it
+                        against yet) showed a flatly wrong "₹0" here despite
+                        the ledger clearly showing money paid out beyond
+                        what was ever billed. See mapVendor's own comment on
+                        why these are two different, both-real numbers. */}
                     <span
                       className={cn(
                         "font-medium",
-                        Number(String(vendor.pendingAmount ?? "").replace(/[^0-9.-]/g, "")) > 0
+                        vendor.balanceType === "Payable" && (vendor.currentBalance ?? 0) > 0
                           ? "text-red-600"
-                          : "text-foreground",
+                          : vendor.balanceType === "Advance"
+                            ? "text-blue-600"
+                            : "text-foreground",
                       )}
                     >
-                      {vendor.pendingAmount || "₹ 0"}
+                      {vendor.balanceType === "Advance"
+                        ? `${inr(Math.abs(vendor.currentBalance ?? 0))} Advance`
+                        : inr(vendor.currentBalance ?? 0) || "₹0"}
                     </span>
                   </td>
 

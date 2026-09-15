@@ -108,13 +108,17 @@ export function CustomersTable({
               <th className="px-4 py-3 font-medium">Phone</th>
               <th className="px-4 py-3 font-medium">City</th>
               <th className="px-4 py-3 font-medium">State</th>
-              {/* Outstanding (pendingAmount), not Opening Balance — plain
-                  <th>, not SortableTableHead: pendingAmount is a live sum of
-                  each customer's unpaid invoice balances computed after the
+              {/* Outstanding shows currentBalance (ledger-derived: opening
+                  + every DEBIT sale - every CREDIT payment/refund), not
+                  pendingAmount — pendingAmount only sums unpaid
+                  Invoice/KachaInvoice balances, so a customer whose every
+                  document is fully paid but who has also made a standalone
+                  advance payment (no invoice yet to apply it against)
+                  showed a flatly wrong "₹0" here despite the ledger clearly
+                  showing money paid beyond what was ever billed. Plain
+                  <th>, not SortableTableHead: this is computed after the
                   page's own rows are fetched (see getCustomers()), not a
-                  real column the database can ORDER BY, so there's no sort
-                  key for it to wire up (openingBalance's own sortKey would
-                  sort by a different number than what this column shows). */}
+                  real column the database can ORDER BY. */}
               <th className="px-4 py-3 font-medium">Outstanding</th>
             </tr>
           </thead>
@@ -170,12 +174,20 @@ export function CustomersTable({
                           fields: [
                             { label: "Opening balance", value: inr(customer.openingBalance) },
                             {
+                              // currentBalance (ledger-derived), not
+                              // pendingAmount — see the main "Outstanding"
+                              // column's own comment below for why.
                               label: "Outstanding",
-                              value: customer.pendingAmount ? (
-                                <span className="text-red-600">{customer.pendingAmount}</span>
-                              ) : (
-                                customer.pendingAmount
-                              ),
+                              value:
+                                customer.balanceType === "Advance" ? (
+                                  <span className="text-blue-600">
+                                    {inr(Math.abs(customer.currentBalance ?? 0))} Advance
+                                  </span>
+                                ) : (customer.currentBalance ?? 0) > 0 ? (
+                                  <span className="text-red-600">{inr(customer.currentBalance)}</span>
+                                ) : (
+                                  inr(customer.currentBalance ?? 0)
+                                ),
                             },
                             { label: "Orders", value: customer.totalOrders },
                             { label: "Last purchase", value: customer.lastPurchaseDate },
@@ -198,7 +210,20 @@ export function CustomersTable({
                   </td>
 
                   <td className="px-4 py-3">
-                    <span className="text-red-600">{customer.pendingAmount}</span>
+                    <span
+                      className={cn(
+                        "font-medium",
+                        customer.balanceType === "Advance"
+                          ? "text-blue-600"
+                          : (customer.currentBalance ?? 0) > 0
+                            ? "text-red-600"
+                            : "text-foreground",
+                      )}
+                    >
+                      {customer.balanceType === "Advance"
+                        ? `${inr(Math.abs(customer.currentBalance ?? 0))} Advance`
+                        : inr(customer.currentBalance ?? 0) || "₹0"}
+                    </span>
                   </td>
                 </tr>
               )

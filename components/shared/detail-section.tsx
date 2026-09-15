@@ -54,15 +54,25 @@ export function DetailSection({
         {action}
       </CardHeader>
 
-      <CardContent className="p-6">{children}</CardContent>
+      <CardContent className="@container p-6">{children}</CardContent>
     </Card>
   )
 }
 
-/** A grid of fields. Defaults to three columns, the density these pages want. */
+/**
+ * A grid of fields. Defaults to three columns, the density these pages
+ * want — but keyed off the CARD's own width (via DetailSection's
+ * `@container` on CardContent), not the browser viewport. This same
+ * component renders both on a full-width standalone detail page and
+ * inside a much narrower split-panel/slide-over — a plain `sm:`/`lg:`
+ * breakpoint responds to the viewport either way, so on a wide screen it
+ * forced 3 columns even inside a narrow panel, squeezing short values
+ * ("Rajasthan", "Receivable", "09/09/26") into a column too tight for
+ * them and breaking them mid-word.
+ */
 export function DetailGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-x-8 gap-y-5 @sm:grid-cols-2 @lg:grid-cols-3">
       {children}
     </div>
   )
@@ -94,7 +104,7 @@ export function DetailField({
   if (empty) return null
 
   return (
-    <div className={span ? "sm:col-span-2 lg:col-span-3" : undefined}>
+    <div className={span ? "@sm:col-span-2 @lg:col-span-3" : undefined}>
       <p className="text-xs uppercase tracking-wide text-muted-foreground">
         {label}
       </p>

@@ -43,7 +43,7 @@ export function VendorDetailContent({
   const hasBusinessSummary = (vendor.totalOrders ?? 0) > 0 || vendor.openingBalance !== 0
 
   return (
-    <div className="space-y-6">
+    <div className="@container space-y-6">
       {/* Ledger first — same reasoning as the Customer detail page: the
           financial history is why this page gets opened day to day, not
           the contact-card details below it. Renders nothing when this
@@ -52,12 +52,17 @@ export function VendorDetailContent({
           room, unlike the smaller info cards. */}
       {ledger}
 
-      {/* Two columns on a wide screen instead of one long single-column
+      {/* Two columns on a wide CONTAINER instead of one long single-column
           stack — on a desktop-width max-w-5xl page these cards otherwise
           sit narrow in the middle with acres of empty space either side.
-          Falls back to a single column below lg, same as DetailGrid's own
-          breakpoint convention. */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          @container/@lg (not a plain lg: viewport breakpoint) because this
+          same component also renders inside the Customers/Vendors list's
+          much-narrower inline split panel — a viewport breakpoint doesn't
+          know the difference and forced 2 columns there too, squeezing
+          each card (and the field grid inside it, see DetailGrid's own
+          @container fix) well past the point short values like
+          "Rajasthan"/"₹95,796"/"Receivable" could sit on one line. */}
+      <div className="grid grid-cols-1 gap-6 @lg:grid-cols-2">
         <VendorCustomerLinkCard
           vendorId={vendor.id}
           linkedCustomer={vendor.linkedCustomer ?? null}

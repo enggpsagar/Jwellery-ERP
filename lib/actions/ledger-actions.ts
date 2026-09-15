@@ -506,12 +506,33 @@ export type LedgerTotals = {
  * three names. Bucketing by the live FK instead means any configured unit
  * shows correct totals here, matching the dynamic Business Model config.
  */
+// India Standard Time, as a fixed offset — no daylight saving in India, so
+// +5:30 is exact rather than an approximation. "Today" here means the
+// shop's own day, which starts at midnight IST — not midnight wherever the
+// server happens to run (Vercel: UTC). Same reasoning as
+// lib/report-builder.ts's own IST_OFFSET_MS; this used to use
+// `new Date(); setHours(0,0,0,0)`, which reads the SERVER's local
+// timezone — correct by accident in local dev (a machine already set to
+// IST) but wrong in production, where it silently used UTC midnight
+// instead: entries from 12:00 AM-5:30 AM IST were miscounted as
+// "yesterday" in the Today's Transactions card.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
+
+function startOfIstDay(date: Date): Date {
+  const istShifted = new Date(date.getTime() + IST_OFFSET_MS)
+  const startOfDayIstAsUtcMs = Date.UTC(
+    istShifted.getUTCFullYear(),
+    istShifted.getUTCMonth(),
+    istShifted.getUTCDate(),
+  )
+  return new Date(startOfDayIstAsUtcMs - IST_OFFSET_MS)
+}
+
 export async function getLedgerTotals(): Promise<LedgerTotals> {
   const storeId = await requireStoreScope()
   const scope = await getLocationScope()
 
-  const startOfToday = new Date()
-  startOfToday.setHours(0, 0, 0, 0)
+  const startOfToday = startOfIstDay(new Date())
 
   const activeUnits = await getActiveBusinessUnits()
   const nonMoneyUnits = activeUnits.filter((unit) => unit.value !== MONEY_UNIT)

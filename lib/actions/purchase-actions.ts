@@ -288,20 +288,33 @@ async function generatePurchaseNumber(storeId: string) {
 /**
  * Auto-generated stock code for stock rows created by a purchase (the manual
  * stock-entry form has the user type one; here nobody does). `offset` lets a
- * caller mint several sequential codes off a single base count without each
- * call re-reading a count that hasn't been written yet inside the same
+ * caller mint several sequential codes off a single base number without each
+ * call re-reading a number that hasn't been written yet inside the same
  * transaction.
+ *
+ * Keyed off the HIGHEST existing number for this store/year, not a row
+ * count — a count undercounts as soon as any row in the middle of the
+ * sequence is gone (deletePurchase removes a purchase's stock rows
+ * entirely), so count+1 can recompute a number that's already taken by a
+ * row further along. That's exactly what happened in production: codes
+ * 0001-0003, 0005, 0006 existed (0004 deleted), so a count of 5 kept
+ * reminting the already-used "0006" on every single attempt — not a race,
+ * a deterministic collision withStockCodeRetry's regeneration could never
+ * get past on its own. Sorting by stockCode string descending matches
+ * numeric order here because every number is zero-padded to the same
+ * width, same assumption generatePurchaseNumber's own count already made.
  */
 async function generateStockCode(storeId: string, offset = 0) {
   const year = new Date().getFullYear();
-  const count = await prisma.inventoryStock.count({
-    where: {
-      storeId,
-      stockCode: { startsWith: `STK-${year}-` },
-    },
+  const prefix = `STK-${year}-`;
+  const latest = await prisma.inventoryStock.findFirst({
+    where: { storeId, stockCode: { startsWith: prefix } },
+    orderBy: { stockCode: "desc" },
+    select: { stockCode: true },
   });
+  const latestNumber = latest ? Number(latest.stockCode.slice(prefix.length)) || 0 : 0;
 
-  return `STK-${year}-${String(count + 1 + offset).padStart(4, "0")}`;
+  return `${prefix}${String(latestNumber + 1 + offset).padStart(4, "0")}`;
 }
 
 const STOCK_CODE_RETRY_ATTEMPTS = 3;

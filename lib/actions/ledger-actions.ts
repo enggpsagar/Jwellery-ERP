@@ -174,13 +174,31 @@ export async function getKarigarLedger(
 ): Promise<KarigarLedgerResult> {
   const storeId = await getStoreIdForRead()
 
-  const entries = await prisma.ledgerEntry.findMany({
-    where: { storeId, karigarId },
-    orderBy: [{ entryDate: "asc" }, { createdAt: "asc" }],
-    include: { metalType: { select: { name: true } }, createdBy: { select: { name: true } } },
-  })
+  const [entries, karigar] = await Promise.all([
+    prisma.ledgerEntry.findMany({
+      where: { storeId, karigarId },
+      orderBy: [{ entryDate: "asc" }, { createdAt: "asc" }],
+      include: { metalType: { select: { name: true } }, createdBy: { select: { name: true } } },
+    }),
+    prisma.karigar.findFirst({
+      where: { id: karigarId, storeId },
+      select: { openingGold: true, openingCash: true },
+    }),
+  ])
 
-  let cashBalance = 0
+  // Seeded from the karigar's own opening figures rather than starting at
+  // 0 — this used to silently drop them (same bug mapCustomer/mapVendor had
+  // before this session's fix, see lib/core/customer.ts), so a karigar
+  // created with e.g. 50g already owed from before this ERP was in use
+  // showed "Opening Gold: 50g" right next to an unrelated "Outstanding: 0g"
+  // that never accounted for it. Cash is a single unambiguous scalar, so it
+  // always seeds. Gold only seeds when this store has exactly one
+  // gold-named StoreMetal — openingGold is one scalar per karigar, not
+  // split per gold variant, so seeding it into a specific metalTypeId
+  // bucket when more than one exists would be a guess; getKarigarLedgerSummary's
+  // own store-wide total (unambiguous, no per-metal split) still reflects
+  // it correctly either way.
+  let cashBalance = Number(karigar?.openingCash ?? 0)
   let totalDebit = 0
   let totalCredit = 0
   // Running fine-weight balance kept per metalTypeId (or the "no metal
@@ -188,6 +206,17 @@ export async function getKarigarLedger(
   // against their own total rather than a shared one.
   const fineBalanceByMetal = new Map<string | null, number>()
   const groupsByMetal = new Map<string | null, { metalLabel: string; rows: KarigarLedgerRow[] }>()
+
+  const openingGold = Number(karigar?.openingGold ?? 0)
+  if (openingGold !== 0) {
+    const goldMetals = await prisma.storeMetal.findMany({
+      where: { storeId, name: { contains: "gold", mode: "insensitive" } },
+      select: { id: true },
+    })
+    if (goldMetals.length === 1) {
+      fineBalanceByMetal.set(goldMetals[0].id, openingGold)
+    }
+  }
 
   const rows: KarigarLedgerRow[] = entries.map((entry) => {
     const isDebit = entry.type === "DEBIT"
@@ -405,19 +434,31 @@ export async function getKarigarLedgerSummary(): Promise<KarigarLedgerSummary> {
       else if (g.type === "CREDIT" && g.sourceType !== "KARIGAR_RECEIPT") totalPaid += amt
     }
 
+    const openingGold = Number(karigar.openingGold)
+    const openingCash = Number(karigar.openingCash)
+
     return {
       id: karigar.id,
       name: karigar.name,
       code: karigar.code,
-      openingGold: Number(karigar.openingGold),
-      openingCash: Number(karigar.openingCash),
+      openingGold,
+      openingCash,
       goldIssued,
       goldUsed,
-      outstandingGold: goldIssued - goldUsed,
+      // Was goldIssued - goldUsed alone — silently dropped a karigar's
+      // openingGold (gold they already owed the store before this ERP was
+      // used), the same bug mapCustomer/mapVendor had before this session's
+      // fix (see lib/core/customer.ts). openingGold is a single scalar per
+      // karigar (not split per gold purity/variant), so it's added once
+      // here at the aggregate level rather than into any one metal-type
+      // bucket — see getKarigarLedger's own comment on why the per-row
+      // ledger detail only seeds this when the store has exactly one
+      // gold-named metal.
+      outstandingGold: openingGold + goldIssued - goldUsed,
       itemsDelivered: itemsByKarigar.get(karigar.id) ?? 0,
       totalEarned,
       totalPaid,
-      outstandingCash: totalEarned - totalPaid,
+      outstandingCash: openingCash + totalEarned - totalPaid,
     }
   })
 

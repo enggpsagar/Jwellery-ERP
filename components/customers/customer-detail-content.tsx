@@ -50,106 +50,115 @@ export function CustomerDetailContent({
       {/* Ledger first — it's the primary reason this page gets opened day
           to day (financial activity), not the contact-card details below
           it. The customer's own identity is already established by this
-          page's own header, so it doesn't need to lead here too. */}
+          page's own header, so it doesn't need to lead here too. Stays
+          full-width above the grid below it — a ledger table wants the
+          room, unlike the smaller info cards. */}
       {ledger}
 
-      <CustomerVendorLinkCard
-        customerId={customer.id}
-        linkedVendor={customer.linkedVendor ?? null}
-        onChanged={onLinkChanged}
-      />
+      {/* Two columns on a wide screen instead of one long single-column
+          stack — on a desktop-width max-w-5xl page these cards otherwise
+          sit narrow in the middle with acres of empty space either side.
+          Falls back to a single column below lg, same as DetailGrid's own
+          breakpoint convention. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <CustomerVendorLinkCard
+          customerId={customer.id}
+          linkedVendor={customer.linkedVendor ?? null}
+          onChanged={onLinkChanged}
+        />
 
-      <DetailSection
-        title="Party Information"
-        icon={User}
-        tint="var(--chart-1)"
-      >
-        <DetailGrid>
-          <DetailField label="Phone" value={customer.phone} />
-          <DetailField label="Alternate Phone" value={customer.altPhone} />
-          <DetailField label="Email" value={customer.email} />
-          <DetailField label="GST Number" value={customer.gstNumber} />
-          <DetailField label="Party Type" value={customer.customerType} />
-        </DetailGrid>
-      </DetailSection>
-
-      {hasAddress ? (
         <DetailSection
-          title="Address"
-          description="Where this party is based."
-          icon={MapPin}
-          tint="var(--chart-3)"
+          title="Party Information"
+          icon={User}
+          tint="var(--chart-1)"
         >
           <DetailGrid>
-            <DetailField label="City" value={customer.city} />
-            <DetailField label="State" value={customer.state} />
-            <DetailField label="Pincode" value={customer.pincode} />
-            <DetailField
-              label="Full Address"
-              span
-              value={
-                customer.address ? (
-                  <span className="whitespace-pre-line">{customer.address}</span>
-                ) : null
-              }
-            />
-            <DetailField
-              label="Notes"
-              span
-              value={
-                customer.notes ? (
-                  <span className="whitespace-pre-line">{customer.notes}</span>
-                ) : null
-              }
-            />
+            <DetailField label="Phone" value={customer.phone} />
+            <DetailField label="Alternate Phone" value={customer.altPhone} />
+            <DetailField label="Email" value={customer.email} />
+            <DetailField label="GST Number" value={customer.gstNumber} />
+            <DetailField label="Party Type" value={customer.customerType} />
           </DetailGrid>
         </DetailSection>
-      ) : null}
 
-      {/* Hidden when there's nothing to summarize — a customer with zero
-          orders and no opening balance has no business activity to show;
-          totalPurchaseValue/pendingAmount are both derived from the same
-          invoices totalOrders counts, so they can't be nonzero on their
-          own once that's zero. */}
-      {(customer.totalOrders ?? 0) > 0 || customer.openingBalance !== 0 ? (
-      <DetailSection
-        title="Business Summary"
-        icon={IndianRupee}
-        tint="var(--chart-2)"
-      >
-        <DetailGrid>
-          <DetailField label="Total Orders" value={customer.totalOrders ?? 0} />
-          <DetailField
-            label="Total Purchase Value"
-            value={customer.totalPurchaseValue ?? money(0)}
-          />
-          <DetailField
-            label="Opening Balance"
-            value={customer.openingBalance !== 0 ? money(customer.openingBalance) : undefined}
-          />
-          <DetailField
-            label="Current Balance"
-            value={
-              // Was `money(customer.currentBalance)` verbatim — for a
-              // negative balance (the customer has paid more than they've
-              // been billed, an advance) that rendered as the confusing
-              // "₹ -X" in the same red used for money owed, when a
-              // negative balance here means the opposite.
-              customer.balanceType === "Advance" ? (
-                <span className="text-blue-600">{money(Math.abs(customer.currentBalance ?? 0))} Advance</span>
-              ) : customer.currentBalance ? (
-                <span className="text-red-600">{money(customer.currentBalance)}</span>
-              ) : (
-                money(0)
-              )
-            }
-          />
-          <DetailField label="Balance Type" value={customer.balanceType} />
-          <DetailField label="Last Purchase" value={customer.lastPurchaseDate} />
-          <DetailField label="Last Payment" value={customer.lastPaymentDate} />
-        </DetailGrid>
-      </DetailSection>
-      ) : null}
+        {hasAddress ? (
+          <DetailSection
+            title="Address"
+            description="Where this party is based."
+            icon={MapPin}
+            tint="var(--chart-3)"
+          >
+            <DetailGrid>
+              <DetailField label="City" value={customer.city} />
+              <DetailField label="State" value={customer.state} />
+              <DetailField label="Pincode" value={customer.pincode} />
+              <DetailField
+                label="Full Address"
+                span
+                value={
+                  customer.address ? (
+                    <span className="whitespace-pre-line">{customer.address}</span>
+                  ) : null
+                }
+              />
+              <DetailField
+                label="Notes"
+                span
+                value={
+                  customer.notes ? (
+                    <span className="whitespace-pre-line">{customer.notes}</span>
+                  ) : null
+                }
+              />
+            </DetailGrid>
+          </DetailSection>
+        ) : null}
+
+        {/* Hidden when there's nothing to summarize — a customer with zero
+            orders and no opening balance has no business activity to show;
+            totalPurchaseValue/pendingAmount are both derived from the same
+            invoices totalOrders counts, so they can't be nonzero on their
+            own once that's zero. */}
+        {(customer.totalOrders ?? 0) > 0 || customer.openingBalance !== 0 ? (
+        <DetailSection
+          title="Business Summary"
+          icon={IndianRupee}
+          tint="var(--chart-2)"
+        >
+          <DetailGrid>
+            <DetailField label="Total Orders" value={customer.totalOrders ?? 0} />
+            <DetailField
+              label="Total Purchase Value"
+              value={customer.totalPurchaseValue ?? money(0)}
+            />
+            <DetailField
+              label="Opening Balance"
+              value={customer.openingBalance !== 0 ? money(customer.openingBalance) : undefined}
+            />
+            <DetailField
+              label="Current Balance"
+              value={
+                // Was `money(customer.currentBalance)` verbatim — for a
+                // negative balance (the customer has paid more than they've
+                // been billed, an advance) that rendered as the confusing
+                // "₹ -X" in the same red used for money owed, when a
+                // negative balance here means the opposite.
+                customer.balanceType === "Advance" ? (
+                  <span className="text-blue-600">{money(Math.abs(customer.currentBalance ?? 0))} Advance</span>
+                ) : customer.currentBalance ? (
+                  <span className="text-red-600">{money(customer.currentBalance)}</span>
+                ) : (
+                  money(0)
+                )
+              }
+            />
+            <DetailField label="Balance Type" value={customer.balanceType} />
+            <DetailField label="Last Purchase" value={customer.lastPurchaseDate} />
+            <DetailField label="Last Payment" value={customer.lastPaymentDate} />
+          </DetailGrid>
+        </DetailSection>
+        ) : null}
+      </div>
     </div>
   )
 }

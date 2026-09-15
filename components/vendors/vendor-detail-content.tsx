@@ -47,100 +47,109 @@ export function VendorDetailContent({
       {/* Ledger first — same reasoning as the Customer detail page: the
           financial history is why this page gets opened day to day, not
           the contact-card details below it. Renders nothing when this
-          vendor has no ledger activity yet (see VendorLedgerBody). */}
+          vendor has no ledger activity yet (see VendorLedgerBody). Stays
+          full-width above the grid below it — a ledger table wants the
+          room, unlike the smaller info cards. */}
       {ledger}
 
-      <VendorCustomerLinkCard
-        vendorId={vendor.id}
-        linkedCustomer={vendor.linkedCustomer ?? null}
-        onChanged={onLinkChanged}
-      />
+      {/* Two columns on a wide screen instead of one long single-column
+          stack — on a desktop-width max-w-5xl page these cards otherwise
+          sit narrow in the middle with acres of empty space either side.
+          Falls back to a single column below lg, same as DetailGrid's own
+          breakpoint convention. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <VendorCustomerLinkCard
+          vendorId={vendor.id}
+          linkedCustomer={vendor.linkedCustomer ?? null}
+          onChanged={onLinkChanged}
+        />
 
-      <DetailSection
-        title="Vendor Information"
-        icon={Truck}
-        tint="var(--chart-1)"
-      >
-        <DetailGrid>
-          <DetailField label="Phone" value={vendor.phone} />
-          <DetailField label="Alternate Phone" value={vendor.altPhone} />
-          <DetailField label="Email" value={vendor.email} />
-          <DetailField label="GST Number" value={vendor.gstNumber} />
-        </DetailGrid>
-      </DetailSection>
-
-      {hasAddress ? (
         <DetailSection
-          title="Address"
-          description="Where this vendor is based."
-          icon={MapPin}
-          tint="var(--chart-3)"
+          title="Vendor Information"
+          icon={Truck}
+          tint="var(--chart-1)"
         >
           <DetailGrid>
-            <DetailField label="City" value={vendor.city} />
-            <DetailField label="State" value={vendor.state} />
-            <DetailField label="Pincode" value={vendor.pincode} />
-            <DetailField
-              label="Full Address"
-              span
-              value={
-                vendor.address ? (
-                  <span className="whitespace-pre-line">{vendor.address}</span>
-                ) : null
-              }
-            />
-            <DetailField
-              label="Notes"
-              span
-              value={
-                vendor.notes ? (
-                  <span className="whitespace-pre-line">{vendor.notes}</span>
-                ) : null
-              }
-            />
+            <DetailField label="Phone" value={vendor.phone} />
+            <DetailField label="Alternate Phone" value={vendor.altPhone} />
+            <DetailField label="Email" value={vendor.email} />
+            <DetailField label="GST Number" value={vendor.gstNumber} />
           </DetailGrid>
         </DetailSection>
-      ) : null}
 
-      {hasBusinessSummary ? (
-        <DetailSection
-          title="Business Summary"
-          icon={IndianRupee}
-          tint="var(--chart-2)"
-        >
-          <DetailGrid>
-            <DetailField label="Total Orders" value={vendor.totalOrders ?? 0} />
-            <DetailField
-              label="Total Purchase Value"
-              value={vendor.totalPurchaseValue ?? money(0)}
-            />
-            <DetailField
-              label="Opening Balance"
-              value={vendor.openingBalance !== 0 ? money(vendor.openingBalance) : undefined}
-            />
-            <DetailField
-              label="Current Balance"
-              value={
-                // Was `money(vendor.currentBalance)` verbatim — for a
-                // negative balance (we've paid this vendor more than
-                // they've billed us, an advance) that rendered as the
-                // confusing "₹ -36,000" in the same red used for money
-                // owed, when a negative balance here means the opposite.
-                vendor.balanceType === "Advance" ? (
-                  <span className="text-blue-600">{money(Math.abs(vendor.currentBalance ?? 0))} Advance</span>
-                ) : vendor.currentBalance ? (
-                  <span className="text-red-600">{money(vendor.currentBalance)}</span>
-                ) : (
-                  money(0)
-                )
-              }
-            />
-            <DetailField label="Balance Type" value={vendor.balanceType} />
-            <DetailField label="Last Purchase" value={vendor.lastPurchaseDate} />
-            <DetailField label="Last Payment" value={vendor.lastPaymentDate} />
-          </DetailGrid>
-        </DetailSection>
-      ) : null}
+        {hasAddress ? (
+          <DetailSection
+            title="Address"
+            description="Where this vendor is based."
+            icon={MapPin}
+            tint="var(--chart-3)"
+          >
+            <DetailGrid>
+              <DetailField label="City" value={vendor.city} />
+              <DetailField label="State" value={vendor.state} />
+              <DetailField label="Pincode" value={vendor.pincode} />
+              <DetailField
+                label="Full Address"
+                span
+                value={
+                  vendor.address ? (
+                    <span className="whitespace-pre-line">{vendor.address}</span>
+                  ) : null
+                }
+              />
+              <DetailField
+                label="Notes"
+                span
+                value={
+                  vendor.notes ? (
+                    <span className="whitespace-pre-line">{vendor.notes}</span>
+                  ) : null
+                }
+              />
+            </DetailGrid>
+          </DetailSection>
+        ) : null}
+
+        {hasBusinessSummary ? (
+          <DetailSection
+            title="Business Summary"
+            icon={IndianRupee}
+            tint="var(--chart-2)"
+          >
+            <DetailGrid>
+              <DetailField label="Total Orders" value={vendor.totalOrders ?? 0} />
+              <DetailField
+                label="Total Purchase Value"
+                value={vendor.totalPurchaseValue ?? money(0)}
+              />
+              <DetailField
+                label="Opening Balance"
+                value={vendor.openingBalance !== 0 ? money(vendor.openingBalance) : undefined}
+              />
+              <DetailField
+                label="Current Balance"
+                value={
+                  // Was `money(vendor.currentBalance)` verbatim — for a
+                  // negative balance (we've paid this vendor more than
+                  // they've billed us, an advance) that rendered as the
+                  // confusing "₹ -36,000" in the same red used for money
+                  // owed, when a negative balance here means the opposite.
+                  vendor.balanceType === "Advance" ? (
+                    <span className="text-blue-600">{money(Math.abs(vendor.currentBalance ?? 0))} Advance</span>
+                  ) : vendor.currentBalance ? (
+                    <span className="text-red-600">{money(vendor.currentBalance)}</span>
+                  ) : (
+                    money(0)
+                  )
+                }
+              />
+              <DetailField label="Balance Type" value={vendor.balanceType} />
+              <DetailField label="Last Purchase" value={vendor.lastPurchaseDate} />
+              <DetailField label="Last Payment" value={vendor.lastPaymentDate} />
+            </DetailGrid>
+          </DetailSection>
+        ) : null}
+      </div>
     </div>
   )
 }

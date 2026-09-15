@@ -37,7 +37,17 @@ type LinkedCustomerInfo = {
   name: string
   customerCode: string | null
   isActive: boolean
-  pendingAmount: string
+  currentBalance: number
+  balanceType: string
+}
+
+/** Money as it reads on a jewellery ledger. */
+function inr(value: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(value)
 }
 
 type VendorCustomerLinkCardProps = {
@@ -168,7 +178,20 @@ export function VendorCustomerLinkCard({
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {linkedCustomer.customerCode ? `${linkedCustomer.customerCode} — ` : ""}
-                  Pending receivable: {linkedCustomer.pendingAmount}
+                  Outstanding:{" "}
+                  <span
+                    className={
+                      linkedCustomer.balanceType === "Advance"
+                        ? "font-medium text-blue-600"
+                        : linkedCustomer.currentBalance > 0
+                          ? "font-medium text-red-600"
+                          : undefined
+                    }
+                  >
+                    {linkedCustomer.balanceType === "Advance"
+                      ? `${inr(Math.abs(linkedCustomer.currentBalance))} Advance`
+                      : inr(linkedCustomer.currentBalance)}
+                  </span>
                 </p>
               </div>
               <div className="flex items-center gap-2">

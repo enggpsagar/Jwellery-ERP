@@ -55,14 +55,22 @@ export type CustomerRecord = {
    *  real-world person/business — see Customer.linkedVendorId's doc
    *  comment in schema.prisma. Only meaningfully populated by
    *  getCustomerByIdCore (the detail view); a list row always maps this to
-   *  null since CUSTOMER_LIST_INCLUDE never fetches it, not because the
-   *  customer definitely has no link. */
+   *  null since it only ever gets the minimal balance-only shape from
+   *  CUSTOMER_LIST_INCLUDE, never the full display shape (name/code/
+   *  isActive) — see mapCustomer's own check. Not because the customer
+   *  definitely has no link. */
   linkedVendor?: {
     id: string;
     name: string;
     vendorCode: string | null;
     isActive: boolean;
-    pendingAmount: string;
+    /** The linked Vendor's own ledger-derived currentBalance (see
+     *  vendor-actions.ts mapVendor) — already folded into this customer's
+     *  own currentBalance/balanceType above; exposed here too so the
+     *  "Vendor Relationship" card can show it labeled correctly instead of
+     *  the flatly-wrong document-based figure it used to. */
+    currentBalance: number;
+    balanceType: "Advance" | "Payable";
   } | null;
 };
 
@@ -196,11 +204,21 @@ export const CUSTOMER_LIST_INCLUDE = {
     select: { id: true, amount: true, type: true, entryDate: true },
     orderBy: { entryDate: "desc" as const },
   },
+  // Minimal linked-Vendor balance fields — just enough for mapCustomer to
+  // fold the linked Vendor's own outstanding into this row's currentBalance
+  // (see mapCustomer's combinedBalance). Kept to only openingBalance +
+  // ledgerEntries (not name/code/isActive, which nothing on the list page
+  // renders) so a paginated Customers list doesn't pay for a full display
+  // join on every row — CUSTOMER_DETAIL_INCLUDE below adds those for the
+  // one row a detail view actually shows a "Vendor Relationship" card for.
+  linkedVendor: {
+    select: {
+      openingBalance: true,
+      ledgerEntries: { select: { amount: true, type: true } },
+    },
+  },
 };
 
-/** Same as CUSTOMER_LIST_INCLUDE, plus the linked Vendor row (if any) — kept
- * off the list include so a paginated Customers list doesn't pay for an
- * extra join/select on every row for a field only the detail view shows. */
 export const CUSTOMER_DETAIL_INCLUDE = {
   ...CUSTOMER_LIST_INCLUDE,
   linkedVendor: {
@@ -209,7 +227,8 @@ export const CUSTOMER_DETAIL_INCLUDE = {
       name: true,
       vendorCode: true,
       isActive: true,
-      purchases: { select: { balanceAmount: true } },
+      openingBalance: true,
+      ledgerEntries: { select: { amount: true, type: true } },
     },
   },
 };
@@ -264,6 +283,31 @@ export function mapCustomer(customer: any): CustomerRecord {
     0,
   );
 
+  const ownBalance = Number(customer.openingBalance ?? 0) + ledgerBalanceDelta;
+
+  // The same real person can also exist as a Vendor row (Customer.
+  // linkedVendorId) — e.g. paid too much on a purchase, leaving a Vendor-
+  // side balance that's actually owed BACK to the store, with no payout
+  // flow to settle it directly. That amount doesn't vanish just because
+  // it's sitting on the other record: a Vendor-side Advance (vendor owes
+  // us) becomes a Receivable here, and a Vendor-side Payable (we owe them)
+  // reduces what this same person nets out owing us. Computed fresh from
+  // the linked row's own ledger every time (never written into
+  // openingBalance), so it can't drift out of sync or get double-counted —
+  // see mapVendor's mirror-image comment for the reverse direction.
+  // linkedVendor is undefined/null for the ~all customers with no link, so
+  // this is a no-op for them.
+  const linkedVendorBalance = customer.linkedVendor
+    ? Number(customer.linkedVendor.openingBalance ?? 0) +
+      (customer.linkedVendor.ledgerEntries ?? []).reduce(
+        (sum: number, entry: any) =>
+          sum + (entry.type === "CREDIT" ? Number(entry.amount ?? 0) : -Number(entry.amount ?? 0)),
+        0,
+      )
+    : 0;
+
+  const combinedBalance = ownBalance - linkedVendorBalance;
+
   return {
     id: customer.id,
     name: customer.name,
@@ -287,11 +331,11 @@ export function mapCustomer(customer: any): CustomerRecord {
     // right figure for "which specific documents are still open," used by
     // the Payment In picker's allocator — a different question that happens
     // to usually match this one in a fully consistent ledger.
-    currentBalance: Number(customer.openingBalance ?? 0) + ledgerBalanceDelta,
+    currentBalance: combinedBalance,
     // Was hardcoded to "Receivable" for every customer regardless of sign —
     // a customer who has prepaid (currentBalance < 0) is owed money BY the
     // store, not the other way around.
-    balanceType: Number(customer.openingBalance ?? 0) + ledgerBalanceDelta < 0 ? "Advance" : "Receivable",
+    balanceType: combinedBalance < 0 ? "Advance" : "Receivable",
     goldBalance: 0,
     silverBalance: 0,
     creditLimit: "",
@@ -309,18 +353,18 @@ export function mapCustomer(customer: any): CustomerRecord {
     lastPaymentDate,
     notes: customer.notes ?? "",
     createdAt: customer.createdAt.toISOString(),
-    linkedVendor: customer.linkedVendor
+    // Only the detail-shape query (CUSTOMER_DETAIL_INCLUDE) selects `name` —
+    // the list-shape one (CUSTOMER_LIST_INCLUDE) only fetches the balance
+    // fields above for combinedBalance's sake, so a list row keeps this
+    // null exactly as before.
+    linkedVendor: customer.linkedVendor?.name !== undefined
       ? {
           id: customer.linkedVendor.id,
           name: customer.linkedVendor.name,
           vendorCode: customer.linkedVendor.vendorCode,
           isActive: customer.linkedVendor.isActive,
-          pendingAmount: formatCurrency(
-            customer.linkedVendor.purchases.reduce(
-              (sum: number, purchase: any) => sum + Number(purchase.balanceAmount || 0),
-              0,
-            ),
-          ),
+          currentBalance: linkedVendorBalance,
+          balanceType: linkedVendorBalance < 0 ? "Advance" : "Payable",
         }
       : null,
   };

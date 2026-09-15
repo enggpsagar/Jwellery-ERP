@@ -51,14 +51,22 @@ export type Vendor = {
   createdAt?: string
   /** Set only when this vendor is linked to a Customer row for the same
    *  real-world person/business — see Customer.linkedVendorId's doc
-   *  comment in schema.prisma. Only populated by getVendorById (the detail
-   *  view), never by the list query. */
+   *  comment in schema.prisma. Only the detail-shape query (getVendorById)
+   *  selects `name`, so a list row (getVendors) keeps this null — see
+   *  mapVendor's own check — even though it does fetch the minimal balance
+   *  fields for combinedBalance's sake. */
   linkedCustomer?: {
     id: string
     name: string
     customerCode: string | null
     isActive: boolean
-    pendingAmount: string
+    /** The linked Customer's own ledger-derived currentBalance (see
+     *  lib/core/customer.ts mapCustomer) — already folded into this
+     *  vendor's own currentBalance/balanceType above; exposed here too so
+     *  the "Party Relationship" card can show it labeled correctly instead
+     *  of the flatly-wrong document-based figure it used to. */
+    currentBalance: number
+    balanceType: "Advance" | "Receivable"
   } | null
 }
 
@@ -214,6 +222,29 @@ function mapVendor(vendor: any): Vendor {
     0,
   )
 
+  const ownBalance = Number(vendor.openingBalance ?? 0) + ledgerBalanceDelta
+
+  // Mirror image of mapCustomer's own combinedBalance comment
+  // (lib/core/customer.ts): this same real person can also exist as a
+  // Customer row (Customer.linkedVendorId), and that balance doesn't vanish
+  // just because it's sitting on the other record. A linked Customer-side
+  // Receivable (they owe us) reduces what we net owe this vendor; a linked
+  // Customer-side Advance (we owe them) adds to it. Computed fresh from the
+  // linked row's own ledger every time, never written into openingBalance,
+  // so it can't drift or get double-counted. linkedCustomer is
+  // undefined/null for the ~all vendors with no link, so this is a no-op
+  // for them.
+  const linkedCustomerBalance = vendor.linkedCustomer
+    ? Number(vendor.linkedCustomer.openingBalance ?? 0) +
+      (vendor.linkedCustomer.ledgerEntries ?? []).reduce(
+        (sum: number, entry: any) =>
+          sum + (entry.type === "DEBIT" ? Number(entry.amount ?? 0) : -Number(entry.amount ?? 0)),
+        0,
+      )
+    : 0
+
+  const combinedBalance = ownBalance - linkedCustomerBalance
+
   return {
     id: vendor.id,
     name: vendor.name,
@@ -233,11 +264,11 @@ function mapVendor(vendor: any): Vendor {
     // Purchase.balanceAmount write path might not be. pendingAmountNumber
     // (unpaid Purchases + opening) remains right for "which purchases are
     // still open," used by the Payment Out picker.
-    currentBalance: Number(vendor.openingBalance ?? 0) + ledgerBalanceDelta,
+    currentBalance: combinedBalance,
     // Was hardcoded to "Payable" for every vendor regardless of sign — a
     // vendor the store has overpaid (currentBalance < 0) is owed nothing
     // further; the store is instead owed a refund/credit.
-    balanceType: Number(vendor.openingBalance ?? 0) + ledgerBalanceDelta < 0 ? "Advance" : "Payable",
+    balanceType: combinedBalance < 0 ? "Advance" : "Payable",
     goldBalance: 0,
     silverBalance: 0,
     creditLimit: "",
@@ -252,21 +283,14 @@ function mapVendor(vendor: any): Vendor {
     lastPaymentDate,
     notes: vendor.notes ?? "",
     createdAt: vendor.createdAt.toISOString(),
-    linkedCustomer: vendor.linkedCustomer
+    linkedCustomer: vendor.linkedCustomer?.name !== undefined
       ? {
           id: vendor.linkedCustomer.id,
           name: vendor.linkedCustomer.name,
           customerCode: vendor.linkedCustomer.customerCode,
           isActive: vendor.linkedCustomer.isActive,
-          // Same fix as this file's own mapVendor pendingAmount — was
-          // ignoring openingBalance and any CANCELLED invoice.
-          pendingAmount: formatCurrency(
-            vendor.linkedCustomer.invoices.reduce(
-              (sum: number, invoice: any) =>
-                invoice.status === "CANCELLED" ? sum : sum + Number(invoice.balanceAmount || 0),
-              0,
-            ) + Number(vendor.linkedCustomer.openingBalance ?? 0),
-          ),
+          currentBalance: linkedCustomerBalance,
+          balanceType: linkedCustomerBalance < 0 ? "Advance" : "Receivable",
         }
       : null,
   }
@@ -327,6 +351,17 @@ export async function getVendors(
             entryDate: "desc",
           },
         },
+        // Minimal linked-Customer balance fields — just enough for
+        // mapVendor to fold the linked Customer's own outstanding into this
+        // row's currentBalance (see mapVendor's combinedBalance). Not the
+        // full display shape (name/code/isActive), which nothing on the
+        // list page renders — getVendorById below adds those.
+        linkedCustomer: {
+          select: {
+            openingBalance: true,
+            ledgerEntries: { select: { amount: true, type: true } },
+          },
+        },
       },
     }),
   ])
@@ -383,7 +418,7 @@ export async function getVendorById(id: string): Promise<Vendor | null> {
           customerCode: true,
           isActive: true,
           openingBalance: true,
-          invoices: { select: { balanceAmount: true, status: true } },
+          ledgerEntries: { select: { amount: true, type: true } },
         },
       },
     },

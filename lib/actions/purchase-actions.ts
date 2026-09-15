@@ -304,6 +304,43 @@ async function generateStockCode(storeId: string, offset = 0) {
   return `STK-${year}-${String(count + 1 + offset).padStart(4, "0")}`;
 }
 
+const STOCK_CODE_RETRY_ATTEMPTS = 3;
+
+/** True for a unique-constraint violation on InventoryStock's own
+ * (storeId, stockCode) index — the one failure mode generateStockCode's
+ * count-based numbering can produce: two submissions racing (a fast
+ * double-click, or a retry landing before an earlier attempt's count has
+ * settled) can both compute the same "next" code. */
+function isStockCodeConflict(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002" &&
+    Array.isArray((error.meta as { target?: unknown } | undefined)?.target) &&
+    ((error.meta as { target: unknown[] }).target).includes("stockCode")
+  );
+}
+
+/**
+ * Runs `fn` (which mints fresh stock codes and then writes them) and, on a
+ * stockCode collision, retries with a newly recomputed set rather than
+ * failing the whole purchase outright — see isStockCodeConflict's own
+ * comment for why this collision happens at all. Any other error still
+ * propagates immediately.
+ */
+async function withStockCodeRetry<T>(
+  fn: () => Promise<T>,
+  attemptsLeft: number = STOCK_CODE_RETRY_ATTEMPTS,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (isStockCodeConflict(error) && attemptsLeft > 1) {
+      return withStockCodeRetry(fn, attemptsLeft - 1);
+    }
+    throw error;
+  }
+}
+
 function mapPurchase(purchase: any) {
   return {
     id: purchase.id,
@@ -782,13 +819,6 @@ export async function createPurchase(
     const purchaseNumber = await generatePurchaseNumber(storeId);
     const purchaseDate = purchaseDateRaw ? new Date(purchaseDateRaw) : new Date();
 
-    // Mint all stock codes off one base count before any writes happen, so
-    // each sequential offset lands on a distinct number.
-    const stockCodes: string[] = [];
-    for (let i = 0; i < items.length; i++) {
-      stockCodes.push(await generateStockCode(storeId, i));
-    }
-
     // Resolved once, up front, for every DISTINCT rate any line actually
     // uses — see resolvePerLineGstRateSnapshots' own doc comment. Must
     // happen before the transaction below since a nested Prisma `create`
@@ -802,7 +832,19 @@ export async function createPurchase(
     // reliably exceeds 5s and throws P2028 ("Transaction not found") once
     // Prisma has already closed it out from under the callback. Same fix as
     // store-registration-actions.ts's own transaction for the same reason.
-    const purchase = await prisma.$transaction(async (tx) => {
+    //
+    // Wrapped in withStockCodeRetry: stock codes are minted fresh on every
+    // attempt (not just once up front), so a collision from a race gets a
+    // clean recount instead of failing the purchase outright.
+    const purchase = await withStockCodeRetry(async () => {
+    // Mint all stock codes off one base count before any writes happen, so
+    // each sequential offset lands on a distinct number.
+    const stockCodes: string[] = [];
+    for (let i = 0; i < items.length; i++) {
+      stockCodes.push(await generateStockCode(storeId, i));
+    }
+
+    return prisma.$transaction(async (tx) => {
       // 1. Create a new InventoryStock row per line item first, so the
       //    Purchase's nested item creates can link straight to it.
       const stockIds: string[] = [];
@@ -985,6 +1027,7 @@ export async function createPurchase(
 
       return created;
     }, { timeout: 15000 });
+    });
 
     revalidatePath("/purchases");
     revalidatePath("/inventory/stock");
@@ -1280,14 +1323,19 @@ export async function updatePurchase(
       return { success: false, message: "One or more selected products are invalid" };
     }
 
+    const perLineGstRateSnapshots = await resolvePerLineGstRateSnapshots(storeId, items);
+
+    // Wrapped in withStockCodeRetry — see createPurchase's identical
+    // comment. The delete-then-recreate below re-runs cleanly on a retry:
+    // deleting rows already gone (from the previous, failed attempt inside
+    // the same transaction, which rolled back) is a no-op either way.
+    await withStockCodeRetry(async () => {
     const stockCodes: string[] = [];
     for (let i = 0; i < items.length; i++) {
       stockCodes.push(await generateStockCode(storeId, i));
     }
 
-    const perLineGstRateSnapshots = await resolvePerLineGstRateSnapshots(storeId, items);
-
-    await prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx) => {
       // 1. Drop every old line (unlinks each stock row's FK) then the
       //    now-orphaned stock rows themselves — cascades their
       //    InventoryTransaction rows. Safe only because stockUntouched was
@@ -1436,6 +1484,7 @@ export async function updatePurchase(
         });
       }
     }, { timeout: 15000 });
+    });
 
     revalidatePath("/purchases");
     revalidatePath(`/purchases/${id}`);

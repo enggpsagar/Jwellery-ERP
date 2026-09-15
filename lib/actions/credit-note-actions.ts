@@ -424,6 +424,31 @@ export async function createCreditNote(
         },
       });
 
+      // The invoice's own balanceAmount/status were previously left
+      // completely untouched by a return — the ledger above correctly
+      // reflected the customer owing less (or the store now owing them a
+      // refund), but the invoice record itself (what Billing, Dashboard's
+      // Outstanding Receivables, and the Payment In FIFO allocator all
+      // actually read) kept showing the pre-return balance forever.
+      // totalAmount itself is left alone — it's the original tax invoice's
+      // legal billed amount, the CreditNote row is the audit trail for the
+      // adjustment, same convention as every other document here. A
+      // negative balanceAmount (returned value exceeds what was still
+      // owed) means the store now owes the customer money back; every
+      // "outstanding" aggregate in this app already only sums
+      // balanceAmount > 0, so that correctly stops counting it as
+      // receivable rather than needing a separate flag.
+      const newBalance = Number(
+        (Number(invoice.balanceAmount) - totalAmount).toFixed(2),
+      );
+      await tx.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          balanceAmount: newBalance,
+          status: newBalance <= 0 ? InvoiceStatus.PAID : InvoiceStatus.PARTIAL,
+        },
+      });
+
       return creditNote;
     });
 

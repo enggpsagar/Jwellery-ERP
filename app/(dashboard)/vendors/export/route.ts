@@ -7,13 +7,10 @@ import { prisma } from "@/lib/prisma"
 import { requireStoreScope, assertPlanActiveForExport, PlanExpiredError } from "@/lib/store-context"
 import { formatShortDate } from "@/lib/utils"
 import { logger } from "@/lib/logger";
+import { mapVendorForExport } from "@/lib/actions/vendor-actions"
 
 type VendorSortBy = "name" | "createdAt" | "openingBalance"
 type SortOrder = "asc" | "desc"
-
-function formatCurrency(value: number) {
-  return `₹ ${value.toLocaleString("en-IN")}`
-}
 
 function formatDate(date?: Date | null) {
   return formatShortDate(date)
@@ -66,6 +63,10 @@ export async function GET(request: NextRequest) {
           ? { openingBalance: sortOrder }
           : { createdAt: sortOrder }
 
+    // Same include + mapVendor() this app's every other vendor list/detail
+    // view uses (lib/actions/vendor-actions.ts) — this route used to run
+    // its own separate, drifted copy of the pendingAmount/currentBalance
+    // math (missing openingBalance and any CANCELLED-purchase filter).
     const vendors = await prisma.vendor.findMany({
       where,
       orderBy,
@@ -76,6 +77,7 @@ export async function GET(request: NextRequest) {
             totalAmount: true,
             balanceAmount: true,
             purchaseDate: true,
+            status: true,
           },
           orderBy: {
             purchaseDate: "desc",
@@ -94,28 +96,8 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const rows = vendors.map((vendor, index) => {
-      const totalOrders = vendor.purchases.length
-
-      const totalPurchaseValueNumber = vendor.purchases.reduce(
-        (sum, purchase) => sum + Number(purchase.totalAmount || 0),
-        0
-      )
-
-      const pendingAmountNumber = vendor.purchases.reduce(
-        (sum, purchase) => sum + Number(purchase.balanceAmount || 0),
-        0
-      )
-
-      const lastPurchaseDate =
-        vendor.purchases.length > 0
-          ? formatDate(vendor.purchases[0].purchaseDate)
-          : "-"
-
-      const lastPaymentDate =
-        vendor.ledgerEntries.length > 0
-          ? formatDate(vendor.ledgerEntries[0].entryDate)
-          : "-"
+    const rows = await Promise.all(vendors.map(async (vendor, index) => {
+      const mapped = await mapVendorForExport(vendor)
 
       return {
         "Sr No": index + 1,
@@ -128,17 +110,17 @@ export async function GET(request: NextRequest) {
         State: vendor.state ?? "",
         Pincode: vendor.pincode ?? "",
         GSTIN: vendor.gstin ?? "",
-        "Opening Balance": Number(vendor.openingBalance ?? 0),
-        "Current Balance": Number(vendor.openingBalance ?? 0),
-        "Total Orders": totalOrders,
-        "Total Purchase Value": formatCurrency(totalPurchaseValueNumber),
-        "Pending Amount": formatCurrency(pendingAmountNumber),
-        "Last Purchase Date": lastPurchaseDate,
-        "Last Payment Date": lastPaymentDate,
+        "Opening Balance": mapped.openingBalance,
+        "Current Balance": mapped.currentBalance,
+        "Total Orders": mapped.totalOrders,
+        "Total Purchase Value": mapped.totalPurchaseValue,
+        "Pending Amount": mapped.pendingAmount,
+        "Last Purchase Date": mapped.lastPurchaseDate,
+        "Last Payment Date": mapped.lastPaymentDate,
         Notes: vendor.notes ?? "",
         "Created At": formatDate(vendor.createdAt),
       }
-    })
+    }))
 
     const worksheet = XLSX.utils.json_to_sheet(rows)
 

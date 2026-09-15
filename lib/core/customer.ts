@@ -178,8 +178,19 @@ export const CUSTOMER_LIST_INCLUDE = {
       totalAmount: true,
       balanceAmount: true,
       invoiceDate: true,
+      status: true,
     },
     orderBy: { invoiceDate: "desc" as const },
+  },
+  // Outstanding amount has to include Kacha slips, not just Invoices — a
+  // Kacha (Estimate) slip's own unpaid balanceAmount is real money owed
+  // (kacha-invoice-actions.ts posts a real ledger DEBIT for it), and the
+  // FIFO payment allocator (payments-actions.ts) already applies a general
+  // Payment In against outstanding Kacha slips too. Selected but not
+  // counted in totalOrders/totalPurchaseValue below — those stay
+  // Invoice-only, matching what "an order" has always meant here.
+  kachaInvoices: {
+    select: { id: true, balanceAmount: true, status: true },
   },
   ledgerEntries: {
     select: { id: true, amount: true, type: true, entryDate: true },
@@ -211,10 +222,25 @@ export function mapCustomer(customer: any): CustomerRecord {
     0,
   );
 
-  const pendingAmountNumber = customer.invoices.reduce(
-    (sum: number, invoice: any) => sum + Number(invoice.balanceAmount || 0),
+  // Outstanding = unpaid Invoices + unpaid Kacha slips + opening balance —
+  // matches getCustomerLedgerSummary's own currentBalance exactly (that
+  // function was the only one of the three independent "how much does this
+  // customer owe" implementations in this app that got this right). Every
+  // other display of "pending"/"outstanding"/"current balance" for a
+  // customer reads from this same number now, via mapCustomer, so the
+  // Parties list, a customer's detail page, and the Payment In picker can
+  // no longer disagree with the Ledger tab.
+  const invoiceBalance = customer.invoices.reduce(
+    (sum: number, invoice: any) =>
+      invoice.status === "CANCELLED" ? sum : sum + Number(invoice.balanceAmount || 0),
     0,
   );
+  const kachaBalance = (customer.kachaInvoices ?? []).reduce(
+    (sum: number, kacha: any) =>
+      kacha.status === "CANCELLED" ? sum : sum + Number(kacha.balanceAmount || 0),
+    0,
+  );
+  const pendingAmountNumber = invoiceBalance + kachaBalance + Number(customer.openingBalance ?? 0);
 
   const lastPurchaseDate =
     customer.invoices.length > 0
@@ -250,8 +276,22 @@ export function mapCustomer(customer: any): CustomerRecord {
     pincode: customer.pincode ?? "",
     customerType: "",
     openingBalance: Number(customer.openingBalance ?? 0),
+    // Ledger-derived (opening balance + DEBIT total - CREDIT total) rather
+    // than pendingAmountNumber above — this is the account's actual running
+    // balance from its full transaction history, the same figure
+    // getCustomerLedgerSummary computes, and it stays correct even where a
+    // cached document balanceAmount might not (e.g. it already reflects a
+    // Credit Note's return via that return's own ledger CREDIT, with no
+    // dependency on also having fixed every document-balance write path).
+    // pendingAmountNumber (unpaid Invoices/Kacha + opening) remains the
+    // right figure for "which specific documents are still open," used by
+    // the Payment In picker's allocator — a different question that happens
+    // to usually match this one in a fully consistent ledger.
     currentBalance: Number(customer.openingBalance ?? 0) + ledgerBalanceDelta,
-    balanceType: "Receivable",
+    // Was hardcoded to "Receivable" for every customer regardless of sign —
+    // a customer who has prepaid (currentBalance < 0) is owed money BY the
+    // store, not the other way around.
+    balanceType: Number(customer.openingBalance ?? 0) + ledgerBalanceDelta < 0 ? "Advance" : "Receivable",
     goldBalance: 0,
     silverBalance: 0,
     creditLimit: "",

@@ -1302,6 +1302,18 @@ export async function recordInvoicePayment(
     const invoice = await prisma.invoice.findFirst({ where: { id: invoiceId, storeId } });
     if (!invoice) return { success: false, message: "Invoice not found" };
 
+    // Reject rather than silently clamp — without this, an amount typed
+    // larger than what's actually owed pushed paidAmount past totalAmount
+    // with balanceAmount floored at 0, permanently hiding the overage (no
+    // record of it, no way to see or refund it) instead of surfacing it.
+    const currentBalance = Number(invoice.balanceAmount);
+    if (amount > currentBalance) {
+      return {
+        success: false,
+        message: `Amount exceeds the outstanding balance of ₹${currentBalance.toLocaleString("en-IN")}`,
+      };
+    }
+
     const newPaid = Number(invoice.paidAmount) + amount;
     const newBalance = Math.max(0, Number(invoice.totalAmount) - newPaid);
     const status: InvoiceStatus =

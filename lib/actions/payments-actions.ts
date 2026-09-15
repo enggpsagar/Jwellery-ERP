@@ -265,16 +265,25 @@ export async function getPaymentFormVendorsWithBalance(): Promise<PaymentVendorO
       name: true,
       phone: true,
       vendorCode: true,
-      purchases: { select: { balanceAmount: true } },
+      openingBalance: true,
+      purchases: { select: { balanceAmount: true, status: true } },
     },
   })
 
+  // Same fix as mapVendor's own pendingAmount (vendor-actions.ts) — this
+  // used to ignore openingBalance and any CANCELLED purchase entirely,
+  // so this picker could show a different "owed" figure than the Vendors
+  // list for the exact same vendor.
   return vendors.map((vendor) => ({
     id: vendor.id,
     name: vendor.name,
     phone: vendor.phone,
     vendorCode: vendor.vendorCode,
-    pendingAmount: vendor.purchases.reduce((sum, p) => sum + Number(p.balanceAmount || 0), 0),
+    pendingAmount:
+      vendor.purchases.reduce(
+        (sum, p) => (p.status === "CANCELLED" ? sum : sum + Number(p.balanceAmount || 0)),
+        0,
+      ) + Number(vendor.openingBalance ?? 0),
   }))
 }
 
@@ -302,16 +311,31 @@ export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCusto
       name: true,
       phone: true,
       customerCode: true,
-      invoices: { select: { balanceAmount: true } },
+      openingBalance: true,
+      invoices: { select: { balanceAmount: true, status: true } },
+      kachaInvoices: { select: { balanceAmount: true, status: true } },
     },
   })
 
+  // Same fix as mapCustomer's own pendingAmount (lib/core/customer.ts) —
+  // this used to ignore Kacha slips, any CANCELLED invoice, and
+  // openingBalance entirely, so this picker could show a different "owed"
+  // figure than the Parties list for the exact same customer.
   return customers.map((customer) => ({
     id: customer.id,
     name: customer.name,
     phone: customer.phone,
     customerCode: customer.customerCode,
-    pendingAmount: customer.invoices.reduce((sum, i) => sum + Number(i.balanceAmount || 0), 0),
+    pendingAmount:
+      customer.invoices.reduce(
+        (sum, i) => (i.status === "CANCELLED" ? sum : sum + Number(i.balanceAmount || 0)),
+        0,
+      ) +
+      customer.kachaInvoices.reduce(
+        (sum, k) => (k.status === "CANCELLED" ? sum : sum + Number(k.balanceAmount || 0)),
+        0,
+      ) +
+      Number(customer.openingBalance ?? 0),
   }))
 }
 

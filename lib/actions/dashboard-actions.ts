@@ -897,28 +897,53 @@ export async function getRecentActivity(
     take: limit,
     include: {
       customer: { select: { name: true } },
+      // Was missing entirely — every vendor-side entry (a Purchase's own
+      // balance-due accrual, a Payment Out) had neither customer nor
+      // karigar set, so it fell all the way through to the generic "Store"
+      // fallback below regardless of which vendor it was actually about.
+      vendor: { select: { name: true } },
       karigar: { select: { name: true } },
       metalType: { select: { name: true } },
+      createdBy: { select: { name: true } },
     },
   });
 
   return entries.map((entry) => {
-    const name = entry.customer?.name ?? entry.karigar?.name ?? "Store";
+    const name = entry.customer?.name ?? entry.vendor?.name ?? entry.karigar?.name ?? "Store";
     const isCredit = entry.type === "CREDIT";
 
     let action = entry.description ?? "Ledger entry recorded";
     if (entry.sourceType === "SALE") {
       action = isCredit ? "Payment received" : "Completed a purchase";
+    } else if (entry.sourceType === "PURCHASE") {
+      // Purchase's own balance-due accrual entry — distinct from an actual
+      // payment (PAYMENT_OUT below), same convention the SALE branch above
+      // already draws for its Invoice-side equivalent.
+      action = "Recorded a purchase";
+    } else if (entry.sourceType === "PAYMENT_IN") {
+      action = "Payment received";
+    } else if (entry.sourceType === "PAYMENT_OUT") {
+      action = "Payment made";
+    } else if (entry.sourceType === "SALE_RETURN") {
+      action = "Processed a return";
+    } else if (entry.sourceType === "ADJUSTMENT") {
+      action = "Balance adjusted";
     } else if (entry.sourceType === "KARIGAR_ISSUE") {
       action = "Material issued to artisan";
     } else if (entry.sourceType === "KARIGAR_RECEIPT") {
       action = "Received goods from artisan";
     }
 
-    const detail =
+    const amountOrWeight =
       entry.metalWeight && entry.metalType
         ? `${entry.metalType.name} · ${Number(entry.metalWeight).toFixed(1)} g`
         : `₹${Number(entry.amount).toLocaleString("en-IN")}`;
+    // "by <staff name>" answers who actually recorded this — createdBy is
+    // nullable (entries written before that column existed have none), so
+    // this quietly drops rather than showing "by null" for those.
+    const detail = entry.createdBy?.name
+      ? `${amountOrWeight} · by ${entry.createdBy.name}`
+      : amountOrWeight;
 
     return {
       name,

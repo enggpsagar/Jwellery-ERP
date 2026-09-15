@@ -340,14 +340,36 @@ export type KarigarLedgerSummary = {
 export async function getKarigarLedgerSummary(): Promise<KarigarLedgerSummary> {
   const storeId = await requireStoreScope()
 
+  // Same location-scoping getKarigars() itself already applies — this
+  // store-wide summary was fetching every karigar regardless of the
+  // caller's own location restriction, unlike everywhere else karigars are
+  // listed.
+  const scope = await getLocationScope()
   const karigars = await prisma.karigar.findMany({
-    where: { storeId },
+    where: { storeId, ...locationWhere(scope) },
     select: { id: true, name: true, code: true, openingGold: true, openingCash: true },
     orderBy: { name: "asc" },
   })
 
+  // "Gold Issued/Used/Outstanding" below means gold specifically, not
+  // every metal a karigar handles — this groupBy used to omit metalTypeId
+  // entirely, so a karigar issued both Gold and Silver had the two fine
+  // weights silently summed into one figure labeled "Gold". Restricted to
+  // this store's actual gold StoreMetal row(s) (by name, since metals are a
+  // per-store taxonomy, not a fixed enum — see StoreMetal's own schema
+  // comment); a karigar who only ever handles non-gold metals correctly
+  // shows 0 here now rather than someone else's silver.
+  const goldMetalIds = new Set(
+    (
+      await prisma.storeMetal.findMany({
+        where: { storeId, name: { contains: "gold", mode: "insensitive" } },
+        select: { id: true },
+      })
+    ).map((m) => m.id),
+  )
+
   const grouped = await prisma.ledgerEntry.groupBy({
-    by: ["karigarId", "type", "sourceType"],
+    by: ["karigarId", "type", "sourceType", "metalTypeId"],
     where: { storeId, karigarId: { not: null } },
     _sum: { metalWeightFine: true, amount: true },
   })
@@ -372,10 +394,15 @@ export async function getKarigarLedgerSummary(): Promise<KarigarLedgerSummary> {
       const fine = Number(g._sum.metalWeightFine ?? 0)
       const amt = Number(g._sum.amount ?? 0)
 
-      if (g.type === "DEBIT" && g.sourceType === "KARIGAR_ISSUE") goldIssued += fine
-      else if (g.type === "CREDIT" && g.sourceType === "KARIGAR_RECEIPT") goldUsed += fine
-      else if (g.type === "DEBIT") totalEarned += amt
-      else if (g.type === "CREDIT") totalPaid += amt
+      const isGold = g.metalTypeId !== null && goldMetalIds.has(g.metalTypeId)
+
+      if (isGold && g.type === "DEBIT" && g.sourceType === "KARIGAR_ISSUE") goldIssued += fine
+      else if (isGold && g.type === "CREDIT" && g.sourceType === "KARIGAR_RECEIPT") goldUsed += fine
+      // Cash (labour-charge DEBIT / payment CREDIT) entries carry no
+      // metalTypeId at all — unaffected by the isGold filter above, exactly
+      // as before.
+      else if (g.type === "DEBIT" && g.sourceType !== "KARIGAR_ISSUE") totalEarned += amt
+      else if (g.type === "CREDIT" && g.sourceType !== "KARIGAR_RECEIPT") totalPaid += amt
     }
 
     return {

@@ -31,14 +31,47 @@ const ON_HAND_STOCK_STATUSES = [
   InventoryStockStatus.RESERVED,
 ];
 
-function startOfDay(date: Date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+// India Standard Time, as a fixed offset — no daylight saving in India, so
+// +5:30 is exact rather than an approximation. Every "today"/"this week"/
+// "this month"/"this quarter"/"this year" boundary and chart bucket in this
+// file describes the shop's own calendar, which turns over at midnight IST —
+// not midnight wherever the server happens to run (Vercel: UTC). Every date
+// helper below used to read `date.getFullYear()`/`getMonth()`/`getDate()`/
+// `getHours()`/`getDay()` (the LOCAL getters) and construct with
+// `new Date(y, m, d)` (also local-timezone), correct by accident on a dev
+// machine already set to IST but wrong in production: it silently used UTC
+// boundaries instead, misattributing the first ~5.5 hours of every IST day/
+// week/month/quarter/year to the *previous* bucket, and shifting every
+// hourly sales-trend point by a fixed 5.5 hours all day, every day. Same
+// reasoning as lib/report-builder.ts's own IST_OFFSET_MS and
+// lib/actions/ledger-actions.ts's startOfIstDay.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+/** Shifts a real instant so its UTC getters (getUTCFullYear, getUTCMonth,
+ *  getUTCDate, getUTCDay, getUTCHours) read as IST wall-clock components —
+ *  never read a plain Date's own local getters below, or the server's own
+ *  timezone dependence creeps back in. */
+function toIst(date: Date): Date {
+  return new Date(date.getTime() + IST_OFFSET_MS);
 }
 
-function startOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
+/** Reverses toIst: turns a `Date.UTC(...)` value built from IST-shifted
+ *  components back into the real instant to store/compare/query by. */
+function fromIstUtcMs(istUtcMs: number): Date {
+  return new Date(istUtcMs - IST_OFFSET_MS);
+}
+
+const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function startOfDay(date: Date): Date {
+  const ist = toIst(date);
+  return fromIstUtcMs(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()));
+}
+
+function startOfMonth(date: Date): Date {
+  const ist = toIst(date);
+  return fromIstUtcMs(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), 1));
 }
 
 export type DashboardStat = {
@@ -70,8 +103,10 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     where: { storeId, isActive: true },
   });
 
-  const tomorrowStart = new Date(todayStart);
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+  // IST has no daylight saving, so a plain +24h is exact — no need for a
+  // calendar-aware setDate() (which reads/writes the server's own local
+  // timezone) now that todayStart is itself already an IST-correct instant.
+  const tomorrowStart = new Date(todayStart.getTime() + 86_400_000);
 
   const [
     outstandingAgg,
@@ -260,66 +295,80 @@ function salesTrendBuckets(period: SalesTrendPeriod, now: Date): SalesTrendBucke
 /** Steps `date` back/forward by `amount` whole periods. */
 function offsetPeriod(period: SalesTrendPeriod, date: Date, amount: number): Date {
   switch (period) {
+    // Daily/weekly are fixed-length in IST (no DST), so plain ms arithmetic
+    // on the already-IST-correct instant is exact and needs no shift.
     case "daily":
-      return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount);
+      return new Date(date.getTime() + amount * 86_400_000);
     case "weekly":
-      return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount * 7);
-    case "monthly":
-      return new Date(date.getFullYear(), date.getMonth() + amount, 1);
-    case "quarterly":
-      return new Date(date.getFullYear(), date.getMonth() + amount * 3, 1);
-    case "yearly":
-      return new Date(date.getFullYear() + amount, 0, 1);
+      return new Date(date.getTime() + amount * 7 * 86_400_000);
+    case "monthly": {
+      const ist = toIst(date);
+      return fromIstUtcMs(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth() + amount, 1));
+    }
+    case "quarterly": {
+      const ist = toIst(date);
+      return fromIstUtcMs(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth() + amount * 3, 1));
+    }
+    case "yearly": {
+      const ist = toIst(date);
+      return fromIstUtcMs(Date.UTC(ist.getUTCFullYear() + amount, 0, 1));
+    }
   }
 }
 
 /** Monday-start week, matching lib/date-range.ts's "This Week" convention. */
-function startOfWeekMonday(date: Date) {
+function startOfWeekMonday(date: Date): Date {
   const d = startOfDay(date);
-  const day = d.getDay();
+  const day = toIst(d).getUTCDay();
   const diff = day === 0 ? 6 : day - 1;
-  d.setDate(d.getDate() - diff);
-  return d;
+  return new Date(d.getTime() - diff * 86_400_000);
 }
 
 function salesTrendBucketFor(period: SalesTrendPeriod, date: Date): SalesTrendBucket {
   switch (period) {
     case "daily": {
       const start = startOfDay(date);
+      const ist = toIst(start);
       return {
-        key: start.toISOString().slice(0, 10),
-        label: start.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        key: `${ist.getUTCFullYear()}-${String(ist.getUTCMonth() + 1).padStart(2, "0")}-${String(ist.getUTCDate()).padStart(2, "0")}`,
+        label: `${MONTH_ABBR[ist.getUTCMonth()]} ${ist.getUTCDate()}`,
         start,
       };
     }
     case "weekly": {
       const start = startOfWeekMonday(date);
+      const ist = toIst(start);
       return {
-        key: start.toISOString().slice(0, 10),
-        label: start.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        key: `${ist.getUTCFullYear()}-${String(ist.getUTCMonth() + 1).padStart(2, "0")}-${String(ist.getUTCDate()).padStart(2, "0")}`,
+        label: `${MONTH_ABBR[ist.getUTCMonth()]} ${ist.getUTCDate()}`,
         start,
       };
     }
     case "monthly": {
       const start = startOfMonth(date);
+      const ist = toIst(start);
       return {
-        key: `${start.getFullYear()}-${start.getMonth()}`,
-        label: start.toLocaleDateString("en-US", { month: "short" }),
+        key: `${ist.getUTCFullYear()}-${ist.getUTCMonth()}`,
+        label: MONTH_ABBR[ist.getUTCMonth()],
         start,
       };
     }
     case "quarterly": {
-      const quarter = Math.floor(date.getMonth() / 3);
-      const start = new Date(date.getFullYear(), quarter * 3, 1);
+      const dateIst = toIst(date);
+      const quarter = Math.floor(dateIst.getUTCMonth() / 3);
+      const start = fromIstUtcMs(Date.UTC(dateIst.getUTCFullYear(), quarter * 3, 1));
+      const startYear = toIst(start).getUTCFullYear();
       return {
-        key: `${start.getFullYear()}-Q${quarter + 1}`,
-        label: `Q${quarter + 1} '${String(start.getFullYear()).slice(2)}`,
+        key: `${startYear}-Q${quarter + 1}`,
+        label: `Q${quarter + 1} '${String(startYear).slice(2)}`,
         start,
       };
     }
     case "yearly": {
-      const start = new Date(date.getFullYear(), 0, 1);
-      return { key: `${start.getFullYear()}`, label: `${start.getFullYear()}`, start };
+      const dateIst = toIst(date);
+      const start = fromIstUtcMs(Date.UTC(dateIst.getUTCFullYear(), 0, 1));
+      const startYear = toIst(start).getUTCFullYear();
+      return { key: `${startYear}`, label: `${startYear}`, start };
     }
   }
 }
@@ -478,11 +527,14 @@ function startOfPeriod(period: SalesTrendPeriod, date: Date): Date {
     case "monthly":
       return startOfMonth(date);
     case "quarterly": {
-      const quarter = Math.floor(date.getMonth() / 3);
-      return new Date(date.getFullYear(), quarter * 3, 1);
+      const ist = toIst(date);
+      const quarter = Math.floor(ist.getUTCMonth() / 3);
+      return fromIstUtcMs(Date.UTC(ist.getUTCFullYear(), quarter * 3, 1));
     }
-    case "yearly":
-      return new Date(date.getFullYear(), 0, 1);
+    case "yearly": {
+      const ist = toIst(date);
+      return fromIstUtcMs(Date.UTC(ist.getUTCFullYear(), 0, 1));
+    }
   }
 }
 
@@ -492,14 +544,12 @@ type SubBucket = { key: string; label: string; start: Date };
 function subBucketsFor(period: SalesTrendPeriod, periodStart: Date): SubBucket[] {
   switch (period) {
     case "daily": {
+      // periodStart is already the correct IST-midnight instant — adding
+      // whole hours of real elapsed time lands each sub-bucket at the right
+      // moment regardless of server timezone (no DST in IST to worry about).
       const buckets: SubBucket[] = [];
       for (let h = 0; h < 24; h++) {
-        const start = new Date(
-          periodStart.getFullYear(),
-          periodStart.getMonth(),
-          periodStart.getDate(),
-          h
-        );
+        const start = new Date(periodStart.getTime() + h * 3_600_000);
         const suffix = h < 12 ? "AM" : "PM";
         const displayHour = h % 12 === 0 ? 12 : h % 12;
         buckets.push({ key: `h${h}`, label: `${displayHour}${suffix}`, start });
@@ -509,51 +559,48 @@ function subBucketsFor(period: SalesTrendPeriod, periodStart: Date): SubBucket[]
     case "weekly": {
       const buckets: SubBucket[] = [];
       for (let d = 0; d < 7; d++) {
-        const start = new Date(
-          periodStart.getFullYear(),
-          periodStart.getMonth(),
-          periodStart.getDate() + d
-        );
+        const start = new Date(periodStart.getTime() + d * 86_400_000);
         buckets.push({
           key: `d${d}`,
-          label: start.toLocaleDateString("en-US", { weekday: "short" }),
+          label: WEEKDAY_ABBR[toIst(start).getUTCDay()],
           start,
         });
       }
       return buckets;
     }
     case "monthly": {
-      const daysInMonth = new Date(
-        periodStart.getFullYear(),
-        periodStart.getMonth() + 1,
-        0
-      ).getDate();
+      const ist = toIst(periodStart);
+      // Day 0 of next month == the last day of this one — a standard trick,
+      // done here via Date.UTC so it isn't itself server-timezone-dependent.
+      const daysInMonth = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth() + 1, 0)).getUTCDate();
       const buckets: SubBucket[] = [];
       for (let d = 0; d < daysInMonth; d++) {
-        const start = new Date(periodStart.getFullYear(), periodStart.getMonth(), d + 1);
+        const start = fromIstUtcMs(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), d + 1));
         buckets.push({ key: `d${d}`, label: `${d + 1}`, start });
       }
       return buckets;
     }
     case "quarterly": {
+      const ist = toIst(periodStart);
       const buckets: SubBucket[] = [];
       for (let m = 0; m < 3; m++) {
-        const start = new Date(periodStart.getFullYear(), periodStart.getMonth() + m, 1);
+        const start = fromIstUtcMs(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth() + m, 1));
         buckets.push({
           key: `m${m}`,
-          label: start.toLocaleDateString("en-US", { month: "short" }),
+          label: MONTH_ABBR[toIst(start).getUTCMonth()],
           start,
         });
       }
       return buckets;
     }
     case "yearly": {
+      const ist = toIst(periodStart);
       const buckets: SubBucket[] = [];
       for (let m = 0; m < 12; m++) {
-        const start = new Date(periodStart.getFullYear(), m, 1);
+        const start = fromIstUtcMs(Date.UTC(ist.getUTCFullYear(), m, 1));
         buckets.push({
           key: `m${m}`,
-          label: start.toLocaleDateString("en-US", { month: "short" }),
+          label: MONTH_ABBR[m],
           start,
         });
       }
@@ -568,15 +615,15 @@ function subBucketsFor(period: SalesTrendPeriod, periodStart: Date): SubBucket[]
 function subBucketIndexFor(period: SalesTrendPeriod, periodStart: Date, date: Date): number {
   switch (period) {
     case "daily":
-      return date.getHours();
+      return toIst(date).getUTCHours();
     case "weekly":
       return Math.floor((startOfDay(date).getTime() - periodStart.getTime()) / 86_400_000);
     case "monthly":
-      return date.getDate() - 1;
+      return toIst(date).getUTCDate() - 1;
     case "quarterly":
-      return date.getMonth() - periodStart.getMonth();
+      return toIst(date).getUTCMonth() - toIst(periodStart).getUTCMonth();
     case "yearly":
-      return date.getMonth();
+      return toIst(date).getUTCMonth();
   }
 }
 
@@ -714,11 +761,14 @@ function revenueByMetalPeriodStart(period: RevenueByMetalPeriod, now: Date): Dat
     case "monthly":
       return startOfMonth(now);
     case "quarterly": {
-      const quarter = Math.floor(now.getMonth() / 3);
-      return new Date(now.getFullYear(), quarter * 3, 1);
+      const ist = toIst(now);
+      const quarter = Math.floor(ist.getUTCMonth() / 3);
+      return fromIstUtcMs(Date.UTC(ist.getUTCFullYear(), quarter * 3, 1));
     }
-    case "yearly":
-      return new Date(now.getFullYear(), 0, 1);
+    case "yearly": {
+      const ist = toIst(now);
+      return fromIstUtcMs(Date.UTC(ist.getUTCFullYear(), 0, 1));
+    }
   }
 }
 

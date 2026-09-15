@@ -200,6 +200,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
           {
             label: "Total Debit",
             value: formatCurrency(totals.totalDebit),
+            rawValue: totals.totalDebit,
             sub: "Debit entries — all accounts",
             icon: ArrowUpCircle,
             accent: "text-destructive bg-destructive/10",
@@ -208,6 +209,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
           {
             label: "Total Credit",
             value: formatCurrency(totals.totalCredit),
+            rawValue: totals.totalCredit,
             sub: "Credit entries — all accounts",
             icon: ArrowDownCircle,
             accent: "text-emerald-600 bg-emerald-50",
@@ -219,6 +221,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
       {
         label: `${unit.label} Debit`,
         value: formatUnitTotal(unit, unit.debit),
+        rawValue: unit.debit,
         sub: `Owed in ${unit.label.toLowerCase()}`,
         icon: ArrowUpCircle,
         accent: "text-destructive bg-destructive/10",
@@ -228,6 +231,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
       {
         label: `${unit.label} Credit`,
         value: formatUnitTotal(unit, unit.credit),
+        rawValue: unit.credit,
         sub: `Received in ${unit.label.toLowerCase()}`,
         icon: ArrowDownCircle,
         accent: "text-emerald-600 bg-emerald-50",
@@ -238,12 +242,18 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
     {
       label: "Today's Transactions",
       value: String(totals.todayCount),
+      rawValue: totals.todayCount,
       sub: "Recorded today",
       icon: ArrowRightLeft,
       accent: "text-primary bg-primary/10",
       polarity: "net" as const,
     },
-  ]
+    // Every card above with nothing to show (a metal never traded in, no
+    // activity of a given kind at all) is dropped rather than cluttering the
+    // row with a wall of "0 g"/"₹0" cards — a store only dealing in cash
+    // (no configured metal units ever moved) no longer shows four empty
+    // Gold/Silver/Platinum/Diamond cards side by side.
+  ].filter((card) => card.rawValue !== 0)
 
   return (
     <>

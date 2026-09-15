@@ -108,8 +108,13 @@ export function VendorsTable({
               </th>
               <SortableTableHead label="Vendor Name" sortKey="name" defaultSortBy="createdAt" />
               <SortableTableHead label="Phone" sortKey="phone" defaultSortBy="createdAt" />
-              <SortableTableHead label="City" sortKey="city" defaultSortBy="createdAt" />
-              <SortableTableHead label="State" sortKey="state" defaultSortBy="createdAt" />
+              {/* City/State hidden below sm — same fix as customers-table.tsx:
+                  this table sits inside overflow-x-auto with no scroll
+                  affordance shown, so these two silently scrolled out of
+                  view on a phone with nothing indicating more columns
+                  existed. Outstanding stays visible at every width. */}
+              <SortableTableHead label="City" sortKey="city" defaultSortBy="createdAt" className="hidden sm:table-cell" />
+              <SortableTableHead label="State" sortKey="state" defaultSortBy="createdAt" className="hidden sm:table-cell" />
               <th className="px-4 py-3">Outstanding</th>
             </tr>
           </thead>
@@ -176,11 +181,11 @@ export function VendorsTable({
                     {vendor.phone || "-"}
                   </td>
 
-                  <td className="px-4 py-3 text-foreground">
+                  <td className="hidden px-4 py-3 text-foreground sm:table-cell">
                     {vendor.city || "-"}
                   </td>
 
-                  <td className="px-4 py-3 text-foreground">
+                  <td className="hidden px-4 py-3 text-foreground sm:table-cell">
                     {vendor.state || "-"}
                   </td>
 

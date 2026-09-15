@@ -410,12 +410,19 @@ export function ReportsTabs({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b">
-        <div className="flex gap-2">
+        {/* Scrolls horizontally instead of wrapping — this app has 8+
+            report tabs, more than fit in one row even on a tablet, and
+            wrapping a tab strip onto a second line reads as broken rather
+            than as a deliberate control. overflow-x-auto here (not
+            flex-wrap) was the actual cause of this page's own reported
+            horizontal page-level overflow: with no scroll container, the
+            tab row's real content width pushed the whole page wider. */}
+        <div className="flex gap-2 overflow-x-auto">
           {TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+              className={`shrink-0 px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 -mb-px ${
                 activeTab === tab.key
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -426,7 +433,7 @@ export function ReportsTabs({
           ))}
         </div>
 
-        <div className="flex items-center gap-2 pb-2">
+        <div className="flex flex-wrap items-center gap-2 pb-2">
           <Button
             type="button"
             variant="outline"

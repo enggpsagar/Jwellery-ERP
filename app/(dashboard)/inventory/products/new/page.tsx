@@ -41,7 +41,7 @@ export default async function NewProductPage({
     ]);
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-6">
+    <main className="mx-auto min-w-0 max-w-6xl space-y-6 p-6">
       <ResetFormWrapper
         header={{
           title: "Add Product",

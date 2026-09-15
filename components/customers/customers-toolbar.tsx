@@ -156,27 +156,13 @@ export function CustomersToolbar({
       </div>
 
       <div className="flex flex-1 flex-wrap items-center gap-3">
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
-          value={currentSortBy}
-          onChange={(e) => updateParam("sortBy", e.target.value)}
-          disabled={isPending}
-        >
-          <option value="createdAt">Sort by Created Date</option>
-          <option value="name">Sort by Name</option>
-          <option value="openingBalance">Sort by Opening Balance</option>
-        </select>
-
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
-          value={currentSortOrder}
-          onChange={(e) => updateParam("sortOrder", e.target.value)}
-          disabled={isPending}
-        >
-          <option value="desc">Descending</option>
-          <option value="asc">Ascending</option>
-        </select>
-
+        {/* Sort by / Ascending-Descending dropdowns removed — redundant
+            with the table's own clickable column headers (Party Name,
+            Opening Balance, ...), which already drive sortBy/sortOrder via
+            SortableTableHead, and were extra clutter in an already-tight
+            toolbar (especially on mobile). currentSortBy/currentSortOrder
+            stay read (below and in handleExport) so an export still
+            respects whatever sort a column header click has set. */}
         <select
           className="rounded-md border px-3 py-2 text-sm"
           value={currentPageSize}

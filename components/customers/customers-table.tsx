@@ -106,8 +106,16 @@ export function CustomersTable({
               </th>
               <th className="px-4 py-3 font-medium">Party Name</th>
               <th className="px-4 py-3 font-medium">Phone</th>
-              <th className="px-4 py-3 font-medium">City</th>
-              <th className="px-4 py-3 font-medium">State</th>
+              {/* City/State hidden below sm — on a narrow phone this table
+                  sits inside overflow-x-auto with no scroll affordance
+                  shown, so these two (the least useful at a glance) got
+                  silently scrolled out of view with nothing telling the
+                  user more columns existed. Outstanding — the one figure
+                  someone actually needs on this list — stays visible at
+                  every width instead of being hidden behind that same
+                  invisible scroll. */}
+              <th className="hidden px-4 py-3 font-medium sm:table-cell">City</th>
+              <th className="hidden px-4 py-3 font-medium sm:table-cell">State</th>
               {/* Outstanding shows currentBalance (ledger-derived: opening
                   + every DEBIT sale - every CREDIT payment/refund), not
                   pendingAmount — pendingAmount only sums unpaid
@@ -201,11 +209,11 @@ export function CustomersTable({
                     {customer.phone || "-"}
                   </td>
 
-                  <td className="px-4 py-3 text-foreground">
+                  <td className="hidden px-4 py-3 text-foreground sm:table-cell">
                     {customer.city || "-"}
                   </td>
 
-                  <td className="px-4 py-3 text-foreground">
+                  <td className="hidden px-4 py-3 text-foreground sm:table-cell">
                     {customer.state || "-"}
                   </td>
 

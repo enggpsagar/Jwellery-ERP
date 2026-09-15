@@ -53,7 +53,12 @@ export function PurchaseTable({ purchases, activePurchaseId, onActivate }: Purch
           <thead className="bg-muted/40">
             <tr className="border-b">
               <SortableTableHead label="Purchase #" sortKey="purchaseNumber" defaultSortBy="purchaseDate" />
-              <SortableTableHead label="Date" sortKey="purchaseDate" defaultSortBy="purchaseDate" />
+              {/* Date hidden below sm — same rationale as City/State on
+                  Customers/Vendors: this table sits inside overflow-x-auto
+                  with no scroll affordance shown, so the least-essential
+                  column is hidden instead of silently scrolling out of view.
+                  Purchase #, Vendor, Status, Total, Balance stay visible. */}
+              <SortableTableHead label="Date" sortKey="purchaseDate" defaultSortBy="purchaseDate" className="hidden sm:table-cell" />
               <th className="px-4 py-3 text-left font-medium">Vendor</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <SortableTableHead label="Total" sortKey="totalAmount" defaultSortBy="purchaseDate" />
@@ -110,7 +115,7 @@ export function PurchaseTable({ purchases, activePurchaseId, onActivate }: Purch
                     ]}
                   />
                 </td>
-                <td className="px-4 py-3">
+                <td className="hidden px-4 py-3 sm:table-cell">
                   {formatShortDate(purchase.purchaseDate)}
                 </td>
                 <td className="px-4 py-3">

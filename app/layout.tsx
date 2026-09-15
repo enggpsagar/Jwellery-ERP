@@ -120,7 +120,16 @@ export default async function RootLayout({
           }}
         />
       )}
-      <body>
+      {/* overflow-x-hidden at the true document root — belt-and-suspenders
+          on top of the (dashboard) layout's own overflow-x-hidden <main>.
+          That inner one clips correctly in Chromium, but WebKit/Safari
+          still let the page itself scroll a nested flex/grid's wide
+          intrinsic content past the viewport (confirmed live: window
+          actually scrolled ~93px on Safari's engine on the billing/new
+          page, not just a scrollWidth-measurement artifact) — this is the
+          one place a fix can't be undone by any WebKit-specific layout
+          quirk further down the tree, since nothing sits above <body>. */}
+      <body className="overflow-x-hidden">
         <NumberInputWheelGuard />
         <SessionProvider session={session}>
           <TooltipProvider>

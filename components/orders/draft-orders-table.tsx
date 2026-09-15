@@ -105,11 +105,17 @@ export function DraftOrdersTable({
                   />
                 </th>
                 <SortableTableHead label="Order #" sortKey="orderNumber" defaultSortBy="orderDate" />
-                <SortableTableHead label="Date" sortKey="orderDate" defaultSortBy="orderDate" />
+                {/* Date and Artisan Job hidden below sm — same rationale as
+                    the other list tables: this table sits inside
+                    overflow-x-auto with no scroll affordance shown, so the
+                    least-essential columns are hidden instead of silently
+                    scrolling out of view. Order #, Party, Items, Status,
+                    Actions stay visible. */}
+                <SortableTableHead label="Date" sortKey="orderDate" defaultSortBy="orderDate" className="hidden sm:table-cell" />
                 <th className="px-4 py-3 text-left font-medium">Party</th>
                 <th className="px-4 py-3 text-left font-medium">Items</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
-                <th className="px-4 py-3 text-left font-medium">Artisan Job</th>
+                <th className="hidden px-4 py-3 text-left font-medium sm:table-cell">Artisan Job</th>
                 <th className="px-4 py-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
@@ -152,7 +158,7 @@ export function DraftOrdersTable({
                         </Link>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
                       {formatShortDate(order.orderDate)}
                     </td>
                     <td className="px-4 py-3">{order.customer?.name ?? "—"}</td>
@@ -160,7 +166,7 @@ export function DraftOrdersTable({
                     <td className="px-4 py-3">
                       <DraftOrderStatusBadge status={order.status} />
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
                       {order.karigarJob?.jobNumber ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>

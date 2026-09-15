@@ -116,8 +116,13 @@ export function StockTable({
               </th>
               <SortableTableHead label="Stock Code" sortKey="stockCode" defaultSortBy="createdAt" />
               <SortableTableHead label="Title" sortKey="product" defaultSortBy="createdAt" />
-              <th className="px-4 py-3 text-right font-medium">Gross Weight</th>
-              {/* Only Net Weight has a server-side sort option (getStockOrderBy) — Gross Weight isn't sortable there, so it stays a plain header. */}
+              {/* Gross Weight hidden below sm — same rationale as the other
+                  list tables: least-essential column hidden instead of
+                  silently scrolling out of view. Net Weight (sortable) stays
+                  visible. Only Net Weight has a server-side sort option
+                  (getStockOrderBy) — Gross Weight isn't sortable there, so it
+                  stays a plain header. */}
+              <th className="hidden px-4 py-3 text-right font-medium sm:table-cell">Gross Weight</th>
               <SortableTableHead
                 label="Net Weight"
                 sortKey="netWeight"
@@ -180,7 +185,7 @@ export function StockTable({
                     />
                   </td>
 
-                  <td className="px-4 py-3 text-right tabular-nums">
+                  <td className="hidden px-4 py-3 text-right tabular-nums sm:table-cell">
                     {formatWeightCell(item.grossWeight)}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">

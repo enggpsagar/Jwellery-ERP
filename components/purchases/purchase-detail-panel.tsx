@@ -70,7 +70,7 @@ export function PurchaseDetailPanel({ purchaseId, locations }: PurchaseDetailPan
     <div className="space-y-4 rounded-xl border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{purchase.purchaseNumber}</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <RecordPurchasePaymentDialog
             purchaseId={purchase.id}
             balanceAmount={purchase.balanceAmount}

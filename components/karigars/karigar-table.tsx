@@ -83,7 +83,11 @@ export function KarigarTable({
               </th>
               <SortableTableHead label="Name" sortKey="name" defaultSortBy="createdAt" />
               <th className="px-4 py-3 text-left font-medium">Mobile</th>
-              <th className="px-4 py-3 text-left font-medium">City</th>
+              {/* City hidden below sm — same rationale as the other list
+                  tables: least-essential column hidden instead of silently
+                  scrolling out of view. Mobile and Opening Gold stay
+                  visible. */}
+              <th className="hidden px-4 py-3 text-left font-medium sm:table-cell">City</th>
               <th className="px-4 py-3 text-left font-medium">Opening Gold</th>
             </tr>
           </thead>
@@ -137,7 +141,7 @@ export function KarigarTable({
                   />
                 </td>
                 <td className="px-4 py-3">{karigar.mobile || "-"}</td>
-                <td className="px-4 py-3">{karigar.city || "-"}</td>
+                <td className="hidden px-4 py-3 sm:table-cell">{karigar.city || "-"}</td>
                 <td className="px-4 py-3">{karigar.openingGold.toFixed(3)} g</td>
               </tr>
               )

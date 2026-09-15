@@ -60,7 +60,7 @@ export function CustomersClient({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link href="/customers/archived">
             <Button variant="outline">Archived Parties</Button>
           </Link>

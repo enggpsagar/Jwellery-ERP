@@ -279,7 +279,16 @@ export default async function DashboardLayout({
               the whole page area actually shows a customized backgroundColor
               on; a fixed color here would make that Branding option
               silently do nothing for most of the visible screen. */}
-          <main className="flex min-w-0 flex-1 flex-col bg-background p-6">
+          {/* overflow-x-hidden here (not just min-w-0, which alone didn't
+              stop it — see the billing/new page investigation) is what
+              actually enforces this column's width as a hard boundary, so
+              a deeply nested fixed-min-width element (e.g. invoice-form.tsx's
+              compact line-items grid, min-w-[900px] in its own
+              overflow-x-auto) scrolls within that boundary instead of
+              silently growing the whole page past the viewport. Every page
+              in the app renders through this one wrapper, so this is a
+              single, app-wide fix rather than one per page. */}
+          <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden bg-background p-6">
             {isSuperAdmin && !isStoreExemptRoute && stores.length === 0 ? (
               <NoStoreAccessNotice />
             ) : isSuperAdmin && !isStoreExemptRoute && !activeStoreId ? (

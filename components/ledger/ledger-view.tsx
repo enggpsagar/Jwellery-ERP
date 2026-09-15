@@ -188,10 +188,19 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
   const summaryCards = [
     ...(totals.moneyActive
       ? [
+          // Sub-labels were "Amount owed by parties"/"Payments received" —
+          // read naturally as a net customer-receivables figure, but
+          // totals.totalDebit/totalCredit (getLedgerTotals) sum DEBIT/CREDIT
+          // across every account type (customer, vendor, AND karigar), each
+          // with its own opposite sign convention. A vendor Payment Out is a
+          // DEBIT here (money paid OUT), not an "amount owed by a party" —
+          // so the old sub-label overclaimed a meaning the number doesn't
+          // actually have. See Customer/Vendor Outstanding for the real
+          // per-account receivable/payable figures.
           {
             label: "Total Debit",
             value: formatCurrency(totals.totalDebit),
-            sub: "Amount owed by parties",
+            sub: "Debit entries — all accounts",
             icon: ArrowUpCircle,
             accent: "text-destructive bg-destructive/10",
             polarity: "debit" as const,
@@ -199,7 +208,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
           {
             label: "Total Credit",
             value: formatCurrency(totals.totalCredit),
-            sub: "Payments received",
+            sub: "Credit entries — all accounts",
             icon: ArrowDownCircle,
             accent: "text-emerald-600 bg-emerald-50",
             polarity: "credit" as const,

@@ -3,7 +3,7 @@ import { Boxes, IndianRupee, Scale, Truck } from "lucide-react"
 import type { getInventoryStockById } from "@/lib/actions/inventory/stock-actions"
 import { StockStatusBadge } from "@/components/inventory/shared/stock-status-badge"
 import { FinishBadge } from "@/components/inventory/shared/finish-badge"
-import { ActiveBadge } from "@/components/shared/active-badge"
+import { StockStatusToggle } from "@/components/inventory/stock/stock-status-toggle"
 import { DetailField, DetailGrid, DetailSection } from "@/components/shared/detail-section"
 import { formatShortDate } from "@/lib/utils"
 
@@ -67,7 +67,7 @@ export function StockDetailContent({
           <DetailField label="Metal Type" value={stock.metalType?.name} />
           <DetailField label="Purity" value={stock.purity} />
           <DetailField label="Quantity" value={stock.quantity} />
-          <DetailField label="Active" value={<ActiveBadge isActive={stock.isActive} />} />
+          <DetailField label="Active" value={<StockStatusToggle stockId={stock.id} isActive={stock.isActive} />} />
         </DetailGrid>
       </DetailSection>
 

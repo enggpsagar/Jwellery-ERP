@@ -1149,6 +1149,53 @@ export async function updateInventoryStock(
   }
 }
 
+/** Same immediate, no-confirm switch as ProductStatusToggle/KarigarStatusCard — flips Active/Inactive without going through the full edit form. */
+export async function disableStock(id: string): Promise<StockFormState> {
+  try {
+    const storeId = await requireStoreScope()
+
+    const { count } = await prisma.inventoryStock.updateMany({
+      where: { id, storeId },
+      data: { isActive: false },
+    })
+
+    if (count === 0) {
+      return { success: false, message: "Stock item not found", errors: {} }
+    }
+
+    revalidatePath("/inventory/stock")
+    revalidatePath(`/inventory/stock/${id}`)
+
+    return { success: true, message: "Stock item marked inactive", errors: {} }
+  } catch (error) {
+    logger.error("disableStock error", error)
+    return { success: false, message: actionErrorMessage(error, "Failed to update stock"), errors: {} }
+  }
+}
+
+export async function enableStock(id: string): Promise<StockFormState> {
+  try {
+    const storeId = await requireStoreScope()
+
+    const { count } = await prisma.inventoryStock.updateMany({
+      where: { id, storeId },
+      data: { isActive: true },
+    })
+
+    if (count === 0) {
+      return { success: false, message: "Stock item not found", errors: {} }
+    }
+
+    revalidatePath("/inventory/stock")
+    revalidatePath(`/inventory/stock/${id}`)
+
+    return { success: true, message: "Stock item marked active", errors: {} }
+  } catch (error) {
+    logger.error("enableStock error", error)
+    return { success: false, message: actionErrorMessage(error, "Failed to update stock"), errors: {} }
+  }
+}
+
 export async function deleteInventoryStock(id: string): Promise<StockFormState> {
   try {
     const storeId = await requireStoreScope()

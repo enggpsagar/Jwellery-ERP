@@ -19,6 +19,12 @@ import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { getReturnEligibility, type ReturnEligibility } from "@/lib/return-window";
 import { formatShortDate } from "@/lib/utils";
 import { logger } from "@/lib/logger";
+import { parseDateRangeBoundary } from "@/lib/date-range";
+import {
+  buildExcelExport,
+  buildCsvExportBase64,
+  buildPdfExportBase64,
+} from "@/lib/excel-export";
 
 export type CreditNoteFormState = {
   success: boolean;
@@ -227,15 +233,151 @@ export async function getCreditNotesForInvoice(invoiceId: string): Promise<Credi
   return creditNotes.map(mapCreditNote);
 }
 
-/** Store-wide list, newest first — backs /billing/credit-notes. */
-export async function getCreditNotes(): Promise<CreditNoteView[]> {
+export type CreditNoteSortBy = "creditNoteDate" | "totalAmount" | "creditNoteNumber";
+export type SortOrder = "asc" | "desc";
+
+export type GetCreditNotesParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  sortBy?: CreditNoteSortBy;
+  sortOrder?: SortOrder;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+export type CreditNotesListResponse = {
+  creditNotes: CreditNoteView[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+  };
+};
+
+type ExportCreditNotesParams = {
+  selectedIds?: string[];
+  search?: string;
+  sortBy?: string;
+  sortOrder?: SortOrder;
+  dateFrom?: string;
+  dateTo?: string;
+  format?: "csv" | "xlsx" | "pdf";
+};
+
+function getCreditNoteWhere(storeId: string, search?: string, dateFrom?: string, dateTo?: string) {
+  const query = String(search || "").trim();
+  const from = parseDateRangeBoundary(dateFrom, false);
+  const to = parseDateRangeBoundary(dateTo, true);
+
+  return {
+    storeId,
+    ...(from || to
+      ? { creditNoteDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
+      : {}),
+    ...(query
+      ? {
+          OR: [
+            { creditNoteNumber: { contains: query, mode: "insensitive" as const } },
+            { customer: { name: { contains: query, mode: "insensitive" as const } } },
+            { invoice: { invoiceNumber: { contains: query, mode: "insensitive" as const } } },
+          ],
+        }
+      : {}),
+  };
+}
+
+function getCreditNoteOrderBy(sortBy: CreditNoteSortBy = "creditNoteDate", sortOrder: SortOrder = "desc") {
+  if (sortBy === "totalAmount") return { totalAmount: sortOrder };
+  if (sortBy === "creditNoteNumber") return { creditNoteNumber: sortOrder };
+  return { creditNoteDate: sortOrder };
+}
+
+/** Paginated, filterable store-wide list — backs /billing/credit-notes. */
+export async function getCreditNotes(params: GetCreditNotesParams = {}): Promise<CreditNotesListResponse> {
+  const page = Math.max(1, Number(params.page || 1));
+  const pageSize = Math.max(1, Number(params.pageSize || 10));
+  const sortBy = params.sortBy || "creditNoteDate";
+  const sortOrder = params.sortOrder || "desc";
+
   const storeId = await requireStoreScope();
-  const creditNotes = await prisma.creditNote.findMany({
-    where: { storeId },
-    orderBy: { creditNoteDate: "desc" },
-    include: CREDIT_NOTE_INCLUDE,
-  });
+  const where = getCreditNoteWhere(storeId, params.search, params.dateFrom, params.dateTo);
+  const orderBy = getCreditNoteOrderBy(sortBy, sortOrder);
+
+  const [totalCount, creditNotes] = await Promise.all([
+    prisma.creditNote.count({ where }),
+    prisma.creditNote.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: CREDIT_NOTE_INCLUDE,
+    }),
+  ]);
+
+  return {
+    creditNotes: creditNotes.map(mapCreditNote),
+    pagination: {
+      page,
+      pageSize,
+      totalCount,
+      totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
+    },
+  };
+}
+
+async function getAllCreditNotesForExport(params: ExportCreditNotesParams = {}): Promise<CreditNoteView[]> {
+  const sortBy = (params.sortBy || "creditNoteDate") as CreditNoteSortBy;
+  const sortOrder = params.sortOrder || "desc";
+
+  const storeId = await requireStoreScope();
+  const where = params.selectedIds?.length
+    ? { id: { in: params.selectedIds }, storeId }
+    : getCreditNoteWhere(storeId, params.search, params.dateFrom, params.dateTo);
+  const orderBy = getCreditNoteOrderBy(sortBy, sortOrder);
+
+  const creditNotes = await prisma.creditNote.findMany({ where, orderBy, include: CREDIT_NOTE_INCLUDE });
   return creditNotes.map(mapCreditNote);
+}
+
+export async function exportCreditNotesToExcel(params: ExportCreditNotesParams = {}): Promise<{
+  success: boolean;
+  message: string;
+  fileName?: string;
+  fileBase64?: string;
+}> {
+  try {
+    const creditNotes = await getAllCreditNotesForExport(params);
+
+    if (!creditNotes.length) {
+      return { success: false, message: "No credit notes found to export." };
+    }
+
+    const rows = creditNotes.map((creditNote, index) => ({
+      "Sr. No.": index + 1,
+      "Credit Note #": creditNote.creditNoteNumber,
+      Date: formatShortDate(creditNote.creditNoteDate),
+      Party: creditNote.customer?.name || "",
+      "Against Invoice": creditNote.invoice.invoiceNumber,
+      "Amount Refunded": creditNote.totalAmount,
+      Reason: creditNote.reason || "",
+      "Created By": creditNote.createdByName || "",
+      Location: creditNote.locationName || "",
+    }));
+
+    const { fileName, fileBase64 } =
+      params.format === "csv"
+        ? buildCsvExportBase64(rows, "credit-notes")
+        : params.format === "pdf"
+          ? buildPdfExportBase64(rows, "Credit Notes", "credit-notes")
+          : buildExcelExport(rows, "Credit Notes", "credit-notes");
+
+    return { success: true, message: "Credit notes exported successfully.", fileName, fileBase64 };
+  } catch (error) {
+    logger.error("exportCreditNotesToExcel error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to export credit notes.") };
+  }
 }
 
 export type CreditNoteLineInput = {

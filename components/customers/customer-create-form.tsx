@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { User, Phone, Mail, MapPin, Hash, IndianRupee } from "lucide-react"
 
 import { addCustomer, type CustomerFormState } from "@/lib/actions/customer-actions"
+import { createLinkedVendorFromCustomer } from "@/lib/actions/party-link-actions"
 import { getCitiesByStateId } from "@/lib/actions/location-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -75,6 +76,7 @@ export function CustomerCreateForm({
   )
   const [cities, setCities] = useState<CityItem[]>([])
   const [loadingCities, setLoadingCities] = useState(false)
+  const [alsoCreateVendor, setAlsoCreateVendor] = useState(false)
 
   const [state, formAction, pending] = useActionState(addCustomer, initialState)
 
@@ -87,16 +89,32 @@ export function CustomerCreateForm({
     if (state.success) {
       toast.success(state.message || "Party added successfully")
 
-      // Hand the new id back to whoever sent us here so it can be selected
-      // straight away, rather than making the user hunt for it in the list.
-      if (returnTo && state.customer) {
-        const separator = returnTo.includes("?") ? "&" : "?"
-        router.push(`${returnTo}${separator}newCustomerId=${state.customer.id}`)
-      } else {
-        router.push("/customers")
+      async function finish() {
+        // Best-effort: the party itself is already saved either way, so a
+        // failure here (e.g. its phone number already belongs to some other
+        // vendor) is surfaced but never blocks navigating away.
+        if (alsoCreateVendor && state.customer) {
+          const linkResult = await createLinkedVendorFromCustomer(state.customer.id)
+          if (linkResult.success) {
+            toast.success(linkResult.message || "Also registered as a vendor")
+          } else {
+            toast.error(linkResult.message || "Party saved, but registering as a vendor failed")
+          }
+        }
+
+        // Hand the new id back to whoever sent us here so it can be selected
+        // straight away, rather than making the user hunt for it in the list.
+        if (returnTo && state.customer) {
+          const separator = returnTo.includes("?") ? "&" : "?"
+          router.push(`${returnTo}${separator}newCustomerId=${state.customer.id}`)
+        } else {
+          router.push("/customers")
+        }
+
+        router.refresh()
       }
 
-      router.refresh()
+      finish()
       return
     }
 
@@ -317,6 +335,25 @@ export function CustomerCreateForm({
               className={FIELD}
               placeholder="0.00"
             />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={alsoCreateVendor}
+                onChange={(e) => setAlsoCreateVendor(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-input"
+              />
+              <span>
+                <span className="font-medium">This party is also a vendor</span>
+                <span className="block text-xs text-muted-foreground">
+                  Creates a linked Vendor record with the same details — you can buy from and sell to the
+                  same business without entering it twice. Linked records can be unlinked later from either
+                  one&apos;s detail page.
+                </span>
+              </span>
+            </label>
           </div>
 
           <div className="flex justify-end gap-3 pt-2 md:col-span-2">

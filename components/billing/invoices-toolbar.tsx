@@ -25,6 +25,7 @@ export function InvoicesToolbar() {
       defaultSortBy="invoiceDate"
       hideSort
       statusOptions={STATUS_OPTIONS}
+      dateField="Invoice Date"
       entityLabel="invoices"
       exportAction={exportInvoicesToExcel}
     />

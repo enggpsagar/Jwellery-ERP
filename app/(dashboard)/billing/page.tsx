@@ -16,6 +16,8 @@ type BillingPageProps = {
     sortBy?: InvoiceSortField
     sortOrder?: "asc" | "desc"
     status?: string
+    dateFrom?: string
+    dateTo?: string
   }>
 }
 
@@ -30,9 +32,11 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   const sortBy = params.sortBy || "invoiceDate"
   const sortOrder = params.sortOrder || "desc"
   const status = params.status || "ALL"
+  const dateFrom = params.dateFrom || undefined
+  const dateTo = params.dateTo || undefined
 
   const [{ invoices, pagination }, locations] = await Promise.all([
-    getInvoices({ page, pageSize, search, sortBy, sortOrder, status }),
+    getInvoices({ page, pageSize, search, sortBy, sortOrder, status, dateFrom, dateTo }),
     getStoreLocations(),
   ])
 

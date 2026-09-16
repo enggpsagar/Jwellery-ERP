@@ -165,7 +165,16 @@ export function StockTable({
 
                   <td className="px-4 py-3 font-medium">
                     <RecordHoverCard
-                      label={item.product?.name ?? item.stockCode}
+                      label={
+                        <div className="flex flex-col">
+                          <span>{item.product?.name ?? item.stockCode}</span>
+                          {item.product?.productCode && (
+                            <span className="text-xs font-normal text-muted-foreground">
+                              {item.product.productCode}
+                            </span>
+                          )}
+                        </div>
+                      }
                       href={onActivate ? undefined : `/inventory/stock/${item.id}`}
                       title={item.product?.name ?? item.stockCode}
                       subtitle={item.stockCode}

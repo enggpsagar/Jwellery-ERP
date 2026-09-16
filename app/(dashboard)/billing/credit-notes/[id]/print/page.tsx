@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 
 import { getCreditNoteById } from "@/lib/actions/credit-note-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
+import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button"
 import { formatShortDate } from "@/lib/utils"
 
@@ -38,8 +39,13 @@ function fmtDate(value: string) {
 export default async function CreditNotePrintPage({ params }: Props) {
   const { id } = await params
 
-  const [creditNote, settings] = await Promise.all([getCreditNote(id), getBusinessSettings()])
+  const [creditNote, settings, locations] = await Promise.all([
+    getCreditNote(id),
+    getBusinessSettings(),
+    getStoreLocations(),
+  ])
   if (!creditNote) notFound()
+  const showLocation = locations.length > 1
 
   const businessAddressLines = [
     settings.address,
@@ -72,7 +78,7 @@ export default async function CreditNotePrintPage({ params }: Props) {
           <span>Date : {fmtDate(creditNote.creditNoteDate)}</span>
           <span>Against Invoice : {creditNote.invoice.invoiceNumber}</span>
           <span>Invoice Date : {fmtDate(creditNote.invoice.invoiceDate)}</span>
-          {creditNote.locationName && <span>Location : {creditNote.locationName}</span>}
+          {showLocation && creditNote.locationName && <span>Location : {creditNote.locationName}</span>}
         </div>
 
         <div className="grid grid-cols-2 border-b border-black">

@@ -67,6 +67,20 @@ export function LocationSelect({
     return locations.filter((location) => location.name.toLowerCase().includes(query))
   }, [locations, search])
 
+  // A store with 0 or 1 locations has nothing meaningful to pick — every
+  // caller's own Label/helper text around this component is expected to
+  // hide itself too (see each usage's own `locations.length > 1` guard),
+  // but this still has to render *something* so the sole location's id
+  // (there's always exactly one from registration onward, per
+  // store-registration-actions.ts) keeps submitting via `name` exactly as
+  // it did when a human picked it from the dropdown. After the hooks above,
+  // not before — an early return can't skip a hook call on some renders
+  // and not others.
+  if (locations.length <= 1) {
+    const soleLocationId = locations[0]?.id ?? defaultValue ?? ""
+    return name ? <input type="hidden" name={name} value={soleLocationId} /> : null
+  }
+
   return (
     <div className="space-y-2">
       {name && <input type="hidden" name={name} value={selected} />}

@@ -29,9 +29,13 @@ type StockClientProps = {
   stockItems: React.ComponentProps<typeof StockTable>["stockItems"]
   pagination: Pagination
   metals: StoreMetalRow[]
+  /** False for a single-location (or zero-location) store — there's
+   * nothing to distinguish, so the Location field/column has no reason to
+   * show anywhere in this table or its detail panel. */
+  showLocation: boolean
 }
 
-export function StockClient({ stockItems, pagination, metals }: StockClientProps) {
+export function StockClient({ stockItems, pagination, metals, showLocation }: StockClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   // Which row's full detail shows in the right-hand panel — defaults to
   // the first row on this page/search result so the panel is never empty
@@ -128,10 +132,11 @@ export function StockClient({ stockItems, pagination, metals }: StockClientProps
             onSelectionChange={setSelectedIds}
             activeStockId={activeStockId}
             onActivate={setActiveStockId}
+            showLocation={showLocation}
           />
         </div>
 
-        <StockDetailPanel stockId={activeStockId} />
+        <StockDetailPanel stockId={activeStockId} showLocation={showLocation} />
       </div>
     </main>
   )

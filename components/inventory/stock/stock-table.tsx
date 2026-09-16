@@ -32,6 +32,8 @@ type StockTableProps = {
   /** Which row's detail is showing in the panel alongside this table — distinct from selectedIds, which is the bulk-action checkbox selection. */
   activeStockId?: string | null
   onActivate?: (id: string) => void
+  /** False for a single-location (or zero-location) store — see StockClientProps. Defaults true so a caller that hasn't been updated still shows it, matching today's behavior. */
+  showLocation?: boolean
 }
 
 function formatNumber(value: number | string | null | undefined, digits = 3) {
@@ -51,6 +53,7 @@ export function StockTable({
   onSelectionChange,
   activeStockId,
   onActivate,
+  showLocation = true,
 }: StockTableProps) {
   const allIds = React.useMemo(
     () => stockItems.map((item) => item.id),
@@ -178,7 +181,9 @@ export function StockTable({
                         {
                           fields: [
                             { label: "Quantity", value: item.quantity },
-                            { label: "Location", value: item.location?.name },
+                            ...(showLocation
+                              ? [{ label: "Location", value: item.location?.name }]
+                              : []),
                           ],
                         },
                       ]}

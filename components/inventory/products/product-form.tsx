@@ -1347,17 +1347,19 @@ export function ProductForm({
               </div>
 
               <div>
-                <Label htmlFor="locationId">Location</Label>
+                {locations.length > 1 && <Label htmlFor="locationId">Location</Label>}
                 <LocationSelect
                   locations={locations}
                   name="locationId"
                   defaultValue={defaultLocationId}
                   placeholder="Select location (optional)"
                 />
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  Optional — left blank, the same default a full Add Stock
-                  entry would use is applied automatically.
-                </p>
+                {locations.length > 1 && (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Optional — left blank, the same default a full Add Stock
+                    entry would use is applied automatically.
+                  </p>
+                )}
                 <ErrorText error={state.errors.locationId} />
               </div>
             </div>

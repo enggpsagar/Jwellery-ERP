@@ -43,9 +43,15 @@ function formatNumber(value: unknown) {
 export function StockDetailContent({
   stock,
   qrCard,
+  showLocation = true,
 }: {
   stock: Stock
   qrCard: React.ReactNode
+  /** False for a single-location (or zero-location) store — nothing to
+   * distinguish, so this field has no reason to show. Defaults true so a
+   * caller that hasn't been updated still shows it, matching today's
+   * behavior. */
+  showLocation?: boolean
 }) {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -93,7 +99,7 @@ export function StockDetailContent({
         <DetailGrid>
           <DetailField label="Vendor Name" value={stock.vendorName} />
           <DetailField label="Purchase Date" value={formatDate(stock.purchaseDate)} />
-          <DetailField label="Location" value={stock.location?.name} />
+          {showLocation && <DetailField label="Location" value={stock.location?.name} />}
           <DetailField
             label="Remarks"
             span

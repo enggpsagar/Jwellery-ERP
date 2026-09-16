@@ -15,6 +15,8 @@ type Stock = NonNullable<Awaited<ReturnType<typeof getInventoryStockById>>>
 
 type StockDetailPanelProps = {
   stockId: string | null
+  /** False for a single-location (or zero-location) store — see StockClientProps. Defaults true so a caller that hasn't been updated still shows it, matching today's behavior. */
+  showLocation?: boolean
 }
 
 /**
@@ -29,7 +31,7 @@ type StockDetailPanelProps = {
  * does) — a client component can't read that server-only env var. Both
  * point at the same `/s/{id}` scan entry point either way.
  */
-export function StockDetailPanel({ stockId }: StockDetailPanelProps) {
+export function StockDetailPanel({ stockId, showLocation = true }: StockDetailPanelProps) {
   const [stock, setStock] = useState<Stock | null>(null)
   const [loading, setLoading] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
@@ -102,6 +104,7 @@ export function StockDetailPanel({ stockId }: StockDetailPanelProps) {
 
       <StockDetailContent
         stock={stock}
+        showLocation={showLocation}
         qrCard={
           <StockQrCard
             dataUrl={qrDataUrl}

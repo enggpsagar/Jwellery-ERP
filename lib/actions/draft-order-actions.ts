@@ -16,6 +16,7 @@ import {
   generateJobNumber,
 } from "@/lib/actions/inventory-stock-actions";
 import { logger } from "@/lib/logger";
+import { getBusinessSettings } from "@/lib/actions/settings-actions";
 
 /**
  * A phone/counter order captured before the physical piece exists — see
@@ -561,6 +562,11 @@ export async function sendDraftOrderToKarigar(
   try {
     const storeId = await requireStoreScope();
     const currentUser = await getCurrentUser();
+
+    const settings = await getBusinessSettings();
+    if (!settings.sendToArtisanEnabled) {
+      return { success: false, message: "Sending orders to an artisan is turned off in Settings" };
+    }
 
     const order = await prisma.draftOrder.findFirst({
       where: { id: orderId, storeId },

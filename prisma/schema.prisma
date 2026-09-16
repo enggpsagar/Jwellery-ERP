@@ -1745,6 +1745,18 @@ model BusinessSettings {
   // a per-item attribute. Only enforced when returnWindowEnabled is true.
   returnWindowDays    Int     @default(30)
 
+  // Whether staff can send a Draft Order's items out to an artisan (Karigar)
+  // for work. Off by default is wrong for most stores, so this defaults to
+  // true — the point is to let a store that doesn't use artisans turn the
+  // action off from Settings instead of it just being a button nobody uses,
+  // without touching the Karigar module itself (artisan records, past jobs,
+  // ledger, and reports stay fully visible either way — this only gates
+  // starting a *new* send). Checked both in the UI (Send to Artisan button/
+  // dialog on the Draft Order page) and server-side in
+  // sendDraftOrderToKarigar(), same "don't trust the client" pattern as
+  // returnWindowEnabled above.
+  sendToArtisanEnabled Boolean @default(true)
+
   // Financial year
   financialYearStartMonth Int @default(4) // April = 4, common in India
 

@@ -8,6 +8,7 @@ import { requireStoreScope, assertPlanActiveForExport, PlanExpiredError } from "
 import { formatShortDate } from "@/lib/utils"
 import { logger } from "@/lib/logger";
 import { mapVendorForExport } from "@/lib/actions/vendor-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 
 type VendorSortBy = "name" | "createdAt" | "openingBalance"
 type SortOrder = "asc" | "desc"
@@ -39,6 +40,14 @@ export async function GET(request: NextRequest) {
 
     const storeId = await requireStoreScope()
     await assertPlanActiveForExport(storeId)
+
+    const businessSettings = await getBusinessSettings()
+    if (!businessSettings.vendorsModuleEnabled) {
+      return NextResponse.json(
+        { success: false, message: "The Vendors module is turned off in Settings" },
+        { status: 403 },
+      )
+    }
 
     const where = {
       storeId,

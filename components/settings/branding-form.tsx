@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCcw, AlertTriangle } from "lucide-react";
-import type { BrandFontFamily, BrandRadius } from "@prisma/client";
+import type { BrandFontFamily, BrandFontStyle, BrandFontWeight, BrandRadius } from "@prisma/client";
 
 import {
   updateStoreBranding,
@@ -16,7 +16,11 @@ import {
   BRAND_ACTION_KEYS,
   BRAND_ACTION_LABEL,
   BRAND_FONT_LABEL,
+  BRAND_FONT_STYLE_LABEL,
+  BRAND_FONT_STYLE_VALUE,
   BRAND_FONT_VARIABLE,
+  BRAND_FONT_WEIGHT_LABEL,
+  BRAND_FONT_WEIGHT_VALUE,
   BRAND_RADIUS_LABEL,
   BRAND_RADIUS_VALUE,
   BRAND_STATUS_DEFAULT,
@@ -60,6 +64,8 @@ type SurfaceKey = keyof typeof SURFACE_DEFAULTS;
 const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 const FONT_FAMILY_OPTIONS = Object.keys(BRAND_FONT_LABEL) as BrandFontFamily[];
+const FONT_WEIGHT_OPTIONS = Object.keys(BRAND_FONT_WEIGHT_LABEL) as BrandFontWeight[];
+const FONT_STYLE_OPTIONS = Object.keys(BRAND_FONT_STYLE_LABEL) as BrandFontStyle[];
 const RADIUS_OPTIONS = Object.keys(BRAND_RADIUS_LABEL) as BrandRadius[];
 
 function ColorField({
@@ -150,6 +156,8 @@ export function BrandingForm({ settings, canEdit }: { settings: StoreBrandingSet
   });
   const [showIcons, setShowIcons] = useState(settings.showIcons);
   const [fontFamily, setFontFamily] = useState<BrandFontFamily>(settings.fontFamily);
+  const [fontWeight, setFontWeight] = useState<BrandFontWeight>(settings.fontWeight);
+  const [fontStyle, setFontStyle] = useState<BrandFontStyle>(settings.fontStyle);
   const [radius, setRadius] = useState<BrandRadius>(settings.radius);
 
   function setSurfaceField(key: SurfaceKey, value: string) {
@@ -211,6 +219,8 @@ export function BrandingForm({ settings, canEdit }: { settings: StoreBrandingSet
         });
         setShowIcons(true);
         setFontFamily("INTER");
+        setFontWeight("NORMAL");
+        setFontStyle("NORMAL");
         setRadius("DEFAULT");
         toast.success(result.message);
         router.refresh();
@@ -368,6 +378,49 @@ export function BrandingForm({ settings, canEdit }: { settings: StoreBrandingSet
             </div>
 
             <div className="space-y-1.5">
+              <Label htmlFor="fontWeight">Font Weight</Label>
+              <Select
+                value={fontWeight}
+                onValueChange={(v) => setFontWeight(v as BrandFontWeight)}
+              >
+                <SelectTrigger id="fontWeight" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FONT_WEIGHT_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {BRAND_FONT_WEIGHT_LABEL[option]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <input type="hidden" name="fontWeight" value={fontWeight} />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="fontStyle">Font Style</Label>
+              <Select
+                value={fontStyle}
+                onValueChange={(v) => setFontStyle(v as BrandFontStyle)}
+              >
+                <SelectTrigger id="fontStyle" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FONT_STYLE_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {BRAND_FONT_STYLE_LABEL[option]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <input type="hidden" name="fontStyle" value={fontStyle} />
+              <p className="text-xs text-muted-foreground">
+                Combine with Font Weight above for e.g. Bold Italic.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
               <Label htmlFor="radius">Corner Style</Label>
               <Select value={radius} onValueChange={(v) => setRadius(v as BrandRadius)}>
                 <SelectTrigger id="radius" className="w-full">
@@ -429,6 +482,8 @@ export function BrandingForm({ settings, canEdit }: { settings: StoreBrandingSet
                 backgroundColor: previewBackground,
                 color: previewForeground,
                 fontFamily: fontFamily === "INTER" ? undefined : BRAND_FONT_VARIABLE[fontFamily],
+                fontWeight: BRAND_FONT_WEIGHT_VALUE[fontWeight],
+                fontStyle: BRAND_FONT_STYLE_VALUE[fontStyle],
               }}
             >
               <div
@@ -494,8 +549,8 @@ export function BrandingForm({ settings, canEdit }: { settings: StoreBrandingSet
                 </div>
               </div>
               <p className="text-xs opacity-70">
-                This preview reflects colors, font, and corner style as
-                they&apos;re chosen at left, before Save.
+                This preview reflects colors, font, weight, style, and corner
+                style as they&apos;re chosen at left, before Save.
               </p>
             </div>
           </CardContent>

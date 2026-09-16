@@ -298,6 +298,11 @@
 
   html {
     @apply font-sans;
+    /* Branding's Font Weight/Style pickers — see (dashboard) layout.tsx's
+       own --brand-font-weight/--brand-font-style, only ever set when a
+       store has customized one away from Normal. */
+    font-weight: var(--brand-font-weight, normal);
+    font-style: var(--brand-font-style, normal);
   }
 }
 

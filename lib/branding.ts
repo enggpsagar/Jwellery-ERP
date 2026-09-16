@@ -1,5 +1,5 @@
 // FILE PATH: lib/branding.ts
-import { BrandFontFamily, BrandRadius } from "@prisma/client";
+import { BrandFontFamily, BrandFontStyle, BrandFontWeight, BrandRadius } from "@prisma/client";
 
 /**
  * Which next/font CSS variable (app/layout.tsx) a BrandFontFamily choice
@@ -36,6 +36,37 @@ export const BRAND_FONT_LABEL: Record<BrandFontFamily, string> = {
   RALEWAY: "Raleway",
   WORK_SANS: "Work Sans",
   OSWALD: "Oswald (condensed)",
+};
+
+// CSS font-weight values — see BrandFontWeight's own schema doc comment on
+// which families actually have every one of these loaded vs. render at the
+// nearest available static weight instead.
+export const BRAND_FONT_WEIGHT_VALUE: Record<BrandFontWeight, string> = {
+  LIGHT: "300",
+  NORMAL: "400",
+  MEDIUM: "500",
+  SEMIBOLD: "600",
+  BOLD: "700",
+  EXTRABOLD: "800",
+};
+
+export const BRAND_FONT_WEIGHT_LABEL: Record<BrandFontWeight, string> = {
+  LIGHT: "Light",
+  NORMAL: "Normal (default)",
+  MEDIUM: "Medium",
+  SEMIBOLD: "Semibold",
+  BOLD: "Bold",
+  EXTRABOLD: "Extrabold",
+};
+
+export const BRAND_FONT_STYLE_VALUE: Record<BrandFontStyle, string> = {
+  NORMAL: "normal",
+  ITALIC: "italic",
+};
+
+export const BRAND_FONT_STYLE_LABEL: Record<BrandFontStyle, string> = {
+  NORMAL: "Normal (default)",
+  ITALIC: "Italic",
 };
 
 // rem values — DEFAULT matches globals.css's own --radius: 0.5rem exactly,

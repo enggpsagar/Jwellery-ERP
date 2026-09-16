@@ -52,7 +52,7 @@ export default async function BrandGuidePage() {
     <main className="mx-auto max-w-5xl space-y-6 p-6">
       <PageBackHeader
         title="Branding"
-        description="Customize the accent color, background, font, and corner style your store's staff see across the whole app."
+        description="Customize the accent color, background, font, font weight/style, and corner style your store's staff see across the whole app."
         backHref="/dashboard"
         backLabel="Back to Dashboard"
       />

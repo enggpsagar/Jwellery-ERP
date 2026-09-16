@@ -15,7 +15,9 @@ import { getSidebarCounts } from "@/lib/actions/sidebar-actions";
 import {
   BRAND_ACTION_CSS_PREFIX,
   BRAND_ACTION_KEYS,
+  BRAND_FONT_STYLE_VALUE,
   BRAND_FONT_VARIABLE,
+  BRAND_FONT_WEIGHT_VALUE,
   BRAND_RADIUS_VALUE,
   BRAND_STATUS_CSS_PREFIX,
   BRAND_STATUS_KEYS,
@@ -244,6 +246,12 @@ export default async function DashboardLayout({
 
   if (brandingSettings && brandingSettings.fontFamily !== "INTER") {
     brandingStyle["--font-sans"] = BRAND_FONT_VARIABLE[brandingSettings.fontFamily];
+  }
+  if (brandingSettings && brandingSettings.fontWeight !== "NORMAL") {
+    brandingStyle["--brand-font-weight"] = BRAND_FONT_WEIGHT_VALUE[brandingSettings.fontWeight];
+  }
+  if (brandingSettings && brandingSettings.fontStyle !== "NORMAL") {
+    brandingStyle["--brand-font-style"] = BRAND_FONT_STYLE_VALUE[brandingSettings.fontStyle];
   }
   if (brandingSettings && brandingSettings.radius !== "DEFAULT") {
     brandingStyle["--radius"] = BRAND_RADIUS_VALUE[brandingSettings.radius];

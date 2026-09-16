@@ -2,7 +2,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { BrandFontFamily, BrandRadius, UserRole } from "@prisma/client";
+import { BrandFontFamily, BrandFontStyle, BrandFontWeight, BrandRadius, UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { getStoreIdForRead, requireStoreScope } from "@/lib/store-context";
@@ -31,6 +31,8 @@ export type StoreBrandingSettings = {
   statusInactiveColor: string | null;
   showIcons: boolean;
   fontFamily: BrandFontFamily;
+  fontWeight: BrandFontWeight;
+  fontStyle: BrandFontStyle;
   radius: BrandRadius;
 };
 
@@ -123,6 +125,8 @@ export async function getStoreBranding(): Promise<StoreBrandingSettings> {
     statusInactiveColor: branding.statusInactiveColor,
     showIcons: branding.showIcons,
     fontFamily: branding.fontFamily,
+    fontWeight: branding.fontWeight,
+    fontStyle: branding.fontStyle,
     radius: branding.radius,
   };
 }
@@ -153,13 +157,23 @@ export async function updateStoreBranding(
       ? (radiusRaw as BrandRadius)
       : BrandRadius.DEFAULT;
 
+    const fontWeightRaw = String(formData.get("fontWeight") || "NORMAL");
+    const fontWeight = Object.values(BrandFontWeight).includes(fontWeightRaw as BrandFontWeight)
+      ? (fontWeightRaw as BrandFontWeight)
+      : BrandFontWeight.NORMAL;
+
+    const fontStyleRaw = String(formData.get("fontStyle") || "NORMAL");
+    const fontStyle = Object.values(BrandFontStyle).includes(fontStyleRaw as BrandFontStyle)
+      ? (fontStyleRaw as BrandFontStyle)
+      : BrandFontStyle.NORMAL;
+
     const showIcons = String(formData.get("showIcons") || "true") !== "false";
 
     if (Object.keys(errors).length > 0) {
       return { success: false, message: "Fix the highlighted fields", errors };
     }
 
-    const data = { ...colors, fontFamily, radius, showIcons };
+    const data = { ...colors, fontFamily, fontWeight, fontStyle, radius, showIcons };
 
     await prisma.storeBranding.upsert({
       where: { storeId },
@@ -197,6 +211,8 @@ export async function resetStoreBranding(): Promise<BrandingFormState> {
       update: {
         ...clearedColors,
         fontFamily: BrandFontFamily.INTER,
+        fontWeight: BrandFontWeight.NORMAL,
+        fontStyle: BrandFontStyle.NORMAL,
         radius: BrandRadius.DEFAULT,
         showIcons: true,
       },

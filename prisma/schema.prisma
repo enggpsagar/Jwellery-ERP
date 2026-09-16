@@ -1805,6 +1805,30 @@ enum BrandFontFamily {
   OSWALD
 }
 
+// Independent of BrandFontFamily above, not tied to which family is picked —
+// most curated fonts here load as variable fonts with the full weight range
+// (see app/layout.tsx's next/font config); the handful loaded as static
+// weights (Roboto/Poppins/Merriweather/Lato/Nunito) only have 400/700ish
+// available, so an in-between choice here just renders at the nearest loaded
+// weight rather than every value being pixel-distinct for those five. NORMAL
+// (400) matches the app's un-customized default.
+enum BrandFontWeight {
+  LIGHT
+  NORMAL
+  MEDIUM
+  SEMIBOLD
+  BOLD
+  EXTRABOLD
+}
+
+// Independent of both BrandFontFamily and BrandFontWeight — "Bold Italic" is
+// weight=BOLD + style=ITALIC together, not a combined enum value, the same
+// way a word processor's Bold and Italic toggles are two separate switches.
+enum BrandFontStyle {
+  NORMAL
+  ITALIC
+}
+
 // Sharp/Default/Rounded — a store-wide multiplier on the app's single
 // --radius token (globals.css derives --radius-sm..4xl from it), not a
 // new scale of its own.
@@ -1932,6 +1956,8 @@ model StoreBranding {
   showIcons Boolean @default(true)
 
   fontFamily BrandFontFamily @default(INTER)
+  fontWeight BrandFontWeight @default(NORMAL)
+  fontStyle  BrandFontStyle  @default(NORMAL)
   radius     BrandRadius     @default(DEFAULT)
 
   updatedAt DateTime @updatedAt

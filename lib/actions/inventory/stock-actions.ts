@@ -596,6 +596,14 @@ export async function createInventoryStock(
       errors.quantity = ["Quantity must be at least 1"]
     }
 
+    if (grossWeight === null || grossWeight <= 0) {
+      errors.grossWeight = ["Gross weight is required"]
+    }
+
+    if (netWeight === null || netWeight <= 0) {
+      errors.netWeight = ["Net weight is required"]
+    }
+
     if (Object.keys(errors).length > 0) {
       return {
         success: false,
@@ -920,6 +928,14 @@ export async function updateInventoryStock(
 
     if (quantity < 1) {
       errors.quantity = ["Quantity must be at least 1"]
+    }
+
+    if (grossWeight === null || grossWeight <= 0) {
+      errors.grossWeight = ["Gross weight is required"]
+    }
+
+    if (netWeight === null || netWeight <= 0) {
+      errors.netWeight = ["Net weight is required"]
     }
 
     if (Object.keys(errors).length > 0) {

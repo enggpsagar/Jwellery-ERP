@@ -701,13 +701,14 @@ export function StockForm({
           </div>
 
           <div>
-            <Label htmlFor="grossWeight">Gross Weight</Label>
+            <Label htmlFor="grossWeight">Gross Weight <RequiredMark /></Label>
 
             <input type="hidden" name="grossWeight" value={submittedWeight(grossWeight)} />
             <Input
               id="grossWeight"
               type="number"
               step="0.00001"
+              required
               value={displayWeight(grossWeight)}
               onChange={(event) => editGrossWeight(toGramsString(event.target.value))}
             />
@@ -731,13 +732,14 @@ export function StockForm({
           </div>
 
           <div>
-            <Label htmlFor="netWeight">Net Weight</Label>
+            <Label htmlFor="netWeight">Net Weight <RequiredMark /></Label>
 
             <input type="hidden" name="netWeight" value={submittedWeight(netWeight)} />
             <Input
               id="netWeight"
               type="number"
               step="0.00001"
+              required
               value={displayWeight(netWeight)}
               onChange={(event) => editNetWeight(toGramsString(event.target.value))}
             />

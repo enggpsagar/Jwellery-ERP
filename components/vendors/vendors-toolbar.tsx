@@ -139,7 +139,7 @@ export function VendorsToolbar({
   return (
     // Column stack below sm — same fix as DataTableToolbar/CustomersToolbar.
     <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-center">
-      <div className="relative w-full sm:w-64">
+      <div className="relative min-w-[120px] flex-1 sm:max-w-44">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={search}

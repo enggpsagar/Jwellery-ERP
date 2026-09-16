@@ -46,15 +46,15 @@ export function IncludesStoneToggle({
       />
       <span
         className={cn(
-          "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200",
+          "relative inline-flex h-7 w-14 shrink-0 items-center rounded-full transition-colors duration-200",
           "peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-ring",
           checked ? "bg-emerald-500" : "bg-red-500"
         )}
       >
         <span
           className={cn(
-            "flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-bold leading-none shadow transition-transform duration-200",
-            checked ? "translate-x-[22px] text-emerald-600" : "translate-x-0.5 text-red-600"
+            "flex h-6 w-6 items-center justify-center rounded-full bg-white text-xs font-bold leading-none shadow transition-transform duration-200",
+            checked ? "translate-x-[30px] text-emerald-600" : "translate-x-0.5 text-red-600"
           )}
         >
           {checked ? "✓" : "✕"}

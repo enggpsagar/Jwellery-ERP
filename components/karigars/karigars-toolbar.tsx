@@ -3,10 +3,10 @@
 
 import * as React from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Download, Search, X } from "lucide-react"
+import { Download, X } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { CollapsibleSearch } from "@/components/shared/collapsible-search"
 import {
   Select,
   SelectContent,
@@ -155,27 +155,12 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
   return (
     // Column stack below sm — same fix as DataTableToolbar/CustomersToolbar/VendorsToolbar.
     <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-center">
-      <div className="relative min-w-[120px] flex-1 sm:max-w-44">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name, code, mobile..."
-          className="h-9 pl-9 pr-8"
-          disabled={isPending}
-        />
-        {search ? (
-          <button
-            type="button"
-            onClick={() => setSearch("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            title="Clear search"
-            aria-label="Clear search"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        ) : null}
-      </div>
+      <CollapsibleSearch
+        value={search}
+        onChange={setSearch}
+        placeholder="Search by name, code, mobile..."
+        disabled={isPending}
+      />
 
       <div className="flex flex-1 flex-wrap items-center gap-3">
         <Select value={currentType} onValueChange={(value) => updateParam("type", value)} disabled={isPending}>

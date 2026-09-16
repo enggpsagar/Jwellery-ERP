@@ -110,20 +110,34 @@ export function EditInvoiceDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 
-  const ewayBillLabel = ewayBillNumber?.trim() ? "Update E-way Bill" : "E-way Bill"
+  // Reflects whichever of E-way Bill / E-Invoice is already filled in, so
+  // this trigger doesn't stay permanently labeled "E-way Bill" even for a
+  // store that only ever fills in the E-Invoice section — that hid the
+  // E-Invoice feature entirely (it lives in the same dialog, but nothing
+  // about the button said so).
+  const hasEwayBill = !!ewayBillNumber?.trim()
+  const hasEInvoice = !!irnNumber?.trim()
+  const complianceLabel =
+    hasEwayBill && hasEInvoice
+      ? "Update E-way Bill / E-Invoice"
+      : hasEInvoice
+        ? "Update E-Invoice"
+        : hasEwayBill
+          ? "Update E-way Bill"
+          : "E-way Bill / E-Invoice"
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {compact ? (
-          <Button size="sm" variant="edit" className="gap-1.5" title="Edit Date & E-way Bill">
+          <Button size="sm" variant="edit" className="gap-1.5" title="Edit Date, E-way Bill & E-Invoice">
             <Truck className="h-4 w-4" />
-            {ewayBillLabel}
+            {complianceLabel}
           </Button>
         ) : (
-          <Button variant="edit" className="gap-2" title="Edit Date & E-way Bill">
+          <Button variant="edit" className="gap-2" title="Edit Date, E-way Bill & E-Invoice">
             <Truck className="h-4 w-4" />
-            {ewayBillLabel}
+            {complianceLabel}
           </Button>
         )}
       </DialogTrigger>

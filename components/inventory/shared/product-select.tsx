@@ -119,7 +119,7 @@ export function ProductSelect({
           onChange?.(value, products.find((product) => product.id === value))
         }}
       >
-        <SelectTrigger>
+        <SelectTrigger className="w-full">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
 

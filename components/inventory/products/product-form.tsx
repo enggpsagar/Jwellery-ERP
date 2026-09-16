@@ -613,51 +613,6 @@ export function ProductForm({
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div>
-            <Label htmlFor="productCode">SKU / Product Code</Label>
-
-            {mode === "edit" ? (
-              <div
-                id="productCode"
-                className="flex h-11 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground"
-              >
-                {product?.productCode}
-              </div>
-            ) : (
-              <>
-                <div
-                  id="productCode"
-                  className="flex h-11 items-center rounded-md border border-dashed bg-muted/40 px-3 text-sm text-muted-foreground"
-                >
-                  {skuPreview ? (
-                    <span className="font-medium text-foreground">{skuPreview}-###</span>
-                  ) : (
-                    "Select Metal, Purity, Style and Category to preview"
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Generated automatically from Metal + Purity + Style + Category — the
-                  final number is assigned when you save.
-                </p>
-              </>
-            )}
-
-            <ErrorText error={state.errors.productCode} />
-          </div>
-
-          <div>
-            <Label htmlFor="name">Product Name <RequiredMark /></Label>
-
-            <Input
-              id="name"
-              name="name"
-              defaultValue={product?.name ?? ""}
-              placeholder="Ladies Ring"
-            />
-
-            <ErrorText error={state.errors.name} />
-          </div>
-
-          <div>
             <Label>Category <RequiredMark /></Label>
 
             <div className="flex gap-1.5">
@@ -706,6 +661,7 @@ export function ProductForm({
 
             <ErrorText error={state.errors.categoryId} />
           </div>
+
           <div>
             <Label>Type</Label>
 
@@ -777,6 +733,51 @@ export function ProductForm({
             />
 
             <ErrorText error={state.errors.categoryTypeId} />
+          </div>
+
+          <div>
+            <Label htmlFor="name">Product Name <RequiredMark /></Label>
+
+            <Input
+              id="name"
+              name="name"
+              defaultValue={product?.name ?? ""}
+              placeholder="Ladies Ring"
+            />
+
+            <ErrorText error={state.errors.name} />
+          </div>
+
+          <div>
+            <Label htmlFor="productCode">SKU / Product Code</Label>
+
+            {mode === "edit" ? (
+              <div
+                id="productCode"
+                className="flex h-11 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground"
+              >
+                {product?.productCode}
+              </div>
+            ) : (
+              <>
+                <div
+                  id="productCode"
+                  className="flex h-11 items-center rounded-md border border-dashed bg-muted/40 px-3 text-sm text-muted-foreground"
+                >
+                  {skuPreview ? (
+                    <span className="font-medium text-foreground">{skuPreview}-###</span>
+                  ) : (
+                    "Select Metal, Purity, Style and Category to preview"
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Generated automatically from Metal + Purity + Style + Category — the
+                  final number is assigned when you save.
+                </p>
+              </>
+            )}
+
+            <ErrorText error={state.errors.productCode} />
           </div>
 
           <div>

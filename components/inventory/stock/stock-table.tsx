@@ -118,6 +118,7 @@ export function StockTable({
                 />
               </th>
               <SortableTableHead label="Stock Code" sortKey="stockCode" defaultSortBy="createdAt" />
+              <th className="hidden px-4 py-3 text-left font-medium md:table-cell">Product Code</th>
               <SortableTableHead label="Title" sortKey="product" defaultSortBy="createdAt" />
               {/* Gross Weight hidden below sm — same rationale as the other
                   list tables: least-essential column hidden instead of
@@ -163,18 +164,13 @@ export function StockTable({
 
                   <td className="px-4 py-3 text-foreground">{item.stockCode}</td>
 
+                  <td className="hidden px-4 py-3 text-foreground md:table-cell">
+                    {item.product?.productCode ?? "-"}
+                  </td>
+
                   <td className="px-4 py-3 font-medium">
                     <RecordHoverCard
-                      label={
-                        <div className="flex flex-col">
-                          <span>{item.product?.name ?? item.stockCode}</span>
-                          {item.product?.productCode && (
-                            <span className="text-xs font-normal text-muted-foreground">
-                              {item.product.productCode}
-                            </span>
-                          )}
-                        </div>
-                      }
+                      label={item.product?.name ?? item.stockCode}
                       href={onActivate ? undefined : `/inventory/stock/${item.id}`}
                       title={item.product?.name ?? item.stockCode}
                       subtitle={item.stockCode}

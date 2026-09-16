@@ -10,6 +10,12 @@ import { verifyQuickSaleToken } from "@/lib/quick-sale-token";
 import { createInvoice } from "@/lib/actions/invoice-actions";
 import { logger } from "@/lib/logger";
 
+/** Never NaN: a blank or garbled field becomes `fallback`, same as the full invoice form. */
+function toNumber(value: unknown, fallback = 0) {
+  const num = Number(value);
+  return Number.isNaN(num) ? fallback : num;
+}
+
 /**
  * Scan-to-sell.
  *
@@ -213,9 +219,9 @@ export async function completeQuickSale(
         message: "You do not have permission to create invoices in this store.",
       };
     }
-    const sellingPrice = Number(formData.get("sellingPrice"));
-    const quantity = Math.max(1, Math.trunc(Number(formData.get("quantity")) || 1));
-    const paidNow = Number(formData.get("paidAmount"));
+    const sellingPrice = toNumber(formData.get("sellingPrice"));
+    const quantity = Math.max(1, Math.trunc(toNumber(formData.get("quantity"), 1)));
+    const paidNow = toNumber(formData.get("paidAmount"));
     const customerId = String(formData.get("customerId") || "").trim();
 
     if (!customerId) {
@@ -226,7 +232,7 @@ export async function completeQuickSale(
       return { success: false, message: "No stock item was scanned." };
     }
 
-    if (!Number.isFinite(sellingPrice) || sellingPrice <= 0) {
+    if (sellingPrice <= 0) {
       return { success: false, message: "Enter a selling price." };
     }
 
@@ -319,10 +325,7 @@ export async function completeQuickSale(
     invoiceForm.set("itemsJson", JSON.stringify([lineItem]));
     invoiceForm.set("discount", "0");
     invoiceForm.set("taxAmount", "0");
-    invoiceForm.set(
-      "paidAmount",
-      String(Number.isFinite(paidNow) && paidNow > 0 ? paidNow : 0),
-    );
+    invoiceForm.set("paidAmount", String(paidNow > 0 ? paidNow : 0));
     invoiceForm.set("notes", `Counter sale — scanned ${target.stockCode}`);
 
     const result = await createInvoice(

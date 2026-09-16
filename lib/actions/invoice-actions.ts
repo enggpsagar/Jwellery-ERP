@@ -764,6 +764,12 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
     stoneMetalTypeName: stock.stoneMetalTypeName ?? null,
     stoneTypeNames: stock.stoneTypeNames ?? null,
     saleRate: stock.saleRate ? Number(stock.saleRate) : null,
+    // Recorded at stock-creation time (Add Stock's own Making Charge
+    // field) but never carried into the Sale form until now — a piece's
+    // line item always started at 0/FIXED regardless of what was set
+    // when the stock was added, silently discarding it.
+    makingCharge: stock.makingCharge ? Number(stock.makingCharge) : null,
+    makingChargeType: stock.makingChargeType,
     quantity: stock.quantity,
   }));
 
@@ -815,6 +821,8 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       stoneMetalTypeName: stock.stoneMetalTypeName ?? null,
       stoneTypeNames: stock.stoneTypeNames ?? null,
       saleRate: stock.saleRate ? Number(stock.saleRate) : null,
+      makingCharge: stock.makingCharge ? Number(stock.makingCharge) : null,
+      makingChargeType: stock.makingChargeType,
       quantity: stock.quantity + claimed,
     });
   }

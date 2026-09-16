@@ -6,6 +6,13 @@ import { Download, Search, X } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { exportVendorsToExcel, type VendorSortBy } from "@/lib/actions/vendor-actions"
 import { useToast } from "@/components/providers/toast-provider"
 
@@ -146,7 +153,7 @@ export function VendorsToolbar({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name, phone, email, city..."
-          className="pl-9 pr-8"
+          className="h-9 pl-9 pr-8"
           disabled={isPending}
         />
         {search ? (
@@ -163,12 +170,12 @@ export function VendorsToolbar({
       </div>
 
       <div className="flex flex-1 flex-wrap items-center gap-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-sm text-muted-foreground">Added</span>
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-input px-2.5 py-1">
+          <span className="whitespace-nowrap text-sm text-muted-foreground">Added</span>
           <input
             type="date"
             aria-label="Added from"
-            className="rounded-md border px-3 py-2 text-sm"
+            className="h-7 rounded-md border-0 bg-transparent text-sm outline-none"
             value={currentDateFrom}
             max={currentDateTo || undefined}
             onChange={(e) => updateParam("dateFrom", e.target.value)}
@@ -178,7 +185,7 @@ export function VendorsToolbar({
           <input
             type="date"
             aria-label="Added to"
-            className="rounded-md border px-3 py-2 text-sm"
+            className="h-7 rounded-md border-0 bg-transparent text-sm outline-none"
             value={currentDateTo}
             min={currentDateFrom || undefined}
             onChange={(e) => updateParam("dateTo", e.target.value)}
@@ -205,16 +212,16 @@ export function VendorsToolbar({
           ) : null}
         </div>
 
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
-          value={currentPageSize}
-          onChange={(e) => updateParam("pageSize", e.target.value)}
-          disabled={isPending}
-        >
-          <option value="10">10 / page</option>
-          <option value="20">20 / page</option>
-          <option value="50">50 / page</option>
-        </select>
+        <Select value={currentPageSize} onValueChange={(value) => updateParam("pageSize", value)} disabled={isPending}>
+          <SelectTrigger className="h-9 w-[110px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="10">10 / page</SelectItem>
+            <SelectItem value="20">20 / page</SelectItem>
+            <SelectItem value="50">50 / page</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="flex items-center gap-3">

@@ -553,6 +553,12 @@ export async function createProduct(
   formData: FormData,
 ): Promise<ProductFormState> {
   try {
+    const storeId = await requireStoreScope();
+    const businessSettings = await prisma.businessSettings.findUnique({
+      where: { storeId },
+      select: { skuFormat: true, styleFieldEnabled: true },
+    });
+
     const name = String(formData.get("name") ?? "").trim();
 
     const categoryId = String(formData.get("categoryId") ?? "").trim();
@@ -631,7 +637,7 @@ export async function createProduct(
       errors.name = ["Product name is required"];
     }
 
-    if (!targetStyle) {
+    if (businessSettings?.styleFieldEnabled !== false && !targetStyle) {
       errors.targetStyle = ["Style is required"];
     }
 
@@ -642,8 +648,6 @@ export async function createProduct(
     if (defaultNetWeight === null) {
       errors.defaultNetWeight = ["Net weight is required"];
     }
-
-    const storeId = await requireStoreScope();
 
     Object.assign(
       errors,
@@ -669,19 +673,18 @@ export async function createProduct(
     // lookup rather than re-plumbing names through from the client, which
     // can't be trusted anyway (a stale/tampered label would silently mint
     // a wrong-looking SKU).
-    const [metalRow, categoryTypeRow, categoryRow, businessSettings] = await Promise.all([
+    const [metalRow, categoryTypeRow, categoryRow] = await Promise.all([
       prisma.storeMetal.findFirst({ where: { id: metalTypeId, storeId }, select: { name: true } }),
       categoryTypeId
         ? prisma.storeCategoryType.findFirst({ where: { id: categoryTypeId, storeId }, select: { name: true } })
         : Promise.resolve(null),
       prisma.storeCategory.findFirst({ where: { id: categoryId, storeId }, select: { name: true } }),
-      prisma.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true } }),
     ]);
 
     const skuPrefix = buildSkuPrefix({
       metalName: metalRow?.name ?? "X",
       purity: defaultPurity,
-      targetStyle: targetStyle as TargetStyle,
+      targetStyle,
       categoryTypeName: categoryTypeRow?.name ?? null,
       categoryName: categoryRow?.name ?? null,
       format: businessSettings?.skuFormat,
@@ -1356,7 +1359,7 @@ export async function importProductsFromExcel(
         select: { id: true, name: true, storeMetalId: true },
       }),
       prisma.storeLocation.findMany({ where: { storeId }, select: { id: true, name: true } }),
-      prisma.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true } }),
+      prisma.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true, styleFieldEnabled: true } }),
     ]);
 
     const categoryByName = new Map(categories.map((c) => [c.name.trim().toLowerCase(), c]));
@@ -1425,8 +1428,9 @@ export async function importProductsFromExcel(
 
       const styleRaw = productImportCell(row, "Style");
       const targetStyle = styleRaw ? styleByLabel.get(styleRaw.toLowerCase()) : undefined;
-      if (!styleRaw) rowErrors.push("Style is required");
-      else if (!targetStyle) {
+      if (!styleRaw) {
+        if (businessSettings?.styleFieldEnabled !== false) rowErrors.push("Style is required");
+      } else if (!targetStyle) {
         rowErrors.push(`"${styleRaw}" is not a valid Style — use Ladies, Gents, Kids, or Unisex`);
       }
 
@@ -1544,12 +1548,14 @@ export async function importProductsFromExcel(
         continue;
       }
 
-      // Every check above passed, so category/metal/targetStyle are
-      // guaranteed non-null here even though TypeScript can't tell from the
-      // control flow alone.
+      // Every check above passed, so category/metal are guaranteed non-null
+      // here even though TypeScript can't tell from the control flow alone.
+      // targetStyle stays possibly-undefined on purpose — a missing Style
+      // only reached here without a row error when the store has turned
+      // the Style field off (styleFieldEnabled === false).
       const resolvedCategory = category!;
       const resolvedMetal = metal!;
-      const resolvedTargetStyle = targetStyle!;
+      const resolvedTargetStyle = targetStyle;
       const hasStoneComponent = productImportYesNo(row, "Has Stone Component", false);
       const isActive = productImportYesNo(row, "Active", true);
 

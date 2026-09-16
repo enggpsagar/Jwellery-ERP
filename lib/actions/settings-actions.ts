@@ -68,6 +68,12 @@ export type BusinessSettings = {
   // small SkuFormatForm/updateSkuFormat, not the big updateBusinessSettings
   // form below.
   skuFormat: SkuFormat;
+  // Whether the Style (Ladies/Gents/Kids/Unisex) field shows at all on the
+  // product create/edit form — see prisma/schema.prisma's
+  // BusinessSettings.styleFieldEnabled doc comment. Edited via the same
+  // small SkuFormatForm/updateSkuFormat as skuFormat above, since it's
+  // directly part of how a product's SKU is generated.
+  styleFieldEnabled: boolean;
   // How many days after invoiceDate a sold item may still be returned via a
   // Credit Note — see prisma/schema.prisma's BusinessSettings.returnWindowDays
   // doc comment and lib/return-window.ts's getReturnEligibility(). Only
@@ -131,6 +137,7 @@ function mapSettings(settings: any): BusinessSettings {
     returnWindowEnabled: settings.returnWindowEnabled ?? true,
     sendToArtisanEnabled: settings.sendToArtisanEnabled ?? true,
     skuFormat: settings.skuFormat ?? SkuFormat.METAL_PURITY_STYLE_CATEGORY,
+    styleFieldEnabled: settings.styleFieldEnabled ?? true,
     returnWindowDays: settings.returnWindowDays ?? 30,
     financialYearStartMonth: settings.financialYearStartMonth ?? 4,
     businessUnits: settings.businessUnits?.length
@@ -430,6 +437,7 @@ export async function updateSkuFormat(
     if (!Object.values(SkuFormat).includes(skuFormatRaw as SkuFormat)) {
       return { success: false, message: "Select a valid SKU format" };
     }
+    const styleFieldEnabled = formData.get("styleFieldEnabled") === "on";
 
     const storeId = await requireStoreScope();
 
@@ -437,7 +445,7 @@ export async function updateSkuFormat(
     // already created the row on first access — a plain update is safe.
     await prisma.businessSettings.update({
       where: { storeId },
-      data: { skuFormat: skuFormatRaw as SkuFormat },
+      data: { skuFormat: skuFormatRaw as SkuFormat, styleFieldEnabled },
     });
 
     revalidatePath("/settings");

@@ -86,6 +86,7 @@ export function QuotationsClient({ quotations, pagination }: QuotationsClientPro
             totalCount={pagination.totalCount}
             pageSize={pagination.pageSize}
             itemLabel="quotations"
+            showPageSizeSelector
           />
         </div>
       </div>

@@ -82,6 +82,7 @@ export function DraftOrdersClient({
           hideSort
           statusOptions={STATUS_OPTIONS}
           dateField="Order Date"
+          hidePageSize
           selectedIds={selectedIds}
           entityLabel="draft orders"
           exportAction={exportDraftOrdersToExcel}
@@ -112,6 +113,7 @@ export function DraftOrdersClient({
             totalCount={pagination.totalCount}
             pageSize={pagination.pageSize}
             itemLabel="draft orders"
+            showPageSizeSelector
           />
         </div>
       </div>

@@ -28,6 +28,7 @@ export function PurchasesToolbar() {
       hideSort
       statusOptions={STATUS_OPTIONS}
       dateField="Purchase Date"
+      hidePageSize
       entityLabel="purchases"
       exportAction={exportPurchasesToExcel}
     />

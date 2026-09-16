@@ -69,7 +69,6 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
   const currentSortOrder = (searchParams.get("sortOrder") ?? "desc") as
     | "asc"
     | "desc"
-  const currentPageSize = searchParams.get("pageSize") ?? "10"
   const currentType = searchParams.get("type") ?? "ALL"
   const currentDateFrom = searchParams.get("dateFrom") ?? ""
   const currentDateTo = searchParams.get("dateTo") ?? ""
@@ -237,17 +236,6 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
             </button>
           ) : null}
         </div>
-
-        <Select value={currentPageSize} onValueChange={(value) => updateParam("pageSize", value)} disabled={isPending}>
-          <SelectTrigger className="h-9 w-[110px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="10">10 / page</SelectItem>
-            <SelectItem value="20">20 / page</SelectItem>
-            <SelectItem value="50">50 / page</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="flex items-center gap-3">

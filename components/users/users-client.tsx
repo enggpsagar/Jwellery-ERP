@@ -115,6 +115,7 @@ export function UsersClient({
             defaultSortBy="createdAt"
             hideSort
             dateField="Created Date"
+            hidePageSize
             selectedIds={selectedIds}
             entityLabel="users"
             exportAction={exportUsersToExcel}
@@ -153,6 +154,7 @@ export function UsersClient({
               totalCount={pagination.totalCount}
               pageSize={pagination.pageSize}
               itemLabel="users"
+              showPageSizeSelector
             />
           </div>
         </div>

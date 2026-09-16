@@ -49,6 +49,7 @@ export function StockToolbar({ selectedIds, metals, bulkActions }: StockToolbarP
       defaultSortBy="createdAt"
       hideSort
       dateField="Purchase Date"
+      hidePageSize
       selectedIds={selectedIds}
       entityLabel="stock items"
       exportAction={exportInventoryStockToExcel}

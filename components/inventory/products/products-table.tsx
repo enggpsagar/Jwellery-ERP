@@ -218,6 +218,7 @@ export function ProductsTable({
         totalCount={pagination.totalCount}
         totalPages={pagination.totalPages}
         itemLabel="products"
+        showPageSizeSelector
       />
     </div>
   )

@@ -32,6 +32,7 @@ export function QuotationsToolbar({ selectedIds, bulkActions }: QuotationsToolba
       hideSort
       statusOptions={STATUS_OPTIONS}
       dateField="Quotation Date"
+      hidePageSize
       entityLabel="quotations"
       exportAction={exportQuotationsToExcel}
       selectedIds={selectedIds}

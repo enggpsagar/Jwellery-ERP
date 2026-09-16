@@ -221,6 +221,7 @@ export function StockTable({
         totalCount={pagination.totalCount}
         totalPages={pagination.totalPages}
         itemLabel="stock items"
+        showPageSizeSelector
       />
     </div>
   )

@@ -27,6 +27,8 @@ type DraftOrdersPageProps = {
     sortBy?: DraftOrderSortBy
     sortOrder?: SortOrder
     status?: string
+    dateFrom?: string
+    dateTo?: string
   }>
 }
 
@@ -39,9 +41,11 @@ export default async function DraftOrdersPage({ searchParams }: DraftOrdersPageP
   const sortBy = params.sortBy || "orderDate"
   const sortOrder = params.sortOrder || "desc"
   const status = params.status || undefined
+  const dateFrom = params.dateFrom || undefined
+  const dateTo = params.dateTo || undefined
 
   const [{ orders, pagination }, karigars, locations, defaultLocationId, settings] = await Promise.all([
-    getDraftOrders({ page, pageSize, search, sortBy, sortOrder, status }),
+    getDraftOrders({ page, pageSize, search, sortBy, sortOrder, status, dateFrom, dateTo }),
     getPaymentFormKarigars(),
     getStoreLocations(),
     getDefaultLocationId(),

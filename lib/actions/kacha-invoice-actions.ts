@@ -46,6 +46,7 @@ import {
   parseExcelWorkbook,
 } from "@/lib/excel-export";
 import { logger } from "@/lib/logger";
+import { parseDateRangeBoundary } from "@/lib/date-range";
 
 export type KachaInvoiceLineItemInput = {
   itemName: string;
@@ -243,6 +244,8 @@ export type GetKachaInvoicesParams = {
   status?: InvoiceStatus | "ALL" | string;
   sortBy?: KachaInvoiceSortField | string;
   sortOrder?: "asc" | "desc";
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 type KachaInvoiceQueryParams = {
@@ -251,6 +254,8 @@ type KachaInvoiceQueryParams = {
   sortBy?: KachaInvoiceSortField | string;
   sortOrder?: "asc" | "desc" | string;
   selectedIds?: string[];
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 /**
@@ -270,12 +275,17 @@ function buildKachaInvoiceQuery(
   const sortBy = isKachaInvoiceSortField(params.sortBy) ? params.sortBy : "invoiceDate";
   const sortOrder = params.sortOrder === "asc" ? "asc" : "desc";
   const selectedIds = params.selectedIds?.filter(Boolean) ?? [];
+  const dateFrom = parseDateRangeBoundary(params.dateFrom, false);
+  const dateTo = parseDateRangeBoundary(params.dateTo, true);
 
   const where = {
     storeId,
     ...locationWhere(scope),
     ...(selectedIds.length ? { id: { in: selectedIds } } : {}),
     ...(status ? { status } : {}),
+    ...(dateFrom || dateTo
+      ? { invoiceDate: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } }
+      : {}),
     ...(search
       ? {
           OR: [

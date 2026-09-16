@@ -17,6 +17,7 @@ import {
 } from "@/lib/actions/inventory-stock-actions";
 import { logger } from "@/lib/logger";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
+import { parseDateRangeBoundary } from "@/lib/date-range";
 
 /**
  * A phone/counter order captured before the physical piece exists — see
@@ -103,6 +104,8 @@ export type GetDraftOrdersParams = {
   sortOrder?: SortOrder;
   /** One of DraftOrder's own status strings (DRAFT/SENT_TO_KARIGAR/RECEIVED/CANCELLED). */
   status?: string;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export type DraftOrdersListResponse = {
@@ -117,12 +120,21 @@ export type DraftOrdersListResponse = {
   };
 };
 
-function getDraftOrdersWhere(storeId: string, search?: string, status?: string) {
+function getDraftOrdersWhere(
+  storeId: string,
+  search?: string,
+  status?: string,
+  dateFrom?: string,
+  dateTo?: string,
+) {
   const query = String(search || "").trim();
+  const from = parseDateRangeBoundary(dateFrom, false);
+  const to = parseDateRangeBoundary(dateTo, true);
 
   return {
     storeId,
     ...(status ? { status } : {}),
+    ...(from || to ? { orderDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(query
       ? {
           OR: [
@@ -156,7 +168,7 @@ export async function getDraftOrders(
   const sortBy: DraftOrderSortBy = params.sortBy || "orderDate";
   const sortOrder: SortOrder = params.sortOrder || "desc";
 
-  const where = getDraftOrdersWhere(storeId, params.search, params.status);
+  const where = getDraftOrdersWhere(storeId, params.search, params.status, params.dateFrom, params.dateTo);
   const orderBy = getDraftOrdersOrderBy(sortBy, sortOrder);
 
   const [totalCount, orders] = await Promise.all([
@@ -191,6 +203,8 @@ type ExportDraftOrdersParams = {
   sortBy?: string;
   sortOrder?: SortOrder;
   status?: string;
+  dateFrom?: string;
+  dateTo?: string;
   format?: "csv" | "xlsx" | "pdf";
 };
 
@@ -209,6 +223,8 @@ export async function exportDraftOrdersToExcel(params: ExportDraftOrdersParams =
           storeId,
           params.search,
           params.status,
+          params.dateFrom,
+          params.dateTo,
         );
 
     const orderBy = getDraftOrdersOrderBy(

@@ -442,38 +442,33 @@ export function UserFormDialog({
           </div>
         )}
 
-        {role === UserRole.STAFF && (
+        {/* Restricting access only means something with 2+ locations to
+            choose between — with 0 or 1, every user already has full
+            (and only possible) access, so there's nothing to configure. */}
+        {role === UserRole.STAFF && locations.length > 1 && (
           <div className="space-y-2 md:col-span-2">
             <Label>Location Access</Label>
-            {locations.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No locations configured yet — this user will see all data.
-              </p>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-2 rounded-md border p-3">
-                  {locations.map((location) => (
-                    <label
-                      key={location.id}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={selectedLocations.has(location.id)}
-                        onChange={(event) => toggleLocation(location.id, event.target.checked)}
-                      />
-                      {location.name}
-                    </label>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Leave everything unchecked for unrestricted access to
-                  every location. Checking any location restricts this
-                  user to only those.
-                </p>
-              </>
-            )}
+            <div className="grid grid-cols-2 gap-2 rounded-md border p-3">
+              {locations.map((location) => (
+                <label
+                  key={location.id}
+                  className="flex items-center gap-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={selectedLocations.has(location.id)}
+                    onChange={(event) => toggleLocation(location.id, event.target.checked)}
+                  />
+                  {location.name}
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Leave everything unchecked for unrestricted access to
+              every location. Checking any location restricts this
+              user to only those.
+            </p>
           </div>
         )}
 

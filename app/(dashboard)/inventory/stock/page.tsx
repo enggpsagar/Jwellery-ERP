@@ -5,6 +5,7 @@ import {
   type StockSortBy,
 } from "@/lib/actions/inventory/stock-actions";
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
+import { getStoreLocations } from "@/lib/actions/store-location-actions";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 
 import { StockClient } from "@/components/inventory/stock/stock-client";
@@ -21,6 +22,8 @@ type InventoryStockPageProps = {
     sortBy?: StockSortBy
     sortOrder?: "asc" | "desc"
     type?: string
+    dateFrom?: string
+    dateTo?: string
   }>
 }
 
@@ -37,9 +40,11 @@ export default async function InventoryStockPage({
   const sortBy = params.sortBy || "createdAt"
   const sortOrder = params.sortOrder || "desc"
 
-  const metals = await getStoreMetals()
+  const [metals, locations] = await Promise.all([getStoreMetals(), getStoreLocations()])
   const validMetalTypeIds = new Set([...metals.map((m) => m.id), UNASSIGNED_METAL_TYPE])
   const metalTypeId = params.type && validMetalTypeIds.has(params.type) ? params.type : undefined
+  const dateFrom = params.dateFrom || undefined
+  const dateTo = params.dateTo || undefined
 
   const { stockItems, pagination } = await getInventoryStock({
     page,
@@ -48,7 +53,16 @@ export default async function InventoryStockPage({
     sortBy,
     sortOrder,
     metalTypeId,
+    dateFrom,
+    dateTo,
   })
 
-  return <StockClient stockItems={stockItems} pagination={pagination} metals={metals} />;
+  return (
+    <StockClient
+      stockItems={stockItems}
+      pagination={pagination}
+      metals={metals}
+      showLocation={locations.length > 1}
+    />
+  );
 }

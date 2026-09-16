@@ -56,6 +56,8 @@ export function VendorsToolbar({
     | "asc"
     | "desc"
   const currentPageSize = searchParams.get("pageSize") ?? "10"
+  const currentDateFrom = searchParams.get("dateFrom") ?? ""
+  const currentDateTo = searchParams.get("dateTo") ?? ""
 
   const [search, setSearch] = React.useState(currentSearch)
   const [isPending, startTransition] = React.useTransition()
@@ -111,7 +113,13 @@ export function VendorsToolbar({
       const result = await exportVendorsToExcel(
         hasSelection
           ? { selectedIds: selectedVendorIds, sortBy: currentSortBy, sortOrder: currentSortOrder }
-          : { search: currentSearch, sortBy: currentSortBy, sortOrder: currentSortOrder },
+          : {
+              search: currentSearch,
+              sortBy: currentSortBy,
+              sortOrder: currentSortOrder,
+              dateFrom: currentDateFrom || undefined,
+              dateTo: currentDateTo || undefined,
+            },
       )
 
       if (!result.success || !result.fileBase64 || !result.fileName) {
@@ -130,7 +138,8 @@ export function VendorsToolbar({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 shadow-sm">
+    // Column stack below sm — same fix as DataTableToolbar/CustomersToolbar.
+    <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-center">
       <div className="relative w-full sm:w-64">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -154,6 +163,48 @@ export function VendorsToolbar({
       </div>
 
       <div className="flex flex-1 flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-sm text-muted-foreground">Added</span>
+          <input
+            type="date"
+            aria-label="Added from"
+            className="rounded-md border px-3 py-2 text-sm"
+            value={currentDateFrom}
+            max={currentDateTo || undefined}
+            onChange={(e) => updateParam("dateFrom", e.target.value)}
+            disabled={isPending}
+          />
+          <span className="text-sm text-muted-foreground">to</span>
+          <input
+            type="date"
+            aria-label="Added to"
+            className="rounded-md border px-3 py-2 text-sm"
+            value={currentDateTo}
+            min={currentDateFrom || undefined}
+            onChange={(e) => updateParam("dateTo", e.target.value)}
+            disabled={isPending}
+          />
+          {currentDateFrom || currentDateTo ? (
+            <button
+              type="button"
+              onClick={() => {
+                startTransition(() => {
+                  const params = new URLSearchParams(searchParams.toString())
+                  params.delete("dateFrom")
+                  params.delete("dateTo")
+                  params.set("page", "1")
+                  router.replace(`${pathname}?${params.toString()}`)
+                })
+              }}
+              className="text-muted-foreground hover:text-foreground"
+              title="Clear date range"
+              aria-label="Clear date range"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+
         <select
           className="rounded-md border px-3 py-2 text-sm"
           value={currentPageSize}

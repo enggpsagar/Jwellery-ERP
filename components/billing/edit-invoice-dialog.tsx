@@ -146,7 +146,7 @@ export function EditInvoiceDialog({
           </div>
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <Label>Store Location</Label>
+            {locations.length > 1 && <Label>Store Location</Label>}
             <LocationSelect locations={locations} name="locationId" defaultValue={locationId ?? ""} />
           </div>
 

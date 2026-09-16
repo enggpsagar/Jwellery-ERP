@@ -15,6 +15,8 @@ type VendorsPageProps = {
     search?: string
     sortBy?: VendorSortBy
     sortOrder?: "asc" | "desc"
+    dateFrom?: string
+    dateTo?: string
   }>
 }
 
@@ -30,9 +32,11 @@ export default async function VendorsPage({
   const search = params.search || ""
   const sortBy = params.sortBy || "createdAt"
   const sortOrder = params.sortOrder || "desc"
+  const dateFrom = params.dateFrom || undefined
+  const dateTo = params.dateTo || undefined
 
   const [{ vendors, pagination }, states] = await Promise.all([
-    getVendors({ page, pageSize, search, sortBy, sortOrder }),
+    getVendors({ page, pageSize, search, sortBy, sortOrder, dateFrom, dateTo }),
     getStates(),
   ])
 

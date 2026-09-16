@@ -18,6 +18,7 @@ import {
   parseExcelUpload,
 } from "@/lib/excel-export"
 import { logger } from "@/lib/logger";
+import { parseDateRangeBoundary } from "@/lib/date-range";
 
 export type Vendor = {
   id: string
@@ -96,6 +97,8 @@ export type GetVendorsParams = {
   sortOrder?: SortOrder
   /** Defaults to the active list — set true to list archived vendors instead. */
   archived?: boolean
+  dateFrom?: string
+  dateTo?: string
 }
 
 export type VendorsListResponse = {
@@ -115,6 +118,8 @@ type ExportVendorsParams = {
   search?: string
   sortBy?: VendorSortBy
   sortOrder?: SortOrder
+  dateFrom?: string
+  dateTo?: string
   format?: "csv" | "xlsx" | "pdf"
 }
 
@@ -149,12 +154,21 @@ function formatDate(date?: Date | null) {
   return formatShortDate(date)
 }
 
-function getVendorWhere(storeId: string, search?: string, archived = false) {
+function getVendorWhere(
+  storeId: string,
+  search?: string,
+  archived = false,
+  dateFrom?: string,
+  dateTo?: string,
+) {
   const query = String(search || "").trim()
+  const from = parseDateRangeBoundary(dateFrom, false)
+  const to = parseDateRangeBoundary(dateTo, true)
 
   return {
     storeId,
     isArchived: archived,
+    ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(query
       ? {
           OR: [
@@ -317,7 +331,7 @@ export async function getVendors(
   const sortOrder: SortOrder = params.sortOrder || "desc"
 
   const storeId = await requireStoreScope()
-  const where = getVendorWhere(storeId, search, params.archived)
+  const where = getVendorWhere(storeId, search, params.archived, params.dateFrom, params.dateTo)
   const orderBy = getVendorOrderBy(sortBy, sortOrder)
 
   const [totalCount, vendors] = await Promise.all([
@@ -464,7 +478,7 @@ async function getAllVendorsForExport(
         storeId,
         isArchived: false,
       }
-    : getVendorWhere(storeId, params.search)
+    : getVendorWhere(storeId, params.search, false, params.dateFrom, params.dateTo)
 
   const vendors = await prisma.vendor.findMany({
     where,

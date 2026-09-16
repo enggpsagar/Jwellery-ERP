@@ -123,7 +123,7 @@ export function DraftOrderForm({
             <Input name="expectedDate" type="date" />
           </div>
           <div className="space-y-1.5">
-            <Label>Location</Label>
+            {locations.length > 1 && <Label>Location</Label>}
             <LocationSelect
               locations={locations}
               name="locationId"

@@ -8,6 +8,7 @@ import { Pencil, ScanLine } from "lucide-react"
 import QRCode from "qrcode"
 
 import { getInventoryStockById } from "@/lib/actions/inventory/stock-actions"
+import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { formatShortDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { StockQrCard } from "@/components/inventory/stock/stock-qr-card"
@@ -41,7 +42,7 @@ export default async function InventoryStockDetailsPage({
   params,
 }: InventoryStockDetailsPageProps) {
   const { id } = await params
-  const stock = await getInventoryStock(id)
+  const [stock, locations] = await Promise.all([getInventoryStock(id), getStoreLocations()])
 
   if (!stock) {
     notFound()
@@ -96,6 +97,7 @@ export default async function InventoryStockDetailsPage({
 
       <StockDetailContent
         stock={stock}
+        showLocation={locations.length > 1}
         qrCard={
           <StockQrCard
             dataUrl={qrDataUrl}

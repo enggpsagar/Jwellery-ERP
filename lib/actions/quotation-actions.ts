@@ -35,6 +35,7 @@ import type {
   DataTableExportResult,
 } from "@/components/shared/data-table-toolbar";
 import { logger } from "@/lib/logger";
+import { parseDateRangeBoundary } from "@/lib/date-range";
 
 export type QuotationLineItemInput = {
   itemName: string;
@@ -213,16 +214,21 @@ export type QuotationSortBy = "quotationDate" | "quotationNumber" | "totalAmount
 
 function buildQuotationsWhere(
   storeId: string,
-  params: { search?: string; status?: string | "ALL" },
+  params: { search?: string; status?: string | "ALL"; dateFrom?: string; dateTo?: string },
   scope: LocationScope,
 ) {
   const search = String(params.search || "").trim();
   const status = params.status && params.status !== "ALL" ? params.status : undefined;
+  const dateFrom = parseDateRangeBoundary(params.dateFrom, false);
+  const dateTo = parseDateRangeBoundary(params.dateTo, true);
 
   return {
     storeId,
     ...locationWhere(scope),
     ...(status ? { status } : {}),
+    ...(dateFrom || dateTo
+      ? { quotationDate: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } }
+      : {}),
     ...(search
       ? {
           OR: [
@@ -248,6 +254,8 @@ export type GetQuotationsParams = {
   status?: string | "ALL";
   sortBy?: QuotationSortBy;
   sortOrder?: "asc" | "desc";
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export async function getQuotations(params: GetQuotationsParams = {}) {
@@ -323,7 +331,7 @@ export async function exportQuotationsToExcel(
     const where =
       params.selectedIds && params.selectedIds.length > 0
         ? { id: { in: params.selectedIds }, storeId, ...locationWhere(scope) }
-        : buildQuotationsWhere(storeId, { search: params.search, status: params.status }, scope);
+        : buildQuotationsWhere(storeId, { search: params.search, status: params.status, dateFrom: params.dateFrom, dateTo: params.dateTo }, scope);
 
     const quotations = await prisma.quotation.findMany({
       where,

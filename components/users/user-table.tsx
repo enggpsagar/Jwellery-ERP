@@ -201,14 +201,20 @@ export function UserTable({
                             label: "Added",
                             value: formatShortDate(user.createdAt),
                           },
-                          {
-                            // Empty means unrestricted, which is not the same
-                            // as none — say so rather than showing 0.
-                            label: "Locations",
-                            value: user.locationAccess?.length
-                              ? user.locationAccess.length
-                              : "All",
-                          },
+                          // Meaningless with 0-1 locations total — there's
+                          // nowhere else access could be restricted to.
+                          ...(locations.length > 1
+                            ? [
+                                {
+                                  // Empty means unrestricted, which is not the
+                                  // same as none — say so rather than showing 0.
+                                  label: "Locations",
+                                  value: user.locationAccess?.length
+                                    ? user.locationAccess.length
+                                    : "All",
+                                },
+                              ]
+                            : []),
                         ],
                       },
                     ]}

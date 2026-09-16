@@ -114,6 +114,7 @@ export function UsersClient({
             ]}
             defaultSortBy="createdAt"
             hideSort
+            dateField="Created Date"
             selectedIds={selectedIds}
             entityLabel="users"
             exportAction={exportUsersToExcel}

@@ -39,6 +39,7 @@ import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/
 import { OversellError } from "@/lib/inventory/oversell-error";
 import { formatShortDate } from "@/lib/utils";
 import { logger } from "@/lib/logger";
+import { parseDateRangeBoundary } from "@/lib/date-range";
 
 export type InvoiceLineItemInput = {
   itemName: string;
@@ -423,22 +424,6 @@ type InvoiceQueryParams = {
 };
 
 /**
- * "YYYY-MM-DD" -> a Date at local midnight (start of day) or, for `end`,
- * the instant just before the *next* day's midnight — so a same-day
- * dateFrom/dateTo (a single day's range) includes every invoice from that
- * day rather than excluding everything after 00:00:00.000, which is what
- * a naive `new Date(dateTo)` upper bound would do.
- */
-function parseDateBoundary(value: string | undefined, end: boolean): Date | undefined {
-  if (!value) return undefined;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return undefined;
-  if (end) parsed.setHours(23, 59, 59, 999);
-  else parsed.setHours(0, 0, 0, 0);
-  return parsed;
-}
-
-/**
  * Shared where/orderBy builder for the invoice list and the export action,
  * so the two never drift apart on what "the filtered set" means.
  */
@@ -451,8 +436,8 @@ function buildInvoiceQuery(params: InvoiceQueryParams, storeId: string, scope: L
   const sortBy = isInvoiceSortField(params.sortBy) ? params.sortBy : "invoiceDate";
   const sortOrder = params.sortOrder === "asc" ? "asc" : "desc";
   const selectedIds = params.selectedIds?.filter(Boolean) ?? [];
-  const dateFrom = parseDateBoundary(params.dateFrom, false);
-  const dateTo = parseDateBoundary(params.dateTo, true);
+  const dateFrom = parseDateRangeBoundary(params.dateFrom, false);
+  const dateTo = parseDateRangeBoundary(params.dateTo, true);
 
   const where = {
     storeId,

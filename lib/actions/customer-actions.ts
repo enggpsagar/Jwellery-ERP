@@ -54,6 +54,8 @@ type ExportCustomersParams = {
   search?: string
   sortBy?: CustomerSortBy
   sortOrder?: SortOrder
+  dateFrom?: string
+  dateTo?: string
   format?: "csv" | "xlsx" | "pdf"
 }
 
@@ -117,7 +119,7 @@ async function getAllCustomersForExport(
         storeId,
         isArchived: false,
       }
-    : getCustomerWhere(storeId, params.search)
+    : getCustomerWhere(storeId, params.search, false, params.dateFrom, params.dateTo)
 
   const customers = await prisma.customer.findMany({
     where,

@@ -32,6 +32,7 @@ import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-loc
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions";
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions";
 import { logger } from "@/lib/logger";
+import { parseDateRangeBoundary } from "@/lib/date-range";
 
 export type Karigar = {
   id: string;
@@ -92,6 +93,8 @@ export type GetKarigarsParams = {
    * "UNASSIGNED" for karigars with no metal set. Dynamic: whatever the
    * store has configured, not a fixed set of categories. */
   metalTypeId?: string;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export type KarigarListResponse = {
@@ -112,6 +115,8 @@ export type ExportKarigarsParams = {
   sortBy?: KarigarSortBy;
   sortOrder?: SortOrder;
   type?: string;
+  dateFrom?: string;
+  dateTo?: string;
   format?: "csv" | "xlsx" | "pdf";
 };
 
@@ -177,8 +182,12 @@ function getWhere(
   scope: LocationScope,
   active = true,
   metalTypeId?: string,
+  dateFrom?: string,
+  dateTo?: string,
 ) {
   const query = String(search || "").trim();
+  const from = parseDateRangeBoundary(dateFrom, false);
+  const to = parseDateRangeBoundary(dateTo, true);
 
   return {
     storeId,
@@ -189,6 +198,7 @@ function getWhere(
       : metalTypeId
         ? { metalTypeId }
         : {}),
+    ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(query
       ? {
           OR: [
@@ -222,7 +232,7 @@ export async function getKarigars(
   const sortOrder = params.sortOrder || "desc";
   const storeId = await requireStoreScope();
   const scope = await getLocationScope();
-  const where = getWhere(storeId, search, scope, params.active ?? true, params.metalTypeId);
+  const where = getWhere(storeId, search, scope, params.active ?? true, params.metalTypeId, params.dateFrom, params.dateTo);
 
   const [totalCount, karigars] = await Promise.all([
     prisma.karigar.count({ where }),
@@ -920,7 +930,7 @@ export async function exportKarigarsToExcel(
 
     const where = selectedIds?.length
       ? { id: { in: selectedIds }, storeId, ...locationWhere(scope) }
-      : getWhere(storeId, search, scope, true, params.type);
+      : getWhere(storeId, search, scope, true, params.type, params.dateFrom, params.dateTo);
 
     const karigars = await prisma.karigar.findMany({
       where,

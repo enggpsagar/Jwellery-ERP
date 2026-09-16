@@ -153,6 +153,7 @@ export function StoresClient({
             ]}
             defaultSortBy="createdAt"
             hideSort
+            dateField="Created Date"
             statusOptions={[
               { value: "ACTIVE", label: "Active" },
               { value: "INACTIVE", label: "Inactive" },

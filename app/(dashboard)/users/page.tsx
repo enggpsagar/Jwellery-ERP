@@ -22,6 +22,8 @@ type UsersPageProps = {
     sortBy?: UserSortBy;
     sortOrder?: SortOrder;
     status?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }>;
 };
 
@@ -47,11 +49,13 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
   const status = Object.values(UserStatus).includes(params.status as UserStatus)
     ? (params.status as UserStatus)
     : undefined;
+  const dateFrom = params.dateFrom || undefined;
+  const dateTo = params.dateTo || undefined;
 
   const storeId = await getEffectiveStoreId();
 
   const [{ users, pagination }, karigars, locations] = await Promise.all([
-    getUsers(storeId, { page, pageSize, search, sortBy, sortOrder, status }),
+    getUsers(storeId, { page, pageSize, search, sortBy, sortOrder, status, dateFrom, dateTo }),
     storeId
       ? prisma.karigar.findMany({
           where: { storeId, isActive: true },

@@ -26,6 +26,7 @@ export function InvoicesToolbar() {
       hideSort
       statusOptions={STATUS_OPTIONS}
       dateField="Invoice Date"
+      hidePageSize
       entityLabel="invoices"
       exportAction={exportInvoicesToExcel}
     />

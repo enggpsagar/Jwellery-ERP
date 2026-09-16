@@ -931,7 +931,7 @@ export function ReceiveItemsForm({
                     </div>
 
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">Location</Label>
+                      {locations.length > 1 && <Label className="text-xs">Location</Label>}
                       <LocationSelect
                         locations={locations}
                         defaultValue={item.locationId}

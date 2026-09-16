@@ -102,7 +102,7 @@ export function SendToKarigarDialog({
           </div>
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <Label>Location</Label>
+            {locations.length > 1 && <Label>Location</Label>}
             <LocationSelect
               locations={locations}
               name="locationId"

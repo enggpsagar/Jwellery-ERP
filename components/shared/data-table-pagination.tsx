@@ -16,9 +16,15 @@ type DataTablePaginationProps = {
   totalCount: number
   pageSize: number
   itemLabel: string
+  /** Renders the "N / page" selector in this footer instead of relying on
+   * DataTableToolbar to show it up top (pair with that component's own
+   * hidePageSize) — opt-in so every existing caller's toolbar-hosted
+   * selector keeps working unchanged. */
+  showPageSizeSelector?: boolean
+  pageSizeOptions?: string[]
 }
 
-const PAGE_SIZE_OPTIONS = ["10", "20", "50"]
+const DEFAULT_PAGE_SIZE_OPTIONS = ["10", "20", "50"]
 
 /** Generic URL-param-driven Prev/Next pagination footer, shared across every data table. */
 export function DataTablePagination({
@@ -27,6 +33,8 @@ export function DataTablePagination({
   totalCount,
   pageSize,
   itemLabel,
+  showPageSizeSelector = false,
+  pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
 }: DataTablePaginationProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -38,9 +46,9 @@ export function DataTablePagination({
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
-  function changePageSize(nextPageSize: string) {
+  function changePageSize(nextSize: string) {
     const params = new URLSearchParams(searchParams.toString())
-    params.set("pageSize", nextPageSize)
+    params.set("pageSize", nextSize)
     params.set("page", "1")
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
@@ -57,18 +65,20 @@ export function DataTablePagination({
       </p>
 
       <div className="flex items-center gap-2 md:justify-self-center">
-        <Select value={String(pageSize)} onValueChange={changePageSize}>
-          <SelectTrigger className="h-8 w-[110px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PAGE_SIZE_OPTIONS.map((option) => (
-              <SelectItem key={option} value={option}>
-                {option} / page
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {showPageSizeSelector ? (
+          <Select value={String(pageSize)} onValueChange={changePageSize}>
+            <SelectTrigger className="h-8 w-[110px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {pageSizeOptions.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option} / page
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
       </div>
 
       <div className="flex items-center gap-2 md:justify-self-end">

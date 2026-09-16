@@ -19,6 +19,8 @@ type KarigarsPageProps = {
     sortBy?: "name" | "code" | "createdAt"
     sortOrder?: "asc" | "desc"
     type?: string
+    dateFrom?: string
+    dateTo?: string
   }>
 }
 
@@ -36,6 +38,8 @@ export default async function KarigarsPage({ searchParams }: KarigarsPageProps) 
   const metals = await getStoreMetals()
   const validMetalTypeIds = new Set([...metals.map((m) => m.id), UNASSIGNED_METAL_TYPE])
   const metalTypeId = params.type && validMetalTypeIds.has(params.type) ? params.type : undefined
+  const dateFrom = params.dateFrom || undefined
+  const dateTo = params.dateTo || undefined
 
   const { karigars, pagination } = await getKarigars({
     page,
@@ -44,6 +48,8 @@ export default async function KarigarsPage({ searchParams }: KarigarsPageProps) 
     sortBy,
     sortOrder,
     metalTypeId,
+    dateFrom,
+    dateTo,
   })
 
   return <KarigarsClient karigars={karigars} pagination={pagination} metals={metals} />

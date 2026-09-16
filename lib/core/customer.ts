@@ -17,6 +17,7 @@ import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE }
 import { isValidPanNumber, normalizePanNumber, PAN_INVALID_MESSAGE } from "@/lib/pan";
 import { formatShortDate } from "@/lib/utils";
 import { logger } from "@/lib/logger";
+import { parseDateRangeBoundary } from "@/lib/date-range";
 
 export type CustomerRecord = {
   id: string;
@@ -97,6 +98,8 @@ export type GetCustomersParams = {
   sortOrder?: SortOrder;
   /** Defaults to the active list — set true to list archived customers instead. */
   archived?: boolean;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export type CustomersListResponse = {
@@ -150,12 +153,21 @@ function formatDate(date?: Date | null) {
   return formatShortDate(date);
 }
 
-export function getCustomerWhere(storeId: string, search?: string, archived = false) {
+export function getCustomerWhere(
+  storeId: string,
+  search?: string,
+  archived = false,
+  dateFrom?: string,
+  dateTo?: string,
+) {
   const query = String(search || "").trim();
+  const from = parseDateRangeBoundary(dateFrom, false);
+  const to = parseDateRangeBoundary(dateTo, true);
 
   return {
     storeId,
     isArchived: archived,
+    ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(query
       ? {
           OR: [
@@ -379,7 +391,7 @@ export async function getCustomersCore(
   const sortBy: CustomerSortBy = params.sortBy || "createdAt";
   const sortOrder: SortOrder = params.sortOrder || "desc";
 
-  const where = getCustomerWhere(storeId, params.search, params.archived);
+  const where = getCustomerWhere(storeId, params.search, params.archived, params.dateFrom, params.dateTo);
   const orderBy = getCustomerOrderBy(sortBy, sortOrder);
 
   const [totalCount, customers] = await Promise.all([

@@ -87,11 +87,13 @@ export function UserDetailContent({
         tint="var(--chart-3)"
       >
         <DetailGrid>
-          <DetailField
-            label="Locations"
-            span
-            value={<LocationAccessChecklist locationAccess={user.locationAccess} locations={locations} />}
-          />
+          {locations.length > 1 && (
+            <DetailField
+              label="Locations"
+              span
+              value={<LocationAccessChecklist locationAccess={user.locationAccess} locations={locations} />}
+            />
+          )}
           <DetailField
             label="Permissions"
             span

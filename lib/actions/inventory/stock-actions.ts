@@ -606,11 +606,15 @@ export async function createInventoryStock(
       errors.quantity = ["Quantity must be at least 1"]
     }
 
-    if (grossWeight === null || grossWeight <= 0) {
+    // >= 0, not > 0: a product master is allowed a placeholder 0 weight
+    // (product-actions.ts only requires non-null) before it's been
+    // physically weighed — stock created against it must accept that same
+    // 0, not reject it as if the field were left blank.
+    if (grossWeight === null || grossWeight < 0) {
       errors.grossWeight = ["Gross weight is required"]
     }
 
-    if (netWeight === null || netWeight <= 0) {
+    if (netWeight === null || netWeight < 0) {
       errors.netWeight = ["Net weight is required"]
     }
 
@@ -940,11 +944,15 @@ export async function updateInventoryStock(
       errors.quantity = ["Quantity must be at least 1"]
     }
 
-    if (grossWeight === null || grossWeight <= 0) {
+    // >= 0, not > 0: a product master is allowed a placeholder 0 weight
+    // (product-actions.ts only requires non-null) before it's been
+    // physically weighed — stock created against it must accept that same
+    // 0, not reject it as if the field were left blank.
+    if (grossWeight === null || grossWeight < 0) {
       errors.grossWeight = ["Gross weight is required"]
     }
 
-    if (netWeight === null || netWeight <= 0) {
+    if (netWeight === null || netWeight < 0) {
       errors.netWeight = ["Net weight is required"]
     }
 

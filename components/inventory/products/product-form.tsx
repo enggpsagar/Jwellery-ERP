@@ -126,6 +126,11 @@ type ProductFormProps = {
    * what createProduct actually generates. Undefined in edit mode, where
    * productCode is immutable and just displayed as-is. */
   skuFormat?: SkuFormat;
+  /** Settings > Metals, Stones & Categories > "Require Style on products" —
+   * hides the Style field entirely and skips it from the SKU preview when
+   * off. Defaults true so a caller that hasn't been updated still shows it,
+   * matching today's behavior. */
+  styleFieldEnabled?: boolean;
 };
 
 function ErrorText({ error }: { error?: string[] }) {
@@ -146,6 +151,7 @@ export function ProductForm({
   locations = [],
   defaultLocationId,
   skuFormat,
+  styleFieldEnabled = true,
 }: ProductFormProps) {
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? "");
 
@@ -255,11 +261,11 @@ export function ProductForm({
   const selectedCategoryType = types.find((item) => item.id === categoryTypeId);
   const selectedCategory = categories.find((item) => item.id === categoryId);
   const skuPreview =
-    selectedMetal && targetStyle
+    selectedMetal && (targetStyle || !styleFieldEnabled)
       ? buildSkuPrefix({
           metalName: selectedMetal.name,
           purity: defaultPurity === "__none__" ? null : (defaultPurity as PurityType),
-          targetStyle: targetStyle as TargetStyle,
+          targetStyle: targetStyle ? (targetStyle as TargetStyle) : null,
           categoryTypeName: selectedCategoryType?.name ?? null,
           categoryName: selectedCategory?.name ?? null,
           format: skuFormat,
@@ -767,11 +773,11 @@ export function ProductForm({
                   {skuPreview ? (
                     <span className="font-medium text-foreground">{skuPreview}-###</span>
                   ) : (
-                    "Select Metal, Purity, Style and Category to preview"
+                    `Select Metal, Purity${styleFieldEnabled ? ", Style" : ""} and Category to preview`
                   )}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Generated automatically from Metal + Purity + Style + Category — the
+                  Generated automatically from Metal + Purity{styleFieldEnabled ? " + Style" : ""} + Category — the
                   final number is assigned when you save.
                 </p>
               </>
@@ -780,26 +786,28 @@ export function ProductForm({
             <ErrorText error={state.errors.productCode} />
           </div>
 
-          <div>
-            <Label htmlFor="targetStyle">Style <RequiredMark /></Label>
+          {styleFieldEnabled && (
+            <div>
+              <Label htmlFor="targetStyle">Style <RequiredMark /></Label>
 
-            <Select value={targetStyle || "__none__"} onValueChange={(value) => setTargetStyle(value === "__none__" ? "" : value)}>
-              <SelectTrigger id="targetStyle" className="h-11 w-full">
-                <SelectValue placeholder="Select style" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.values(TargetStyle).map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {TARGET_STYLE_LABEL[value]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={targetStyle || "__none__"} onValueChange={(value) => setTargetStyle(value === "__none__" ? "" : value)}>
+                <SelectTrigger id="targetStyle" className="h-11 w-full">
+                  <SelectValue placeholder="Select style" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(TargetStyle).map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {TARGET_STYLE_LABEL[value]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <input type="hidden" name="targetStyle" value={targetStyle} />
+              <input type="hidden" name="targetStyle" value={targetStyle} />
 
-            <ErrorText error={state.errors.targetStyle} />
-          </div>
+              <ErrorText error={state.errors.targetStyle} />
+            </div>
+          )}
         </div>
       </div>
 

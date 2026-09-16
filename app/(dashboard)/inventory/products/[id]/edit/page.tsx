@@ -14,6 +14,7 @@ import {
   getAllStoreMetalOrigins,
 } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { EditProductForm } from "@/components/inventory/products/edit-product-form"
 
 type ProductEditPageProps = {
@@ -49,12 +50,13 @@ export default async function ProductEditPage({
     redirect(`/inventory/products/${id}`)
   }
 
-  const [product, metals, categories, caratConversionRates, origins] = await Promise.all([
+  const [product, metals, categories, caratConversionRates, origins, businessSettings] = await Promise.all([
     getProduct(id),
     getStoreMetals(),
     getStoreCategories(),
     getCaratConversionRateMap(),
     getAllStoreMetalOrigins(),
+    getBusinessSettings(),
   ])
 
   if (!product) {
@@ -89,6 +91,7 @@ export default async function ProductEditPage({
         categories={categories}
         caratConversionRates={caratConversionRates}
         origins={origins}
+        styleFieldEnabled={businessSettings.styleFieldEnabled}
       />
     </main>
   )

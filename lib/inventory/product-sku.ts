@@ -113,7 +113,10 @@ export function composeSkuPrefix(
 export function buildSkuPrefix(params: {
   metalName: string;
   purity: PurityType | null | undefined;
-  targetStyle: TargetStyle;
+  /** Null when the store has Style turned off (Settings > Taxonomy) — that
+   * segment is simply omitted from the SKU, same "blank group dropped"
+   * convention joinGroups already uses for a missing purity number. */
+  targetStyle: TargetStyle | null | undefined;
   categoryTypeName: string | null | undefined;
   categoryName: string | null | undefined;
   format?: SkuFormat;
@@ -123,7 +126,7 @@ export function buildSkuPrefix(params: {
   return composeSkuPrefix(params.format ?? "METAL_PURITY_STYLE_CATEGORY", {
     metalInitial: initial(params.metalName),
     purityDigits: purityNumber(params.purity) ?? "",
-    targetInitial: TARGET_STYLE_INITIAL[params.targetStyle],
+    targetInitial: params.targetStyle ? TARGET_STYLE_INITIAL[params.targetStyle] : "",
     categoryInitial: initial(typeLabel),
   });
 }

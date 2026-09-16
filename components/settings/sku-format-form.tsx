@@ -9,11 +9,14 @@ import { SKU_FORMAT_OPTIONS, exampleSkuForFormat } from "@/lib/inventory/product
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/providers/toast-provider";
 import { cn } from "@/lib/utils";
 
 type SkuFormatFormProps = {
   skuFormat: SkuFormat;
+  styleFieldEnabled: boolean;
   canEdit: boolean;
   /** First active metal/category by name, so the example's letters are the
    * store's own rather than a hardcoded stock photo — see
@@ -33,6 +36,7 @@ const initialState: SettingsFormState = { success: false, message: "" };
  */
 export function SkuFormatForm({
   skuFormat,
+  styleFieldEnabled,
   canEdit,
   sampleMetalName,
   sampleCategoryName,
@@ -40,6 +44,7 @@ export function SkuFormatForm({
   const [state, formAction, isPending] = useActionState(updateSkuFormat, initialState);
   const toast = useToast();
   const [selected, setSelected] = useState<SkuFormat>(skuFormat);
+  const [styleEnabled, setStyleEnabled] = useState(styleFieldEnabled);
 
   useEffect(() => {
     if (state.message && state.success) {
@@ -59,6 +64,7 @@ export function SkuFormatForm({
       className="space-y-6"
     >
       <input type="hidden" name="skuFormat" value={selected} />
+      <input type="hidden" name="styleFieldEnabled" value={styleEnabled ? "on" : ""} />
       <fieldset disabled={!canEdit}>
         <Card>
           <CardHeader>
@@ -71,7 +77,25 @@ export function SkuFormatForm({
               you save; existing SKUs are never rewritten.
             </p>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3 rounded-lg border p-3">
+              <Switch
+                id="styleFieldEnabled"
+                checked={styleEnabled}
+                onCheckedChange={setStyleEnabled}
+                disabled={!canEdit}
+              />
+              <div>
+                <Label htmlFor="styleFieldEnabled">Require Style on products</Label>
+                <p className="text-xs text-muted-foreground">
+                  Turn off if your store doesn&apos;t segment by Ladies/Gents/Kids/Unisex — the
+                  Style field disappears from the product form entirely, and the SKU is
+                  generated without that segment.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
             {SKU_FORMAT_OPTIONS.map((option) => {
               const isSelected = selected === option.value;
               const example = exampleSkuForFormat(option.value, {
@@ -98,6 +122,7 @@ export function SkuFormatForm({
                 </button>
               );
             })}
+            </div>
           </CardContent>
         </Card>
 

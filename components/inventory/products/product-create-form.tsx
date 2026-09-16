@@ -32,6 +32,8 @@ type ProductCreateFormProps = {
   returnTo?: string
   /** The store's configured SKU layout — see the same prop on ProductForm. */
   skuFormat: SkuFormat;
+  /** Settings > Metals, Stones & Categories > "Require Style on products" — see the same prop on ProductForm. */
+  styleFieldEnabled?: boolean;
 };
 
 export function ProductCreateForm({
@@ -43,6 +45,7 @@ export function ProductCreateForm({
   defaultLocationId,
   returnTo,
   skuFormat,
+  styleFieldEnabled,
 }: ProductCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -107,6 +110,7 @@ export function ProductCreateForm({
         locations={locations}
         defaultLocationId={defaultLocationId}
         skuFormat={skuFormat}
+        styleFieldEnabled={styleFieldEnabled}
       />
     </form>
   );

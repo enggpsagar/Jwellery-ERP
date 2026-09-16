@@ -1722,6 +1722,16 @@ model BusinessSettings {
   // Settings.
   skuFormat SkuFormat @default(METAL_PURITY_STYLE_CATEGORY)
 
+  // Whether the Style (Ladies/Gents/Kids/Unisex) field is shown and
+  // required on the product create/edit form at all — some stores don't
+  // segment by style and found a mandatory field for a distinction they
+  // don't track just friction. Defaults true so existing behavior (Style
+  // required on every product) is unchanged until an Admin turns it off.
+  // When off: the field is hidden entirely, Product.targetStyle is saved
+  // as null for new products, and buildSkuPrefix simply omits that
+  // segment from the generated SKU (see its own null-handling).
+  styleFieldEnabled Boolean @default(true)
+
   // Tax defaults
   defaultGstRate Float @default(3.0) // jewellery GST is typically 3%
 

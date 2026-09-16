@@ -52,6 +52,7 @@ export default async function TaxonomySettingsPage() {
 
       <SkuFormatForm
         skuFormat={businessSettings.skuFormat}
+        styleFieldEnabled={businessSettings.styleFieldEnabled}
         canEdit={canEdit}
         sampleMetalName={sampleMetal?.name ?? "Gold"}
         sampleCategoryName={sampleCategory?.name ?? "Ring"}

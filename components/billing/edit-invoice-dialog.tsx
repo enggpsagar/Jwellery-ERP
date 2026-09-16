@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
-import { Truck } from "lucide-react"
+import { FileCheck } from "lucide-react"
 
 import { updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
@@ -110,33 +110,27 @@ export function EditInvoiceDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 
-  // Reflects whichever of E-way Bill / E-Invoice is already filled in, so
-  // this trigger doesn't stay permanently labeled "E-way Bill" even for a
-  // store that only ever fills in the E-Invoice section — that hid the
-  // E-Invoice feature entirely (it lives in the same dialog, but nothing
-  // about the button said so).
+  // A constant label rather than one that guesses which of E-way Bill /
+  // E-Invoice to mention based on what's already filled in: they're two
+  // independent features (see this component's own doc comment), and a
+  // label that only names whichever one happens to be filled risks
+  // implying the other isn't available here at all. One honest label,
+  // naming both every time, beats a label that changes shape on you.
   const hasEwayBill = !!ewayBillNumber?.trim()
   const hasEInvoice = !!irnNumber?.trim()
-  const complianceLabel =
-    hasEwayBill && hasEInvoice
-      ? "Update E-way Bill / E-Invoice"
-      : hasEInvoice
-        ? "Update E-Invoice"
-        : hasEwayBill
-          ? "Update E-way Bill"
-          : "E-way Bill / E-Invoice"
+  const complianceLabel = hasEwayBill || hasEInvoice ? "Update E-way Bill / E-Invoice" : "E-way Bill / E-Invoice"
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {compact ? (
           <Button size="sm" variant="edit" className="gap-1.5" title="Edit Date, E-way Bill & E-Invoice">
-            <Truck className="h-4 w-4" />
+            <FileCheck className="h-4 w-4" />
             {complianceLabel}
           </Button>
         ) : (
           <Button variant="edit" className="gap-2" title="Edit Date, E-way Bill & E-Invoice">
-            <Truck className="h-4 w-4" />
+            <FileCheck className="h-4 w-4" />
             {complianceLabel}
           </Button>
         )}

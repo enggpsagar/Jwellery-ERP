@@ -53,6 +53,8 @@ type EditProductFormProps = {
   categories: StoreCategoryOption[];
   caratConversionRates: Record<PurityType, number>;
   origins: StoreMetalOriginRow[];
+  /** Settings > Metals, Stones & Categories > "Require Style on products" — see the same prop on ProductForm. */
+  styleFieldEnabled?: boolean;
 };
 
 export function EditProductForm({
@@ -61,6 +63,7 @@ export function EditProductForm({
   categories,
   caratConversionRates,
   origins,
+  styleFieldEnabled,
 }: EditProductFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -118,6 +121,7 @@ export function EditProductForm({
         categories={categories}
         caratConversionRates={caratConversionRates}
         origins={origins}
+        styleFieldEnabled={styleFieldEnabled}
       />
     </form>
   );

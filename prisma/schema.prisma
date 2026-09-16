@@ -1767,6 +1767,17 @@ model BusinessSettings {
   // returnWindowEnabled above.
   sendToArtisanEnabled Boolean @default(true)
 
+  // Whether the Vendors module shows up in this store's app at all —
+  // defaults to true so nothing changes for existing stores. Turning it off
+  // hides the "Vendors" sidebar item and blocks the list/create/archived/
+  // export pages, but deliberately does NOT touch Vendor rows themselves:
+  // Purchases still needs vendors to exist and still lets staff pick/create
+  // one, a Customer's linked-vendor balance still computes correctly, and a
+  // vendor's own detail/edit page stays reachable via that one direct link
+  // (same "hide the module's own UI, keep existing data/relationships
+  // working" precedent as sendToArtisanEnabled above).
+  vendorsModuleEnabled Boolean @default(true)
+
   // Financial year
   financialYearStartMonth Int @default(4) // April = 4, common in India
 

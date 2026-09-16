@@ -24,6 +24,8 @@ export type DataTableExportParams = {
   sortOrder?: "asc" | "desc"
   status?: string
   type?: string
+  dateFrom?: string
+  dateTo?: string
   format?: DataTableExportFormat
 }
 
@@ -55,6 +57,13 @@ type DataTableToolbarProps = {
    * control in the toolbar. Defaults to false so every existing caller keeps
    * both dropdowns exactly as before. */
   hideSort?: boolean
+  /** Adds a From/To date-range filter (URL params dateFrom/dateTo, both
+   * "YYYY-MM-DD", inclusive) — opt-in per table since not every list has a
+   * single obvious date field to filter on. `dateField` only labels the
+   * fields (e.g. "Invoice Date"); the actual column filtered on is decided
+   * server-side by whatever the caller's fetch/export actions do with these
+   * two params. */
+  dateField?: string
   /** Omit when this table has no row-select — the single Export button then always exports the filtered set. */
   selectedIds?: string[]
   entityLabel: string
@@ -83,6 +92,7 @@ export function DataTableToolbar({
   typeOptions,
   typeLabel = "Type",
   hideSort = false,
+  dateField,
   selectedIds,
   entityLabel,
   exportAction,
@@ -99,6 +109,8 @@ export function DataTableToolbar({
   const currentPageSize = searchParams.get("pageSize") ?? "10"
   const currentStatus = searchParams.get("status") ?? "ALL"
   const currentType = searchParams.get("type") ?? "ALL"
+  const currentDateFrom = searchParams.get("dateFrom") ?? ""
+  const currentDateTo = searchParams.get("dateTo") ?? ""
 
   const [search, setSearch] = React.useState(currentSearch)
   const [isPending, startTransition] = React.useTransition()
@@ -164,6 +176,8 @@ export function DataTableToolbar({
               sortOrder: currentSortOrder,
               status: currentStatus !== "ALL" ? currentStatus : undefined,
               type: currentType !== "ALL" ? currentType : undefined,
+              dateFrom: currentDateFrom || undefined,
+              dateTo: currentDateTo || undefined,
               format,
             },
       )
@@ -246,6 +260,50 @@ export function DataTableToolbar({
               </option>
             ))}
           </select>
+        ) : null}
+
+        {dateField ? (
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-muted-foreground">{dateField}</span>
+            <input
+              type="date"
+              aria-label={`${dateField} from`}
+              className="rounded-md border px-3 py-2 text-sm"
+              value={currentDateFrom}
+              max={currentDateTo || undefined}
+              onChange={(e) => updateParam("dateFrom", e.target.value)}
+              disabled={isPending}
+            />
+            <span className="text-sm text-muted-foreground">to</span>
+            <input
+              type="date"
+              aria-label={`${dateField} to`}
+              className="rounded-md border px-3 py-2 text-sm"
+              value={currentDateTo}
+              min={currentDateFrom || undefined}
+              onChange={(e) => updateParam("dateTo", e.target.value)}
+              disabled={isPending}
+            />
+            {currentDateFrom || currentDateTo ? (
+              <button
+                type="button"
+                onClick={() => {
+                  startTransition(() => {
+                    const params = new URLSearchParams(searchParams.toString())
+                    params.delete("dateFrom")
+                    params.delete("dateTo")
+                    params.set("page", "1")
+                    router.replace(`${pathname}?${params.toString()}`)
+                  })
+                }}
+                className="text-muted-foreground hover:text-foreground"
+                title="Clear date range"
+                aria-label="Clear date range"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         {hideSort ? null : (

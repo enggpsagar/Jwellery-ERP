@@ -160,6 +160,9 @@ export function InvoiceActionsBar({
             vehicleNumber={invoice.vehicleNumber}
             transportMode={invoice.transportMode}
             distanceKm={invoice.distanceKm}
+            irnNumber={invoice.irnNumber}
+            ackNumber={invoice.ackNumber}
+            ackDate={invoice.ackDate}
           />
         </>
       )}

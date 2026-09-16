@@ -44,6 +44,9 @@ type EditInvoiceDialogProps = {
   vehicleNumber?: string | null
   transportMode?: string | null
   distanceKm?: number | null
+  irnNumber?: string | null
+  ackNumber?: string | null
+  ackDate?: string | null
   /** Smaller trigger (still labeled "E-way Bill", not just a bare pencil)
    * for a table row's Actions column — distinguishes it from "Edit Items"
    * (also a pencil icon, but full line-item editing) sitting elsewhere in
@@ -65,6 +68,13 @@ type EditInvoiceDialogProps = {
  * invoice. Available regardless of payment status (DRAFT/PARTIAL/PAID),
  * since a bill is usually generated at dispatch, not necessarily at the
  * moment the invoice itself was raised.
+ *
+ * E-Invoice (IRN) fields are the same record-keeping-only convention —
+ * no GSP/IRP API call. The store generates the actual e-invoice (and its
+ * IRN) on their own GSP portal or the government e-invoice system, then
+ * enters the acknowledgement details back here so they print on the
+ * invoice. Independent of E-way Bill: a store may have neither, either,
+ * or both depending on turnover threshold and B2B/B2C.
  */
 export function EditInvoiceDialog({
   invoiceId,
@@ -79,6 +89,9 @@ export function EditInvoiceDialog({
   vehicleNumber,
   transportMode,
   distanceKm,
+  irnNumber,
+  ackNumber,
+  ackDate,
   compact = false,
 }: EditInvoiceDialogProps) {
   const [open, setOpen] = useState(false)
@@ -153,6 +166,33 @@ export function EditInvoiceDialog({
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Notes</Label>
             <Textarea name="notes" rows={3} defaultValue={notes ?? ""} />
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-dashed p-3">
+            <div>
+              <p className="text-sm font-medium">E-Invoice (IRN)</p>
+              <p className="text-xs text-muted-foreground">
+                Generate the actual e-invoice on your GSP/IRP portal, then
+                enter its acknowledgement details here so they print on
+                this invoice.
+              </p>
+            </div>
+
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+              <Label>IRN (Invoice Reference Number)</Label>
+              <Input name="irnNumber" placeholder="Optional" defaultValue={irnNumber ?? ""} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+                <Label>Ack. Number</Label>
+                <Input name="ackNumber" placeholder="Optional" defaultValue={ackNumber ?? ""} />
+              </div>
+              <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+                <Label>Ack. Date</Label>
+                <Input type="date" name="ackDate" defaultValue={ackDate?.slice(0, 10) ?? ""} />
+              </div>
+            </div>
           </div>
 
           <div className="space-y-3 rounded-lg border border-dashed p-3">

@@ -247,12 +247,32 @@ export default async function DashboardLayout({
   if (brandingSettings && brandingSettings.fontFamily !== "INTER") {
     brandingStyle["--font-sans"] = BRAND_FONT_VARIABLE[brandingSettings.fontFamily];
   }
-  if (brandingSettings && brandingSettings.fontWeight !== "NORMAL") {
-    brandingStyle["--brand-font-weight"] = BRAND_FONT_WEIGHT_VALUE[brandingSettings.fontWeight];
-  }
-  if (brandingSettings && brandingSettings.fontStyle !== "NORMAL") {
-    brandingStyle["--brand-font-style"] = BRAND_FONT_STYLE_VALUE[brandingSettings.fontStyle];
-  }
+  // Font Weight/Style are NOT set into brandingStyle as CSS custom
+  // properties the way every other field above is — font-weight/font-style
+  // are *inherited* properties, and inheritance can never win against any
+  // rule that directly matches a descendant element, no matter how specific
+  // or !important a rule on this wrapper (or `html`) is. Almost every
+  // visible element in this app (headings, labels, table cells, buttons)
+  // sets its own explicit Tailwind font-weight utility
+  // (font-medium/semibold/bold), which directly matches that element and so
+  // always wins over an inherited value — a `--brand-font-weight` custom
+  // property here would only ever have reached genuinely unstyled text like
+  // a bare <p>. fontWeightOverride/fontStyleOverride below instead render a
+  // real `* { ... !important }` rule (see the <style> tag below) that
+  // targets every element directly — but ONLY when actually customized: the
+  // rule must not exist in the DOM at all for a store that hasn't touched
+  // this, since even an "!important: normal" fallback would incorrectly
+  // stomp every component's own intentional font-weight for every
+  // uncustomized store.
+  const fontWeightOverride =
+    brandingSettings && brandingSettings.fontWeight !== "NORMAL"
+      ? BRAND_FONT_WEIGHT_VALUE[brandingSettings.fontWeight]
+      : null;
+  const fontStyleOverride =
+    brandingSettings && brandingSettings.fontStyle !== "NORMAL"
+      ? BRAND_FONT_STYLE_VALUE[brandingSettings.fontStyle]
+      : null;
+
   if (brandingSettings && brandingSettings.radius !== "DEFAULT") {
     brandingStyle["--radius"] = BRAND_RADIUS_VALUE[brandingSettings.radius];
   }
@@ -322,6 +342,14 @@ export default async function DashboardLayout({
       style={brandingStyle as React.CSSProperties}
       data-hide-icons={brandingSettings?.showIcons === false ? "true" : undefined}
     >
+      {(fontWeightOverride || fontStyleOverride) && (
+        <style>{`
+          * {
+            ${fontWeightOverride ? `font-weight: ${fontWeightOverride} !important;` : ""}
+            ${fontStyleOverride ? `font-style: ${fontStyleOverride} !important;` : ""}
+          }
+        `}</style>
+      )}
       <SidebarProvider side={sidebarSide}>
         {/* DOM order, not just <Sidebar side=...>, is what actually moves
             the sidebar to the right — see sidebarSide's own comment above. */}

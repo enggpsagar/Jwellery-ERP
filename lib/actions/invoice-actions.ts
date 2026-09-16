@@ -315,6 +315,9 @@ function mapInvoice(invoice: any) {
     vehicleNumber: invoice.vehicleNumber ?? null,
     transportMode: (invoice.transportMode ?? null) as TransportMode | null,
     distanceKm: invoice.distanceKm ?? null,
+    irnNumber: invoice.irnNumber ?? null,
+    ackNumber: invoice.ackNumber ?? null,
+    ackDate: invoice.ackDate?.toISOString() ?? null,
     createdByName: invoice.createdByName ?? invoice.createdBy?.name ?? null,
     cancelledAt: invoice.cancelledAt?.toISOString() ?? null,
     cancelledByName: invoice.cancelledByName ?? invoice.cancelledBy?.name ?? null,
@@ -1492,6 +1495,12 @@ export async function updateInvoice(
     const distanceKmRaw = String(formData.get("distanceKm") || "").trim();
     const distanceKm = distanceKmRaw ? Math.trunc(Number(distanceKmRaw)) || null : null;
 
+    // E-Invoice (IRN) — same record-keeping-only convention as E-way Bill
+    // above. See the schema's own doc comment on Invoice.irnNumber.
+    const irnNumber = String(formData.get("irnNumber") || "").trim() || null;
+    const ackNumber = String(formData.get("ackNumber") || "").trim() || null;
+    const ackDateRaw = String(formData.get("ackDate") || "");
+
     const locationScope = await getLocationScope();
     const locationResolution = await resolveWritableLocationId(storeId, locationId, locationScope);
     if (!locationResolution.ok) {
@@ -1515,6 +1524,9 @@ export async function updateInvoice(
           vehicleNumber,
           transportMode,
           distanceKm,
+          irnNumber,
+          ackNumber,
+          ackDate: ackDateRaw ? new Date(ackDateRaw) : null,
         },
       });
 

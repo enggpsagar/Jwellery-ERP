@@ -381,6 +381,19 @@ export function InvoicePrintModern({ invoice, settings }: InvoicePrintModernProp
             </div>
           </div>
 
+          {(invoice.irnNumber || invoice.ackNumber) && (
+            <div className="border-t border-slate-200 p-5">
+              <p className="font-semibold">E-Invoice</p>
+              <div className="grid grid-cols-1 gap-x-4">
+                {invoice.irnNumber && <span className="break-all">IRN: {invoice.irnNumber}</span>}
+                <div className="grid grid-cols-3 gap-x-4">
+                  {invoice.ackNumber && <span>Ack No: {invoice.ackNumber}</span>}
+                  {invoice.ackDate && <span>Ack Date: {formatShortDate(invoice.ackDate)}</span>}
+                </div>
+              </div>
+            </div>
+          )}
+
           {(invoice.ewayBillNumber ||
             invoice.transporterName ||
             invoice.vehicleNumber ||

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { getDraftOrderById } from "@/lib/actions/draft-order-actions"
 import { getPaymentFormKarigars } from "@/lib/actions/payments-actions"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 
 import { DraftOrderActionsBar } from "@/components/orders/draft-order-actions-bar"
 import { DraftOrderDetailContent } from "@/components/orders/draft-order-detail-content"
@@ -24,10 +25,11 @@ export default async function DraftOrderDetailPage({ params }: Props) {
   const order = await getDraftOrderById(id)
   if (!order) notFound()
 
-  const [karigars, locations, defaultLocationId] = await Promise.all([
+  const [karigars, locations, defaultLocationId, settings] = await Promise.all([
     getPaymentFormKarigars(),
     getStoreLocations(),
     getDefaultLocationId(),
+    getBusinessSettings(),
   ])
 
   return (
@@ -43,6 +45,7 @@ export default async function DraftOrderDetailPage({ params }: Props) {
             karigars={karigars}
             locations={locations}
             defaultLocationId={order.locationId ?? defaultLocationId}
+            sendToArtisanEnabled={settings.sendToArtisanEnabled}
           />
         }
       />

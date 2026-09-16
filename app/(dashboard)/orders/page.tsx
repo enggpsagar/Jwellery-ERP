@@ -8,6 +8,7 @@ import {
 } from "@/lib/actions/draft-order-actions"
 import { getPaymentFormKarigars } from "@/lib/actions/payments-actions"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { DraftOrdersClient } from "@/components/orders/draft-orders-client"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
@@ -39,11 +40,12 @@ export default async function DraftOrdersPage({ searchParams }: DraftOrdersPageP
   const sortOrder = params.sortOrder || "desc"
   const status = params.status || undefined
 
-  const [{ orders, pagination }, karigars, locations, defaultLocationId] = await Promise.all([
+  const [{ orders, pagination }, karigars, locations, defaultLocationId, settings] = await Promise.all([
     getDraftOrders({ page, pageSize, search, sortBy, sortOrder, status }),
     getPaymentFormKarigars(),
     getStoreLocations(),
     getDefaultLocationId(),
+    getBusinessSettings(),
   ])
 
   return (
@@ -66,6 +68,7 @@ export default async function DraftOrdersPage({ searchParams }: DraftOrdersPageP
         karigars={karigars}
         locations={locations}
         defaultLocationId={defaultLocationId}
+        sendToArtisanEnabled={settings.sendToArtisanEnabled}
       />
     </main>
   )

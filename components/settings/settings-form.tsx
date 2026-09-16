@@ -106,6 +106,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
   const [cities, setCities] = useState<CityItem[]>([])
   const [loadingCities, setLoadingCities] = useState(false)
   const [returnWindowEnabled, setReturnWindowEnabled] = useState(settings.returnWindowEnabled)
+  const [sendToArtisanEnabled, setSendToArtisanEnabled] = useState(settings.sendToArtisanEnabled)
   const [printLayout, setPrintLayout] = useState<PrintLayout>(settings.printLayout)
   const [invoiceTemplate, setInvoiceTemplate] = useState<InvoiceTemplate>(settings.invoiceTemplate)
   const stateNameMap = useMemo(
@@ -274,6 +275,31 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               Where backups are sent before any bulk delete. Deleting all
               Estimates is blocked until this is set, and again if the backup email
               fails to send.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Operations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="sendToArtisanEnabled"
+                checked={sendToArtisanEnabled}
+                onCheckedChange={setSendToArtisanEnabled}
+              />
+              <input type="hidden" name="sendToArtisanEnabled" value={sendToArtisanEnabled ? "on" : ""} />
+              <Label htmlFor="sendToArtisanEnabled">Enable Send to Artisan</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Whether staff can send a Draft Order's items out to an artisan
+              for work. Turning this off hides the Send to Artisan button on
+              Draft Orders — your artisan list, past jobs, ledger, and
+              reports stay exactly as they are either way.
             </p>
           </div>
         </CardContent>

@@ -42,6 +42,7 @@ type DraftOrdersClientProps = {
   karigars: KarigarOption[]
   locations: LocationOption[]
   defaultLocationId: string | null
+  sendToArtisanEnabled: boolean
 }
 
 /**
@@ -56,6 +57,7 @@ export function DraftOrdersClient({
   karigars,
   locations,
   defaultLocationId,
+  sendToArtisanEnabled,
 }: DraftOrdersClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   // Defaults to the first row on load so the panel is never empty —
@@ -118,6 +120,7 @@ export function DraftOrdersClient({
         karigars={karigars}
         locations={locations}
         defaultLocationId={defaultLocationId}
+        sendToArtisanEnabled={sendToArtisanEnabled}
       />
     </div>
   )

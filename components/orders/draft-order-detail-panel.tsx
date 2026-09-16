@@ -15,6 +15,7 @@ type DraftOrderDetailPanelProps = {
   karigars: KarigarOption[]
   locations: LocationOption[]
   defaultLocationId: string | null
+  sendToArtisanEnabled: boolean
 }
 
 /**
@@ -31,6 +32,7 @@ export function DraftOrderDetailPanel({
   karigars,
   locations,
   defaultLocationId,
+  sendToArtisanEnabled,
 }: DraftOrderDetailPanelProps) {
   const [order, setOrder] = useState<DraftOrderDetail | null>(null)
   const [loading, setLoading] = useState(false)
@@ -84,6 +86,7 @@ export function DraftOrderDetailPanel({
           karigars={karigars}
           locations={locations}
           defaultLocationId={defaultLocationId}
+          sendToArtisanEnabled={sendToArtisanEnabled}
         />
       </div>
 

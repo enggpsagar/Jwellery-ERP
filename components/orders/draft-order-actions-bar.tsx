@@ -12,6 +12,8 @@ type DraftOrderActionsBarProps = {
   karigars: KarigarOption[]
   locations: LocationOption[]
   defaultLocationId?: string | null
+  /** BusinessSettings.sendToArtisanEnabled — hides Send to Artisan when off (see its schema doc comment). Defaults true so existing callers that haven't been updated to pass it don't lose the button. */
+  sendToArtisanEnabled?: boolean
 }
 
 /**
@@ -29,6 +31,7 @@ export function DraftOrderActionsBar({
   karigars,
   locations,
   defaultLocationId,
+  sendToArtisanEnabled = true,
 }: DraftOrderActionsBarProps) {
   if (order.status !== "DRAFT") return null
 
@@ -41,12 +44,14 @@ export function DraftOrderActionsBar({
         notes={order.notes}
       />
       <CancelDraftOrderButton orderId={order.id} />
-      <SendToKarigarDialog
-        orderId={order.id}
-        karigars={karigars}
-        locations={locations}
-        defaultLocationId={order.locationId ?? defaultLocationId}
-      />
+      {sendToArtisanEnabled ? (
+        <SendToKarigarDialog
+          orderId={order.id}
+          karigars={karigars}
+          locations={locations}
+          defaultLocationId={order.locationId ?? defaultLocationId}
+        />
+      ) : null}
     </div>
   )
 }

@@ -57,6 +57,11 @@ export type BusinessSettings = {
   // prisma/schema.prisma's BusinessSettings.returnWindowEnabled doc comment.
   // Every consumer of returnWindowDays below must also check this.
   returnWindowEnabled: boolean;
+  // Whether staff can send a Draft Order to an artisan (Karigar) — see
+  // prisma/schema.prisma's BusinessSettings.sendToArtisanEnabled doc
+  // comment. Only gates starting a *new* send; existing artisans/jobs/
+  // ledger/reports stay visible regardless of this flag.
+  sendToArtisanEnabled: boolean;
   // Which SKU layout preset createProduct's generator arranges Metal/
   // Purity/Style/Category into — see prisma/schema.prisma's SkuFormat and
   // lib/inventory/product-sku.ts's composeSkuPrefix(). Edited via its own
@@ -124,6 +129,7 @@ function mapSettings(settings: any): BusinessSettings {
     defaultGstRate: Number(settings.defaultGstRate ?? 3.0),
     hallmarkChargePerPiece: Number(settings.hallmarkChargePerPiece ?? 45),
     returnWindowEnabled: settings.returnWindowEnabled ?? true,
+    sendToArtisanEnabled: settings.sendToArtisanEnabled ?? true,
     skuFormat: settings.skuFormat ?? SkuFormat.METAL_PURITY_STYLE_CATEGORY,
     returnWindowDays: settings.returnWindowDays ?? 30,
     financialYearStartMonth: settings.financialYearStartMonth ?? 4,
@@ -304,6 +310,7 @@ export async function updateBusinessSettings(
           45,
         ),
         returnWindowEnabled: formData.get("returnWindowEnabled") === "on",
+        sendToArtisanEnabled: formData.get("sendToArtisanEnabled") === "on",
         returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),
@@ -344,6 +351,7 @@ export async function updateBusinessSettings(
           45,
         ),
         returnWindowEnabled: formData.get("returnWindowEnabled") === "on",
+        sendToArtisanEnabled: formData.get("sendToArtisanEnabled") === "on",
         returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),

@@ -85,6 +85,7 @@ export default async function KachaBillingPage({ searchParams }: KachaBillingPag
           totalCount={pagination.totalCount}
           pageSize={pagination.pageSize}
           itemLabel="estimates"
+          showPageSizeSelector
         />
       ) : null}
     </main>

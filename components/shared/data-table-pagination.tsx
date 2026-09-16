@@ -2,6 +2,13 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 type DataTablePaginationProps = {
   page: number
@@ -50,29 +57,31 @@ export function DataTablePagination({
   const end = Math.min(page * pageSize, totalCount)
 
   return (
-    <div className="flex flex-col gap-3 rounded-b-xl border-t bg-muted/40 px-4 py-3 text-sm md:flex-row md:items-center md:justify-between">
-      <p className="text-muted-foreground">
+    <div className="grid grid-cols-1 items-center gap-3 rounded-b-xl border-t bg-muted/40 px-4 py-3 text-sm md:grid-cols-[1fr_auto_1fr]">
+      <p className="text-muted-foreground md:justify-self-start">
         Showing <span className="font-medium">{start}</span> to{" "}
         <span className="font-medium">{end}</span> of{" "}
         <span className="font-medium">{totalCount}</span> {itemLabel}
       </p>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2 md:justify-self-center">
         {showPageSizeSelector ? (
-          <select
-            aria-label="Rows per page"
-            className="rounded-md border px-2 py-1.5 text-sm"
-            value={String(pageSize)}
-            onChange={(e) => changePageSize(e.target.value)}
-          >
-            {pageSizeOptions.map((option) => (
-              <option key={option} value={option}>
-                {option} / page
-              </option>
-            ))}
-          </select>
+          <Select value={String(pageSize)} onValueChange={changePageSize}>
+            <SelectTrigger className="h-8 w-[110px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {pageSizeOptions.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option} / page
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : null}
+      </div>
 
+      <div className="flex items-center gap-2 md:justify-self-end">
         <Button variant="outline" disabled={page <= 1} onClick={() => goToPage(page - 1)}>
           Previous
         </Button>

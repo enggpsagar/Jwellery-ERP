@@ -85,6 +85,7 @@ export function PurchasesClient({ purchases, locations, pagination }: PurchasesC
             totalCount={pagination.totalCount}
             pageSize={pagination.pageSize}
             itemLabel="purchases"
+            showPageSizeSelector
           />
         </div>
 

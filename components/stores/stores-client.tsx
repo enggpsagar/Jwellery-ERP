@@ -158,6 +158,7 @@ export function StoresClient({
               { value: "ACTIVE", label: "Active" },
               { value: "INACTIVE", label: "Inactive" },
             ]}
+            hidePageSize
             selectedIds={selectedIds}
             entityLabel="stores"
             exportAction={exportStoresToExcel}
@@ -189,6 +190,7 @@ export function StoresClient({
               totalCount={pagination.totalCount}
               pageSize={pagination.pageSize}
               itemLabel="stores"
+              showPageSizeSelector
             />
           </div>
         </div>

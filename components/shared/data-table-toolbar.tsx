@@ -7,6 +7,13 @@ import { Loader } from "@/components/ui/loader"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -112,11 +119,11 @@ export function DataTableToolbar({
   const currentSearch = searchParams.get("search") ?? ""
   const currentSortBy = searchParams.get("sortBy") ?? defaultSortBy
   const currentSortOrder = (searchParams.get("sortOrder") ?? defaultSortOrder) as "asc" | "desc"
-  const currentPageSize = searchParams.get("pageSize") ?? "10"
   const currentStatus = searchParams.get("status") ?? "ALL"
   const currentType = searchParams.get("type") ?? "ALL"
   const currentDateFrom = searchParams.get("dateFrom") ?? ""
   const currentDateTo = searchParams.get("dateTo") ?? ""
+  const currentPageSize = searchParams.get("pageSize") ?? "10"
 
   const [search, setSearch] = React.useState(currentSearch)
   const [isPending, startTransition] = React.useTransition()
@@ -218,13 +225,13 @@ export function DataTableToolbar({
     // search box, which squeezed every select/date-input in it before that
     // point on a narrow screen instead of giving them their own line.
     <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-center">
-      <div className="relative w-full sm:w-80">
+      <div className="relative w-full sm:w-64">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={searchPlaceholder}
-          className="pl-9 pr-8"
+          className="h-9 pl-9 pr-8"
           disabled={isPending}
         />
         {search ? (
@@ -242,44 +249,44 @@ export function DataTableToolbar({
 
       <div className="flex flex-1 flex-wrap items-center gap-3">
         {statusOptions ? (
-          <select
-            className="rounded-md border px-3 py-2 text-sm"
-            value={currentStatus}
-            onChange={(e) => updateParam("status", e.target.value)}
-            disabled={isPending}
-          >
-            <option value="ALL">All Statuses</option>
-            {statusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <Select value={currentStatus} onValueChange={(value) => updateParam("status", value)} disabled={isPending}>
+            <SelectTrigger className="h-9 w-[150px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Statuses</SelectItem>
+              {statusOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : null}
 
         {typeOptions ? (
-          <select
-            className="rounded-md border px-3 py-2 text-sm"
-            value={currentType}
-            onChange={(e) => updateParam("type", e.target.value)}
-            disabled={isPending}
-          >
-            <option value="ALL">All {typeLabel}s</option>
-            {typeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <Select value={currentType} onValueChange={(value) => updateParam("type", value)} disabled={isPending}>
+            <SelectTrigger className="h-9 w-[150px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All {typeLabel}s</SelectItem>
+              {typeOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : null}
 
         {dateField ? (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-sm text-muted-foreground">{dateField}</span>
+          <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-input px-2.5 py-1">
+            <span className="whitespace-nowrap text-sm text-muted-foreground">{dateField}</span>
             <input
               type="date"
               aria-label={`${dateField} from`}
-              className="rounded-md border px-3 py-2 text-sm"
+              className="h-7 rounded-md border-0 bg-transparent text-sm outline-none"
               value={currentDateFrom}
               max={currentDateTo || undefined}
               onChange={(e) => updateParam("dateFrom", e.target.value)}
@@ -289,7 +296,7 @@ export function DataTableToolbar({
             <input
               type="date"
               aria-label={`${dateField} to`}
-              className="rounded-md border px-3 py-2 text-sm"
+              className="h-7 rounded-md border-0 bg-transparent text-sm outline-none"
               value={currentDateTo}
               min={currentDateFrom || undefined}
               onChange={(e) => updateParam("dateTo", e.target.value)}
@@ -319,42 +326,46 @@ export function DataTableToolbar({
 
         {hideSort ? null : (
           <>
-            <select
-              className="rounded-md border px-3 py-2 text-sm"
-              value={currentSortBy}
-              onChange={(e) => updateParam("sortBy", e.target.value)}
-              disabled={isPending}
-            >
-              {sortOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <Select value={currentSortBy} onValueChange={(value) => updateParam("sortBy", value)} disabled={isPending}>
+              <SelectTrigger className="h-9 w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {sortOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-            <select
-              className="rounded-md border px-3 py-2 text-sm"
+            <Select
               value={currentSortOrder}
-              onChange={(e) => updateParam("sortOrder", e.target.value)}
+              onValueChange={(value) => updateParam("sortOrder", value)}
               disabled={isPending}
             >
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </select>
+              <SelectTrigger className="h-9 w-[130px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="desc">Descending</SelectItem>
+                <SelectItem value="asc">Ascending</SelectItem>
+              </SelectContent>
+            </Select>
           </>
         )}
 
         {hidePageSize ? null : (
-          <select
-            className="rounded-md border px-3 py-2 text-sm"
-            value={currentPageSize}
-            onChange={(e) => updateParam("pageSize", e.target.value)}
-            disabled={isPending}
-          >
-            <option value="10">10 / page</option>
-            <option value="20">20 / page</option>
-            <option value="50">50 / page</option>
-          </select>
+          <Select value={currentPageSize} onValueChange={(value) => updateParam("pageSize", value)} disabled={isPending}>
+            <SelectTrigger className="h-9 w-[110px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10 / page</SelectItem>
+              <SelectItem value="20">20 / page</SelectItem>
+              <SelectItem value="50">50 / page</SelectItem>
+            </SelectContent>
+          </Select>
         )}
       </div>
 

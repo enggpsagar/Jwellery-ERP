@@ -109,6 +109,7 @@ export function ProductsClient({
             defaultSortBy="createdAt"
             hideSort
             dateField="Created Date"
+            hidePageSize
             selectedIds={selectedIds}
             entityLabel="products"
             exportAction={exportProductsToExcel}

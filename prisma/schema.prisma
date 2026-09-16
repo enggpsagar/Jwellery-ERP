@@ -777,6 +777,16 @@ model Invoice {
   vehicleNumber          String?
   transportMode          TransportMode?
   distanceKm             Int?
+  // E-Invoice (IRN) — same record-keeping-only convention as E-way Bill
+  // above: this app never calls a GSP/IRP API. The store generates the
+  // actual e-invoice (and its IRN) on their GSP portal or the government's
+  // own e-invoice system, then enters the acknowledgement details back
+  // here so they print on the invoice. Independent of E-way Bill — a
+  // store can have one, both, or neither depending on their turnover
+  // threshold and whether the sale is B2B/B2C.
+  irnNumber              String?
+  ackNumber              String?
+  ackDate                DateTime?
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
   store                  Store          @relation(fields: [storeId], references: [id])

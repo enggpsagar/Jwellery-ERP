@@ -231,6 +231,32 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled
         </div>
       </div>
 
+      {(invoice.irnNumber || invoice.ackNumber) && (
+        <div className="rounded-xl border bg-card p-5">
+          <p className="mb-3 text-sm font-medium">E-Invoice (IRN)</p>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {invoice.irnNumber && (
+              <div className="col-span-2 sm:col-span-3">
+                <p className="text-xs text-muted-foreground">IRN</p>
+                <p className="break-all font-medium">{invoice.irnNumber}</p>
+              </div>
+            )}
+            {invoice.ackNumber && (
+              <div>
+                <p className="text-xs text-muted-foreground">Ack. Number</p>
+                <p className="font-medium">{invoice.ackNumber}</p>
+              </div>
+            )}
+            {invoice.ackDate && (
+              <div>
+                <p className="text-xs text-muted-foreground">Ack. Date</p>
+                <p className="font-medium">{formatShortDate(invoice.ackDate)}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {(invoice.ewayBillNumber ||
         invoice.transporterName ||
         invoice.vehicleNumber ||

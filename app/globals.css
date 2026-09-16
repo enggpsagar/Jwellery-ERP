@@ -298,13 +298,25 @@
 
   html {
     @apply font-sans;
-    /* Branding's Font Weight/Style pickers — see (dashboard) layout.tsx's
-       own --brand-font-weight/--brand-font-style, only ever set when a
-       store has customized one away from Normal. */
-    font-weight: var(--brand-font-weight, normal);
-    font-style: var(--brand-font-style, normal);
   }
 }
+
+/* Branding's Font Weight/Style pickers — see (dashboard) layout.tsx's own
+   conditional <style> tag, which only ever renders this rule at all when a
+   store has customized one away from Normal (never as a permanent rule with
+   a "normal" fallback — see that file's own comment on why: font-weight/
+   font-style are *inherited* properties, and inheritance can never win
+   against any rule that directly matches a descendant element, no matter
+   how specific or !important a rule targeting an ancestor like `html` is.
+   Almost every visible element here (headings, labels, table cells,
+   buttons) sets its own explicit Tailwind font-weight utility
+   (font-medium/semibold/bold), which directly matches that element and so
+   always wins over anything only set on `html` — a plain, or even
+   !important, `html { font-weight: ... }` rule only ever reached genuinely
+   unstyled text like a bare <p>, which is why Bold visibly changed almost
+   nothing app-wide. Targeting `*` directly here (not `html`) is what
+   actually reaches every element's own cascade instead of only its
+   inherited fallback. */
 
 /* Branding's "Show icons on buttons" toggle (lib/actions/branding-actions.ts,
    StoreBranding.showIcons) — set [data-hide-icons] on the (dashboard)

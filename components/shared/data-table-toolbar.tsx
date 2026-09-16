@@ -225,7 +225,7 @@ export function DataTableToolbar({
     // search box, which squeezed every select/date-input in it before that
     // point on a narrow screen instead of giving them their own line.
     <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-center">
-      <div className="relative w-full sm:w-80">
+      <div className="relative w-full sm:w-64">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={search}

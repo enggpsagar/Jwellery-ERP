@@ -94,6 +94,7 @@ export function InvoicesClient({ invoices, locations, pagination }: InvoicesClie
               totalCount={pagination.totalCount}
               pageSize={pagination.pageSize}
               itemLabel="invoices"
+              showPageSizeSelector
             />
           ) : null}
         </div>

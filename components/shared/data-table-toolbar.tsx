@@ -64,6 +64,11 @@ type DataTableToolbarProps = {
    * server-side by whatever the caller's fetch/export actions do with these
    * two params. */
   dateField?: string
+  /** Moves the "N / page" selector out of this bar — for a caller that
+   * renders it next to its own pagination footer instead (see
+   * DataTablePagination's showPageSizeSelector). Defaults to false so
+   * every existing caller keeps it here exactly as before. */
+  hidePageSize?: boolean
   /** Omit when this table has no row-select — the single Export button then always exports the filtered set. */
   selectedIds?: string[]
   entityLabel: string
@@ -93,6 +98,7 @@ export function DataTableToolbar({
   typeLabel = "Type",
   hideSort = false,
   dateField,
+  hidePageSize = false,
   selectedIds,
   entityLabel,
   exportAction,
@@ -206,7 +212,12 @@ export function DataTableToolbar({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 shadow-sm">
+    // Column stack below sm, not just flex-wrap on one row — flex-wrap only
+    // moves the *whole* filters group (flex-1, so it shrinks first rather
+    // than wrapping) to a new line once there's no room left next to the
+    // search box, which squeezed every select/date-input in it before that
+    // point on a narrow screen instead of giving them their own line.
+    <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-center">
       <div className="relative w-full sm:w-80">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -263,7 +274,7 @@ export function DataTableToolbar({
         ) : null}
 
         {dateField ? (
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-sm text-muted-foreground">{dateField}</span>
             <input
               type="date"
@@ -333,16 +344,18 @@ export function DataTableToolbar({
           </>
         )}
 
-        <select
-          className="rounded-md border px-3 py-2 text-sm"
-          value={currentPageSize}
-          onChange={(e) => updateParam("pageSize", e.target.value)}
-          disabled={isPending}
-        >
-          <option value="10">10 / page</option>
-          <option value="20">20 / page</option>
-          <option value="50">50 / page</option>
-        </select>
+        {hidePageSize ? null : (
+          <select
+            className="rounded-md border px-3 py-2 text-sm"
+            value={currentPageSize}
+            onChange={(e) => updateParam("pageSize", e.target.value)}
+            disabled={isPending}
+          >
+            <option value="10">10 / page</option>
+            <option value="20">20 / page</option>
+            <option value="50">50 / page</option>
+          </select>
+        )}
       </div>
 
       <div className="flex items-center gap-3">

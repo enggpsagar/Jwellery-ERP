@@ -9,7 +9,15 @@ type DataTablePaginationProps = {
   totalCount: number
   pageSize: number
   itemLabel: string
+  /** Renders the "N / page" selector in this footer instead of relying on
+   * DataTableToolbar to show it up top (pair with that component's own
+   * hidePageSize) — opt-in so every existing caller's toolbar-hosted
+   * selector keeps working unchanged. */
+  showPageSizeSelector?: boolean
+  pageSizeOptions?: string[]
 }
+
+const DEFAULT_PAGE_SIZE_OPTIONS = ["10", "20", "50"]
 
 /** Generic URL-param-driven Prev/Next pagination footer, shared across every data table. */
 export function DataTablePagination({
@@ -18,6 +26,8 @@ export function DataTablePagination({
   totalCount,
   pageSize,
   itemLabel,
+  showPageSizeSelector = false,
+  pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
 }: DataTablePaginationProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -26,6 +36,13 @@ export function DataTablePagination({
   function goToPage(nextPage: number) {
     const params = new URLSearchParams(searchParams.toString())
     params.set("page", String(nextPage))
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  function changePageSize(nextSize: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("pageSize", nextSize)
+    params.set("page", "1")
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
@@ -40,7 +57,22 @@ export function DataTablePagination({
         <span className="font-medium">{totalCount}</span> {itemLabel}
       </p>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {showPageSizeSelector ? (
+          <select
+            aria-label="Rows per page"
+            className="rounded-md border px-2 py-1.5 text-sm"
+            value={String(pageSize)}
+            onChange={(e) => changePageSize(e.target.value)}
+          >
+            {pageSizeOptions.map((option) => (
+              <option key={option} value={option}>
+                {option} / page
+              </option>
+            ))}
+          </select>
+        ) : null}
+
         <Button variant="outline" disabled={page <= 1} onClick={() => goToPage(page - 1)}>
           Previous
         </Button>

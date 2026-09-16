@@ -19,6 +19,7 @@ import {
   parseExcelUpload,
 } from "@/lib/excel-export";
 import { logger } from "@/lib/logger";
+import { parseDateRangeBoundary } from "@/lib/date-range";
 
 function parseNullableString(value: FormDataEntryValue | null) {
   const parsed = String(value || "").trim();
@@ -166,6 +167,8 @@ export type GetProductsParams = {
    * filters. This is the only way to actually see just the inactive
    * products — active-first sort alone still shows them, just at the end. */
   status?: string;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 type ExportProductsParams = {
@@ -175,6 +178,8 @@ type ExportProductsParams = {
   sortOrder?: ProductSortOrder;
   type?: string;
   status?: string;
+  dateFrom?: string;
+  dateTo?: string;
   format?: "csv" | "xlsx" | "pdf";
 };
 
@@ -183,8 +188,12 @@ function getProductWhere(
   search?: string,
   metalTypeId?: string,
   status?: string,
+  dateFrom?: string,
+  dateTo?: string,
 ) {
   const query = String(search || "").trim();
+  const from = parseDateRangeBoundary(dateFrom, false);
+  const to = parseDateRangeBoundary(dateTo, true);
 
   return {
     storeId,
@@ -198,6 +207,7 @@ function getProductWhere(
       : status === "INACTIVE"
         ? { isActive: false }
         : {}),
+    ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(query
       ? {
           OR: [
@@ -308,7 +318,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   const sortOrder: ProductSortOrder = params.sortOrder || "desc";
 
   const storeId = await requireStoreScope();
-  const where = getProductWhere(storeId, search, params.metalTypeId, params.status);
+  const where = getProductWhere(storeId, search, params.metalTypeId, params.status, params.dateFrom, params.dateTo);
   const orderBy = getProductOrderBy(sortBy, sortOrder);
 
   const [totalCount, rows] = await Promise.all([
@@ -381,7 +391,7 @@ async function getAllProductsForExport(params: ExportProductsParams = {}) {
         id: { in: params.selectedIds },
         storeId,
       }
-    : getProductWhere(storeId, params.search, params.type, params.status);
+    : getProductWhere(storeId, params.search, params.type, params.status, params.dateFrom, params.dateTo);
 
   const rows = await prisma.product.findMany({
     where,

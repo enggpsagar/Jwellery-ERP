@@ -24,6 +24,8 @@ type InventoryProductsPageProps = {
     sortOrder?: "asc" | "desc"
     type?: string
     status?: string
+    dateFrom?: string
+    dateTo?: string
   }>
 }
 
@@ -53,6 +55,8 @@ export default async function InventoryProductsPage({
   const metalTypeId = params.type && validMetalTypeIds.has(params.type) ? params.type : undefined;
 
   const status = params.status === "ACTIVE" || params.status === "INACTIVE" ? params.status : undefined;
+  const dateFrom = params.dateFrom || undefined;
+  const dateTo = params.dateTo || undefined;
 
   const { products, pagination } = await getProducts({
     page,
@@ -62,6 +66,8 @@ export default async function InventoryProductsPage({
     sortOrder,
     metalTypeId,
     status,
+    dateFrom,
+    dateTo,
   });
 
   return (

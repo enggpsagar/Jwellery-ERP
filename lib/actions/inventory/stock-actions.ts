@@ -35,6 +35,7 @@ import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 import { getFinenessMap, toFineWeight } from "@/lib/purity"
 import { formatShortDate, formatShortDateTime } from "@/lib/utils"
 import { logger } from "@/lib/logger";
+import { parseDateRangeBoundary } from "@/lib/date-range";
 
 function parseNullableString(value: FormDataEntryValue | null) {
   const parsed = String(value || "").trim()
@@ -111,6 +112,8 @@ export type GetInventoryStockParams = {
    * "UNASSIGNED" for stock with no metal set. Dynamic: whatever the store
    * has configured, not a fixed set of categories. */
   metalTypeId?: string
+  dateFrom?: string
+  dateTo?: string
 }
 
 type ExportInventoryStockParams = {
@@ -119,6 +122,8 @@ type ExportInventoryStockParams = {
   sortBy?: string
   sortOrder?: StockSortOrder
   type?: string
+  dateFrom?: string
+  dateTo?: string
   format?: "csv" | "xlsx" | "pdf"
 }
 
@@ -156,8 +161,12 @@ function getStockWhere(
   search: string | undefined,
   scope: LocationScope,
   metalTypeId?: string,
+  dateFrom?: string,
+  dateTo?: string,
 ) {
   const query = String(search || "").trim()
+  const from = parseDateRangeBoundary(dateFrom, false)
+  const to = parseDateRangeBoundary(dateTo, true)
 
   return {
     storeId,
@@ -167,6 +176,7 @@ function getStockWhere(
       : metalTypeId
         ? { metalTypeId }
         : {}),
+    ...(from || to ? { purchaseDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(query
       ? {
           OR: [
@@ -241,7 +251,7 @@ export async function getInventoryStock(params: GetInventoryStockParams = {}) {
 
   const storeId = await requireStoreScope()
   const scope = await getLocationScope()
-  const where = getStockWhere(storeId, search, scope, params.metalTypeId)
+  const where = getStockWhere(storeId, search, scope, params.metalTypeId, params.dateFrom, params.dateTo)
   const orderBy = getStockOrderBy(sortBy, sortOrder)
 
   const [totalCount, rows] = await Promise.all([
@@ -303,7 +313,7 @@ async function getAllInventoryStockForExport(
         storeId,
         ...locationWhere(scope),
       }
-    : getStockWhere(storeId, params.search, scope, params.type)
+    : getStockWhere(storeId, params.search, scope, params.type, params.dateFrom, params.dateTo)
 
   const rows = await prisma.inventoryStock.findMany({
     where,

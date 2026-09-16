@@ -27,6 +27,7 @@ export function PurchasesToolbar() {
       defaultSortOrder="desc"
       hideSort
       statusOptions={STATUS_OPTIONS}
+      dateField="Purchase Date"
       entityLabel="purchases"
       exportAction={exportPurchasesToExcel}
     />

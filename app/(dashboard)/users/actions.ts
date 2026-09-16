@@ -307,6 +307,8 @@ export type ExportUsersParams = {
   sortBy?: string;
   sortOrder?: SortOrder;
   status?: string;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export async function exportUsersToExcel(params: ExportUsersParams = {}): Promise<{
@@ -329,6 +331,8 @@ export async function exportUsersToExcel(params: ExportUsersParams = {}): Promis
       sortBy: params.sortBy as UserSortBy,
       sortOrder: params.sortOrder,
       status: params.status as UserStatus | undefined,
+      dateFrom: params.dateFrom,
+      dateTo: params.dateTo,
     });
 
     if (!users.length) {

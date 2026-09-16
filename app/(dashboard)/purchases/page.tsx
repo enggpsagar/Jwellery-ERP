@@ -17,6 +17,8 @@ type PurchasesPageProps = {
     sortBy?: "purchaseDate" | "purchaseNumber" | "totalAmount"
     sortOrder?: "asc" | "desc"
     status?: string
+    dateFrom?: string
+    dateTo?: string
   }>
 }
 
@@ -32,9 +34,11 @@ export default async function PurchasesPage({ searchParams }: PurchasesPageProps
   const sortOrder = params.sortOrder || "desc"
   const isValidStatus = (Object.values(InvoiceStatus) as string[]).includes(params.status ?? "")
   const status = isValidStatus ? (params.status as InvoiceStatus) : "ALL"
+  const dateFrom = params.dateFrom || undefined
+  const dateTo = params.dateTo || undefined
 
   const [{ purchases, pagination }, locations] = await Promise.all([
-    getPurchases({ page, pageSize, search, sortBy, sortOrder, status }),
+    getPurchases({ page, pageSize, search, sortBy, sortOrder, status, dateFrom, dateTo }),
     getStoreLocations(),
   ])
 

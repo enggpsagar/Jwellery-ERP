@@ -64,6 +64,8 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
     | "desc"
   const currentPageSize = searchParams.get("pageSize") ?? "10"
   const currentType = searchParams.get("type") ?? "ALL"
+  const currentDateFrom = searchParams.get("dateFrom") ?? ""
+  const currentDateTo = searchParams.get("dateTo") ?? ""
 
   const [search, setSearch] = React.useState(currentSearch)
   const [isPending, startTransition] = React.useTransition()
@@ -124,6 +126,8 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
               sortBy: currentSortBy,
               sortOrder: currentSortOrder,
               type: currentType !== "ALL" ? currentType : undefined,
+              dateFrom: currentDateFrom || undefined,
+              dateTo: currentDateTo || undefined,
             },
       )
 
@@ -143,7 +147,8 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 shadow-sm">
+    // Column stack below sm — same fix as DataTableToolbar/CustomersToolbar/VendorsToolbar.
+    <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-center">
       <div className="relative min-w-[120px] flex-1 sm:max-w-44">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -183,6 +188,48 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
             ))}
           <option value={UNASSIGNED_METAL_TYPE}>Unassigned</option>
         </select>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-sm text-muted-foreground">Added</span>
+          <input
+            type="date"
+            aria-label="Added from"
+            className="rounded-md border px-3 py-2 text-sm"
+            value={currentDateFrom}
+            max={currentDateTo || undefined}
+            onChange={(e) => updateParam("dateFrom", e.target.value)}
+            disabled={isPending}
+          />
+          <span className="text-sm text-muted-foreground">to</span>
+          <input
+            type="date"
+            aria-label="Added to"
+            className="rounded-md border px-3 py-2 text-sm"
+            value={currentDateTo}
+            min={currentDateFrom || undefined}
+            onChange={(e) => updateParam("dateTo", e.target.value)}
+            disabled={isPending}
+          />
+          {currentDateFrom || currentDateTo ? (
+            <button
+              type="button"
+              onClick={() => {
+                startTransition(() => {
+                  const params = new URLSearchParams(searchParams.toString())
+                  params.delete("dateFrom")
+                  params.delete("dateTo")
+                  params.set("page", "1")
+                  router.replace(`${pathname}?${params.toString()}`)
+                })
+              }}
+              className="text-muted-foreground hover:text-foreground"
+              title="Clear date range"
+              aria-label="Clear date range"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
 
         <select
           className="rounded-md border px-3 py-2 text-sm"

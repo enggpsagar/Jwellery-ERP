@@ -21,6 +21,8 @@ type KachaBillingPageProps = {
     sortBy?: KachaInvoiceSortField
     sortOrder?: "asc" | "desc"
     status?: string
+    dateFrom?: string
+    dateTo?: string
   }>
 }
 
@@ -35,6 +37,8 @@ export default async function KachaBillingPage({ searchParams }: KachaBillingPag
   const sortBy = params.sortBy || "invoiceDate"
   const sortOrder = params.sortOrder || "desc"
   const status = params.status || "ALL"
+  const dateFrom = params.dateFrom || undefined
+  const dateTo = params.dateTo || undefined
 
   // Wiping every slip is owner-only, mirroring the role check the
   // `deleteAllKachaInvoices` action enforces server-side.
@@ -48,6 +52,8 @@ export default async function KachaBillingPage({ searchParams }: KachaBillingPag
     sortBy,
     sortOrder,
     status,
+    dateFrom,
+    dateTo,
   })
 
   return (

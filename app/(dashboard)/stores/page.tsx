@@ -23,6 +23,8 @@ type StoresPageProps = {
     sortBy?: StoreSortBy;
     sortOrder?: SortOrder;
     status?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }>;
 };
 
@@ -40,9 +42,11 @@ export default async function StoresPage({ searchParams }: StoresPageProps) {
     params.status === "ACTIVE" || params.status === "INACTIVE"
       ? (params.status as StoreStatusFilter)
       : undefined;
+  const dateFrom = params.dateFrom || undefined;
+  const dateTo = params.dateTo || undefined;
 
   const [{ stores, pagination }, goldSummary, plans] = await Promise.all([
-    getStores({ page, pageSize, search, sortBy, sortOrder, status }),
+    getStores({ page, pageSize, search, sortBy, sortOrder, status, dateFrom, dateTo }),
     getPlatformGoldInventory(),
     getPlans({ activeOnly: true }),
   ]);

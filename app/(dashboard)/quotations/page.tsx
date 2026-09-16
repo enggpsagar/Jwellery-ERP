@@ -18,6 +18,8 @@ type QuotationsPageProps = {
     sortBy?: "quotationDate" | "quotationNumber" | "totalAmount"
     sortOrder?: "asc" | "desc"
     status?: string
+    dateFrom?: string
+    dateTo?: string
   }>
 }
 
@@ -32,6 +34,8 @@ export default async function QuotationsPage({ searchParams }: QuotationsPagePro
   const sortBy = params.sortBy || "quotationDate"
   const sortOrder = params.sortOrder || "desc"
   const status = params.status || "ALL"
+  const dateFrom = params.dateFrom || undefined
+  const dateTo = params.dateTo || undefined
 
   const { quotations, pagination } = await getQuotations({
     page,
@@ -40,6 +44,8 @@ export default async function QuotationsPage({ searchParams }: QuotationsPagePro
     sortBy,
     sortOrder,
     status,
+    dateFrom,
+    dateTo,
   })
 
   return (

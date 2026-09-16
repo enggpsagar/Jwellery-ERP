@@ -37,6 +37,7 @@ import type {
   DataTableExportResult,
 } from "@/components/shared/data-table-toolbar";
 import { logger } from "@/lib/logger";
+import { parseDateRangeBoundary } from "@/lib/date-range";
 
 const PURCHASE_SORT_FIELDS = ["purchaseDate", "purchaseNumber", "totalAmount"] as const;
 
@@ -417,16 +418,21 @@ export type PurchaseSortBy = "purchaseDate" | "purchaseNumber" | "totalAmount";
 
 function buildPurchasesWhere(
   storeId: string,
-  params: { search?: string; status?: InvoiceStatus | "ALL" },
+  params: { search?: string; status?: InvoiceStatus | "ALL"; dateFrom?: string; dateTo?: string },
   scope: LocationScope,
 ) {
   const search = String(params.search || "").trim();
   const status = params.status && params.status !== "ALL" ? params.status : undefined;
+  const dateFrom = parseDateRangeBoundary(params.dateFrom, false);
+  const dateTo = parseDateRangeBoundary(params.dateTo, true);
 
   return {
     storeId,
     ...locationWhere(scope),
     ...(status ? { status } : {}),
+    ...(dateFrom || dateTo
+      ? { purchaseDate: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } }
+      : {}),
     ...(search
       ? {
           OR: [
@@ -452,6 +458,8 @@ export type GetPurchasesParams = {
   status?: InvoiceStatus | "ALL";
   sortBy?: PurchaseSortBy;
   sortOrder?: "asc" | "desc";
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export async function getPurchases(params: GetPurchasesParams = {}) {
@@ -524,7 +532,7 @@ export async function exportPurchasesToExcel(
     const where =
       params.selectedIds && params.selectedIds.length > 0
         ? { id: { in: params.selectedIds }, storeId, ...locationWhere(scope) }
-        : buildPurchasesWhere(storeId, { search: params.search, status }, scope);
+        : buildPurchasesWhere(storeId, { search: params.search, status, dateFrom: params.dateFrom, dateTo: params.dateTo }, scope);
 
     const purchases = await prisma.purchase.findMany({
       where,

@@ -15,6 +15,8 @@ type CustomersPageProps = {
     search?: string
     sortBy?: "name" | "createdAt" | "openingBalance"
     sortOrder?: "asc" | "desc"
+    dateFrom?: string
+    dateTo?: string
   }>
 }
 
@@ -30,9 +32,11 @@ export default async function CustomersPage({
   const search = params.search || ""
   const sortBy = params.sortBy || "createdAt"
   const sortOrder = params.sortOrder || "desc"
+  const dateFrom = params.dateFrom || undefined
+  const dateTo = params.dateTo || undefined
 
   const [{ customers, pagination }, states] = await Promise.all([
-    getCustomers({ page, pageSize, search, sortBy, sortOrder }),
+    getCustomers({ page, pageSize, search, sortBy, sortOrder, dateFrom, dateTo }),
     getStates(),
   ])
 

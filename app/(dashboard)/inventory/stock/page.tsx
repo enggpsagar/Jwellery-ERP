@@ -22,6 +22,8 @@ type InventoryStockPageProps = {
     sortBy?: StockSortBy
     sortOrder?: "asc" | "desc"
     type?: string
+    dateFrom?: string
+    dateTo?: string
   }>
 }
 
@@ -41,6 +43,8 @@ export default async function InventoryStockPage({
   const [metals, locations] = await Promise.all([getStoreMetals(), getStoreLocations()])
   const validMetalTypeIds = new Set([...metals.map((m) => m.id), UNASSIGNED_METAL_TYPE])
   const metalTypeId = params.type && validMetalTypeIds.has(params.type) ? params.type : undefined
+  const dateFrom = params.dateFrom || undefined
+  const dateTo = params.dateTo || undefined
 
   const { stockItems, pagination } = await getInventoryStock({
     page,
@@ -49,6 +53,8 @@ export default async function InventoryStockPage({
     sortBy,
     sortOrder,
     metalTypeId,
+    dateFrom,
+    dateTo,
   })
 
   return (

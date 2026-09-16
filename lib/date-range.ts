@@ -91,3 +91,21 @@ export function matchFinancialYear(from: string, to: string): number | undefined
     return range.from === from && range.to === to;
   });
 }
+
+/**
+ * "YYYY-MM-DD" -> a Date at local midnight (start of day) or, for `end`,
+ * the instant just before the *next* day's midnight — so a same-day
+ * dateFrom/dateTo (a single day's range) includes every row from that day
+ * rather than excluding everything after 00:00:00.000, which a naive
+ * `new Date(dateTo)` upper bound would do. Shared by every list's
+ * DataTableToolbar-driven date-range filter (dateFrom/dateTo params) to
+ * build its own Prisma `where` boundary.
+ */
+export function parseDateRangeBoundary(value: string | undefined, end: boolean): Date | undefined {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  if (end) parsed.setHours(23, 59, 59, 999);
+  else parsed.setHours(0, 0, 0, 0);
+  return parsed;
+}

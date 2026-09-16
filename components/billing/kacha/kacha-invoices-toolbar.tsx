@@ -29,6 +29,7 @@ export function KachaInvoicesToolbar({
       sortOptions={SORT_OPTIONS}
       defaultSortBy="invoiceDate"
       statusOptions={STATUS_OPTIONS}
+      dateField="Estimate Date"
       entityLabel="estimates"
       selectedIds={selectedIds}
       exportAction={exportKachaInvoicesToExcel}

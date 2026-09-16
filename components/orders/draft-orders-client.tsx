@@ -81,6 +81,7 @@ export function DraftOrdersClient({
           defaultSortBy="orderDate"
           hideSort
           statusOptions={STATUS_OPTIONS}
+          dateField="Order Date"
           selectedIds={selectedIds}
           entityLabel="draft orders"
           exportAction={exportDraftOrdersToExcel}

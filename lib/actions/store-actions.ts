@@ -14,6 +14,7 @@ import { classifyMetalName } from "@/lib/business-units";
 import { buildUniqueStoreCode } from "@/lib/store-code";
 import { sendInviteEmailSafely } from "@/lib/invite-email";
 import { logger } from "@/lib/logger";
+import { parseDateRangeBoundary } from "@/lib/date-range";
 
 export type StoreFormState = {
   success: boolean;
@@ -32,6 +33,8 @@ export type GetStoresParams = {
   sortBy?: StoreSortBy;
   sortOrder?: SortOrder;
   status?: StoreStatusFilter;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export type StoresPagination = {
@@ -48,6 +51,8 @@ type ExportStoresParams = {
   sortBy?: string;
   sortOrder?: SortOrder;
   status?: string;
+  dateFrom?: string;
+  dateTo?: string;
   format?: "csv" | "xlsx" | "pdf";
 };
 
@@ -63,11 +68,14 @@ function toOptionalString(value: FormDataEntryValue | null) {
   return str || null;
 }
 
-function getStoresWhere(search?: string, status?: StoreStatusFilter) {
+function getStoresWhere(search?: string, status?: StoreStatusFilter, dateFrom?: string, dateTo?: string) {
   const query = String(search || "").trim();
+  const from = parseDateRangeBoundary(dateFrom, false);
+  const to = parseDateRangeBoundary(dateTo, true);
 
   return {
     ...(status ? { isActive: status === "ACTIVE" } : {}),
+    ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(query
       ? {
           OR: [
@@ -95,7 +103,7 @@ export async function getStores(params: GetStoresParams = {}) {
   const sortBy = params.sortBy || "createdAt";
   const sortOrder = params.sortOrder || "desc";
 
-  const where = getStoresWhere(search, params.status);
+  const where = getStoresWhere(search, params.status, params.dateFrom, params.dateTo);
   const orderBy = getStoresOrderBy(sortBy, sortOrder);
 
   const [totalCount, stores] = await Promise.all([
@@ -136,7 +144,7 @@ export async function exportStoresToExcel(params: ExportStoresParams = {}): Prom
       params.status === "ACTIVE" || params.status === "INACTIVE"
         ? (params.status as StoreStatusFilter)
         : undefined;
-    const where = getStoresWhere(params.search, status);
+    const where = getStoresWhere(params.search, status, params.dateFrom, params.dateTo);
     const orderBy = getStoresOrderBy(
       (params.sortBy as StoreSortBy) || "createdAt",
       params.sortOrder || "desc"

@@ -318,6 +318,8 @@ function mapInvoice(invoice: any) {
     irnNumber: invoice.irnNumber ?? null,
     ackNumber: invoice.ackNumber ?? null,
     ackDate: invoice.ackDate?.toISOString() ?? null,
+    deliveryState: invoice.deliveryState ?? null,
+    deliveryStateCode: invoice.deliveryStateCode ?? null,
     createdByName: invoice.createdByName ?? invoice.createdBy?.name ?? null,
     cancelledAt: invoice.cancelledAt?.toISOString() ?? null,
     cancelledByName: invoice.cancelledByName ?? invoice.cancelledBy?.name ?? null,
@@ -888,6 +890,8 @@ export async function createInvoice(
     const locationId = String(formData.get("locationId") || "").trim() || null;
     const replacesId = String(formData.get("replacesId") || "").trim() || null;
     const gstRateId = String(formData.get("gstRateId") || "").trim() || null;
+    const deliveryState = String(formData.get("deliveryState") || "").trim() || null;
+    const deliveryStateCode = String(formData.get("deliveryStateCode") || "").trim() || null;
 
     const subtotal = items.reduce(
       (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
@@ -1106,6 +1110,8 @@ export async function createInvoice(
           gstRateId: gstRateSnapshot?.gstRateId ?? undefined,
           gstRateName: gstRateSnapshot?.gstRateName ?? undefined,
           gstRatePercent: gstRateSnapshot?.gstRatePercent ?? undefined,
+          deliveryState,
+          deliveryStateCode,
           // Recorded at the moment of sale, name included, so the invoice
           // still says who raised it after that person leaves the shop.
           createdById: actor.id ?? null,
@@ -1479,6 +1485,11 @@ export async function updateInvoice(
     const dueDateRaw = String(formData.get("dueDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
     const locationId = String(formData.get("locationId") || "").trim() || null;
+    // Only present on the full line-item edit form (EditInvoiceDialog's
+    // metadata-only form has no Delivery Location section) — untouched by
+    // the `!hasItems` branch below for exactly that reason.
+    const deliveryState = String(formData.get("deliveryState") || "").trim() || null;
+    const deliveryStateCode = String(formData.get("deliveryStateCode") || "").trim() || null;
 
     // E-way Bill — record-keeping only, no government API call. See the
     // schema's own doc comment on Invoice.ewayBillNumber.
@@ -1719,6 +1730,8 @@ export async function updateInvoice(
           gstRateId: gstRateSnapshot?.gstRateId ?? null,
           gstRateName: gstRateSnapshot?.gstRateName ?? null,
           gstRatePercent: gstRateSnapshot?.gstRatePercent ?? null,
+          deliveryState,
+          deliveryStateCode,
           items: {
             deleteMany: {},
             create: items.map((item) => ({

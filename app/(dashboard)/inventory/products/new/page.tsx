@@ -5,6 +5,7 @@ import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper";
 import {
   getStoreCategories,
   getStoreMetals,
+  getStoreStyles,
   getAllStoreMetalOrigins,
 } from "@/lib/actions/taxonomy-actions";
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions";
@@ -29,10 +30,11 @@ export default async function NewProductPage({
   const params = (await searchParams) ?? {};
   const returnTo = safeReturnTo(params.returnTo);
 
-  const [metals, categories, caratConversionRates, origins, locations, defaultLocationId, businessSettings] =
+  const [metals, categories, styles, caratConversionRates, origins, locations, defaultLocationId, businessSettings] =
     await Promise.all([
       getStoreMetals(),
       getStoreCategories(),
+      getStoreStyles(),
       getCaratConversionRateMap(),
       getAllStoreMetalOrigins(),
       getStoreLocations(),
@@ -53,6 +55,7 @@ export default async function NewProductPage({
         <ProductCreateForm
           metals={metals}
           categories={categories}
+          styles={styles}
           caratConversionRates={caratConversionRates}
           origins={origins}
           locations={locations}

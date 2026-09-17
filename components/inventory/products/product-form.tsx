@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 
-import { PurityType, TargetStyle, type SkuFormat } from "@prisma/client";
+import { PurityType, type SkuFormat } from "@prisma/client";
 
 import type { ProductFormState } from "@/lib/inventory/product-types";
-import { buildSkuPrefix, TARGET_STYLE_LABEL } from "@/lib/inventory/product-sku";
+import { buildSkuPrefix } from "@/lib/inventory/product-sku";
 import {
   getStoreCategoryTypes,
   getStoreMetalOrigins,
@@ -64,6 +64,12 @@ export type StoreCategoryOption = {
   name: string;
 };
 
+export type StoreStyleOption = {
+  id: string;
+  name: string;
+  isActive: boolean;
+};
+
 export type StoreCategoryTypeOption = {
   id: string;
   categoryId: string;
@@ -77,7 +83,7 @@ type Product = {
   categoryId: string | null;
   categoryTypeId: string | null;
   metalTypeId: string | null;
-  targetStyle: string | null;
+  targetStyleId: string | null;
   stoneOriginOptionId: string | null;
   defaultPurity: string | null;
   defaultMakingCharge: string | null;
@@ -106,6 +112,7 @@ type ProductFormProps = {
   pending: boolean;
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
+  styles: StoreStyleOption[];
   origins: StoreMetalOriginRow[];
   /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
    * Conversion Rules) — see the same prop on InvoiceForm. */
@@ -146,6 +153,7 @@ export function ProductForm({
   pending,
   metals: initialMetals,
   categories: initialCategories,
+  styles,
   origins: initialOrigins,
   caratConversionRates,
   locations = [],
@@ -162,7 +170,7 @@ export function ProductForm({
 
   const [metalTypeId, setMetalTypeId] = useState(product?.metalTypeId ?? "");
 
-  const [targetStyle, setTargetStyle] = useState(product?.targetStyle ?? "");
+  const [targetStyleId, setTargetStyleId] = useState(product?.targetStyleId ?? "");
 
   const [stoneOriginOptionId, setStoneOriginOptionId] = useState(
     product?.stoneOriginOptionId ?? "",
@@ -261,12 +269,13 @@ export function ProductForm({
   // this exact prefix), so this shows the prefix alone with a placeholder.
   const selectedCategoryType = types.find((item) => item.id === categoryTypeId);
   const selectedCategory = categories.find((item) => item.id === categoryId);
+  const selectedStyle = styles.find((item) => item.id === targetStyleId);
   const skuPreview =
-    selectedMetal && (targetStyle || !styleFieldEnabled)
+    selectedMetal && (targetStyleId || !styleFieldEnabled)
       ? buildSkuPrefix({
           metalName: selectedMetal.name,
           purity: defaultPurity === "__none__" ? null : (defaultPurity as PurityType),
-          targetStyle: targetStyle ? (targetStyle as TargetStyle) : null,
+          targetStyleName: selectedStyle?.name ?? null,
           categoryTypeName: selectedCategoryType?.name ?? null,
           categoryName: selectedCategory?.name ?? null,
           format: skuFormat,
@@ -791,22 +800,24 @@ export function ProductForm({
             <div>
               <Label htmlFor="targetStyle">Style <RequiredMark /></Label>
 
-              <Select value={targetStyle || "__none__"} onValueChange={(value) => setTargetStyle(value === "__none__" ? "" : value)}>
+              <Select value={targetStyleId || "__none__"} onValueChange={(value) => setTargetStyleId(value === "__none__" ? "" : value)}>
                 <SelectTrigger id="targetStyle" className="h-11 w-full">
                   <SelectValue placeholder="Select style" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.values(TargetStyle).map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {TARGET_STYLE_LABEL[value]}
-                    </SelectItem>
-                  ))}
+                  {styles
+                    .filter((style) => style.isActive || style.id === targetStyleId)
+                    .map((style) => (
+                      <SelectItem key={style.id} value={style.id}>
+                        {style.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
 
-              <input type="hidden" name="targetStyle" value={targetStyle} />
+              <input type="hidden" name="targetStyleId" value={targetStyleId} />
 
-              <ErrorText error={state.errors.targetStyle} />
+              <ErrorText error={state.errors.targetStyleId} />
             </div>
           )}
         </div>

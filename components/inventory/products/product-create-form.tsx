@@ -16,11 +16,13 @@ import {
   ProductForm,
   type StoreCategoryOption,
   type StoreMetalOption,
+  type StoreStyleOption,
 } from "./product-form";
 
 type ProductCreateFormProps = {
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
+  styles: StoreStyleOption[];
   caratConversionRates: Record<PurityType, number>;
   origins: StoreMetalOriginRow[];
   locations: LocationOption[];
@@ -39,6 +41,7 @@ type ProductCreateFormProps = {
 export function ProductCreateForm({
   metals,
   categories,
+  styles,
   caratConversionRates,
   origins,
   locations,
@@ -105,6 +108,7 @@ export function ProductCreateForm({
         pending={pending}
         metals={metals}
         categories={categories}
+        styles={styles}
         caratConversionRates={caratConversionRates}
         origins={origins}
         locations={locations}

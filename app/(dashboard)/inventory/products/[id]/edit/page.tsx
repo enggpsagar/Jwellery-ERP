@@ -11,6 +11,7 @@ import { PERMISSIONS } from "@/lib/permissions"
 import {
   getStoreCategories,
   getStoreMetals,
+  getStoreStyles,
   getAllStoreMetalOrigins,
 } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
@@ -50,10 +51,11 @@ export default async function ProductEditPage({
     redirect(`/inventory/products/${id}`)
   }
 
-  const [product, metals, categories, caratConversionRates, origins, businessSettings] = await Promise.all([
+  const [product, metals, categories, styles, caratConversionRates, origins, businessSettings] = await Promise.all([
     getProduct(id),
     getStoreMetals(),
     getStoreCategories(),
+    getStoreStyles(),
     getCaratConversionRateMap(),
     getAllStoreMetalOrigins(),
     getBusinessSettings(),
@@ -89,6 +91,7 @@ export default async function ProductEditPage({
         product={product}
         metals={metals}
         categories={categories}
+        styles={styles}
         caratConversionRates={caratConversionRates}
         origins={origins}
         styleFieldEnabled={businessSettings.styleFieldEnabled}

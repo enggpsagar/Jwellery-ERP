@@ -260,6 +260,10 @@ type InvoiceFormProps = {
    * storeState/storeStateCode when unset (a fresh invoice). */
   initialDeliveryState?: string | null
   initialDeliveryStateCode?: string | null
+  /** BusinessSettings.showDueDate — hides the Due Date field entirely when
+   * off. Defaults true so an existing caller not yet passing this keeps
+   * showing it, matching today's behavior. */
+  showDueDate?: boolean
   /** Prefill from a cancelled invoice being replaced — see
    * app/(dashboard)/billing/[id]/replace/page.tsx. All optional; a fresh
    * "New Invoice" passes none of these. */
@@ -300,6 +304,7 @@ export function InvoiceForm({
   states,
   initialDeliveryState,
   initialDeliveryStateCode,
+  showDueDate = true,
   initialCustomerId,
   initialLocationId,
   initialItems,
@@ -1110,10 +1115,12 @@ export function InvoiceForm({
           />
         </div>
 
-        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <Label>Due Date</Label>
-          <Input type="date" name="dueDate" className="h-11" min={todayForDateInput()} />
-        </div>
+        {showDueDate && (
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+            <Label>Due Date</Label>
+            <Input type="date" name="dueDate" className="h-11" min={todayForDateInput()} />
+          </div>
+        )}
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           {showLocationField && <Label>Store Location</Label>}

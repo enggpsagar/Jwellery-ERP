@@ -22,6 +22,8 @@ type InventoryStockPageProps = {
     sortBy?: StockSortBy
     sortOrder?: "asc" | "desc"
     type?: string
+    /** "IN_STOCK" | "OOS" — the toolbar's In Stock/Out of Stock/Both filter. */
+    status?: string
     dateFrom?: string
     dateTo?: string
   }>
@@ -53,6 +55,7 @@ export default async function InventoryStockPage({
     sortBy,
     sortOrder,
     metalTypeId,
+    status: params.status,
     dateFrom,
     dateTo,
   })

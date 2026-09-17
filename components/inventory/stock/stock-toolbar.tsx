@@ -53,6 +53,11 @@ export function StockToolbar({ selectedIds, metals, bulkActions }: StockToolbarP
       selectedIds={selectedIds}
       entityLabel="stock items"
       exportAction={exportInventoryStockToExcel}
+      statusOptions={[
+        { value: "IN_STOCK", label: "In Stock" },
+        { value: "OOS", label: "Out of Stock" },
+      ]}
+      statusAllLabel="Both"
       typeOptions={[
         ...metals
           .filter((metal) => metal.isActive)

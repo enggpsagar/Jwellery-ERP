@@ -59,10 +59,6 @@ function parseOptionalInt(value: FormDataEntryValue | null) {
   return Math.trunc(num)
 }
 
-function parseBoolean(value: FormDataEntryValue | null) {
-  return String(value || "") === "true"
-}
-
 function parseOptionalEnum<T extends string>(
   value: FormDataEntryValue | null,
   allowed: readonly T[]
@@ -99,7 +95,6 @@ export type StockSortBy =
   | "finish"
   | "location"
   | "purchaseDate"
-  | "isActive"
 export type StockSortOrder = "asc" | "desc"
 
 export type GetInventoryStockParams = {
@@ -114,6 +109,11 @@ export type GetInventoryStockParams = {
   metalTypeId?: string
   dateFrom?: string
   dateTo?: string
+  /** "IN_STOCK" (quantity > 0) or "OOS" (quantity = 0) — the toolbar's
+   * Status filter, labeled "In Stock"/"Out of Stock"/"Both" (see
+   * StockToolbar). Stock has no Active/Inactive concept of its own;
+   * availability is this and only this. */
+  status?: string
 }
 
 type ExportInventoryStockParams = {
@@ -122,6 +122,7 @@ type ExportInventoryStockParams = {
   sortBy?: string
   sortOrder?: StockSortOrder
   type?: string
+  status?: string
   dateFrom?: string
   dateTo?: string
   format?: "csv" | "xlsx" | "pdf"
@@ -163,6 +164,7 @@ function getStockWhere(
   metalTypeId?: string,
   dateFrom?: string,
   dateTo?: string,
+  availability?: string,
 ) {
   const query = String(search || "").trim()
   const from = parseDateRangeBoundary(dateFrom, false)
@@ -175,6 +177,13 @@ function getStockWhere(
       ? { metalTypeId: null }
       : metalTypeId
         ? { metalTypeId }
+        : {}),
+    // "Both" (the default) applies no filter at all — see StockToolbar's
+    // statusAllLabel.
+    ...(availability === "IN_STOCK"
+      ? { quantity: { gt: 0 } }
+      : availability === "OOS"
+        ? { quantity: 0 }
         : {}),
     ...(from || to ? { purchaseDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(query
@@ -193,9 +202,6 @@ function getStockWhere(
   }
 }
 
-// Active items always sort ahead of inactive ones, regardless of which
-// column the user picked — that column only decides ordering *within* each
-// of those two groups.
 function getStockOrderBy(
   sortBy: StockSortBy = "createdAt",
   sortOrder: StockSortOrder = "desc"
@@ -212,11 +218,9 @@ function getStockOrderBy(
     : sortBy === "finish" ? { finish: sortOrder }
     : sortBy === "location" ? { location: { name: sortOrder } }
     : sortBy === "purchaseDate" ? { purchaseDate: sortOrder }
-    : sortBy === "isActive" ? { isActive: sortOrder }
     : { createdAt: sortOrder }
 
-  if (sortBy === "isActive") return [primary]
-  return [{ isActive: "desc" as const }, primary]
+  return [primary]
 }
 
 function mapStockRow(row: any) {
@@ -251,7 +255,7 @@ export async function getInventoryStock(params: GetInventoryStockParams = {}) {
 
   const storeId = await requireStoreScope()
   const scope = await getLocationScope()
-  const where = getStockWhere(storeId, search, scope, params.metalTypeId, params.dateFrom, params.dateTo)
+  const where = getStockWhere(storeId, search, scope, params.metalTypeId, params.dateFrom, params.dateTo, params.status)
   const orderBy = getStockOrderBy(sortBy, sortOrder)
 
   const [totalCount, rows] = await Promise.all([
@@ -297,7 +301,6 @@ async function getAllInventoryStockForExport(
     "finish",
     "location",
     "purchaseDate",
-    "isActive",
   ]
   const sortBy: StockSortBy = validSortBy.includes(params.sortBy as StockSortBy)
     ? (params.sortBy as StockSortBy)
@@ -313,7 +316,7 @@ async function getAllInventoryStockForExport(
         storeId,
         ...locationWhere(scope),
       }
-    : getStockWhere(storeId, params.search, scope, params.type, params.dateFrom, params.dateTo)
+    : getStockWhere(storeId, params.search, scope, params.type, params.dateFrom, params.dateTo, params.status)
 
   const rows = await prisma.inventoryStock.findMany({
     where,
@@ -562,7 +565,6 @@ export async function createInventoryStock(
       ) as InventoryFinish | null) ?? InventoryFinish.KACHA
 
     const quantity = parseOptionalInt(formData.get("quantity")) ?? 1
-    const isActive = parseBoolean(formData.get("isActive"))
 
     const grossWeight = parseOptionalNumber(formData.get("grossWeight"))
     const lessWeight = parseOptionalNumber(formData.get("lessWeight"))
@@ -757,7 +759,6 @@ export async function createInventoryStock(
           status,
           finish,
           quantity,
-          isActive,
           grossWeight: toDecimal(grossWeight),
           lessWeight: toDecimal(lessWeight),
           netWeight: toDecimal(netWeight),
@@ -900,7 +901,6 @@ export async function updateInventoryStock(
       ) as InventoryFinish | null) ?? InventoryFinish.KACHA
 
     const quantity = parseOptionalInt(formData.get("quantity")) ?? 1
-    const isActive = parseBoolean(formData.get("isActive"))
 
     const grossWeight = parseOptionalNumber(formData.get("grossWeight"))
     const lessWeight = parseOptionalNumber(formData.get("lessWeight"))
@@ -1079,7 +1079,6 @@ export async function updateInventoryStock(
         data: {
           status,
           finish,
-          isActive,
           locationId,
           remarks,
           vendorName,
@@ -1110,7 +1109,6 @@ export async function updateInventoryStock(
         status,
         finish,
         quantity,
-        isActive,
         grossWeight: toDecimal(grossWeight),
         lessWeight: toDecimal(lessWeight),
         netWeight: toDecimal(netWeight),
@@ -1154,53 +1152,6 @@ export async function updateInventoryStock(
       message: actionErrorMessage(error, "Failed to update stock"),
       errors: {},
     }
-  }
-}
-
-/** Same immediate, no-confirm switch as ProductStatusToggle/KarigarStatusCard — flips Active/Inactive without going through the full edit form. */
-export async function disableStock(id: string): Promise<StockFormState> {
-  try {
-    const storeId = await requireStoreScope()
-
-    const { count } = await prisma.inventoryStock.updateMany({
-      where: { id, storeId },
-      data: { isActive: false },
-    })
-
-    if (count === 0) {
-      return { success: false, message: "Stock item not found", errors: {} }
-    }
-
-    revalidatePath("/inventory/stock")
-    revalidatePath(`/inventory/stock/${id}`)
-
-    return { success: true, message: "Stock item marked inactive", errors: {} }
-  } catch (error) {
-    logger.error("disableStock error", error)
-    return { success: false, message: actionErrorMessage(error, "Failed to update stock"), errors: {} }
-  }
-}
-
-export async function enableStock(id: string): Promise<StockFormState> {
-  try {
-    const storeId = await requireStoreScope()
-
-    const { count } = await prisma.inventoryStock.updateMany({
-      where: { id, storeId },
-      data: { isActive: true },
-    })
-
-    if (count === 0) {
-      return { success: false, message: "Stock item not found", errors: {} }
-    }
-
-    revalidatePath("/inventory/stock")
-    revalidatePath(`/inventory/stock/${id}`)
-
-    return { success: true, message: "Stock item marked active", errors: {} }
-  } catch (error) {
-    logger.error("enableStock error", error)
-    return { success: false, message: actionErrorMessage(error, "Failed to update stock"), errors: {} }
   }
 }
 

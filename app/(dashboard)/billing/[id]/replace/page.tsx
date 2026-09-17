@@ -157,6 +157,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
         gstScheme={businessSettings.gstScheme}
         storeState={businessSettings.state}
         storeStateCode={businessSettings.stateCode}
+        showDueDate={businessSettings.showDueDate}
         states={states}
         initialCustomerId={cancelledInvoice.customer?.id}
         initialLocationId={cancelledInvoice.locationId ?? defaultLocationId ?? undefined}

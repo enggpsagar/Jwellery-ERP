@@ -51,6 +51,12 @@ type DataTableToolbarProps = {
   defaultSortBy: string
   defaultSortOrder?: "asc" | "desc"
   statusOptions?: Option[]
+  /** Label for the catch-all "show everything" option in the Status
+   * dropdown — defaults to "All Statuses" (every existing caller). A table
+   * whose statusOptions form a natural complementary pair (e.g. Stock's In
+   * Stock / Out of Stock) can override this to something that reads more
+   * naturally as "show both," e.g. "Both". */
+  statusAllLabel?: string
   /** A second, independent filter dropdown next to Status — e.g. Stock/
    * Karigar's Gold/Silver/Diamond/Stone/Other Type filter. Kept as its own
    * prop/URL param ("type") rather than reusing statusOptions, since a table
@@ -101,6 +107,7 @@ export function DataTableToolbar({
   defaultSortBy,
   defaultSortOrder = "desc",
   statusOptions,
+  statusAllLabel = "All Statuses",
   typeOptions,
   typeLabel = "Type",
   hideSort = false,
@@ -239,7 +246,7 @@ export function DataTableToolbar({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">All Statuses</SelectItem>
+              <SelectItem value="ALL">{statusAllLabel}</SelectItem>
               {statusOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}

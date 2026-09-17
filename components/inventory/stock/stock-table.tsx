@@ -7,7 +7,6 @@ import type { getInventoryStock } from "@/lib/actions/inventory/stock-actions"
 
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
-import { ActiveBadge } from "@/components/shared/active-badge"
 import { cn } from "@/lib/utils"
 
 // Derived from the actual server action's return shape (rather than
@@ -133,7 +132,11 @@ export function StockTable({
                 defaultSortBy="createdAt"
                 align="right"
               />
-              <SortableTableHead label="Active" sortKey="isActive" defaultSortBy="createdAt" />
+              {/* Stock has no Active/Inactive concept of its own — that
+                  belongs to Product only. Availability here is purely
+                  quantity-driven (see the toolbar's In Stock/Out of Stock
+                  filter), so this column shows the actual count instead. */}
+              <SortableTableHead label="Qty in Stock" sortKey="quantity" defaultSortBy="createdAt" align="right" />
             </tr>
           </thead>
 
@@ -201,8 +204,13 @@ export function StockTable({
                   <td className="px-4 py-3 text-right tabular-nums">
                     {formatWeightCell(item.netWeight)}
                   </td>
-                  <td className="px-4 py-3">
-                    <ActiveBadge isActive={item.isActive} />
+                  <td
+                    className={cn(
+                      "px-4 py-3 text-right tabular-nums font-medium",
+                      item.quantity <= 0 && "text-red-600",
+                    )}
+                  >
+                    {item.quantity}
                   </td>
                 </tr>
               )

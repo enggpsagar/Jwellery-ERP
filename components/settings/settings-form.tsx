@@ -8,6 +8,7 @@ import {
   MapPinned,
   Receipt,
   ScrollText,
+  SlidersHorizontal,
   Wallet,
 } from "lucide-react";
 
@@ -42,18 +43,29 @@ type CityItem = { id: string; name: string }
 // mounted (so nothing typed is lost switching tabs), only the active
 // section's tab panel is visible — same reasoning StockForm's own
 // multi-card layout already uses, one Card per concern.
-type SettingsSection = "general" | "tax" | "address" | "bank" | "model" | "invoice";
+type SettingsSection =
+  | "profile"
+  | "address"
+  | "tax"
+  | "bank"
+  | "model"
+  | "operations"
+  | "invoice";
 
+// Order follows a typical first-time setup flow: who you are, where you
+// are, your tax/legal identity, where money settles, what you transact
+// in, which optional features you use, then how invoices print/number.
 const SECTIONS: {
   id: SettingsSection;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
-  { id: "general", label: "General", icon: Building2 },
-  { id: "tax", label: "Tax & Compliance", icon: Receipt },
+  { id: "profile", label: "Business Profile", icon: Building2 },
   { id: "address", label: "Address", icon: MapPinned },
+  { id: "tax", label: "Tax & Compliance", icon: Receipt },
   { id: "bank", label: "Bank Details", icon: Landmark },
   { id: "model", label: "Business Model", icon: Wallet },
+  { id: "operations", label: "Operations & Features", icon: SlidersHorizontal },
   { id: "invoice", label: "Invoice Preferences", icon: ScrollText },
 ];
 
@@ -76,7 +88,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
   );
   const toast = useToast();
 
-  const [activeSection, setActiveSection] = useState<SettingsSection>("general");
+  const [activeSection, setActiveSection] = useState<SettingsSection>("profile");
 
   const [gstScheme, setGstScheme] = useState<GstScheme>(settings.gstScheme);
 
@@ -110,6 +122,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
   const [vendorsModuleEnabled, setVendorsModuleEnabled] = useState(settings.vendorsModuleEnabled)
   const [ewayBillEnabled, setEwayBillEnabled] = useState(settings.ewayBillEnabled)
   const [eInvoiceEnabled, setEInvoiceEnabled] = useState(settings.eInvoiceEnabled)
+  const [showDueDate, setShowDueDate] = useState(settings.showDueDate)
   const [printLayout, setPrintLayout] = useState<PrintLayout>(settings.printLayout)
   const [invoiceTemplate, setInvoiceTemplate] = useState<InvoiceTemplate>(settings.invoiceTemplate)
   const stateNameMap = useMemo(
@@ -199,7 +212,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
         })}
       </div>
 
-      <div className={activeSection === "general" ? "space-y-6" : "hidden"}>
+      <div className={activeSection === "profile" ? "space-y-6" : "hidden"}>
       <Card>
         <CardHeader>
           <CardTitle>Branding</CardTitle>
@@ -278,85 +291,6 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               Where backups are sent before any bulk delete. Deleting all
               Estimates is blocked until this is set, and again if the backup email
               fails to send.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Operations</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-3">
-              <Switch
-                id="sendToArtisanEnabled"
-                checked={sendToArtisanEnabled}
-                onCheckedChange={setSendToArtisanEnabled}
-              />
-              <input type="hidden" name="sendToArtisanEnabled" value={sendToArtisanEnabled ? "on" : ""} />
-              <Label htmlFor="sendToArtisanEnabled">Enable Send to Artisan</Label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Whether staff can send a Draft Order's items out to an artisan
-              for work. Turning this off hides the Send to Artisan button on
-              Draft Orders — your artisan list, past jobs, ledger, and
-              reports stay exactly as they are either way.
-            </p>
-          </div>
-
-          <div className="space-y-1.5 pt-4">
-            <div className="flex items-center gap-3">
-              <Switch
-                id="vendorsModuleEnabled"
-                checked={vendorsModuleEnabled}
-                onCheckedChange={setVendorsModuleEnabled}
-              />
-              <input type="hidden" name="vendorsModuleEnabled" value={vendorsModuleEnabled ? "on" : ""} />
-              <Label htmlFor="vendorsModuleEnabled">Show Vendors module</Label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Whether the Vendors module shows up at all. Turning this off
-              hides "Vendors" from the sidebar and blocks its list/create/
-              archived/export pages — a vendor already linked to a Purchase
-              or a Customer, and Purchases' own vendor picker, keep working
-              either way.
-            </p>
-          </div>
-
-          <div className="space-y-1.5 pt-4">
-            <div className="flex items-center gap-3">
-              <Switch
-                id="ewayBillEnabled"
-                checked={ewayBillEnabled}
-                onCheckedChange={setEwayBillEnabled}
-              />
-              <input type="hidden" name="ewayBillEnabled" value={ewayBillEnabled ? "on" : ""} />
-              <Label htmlFor="ewayBillEnabled">Enable E-way Bill</Label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Whether an invoice's E-way Bill fields, button, and print
-              section show up at all. Independent of E-Invoice below — a
-              store can need either, both, or neither. Existing E-way Bill
-              data on past invoices is kept either way, just hidden while
-              this is off.
-            </p>
-          </div>
-
-          <div className="space-y-1.5 pt-4">
-            <div className="flex items-center gap-3">
-              <Switch
-                id="eInvoiceEnabled"
-                checked={eInvoiceEnabled}
-                onCheckedChange={setEInvoiceEnabled}
-              />
-              <input type="hidden" name="eInvoiceEnabled" value={eInvoiceEnabled ? "on" : ""} />
-              <Label htmlFor="eInvoiceEnabled">Enable E-Invoice</Label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Same as Enable E-way Bill above, for the E-Invoice (IRN)
-              fields, button, and print section instead.
             </p>
           </div>
         </CardContent>
@@ -492,44 +426,6 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               or Other purities. BIS hallmarking fees change periodically by
               official notification — confirm this matches what your hallmarking
               centre currently charges before relying on it.
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-3">
-              <Switch
-                id="returnWindowEnabled"
-                checked={returnWindowEnabled}
-                onCheckedChange={setReturnWindowEnabled}
-              />
-              <input type="hidden" name="returnWindowEnabled" value={returnWindowEnabled ? "on" : ""} />
-              <Label htmlFor="returnWindowEnabled">Enable Return Window</Label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Whether parties can return sold items at all. Turning this off
-              hides Return Window/Return Items everywhere in the app without
-              losing the day count below — turn it back on later and the same
-              number of days applies again.
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="returnWindowDays">Return Window (days)</Label>
-            <Input
-              id="returnWindowDays"
-              name="returnWindowDays"
-              type="number"
-              step="1"
-              min="0"
-              placeholder="e.g. 7, 15, or 30"
-              defaultValue={settings.returnWindowDays}
-              disabled={!returnWindowEnabled}
-            />
-            <p className="text-xs text-muted-foreground">
-              How many days after an invoice's date a sold item may still be
-              returned via a Credit Note. Counted from the Invoice Date shown
-              on each invoice — an invoice past this window shows as return-
-              ineligible and can no longer have items returned against it.
             </p>
           </div>
         </CardContent>
@@ -718,6 +614,149 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               {state.errors.businessUnits[0]}
             </p>
           ) : null}
+        </CardContent>
+      </Card>
+      </div>
+
+      <div className={activeSection === "operations" ? "space-y-6" : "hidden"}>
+      <Card>
+        <CardHeader>
+          <CardTitle>Feature Toggles</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="sendToArtisanEnabled"
+                checked={sendToArtisanEnabled}
+                onCheckedChange={setSendToArtisanEnabled}
+              />
+              <input type="hidden" name="sendToArtisanEnabled" value={sendToArtisanEnabled ? "on" : ""} />
+              <Label htmlFor="sendToArtisanEnabled">Enable Send to Artisan</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Whether staff can send a Draft Order's items out to an artisan
+              for work. Turning this off hides the Send to Artisan button on
+              Draft Orders — your artisan list, past jobs, ledger, and
+              reports stay exactly as they are either way.
+            </p>
+          </div>
+
+          <div className="space-y-1.5 pt-4">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="vendorsModuleEnabled"
+                checked={vendorsModuleEnabled}
+                onCheckedChange={setVendorsModuleEnabled}
+              />
+              <input type="hidden" name="vendorsModuleEnabled" value={vendorsModuleEnabled ? "on" : ""} />
+              <Label htmlFor="vendorsModuleEnabled">Show Vendors module</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Whether the Vendors module shows up at all. Turning this off
+              hides "Vendors" from the sidebar and blocks its list/create/
+              archived/export pages — a vendor already linked to a Purchase
+              or a Customer, and Purchases' own vendor picker, keep working
+              either way.
+            </p>
+          </div>
+
+          <div className="space-y-1.5 pt-4">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="ewayBillEnabled"
+                checked={ewayBillEnabled}
+                onCheckedChange={setEwayBillEnabled}
+              />
+              <input type="hidden" name="ewayBillEnabled" value={ewayBillEnabled ? "on" : ""} />
+              <Label htmlFor="ewayBillEnabled">Enable E-way Bill</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Whether an invoice's E-way Bill fields, button, and print
+              section show up at all. Independent of E-Invoice below — a
+              store can need either, both, or neither. Existing E-way Bill
+              data on past invoices is kept either way, just hidden while
+              this is off.
+            </p>
+          </div>
+
+          <div className="space-y-1.5 pt-4">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="eInvoiceEnabled"
+                checked={eInvoiceEnabled}
+                onCheckedChange={setEInvoiceEnabled}
+              />
+              <input type="hidden" name="eInvoiceEnabled" value={eInvoiceEnabled ? "on" : ""} />
+              <Label htmlFor="eInvoiceEnabled">Enable E-Invoice</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Same as Enable E-way Bill above, for the E-Invoice (IRN)
+              fields, button, and print section instead.
+            </p>
+          </div>
+
+          <div className="space-y-1.5 pt-4">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="showDueDate"
+                checked={showDueDate}
+                onCheckedChange={setShowDueDate}
+              />
+              <input type="hidden" name="showDueDate" value={showDueDate ? "on" : ""} />
+              <Label htmlFor="showDueDate">Show Due Date</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Whether an invoice's Due Date field, detail-page row, print line, and
+              Calendar reminders show up at all. Off hides it everywhere — it never
+              clears or changes any due date already saved, just its display.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Return Policy</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="returnWindowEnabled"
+                checked={returnWindowEnabled}
+                onCheckedChange={setReturnWindowEnabled}
+              />
+              <input type="hidden" name="returnWindowEnabled" value={returnWindowEnabled ? "on" : ""} />
+              <Label htmlFor="returnWindowEnabled">Enable Return Window</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Whether parties can return sold items at all. Turning this off
+              hides Return Window/Return Items everywhere in the app without
+              losing the day count below — turn it back on later and the same
+              number of days applies again.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="returnWindowDays">Return Window (days)</Label>
+            <Input
+              id="returnWindowDays"
+              name="returnWindowDays"
+              type="number"
+              step="1"
+              min="0"
+              placeholder="e.g. 7, 15, or 30"
+              defaultValue={settings.returnWindowDays}
+              disabled={!returnWindowEnabled}
+            />
+            <p className="text-xs text-muted-foreground">
+              How many days after an invoice's date a sold item may still be
+              returned via a Credit Note. Counted from the Invoice Date shown
+              on each invoice — an invoice past this window shows as return-
+              ineligible and can no longer have items returned against it.
+            </p>
+          </div>
         </CardContent>
       </Card>
       </div>

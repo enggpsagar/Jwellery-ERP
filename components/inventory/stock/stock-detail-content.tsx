@@ -3,7 +3,6 @@ import { Boxes, IndianRupee, Scale, Truck } from "lucide-react"
 import type { getInventoryStockById } from "@/lib/actions/inventory/stock-actions"
 import { StockStatusBadge } from "@/components/inventory/shared/stock-status-badge"
 import { FinishBadge } from "@/components/inventory/shared/finish-badge"
-import { StockStatusToggle } from "@/components/inventory/stock/stock-status-toggle"
 import { DetailField, DetailGrid, DetailSection } from "@/components/shared/detail-section"
 import { formatShortDate } from "@/lib/utils"
 
@@ -28,10 +27,10 @@ function formatNumber(value: unknown) {
  * Built on the shared DetailSection/DetailGrid/DetailField (same as
  * Customer/Vendor/User) rather than hand-rolled label/value divs — that
  * gets every blank field (Tag Number, an unset Metal Type, ...) hidden
- * entirely for free instead of showing a bare "-", and Active reads as the
- * same badge used everywhere else in the app instead of raw "Yes"/"No"
- * text. Stock Code itself isn't repeated here — it's already the QR card's
- * own identifier alongside it.
+ * entirely for free instead of showing a bare "-". Stock Code itself isn't
+ * repeated here — it's already the QR card's own identifier alongside it.
+ * No Active/Inactive field — that status belongs to the Product, not this
+ * Stock row; availability here is read entirely off Quantity.
  *
  * The QR card is a caller-supplied slot rather than rendered inline: the
  * standalone page's QR data URL is generated server-side (via the `qrcode`
@@ -67,7 +66,6 @@ export function StockDetailContent({
           <DetailField label="Metal Type" value={stock.metalType?.name} />
           <DetailField label="Purity" value={stock.purity} />
           <DetailField label="Quantity" value={stock.quantity} />
-          <DetailField label="Active" value={<StockStatusToggle stockId={stock.id} isActive={stock.isActive} />} />
         </DetailGrid>
       </DetailSection>
 

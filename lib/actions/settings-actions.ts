@@ -74,6 +74,10 @@ export type BusinessSettings = {
   ewayBillEnabled: boolean;
   // Same convention as ewayBillEnabled, for the E-Invoice (IRN) fields.
   eInvoiceEnabled: boolean;
+  // Whether Invoice.dueDate is shown/settable anywhere — see
+  // prisma/schema.prisma's BusinessSettings.showDueDate doc comment. Off
+  // never clears/touches the underlying data, only its display.
+  showDueDate: boolean;
   // Which SKU layout preset createProduct's generator arranges Metal/
   // Purity/Style/Category into — see prisma/schema.prisma's SkuFormat and
   // lib/inventory/product-sku.ts's composeSkuPrefix(). Edited via its own
@@ -151,6 +155,7 @@ function mapSettings(settings: any): BusinessSettings {
     vendorsModuleEnabled: settings.vendorsModuleEnabled ?? true,
     ewayBillEnabled: settings.ewayBillEnabled ?? true,
     eInvoiceEnabled: settings.eInvoiceEnabled ?? true,
+    showDueDate: settings.showDueDate ?? true,
     skuFormat: settings.skuFormat ?? SkuFormat.METAL_PURITY_STYLE_CATEGORY,
     styleFieldEnabled: settings.styleFieldEnabled ?? true,
     returnWindowDays: settings.returnWindowDays ?? 30,
@@ -336,6 +341,7 @@ export async function updateBusinessSettings(
         vendorsModuleEnabled: formData.get("vendorsModuleEnabled") === "on",
         ewayBillEnabled: formData.get("ewayBillEnabled") === "on",
         eInvoiceEnabled: formData.get("eInvoiceEnabled") === "on",
+        showDueDate: formData.get("showDueDate") === "on",
         returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),
@@ -380,6 +386,7 @@ export async function updateBusinessSettings(
         vendorsModuleEnabled: formData.get("vendorsModuleEnabled") === "on",
         ewayBillEnabled: formData.get("ewayBillEnabled") === "on",
         eInvoiceEnabled: formData.get("eInvoiceEnabled") === "on",
+        showDueDate: formData.get("showDueDate") === "on",
         returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),

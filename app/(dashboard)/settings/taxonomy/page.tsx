@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import { UserRole } from "@prisma/client";
 import { redirect } from "next/navigation";
 
-import { getStoreMetals, getStoreCategories } from "@/lib/actions/taxonomy-actions";
+import { getStoreMetals, getStoreCategories, getStoreStyles } from "@/lib/actions/taxonomy-actions";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { getCurrentUser } from "@/lib/auth/auth";
 
 import { TaxonomySettingsForm } from "@/components/settings/taxonomy-settings-form";
+import { StyleSettingsForm } from "@/components/settings/style-settings-form";
 import { SkuFormatForm } from "@/components/settings/sku-format-form";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { PageBackHeader } from "@/components/shared/page-back-header";
@@ -24,9 +25,10 @@ export default async function TaxonomySettingsPage() {
     currentUser?.role === UserRole.SUPER_ADMIN;
   if (!canEdit) redirect("/dashboard");
 
-  const [metals, categories, businessSettings] = await Promise.all([
+  const [metals, categories, styles, businessSettings] = await Promise.all([
     getStoreMetals(),
     getStoreCategories(),
+    getStoreStyles(),
     getBusinessSettings(),
   ]);
 
@@ -49,6 +51,8 @@ export default async function TaxonomySettingsPage() {
         categories={categories}
         canEdit={canEdit}
       />
+
+      <StyleSettingsForm styles={styles} canEdit={canEdit} />
 
       <SkuFormatForm
         skuFormat={businessSettings.skuFormat}

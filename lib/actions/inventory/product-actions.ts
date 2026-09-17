@@ -10,7 +10,8 @@ import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scop
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import type { ProductFormState } from "@/lib/inventory/product-types";
 import { buildSkuPrefix } from "@/lib/inventory/product-sku";
-import { PURITY_LABELS } from "@/lib/purity";
+import { PURITY_LABELS, matchLegacyPurityType } from "@/lib/purity";
+import { classifyPurityFamily } from "@/lib/business-units";
 import {
   buildExcelExport,
   buildCsvExportBase64,
@@ -76,6 +77,7 @@ function serializeProduct(product: {
   stoneOriginOption: { id: string; name: string } | null;
   targetStyle: { id: string; name: string } | null;
   defaultPurity: PurityType | null;
+  storeMetalPurityId: string | null;
   defaultMakingCharge: { toString(): string } | null;
   defaultMakingChargeType: ChargeType;
   defaultStoneCharge: { toString(): string } | null;
@@ -111,6 +113,7 @@ function serializeProduct(product: {
     targetStyle: product.targetStyle,
     stoneOriginOption: product.stoneOriginOption,
     defaultPurity: product.defaultPurity,
+    storeMetalPurityId: product.storeMetalPurityId,
     defaultMakingCharge: product.defaultMakingCharge?.toString() ?? null,
     defaultMakingChargeType: product.defaultMakingChargeType,
     defaultStoneCharge: product.defaultStoneCharge?.toString() ?? null,
@@ -589,6 +592,8 @@ export async function createProduct(
       Object.values(PurityType),
     ) as PurityType | null;
 
+    const storeMetalPurityId = parseNullableString(formData.get("storeMetalPurityId"));
+
     const defaultMakingCharge = parseNullableDecimal(
       formData.get("defaultMakingCharge"),
     );
@@ -685,8 +690,8 @@ export async function createProduct(
     // lookup rather than re-plumbing names through from the client, which
     // can't be trusted anyway (a stale/tampered label would silently mint
     // a wrong-looking SKU).
-    const [metalRow, categoryTypeRow, categoryRow, styleRow] = await Promise.all([
-      prisma.storeMetal.findFirst({ where: { id: metalTypeId, storeId }, select: { name: true } }),
+    const [metalRow, categoryTypeRow, categoryRow, styleRow, storeMetalPurityRow] = await Promise.all([
+      prisma.storeMetal.findFirst({ where: { id: metalTypeId, storeId }, select: { name: true, isGemstone: true } }),
       categoryTypeId
         ? prisma.storeCategoryType.findFirst({ where: { id: categoryTypeId, storeId }, select: { name: true } })
         : Promise.resolve(null),
@@ -694,11 +699,29 @@ export async function createProduct(
       targetStyleId
         ? prisma.storeStyle.findFirst({ where: { id: targetStyleId, storeId }, select: { name: true } })
         : Promise.resolve(null),
+      storeMetalPurityId
+        ? prisma.storeMetalPurity.findFirst({
+            where: { id: storeMetalPurityId, storeId, storeMetalId: metalTypeId },
+            select: { label: true, skuCode: true },
+          })
+        : Promise.resolve(null),
     ]);
+
+    // The new per-Metal Purity's own skuCode/label takes over from here —
+    // defaultPurity (the legacy enum) is still populated below on a
+    // best-effort basis purely so anything not yet reading the new columns
+    // still shows something.
+    const resolvedDefaultPurity = storeMetalPurityRow
+      ? (matchLegacyPurityType(
+          metalRow ? classifyPurityFamily(metalRow) : null,
+          storeMetalPurityRow.label,
+        ) ?? defaultPurity)
+      : defaultPurity;
 
     const skuPrefix = buildSkuPrefix({
       metalName: metalRow?.name ?? "X",
-      purity: defaultPurity,
+      purity: resolvedDefaultPurity,
+      purityCode: storeMetalPurityRow?.skuCode,
       targetStyleName: styleRow?.name ?? null,
       categoryTypeName: categoryTypeRow?.name ?? null,
       categoryName: categoryRow?.name ?? null,
@@ -737,7 +760,8 @@ export async function createProduct(
             metalTypeId,
             targetStyleId,
             stoneOriginOptionId,
-            defaultPurity,
+            defaultPurity: resolvedDefaultPurity,
+            storeMetalPurityId,
             defaultMakingCharge,
             defaultMakingChargeType,
             defaultStoneCharge,
@@ -841,7 +865,8 @@ export async function createProduct(
               quantity: Math.trunc(quantity),
               locationId: resolvedLocationId,
               metalTypeId: metalTypeId || null,
-              purity: defaultPurity,
+              purity: resolvedDefaultPurity,
+              purityLabel: storeMetalPurityRow?.label ?? null,
               makingCharge: defaultMakingCharge,
               makingChargeType: defaultMakingChargeType,
               stoneCharge: defaultStoneCharge,
@@ -928,6 +953,7 @@ export async function updateProduct(
       formData.get("defaultPurity"),
       Object.values(PurityType),
     ) as PurityType | null;
+    const storeMetalPurityId = parseNullableString(formData.get("storeMetalPurityId"));
     const defaultMakingCharge = parseNullableDecimal(
       formData.get("defaultMakingCharge"),
     );
@@ -1017,6 +1043,22 @@ export async function updateProduct(
       };
     }
 
+    const [metalRow, storeMetalPurityRow] = await Promise.all([
+      metalTypeId
+        ? prisma.storeMetal.findFirst({ where: { id: metalTypeId, storeId }, select: { name: true, isGemstone: true } })
+        : Promise.resolve(null),
+      storeMetalPurityId
+        ? prisma.storeMetalPurity.findFirst({
+            where: { id: storeMetalPurityId, storeId, storeMetalId: metalTypeId },
+            select: { label: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    const resolvedDefaultPurity = storeMetalPurityRow
+      ? (matchLegacyPurityType(metalRow ? classifyPurityFamily(metalRow) : null, storeMetalPurityRow.label) ?? defaultPurity)
+      : defaultPurity;
+
    const { count } = await prisma.product.updateMany({
   where: { id, storeId },
   data: {
@@ -1026,7 +1068,8 @@ export async function updateProduct(
     metalTypeId,
     targetStyleId,
     stoneOriginOptionId,
-    defaultPurity,
+    defaultPurity: resolvedDefaultPurity,
+    storeMetalPurityId,
     defaultMakingCharge,
     defaultMakingChargeType,
     defaultStoneCharge,

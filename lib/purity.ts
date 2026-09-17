@@ -235,6 +235,51 @@ export function isCaratWeighedMetal(
   return lower.includes("diamond") || lower.includes("stone") || isGemstone === true;
 }
 
+/**
+ * Best-effort match of a real per-Metal Purity's own label (e.g. "22K",
+ * "925") back onto the legacy PurityType enum, for a metal of the given
+ * family — used only to keep the old `defaultPurity`/`purity` enum columns
+ * populated for anything not yet reading the new `storeMetalPurityId`/
+ * `purityLabel` fields (reports, badges, exports). Returns null for a
+ * genuinely custom label with no enum equivalent (e.g. "23.5K") — those
+ * columns are nullable everywhere precisely for this case.
+ */
+export function matchLegacyPurityType(
+  family: "GOLD" | "SILVER" | "PLATINUM" | "DIAMOND" | "STONE" | "OTHER" | null | undefined,
+  label: string | null | undefined,
+): PurityType | null {
+  if (!label) return null;
+  const digits = label.replace(/[^0-9]/g, "");
+  if (!digits) return null;
+
+  const candidates: PurityType[] =
+    family === "GOLD"
+      ? [PurityType.GOLD_24K, PurityType.GOLD_22K, PurityType.GOLD_20K, PurityType.GOLD_18K]
+      : family === "SILVER"
+        ? [PurityType.SILVER_999, PurityType.SILVER_925]
+        : family === "PLATINUM"
+          ? [PurityType.PLATINUM_950, PurityType.PLATINUM_900]
+          : [];
+
+  return candidates.find((purity) => purity.endsWith(`_${digits}${family === "GOLD" ? "K" : ""}`)) ?? null;
+}
+
+/**
+ * Grams-per-carat for a specific Stone Type (StoreMetalOrigin), replacing
+ * the old global-per-PurityType resolveGramsPerCarat for anywhere a real
+ * Stone Type has been selected. Falls back to the universal 0.2g/ct
+ * constant when no Stone Type is selected yet (nothing chosen, or the
+ * store hasn't set up Stone Types) rather than erroring — same "always a
+ * usable number" contract the old function had.
+ */
+export function resolveGramsPerCaratFromOrigin(
+  storeMetalOriginId: string | null | undefined,
+  origins: { id: string; gramsPerCarat: number }[],
+): number {
+  const origin = origins.find((item) => item.id === storeMetalOriginId);
+  return origin?.gramsPerCarat ?? GRAMS_PER_CARAT;
+}
+
 /** Purities BIS hallmarking charges actually apply to — Gold and Silver
  * only, never Platinum/Diamond/Other (per BIS's own hallmarking scope).
  * Drives the per-piece BIS hallmark charge auto-fill (Settings' own

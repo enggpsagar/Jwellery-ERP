@@ -247,23 +247,18 @@ export type PaymentVendorOption = {
   /** Sum of every unpaid/partial purchase's own balanceAmount — used only
    * to decide which purchases a specific payment applies against
    * (allocatePaymentOldestFirst), NOT for display — see currentBalance for
-   * that. Deliberately excludes openingBalance now that it's one shared
-   * field on the merged Party row (see Customer.isVendor's doc comment) —
-   * there's no way to attribute how much of it was ever specifically a
-   * supplier-side debt, so it's left out of this purchase-allocation sum
-   * rather than risk contaminating it with the wrong sign. */
+   * that. */
   pendingAmount: number
-  /** The real, ledger-derived outstanding shown to whoever is paying — same
-   * combined-balance formula as lib/core/customer.ts' mapCustomer, just
-   * negated (mapCustomer's combinedBalance is receivable-direction; this is
-   * payable-direction), so this picker can never disagree with the Parties
-   * list for the exact same party. */
+  /** This Party's own supplier-side ledger balance — tracked independently
+   * from its customer-side balance (Payment In's own picker), same
+   * separation as lib/core/customer.ts' mapCustomer/supplierBalance; the
+   * two are never netted against each other. */
   currentBalance: number
   balanceType: "Advance" | "Payable"
 }
 
 /** Party list for the Payment Out supplier picker, carrying each party's
- * outstanding balance alongside the usual name/phone. */
+ * outstanding supplier-side balance alongside the usual name/phone. */
 export async function getPaymentFormPartiesWithBalance(): Promise<PaymentVendorOption[]> {
   const storeId = await requireStoreScope()
 
@@ -275,9 +270,7 @@ export async function getPaymentFormPartiesWithBalance(): Promise<PaymentVendorO
       name: true,
       phone: true,
       vendorCode: true,
-      openingBalance: true,
       purchasesAsVendor: { select: { balanceAmount: true, status: true } },
-      ledgerEntries: { select: { amount: true, type: true } },
       ledgerEntriesAsVendor: { select: { amount: true, type: true } },
     },
   })
@@ -288,21 +281,13 @@ export async function getPaymentFormPartiesWithBalance(): Promise<PaymentVendorO
       0,
     )
 
-    // Same formula as mapCustomer's combinedBalance, negated (payable
-    // direction instead of receivable) — see that function's own comment.
-    // openingBalance is counted once, in receivable direction, so it
-    // subtracts here rather than adds.
-    const customerSideBalance =
-      Number(party.openingBalance ?? 0) +
-      party.ledgerEntries.reduce(
-        (sum, e) => sum + (e.type === "DEBIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
-        0,
-      )
-    const vendorSideBalance = party.ledgerEntriesAsVendor.reduce(
+    // Same formula as mapCustomer's supplierBalance — purely this Party's
+    // own vendorId-side ledger activity, no opening-balance term (that's
+    // spent on the customer-side figure instead) and no netting against it.
+    const currentBalance = party.ledgerEntriesAsVendor.reduce(
       (sum, e) => sum + (e.type === "CREDIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
       0,
     )
-    const currentBalance = vendorSideBalance - customerSideBalance
 
     return {
       id: party.id,
@@ -350,7 +335,6 @@ export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCusto
       invoices: { select: { balanceAmount: true, status: true } },
       kachaInvoices: { select: { balanceAmount: true, status: true } },
       ledgerEntries: { select: { amount: true, type: true } },
-      ledgerEntriesAsVendor: { select: { amount: true, type: true } },
     },
   })
 
@@ -369,20 +353,16 @@ export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCusto
       ) +
       Number(customer.openingBalance ?? 0)
 
-    // Identical formula to mapCustomer's combinedBalance — see that
-    // function's own comment for why this same Party's own supplier-side
-    // ledger activity (ledgerEntriesAsVendor) factors in here too.
-    const ownBalance =
+    // Identical formula to mapCustomer's currentBalance — purely this
+    // Party's own customer-side ledger activity, tracked independently
+    // from any supplier-side (ledgerEntriesAsVendor) balance it might also
+    // have — see mapCustomer's own comment on why the two aren't netted.
+    const currentBalance =
       Number(customer.openingBalance ?? 0) +
       customer.ledgerEntries.reduce(
         (sum, e) => sum + (e.type === "DEBIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
         0,
       )
-    const vendorSideBalance = customer.ledgerEntriesAsVendor.reduce(
-      (sum, e) => sum + (e.type === "CREDIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
-      0,
-    )
-    const currentBalance = ownBalance - vendorSideBalance
 
     return {
       id: customer.id,
@@ -559,14 +539,15 @@ export async function recordPaymentOut(
 
       const vendor = await prisma.customer.findFirst({
         where: { id: vendorId, storeId },
-        select: { id: true, name: true, isVendor: true },
+        select: { id: true, name: true, isSupplier: true },
       })
       if (!vendor) return { success: false, message: "Vendor not found" }
 
       // Same auto-flip as createPurchase — paying a party as a supplier is
-      // itself evidence of a supplier relationship, never a user choice.
-      if (!vendor.isVendor) {
-        await prisma.customer.update({ where: { id: vendorId }, data: { isVendor: true } })
+      // itself evidence of a supplier relationship, regardless of whether
+      // the Supplier module's own UI is currently on or off.
+      if (!vendor.isSupplier) {
+        await prisma.customer.update({ where: { id: vendorId }, data: { isSupplier: true } })
       }
 
       const totalAmount = payments.reduce((sum, payment) => sum + Number(payment.amount), 0)

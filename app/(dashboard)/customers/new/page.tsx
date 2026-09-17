@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 }
 
 type NewCustomerPageProps = {
-  searchParams?: Promise<{ returnTo?: string }>
+  searchParams?: Promise<{ returnTo?: string; markAsSupplier?: string }>
 }
 
 export default async function NewCustomerPage({
@@ -20,6 +20,10 @@ export default async function NewCustomerPage({
 }: NewCustomerPageProps) {
   const params = (await searchParams) ?? {}
   const returnTo = safeReturnTo(params.returnTo)
+  // Set only by the Suppliers page's own "Add Supplier" link — see
+  // CustomerCreateForm's own doc comment on why this is a follow-up call
+  // rather than a field on this form.
+  const markAsSupplier = params.markAsSupplier === "1"
 
   const [states, settings] = await Promise.all([getStates(), getBusinessSettings()])
 
@@ -27,8 +31,10 @@ export default async function NewCustomerPage({
     <main className="mx-auto max-w-4xl space-y-6 p-6">
       <ResetFormWrapper
         header={{
-          title: "Add Party",
-          description: "Create a new party you sell to.",
+          title: markAsSupplier ? "Add Supplier" : "Add Party",
+          description: markAsSupplier
+            ? "Create a new party you buy from."
+            : "Create a new party you sell to.",
           backHref: returnTo ?? "/customers",
           backLabel: returnTo ? "Back without saving" : "Back to Parties",
         }}
@@ -36,6 +42,7 @@ export default async function NewCustomerPage({
         <CustomerCreateForm
           states={states}
           returnTo={returnTo}
+          markAsSupplier={markAsSupplier}
           gstScheme={settings.gstScheme}
           defaultState={settings.state}
           defaultCity={settings.city}

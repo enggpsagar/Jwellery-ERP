@@ -600,7 +600,7 @@ export async function getPurchaseById(id: string) {
 /** Lightweight party list for the purchase form's supplier picker — every
  * Party (not just ones already used as a supplier) is offered, since
  * picking one and saving the purchase is what marks it as a supplier (see
- * createPurchase's isVendor auto-flip). */
+ * createPurchase's isSupplier auto-flip). */
 export async function getPurchaseFormParties() {
   const storeId = await requireStoreScope();
 
@@ -781,7 +781,7 @@ export async function createPurchase(
 
     const vendor = await prisma.customer.findFirst({
       where: { id: vendorId, storeId },
-      select: { id: true, name: true, gstType: true, isVendor: true },
+      select: { id: true, name: true, gstType: true, isSupplier: true },
     });
     if (!vendor) {
       return { success: false, message: "Please select a vendor" };
@@ -1049,11 +1049,12 @@ export async function createPurchase(
         });
       }
 
-      // A Party becomes a "supplier" (Customer.isVendor) the moment it's
-      // actually used as one — never a user-facing choice, see
-      // Customer.isVendor's doc comment in schema.prisma.
-      if (!vendor.isVendor) {
-        await tx.customer.update({ where: { id: vendorId }, data: { isVendor: true } });
+      // A Party becomes a "supplier" (Customer.isSupplier) the moment it's
+      // actually used as one — same auto-flip regardless of whether the
+      // Supplier module's own UI is currently on or off, see
+      // Customer.isSupplier's doc comment in schema.prisma.
+      if (!vendor.isSupplier) {
+        await tx.customer.update({ where: { id: vendorId }, data: { isSupplier: true } });
       }
 
       return created;

@@ -4,12 +4,14 @@ import { cache } from "react"
 import { notFound } from "next/navigation"
 
 import { getCustomerById } from "@/lib/actions/customer-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { getStates } from "@/lib/actions/location-actions"
 import { CustomerRowActions } from "@/components/customers/customer-row-actions"
 import { CustomerDetailContent } from "@/components/customers/customer-detail-content"
 import { CustomerLedgerCard } from "@/components/customers/ledger/customer-ledger-card"
+import { SupplierLedgerCard } from "@/components/customers/ledger/supplier-ledger-card"
 import { toTitleCase } from "@/lib/utils"
 
 type CustomerDetailsPageProps = {
@@ -43,9 +45,10 @@ export default async function CustomerDetailsPage({
     label: "Back to Parties",
   })
 
-  const [customer, states] = await Promise.all([
+  const [customer, states, businessSettings] = await Promise.all([
     getCustomer(id),
     getStates(),
+    getBusinessSettings(),
   ])
 
   if (!customer) {
@@ -65,12 +68,14 @@ export default async function CustomerDetailsPage({
       <CustomerDetailContent
         customer={customer}
         states={states}
+        supplierModuleEnabled={businessSettings.supplierModuleEnabled}
         ledger={
           <CustomerLedgerCard
             customerId={customer.id}
             hasEmail={Boolean(customer.email)}
           />
         }
+        supplierLedger={<SupplierLedgerCard customerId={customer.id} />}
       />
     </main>
   )

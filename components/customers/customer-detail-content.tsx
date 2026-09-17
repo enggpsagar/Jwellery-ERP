@@ -1,8 +1,8 @@
-import { IndianRupee, MapPin, User } from "lucide-react"
+import { IndianRupee, MapPin, User, Truck } from "lucide-react"
 
 import type { Customer } from "@/lib/actions/customer-actions"
 import { toTitleCase } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
+import { SupplierStatusToggle } from "@/components/customers/supplier-status-toggle"
 import {
   DetailField,
   DetailGrid,
@@ -29,10 +29,24 @@ type StateItem = {
 export function CustomerDetailContent({
   customer,
   ledger,
+  supplierModuleEnabled = false,
+  supplierLedger,
 }: {
   customer: Customer
   states: StateItem[]
   ledger: React.ReactNode
+  /** BusinessSettings.supplierModuleEnabled — hides the "Also Supplier"
+   * action and the Supplier Ledger section entirely when off, same
+   * "module UI off, underlying data untouched" convention as every other
+   * feature toggle in this app. Defaults false so an existing caller not
+   * yet passing this keeps hiding both, matching this module being new
+   * and opt-in. */
+  supplierModuleEnabled?: boolean
+  /** This Party's own supplier-side ledger, a separate slot from `ledger`
+   * above (same reasoning as that prop's own doc comment — server-fetched
+   * on the standalone page, client-fetched on the inline panel). Only
+   * rendered when supplierModuleEnabled && customer.isSupplier. */
+  supplierLedger?: React.ReactNode
 }) {
   const money = (value: unknown) => `₹ ${Number(value || 0).toLocaleString("en-IN")}`
 
@@ -77,10 +91,17 @@ export function CustomerDetailContent({
             <DetailField label="Email" value={customer.email} />
             <DetailField label="GST Number" value={customer.gstNumber} />
             <DetailField label="Party Type" value={customer.customerType} />
-            <DetailField
-              label="Also a Supplier"
-              value={customer.isVendor ? <Badge variant="outline">Supplier</Badge> : undefined}
-            />
+            {supplierModuleEnabled ? (
+              <DetailField
+                label="Also a Supplier"
+                value={
+                  <SupplierStatusToggle
+                    customerId={customer.id}
+                    isSupplier={customer.isSupplier ?? false}
+                  />
+                }
+              />
+            ) : null}
           </DetailGrid>
         </DetailSection>
 
@@ -162,6 +183,38 @@ export function CustomerDetailContent({
         </DetailSection>
         ) : null}
       </div>
+
+      {/* Tracked independently from the Customer ledger/balance above, not
+          netted into it — see lib/core/customer.ts' mapCustomer doc
+          comment on why. Only shown once this Party has actually been
+          used as one (isSupplier) and the module itself is on. */}
+      {supplierModuleEnabled && customer.isSupplier ? (
+        <DetailSection
+          title="Supplier Ledger"
+          description="This party's own activity as a supplier — tracked separately from its Customer balance above."
+          icon={Truck}
+          tint="var(--chart-4)"
+        >
+          <DetailGrid>
+            <DetailField
+              label="Supplier Balance"
+              value={
+                customer.supplierBalanceType === "Advance" ? (
+                  <span className="text-blue-600">
+                    {money(Math.abs(customer.supplierBalance ?? 0))} Advance
+                  </span>
+                ) : customer.supplierBalance ? (
+                  <span className="text-red-600">{money(customer.supplierBalance)}</span>
+                ) : (
+                  money(0)
+                )
+              }
+            />
+            <DetailField label="Balance Type" value={customer.supplierBalanceType} />
+          </DetailGrid>
+          {supplierLedger}
+        </DetailSection>
+      ) : null}
     </div>
   )
 }

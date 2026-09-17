@@ -119,6 +119,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
   const [loadingCities, setLoadingCities] = useState(false)
   const [returnWindowEnabled, setReturnWindowEnabled] = useState(settings.returnWindowEnabled)
   const [sendToArtisanEnabled, setSendToArtisanEnabled] = useState(settings.sendToArtisanEnabled)
+  const [supplierModuleEnabled, setSupplierModuleEnabled] = useState(settings.supplierModuleEnabled)
   const [ewayBillEnabled, setEwayBillEnabled] = useState(settings.ewayBillEnabled)
   const [eInvoiceEnabled, setEInvoiceEnabled] = useState(settings.eInvoiceEnabled)
   const [showDueDate, setShowDueDate] = useState(settings.showDueDate)
@@ -681,6 +682,26 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               for work. Turning this off hides the Send to Artisan button on
               Draft Orders — your artisan list, past jobs, ledger, and
               reports stay exactly as they are either way.
+            </p>
+          </div>
+
+          <div className="space-y-1.5 pt-4">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="supplierModuleEnabled"
+                checked={supplierModuleEnabled}
+                onCheckedChange={setSupplierModuleEnabled}
+              />
+              <input type="hidden" name="supplierModuleEnabled" value={supplierModuleEnabled ? "on" : ""} />
+              <Label htmlFor="supplierModuleEnabled">Enable Supplier Module</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Whether the Suppliers section shows up at all — its own
+              sidebar item, list page, the "Also Supplier" action on a
+              party's detail page, and its separate supplier ledger/balance.
+              Purchases keeps working exactly the same either way; this only
+              hides the standalone supplier-tracking UI, never any
+              underlying data.
             </p>
           </div>
 

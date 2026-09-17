@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
@@ -28,9 +28,15 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
-import { PURITY_SELECT_OPTIONS, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
+import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit, matchLegacyPurityType } from "@/lib/purity"
+import { classifyPurityFamily } from "@/lib/business-units"
 import { RequiredMark } from "@/components/shared/required-mark"
-import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
+import {
+  getStoreMetalPurities,
+  type StoreMetalRow,
+  type StoreMetalOriginRow,
+  type StoreMetalPurityRow,
+} from "@/lib/actions/taxonomy-actions"
 import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
 import { StockItemSelect } from "@/components/inventory/shared/stock-item-select"
@@ -51,6 +57,7 @@ type StockOption = {
   productCode: string | null
   metalType: { id: string; name: string } | null
   purity: string | null
+  purityLabel: string | null
   grossWeight: number | null
   netWeight: number | null
   caratWeight: number | null
@@ -65,6 +72,7 @@ type LineItem = {
   itemName: string
   metalTypeId: string
   purity: string
+  purityLabel: string
   quantity: number
   grossWeight: number
   /** Always in grams internally, regardless of netWeightUnit — that unit
@@ -112,6 +120,7 @@ function emptyLineItem(key: string = crypto.randomUUID()): LineItem {
     itemName: "",
     metalTypeId: "",
     purity: "",
+    purityLabel: "",
     quantity: 1,
     grossWeight: 0,
     netWeight: 0,
@@ -201,6 +210,43 @@ export function QuotationForm({
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
   const metalById = useMemo(() => new Map(metals.map((m) => [m.id, m])), [metals])
+
+  // Real per-Metal Purity options (Settings > Taxonomy > Purities),
+  // replacing the old global PURITY_SELECT_OPTIONS enum list — cached per
+  // metalTypeId since several lines can each have their own metal.
+  const [metalPuritiesCache, setMetalPuritiesCache] = useState<Record<string, StoreMetalPurityRow[]>>({})
+
+  const ensureMetalPurities = useCallback((metalTypeId: string) => {
+    if (!metalTypeId || metalPuritiesCache[metalTypeId]) return
+    getStoreMetalPurities(metalTypeId)
+      .then((data) => setMetalPuritiesCache((prev) => ({ ...prev, [metalTypeId]: data })))
+      .catch((err) => console.error("Failed to load purities:", err))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metalPuritiesCache])
+
+  useEffect(() => {
+    const uniqueMetalTypeIds = Array.from(new Set(items.map((item) => item.metalTypeId).filter(Boolean)))
+    for (const id of uniqueMetalTypeIds) ensureMetalPurities(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Selecting a real Purity updates purityLabel (the true value), keeps the
+  // legacy `purity` enum in sync (matchLegacyPurityType) purely so anything
+  // not yet reading purityLabel still shows something, and auto-fills HM
+  // Charge from the chosen purity's own isHallmarkable flag (falls back to
+  // the legacy isHallmarkablePurity check for a linked-stock line).
+  const selectPurity = (item: LineItem, storeMetalPurityId: string) => {
+    const options = metalPuritiesCache[item.metalTypeId] ?? []
+    const selected = options.find((option) => option.id === storeMetalPurityId)
+    const metal = metalById.get(item.metalTypeId)
+    const family = metal ? classifyPurityFamily(metal) : null
+    const legacyPurity = matchLegacyPurityType(family, selected?.label) ?? ""
+    const patch: Partial<LineItem> = { purityLabel: selected?.label ?? "", purity: legacyPurity }
+    if (!item.hmChargeTouched && (selected?.isHallmarkable || isHallmarkablePurity(legacyPurity))) {
+      patch.hmCharge = hallmarkChargePerPiece
+    }
+    updateItem(item.key, patch)
+  }
   // Stone components are tracked by name (stoneMetalTypeName), not id — no
   // stoneMetalTypeId field exists — so the stone-rate fallback needs its
   // own name-keyed lookup instead of reusing metalById.
@@ -266,19 +312,6 @@ export function QuotationForm({
 
   // Auto-fills HM Charge to the store's configured per-piece BIS hallmark
   // rate the moment a line's Purity becomes a Gold/Silver value — never for
-  // Platinum/Diamond/Other, and never once the user has typed into HM
-  // Charge directly (hmChargeTouched). Plain inline logic in the
-  // purity-change handler, not a separate useEffect/local component state —
-  // see making-charge-input.tsx's own doc comment for the class of bug that
-  // pattern avoids.
-  const handlePurityChange = (item: LineItem, purity: string) => {
-    const patch: Partial<LineItem> = { purity }
-    if (!item.hmChargeTouched && isHallmarkablePurity(purity)) {
-      patch.hmCharge = hallmarkChargePerPiece
-    }
-    updateItem(item.key, patch)
-  }
-
   const handleHmChargeChange = (item: LineItem, value: string) => {
     updateItem(item.key, { hmCharge: Number(value) || 0, hmChargeTouched: true })
   }
@@ -290,6 +323,7 @@ export function QuotationForm({
       return
     }
 
+    if (stock.metalType?.id) ensureMetalPurities(stock.metalType.id)
     // Already stored in the metal's own configured primary unit — this just
     // picks which unit the toggle starts on, not a value conversion.
     const linkedUnit = metalById.get(stock.metalType?.id ?? "")?.primaryUnit ?? "GRAM"
@@ -299,6 +333,7 @@ export function QuotationForm({
       itemName: stock.productName,
       metalTypeId: stock.metalType?.id ?? "",
       purity: stock.purity ?? "",
+      purityLabel: stock.purityLabel ?? "",
       grossWeight: stock.grossWeight ?? 0,
       netWeight: stock.netWeight ?? 0,
       netWeightUnit: linkedUnit,
@@ -490,6 +525,7 @@ export function QuotationForm({
         itemName: item.itemName || "Item",
         metalTypeId: item.metalTypeId || null,
         purity: item.purity || null,
+        purityLabel: item.purityLabel || null,
         quantity: item.quantity || 1,
         grossWeight: item.grossWeight || null,
         netWeight: toUnit(item.netWeight) || null,
@@ -633,17 +669,43 @@ export function QuotationForm({
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                  <Label className="text-xs">Purity</Label>
+                  <Label className="text-xs">Metal Type</Label>
                   <Select
-                    value={item.purity}
-                    onValueChange={(value) => handlePurityChange(item, value)}
+                    value={item.metalTypeId}
+                    onValueChange={(value) => {
+                      ensureMetalPurities(value)
+                      updateItem(item.key, { metalTypeId: value, purity: "", purityLabel: "" })
+                    }}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select purity" />
+                      <SelectValue placeholder="Select metal" />
                     </SelectTrigger>
                     <SelectContent>
-                      {PURITY_SELECT_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
+                      {metals
+                        .filter((metal) => !metal.isGemstone && (metal.isActive || metal.id === item.metalTypeId))
+                        .map((metal) => (
+                          <SelectItem key={metal.id} value={metal.id}>
+                            {metal.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                  <Label className="text-xs">Purity</Label>
+                  <Select
+                    value={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
+                    onValueChange={(value) => selectPurity(item, value === "__none__" ? "" : value)}
+                    disabled={!item.metalTypeId}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={item.metalTypeId ? "Select purity" : "Select a metal first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None</SelectItem>
+                      {(metalPuritiesCache[item.metalTypeId] ?? []).map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
                           {option.label}
                         </SelectItem>
                       ))}

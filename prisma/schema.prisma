@@ -1811,6 +1811,19 @@ model BusinessSettings {
   // working" precedent as sendToArtisanEnabled above).
   vendorsModuleEnabled Boolean @default(true)
 
+  // Whether the E-way Bill fields/button show up on an invoice at all.
+  // Independent of eInvoiceEnabled below — a store may need either, both,
+  // or neither depending on turnover threshold and B2B/B2C mix (see
+  // EditInvoiceDialog's own doc comment). Defaults true so nothing changes
+  // for existing stores. Off hides the E-way Bill section of
+  // EditInvoiceDialog, its card on the invoice detail page, and its block
+  // on every print template — existing ewayBillNumber/etc. data on past
+  // invoices is left completely alone in the database, just not shown or
+  // editable while this is off (re-enabling brings it straight back).
+  ewayBillEnabled Boolean @default(true)
+  // Same convention as ewayBillEnabled, for the E-Invoice (IRN) fields.
+  eInvoiceEnabled Boolean @default(true)
+
   // Financial year
   financialYearStartMonth Int @default(4) // April = 4, common in India
 

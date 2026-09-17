@@ -366,7 +366,7 @@ export function InvoicePrintMinimal({ invoice, settings }: InvoicePrintMinimalPr
             </div>
           </div>
 
-          {(invoice.irnNumber || invoice.ackNumber) && (
+          {settings.eInvoiceEnabled && (invoice.irnNumber || invoice.ackNumber) && (
             <div className="space-y-1">
               <SectionLabel>E-Invoice</SectionLabel>
               <div className="grid grid-cols-1 gap-x-4">
@@ -379,7 +379,7 @@ export function InvoicePrintMinimal({ invoice, settings }: InvoicePrintMinimalPr
             </div>
           )}
 
-          {(invoice.ewayBillNumber ||
+          {settings.ewayBillEnabled && (invoice.ewayBillNumber ||
             invoice.transporterName ||
             invoice.vehicleNumber ||
             invoice.transportMode ||

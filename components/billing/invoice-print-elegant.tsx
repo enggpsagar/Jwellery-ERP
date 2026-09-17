@@ -418,7 +418,7 @@ export function InvoicePrintElegant({ invoice, settings }: InvoicePrintElegantPr
               </div>
             </div>
 
-            {(invoice.irnNumber || invoice.ackNumber) && (
+            {settings.eInvoiceEnabled && (invoice.irnNumber || invoice.ackNumber) && (
               <div className="p-4">
                 <SectionOrnament />
                 <p className="mt-3 font-semibold">E-Invoice</p>
@@ -432,7 +432,7 @@ export function InvoicePrintElegant({ invoice, settings }: InvoicePrintElegantPr
               </div>
             )}
 
-            {(invoice.ewayBillNumber ||
+            {settings.ewayBillEnabled && (invoice.ewayBillNumber ||
               invoice.transporterName ||
               invoice.vehicleNumber ||
               invoice.transportMode ||

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
-import { FileCheck } from "lucide-react"
+import { FileCheck, Pencil } from "lucide-react"
 
 import { updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
 import { useToast } from "@/components/providers/toast-provider"
@@ -47,6 +47,12 @@ type EditInvoiceDialogProps = {
   irnNumber?: string | null
   ackNumber?: string | null
   ackDate?: string | null
+  /** BusinessSettings.ewayBillEnabled/eInvoiceEnabled — each section below
+   * only renders when its own flag is on, independent of the other. Both
+   * default true so an existing caller that hasn't been updated yet keeps
+   * showing both, same as before these settings existed. */
+  ewayBillEnabled?: boolean
+  eInvoiceEnabled?: boolean
   /** Smaller trigger (still labeled "E-way Bill", not just a bare pencil)
    * for a table row's Actions column — distinguishes it from "Edit Items"
    * (also a pencil icon, but full line-item editing) sitting elsewhere in
@@ -92,6 +98,8 @@ export function EditInvoiceDialog({
   irnNumber,
   ackNumber,
   ackDate,
+  ewayBillEnabled = true,
+  eInvoiceEnabled = true,
   compact = false,
 }: EditInvoiceDialogProps) {
   const [open, setOpen] = useState(false)
@@ -115,22 +123,49 @@ export function EditInvoiceDialog({
   // independent features (see this component's own doc comment), and a
   // label that only names whichever one happens to be filled risks
   // implying the other isn't available here at all. One honest label,
-  // naming both every time, beats a label that changes shape on you.
+  // naming both every time, beats a label that changes shape on you. Once
+  // either is disabled in Settings, the label (and dialog body below) only
+  // ever mentions the one still enabled — never the hidden one — and with
+  // both off it falls back to a plain, compliance-free "Edit Details"
+  // (this dialog also edits Invoice Date/Location/Notes, so it still has a
+  // reason to exist even with both toggles off).
   const hasEwayBill = !!ewayBillNumber?.trim()
   const hasEInvoice = !!irnNumber?.trim()
-  const complianceLabel = hasEwayBill || hasEInvoice ? "Update E-way Bill / E-Invoice" : "E-way Bill / E-Invoice"
+  const complianceLabel =
+    ewayBillEnabled && eInvoiceEnabled
+      ? hasEwayBill || hasEInvoice
+        ? "Update E-way Bill / E-Invoice"
+        : "E-way Bill / E-Invoice"
+      : ewayBillEnabled
+        ? hasEwayBill
+          ? "Update E-way Bill"
+          : "E-way Bill"
+        : eInvoiceEnabled
+          ? hasEInvoice
+            ? "Update E-Invoice"
+            : "E-Invoice"
+          : "Edit Details"
+  const TriggerIcon = ewayBillEnabled || eInvoiceEnabled ? FileCheck : Pencil
+  const triggerTitle =
+    ewayBillEnabled && eInvoiceEnabled
+      ? "Edit Date, E-way Bill & E-Invoice"
+      : ewayBillEnabled
+        ? "Edit Date & E-way Bill"
+        : eInvoiceEnabled
+          ? "Edit Date & E-Invoice"
+          : "Edit Date, Location & Notes"
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {compact ? (
-          <Button size="sm" variant="edit" className="gap-1.5" title="Edit Date, E-way Bill & E-Invoice">
-            <FileCheck className="h-4 w-4" />
+          <Button size="sm" variant="edit" className="gap-1.5" title={triggerTitle}>
+            <TriggerIcon className="h-4 w-4" />
             {complianceLabel}
           </Button>
         ) : (
-          <Button variant="edit" className="gap-2" title="Edit Date, E-way Bill & E-Invoice">
-            <FileCheck className="h-4 w-4" />
+          <Button variant="edit" className="gap-2" title={triggerTitle}>
+            <TriggerIcon className="h-4 w-4" />
             {complianceLabel}
           </Button>
         )}
@@ -176,6 +211,7 @@ export function EditInvoiceDialog({
             <Textarea name="notes" rows={3} defaultValue={notes ?? ""} />
           </div>
 
+          {eInvoiceEnabled && (
           <div className="space-y-3 rounded-lg border border-dashed p-3">
             <div>
               <p className="text-sm font-medium">E-Invoice (IRN)</p>
@@ -202,7 +238,9 @@ export function EditInvoiceDialog({
               </div>
             </div>
           </div>
+          )}
 
+          {ewayBillEnabled && (
           <div className="space-y-3 rounded-lg border border-dashed p-3">
             <div>
               <p className="text-sm font-medium">E-way Bill</p>
@@ -262,6 +300,7 @@ export function EditInvoiceDialog({
               </div>
             </div>
           </div>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={pending}>

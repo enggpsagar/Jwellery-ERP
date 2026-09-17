@@ -68,6 +68,12 @@ export type BusinessSettings = {
   // surfaces; Vendor data, Purchases' vendor picker, and a Customer's
   // linked-vendor balance keep working regardless of this flag.
   vendorsModuleEnabled: boolean;
+  // Whether the E-way Bill section/button/card/print-block shows up on an
+  // invoice at all — see prisma/schema.prisma's BusinessSettings.
+  // ewayBillEnabled doc comment. Independent of eInvoiceEnabled below.
+  ewayBillEnabled: boolean;
+  // Same convention as ewayBillEnabled, for the E-Invoice (IRN) fields.
+  eInvoiceEnabled: boolean;
   // Which SKU layout preset createProduct's generator arranges Metal/
   // Purity/Style/Category into — see prisma/schema.prisma's SkuFormat and
   // lib/inventory/product-sku.ts's composeSkuPrefix(). Edited via its own
@@ -143,6 +149,8 @@ function mapSettings(settings: any): BusinessSettings {
     returnWindowEnabled: settings.returnWindowEnabled ?? true,
     sendToArtisanEnabled: settings.sendToArtisanEnabled ?? true,
     vendorsModuleEnabled: settings.vendorsModuleEnabled ?? true,
+    ewayBillEnabled: settings.ewayBillEnabled ?? true,
+    eInvoiceEnabled: settings.eInvoiceEnabled ?? true,
     skuFormat: settings.skuFormat ?? SkuFormat.METAL_PURITY_STYLE_CATEGORY,
     styleFieldEnabled: settings.styleFieldEnabled ?? true,
     returnWindowDays: settings.returnWindowDays ?? 30,
@@ -326,6 +334,8 @@ export async function updateBusinessSettings(
         returnWindowEnabled: formData.get("returnWindowEnabled") === "on",
         sendToArtisanEnabled: formData.get("sendToArtisanEnabled") === "on",
         vendorsModuleEnabled: formData.get("vendorsModuleEnabled") === "on",
+        ewayBillEnabled: formData.get("ewayBillEnabled") === "on",
+        eInvoiceEnabled: formData.get("eInvoiceEnabled") === "on",
         returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),
@@ -368,6 +378,8 @@ export async function updateBusinessSettings(
         returnWindowEnabled: formData.get("returnWindowEnabled") === "on",
         sendToArtisanEnabled: formData.get("sendToArtisanEnabled") === "on",
         vendorsModuleEnabled: formData.get("vendorsModuleEnabled") === "on",
+        ewayBillEnabled: formData.get("ewayBillEnabled") === "on",
+        eInvoiceEnabled: formData.get("eInvoiceEnabled") === "on",
         returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),

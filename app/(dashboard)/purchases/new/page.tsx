@@ -18,7 +18,13 @@ export const metadata: Metadata = {
   title: "New Purchase",
 }
 
-export default async function NewPurchasePage() {
+type Props = {
+  searchParams?: Promise<{ vendorId?: string }>
+}
+
+export default async function NewPurchasePage({ searchParams }: Props) {
+  const params = (await searchParams) ?? {}
+
   const [vendors, products, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, gstRates] =
     await Promise.all([
       getPurchaseFormParties(),
@@ -58,6 +64,7 @@ export default async function NewPurchasePage() {
             defaultGstRate={businessSettings.defaultGstRate}
             storeState={businessSettings.state}
             initialLocationId={defaultLocationId}
+            initialVendorId={params.vendorId}
           />
         </Suspense>
       </ResetFormWrapper>

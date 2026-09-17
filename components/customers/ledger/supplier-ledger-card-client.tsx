@@ -6,7 +6,7 @@ import {
   getSupplierLedgerEntries,
   type SupplierLedgerEntryItem,
 } from "@/lib/actions/customer-ledger-actions"
-import { SupplierLedgerHistoryTable } from "@/components/customers/ledger/supplier-ledger-history-table"
+import { SupplierLedgerBody } from "@/components/customers/ledger/supplier-ledger-body"
 import { Skeleton } from "@/components/ui/skeleton"
 
 /**
@@ -31,5 +31,5 @@ export function SupplierLedgerCardClient({ customerId }: { customerId: string })
     return <Skeleton className="h-40 w-full" />
   }
 
-  return <SupplierLedgerHistoryTable entries={entries} />
+  return <SupplierLedgerBody customerId={customerId} entries={entries} />
 }

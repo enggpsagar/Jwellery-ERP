@@ -18,6 +18,13 @@ export type LedgerEntryRow = {
   account: string
   accountInitials: string
   accountHref: string | null
+  /** Which role this entry belongs to on the same underlying Party
+   * record — a Party/Customer-side entry (customerId set) vs. a
+   * Supplier-side one (vendorId set, same Customer table since the
+   * Vendor→Customer merge) vs. an Artisan (Karigar). Lets the Ledger page
+   * show which of a merged party's two independent balances a row
+   * actually belongs to, instead of leaving that ambiguous. */
+  accountType: "Party" | "Supplier" | "Artisan" | null
   sourceType: string
   sourceLabel: string
   type: "CREDIT" | "DEBIT"
@@ -58,6 +65,7 @@ export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
     take: 500,
     include: {
       customer: { select: { id: true, name: true } },
+      vendor: { select: { id: true, name: true } },
       karigar: { select: { id: true, name: true } },
       invoice: { select: { id: true, invoiceNumber: true } },
       metalType: { select: { name: true } },
@@ -65,12 +73,28 @@ export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
   })
 
   return entries.map((entry) => {
-    const accountName = entry.customer?.name ?? entry.karigar?.name ?? "—"
+    // customerId and vendorId can both be set on the same underlying Party
+    // row (post Vendor→Customer merge) but never on the SAME entry — an
+    // entry is always either this Party's customer-side activity or its
+    // supplier-side activity, never both at once, so customer is checked
+    // first purely for historical priority, not because of any real
+    // ambiguity. entry.vendor was previously not joined at all here, which
+    // left every Purchase/Payment-Out row showing a blank "—" account.
+    const accountName = entry.customer?.name ?? entry.vendor?.name ?? entry.karigar?.name ?? "—"
     const accountHref = entry.customer
       ? `/customers/${entry.customer.id}`
-      : entry.karigar
-        ? `/karigars/${entry.karigar.id}`
-        : null
+      : entry.vendor
+        ? `/customers/${entry.vendor.id}`
+        : entry.karigar
+          ? `/karigars/${entry.karigar.id}`
+          : null
+    const accountType: LedgerEntryRow["accountType"] = entry.customer
+      ? "Party"
+      : entry.vendor
+        ? "Supplier"
+        : entry.karigar
+          ? "Artisan"
+          : null
 
     return {
       id: entry.id,
@@ -79,6 +103,7 @@ export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
       account: accountName,
       accountInitials: initials(accountName),
       accountHref,
+      accountType,
       sourceType: entry.sourceType,
       sourceLabel: formatLedgerSource(entry.sourceType),
       type: entry.type as "CREDIT" | "DEBIT",

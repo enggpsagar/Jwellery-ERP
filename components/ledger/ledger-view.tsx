@@ -442,8 +442,19 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col">
-                          <span className="text-sm font-medium leading-tight">
+                          <span className="flex items-center gap-1.5 text-sm font-medium leading-tight">
                             {entry.account}
+                            {/* Party vs Supplier vs Artisan — see
+                                accountType's own doc comment in
+                                ledger-actions.ts. Same underlying Party
+                                record can be both a Party and a Supplier,
+                                so this says which side of it this specific
+                                entry belongs to. */}
+                            {entry.accountType ? (
+                              <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
+                                {entry.accountType}
+                              </Badge>
+                            ) : null}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {entry.sourceLabel}

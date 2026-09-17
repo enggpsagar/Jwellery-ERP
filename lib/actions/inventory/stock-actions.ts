@@ -473,35 +473,6 @@ export async function getInventoryStockById(id: string) {
           updatedAt: true,
         },
       },
-      invoiceItems: {
-        include: {
-          invoice: {
-            select: {
-              id: true,
-              invoiceNumber: true,
-              invoiceDate: true,
-              customer: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      },
-      karigarJobs: {
-        include: {
-          karigar: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      },
     },
   })
 

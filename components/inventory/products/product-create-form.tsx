@@ -4,8 +4,6 @@ import { startTransition, useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { PurityType } from "@prisma/client";
 
-import type { SkuFormat } from "@prisma/client";
-
 import { useToast } from "@/components/providers/toast-provider";
 import { createProduct } from "@/lib/actions/inventory/product-actions";
 import type { StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions";
@@ -32,8 +30,6 @@ type ProductCreateFormProps = {
   /** Where to go after saving; the new product's id is appended so the
    * calling screen can select it. */
   returnTo?: string
-  /** The store's configured SKU layout — see the same prop on ProductForm. */
-  skuFormat: SkuFormat;
   /** Settings > Metals, Stones & Categories > "Require Style on products" — see the same prop on ProductForm. */
   styleFieldEnabled?: boolean;
 };
@@ -47,7 +43,6 @@ export function ProductCreateForm({
   locations,
   defaultLocationId,
   returnTo,
-  skuFormat,
   styleFieldEnabled,
 }: ProductCreateFormProps) {
   const router = useRouter();
@@ -113,7 +108,6 @@ export function ProductCreateForm({
         origins={origins}
         locations={locations}
         defaultLocationId={defaultLocationId}
-        skuFormat={skuFormat}
         styleFieldEnabled={styleFieldEnabled}
       />
     </form>

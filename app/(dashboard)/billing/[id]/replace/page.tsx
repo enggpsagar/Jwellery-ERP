@@ -9,6 +9,7 @@ import {
 } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getStates } from "@/lib/actions/location-actions"
+import { filterDeliveryStates } from "@/lib/delivery-location"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap, getMetalSellingRateMap } from "@/lib/actions/purity-actions"
@@ -158,7 +159,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
         storeState={businessSettings.state}
         storeStateCode={businessSettings.stateCode}
         showDueDate={businessSettings.showDueDate}
-        states={states}
+        states={filterDeliveryStates(states, businessSettings.allowedDeliveryStateIds)}
         initialCustomerId={cancelledInvoice.customer?.id}
         initialLocationId={cancelledInvoice.locationId ?? defaultLocationId ?? undefined}
         initialItems={initialItems}

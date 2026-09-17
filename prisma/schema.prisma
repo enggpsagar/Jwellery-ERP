@@ -1885,6 +1885,13 @@ model BusinessSettings {
   // whatever was already there, exactly as before.
   showDueDate Boolean @default(true)
 
+  // Which State rows show up in an Invoice's Delivery Location picker
+  // (components/shared/delivery-location-select.tsx) — a curated subset a
+  // Store Admin picks in Settings, since most stores only ever ship within
+  // a handful of states. Holds State.id values. Empty (the default) means
+  // "no curation yet" and shows every State — never an empty picker.
+  allowedDeliveryStateIds String[] @default([])
+
   // Financial year
   financialYearStartMonth Int @default(4) // April = 4, common in India
 

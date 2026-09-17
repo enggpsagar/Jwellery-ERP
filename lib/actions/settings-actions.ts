@@ -72,6 +72,10 @@ export type BusinessSettings = {
   // prisma/schema.prisma's BusinessSettings.showDueDate doc comment. Off
   // never clears/touches the underlying data, only its display.
   showDueDate: boolean;
+  // Curated State.id subset for the Invoice Delivery Location picker — see
+  // prisma/schema.prisma's BusinessSettings.allowedDeliveryStateIds doc
+  // comment. Empty means "show every state" (no curation yet).
+  allowedDeliveryStateIds: string[];
   // Which SKU layout preset createProduct's generator arranges Metal/
   // Purity/Style/Category into — see prisma/schema.prisma's SkuFormat and
   // lib/inventory/product-sku.ts's composeSkuPrefix(). Edited via its own
@@ -149,6 +153,7 @@ function mapSettings(settings: any): BusinessSettings {
     ewayBillEnabled: settings.ewayBillEnabled ?? true,
     eInvoiceEnabled: settings.eInvoiceEnabled ?? true,
     showDueDate: settings.showDueDate ?? true,
+    allowedDeliveryStateIds: settings.allowedDeliveryStateIds ?? [],
     skuFormat: settings.skuFormat ?? SkuFormat.METAL_PURITY_STYLE_CATEGORY,
     styleFieldEnabled: settings.styleFieldEnabled ?? true,
     returnWindowDays: settings.returnWindowDays ?? 30,
@@ -334,6 +339,7 @@ export async function updateBusinessSettings(
         ewayBillEnabled: formData.get("ewayBillEnabled") === "on",
         eInvoiceEnabled: formData.get("eInvoiceEnabled") === "on",
         showDueDate: formData.get("showDueDate") === "on",
+        allowedDeliveryStateIds: formData.getAll("allowedDeliveryStateIds").map(String),
         returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),
@@ -378,6 +384,7 @@ export async function updateBusinessSettings(
         ewayBillEnabled: formData.get("ewayBillEnabled") === "on",
         eInvoiceEnabled: formData.get("eInvoiceEnabled") === "on",
         showDueDate: formData.get("showDueDate") === "on",
+        allowedDeliveryStateIds: formData.getAll("allowedDeliveryStateIds").map(String),
         returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),

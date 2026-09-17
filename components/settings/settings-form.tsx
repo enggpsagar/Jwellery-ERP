@@ -122,6 +122,16 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
   const [ewayBillEnabled, setEwayBillEnabled] = useState(settings.ewayBillEnabled)
   const [eInvoiceEnabled, setEInvoiceEnabled] = useState(settings.eInvoiceEnabled)
   const [showDueDate, setShowDueDate] = useState(settings.showDueDate)
+  const [allowedDeliveryStateIds, setAllowedDeliveryStateIds] = useState<string[]>(
+    settings.allowedDeliveryStateIds,
+  )
+  function toggleDeliveryState(stateId: string) {
+    setAllowedDeliveryStateIds((current) =>
+      current.includes(stateId)
+        ? current.filter((id) => id !== stateId)
+        : [...current, stateId],
+    )
+  }
   const [printLayout, setPrintLayout] = useState<PrintLayout>(settings.printLayout)
   const [invoiceTemplate, setInvoiceTemplate] = useState<InvoiceTemplate>(settings.invoiceTemplate)
   const stateNameMap = useMemo(
@@ -426,6 +436,39 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               official notification — confirm this matches what your hallmarking
               centre currently charges before relying on it.
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Delivery Locations</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Which states show up in the Delivery Location picker when creating an
+            Invoice — most stores only ever ship within a handful of states, so
+            narrowing this makes that dropdown faster to use. Leave every box
+            unchecked to show all states (the default).
+          </p>
+
+          <div className="grid max-h-72 grid-cols-2 gap-x-4 gap-y-1.5 overflow-y-auto rounded-lg border p-3 sm:grid-cols-3">
+            {states.map((state) => (
+              <label
+                key={state.id}
+                className="flex cursor-pointer items-center gap-2 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  name="allowedDeliveryStateIds"
+                  value={state.id}
+                  checked={allowedDeliveryStateIds.includes(state.id)}
+                  onChange={() => toggleDeliveryState(state.id)}
+                  className="size-4"
+                />
+                {state.name}
+              </label>
+            ))}
           </div>
         </CardContent>
       </Card>

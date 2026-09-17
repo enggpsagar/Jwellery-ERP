@@ -11,7 +11,7 @@ import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
-import { requireRole } from "@/lib/auth/auth";
+import { requireRole, getCurrentUser } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
 
 export type StoreLocationRow = {
@@ -55,6 +55,17 @@ export async function getStoreLocations(): Promise<StoreLocationRow[]> {
     isActive: location.isActive,
     isDefault: location.id === store?.defaultLocationId,
   }));
+}
+
+/** Callable straight from a Client Component (LocationSelect) — Store
+ * Owner (ADMIN) and Super Admin always have unrestricted access to every
+ * location (see lib/location-scope.ts), so unlike Staff/Karigar they have
+ * nothing to meaningfully restrict by picking one; LocationSelect uses
+ * this to hide its own picker for exactly those two roles and file the
+ * record under the store's default location instead. */
+export async function getCurrentUserRole(): Promise<UserRole | null> {
+  const user = await getCurrentUser();
+  return (user?.role as UserRole) ?? null;
 }
 
 /** Just the id, for the many create forms that only need to know what to

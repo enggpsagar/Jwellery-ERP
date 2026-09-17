@@ -1,8 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Plus } from "lucide-react"
+import { UserRole } from "@prisma/client"
 
 import {
   Select,
@@ -12,6 +13,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { getCurrentUserRole } from "@/lib/actions/store-location-actions"
+
+const UNRESTRICTED_ROLES: readonly UserRole[] = [UserRole.ADMIN, UserRole.SUPER_ADMIN]
 
 /**
  * Sentinel value for the "Add New Location" row — mirrors ProductSelect's
@@ -60,6 +64,17 @@ export function LocationSelect({
   const [selected, setSelected] = useState(defaultValue ?? "")
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
+  const [role, setRole] = useState<UserRole | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getCurrentUserRole().then((value) => {
+      if (!cancelled) setRole(value)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const filteredLocations = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -76,8 +91,15 @@ export function LocationSelect({
   // it did when a human picked it from the dropdown. After the hooks above,
   // not before — an early return can't skip a hook call on some renders
   // and not others.
-  if (locations.length <= 1) {
-    const soleLocationId = locations[0]?.id ?? defaultValue ?? ""
+  //
+  // Store Owner (ADMIN) / Super Admin collapse the same way: they have
+  // unrestricted access to every location already (see
+  // lib/location-scope.ts), so picking one restricts nothing for them —
+  // it's just an extra click. Files under the store's default location
+  // instead (getDefaultLocationId, passed in as `defaultValue` by every
+  // caller that has one) rather than an arbitrary first location.
+  if (locations.length <= 1 || (role && UNRESTRICTED_ROLES.includes(role))) {
+    const soleLocationId = defaultValue || locations[0]?.id || ""
     return name ? <input type="hidden" name={name} value={soleLocationId} /> : null
   }
 

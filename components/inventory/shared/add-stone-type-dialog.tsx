@@ -56,7 +56,7 @@ export function AddStoneTypeDialog({
   useEffect(() => {
     if (state.success && state.id) {
       toast.success(state.message || "Stone Type added")
-      onCreated({ id: state.id, storeMetalId, name, isActive: true })
+      onCreated({ id: state.id, storeMetalId, name, isActive: true, gramsPerCarat: 0.2, sellingPrice: null })
       onOpenChange(false)
     } else if (!state.success && state.message) {
       toast.error(state.message)

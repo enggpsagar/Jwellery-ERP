@@ -60,6 +60,15 @@ export function CustomerLedgerBody({
 
   return (
     <section className="space-y-4">
+      {/* Explicit "Party Ledger" label — this is the customer/receivable
+          side of this Party's activity, tracked independently from any
+          Supplier Ledger section that may also show further down the same
+          page (see customer-detail-content.tsx). Without this heading a
+          reader had no way to tell which ledger they were looking at from
+          the section itself, only from page position — same reasoning the
+          Supplier Ledger's own DetailSection title already gets. */}
+      <h2 className="text-base font-semibold text-foreground">Party Ledger</h2>
+
       {/* Just the actions, no bordered header card around them — a "Ledger"
           heading and a description restating what the buttons already say
           isn't information, and this bar is the first thing on the page,

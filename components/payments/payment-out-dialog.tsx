@@ -43,9 +43,10 @@ type PaymentOutDialogProps = {
  * post to the same PAYMENT_OUT ledger sourceType, so this list and those
  * flows never disagree.
  *
- * Also reachable pre-filled via ?vendorId=<id> (the Vendors list's own
- * "Pay Now" link) — same query-param-opens-the-dialog convention as the
- * sidebar's ?new=1, just naming which vendor too.
+ * Also reachable pre-filled via ?vendorId=<id> (a party's own Supplier
+ * Ledger "Pay Out" button — see supplier-ledger-body.tsx) — same
+ * query-param-opens-the-dialog convention as the sidebar's ?new=1, just
+ * naming which party too.
  */
 export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
   const searchParams = useSearchParams()

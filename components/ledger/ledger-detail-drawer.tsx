@@ -77,13 +77,20 @@ export function LedgerDetailDrawer({
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col">
-                    {entry.accountHref ? (
-                      <Link href={entry.accountHref} className="font-medium hover:underline">
-                        {entry.account}
-                      </Link>
-                    ) : (
-                      <span className="font-medium">{entry.account}</span>
-                    )}
+                    <span className="flex items-center gap-1.5">
+                      {entry.accountHref ? (
+                        <Link href={entry.accountHref} className="font-medium hover:underline">
+                          {entry.account}
+                        </Link>
+                      ) : (
+                        <span className="font-medium">{entry.account}</span>
+                      )}
+                      {entry.accountType ? (
+                        <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
+                          {entry.accountType}
+                        </Badge>
+                      ) : null}
+                    </span>
                     <span className="text-sm text-muted-foreground">
                       {entry.sourceLabel}
                     </span>

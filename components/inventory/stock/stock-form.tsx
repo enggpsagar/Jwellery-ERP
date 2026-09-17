@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 
 import { ProductSelect } from "@/components/inventory/shared/product-select";
-import { LocationSelect } from "@/components/shared/location-select";
+import { LocationSelect, useShowLocationField } from "@/components/shared/location-select";
 import { RequiredMark } from "@/components/shared/required-mark"
 
 type LocationOption = {
@@ -165,6 +165,7 @@ export function StockForm({
   pending,
   formRef,
 }: StockFormProps) {
+  const showLocationField = useShowLocationField(locations.length);
   const [status, setStatus] = useState(
     stock?.status ?? InventoryStockStatus.IN_STOCK,
   );
@@ -950,7 +951,7 @@ export function StockForm({
           </div>
 
           <div>
-            {locations.length > 1 && <Label>Store Location</Label>}
+            {showLocationField && <Label>Store Location</Label>}
 
             <LocationSelect
               locations={locations}

@@ -37,9 +37,11 @@ export function CustomerDetailContent({
   ledger: React.ReactNode
   /** See CustomerVendorLinkCard's own doc comment on its onChanged prop. */
   onLinkChanged?: () => void
-  /** BusinessSettings.vendorsModuleEnabled — hides the whole Register-as-
-   * Vendor/Link-to-Vendor/View-Vendor card below when off, same as every
-   * other standalone vendor-management surface. */
+  /** Settings > toggle for the Vendors module — see BusinessSettings.vendorsModuleEnabled's
+   * own schema doc comment. Hides the Vendor Relationship card's "start a new link" actions
+   * when off, unless this party is already linked (that link, and its balance, keeps working
+   * regardless of the flag — only *starting* a new one is gated). Defaults true so a caller
+   * that hasn't been updated still shows it, matching today's behavior. */
   vendorsModuleEnabled?: boolean
 }) {
   const money = (value: unknown) => `₹ ${Number(value || 0).toLocaleString("en-IN")}`
@@ -74,7 +76,7 @@ export function CustomerDetailContent({
           @container below (a single level, no stacking) is unaffected and
           stays as-is — this only reverts the OUTER grid. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {vendorsModuleEnabled && (
+        {(vendorsModuleEnabled || customer.linkedVendor) && (
           <CustomerVendorLinkCard
             customerId={customer.id}
             linkedVendor={customer.linkedVendor ?? null}

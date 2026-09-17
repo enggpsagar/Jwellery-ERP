@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
-import { LocationSelect } from "@/components/shared/location-select"
+import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
 import { PURITY_SELECT_OPTIONS, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 import { RequiredMark } from "@/components/shared/required-mark"
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
@@ -197,6 +197,7 @@ export function QuotationForm({
 }: QuotationFormProps) {
   const router = useRouter()
   const toast = useToast()
+  const showLocationField = useShowLocationField(locations.length)
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
   const metalById = useMemo(() => new Map(metals.map((m) => [m.id, m])), [metals])
@@ -560,7 +561,7 @@ export function QuotationForm({
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          {locations.length > 1 && <Label>Store Location</Label>}
+          {showLocationField && <Label>Store Location</Label>}
           <LocationSelect
             locations={locations}
             name="locationId"

@@ -25,7 +25,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { VendorSelect } from "@/components/vendors/vendor-select"
 import { ProductSelect } from "@/components/inventory/shared/product-select"
-import { LocationSelect } from "@/components/shared/location-select"
+import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
 
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
@@ -284,6 +284,7 @@ export function PurchaseForm({
   const router = useRouter()
   const searchParams = useSearchParams()
   const toast = useToast()
+  const showLocationField = useShowLocationField(locations.length)
 
   const formRef = useRef<HTMLFormElement>(null)
 
@@ -930,7 +931,7 @@ export function PurchaseForm({
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          {locations.length > 1 && <Label>Store Location</Label>}
+          {showLocationField && <Label>Store Location</Label>}
           <LocationSelect
             locations={locations}
             name="locationId"

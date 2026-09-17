@@ -14,7 +14,7 @@ import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { classifyMetalName } from "@/lib/business-units"
 import { GRAMS_PER_CARAT, toPrimaryUnit } from "@/lib/purity"
 import { todayForDateInput } from "@/lib/date-input"
-import { LocationSelect } from "@/components/shared/location-select"
+import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { Button } from "@/components/ui/button"
@@ -88,6 +88,7 @@ export function IssueMaterialDialog({
   count,
   trigger = "button",
 }: IssueMaterialDialogProps) {
+  const showLocationField = useShowLocationField(locations.length)
   const activeMetals = useMemo(
     () => metals.filter((m) => m.isActive && assignedMetalTypeIds.includes(m.id)),
     [metals, assignedMetalTypeIds],
@@ -310,7 +311,7 @@ export function IssueMaterialDialog({
           </div>
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            {locations.length > 1 && <Label>Store Location</Label>}
+            {showLocationField && <Label>Store Location</Label>}
             <LocationSelect
               locations={locations}
               name="locationId"

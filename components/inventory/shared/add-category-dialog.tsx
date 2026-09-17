@@ -54,7 +54,7 @@ export function AddCategoryDialog({ open, onOpenChange, onCreated }: AddCategory
   useEffect(() => {
     if (state.success && state.id) {
       toast.success(state.message || "Category added")
-      onCreated({ id: state.id, name, isActive: true })
+      onCreated({ id: state.id, name, isActive: true, metalTagIds: [] })
       onOpenChange(false)
     } else if (!state.success && state.message) {
       toast.error(state.message)

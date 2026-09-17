@@ -135,11 +135,13 @@ enum StorePlanAction {
   REGISTERED
   ASSIGNED
   RENEWED
-  /** A Super Admin pushed the current plan's expiry forward by N days
-   *  without changing the plan itself — see extendStorePlan in
-   *  lib/actions/store-actions.ts. Covers extending a trial the same way
-   *  as any other plan, since a trial is just whichever active Plan has
-   *  the lowest price (see resolveTrialPlan), not a separate concept. */
+  /**
+   * A Super Admin pushed the current plan's expiry forward by N days
+   * without changing the plan itself — see extendStorePlan in
+   * lib/actions/store-actions.ts. Covers extending a trial the same way
+   * as any other plan, since a trial is just whichever active Plan has
+   * the lowest price (see resolveTrialPlan), not a separate concept.
+   */
   EXTENDED
 }
 
@@ -316,6 +318,13 @@ model StoreMetal {
   // how a product picks exactly one.
   origins             StoreMetalOrigin[]
   draftOrderItems     DraftOrderItem[]
+  // Real per-Metal Purity options (e.g. Gold -> 18K/20K/22K/24K) — replaces
+  // the old global PurityType enum + its three enum-keyed Settings tables
+  // (PurityFineness/CaratConversionRate/MetalSellingRate). Only meaningful
+  // for a hasPurity metal; a gemstone's own equivalent concept is its Stone
+  // Type (origins above), which carries its own gramsPerCarat instead.
+  purities            StoreMetalPurity[]
+  categoryTags        StoreCategoryMetal[]
 
   @@unique([storeId, name])
 }
@@ -335,31 +344,87 @@ model StoreMetal {
 // `20260903080000_convert_stone_origin_to_free_text` for the backfill of
 // existing NATURAL/LAB_GROWN rows into `name` values.
 model StoreMetalOrigin {
-  id           String     @id @default(cuid())
-  storeId      String
-  storeMetalId String
-  name         String
-  isActive     Boolean    @default(true)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  storeMetal   StoreMetal @relation(fields: [storeMetalId], references: [id], onDelete: Cascade)
-  products     Product[]
+  id            String     @id @default(cuid())
+  storeId       String
+  storeMetalId  String
+  name          String
+  isActive      Boolean    @default(true)
+  // 1 ct = 0.2g is the real industry standard, but store-overridable the
+  // same way CaratConversionRate used to be per-PurityType — now scoped to
+  // the specific Stone Type instead (a store could in principle price a
+  // Lab-Grown stone's carat differently from a Natural one of the same
+  // gem). See lib/purity.ts's resolveGramsPerCaratFromOrigin.
+  gramsPerCarat Decimal    @default(0.2) @db.Decimal(6, 4)
+  // Optional per-Stone-Type selling rate — falls back to the parent
+  // StoreMetal.sellingPrice when null, same fallback shape used elsewhere
+  // (e.g. Invoice falling back from a line's own rate to a stock item's).
+  sellingPrice  Decimal?   @db.Decimal(12, 2)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  storeMetal    StoreMetal @relation(fields: [storeMetalId], references: [id], onDelete: Cascade)
+  products      Product[]
 
   @@unique([storeMetalId, name])
 }
 
+// Real per-Metal Purity option (e.g. "22K" under Gold) — replaces the old
+// global PurityType enum. A store defines its own list under each metal
+// instead of picking from a fixed 10-value set; skuCode replaces the old
+// trick of regexing a numeric suffix off the enum's key
+// (lib/inventory/product-sku.ts's old purityNumber()).
+model StoreMetalPurity {
+  id              String     @id @default(cuid())
+  storeId         String
+  storeMetalId    String
+  label           String
+  skuCode         String
+  finenessPercent Decimal    @default(100) @db.Decimal(5, 2)
+  // Replaces MetalSellingRate — null means "not configured," same fallback
+  // to StoreMetal.sellingPrice that column already documented.
+  sellingPrice    Decimal?   @db.Decimal(12, 2)
+  // Replaces the hardcoded isHallmarkablePurity() purity list.
+  isHallmarkable  Boolean    @default(false)
+  sortOrder       Int        @default(0)
+  isActive        Boolean    @default(true)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  storeMetal      StoreMetal @relation(fields: [storeMetalId], references: [id], onDelete: Cascade)
+  products        Product[]
+
+  @@unique([storeMetalId, label])
+}
+
 model StoreCategory {
-  id        String              @id @default(cuid())
+  id        String               @id @default(cuid())
   storeId   String
   name      String
-  isActive  Boolean             @default(true)
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
-  store     Store               @relation(fields: [storeId], references: [id])
+  isActive  Boolean              @default(true)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  store     Store                @relation(fields: [storeId], references: [id])
   types     StoreCategoryType[]
   products  Product[]
+  // Which Metals this Category applies to — empty means universal (every
+  // metal), matching today's behavior for all of the app's existing
+  // categories. Populated only once a Store Admin deliberately restricts a
+  // category to specific metals.
+  metalTags StoreCategoryMetal[]
 
   @@unique([storeId, name])
+}
+
+// Join row: one Category tagged as applicable to one Metal. A Category
+// with zero rows here is unrestricted (shown regardless of the selected
+// Metal) — see StoreCategory.metalTags' own doc comment.
+model StoreCategoryMetal {
+  id              String        @id @default(cuid())
+  storeCategoryId String
+  storeMetalId    String
+  createdAt       DateTime      @default(now())
+  storeCategory   StoreCategory @relation(fields: [storeCategoryId], references: [id], onDelete: Cascade)
+  storeMetal      StoreMetal    @relation(fields: [storeMetalId], references: [id], onDelete: Cascade)
+
+  @@unique([storeCategoryId, storeMetalId])
 }
 
 // Real, admin-managed master data for Product.targetStyle — replaces the old
@@ -368,13 +433,13 @@ model StoreCategory {
 // exactly those four forever. Same shape as StoreCategory (no sub-level,
 // unlike Category's StoreCategoryType — Style never needed one).
 model StoreStyle {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   storeId   String
   name      String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  store     Store    @relation(fields: [storeId], references: [id])
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  store     Store     @relation(fields: [storeId], references: [id])
   products  Product[]
 
   @@unique([storeId, name])
@@ -395,25 +460,25 @@ model StoreCategoryType {
 }
 
 model Customer {
-  id             String         @id @default(cuid())
-  storeId        String
-  customerCode   String?
+  id                     String           @id @default(cuid())
+  storeId                String
+  customerCode           String?
   // Parallel to customerCode — preserved from the pre-merge Vendor table's
   // own code sequence for any Party that started life as a Vendor. Never
   // both blank by design (a Party has at least one of the two codes), but
   // nothing stops a Party from eventually having both once it's acted as
   // customer and supplier.
-  vendorCode     String?
-  name           String
-  phone          String?
-  alternatePhone String?
-  email          String?
-  addressLine1   String?
-  addressLine2   String?
-  city           String?
-  state          String?
-  pincode        String?
-  gstin          String?
+  vendorCode             String?
+  name                   String
+  phone                  String?
+  alternatePhone         String?
+  email                  String?
+  addressLine1           String?
+  addressLine2           String?
+  city                   String?
+  state                  String?
+  pincode                String?
+  gstin                  String?
   // This customer's OWN GST registration status — independent of the
   // store's own gstScheme. See PartyGstType's doc comment: it only ever
   // affects whether GSTIN is required/shown here, never how much GST the
@@ -421,20 +486,20 @@ model Customer {
   // Defaults new records to whatever the store's own gstScheme suggests is
   // more likely, but is freely editable per customer afterward. See
   // gstinRequired() in lib/gst.ts.
-  gstType        PartyGstType   @default(UNREGISTERED)
-  panNumber      String?
+  gstType                PartyGstType     @default(UNREGISTERED)
+  panNumber              String?
   // Optional KYC id — validated (12 digits + Verhoeff checksum, see
   // lib/aadhaar.ts) only when actually entered.
-  aadhaarNumber  String?
+  aadhaarNumber          String?
   // A customer-facing loyalty/scheme reference number some stores print on
   // the invoice (e.g. "Encircle Id") — opaque to the app, shown as-is.
-  registrationId String?
-  notes          String?
-  openingBalance Decimal        @default(0) @db.Decimal(12, 2)
-  isActive       Boolean        @default(true)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  isArchived     Boolean        @default(false)
+  registrationId         String?
+  notes                  String?
+  openingBalance         Decimal          @default(0) @db.Decimal(12, 2)
+  isActive               Boolean          @default(true)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  isArchived             Boolean          @default(false)
   // Who created this record — the id is the link, the name a snapshot, same
   // convention as Invoice.createdById/createdByName. Nullable: customers
   // created before this was tracked genuinely have no answer, and an
@@ -591,6 +656,11 @@ model Product {
   // StoreMetalOrigin) this product is.
   stoneOriginOptionId       String?
   defaultPurity             PurityType?
+  // Real per-Metal Purity — see StoreMetalPurity. defaultPurity above stays
+  // populated too (best-effort mapped to a legacy enum value where one
+  // matches) purely so anything not yet reading this new column still
+  // shows something; this FK is the new source of truth going forward.
+  storeMetalPurityId        String?
   defaultMakingCharge       Decimal?             @db.Decimal(12, 2)
   defaultMakingChargeType   ChargeType           @default(FIXED)
   defaultStoneCharge        Decimal?             @db.Decimal(12, 2)
@@ -636,6 +706,7 @@ model Product {
   categoryType              StoreCategoryType?   @relation(fields: [categoryTypeId], references: [id])
   metalType                 StoreMetal?          @relation(fields: [metalTypeId], references: [id])
   stoneOriginOption         StoreMetalOrigin?    @relation(fields: [stoneOriginOptionId], references: [id])
+  storeMetalPurity          StoreMetalPurity?    @relation(fields: [storeMetalPurityId], references: [id])
   targetStyle               StoreStyle?          @relation(fields: [targetStyleId], references: [id])
 
   @@unique([storeId, productCode])
@@ -643,6 +714,7 @@ model Product {
   @@index([categoryTypeId])
   @@index([metalTypeId])
   @@index([stoneOriginOptionId])
+  @@index([storeMetalPurityId])
   @@index([targetStyleId])
   @@index([name])
   @@index([productCode])
@@ -658,6 +730,12 @@ model InventoryStock {
   productId           String
   metalTypeId         String?
   purity              PurityType?
+  // Real per-Metal Purity's own label (e.g. "22K"), denormalized rather
+  // than a StoreMetalPurity FK — same "descriptive label on the line, not
+  // something queried/joined on" convention Product.defaultStoneMetalTypeName
+  // already uses for its own embedded-stone fields. purity above stays
+  // populated on a best-effort basis for anything not yet reading this.
+  purityLabel         String?
   quantity            Int                    @default(1)
   status              InventoryStockStatus   @default(IN_STOCK)
   finish              InventoryFinish        @default(KACHA)
@@ -1017,6 +1095,7 @@ model KachaInvoiceItem {
   itemName           String
   metalTypeId        String?
   purity             PurityType?
+  purityLabel        String?
   quantity           Int             @default(1)
   grossWeight        Decimal?        @db.Decimal(12, 5)
   netWeight          Decimal?        @db.Decimal(12, 5)
@@ -1105,6 +1184,7 @@ model InvoiceItem {
   updatedAt          DateTime         @updatedAt
   inventoryStockId   String?
   purity             PurityType?
+  purityLabel        String?
   inventoryStock     InventoryStock?  @relation(fields: [inventoryStockId], references: [id])
   invoice            Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   metalType          StoreMetal?      @relation(fields: [metalTypeId], references: [id])
@@ -1195,6 +1275,7 @@ model KarigarJob {
   metalTypeId       String?
   issueWeight       Decimal?             @db.Decimal(12, 5)
   issuePurity       PurityType?
+  issuePurityLabel  String?
   issueFineWeight   Decimal?             @db.Decimal(12, 5)
   receiveWeight     Decimal?             @db.Decimal(12, 5)
   receiveFineWeight Decimal?             @db.Decimal(12, 5)
@@ -1234,7 +1315,7 @@ model KarigarJob {
 // confirmed stable in production. Nothing in the app reads or writes this
 // model anymore.
 model Vendor {
-  id             String           @id @default(cuid())
+  id             String       @id @default(cuid())
   storeId        String
   vendorCode     String?
   name           String
@@ -1252,17 +1333,17 @@ model Vendor {
   // to us legally never carries GST, regardless of our own store's
   // gstScheme - see isVendorGstApplicable() in lib/gst.ts, used by the
   // Purchases form/action instead of the store's own scheme.
-  gstType        PartyGstType     @default(UNREGISTERED)
+  gstType        PartyGstType @default(UNREGISTERED)
   // Optional KYC id — validated (12 digits + Verhoeff checksum, see
   // lib/aadhaar.ts) only when actually entered.
   aadhaarNumber  String?
   notes          String?
-  openingBalance Decimal          @default(0) @db.Decimal(12, 2)
-  isActive       Boolean          @default(true)
-  isArchived     Boolean          @default(false)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  store          Store            @relation(fields: [storeId], references: [id])
+  openingBalance Decimal      @default(0) @db.Decimal(12, 2)
+  isActive       Boolean      @default(true)
+  isArchived     Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  store          Store        @relation(fields: [storeId], references: [id])
 
   @@unique([storeId, vendorCode])
   @@index([name])
@@ -1354,6 +1435,7 @@ model PurchaseItem {
   itemName           String
   metalTypeId        String?
   purity             PurityType?
+  purityLabel        String?
   quantity           Int             @default(1)
   grossWeight        Decimal?        @db.Decimal(12, 5)
   netWeight          Decimal?        @db.Decimal(12, 5)
@@ -1510,6 +1592,7 @@ model KarigarReceiptItem {
   productId        String?
   metalTypeId      String?
   purity           PurityType
+  purityLabel      String?
   quantity         Int             @default(1)
   grossWeight      Decimal?        @db.Decimal(12, 5)
   netWeight        Decimal?        @db.Decimal(12, 5)
@@ -1540,26 +1623,26 @@ model KarigarReceiptItem {
 // unique): pooling several orders' metal into one job, or splitting one
 // order across multiple jobs, is out of scope for this pass.
 model DraftOrder {
-  id            String    @id @default(cuid())
-  storeId       String
-  orderNumber   String
-  customerId    String
-  orderDate     DateTime  @default(now())
-  expectedDate  DateTime?
+  id             String    @id @default(cuid())
+  storeId        String
+  orderNumber    String
+  customerId     String
+  orderDate      DateTime  @default(now())
+  expectedDate   DateTime?
   // DRAFT (just created) -> SENT_TO_KARIGAR (job created) -> RECEIVED
   // (every item matched to a KarigarReceiptItem) -> CANCELLED (only ever
   // reachable from DRAFT). Plain String, same convention as
   // KarigarJob.status/Quotation.status.
-  status        String    @default("DRAFT")
-  karigarJobId  String?   @unique
-  locationId    String?
-  notes         String?
+  status         String    @default("DRAFT")
+  karigarJobId   String?   @unique
+  locationId     String?
+  notes          String?
   // Rough total from each item's estimatedWeight × estimatedRate at order
   // time, not a priced/billed amount — the real total lands on whatever
   // Invoice eventually gets raised once the piece is received (see
   // DraftOrderItem's own comment). Exists only so an advance paid now
   // (paidAmount below) has something sane to be capped against/compared to.
-  estimatedTotal Decimal  @default(0) @db.Decimal(12, 2)
+  estimatedTotal Decimal   @default(0) @db.Decimal(12, 2)
   // Sum of every PAYMENT_IN LedgerEntry linked to this order via
   // LedgerEntry.draftOrderId (below) — an advance collected before the
   // piece even exists, not a payment against a finished sale. Deliberately
@@ -1568,11 +1651,11 @@ model DraftOrder {
   // against — this is a plain CREDIT (an on-account advance) until a real
   // Invoice is eventually raised. Whoever bills that Invoice must apply
   // this advance manually today; there is no automatic carry-forward.
-  paidAmount     Decimal  @default(0) @db.Decimal(12, 2)
-  createdById   String?
-  createdByName String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  paidAmount     Decimal   @default(0) @db.Decimal(12, 2)
+  createdById    String?
+  createdByName  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   store         Store            @relation(fields: [storeId], references: [id])
   customer      Customer         @relation(fields: [customerId], references: [id])
@@ -1596,6 +1679,7 @@ model DraftOrderItem {
   itemName             String
   metalTypeId          String?
   purity               PurityType?
+  purityLabel          String?
   quantity             Int         @default(1)
   estimatedWeight      Decimal?    @db.Decimal(12, 5)
   estimatedRate        Decimal?    @db.Decimal(12, 2)
@@ -1671,6 +1755,7 @@ model QuotationItem {
   itemName           String
   metalTypeId        String?
   purity             PurityType?
+  purityLabel        String?
   quantity           Int             @default(1)
   grossWeight        Decimal?        @db.Decimal(12, 5)
   netWeight          Decimal?        @db.Decimal(12, 5)
@@ -1778,13 +1863,13 @@ model BusinessSettings {
   backupEmail String?
 
   // Invoice preferences
-  invoicePrefix     String     @default("INV")
-  invoiceStartingNo Int        @default(1)
+  invoicePrefix     String          @default("INV")
+  invoiceStartingNo Int             @default(1)
   invoiceTerms      String?
   invoiceNotes      String?
   // Which print layout the Invoice print page renders — see PrintLayout's
   // own doc comment. A store-wide default; not per-invoice.
-  printLayout       PrintLayout    @default(A4)
+  printLayout       PrintLayout     @default(A4)
   // Which of the four professionally-designed A4 templates to render when
   // printLayout is A4 — see InvoiceTemplate's own doc comment. Ignored when
   // printLayout is THERMAL (that format has no template variants).
@@ -1995,7 +2080,6 @@ enum BrandRadius {
  * brand-guide/page.tsx, née the Super-Admin-only static design reference).
  * One row per store, same 1-to-1 shape as BusinessSettings, created lazily
  * on first visit to Branding (see getStoreBranding()).
- *
  * Every color field is nullable and means "use the app's built-in default"
  * when unset — deliberately not backfilled with the current default hex at
  * creation, so a store that never customizes a field keeps tracking
@@ -2009,7 +2093,6 @@ enum BrandRadius {
  * together" into "choose 1 color," at the cost of not offering independent
  * border-color/hover-color pickers, which would mostly just let a store
  * accidentally produce an unreadable combination.
- *
  * Two things stated as NOT customizable per-action, even though they're
  * genuinely per-action requests: **Add and Save both stay tied to
  * accentColor below**, not split into their own fields — today's codebase
@@ -2021,7 +2104,6 @@ enum BrandRadius {
  * both new fields. Genuinely new, distinct sources exist for the other five
  * requested action types (Edit/Delete/Cancel/Export/Import — see each
  * field's own comment), which is what actually made those worth adding.
- *
  * Still fixed, not customizable: the chart-1/3/4/5 categorical module-tint
  * rotation (color-blind-safety validated as a set — see globals.css's own
  * comment on it) and dark mode (always the app's own built-in dark palette,
@@ -2128,14 +2210,18 @@ model ReportSettings {
 
   enabled Boolean @default(false)
 
-  /** Independent checkboxes, not a single choice — a store can enable e.g.
-   *  both MONTHLY and ANNUAL at once and gets a separate email for each
-   *  when they're due. */
+  /**
+   * Independent checkboxes, not a single choice — a store can enable e.g.
+   * both MONTHLY and ANNUAL at once and gets a separate email for each
+   * when they're due.
+   */
   frequencies ReportFrequency[] @default([])
 
-  /** Explicit, store-chosen recipients — deliberately not derived from
-   *  ADMIN users/BusinessSettings.backupEmail (the old daily-report cron's
-   *  implicit list), so a store can send reports to whoever it wants. */
+  /**
+   * Explicit, store-chosen recipients — deliberately not derived from
+   * ADMIN users/BusinessSettings.backupEmail (the old daily-report cron's
+   * implicit list), so a store can send reports to whoever it wants.
+   */
   recipientEmails String[] @default([])
 
   /**
@@ -2567,7 +2653,6 @@ enum ChargeType {
   FIXED
   PERCENTAGE
 }
-
 
 // Which structured layout createProduct's SKU generator uses — a
 // store-picked preset (Settings > Business Settings > SKU Format), not a

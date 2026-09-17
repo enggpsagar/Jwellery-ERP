@@ -8,31 +8,20 @@ import { PurityType } from "@prisma/client";
 import type { ProductFormState } from "@/lib/inventory/product-types";
 import {
   getStoreCategoryTypes,
+  getStoreCategoriesForMetal,
   getStoreMetalOrigins,
+  getStoreMetalPurities,
   type StoreMetalOriginRow,
+  type StoreMetalPurityRow,
 } from "@/lib/actions/taxonomy-actions";
-import { classifyPurityFamily, type PurityFamily } from "@/lib/business-units";
-import { resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity";
+import { classifyPurityFamily } from "@/lib/business-units";
+import { resolveGramsPerCarat, toPrimaryUnit, matchLegacyPurityType } from "@/lib/purity";
 import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select";
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle";
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields";
 import { AddCategoryDialog } from "@/components/inventory/shared/add-category-dialog";
 import { AddCategoryTypeDialog } from "@/components/inventory/shared/add-category-type-dialog";
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog";
-
-// classifyPurityFamily (lib/business-units.ts) decides which purities to
-// offer and whether to show the Carat Weight field — also reused by the
-// Stock list's Type filter, so both classify a metal exactly the same way.
-const PURITY_OPTIONS_BY_METAL: Record<PurityFamily, PurityType[]> = {
-  GOLD: [PurityType.GOLD_24K, PurityType.GOLD_22K, PurityType.GOLD_20K, PurityType.GOLD_18K],
-  SILVER: [PurityType.SILVER_999, PurityType.SILVER_925],
-  PLATINUM: [PurityType.PLATINUM_950, PurityType.PLATINUM_900],
-  DIAMOND: [PurityType.DIAMOND],
-  // No PurityType exists for loose gemstone grades — OTHER is the closest
-  // fit, same catch-all a non-purity-tracked metal already uses.
-  STONE: [PurityType.OTHER],
-  OTHER: [PurityType.OTHER],
-};
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,6 +74,7 @@ type Product = {
   targetStyleId: string | null;
   stoneOriginOptionId: string | null;
   defaultPurity: string | null;
+  storeMetalPurityId: string | null;
   defaultMakingCharge: string | null;
   defaultMakingChargeType: "FIXED" | "PERCENTAGE" | null;
   defaultStoneCharge: string | null;
@@ -185,10 +175,32 @@ export function ProductForm({
   // Local state (not the raw `categories` prop) for the same reason
   // `metals`/`origins` below are local — the inline "Add Category" dialog
   // needs to append a newly-created row and select it without a full page
-  // reload, mid-way through filling out the rest of this form.
+  // reload, mid-way through filling out the rest of this form. Re-fetched
+  // per selected Metal (see the effect below) — a category with no
+  // "applicable metals" tags stays universal, one tagged to specific
+  // metals only shows once one of those is selected.
   const [categories, setCategories] = useState(initialCategories);
   const [categorySearch, setCategorySearch] = useState("");
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCategoriesForMetal() {
+      try {
+        const data = await getStoreCategoriesForMetal(metalTypeId);
+        if (!cancelled) setCategories(data);
+      } catch (err) {
+        console.error("Failed to load categories for metal:", err);
+      }
+    }
+
+    loadCategoriesForMetal();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [metalTypeId]);
 
   const filteredCategories = useMemo(() => {
     const query = categorySearch.trim().toLowerCase();
@@ -230,6 +242,14 @@ export function ProductForm({
   const previousCategoryIdRef = useRef(categoryId);
   const previousMetalTypeIdRef = useRef(metalTypeId);
 
+  // The real per-Metal Purity selection (Settings > Taxonomy > Purities) —
+  // the source of truth going forward. defaultPurity (the legacy enum,
+  // below) is kept in sync from it purely so the existing gramsPerCarat/
+  // carat-family math further down (all keyed on the enum) keeps working
+  // unchanged — see the sync effect right after metalPurities loads.
+  const [storeMetalPurityId, setStoreMetalPurityId] = useState(
+    product?.storeMetalPurityId ?? "",
+  );
   const [defaultPurity, setDefaultPurity] = useState(
     product?.defaultPurity ?? "__none__",
   );
@@ -260,30 +280,59 @@ export function ProductForm({
   const metalFamily = selectedMetal
     ? classifyPurityFamily(selectedMetal)
     : null;
-  const availablePurities = metalFamily
-    ? PURITY_OPTIONS_BY_METAL[metalFamily]
-    : Object.values(PurityType);
 
+  // Real per-Metal Purity options (Settings > Taxonomy > Purities), fetched
+  // for whichever Metal is currently selected — replaces the old hardcoded
+  // PURITY_OPTIONS_BY_METAL map. Only meaningful in Metal mode; Stone mode
+  // has no purity concept of its own (see the Purity field's own render
+  // gate further down).
+  const [metalPurities, setMetalPurities] = useState<StoreMetalPurityRow[]>([]);
+  const [loadingMetalPurities, setLoadingMetalPurities] = useState(false);
   const [puritySearch, setPuritySearch] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPurities() {
+      if (!metalTypeId || productKind !== "METAL") {
+        setMetalPurities([]);
+        return;
+      }
+
+      try {
+        setLoadingMetalPurities(true);
+        const data = await getStoreMetalPurities(metalTypeId);
+        if (!cancelled) setMetalPurities(data);
+      } catch (err) {
+        console.error("Failed to load purities:", err);
+        if (!cancelled) setMetalPurities([]);
+      } finally {
+        if (!cancelled) setLoadingMetalPurities(false);
+      }
+    }
+
+    loadPurities();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [metalTypeId, productKind]);
 
   const filteredPurities = useMemo(() => {
     const query = puritySearch.trim().toLowerCase();
-    if (!query) return availablePurities;
-    return availablePurities.filter((item) =>
-      item.replaceAll("_", " ").toLowerCase().includes(query),
-    );
-  }, [availablePurities, puritySearch]);
+    if (!query) return metalPurities;
+    return metalPurities.filter((item) => item.label.toLowerCase().includes(query));
+  }, [metalPurities, puritySearch]);
 
-  // Switching metal (or its purity family no longer including what was
-  // picked) clears a now-invalid Default Purity rather than silently
-  // submitting a Gold purity against a Silver product.
+  // Keeps the legacy defaultPurity enum in sync with whichever real Purity
+  // is selected, purely so gramsPerCarat/carat-family math further down
+  // (still keyed on the enum) keeps working unchanged — see this state's
+  // own doc comment above.
   useEffect(() => {
-    if (defaultPurity === "__none__") return;
-    if (!availablePurities.includes(defaultPurity as PurityType)) {
-      setDefaultPurity("__none__");
-    }
+    const selected = metalPurities.find((item) => item.id === storeMetalPurityId);
+    setDefaultPurity(matchLegacyPurityType(metalFamily, selected?.label) ?? "__none__");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metalTypeId]);
+  }, [storeMetalPurityId, metalPurities]);
 
   const [isActive, setIsActive] = useState(
     product?.isActive === false ? "false" : "true",
@@ -596,12 +645,14 @@ export function ProductForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metalTypeId, selectedMetal?.isGemstone]);
 
-  // Only reset the selected Stone Type when the Metal actually changes as a
-  // result of user interaction — not on initial mount (edit mode needs to
-  // keep the product's existing Stone Type selected while options load).
+  // Only reset the selected Stone Type/Purity when the Metal actually
+  // changes as a result of user interaction — not on initial mount (edit
+  // mode needs to keep the product's existing selection while options
+  // load).
   useEffect(() => {
     if (previousMetalTypeIdRef.current !== metalTypeId) {
       setStoneOriginOptionId("");
+      setStoreMetalPurityId("");
       previousMetalTypeIdRef.current = metalTypeId;
     }
   }, [metalTypeId]);
@@ -898,11 +949,11 @@ export function ProductForm({
               purity list. */}
           {productKind === "METAL" && (
           <div>
-            <Label>Default Purity</Label>
+            <Label>Purity</Label>
 
             <Select
-              value={defaultPurity}
-              onValueChange={setDefaultPurity}
+              value={storeMetalPurityId || "__none__"}
+              onValueChange={(value) => setStoreMetalPurityId(value === "__none__" ? "" : value)}
               disabled={selectedMetal ? !selectedMetal.hasPurity : false}
             >
               <SelectTrigger className="h-11 w-full">
@@ -910,13 +961,15 @@ export function ProductForm({
                   placeholder={
                     selectedMetal && !selectedMetal.hasPurity
                       ? "Not applicable for this metal"
-                      : "Select Purity"
+                      : loadingMetalPurities
+                        ? "Loading purities..."
+                        : "Select Purity"
                   }
                 />
               </SelectTrigger>
 
               <SelectContent>
-                {availablePurities.length > 5 && (
+                {metalPurities.length > 5 && (
                   <div className="p-2">
                     <Input
                       placeholder="Search purities..."
@@ -935,8 +988,8 @@ export function ProductForm({
                   </div>
                 ) : (
                   filteredPurities.map((item) => (
-                    <SelectItem key={item} value={item}>
-                      {item.replaceAll("_", " ")}
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.label}
                     </SelectItem>
                   ))
                 )}
@@ -946,11 +999,14 @@ export function ProductForm({
             {selectedMetal && (
               <p className="mt-1 text-xs text-muted-foreground">
                 {selectedMetal.hasPurity
-                  ? `Showing ${metalFamily?.toLowerCase() ?? "matching"} purities for ${selectedMetal.name}.`
+                  ? metalPurities.length === 0 && !loadingMetalPurities
+                    ? `No purities configured for ${selectedMetal.name} yet — add them under Settings → Taxonomy → Purities.`
+                    : `Showing purities configured for ${selectedMetal.name}.`
                   : `${selectedMetal.name} doesn't track purity.`}
               </p>
             )}
 
+            <input type="hidden" name="storeMetalPurityId" value={storeMetalPurityId} />
             <input
               type="hidden"
               name="defaultPurity"

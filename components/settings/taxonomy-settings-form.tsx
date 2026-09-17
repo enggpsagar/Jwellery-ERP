@@ -14,15 +14,21 @@ import {
   upsertStoreMetalOrigin,
   toggleStoreMetalOriginActive,
   deleteStoreMetalOrigin,
+  getStoreMetalPurities,
+  upsertStoreMetalPurity,
+  toggleStoreMetalPurityActive,
+  deleteStoreMetalPurity,
   upsertStoreCategory,
   toggleStoreCategoryActive,
   deleteStoreCategory,
+  updateStoreCategoryMetalTags,
   getStoreCategoryTypes,
   upsertStoreCategoryType,
   toggleStoreCategoryTypeActive,
   deleteStoreCategoryType,
   type StoreMetalRow,
   type StoreMetalOriginRow,
+  type StoreMetalPurityRow,
   type StoreCategoryRow,
   type StoreCategoryTypeRow,
   type TaxonomyFormState,
@@ -74,13 +80,15 @@ export function TaxonomySettingsForm({
     <div className="space-y-6">
       <MetalsSection metals={metalRows} canEdit={canEdit} />
 
+      <PuritiesSection metals={metalRows} canEdit={canEdit} />
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <StonesSection stones={stoneRows} canEdit={canEdit} />
         <StoneTypesSection stones={stoneRows} canEdit={canEdit} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <CategoriesSection categories={categories} canEdit={canEdit} />
+        <CategoriesSection categories={categories} metals={metalRows.concat(stoneRows)} canEdit={canEdit} />
         <TypesSection categories={categories} canEdit={canEdit} />
       </div>
     </div>
@@ -892,6 +900,378 @@ function StoneTypeFormRow({
         ) : null}
       </div>
 
+      <div className="w-32 space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+        <Label htmlFor="stone-type-carat" required>Grams / Carat</Label>
+        <Input
+          id="stone-type-carat"
+          name="gramsPerCarat"
+          type="number"
+          step="0.0001"
+          min="0"
+          defaultValue={option?.gramsPerCarat ?? 0.2}
+          required
+        />
+        {state.errors?.gramsPerCarat?.[0] ? (
+          <p className="text-sm text-red-600">{state.errors.gramsPerCarat[0]}</p>
+        ) : null}
+      </div>
+
+      <div className="w-36 space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+        <Label htmlFor="stone-type-rate">Selling Price</Label>
+        <Input
+          id="stone-type-rate"
+          name="sellingPrice"
+          type="number"
+          step="0.01"
+          min="0"
+          defaultValue={option?.sellingPrice ?? ""}
+          placeholder="Optional"
+        />
+      </div>
+
+      <div className="flex justify-end gap-2 pb-0.5">
+        <Button type="button" size="sm" variant="outline" onClick={onDone}>
+          Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? <Loader className="h-4 w-4" /> : option ? "Update" : "Save"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Purities — real per-Metal Purity options (Gold -> 18K/20K/22K/24K, etc),
+// replacing the old global PurityType enum. Mirrors Stone Types above
+// exactly, just scoped to a hasPurity Metal instead of a gemstone.
+// ---------------------------------------------------------------------------
+
+function PuritiesSection({
+  metals,
+  canEdit,
+}: {
+  metals: StoreMetalRow[];
+  canEdit: boolean;
+}) {
+  const toast = useToast();
+
+  const [selectedMetalId, setSelectedMetalId] = useState("");
+  const [purities, setPurities] = useState<StoreMetalPurityRow[]>([]);
+  const [loadingPurities, setLoadingPurities] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const purityEligibleMetals = metals.filter((metal) => metal.hasPurity);
+
+  const reloadPurities = React.useCallback(async (storeMetalId: string) => {
+    if (!storeMetalId) {
+      setPurities([]);
+      return;
+    }
+
+    try {
+      const data = await getStoreMetalPurities(storeMetalId);
+      setPurities(data);
+    } catch (error) {
+      console.error("Failed to reload purities:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPurities() {
+      if (!selectedMetalId) {
+        setPurities([]);
+        return;
+      }
+
+      try {
+        setLoadingPurities(true);
+        const data = await getStoreMetalPurities(selectedMetalId);
+        if (!cancelled) setPurities(data);
+      } catch (error) {
+        console.error("Failed to load purities:", error);
+        if (!cancelled) setPurities([]);
+      } finally {
+        if (!cancelled) setLoadingPurities(false);
+      }
+    }
+
+    setEditingId(null);
+    setShowAdd(false);
+    loadPurities();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMetalId]);
+
+  async function handleToggle(id: string, isActive: boolean) {
+    try {
+      setTogglingId(id);
+      const result = await toggleStoreMetalPurityActive(id, isActive);
+      if (result.success) {
+        toast.success(result.message);
+        await reloadPurities(selectedMetalId);
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update purity");
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
+  async function handleDelete(id: string, label: string) {
+    if (!window.confirm(`Delete "${label}"? This can't be undone — it only works if nothing uses it yet.`)) return
+    try {
+      setDeletingId(id);
+      const result = await deleteStoreMetalPurity(id);
+      if (result.success) {
+        toast.success(result.message);
+        await reloadPurities(selectedMetalId);
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete purity");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Purities</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Purity options scoped under a metal, e.g. 18K/20K/22K/24K under
+          Gold — add as many as your store deals in. Replaces the old
+          Settings &gt; Purity page.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="max-w-xs space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+          <Label>Metal</Label>
+          <Select value={selectedMetalId} onValueChange={setSelectedMetalId}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select a metal" />
+            </SelectTrigger>
+            <SelectContent>
+              {purityEligibleMetals.map((metal) => (
+                <SelectItem key={metal.id} value={metal.id}>
+                  {metal.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {!selectedMetalId ? (
+          <p className="text-sm text-muted-foreground">
+            Select a metal to manage its Purities.
+          </p>
+        ) : loadingPurities ? (
+          <p className="text-sm text-muted-foreground">Loading purities...</p>
+        ) : (
+          <div className="space-y-3">
+            {purities.length === 0 && !showAdd ? (
+              <p className="text-sm text-muted-foreground">
+                No purities configured for this metal yet.
+              </p>
+            ) : null}
+
+            {purities.map((option) =>
+              editingId === option.id ? (
+                <PurityFormRow
+                  key={option.id}
+                  option={option}
+                  storeMetalId={selectedMetalId}
+                  onDone={() => setEditingId(null)}
+                  onSaved={() => reloadPurities(selectedMetalId)}
+                />
+              ) : (
+                <div
+                  key={option.id}
+                  className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+                >
+                  <div className={option.isActive ? "" : "text-muted-foreground line-through"}>
+                    <span className="font-medium">{option.label}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      SKU "{option.skuCode}" &middot; {option.finenessPercent}% fine
+                      {option.sellingPrice != null ? ` · ₹${option.sellingPrice}` : ""}
+                      {option.isHallmarkable ? " · Hallmarkable" : ""}
+                    </span>
+                  </div>
+
+                  {canEdit ? (
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={option.isActive}
+                        disabled={togglingId === option.id}
+                        onCheckedChange={(checked) => handleToggle(option.id, checked)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(option.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                        aria-label={`Edit ${option.label}`}
+                        title="Edit Purity"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(option.id, option.label)}
+                        disabled={deletingId === option.id}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                        aria-label={`Delete ${option.label}`}
+                        title="Delete Purity (only if unused)"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <ActiveBadge isActive={option.isActive} />
+                  )}
+                </div>
+              ),
+            )}
+
+            {canEdit ? (
+              showAdd ? (
+                <PurityFormRow
+                  storeMetalId={selectedMetalId}
+                  onDone={() => setShowAdd(false)}
+                  onSaved={() => reloadPurities(selectedMetalId)}
+                />
+              ) : (
+                <Button type="button" className="gap-2" onClick={() => setShowAdd(true)}>
+                  <Plus className="h-4 w-4" />
+                  Add Purity
+                </Button>
+              )
+            ) : null}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PurityFormRow({
+  option,
+  storeMetalId,
+  onDone,
+  onSaved,
+}: {
+  option?: StoreMetalPurityRow;
+  storeMetalId: string;
+  onDone: () => void;
+  onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [state, formAction, pending] = useActionState(upsertStoreMetalPurity, initialState);
+  const [isHallmarkable, setIsHallmarkable] = useState(option?.isHallmarkable ?? false);
+
+  useEffect(() => {
+    if (state.success) {
+      toast.success(state.message);
+      onSaved();
+      onDone();
+    } else if (state.message && !state.success) {
+      toast.error(state.message);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault()
+        formAction(new FormData(event.currentTarget))
+      }}
+      className="flex flex-wrap items-end gap-3 rounded-md border border-dashed p-3"
+    >
+      <input type="hidden" name="id" value={option?.id ?? ""} />
+      <input type="hidden" name="storeMetalId" value={storeMetalId} />
+      <input type="hidden" name="isHallmarkable" value={isHallmarkable ? "true" : "false"} />
+
+      <div className="w-28 space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+        <Label htmlFor="purity-label" required>Label</Label>
+        <Input
+          id="purity-label"
+          name="label"
+          defaultValue={option?.label ?? ""}
+          placeholder="e.g. 22K"
+          required
+        />
+        {state.errors?.label?.[0] ? (
+          <p className="text-sm text-red-600">{state.errors.label[0]}</p>
+        ) : null}
+      </div>
+
+      <div className="w-24 space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+        <Label htmlFor="purity-sku" required>SKU Code</Label>
+        <Input
+          id="purity-sku"
+          name="skuCode"
+          defaultValue={option?.skuCode ?? ""}
+          placeholder="e.g. 22"
+          required
+        />
+        {state.errors?.skuCode?.[0] ? (
+          <p className="text-sm text-red-600">{state.errors.skuCode[0]}</p>
+        ) : null}
+      </div>
+
+      <div className="w-28 space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+        <Label htmlFor="purity-fineness" required>Fineness %</Label>
+        <Input
+          id="purity-fineness"
+          name="finenessPercent"
+          type="number"
+          step="0.01"
+          min="0"
+          max="100"
+          defaultValue={option?.finenessPercent ?? 100}
+          required
+        />
+        {state.errors?.finenessPercent?.[0] ? (
+          <p className="text-sm text-red-600">{state.errors.finenessPercent[0]}</p>
+        ) : null}
+      </div>
+
+      <div className="w-32 space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+        <Label htmlFor="purity-rate">Selling Price</Label>
+        <Input
+          id="purity-rate"
+          name="sellingPrice"
+          type="number"
+          step="0.01"
+          min="0"
+          defaultValue={option?.sellingPrice ?? ""}
+          placeholder="Optional"
+        />
+      </div>
+
+      <label className="flex items-center gap-2 pb-2 text-sm">
+        <input
+          type="checkbox"
+          checked={isHallmarkable}
+          onChange={(event) => setIsHallmarkable(event.target.checked)}
+          className="h-4 w-4 rounded border-input"
+        />
+        Hallmarkable
+      </label>
+
       <div className="flex justify-end gap-2 pb-0.5">
         <Button type="button" size="sm" variant="outline" onClick={onDone}>
           Cancel
@@ -910,9 +1290,11 @@ function StoneTypeFormRow({
 
 function CategoriesSection({
   categories,
+  metals,
   canEdit,
 }: {
   categories: StoreCategoryRow[];
+  metals: StoreMetalRow[];
   canEdit: boolean;
 }) {
   const router = useRouter();
@@ -981,44 +1363,45 @@ function CategoriesSection({
               onDone={() => setEditingId(null)}
             />
           ) : (
-            <div
-              key={category.id}
-              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-            >
-              <span className={category.isActive ? "" : "text-muted-foreground line-through"}>
-                {category.name}
-              </span>
+            <div key={category.id} className="space-y-2 rounded-md border px-3 py-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className={category.isActive ? "" : "text-muted-foreground line-through"}>
+                  {category.name}
+                </span>
 
-              {canEdit ? (
-                <div className="flex items-center gap-3">
-                  <Switch
-                    checked={category.isActive}
-                    disabled={togglingId === category.id}
-                    onCheckedChange={(checked) => handleToggle(category.id, checked)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(category.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                    aria-label={`Edit ${category.name}`}
-                    title="Edit category"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(category.id, category.name)}
-                    disabled={deletingId === category.id}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                    aria-label={`Delete ${category.name}`}
-                    title="Delete category (only if unused)"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <ActiveBadge isActive={category.isActive} />
-              )}
+                {canEdit ? (
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={category.isActive}
+                      disabled={togglingId === category.id}
+                      onCheckedChange={(checked) => handleToggle(category.id, checked)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(category.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                      aria-label={`Edit ${category.name}`}
+                      title="Edit category"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(category.id, category.name)}
+                      disabled={deletingId === category.id}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                      aria-label={`Delete ${category.name}`}
+                      title="Delete category (only if unused)"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <ActiveBadge isActive={category.isActive} />
+                )}
+              </div>
+
+              <CategoryMetalTags category={category} metals={metals} canEdit={canEdit} />
             </div>
           ),
         )}
@@ -1108,6 +1491,70 @@ function CategoryFormRow({
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * "Applicable Metals" — which Metals/Stones this category is restricted to.
+ * No tags checked at all means universal (shown for every metal, matching
+ * every category's behavior before this existed) — see
+ * StoreCategory.metalTags' own doc comment in schema.prisma.
+ */
+function CategoryMetalTags({
+  category,
+  metals,
+  canEdit,
+}: {
+  category: StoreCategoryRow;
+  metals: StoreMetalRow[];
+  canEdit: boolean;
+}) {
+  const toast = useToast();
+  const router = useRouter();
+  const [tagIds, setTagIds] = useState<string[]>(category.metalTagIds);
+  const [saving, setSaving] = useState(false);
+
+  async function toggleTag(storeMetalId: string, checked: boolean) {
+    const next = checked ? [...tagIds, storeMetalId] : tagIds.filter((id) => id !== storeMetalId);
+    setTagIds(next);
+    setSaving(true);
+    try {
+      const result = await updateStoreCategoryMetalTags(category.id, next);
+      if (result.success) {
+        router.refresh();
+      } else {
+        toast.error(result.message);
+        setTagIds(tagIds);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update applicable metals");
+      setTagIds(tagIds);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pl-0.5 text-xs text-muted-foreground">
+      <span className="font-medium">Applicable to:</span>
+      {tagIds.length === 0 && !canEdit ? <span>All metals</span> : null}
+      {metals.map((metal) => (
+        <label key={metal.id} className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={tagIds.includes(metal.id)}
+            disabled={!canEdit || saving}
+            onChange={(event) => toggleTag(metal.id, event.target.checked)}
+            className="h-3.5 w-3.5 rounded border-input"
+          />
+          {metal.name}
+        </label>
+      ))}
+      {tagIds.length === 0 && canEdit ? (
+        <span className="italic">(none checked = all metals)</span>
+      ) : null}
+    </div>
   );
 }
 

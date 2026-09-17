@@ -99,6 +99,12 @@ export function composeSkuPrefix(
 export function buildSkuPrefix(params: {
   metalName: string;
   purity: PurityType | null | undefined;
+  /** A real per-Metal Purity's own StoreMetalPurity.skuCode (Settings >
+   * Taxonomy) — takes priority over `purity` above when present, since it's
+   * the store-configurable source of truth going forward; `purity` (the
+   * legacy enum) stays as the fallback for a product that predates this or
+   * for a metal with no per-metal Purity configured (e.g. a plain Stone). */
+  purityCode?: string | null | undefined;
   /** Null/blank when the store has Style turned off (Settings > Taxonomy)
    * or this product has no style set — that segment is simply omitted from
    * the SKU, same "blank group dropped" convention joinGroups already uses
@@ -113,7 +119,7 @@ export function buildSkuPrefix(params: {
 
   return composeSkuPrefix(params.format ?? "METAL_PURITY_STYLE_CATEGORY", {
     metalInitial: initial(params.metalName),
-    purityDigits: purityNumber(params.purity) ?? "",
+    purityDigits: params.purityCode || purityNumber(params.purity) || "",
     targetInitial: params.targetStyleName ? initial(params.targetStyleName) : "",
     categoryInitial: initial(typeLabel),
   });

@@ -30,6 +30,7 @@ type EditProductFormProps = {
     targetStyleId: string | null;
     stoneOriginOptionId: string | null;
     defaultPurity: string | null;
+    storeMetalPurityId: string | null;
     defaultMakingCharge: string | null;
     defaultMakingChargeType: "FIXED" | "PERCENTAGE" | null;
     defaultStoneCharge: string | null;

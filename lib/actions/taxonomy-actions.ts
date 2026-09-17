@@ -38,12 +38,35 @@ export type StoreMetalOriginRow = {
   storeMetalId: string;
   name: string;
   isActive: boolean;
+  // 1 ct = 0.2g by default, overridable per Stone Type — see the field's
+  // own doc comment in schema.prisma.
+  gramsPerCarat: number;
+  sellingPrice: number | null;
+};
+
+// A single Purity option under a real (hasPurity) Metal — e.g. "22K" under
+// Gold. Replaces the old global PurityType enum + its three enum-keyed
+// Settings tables (PurityFineness/CaratConversionRate/MetalSellingRate).
+export type StoreMetalPurityRow = {
+  id: string;
+  storeMetalId: string;
+  label: string;
+  skuCode: string;
+  finenessPercent: number;
+  sellingPrice: number | null;
+  isHallmarkable: boolean;
+  sortOrder: number;
+  isActive: boolean;
 };
 
 export type StoreCategoryRow = {
   id: string;
   name: string;
   isActive: boolean;
+  // Which Metals this category is restricted to — empty means universal
+  // (shown regardless of the selected Metal), matching every category's
+  // behavior before this existed. See StoreCategoryMetal in schema.prisma.
+  metalTagIds: string[];
 };
 
 export type StoreStyleRow = {
@@ -338,6 +361,8 @@ export async function getAllStoreMetalOrigins(): Promise<StoreMetalOriginRow[]> 
     storeMetalId: option.storeMetalId,
     name: option.name,
     isActive: option.isActive,
+    gramsPerCarat: Number(option.gramsPerCarat),
+    sellingPrice: option.sellingPrice != null ? Number(option.sellingPrice) : null,
   }));
 }
 
@@ -358,6 +383,8 @@ export async function getStoreMetalOrigins(
     storeMetalId: option.storeMetalId,
     name: option.name,
     isActive: option.isActive,
+    gramsPerCarat: Number(option.gramsPerCarat),
+    sellingPrice: option.sellingPrice != null ? Number(option.sellingPrice) : null,
   }));
 }
 
@@ -378,11 +405,18 @@ export async function upsertStoreMetalOrigin(
     const id = String(formData.get("id") || "").trim();
     const storeMetalId = String(formData.get("storeMetalId") || "").trim();
     const name = String(formData.get("name") || "").trim();
+    const gramsPerCaratRaw = String(formData.get("gramsPerCarat") || "").trim();
+    const sellingPriceRaw = String(formData.get("sellingPrice") || "").trim();
+    const gramsPerCarat = gramsPerCaratRaw ? Number(gramsPerCaratRaw) : 0.2;
+    const sellingPrice = sellingPriceRaw ? Number(sellingPriceRaw) : null;
 
     const errors: Record<string, string[]> = {};
     if (!storeMetalId) errors.storeMetalId = ["Stone is required"];
     if (!name) errors.name = ["Type name is required"];
     else if (name.length > 60) errors.name = ["Type name must be 60 characters or fewer"];
+    if (!Number.isFinite(gramsPerCarat) || gramsPerCarat <= 0) {
+      errors.gramsPerCarat = ["Grams per carat must be a positive number"];
+    }
 
     if (Object.keys(errors).length > 0) {
       return { success: false, message: "Please fix the form errors", errors };
@@ -423,7 +457,7 @@ export async function upsertStoreMetalOrigin(
     if (id) {
       const { count } = await prisma.storeMetalOrigin.updateMany({
         where: { id, storeId },
-        data: { name, storeMetalId },
+        data: { name, storeMetalId, gramsPerCarat, sellingPrice },
       });
 
       if (count === 0) {
@@ -431,7 +465,7 @@ export async function upsertStoreMetalOrigin(
       }
     } else {
       const created = await prisma.storeMetalOrigin.create({
-        data: { storeId, storeMetalId, name },
+        data: { storeId, storeMetalId, name, gramsPerCarat, sellingPrice },
         select: { id: true },
       });
       savedId = created.id;
@@ -531,6 +565,219 @@ export async function deleteStoreMetalOrigin(id: string): Promise<TaxonomyFormSt
 }
 
 // ---------------------------------------------------------------------------
+// Store Metal Purities — real per-Metal Purity options (Gold -> 18K/20K/
+// 22K/24K, etc), replacing the old global PurityType enum. Mirrors the
+// Store Metal Origins ("Stone Types") CRUD above exactly, just scoped to a
+// hasPurity Metal instead of a gemstone.
+// ---------------------------------------------------------------------------
+
+export async function getStoreMetalPurities(
+  storeMetalId: string,
+): Promise<StoreMetalPurityRow[]> {
+  const storeId = await getStoreIdForRead();
+
+  if (!storeMetalId) return [];
+
+  const purities = await prisma.storeMetalPurity.findMany({
+    where: { storeMetalId, storeId },
+    orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+  });
+
+  return purities.map((row) => ({
+    id: row.id,
+    storeMetalId: row.storeMetalId,
+    label: row.label,
+    skuCode: row.skuCode,
+    finenessPercent: Number(row.finenessPercent),
+    sellingPrice: row.sellingPrice != null ? Number(row.sellingPrice) : null,
+    isHallmarkable: row.isHallmarkable,
+    sortOrder: row.sortOrder,
+    isActive: row.isActive,
+  }));
+}
+
+export async function upsertStoreMetalPurity(
+  prevState: TaxonomyFormState,
+  formData: FormData,
+): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return {
+      success: false,
+      message: "Only the Store Owner can update these settings.",
+    };
+  }
+
+  try {
+    const id = String(formData.get("id") || "").trim();
+    const storeMetalId = String(formData.get("storeMetalId") || "").trim();
+    const label = String(formData.get("label") || "").trim();
+    const skuCode = String(formData.get("skuCode") || "").trim();
+    const finenessPercentRaw = String(formData.get("finenessPercent") || "").trim();
+    const sellingPriceRaw = String(formData.get("sellingPrice") || "").trim();
+    const isHallmarkable = formData.get("isHallmarkable") === "true";
+    const finenessPercent = finenessPercentRaw ? Number(finenessPercentRaw) : 100;
+    const sellingPrice = sellingPriceRaw ? Number(sellingPriceRaw) : null;
+
+    const errors: Record<string, string[]> = {};
+    if (!storeMetalId) errors.storeMetalId = ["Metal is required"];
+    if (!label) errors.label = ["Purity label is required"];
+    else if (label.length > 40) errors.label = ["Purity label must be 40 characters or fewer"];
+    if (!skuCode) errors.skuCode = ["SKU code is required"];
+    else if (skuCode.length > 20) errors.skuCode = ["SKU code must be 20 characters or fewer"];
+    if (!Number.isFinite(finenessPercent) || finenessPercent <= 0 || finenessPercent > 100) {
+      errors.finenessPercent = ["Fineness must be between 0 and 100"];
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return { success: false, message: "Please fix the form errors", errors };
+    }
+
+    const storeId = await requireStoreScope();
+
+    const metal = await prisma.storeMetal.findFirst({
+      where: { id: storeMetalId, storeId },
+      select: { id: true },
+    });
+
+    if (!metal) {
+      return {
+        success: false,
+        message: "Please fix the form errors",
+        errors: { storeMetalId: ["Metal not found"] },
+      };
+    }
+
+    const existing = await prisma.storeMetalPurity.findFirst({
+      where: { storeMetalId, label, NOT: id ? { id } : undefined },
+      select: { id: true },
+    });
+
+    if (existing) {
+      return {
+        success: false,
+        message: "A purity with this label already exists for this metal",
+        errors: {
+          label: ["A purity with this label already exists for this metal"],
+        },
+      };
+    }
+
+    let savedId = id;
+    const data = { label, skuCode, finenessPercent, sellingPrice, isHallmarkable, storeMetalId };
+
+    if (id) {
+      const { count } = await prisma.storeMetalPurity.updateMany({
+        where: { id, storeId },
+        data,
+      });
+
+      if (count === 0) {
+        return { success: false, message: "Purity not found" };
+      }
+    } else {
+      const created = await prisma.storeMetalPurity.create({
+        data: { storeId, ...data },
+        select: { id: true },
+      });
+      savedId = created.id;
+    }
+
+    revalidatePath(TAXONOMY_PATH);
+
+    return {
+      success: true,
+      id: savedId,
+      message: id ? "Purity updated successfully" : "Purity added successfully",
+    };
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return {
+        success: false,
+        message: "A purity with this label already exists for this metal",
+        errors: {
+          label: ["A purity with this label already exists for this metal"],
+        },
+      };
+    }
+    logger.error("upsertStoreMetalPurity error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to save purity") };
+  }
+}
+
+export async function toggleStoreMetalPurityActive(
+  id: string,
+  isActive: boolean,
+): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return {
+      success: false,
+      message: "Only the Store Owner can update these settings.",
+    };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const { count } = await prisma.storeMetalPurity.updateMany({
+      where: { id, storeId },
+      data: { isActive },
+    });
+
+    if (count === 0) {
+      return { success: false, message: "Purity not found" };
+    }
+
+    revalidatePath(TAXONOMY_PATH);
+
+    return {
+      success: true,
+      message: isActive ? "Purity activated" : "Purity deactivated",
+    };
+  } catch (error) {
+    logger.error("toggleStoreMetalPurityActive error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to update purity") };
+  }
+}
+
+export async function deleteStoreMetalPurity(id: string): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return { success: false, message: "Only a Store Admin or Super Admin can delete a purity." };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const row = await prisma.storeMetalPurity.findFirst({
+      where: { id, storeId },
+      include: { _count: { select: { products: true } } },
+    });
+
+    if (!row) return { success: false, message: "Purity not found" };
+
+    if (row._count.products > 0) {
+      return {
+        success: false,
+        message: `This purity is used by ${row._count.products} product(s) and cannot be deleted. Disable it instead.`,
+      };
+    }
+
+    await prisma.storeMetalPurity.delete({ where: { id } });
+    revalidatePath(TAXONOMY_PATH);
+
+    return { success: true, message: "Purity deleted" };
+  } catch (error) {
+    logger.error("deleteStoreMetalPurity error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to delete purity") };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Store Categories
 // ---------------------------------------------------------------------------
 
@@ -540,13 +787,94 @@ export async function getStoreCategories(): Promise<StoreCategoryRow[]> {
   const categories = await prisma.storeCategory.findMany({
     where: { storeId },
     orderBy: { name: "asc" },
+    include: { metalTags: { select: { storeMetalId: true } } },
   });
 
   return categories.map((category) => ({
     id: category.id,
     name: category.name,
     isActive: category.isActive,
+    metalTagIds: category.metalTags.map((tag) => tag.storeMetalId),
   }));
+}
+
+/**
+ * Which Categories are usable for a given Metal — every category with no
+ * tags at all (universal) plus any tagged specifically to this metal. Used
+ * by the entry forms (Product/Purchase/Invoice/...) to filter the Category
+ * picker once a Metal/Stone is chosen; getStoreCategories above (untargeted)
+ * is what Settings > Taxonomy itself uses to manage the full list + tags.
+ */
+export async function getStoreCategoriesForMetal(
+  storeMetalId: string,
+): Promise<StoreCategoryRow[]> {
+  if (!storeMetalId) return getStoreCategories();
+
+  const storeId = await getStoreIdForRead();
+
+  const categories = await prisma.storeCategory.findMany({
+    where: {
+      storeId,
+      OR: [{ metalTags: { none: {} } }, { metalTags: { some: { storeMetalId } } }],
+    },
+    orderBy: { name: "asc" },
+    include: { metalTags: { select: { storeMetalId: true } } },
+  });
+
+  return categories.map((category) => ({
+    id: category.id,
+    name: category.name,
+    isActive: category.isActive,
+    metalTagIds: category.metalTags.map((tag) => tag.storeMetalId),
+  }));
+}
+
+/**
+ * Replaces a Category's full set of "applicable metals" tags in one call —
+ * simpler for a multiselect UI than diffing add/remove one at a time.
+ * Passing an empty array makes the category universal again.
+ */
+export async function updateStoreCategoryMetalTags(
+  categoryId: string,
+  storeMetalIds: string[],
+): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return {
+      success: false,
+      message: "Only the Store Owner can update these settings.",
+    };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const category = await prisma.storeCategory.findFirst({
+      where: { id: categoryId, storeId },
+      select: { id: true },
+    });
+
+    if (!category) return { success: false, message: "Category not found" };
+
+    await prisma.$transaction([
+      prisma.storeCategoryMetal.deleteMany({ where: { storeCategoryId: categoryId } }),
+      ...(storeMetalIds.length > 0
+        ? [
+            prisma.storeCategoryMetal.createMany({
+              data: storeMetalIds.map((storeMetalId) => ({ storeCategoryId: categoryId, storeMetalId })),
+            }),
+          ]
+        : []),
+    ]);
+
+    revalidatePath(TAXONOMY_PATH);
+
+    return { success: true, message: "Applicable metals updated" };
+  } catch (error) {
+    logger.error("updateStoreCategoryMetalTags error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to update applicable metals") };
+  }
 }
 
 export async function upsertStoreCategory(

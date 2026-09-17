@@ -751,6 +751,153 @@ export function ProductForm({
             <ErrorText error={state.errors.metalTypeId} />
           </div>
 
+          {/* Purity/Stone Type + Includes-a-Stone follow Metal Type directly
+              (Metal -> Metal Type -> Purity -> Category -> Type) instead of
+              a separate card lower down. */}
+          {productKind === "METAL" && (
+          <div>
+            <Label>Purity</Label>
+
+            <Select
+              value={storeMetalPurityId || "__none__"}
+              onValueChange={(value) => setStoreMetalPurityId(value === "__none__" ? "" : value)}
+              disabled={selectedMetal ? !selectedMetal.hasPurity : false}
+            >
+              <SelectTrigger className="h-11 w-full">
+                <SelectValue
+                  placeholder={
+                    selectedMetal && !selectedMetal.hasPurity
+                      ? "Not applicable for this metal"
+                      : loadingMetalPurities
+                        ? "Loading purities..."
+                        : "Select Purity"
+                  }
+                />
+              </SelectTrigger>
+
+              <SelectContent>
+                {metalPurities.length > 5 && (
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search purities..."
+                      value={puritySearch}
+                      onChange={(event) => setPuritySearch(event.target.value)}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    />
+                  </div>
+                )}
+
+                <SelectItem value="__none__">None</SelectItem>
+
+                {filteredPurities.length === 0 && puritySearch ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    No purities found for "{puritySearch}"
+                  </div>
+                ) : (
+                  filteredPurities.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.label}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+
+            {selectedMetal && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {selectedMetal.hasPurity
+                  ? metalPurities.length === 0 && !loadingMetalPurities
+                    ? `No purities configured for ${selectedMetal.name} yet — add them under Settings → Taxonomy → Purities.`
+                    : `Showing purities configured for ${selectedMetal.name}.`
+                  : `${selectedMetal.name} doesn't track purity.`}
+              </p>
+            )}
+
+            <input type="hidden" name="storeMetalPurityId" value={storeMetalPurityId} />
+            <input
+              type="hidden"
+              name="defaultPurity"
+              value={defaultPurity === "__none__" ? "" : defaultPurity}
+            />
+
+            <ErrorText error={state.errors.defaultPurity} />
+          </div>
+          )}
+
+          {productKind === "STONE" && selectedMetal?.isGemstone && (
+            <div>
+              <Label>Stone Type</Label>
+
+              <Select
+                value={stoneOriginOptionId || "__none__"}
+                onValueChange={(value) =>
+                  setStoneOriginOptionId(value === "__none__" ? "" : value)
+                }
+                disabled={loadingStoneOrigins}
+              >
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue
+                    placeholder={
+                      loadingStoneOrigins
+                        ? "Loading Stone Types..."
+                        : "Select Stone Type"
+                    }
+                  />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+
+                  {stoneOrigins.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {!loadingStoneOrigins && stoneOrigins.length === 0 ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  No Stone Types set up for {selectedMetal.name} yet — add
+                  them under Settings → Taxonomy → Stone Types.
+                </p>
+              ) : null}
+
+              <input
+                type="hidden"
+                name="stoneOriginOptionId"
+                value={stoneOriginOptionId}
+              />
+
+              <ErrorText error={state.errors.stoneOriginOptionId} />
+            </div>
+          )}
+
+          {/* Redundant once the product's own type IS a stone — there's no
+              separate "embedded stone" to include on top of itself. */}
+          {productKind === "METAL" && (
+          <div className="flex items-end pb-2">
+            <IncludesStoneToggle
+              checked={hasStoneComponent}
+              onChange={(checked) => {
+                setHasStoneComponent(checked)
+                // Stone Weight is now hidden once the toggle is off (see
+                // below) — clear it so a hidden field can't silently keep
+                // submitting whatever was last typed while it was visible.
+                if (!checked) {
+                  setStoneWeight("")
+                  setStoneWeightTouched(false)
+                }
+              }}
+            />
+            <input
+              type="hidden"
+              name="hasStoneComponent"
+              value={hasStoneComponent ? "true" : "false"}
+            />
+          </div>
+          )}
+
           <div>
             <Label>Category <RequiredMark /></Label>
 
@@ -936,163 +1083,6 @@ export function ProductForm({
         />
       )}
 
-      {/* ============================
-          METAL DETAILS
-      ============================= */}
-
-      <div className="rounded-xl border p-6">
-        <h3 className="mb-6 text-lg font-semibold">Metal Details</h3>
-
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Not applicable once the product's own type IS a stone —
-              a gemstone's pricing is Carat Weight x Rate (below), never a
-              purity list. */}
-          {productKind === "METAL" && (
-          <div>
-            <Label>Purity</Label>
-
-            <Select
-              value={storeMetalPurityId || "__none__"}
-              onValueChange={(value) => setStoreMetalPurityId(value === "__none__" ? "" : value)}
-              disabled={selectedMetal ? !selectedMetal.hasPurity : false}
-            >
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue
-                  placeholder={
-                    selectedMetal && !selectedMetal.hasPurity
-                      ? "Not applicable for this metal"
-                      : loadingMetalPurities
-                        ? "Loading purities..."
-                        : "Select Purity"
-                  }
-                />
-              </SelectTrigger>
-
-              <SelectContent>
-                {metalPurities.length > 5 && (
-                  <div className="p-2">
-                    <Input
-                      placeholder="Search purities..."
-                      value={puritySearch}
-                      onChange={(event) => setPuritySearch(event.target.value)}
-                      onKeyDown={(event) => event.stopPropagation()}
-                    />
-                  </div>
-                )}
-
-                <SelectItem value="__none__">None</SelectItem>
-
-                {filteredPurities.length === 0 && puritySearch ? (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">
-                    No purities found for "{puritySearch}"
-                  </div>
-                ) : (
-                  filteredPurities.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.label}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-
-            {selectedMetal && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                {selectedMetal.hasPurity
-                  ? metalPurities.length === 0 && !loadingMetalPurities
-                    ? `No purities configured for ${selectedMetal.name} yet — add them under Settings → Taxonomy → Purities.`
-                    : `Showing purities configured for ${selectedMetal.name}.`
-                  : `${selectedMetal.name} doesn't track purity.`}
-              </p>
-            )}
-
-            <input type="hidden" name="storeMetalPurityId" value={storeMetalPurityId} />
-            <input
-              type="hidden"
-              name="defaultPurity"
-              value={defaultPurity === "__none__" ? "" : defaultPurity}
-            />
-
-            <ErrorText error={state.errors.defaultPurity} />
-          </div>
-          )}
-
-          {/* Redundant once the product's own type IS a stone — there's no
-              separate "embedded stone" to include on top of itself. */}
-          {productKind === "METAL" && (
-          <div className="flex items-end pb-2">
-            <IncludesStoneToggle
-              checked={hasStoneComponent}
-              onChange={(checked) => {
-                setHasStoneComponent(checked)
-                // Stone Weight is now hidden once the toggle is off (see
-                // below) — clear it so a hidden field can't silently keep
-                // submitting whatever was last typed while it was visible.
-                if (!checked) {
-                  setStoneWeight("")
-                  setStoneWeightTouched(false)
-                }
-              }}
-            />
-            <input
-              type="hidden"
-              name="hasStoneComponent"
-              value={hasStoneComponent ? "true" : "false"}
-            />
-          </div>
-          )}
-
-          {productKind === "STONE" && selectedMetal?.isGemstone && (
-            <div>
-              <Label>Stone Type</Label>
-
-              <Select
-                value={stoneOriginOptionId || "__none__"}
-                onValueChange={(value) =>
-                  setStoneOriginOptionId(value === "__none__" ? "" : value)
-                }
-                disabled={loadingStoneOrigins}
-              >
-                <SelectTrigger className="h-11 w-full">
-                  <SelectValue
-                    placeholder={
-                      loadingStoneOrigins
-                        ? "Loading Stone Types..."
-                        : "Select Stone Type"
-                    }
-                  />
-                </SelectTrigger>
-
-                <SelectContent>
-                  <SelectItem value="__none__">None</SelectItem>
-
-                  {stoneOrigins.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {!loadingStoneOrigins && stoneOrigins.length === 0 ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  No Stone Types set up for {selectedMetal.name} yet — add
-                  them under Settings → Taxonomy → Stone Types.
-                </p>
-              ) : null}
-
-              <input
-                type="hidden"
-                name="stoneOriginOptionId"
-                value={stoneOriginOptionId}
-              />
-
-              <ErrorText error={state.errors.stoneOriginOptionId} />
-            </div>
-          )}
-        </div>
-      </div>
-
       <AddMetalDialog
         open={addMetalOpen}
         onOpenChange={setAddMetalOpen}
@@ -1102,6 +1092,70 @@ export function ProductForm({
           setMetalTypeId(metal.id);
         }}
       />
+
+      {/* ============================
+          STONE PRICING — opens right below Basic Information the moment
+          "Includes a Stone" is checked there, instead of buried inside
+          Weights further down.
+      ============================= */}
+
+      {hasStoneComponent && (
+        <div className="rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50 p-6">
+          <h3 className="mb-6 text-lg font-semibold">Stone Pricing</h3>
+
+          <StoneComponentFields
+            metals={metals}
+            origins={origins}
+            onMetalsChange={setMetals}
+            onOriginsChange={setOrigins}
+            stoneMetalTypeName={stoneMetalTypeName}
+            onStoneChange={(name, typeNames) => {
+              setStoneMetalTypeName(name);
+              setStoneTypeNames(typeNames);
+            }}
+            selectedTypeNames={stoneTypeNames}
+            onTypesChange={setStoneTypeNames}
+            caratWeight={Number(caratWeight) || 0}
+            onCaratWeightChange={handleCaratWeightChange}
+            stoneRate={Number(stoneRate) || 0}
+            onStoneRateChange={handleStoneRateChange}
+            stoneCharge={Number(stoneCharge) || 0}
+            onStoneChargeChange={handleStoneChargeChange}
+            stoneChargeTouched={stoneChargeTouched}
+            stoneWeightInput={
+              stoneWeightUnit === "CARAT"
+                ? Number(
+                    (
+                      (Number(stoneWeight) || 0) /
+                      resolveGramsPerCarat(defaultPurity, caratConversionRates)
+                    ).toFixed(3),
+                  )
+                : Number(stoneWeight) || 0
+            }
+            onStoneWeightInputChange={(value) => {
+              const typed = Number(value) || 0;
+              const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
+              const grams = stoneWeightUnit === "CARAT" ? typed * gramsPerCarat : typed;
+              handleStoneWeightChange(String(Number(grams.toFixed(5))));
+            }}
+            stoneWeightUnit={stoneWeightUnit}
+            onStoneWeightUnitChange={setStoneWeightUnit}
+            netStoneWeightTouched={stoneWeightTouched}
+          />
+
+          <input type="hidden" name="defaultStoneMetalTypeName" value={stoneMetalTypeName} />
+          <input type="hidden" name="defaultStoneTypeNames" value={stoneTypeNames.join(",")} />
+          <input type="hidden" name="defaultCaratWeight" value={caratWeight} />
+          <input type="hidden" name="defaultStoneRate" value={stoneRate} />
+          <input type="hidden" name="defaultStoneCharge" value={stoneCharge} />
+          <input type="hidden" name="defaultStoneWeight" value={stoneWeight} />
+
+          <ErrorText error={state.errors.defaultCaratWeight} />
+          <ErrorText error={state.errors.defaultStoneRate} />
+          <ErrorText error={state.errors.defaultStoneCharge} />
+          <ErrorText error={state.errors.defaultStoneWeight} />
+        </div>
+      )}
 
       {/* ============================
           WEIGHTS
@@ -1218,69 +1272,6 @@ export function ProductForm({
             </div>
           )}
         </div>
-
-        {/* Every stone-pricing field grouped together once "Includes a
-            Stone" is checked, mirroring the same grouping used for a
-            composite line item on Invoice/Purchase/Kacha/Quotation —
-            regardless of the product's own metal family, so these fields
-            (and whatever was already saved in them) are never hidden. */}
-        {hasStoneComponent && (
-          <div className="mt-6 rounded-lg border-2 border-dashed border-emerald-400 bg-emerald-50 p-4">
-            <h4 className="mb-4 text-sm font-semibold">Stone Pricing</h4>
-
-            <StoneComponentFields
-              metals={metals}
-              origins={origins}
-              onMetalsChange={setMetals}
-              onOriginsChange={setOrigins}
-              stoneMetalTypeName={stoneMetalTypeName}
-              onStoneChange={(name, typeNames) => {
-                setStoneMetalTypeName(name);
-                setStoneTypeNames(typeNames);
-              }}
-              selectedTypeNames={stoneTypeNames}
-              onTypesChange={setStoneTypeNames}
-              caratWeight={Number(caratWeight) || 0}
-              onCaratWeightChange={handleCaratWeightChange}
-              stoneRate={Number(stoneRate) || 0}
-              onStoneRateChange={handleStoneRateChange}
-              stoneCharge={Number(stoneCharge) || 0}
-              onStoneChargeChange={handleStoneChargeChange}
-              stoneChargeTouched={stoneChargeTouched}
-              stoneWeightInput={
-                stoneWeightUnit === "CARAT"
-                  ? Number(
-                      (
-                        (Number(stoneWeight) || 0) /
-                        resolveGramsPerCarat(defaultPurity, caratConversionRates)
-                      ).toFixed(3),
-                    )
-                  : Number(stoneWeight) || 0
-              }
-              onStoneWeightInputChange={(value) => {
-                const typed = Number(value) || 0;
-                const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
-                const grams = stoneWeightUnit === "CARAT" ? typed * gramsPerCarat : typed;
-                handleStoneWeightChange(String(Number(grams.toFixed(5))));
-              }}
-              stoneWeightUnit={stoneWeightUnit}
-              onStoneWeightUnitChange={setStoneWeightUnit}
-              netStoneWeightTouched={stoneWeightTouched}
-            />
-
-            <input type="hidden" name="defaultStoneMetalTypeName" value={stoneMetalTypeName} />
-            <input type="hidden" name="defaultStoneTypeNames" value={stoneTypeNames.join(",")} />
-            <input type="hidden" name="defaultCaratWeight" value={caratWeight} />
-            <input type="hidden" name="defaultStoneRate" value={stoneRate} />
-            <input type="hidden" name="defaultStoneCharge" value={stoneCharge} />
-            <input type="hidden" name="defaultStoneWeight" value={stoneWeight} />
-
-            <ErrorText error={state.errors.defaultCaratWeight} />
-            <ErrorText error={state.errors.defaultStoneRate} />
-            <ErrorText error={state.errors.defaultStoneCharge} />
-            <ErrorText error={state.errors.defaultStoneWeight} />
-          </div>
-        )}
       </div>
 
       {/* ============================

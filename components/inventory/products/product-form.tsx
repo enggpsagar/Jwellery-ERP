@@ -162,6 +162,20 @@ export function ProductForm({
 
   const [metalTypeId, setMetalTypeId] = useState(product?.metalTypeId ?? "");
 
+  // Whether this product's own primary type is a real metal (Gold, Silver,
+  // Platinum...) or a gemstone (Diamond, Ruby...) picked directly — drives
+  // which list the field below offers and whether Default Purity /
+  // "Includes a Stone" apply at all. Both cases still save into the same
+  // metalTypeId column; this is purely which half of `metals` is offered
+  // and which fields make sense once one is chosen. Derived on mount from
+  // the saved product's own metal (edit mode); "METAL" by default for a
+  // brand new product.
+  const [productKind, setProductKind] = useState<"METAL" | "STONE">(
+    initialMetals.find((item) => item.id === product?.metalTypeId)?.isGemstone
+      ? "STONE"
+      : "METAL",
+  );
+
   const [targetStyleId, setTargetStyleId] = useState(product?.targetStyleId ?? "");
 
   const [stoneOriginOptionId, setStoneOriginOptionId] = useState(
@@ -220,20 +234,17 @@ export function ProductForm({
     product?.defaultPurity ?? "__none__",
   );
 
-  // A disabled metal (e.g. "Stone" turned off in Settings) is hidden from
-  // the picker so it can't be chosen for a NEW product — but if this
-  // product already uses one (disabled after it was picked), that entry
-  // stays visible here so editing doesn't silently drop/replace their
-  // existing selection. Gemstones are excluded the same way: a product's
-  // stone is meant to be picked through "Includes a Stone" (its own Stone +
-  // Stone Type fields below) instead, not by choosing a gemstone here as the
-  // product's primary type — but a product that already has one saved (from
-  // before this changed) keeps it visible so its edit page doesn't silently
-  // lose the selection.
+  // A disabled metal/stone (turned off in Settings) is hidden from the
+  // picker so it can't be chosen for a NEW product — but if this product
+  // already uses one (disabled after it was picked), that entry stays
+  // visible here so editing doesn't silently drop/replace their existing
+  // selection. Which half of `metals` is offered — real metals or
+  // gemstones — follows productKind, so "Metal" never mixes in Diamond/
+  // Ruby/etc. and "Stone" never mixes in Gold/Silver/etc.
   const selectableMetals = metals.filter(
     (item) =>
       (item.isActive || item.id === product?.metalTypeId) &&
-      (!item.isGemstone || item.id === product?.metalTypeId),
+      (productKind === "STONE" ? item.isGemstone : !item.isGemstone),
   );
 
   const [metalSearch, setMetalSearch] = useState("");
@@ -602,25 +613,54 @@ export function ProductForm({
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div>
-            {/* Gemstones are deliberately excluded from this list (see
-                selectableMetals above) — a product's stone is picked via
-                "Includes a Stone" further down instead, so this stays a
-                plain metal picker rather than mixing the two concepts. Leads
-                the form (ahead of Category) since it's the first thing that
-                narrows every field after it — Default Purity, and the SKU
-                itself, are both derived from it. */}
-            <Label>Metal Type <RequiredMark /></Label>
+            {/* Leads the form (ahead of Category) since it decides which
+                list the field beside it offers, and — through Default
+                Purity below — the SKU itself. */}
+            <Label>Metal / Stone <RequiredMark /></Label>
+
+            <Select
+              value={productKind}
+              onValueChange={(value) => {
+                const kind = value as "METAL" | "STONE";
+                setProductKind(kind);
+                // A metal and a gemstone are never both valid for the
+                // field beside this one — switching modes clears it (and
+                // whatever Stone Type went with it) rather than leaving a
+                // now-mismatched selection silently in place.
+                setMetalTypeId("");
+                setStoneOriginOptionId("");
+                if (kind === "STONE") {
+                  // The product itself IS the stone now — the separate
+                  // "Includes a Stone" (embedded-stone) case doesn't apply.
+                  setHasStoneComponent(false);
+                  setStoneWeight("");
+                  setStoneWeightTouched(false);
+                }
+              }}
+            >
+              <SelectTrigger className="h-11 w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="METAL">Metal</SelectItem>
+                <SelectItem value="STONE">Stone</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>{productKind === "STONE" ? "Stone" : "Metal Type"} <RequiredMark /></Label>
 
             <div className="flex gap-1.5">
               <Select value={metalTypeId} onValueChange={setMetalTypeId}>
                 <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="Select metal type" />
+                  <SelectValue placeholder={productKind === "STONE" ? "Select stone" : "Select metal type"} />
                 </SelectTrigger>
 
                 <SelectContent>
                   <div className="p-2">
                     <Input
-                      placeholder="Search metal types..."
+                      placeholder={productKind === "STONE" ? "Search stones..." : "Search metal types..."}
                       value={metalSearch}
                       onChange={(event) => setMetalSearch(event.target.value)}
                       onKeyDown={(event) => event.stopPropagation()}
@@ -629,7 +669,8 @@ export function ProductForm({
 
                   {filteredMetals.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No metal types found{metalSearch ? ` for "${metalSearch}"` : ""}
+                      {productKind === "STONE" ? "No stones found" : "No metal types found"}
+                      {metalSearch ? ` for "${metalSearch}"` : ""}
                     </div>
                   ) : (
                     filteredMetals.map((item) => (
@@ -647,7 +688,7 @@ export function ProductForm({
                 variant="secondary"
                 size="icon"
                 className="h-11 w-9 shrink-0 px-0"
-                title="Add Metal Type"
+                title={productKind === "STONE" ? "Add Stone" : "Add Metal Type"}
                 onClick={() => setAddMetalOpen(true)}
               >
                 <Plus className="h-4 w-4" />
@@ -852,6 +893,10 @@ export function ProductForm({
         <h3 className="mb-6 text-lg font-semibold">Metal Details</h3>
 
         <div className="grid gap-6 lg:grid-cols-3">
+          {/* Not applicable once the product's own type IS a stone —
+              a gemstone's pricing is Carat Weight x Rate (below), never a
+              purity list. */}
+          {productKind === "METAL" && (
           <div>
             <Label>Default Purity</Label>
 
@@ -914,7 +959,11 @@ export function ProductForm({
 
             <ErrorText error={state.errors.defaultPurity} />
           </div>
+          )}
 
+          {/* Redundant once the product's own type IS a stone — there's no
+              separate "embedded stone" to include on top of itself. */}
+          {productKind === "METAL" && (
           <div className="flex items-end pb-2">
             <IncludesStoneToggle
               checked={hasStoneComponent}
@@ -935,8 +984,9 @@ export function ProductForm({
               value={hasStoneComponent ? "true" : "false"}
             />
           </div>
+          )}
 
-          {selectedMetal?.isGemstone && (
+          {productKind === "STONE" && selectedMetal?.isGemstone && (
             <div>
               <Label>Stone Type</Label>
 
@@ -990,6 +1040,7 @@ export function ProductForm({
       <AddMetalDialog
         open={addMetalOpen}
         onOpenChange={setAddMetalOpen}
+        isGemstone={productKind === "STONE"}
         onCreated={(metal) => {
           setMetals((prev) => [...prev, metal]);
           setMetalTypeId(metal.id);

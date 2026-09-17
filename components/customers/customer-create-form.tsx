@@ -40,9 +40,8 @@ type CustomerCreateFormProps = {
    * them — freely changeable per customer afterward. */
   defaultState?: string
   defaultCity?: string
-  /** Settings > toggle for the Vendors module — hides the "This party is also a
-   * vendor" checkbox when off (nothing to register a new vendor into). See
-   * BusinessSettings.vendorsModuleEnabled's own schema doc comment. */
+  /** BusinessSettings.vendorsModuleEnabled — hides the "also a vendor"
+   * linking toggle below when off, same as its mirror on VendorCreateForm. */
   vendorsModuleEnabled?: boolean
 }
 

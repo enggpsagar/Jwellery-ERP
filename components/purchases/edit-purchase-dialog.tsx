@@ -32,6 +32,8 @@ type EditPurchaseDialogProps = {
   locations: LocationOption[]
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
+  vendorsModuleEnabled?: boolean
 }
 
 /**
@@ -51,7 +53,9 @@ export function EditPurchaseDialog({
   locations,
   open,
   onOpenChange,
+  vendorsModuleEnabled = true,
 }: EditPurchaseDialogProps) {
+  const vendorTermLabel = vendorsModuleEnabled ? "Vendor" : "Supplier"
   const router = useRouter()
   const toast = useToast()
   const showLocationField = useShowLocationField(locations.length)
@@ -98,10 +102,10 @@ export function EditPurchaseDialog({
               <Input type="date" name="purchaseDate" defaultValue={purchaseDate.slice(0, 10)} />
             </div>
             <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-              <Label>Vendor Invoice Number</Label>
+              <Label>{vendorTermLabel} Invoice Number</Label>
               <Input
                 name="vendorInvoiceNumber"
-                placeholder="Vendor's own invoice/bill number"
+                placeholder={`${vendorTermLabel}'s own invoice/bill number`}
                 defaultValue={vendorInvoiceNumber ?? ""}
               />
             </div>

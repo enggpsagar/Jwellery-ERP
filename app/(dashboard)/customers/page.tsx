@@ -36,7 +36,7 @@ export default async function CustomersPage({
   const dateFrom = params.dateFrom || undefined
   const dateTo = params.dateTo || undefined
 
-  const [{ customers, pagination }, states, businessSettings] = await Promise.all([
+  const [{ customers, pagination }, states, settings] = await Promise.all([
     getCustomers({ page, pageSize, search, sortBy, sortOrder, dateFrom, dateTo }),
     getStates(),
     getBusinessSettings(),
@@ -47,7 +47,7 @@ export default async function CustomersPage({
       customers={customers}
       states={states}
       pagination={pagination}
-      vendorsModuleEnabled={businessSettings.vendorsModuleEnabled}
+      vendorsModuleEnabled={settings.vendorsModuleEnabled}
     />
   )
 }

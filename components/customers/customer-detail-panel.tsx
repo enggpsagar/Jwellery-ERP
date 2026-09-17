@@ -18,7 +18,7 @@ type StateItem = {
 type CustomerDetailPanelProps = {
   customerId: string | null
   states: StateItem[]
-  /** See the same prop on CustomerDetailContent. */
+  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
   vendorsModuleEnabled?: boolean
 }
 
@@ -31,7 +31,7 @@ type CustomerDetailPanelProps = {
  * standalone page, which re-renders the list — the selection itself is
  * cleared by the parent's own effect watching the customers prop.
  */
-export function CustomerDetailPanel({ customerId, states, vendorsModuleEnabled }: CustomerDetailPanelProps) {
+export function CustomerDetailPanel({ customerId, states, vendorsModuleEnabled = true }: CustomerDetailPanelProps) {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(false)
 

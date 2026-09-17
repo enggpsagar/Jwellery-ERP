@@ -36,6 +36,8 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
   const [businessName, setBusinessName] = useState("")
   const [returnWindowEnabled, setReturnWindowEnabled] = useState(false)
   const [returnWindowDays, setReturnWindowDays] = useState(0)
+  const [ewayBillEnabled, setEwayBillEnabled] = useState(true)
+  const [eInvoiceEnabled, setEInvoiceEnabled] = useState(true)
   const [hasReturnableItems, setHasReturnableItems] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -60,6 +62,8 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
         setBusinessName(settings.businessName)
         setReturnWindowEnabled(settings.returnWindowEnabled)
         setReturnWindowDays(settings.returnWindowDays)
+        setEwayBillEnabled(settings.ewayBillEnabled)
+        setEInvoiceEnabled(settings.eInvoiceEnabled)
         setHasReturnableItems((returnableItems ?? []).length > 0)
       })
       .finally(() => {
@@ -101,6 +105,8 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
         invoice={invoice}
         returnWindowEnabled={returnWindowEnabled}
         returnWindowDays={returnWindowDays}
+        ewayBillEnabled={ewayBillEnabled}
+        eInvoiceEnabled={eInvoiceEnabled}
         locations={locations}
         hasReturnableItems={hasReturnableItems}
       />
@@ -110,6 +116,8 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
         creditNotes={creditNotes}
         returnWindowEnabled={returnWindowEnabled}
         returnWindowDays={returnWindowDays}
+        ewayBillEnabled={ewayBillEnabled}
+        eInvoiceEnabled={eInvoiceEnabled}
       />
     </div>
   )

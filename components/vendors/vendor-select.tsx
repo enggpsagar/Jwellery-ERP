@@ -41,6 +41,14 @@ type VendorSelectProps = {
   /** Runs just before navigating away, so the caller can stash whatever
    * it would otherwise lose (an in-progress purchase, say). */
   onBeforeAddNew?: () => void
+  /** BusinessSettings.vendorsModuleEnabled drives this — "Vendor" when the
+   * module is on, "Supplier" once a store has hidden the standalone Vendors
+   * module but still needs to pick/create one for a Purchase or Payment
+   * Out (see that setting's own schema comment). Only changes the copy
+   * ("No vendors found" / "Add New Vendor"); the underlying data is the
+   * same Vendor table either way. Callers still control `placeholder`
+   * independently when they want different wording there. */
+  termLabel?: "Vendor" | "Supplier"
 }
 
 /**
@@ -52,10 +60,11 @@ export function VendorSelect({
   vendors,
   name = "vendorId",
   defaultValue,
-  placeholder = "Select a vendor",
+  placeholder,
   onChange,
   addNewHref,
   onBeforeAddNew,
+  termLabel = "Vendor",
 }: VendorSelectProps) {
   const router = useRouter()
   const [search, setSearch] = useState("")
@@ -98,7 +107,7 @@ export function VendorSelect({
         }}
       >
         <SelectTrigger className="w-full">
-          <SelectValue placeholder={placeholder} />
+          <SelectValue placeholder={placeholder ?? `Select a ${termLabel.toLowerCase()}`} />
         </SelectTrigger>
 
         <SelectContent>
@@ -113,7 +122,7 @@ export function VendorSelect({
 
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
-              No vendors found
+              No {termLabel.toLowerCase()}s found
             </div>
           ) : (
             filtered.map((vendor) => (
@@ -137,7 +146,7 @@ export function VendorSelect({
                 className="font-medium text-primary"
               >
                 <Plus className="mr-1 h-4 w-4" />
-                Add New Vendor
+                Add New {termLabel}
               </SelectItem>
             </>
           )}

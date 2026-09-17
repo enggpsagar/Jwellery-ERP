@@ -25,15 +25,16 @@ export default async function NewVendorPage({ searchParams }: NewVendorPageProps
   // that ability shouldn't disappear just because the standalone module's
   // own nav/list is hidden.
   const [states, businessSettings] = await Promise.all([getStates(), getBusinessSettings()])
+  const vendorTermLabel = businessSettings.vendorsModuleEnabled ? "Vendor" : "Supplier"
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 p-6">
       <ResetFormWrapper
         header={{
-          title: "Add Vendor",
-          description: "Create a new vendor you buy stock from.",
+          title: `Add ${vendorTermLabel}`,
+          description: `Create a new ${vendorTermLabel.toLowerCase()} you buy stock from.`,
           backHref: returnTo ?? "/vendors",
-          backLabel: returnTo ? "Back without saving" : "Back to Vendors",
+          backLabel: returnTo ? "Back without saving" : `Back to ${vendorTermLabel}s`,
         }}
       >
         <VendorCreateForm
@@ -42,6 +43,7 @@ export default async function NewVendorPage({ searchParams }: NewVendorPageProps
           gstScheme={businessSettings.gstScheme}
           defaultState={businessSettings.state}
           defaultCity={businessSettings.city}
+          vendorsModuleEnabled={businessSettings.vendorsModuleEnabled}
         />
       </ResetFormWrapper>
     </main>

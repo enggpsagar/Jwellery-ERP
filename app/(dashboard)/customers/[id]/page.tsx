@@ -4,10 +4,10 @@ import { cache } from "react"
 import { notFound } from "next/navigation"
 
 import { getCustomerById } from "@/lib/actions/customer-actions"
-import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { getStates } from "@/lib/actions/location-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { CustomerRowActions } from "@/components/customers/customer-row-actions"
 import { CustomerDetailContent } from "@/components/customers/customer-detail-content"
 import { CustomerLedgerCard } from "@/components/customers/ledger/customer-ledger-card"
@@ -44,7 +44,7 @@ export default async function CustomerDetailsPage({
     label: "Back to Parties",
   })
 
-  const [customer, states, businessSettings] = await Promise.all([
+  const [customer, states, settings] = await Promise.all([
     getCustomer(id),
     getStates(),
     getBusinessSettings(),
@@ -67,7 +67,7 @@ export default async function CustomerDetailsPage({
       <CustomerDetailContent
         customer={customer}
         states={states}
-        vendorsModuleEnabled={businessSettings.vendorsModuleEnabled}
+        vendorsModuleEnabled={settings.vendorsModuleEnabled}
         ledger={
           <CustomerLedgerCard
             customerId={customer.id}

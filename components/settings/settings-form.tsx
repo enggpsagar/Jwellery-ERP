@@ -108,6 +108,8 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
   const [returnWindowEnabled, setReturnWindowEnabled] = useState(settings.returnWindowEnabled)
   const [sendToArtisanEnabled, setSendToArtisanEnabled] = useState(settings.sendToArtisanEnabled)
   const [vendorsModuleEnabled, setVendorsModuleEnabled] = useState(settings.vendorsModuleEnabled)
+  const [ewayBillEnabled, setEwayBillEnabled] = useState(settings.ewayBillEnabled)
+  const [eInvoiceEnabled, setEInvoiceEnabled] = useState(settings.eInvoiceEnabled)
   const [printLayout, setPrintLayout] = useState<PrintLayout>(settings.printLayout)
   const [invoiceTemplate, setInvoiceTemplate] = useState<InvoiceTemplate>(settings.invoiceTemplate)
   const stateNameMap = useMemo(
@@ -320,6 +322,41 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               archived/export pages — a vendor already linked to a Purchase
               or a Customer, and Purchases' own vendor picker, keep working
               either way.
+            </p>
+          </div>
+
+          <div className="space-y-1.5 pt-4">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="ewayBillEnabled"
+                checked={ewayBillEnabled}
+                onCheckedChange={setEwayBillEnabled}
+              />
+              <input type="hidden" name="ewayBillEnabled" value={ewayBillEnabled ? "on" : ""} />
+              <Label htmlFor="ewayBillEnabled">Enable E-way Bill</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Whether an invoice's E-way Bill fields, button, and print
+              section show up at all. Independent of E-Invoice below — a
+              store can need either, both, or neither. Existing E-way Bill
+              data on past invoices is kept either way, just hidden while
+              this is off.
+            </p>
+          </div>
+
+          <div className="space-y-1.5 pt-4">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="eInvoiceEnabled"
+                checked={eInvoiceEnabled}
+                onCheckedChange={setEInvoiceEnabled}
+              />
+              <input type="hidden" name="eInvoiceEnabled" value={eInvoiceEnabled ? "on" : ""} />
+              <Label htmlFor="eInvoiceEnabled">Enable E-Invoice</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Same as Enable E-way Bill above, for the E-Invoice (IRN)
+              fields, button, and print section instead.
             </p>
           </div>
         </CardContent>

@@ -13,6 +13,8 @@ import type { LocationOption } from "@/components/shared/location-select"
 type PurchaseDetailPanelProps = {
   purchaseId: string | null
   locations: LocationOption[]
+  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
+  vendorsModuleEnabled?: boolean
 }
 
 /**
@@ -22,7 +24,7 @@ type PurchaseDetailPanelProps = {
  * navigation. Re-fetches whenever the selected id changes — same
  * convention as CustomerDetailPanel.
  */
-export function PurchaseDetailPanel({ purchaseId, locations }: PurchaseDetailPanelProps) {
+export function PurchaseDetailPanel({ purchaseId, locations, vendorsModuleEnabled = true }: PurchaseDetailPanelProps) {
   const [purchase, setPurchase] = useState<Purchase | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -75,11 +77,11 @@ export function PurchaseDetailPanel({ purchaseId, locations }: PurchaseDetailPan
             purchaseId={purchase.id}
             balanceAmount={purchase.balanceAmount}
           />
-          <PurchaseRowActions purchase={purchase} locations={locations} />
+          <PurchaseRowActions purchase={purchase} locations={locations} vendorsModuleEnabled={vendorsModuleEnabled} />
         </div>
       </div>
 
-      <PurchaseDetailContent purchase={purchase} />
+      <PurchaseDetailContent purchase={purchase} vendorsModuleEnabled={vendorsModuleEnabled} />
     </div>
   )
 }

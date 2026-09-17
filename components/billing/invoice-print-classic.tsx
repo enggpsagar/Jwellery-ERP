@@ -381,7 +381,7 @@ export function InvoicePrintClassic({ invoice, settings }: InvoicePrintClassicPr
           </div>
         </div>
 
-        {(invoice.irnNumber || invoice.ackNumber) && (
+        {settings.eInvoiceEnabled && (invoice.irnNumber || invoice.ackNumber) && (
           <div className="border-t-2 border-slate-300 p-4">
             <p className="font-semibold">E-Invoice</p>
             <div className="grid grid-cols-1 gap-x-4">
@@ -394,7 +394,7 @@ export function InvoicePrintClassic({ invoice, settings }: InvoicePrintClassicPr
           </div>
         )}
 
-        {(invoice.ewayBillNumber ||
+        {settings.ewayBillEnabled && (invoice.ewayBillNumber ||
           invoice.transporterName ||
           invoice.vehicleNumber ||
           invoice.transportMode ||

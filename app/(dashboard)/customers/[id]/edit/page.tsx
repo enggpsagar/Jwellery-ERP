@@ -57,11 +57,15 @@ export default async function EditCustomerPage({
 
       {/* Same "is this customer also a vendor" card the detail page shows —
           previously only visible on /customers/[id], so a linked vendor
-          silently disappeared from view the moment you opened Edit. */}
-      <CustomerVendorLinkCard
-        customerId={customer.id}
-        linkedVendor={customer.linkedVendor ?? null}
-      />
+          silently disappeared from view the moment you opened Edit. Hidden
+          entirely once the Vendors module itself is off, same as the
+          detail page's own copy of this card. */}
+      {businessSettings.vendorsModuleEnabled && (
+        <CustomerVendorLinkCard
+          customerId={customer.id}
+          linkedVendor={customer.linkedVendor ?? null}
+        />
+      )}
 
       <CustomerEditForm
         customer={customer}

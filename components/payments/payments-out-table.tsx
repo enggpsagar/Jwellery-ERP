@@ -35,7 +35,15 @@ function inr(value: number) {
   return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
 }
 
-export function PaymentsOutTable({ rows }: { rows: PaymentOutRow[] }) {
+export function PaymentsOutTable({
+  rows,
+  vendorsModuleEnabled = true,
+}: {
+  rows: PaymentOutRow[]
+  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
+  vendorsModuleEnabled?: boolean
+}) {
+  const vendorTermLabel = vendorsModuleEnabled ? "Vendor" : "Supplier"
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
   // Defaults to the first row on load so the panel is never empty —
@@ -143,7 +151,7 @@ export function PaymentsOutTable({ rows }: { rows: PaymentOutRow[] }) {
                           {row.partyName}
                         </Link>
                         <Badge variant="outline" className="font-normal">
-                          {row.partyType === "VENDOR" ? "Vendor" : "Artisan"}
+                          {row.partyType === "VENDOR" ? vendorTermLabel : "Artisan"}
                         </Badge>
                       </div>
                     </TableCell>
@@ -201,7 +209,7 @@ export function PaymentsOutTable({ rows }: { rows: PaymentOutRow[] }) {
       </Card>
     </div>
 
-      <PaymentOutDetailPanel row={activeRow} />
+      <PaymentOutDetailPanel row={activeRow} vendorsModuleEnabled={vendorsModuleEnabled} />
     </div>
   )
 }

@@ -58,6 +58,7 @@ export default async function NewPurchasePage() {
             defaultGstRate={businessSettings.defaultGstRate}
             storeState={businessSettings.state}
             initialLocationId={defaultLocationId}
+            vendorsModuleEnabled={businessSettings.vendorsModuleEnabled}
           />
         </Suspense>
       </ResetFormWrapper>

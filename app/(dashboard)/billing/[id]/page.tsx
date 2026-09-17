@@ -68,6 +68,8 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         invoice={invoice}
         returnWindowEnabled={settings.returnWindowEnabled}
         returnWindowDays={settings.returnWindowDays}
+        ewayBillEnabled={settings.ewayBillEnabled}
+        eInvoiceEnabled={settings.eInvoiceEnabled}
         locations={locations}
         hasReturnableItems={hasReturnableItems}
       />
@@ -77,6 +79,8 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         creditNotes={creditNotes}
         returnWindowEnabled={settings.returnWindowEnabled}
         returnWindowDays={settings.returnWindowDays}
+        ewayBillEnabled={settings.ewayBillEnabled}
+        eInvoiceEnabled={settings.eInvoiceEnabled}
       />
     </main>
   )

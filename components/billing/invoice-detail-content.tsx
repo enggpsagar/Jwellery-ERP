@@ -23,6 +23,8 @@ type InvoiceDetailContentProps = {
   creditNotes: CreditNoteView[]
   returnWindowEnabled: boolean
   returnWindowDays: number
+  ewayBillEnabled?: boolean
+  eInvoiceEnabled?: boolean
 }
 
 /**
@@ -34,7 +36,14 @@ type InvoiceDetailContentProps = {
  * derivation with InvoiceActionsBar so the two can never disagree about
  * what a given invoice's status allows.
  */
-export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled, returnWindowDays }: InvoiceDetailContentProps) {
+export function InvoiceDetailContent({
+  invoice,
+  creditNotes,
+  returnWindowEnabled,
+  returnWindowDays,
+  ewayBillEnabled = true,
+  eInvoiceEnabled = true,
+}: InvoiceDetailContentProps) {
   const isCancelled = invoice.status === "CANCELLED"
   const isCancellable = invoice.status === "DRAFT" || invoice.status === "PARTIAL"
   const canFullyEdit = isCancellable
@@ -231,7 +240,7 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled
         </div>
       </div>
 
-      {(invoice.irnNumber || invoice.ackNumber) && (
+      {eInvoiceEnabled && (invoice.irnNumber || invoice.ackNumber) && (
         <div className="rounded-xl border bg-card p-5">
           <p className="mb-3 text-sm font-medium">E-Invoice (IRN)</p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -257,7 +266,7 @@ export function InvoiceDetailContent({ invoice, creditNotes, returnWindowEnabled
         </div>
       )}
 
-      {(invoice.ewayBillNumber ||
+      {ewayBillEnabled && (invoice.ewayBillNumber ||
         invoice.transporterName ||
         invoice.vehicleNumber ||
         invoice.transportMode ||

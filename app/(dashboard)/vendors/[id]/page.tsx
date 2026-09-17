@@ -1,10 +1,11 @@
 // app/vendors/[id]/page.tsx
 import type { Metadata } from "next"
 import { cache } from "react"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 
 import { getVendorById } from "@/lib/actions/vendor-actions"
 import { getStates } from "@/lib/actions/location-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { VendorRowActions } from "@/components/vendors/vendor-row-actions"
@@ -43,7 +44,15 @@ export default async function VendorDetailsPage({
     label: "Back to Vendors",
   })
 
-  const [vendor, states] = await Promise.all([getVendor(id), getStates()])
+  const [vendor, states, settings] = await Promise.all([getVendor(id), getStates(), getBusinessSettings()])
+
+  // Module toggled off in Settings — this is the standalone vendor-
+  // management detail page (ledger, stats, Register-as-Party card), not
+  // needed for Purchases/Payment Out's own "pick a supplier" flow, so it's
+  // gated the same as the list/archived/export pages.
+  if (!settings.vendorsModuleEnabled) {
+    redirect("/dashboard")
+  }
 
   if (!vendor) {
     notFound()

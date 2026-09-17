@@ -139,6 +139,7 @@ export default async function EditPurchasePage({ params }: Props) {
             defaultVendorInvoiceNumber={purchase.vendorInvoiceNumber ?? undefined}
             defaultNotes={purchase.notes ?? undefined}
             defaultPaidAmount={purchase.paidAmount}
+            vendorsModuleEnabled={businessSettings.vendorsModuleEnabled}
           />
         </Suspense>
       </ResetFormWrapper>

@@ -12,6 +12,7 @@ import {
   getItemLedgerReport,
   getAvailableFinancialYears,
 } from "@/lib/actions/report-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 
 import { ReportsTabs } from "@/components/reports/reports-tabs"
 import { PageBackHeader } from "@/components/shared/page-back-header"
@@ -46,6 +47,7 @@ export default async function ReportsPage({ searchParams }: Props) {
     vendorPurchase,
     itemLedger,
     financialYears,
+    settings,
   ] = await Promise.all([
       getSalesReport(range),
       getInventoryValuationReport(),
@@ -57,6 +59,7 @@ export default async function ReportsPage({ searchParams }: Props) {
       getVendorPurchaseReport(range),
       getItemLedgerReport(),
       getAvailableFinancialYears(),
+      getBusinessSettings(),
     ])
 
   return (
@@ -79,6 +82,7 @@ export default async function ReportsPage({ searchParams }: Props) {
         vendorPurchase={vendorPurchase}
         itemLedger={itemLedger}
         financialYears={financialYears}
+        vendorsModuleEnabled={settings.vendorsModuleEnabled}
       />
     </main>
   )

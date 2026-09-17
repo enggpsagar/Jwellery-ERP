@@ -27,7 +27,7 @@ type CustomersClientProps = {
     hasNextPage: boolean
     hasPrevPage: boolean
   }
-  /** See the same prop on CustomerDetailContent. */
+  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
   vendorsModuleEnabled?: boolean
 }
 
@@ -35,7 +35,7 @@ export function CustomersClient({
   customers,
   states,
   pagination,
-  vendorsModuleEnabled,
+  vendorsModuleEnabled = true,
 }: CustomersClientProps) {
   const [selectedCustomerIds, setSelectedCustomerIds] = React.useState<string[]>([])
   // Which row's full detail shows in the right-hand panel — defaults to
@@ -110,7 +110,11 @@ export function CustomersClient({
           />
         </div>
 
-        <CustomerDetailPanel customerId={activeCustomerId} states={states} vendorsModuleEnabled={vendorsModuleEnabled} />
+        <CustomerDetailPanel
+          customerId={activeCustomerId}
+          states={states}
+          vendorsModuleEnabled={vendorsModuleEnabled}
+        />
       </div>
     </main>
   )

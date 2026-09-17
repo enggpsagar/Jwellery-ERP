@@ -52,6 +52,11 @@ export type PurchaseLineItemInput = {
   itemName: string;
   metalTypeId?: string | null;
   purity?: PurityType | null;
+  // The real per-Metal Purity's own label (e.g. "22K") — see
+  // StoreMetalPurity in schema.prisma and PurchaseItem.purityLabel's own
+  // doc comment. `purity` above stays populated on a best-effort basis for
+  // anything not yet reading this.
+  purityLabel?: string | null;
   quantity: number;
   grossWeight?: number | null;
   netWeight?: number | null;
@@ -386,6 +391,7 @@ function mapPurchase(purchase: any) {
       itemName: item.itemName,
       metalTypeId: item.metalTypeId,
       purity: item.purity,
+      purityLabel: item.purityLabel,
       quantity: item.quantity,
       grossWeight: item.grossWeight ? Number(item.grossWeight) : null,
       netWeight: item.netWeight ? Number(item.netWeight) : null,
@@ -633,6 +639,7 @@ export async function getPurchaseFormProducts() {
       categoryType: { select: { name: true } },
       metalType: { select: { id: true, name: true } },
       defaultPurity: true,
+      storeMetalPurity: { select: { id: true, label: true } },
       defaultMakingCharge: true,
       defaultMakingChargeType: true,
       defaultStoneCharge: true,
@@ -881,6 +888,7 @@ export async function createPurchase(
             stockCode: stockCodes[i],
             metalTypeId: item.metalTypeId ?? undefined,
             purity: item.purity ?? undefined,
+            purityLabel: item.purityLabel ?? undefined,
             quantity: item.quantity || 1,
             status: InventoryStockStatus.IN_STOCK,
             finish: InventoryFinish.PAKKA,
@@ -946,6 +954,7 @@ export async function createPurchase(
               itemName: item.itemName,
               metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
+              purityLabel: item.purityLabel ?? undefined,
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
@@ -1389,6 +1398,7 @@ export async function updatePurchase(
             stockCode: stockCodes[i],
             metalTypeId: item.metalTypeId ?? undefined,
             purity: item.purity ?? undefined,
+            purityLabel: item.purityLabel ?? undefined,
             quantity: item.quantity || 1,
             status: InventoryStockStatus.IN_STOCK,
             finish: InventoryFinish.PAKKA,
@@ -1445,6 +1455,7 @@ export async function updatePurchase(
               itemName: item.itemName,
               metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
+              purityLabel: item.purityLabel ?? undefined,
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,

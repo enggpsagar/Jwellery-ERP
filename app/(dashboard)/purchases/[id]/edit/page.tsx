@@ -89,6 +89,7 @@ export default async function EditPurchasePage({ params }: Props) {
       itemKind: item.stoneMetalTypeName ? "STONE" : "METAL",
       metalTypeId: item.metalTypeId ?? "",
       purity: item.purity ?? "",
+      purityLabel: item.purityLabel ?? "",
       quantity: item.quantity,
       grossWeight: toGrams(item.grossWeight),
       grossWeightUnit: unit,

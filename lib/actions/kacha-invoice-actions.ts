@@ -52,6 +52,7 @@ export type KachaInvoiceLineItemInput = {
   itemName: string;
   metalTypeId?: string | null;
   purity?: PurityType | null;
+  purityLabel?: string | null;
   quantity: number;
   grossWeight?: number | null;
   netWeight?: number | null;
@@ -205,6 +206,7 @@ function mapKachaInvoice(kachaInvoice: any) {
       itemName: item.itemName,
       metalTypeId: item.metalTypeId,
       purity: item.purity,
+      purityLabel: item.purityLabel,
       quantity: item.quantity,
       grossWeight: item.grossWeight ? Number(item.grossWeight) : null,
       netWeight: item.netWeight ? Number(item.netWeight) : null,
@@ -601,6 +603,7 @@ export async function createKachaInvoice(
               itemName: item.itemName,
               metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
+              purityLabel: item.purityLabel ?? undefined,
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
@@ -937,6 +940,7 @@ export async function convertKachaToPakka(
               itemName: item.itemName,
               metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
+              purityLabel: item.purityLabel ?? undefined,
               quantity: item.quantity,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
@@ -1432,6 +1436,7 @@ export async function importKachaInvoicesFromExcel(
               itemName: item.itemName,
               metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
+              purityLabel: item.purityLabel ?? undefined,
               quantity: item.quantity,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,

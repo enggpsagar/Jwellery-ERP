@@ -45,6 +45,11 @@ export type InvoiceLineItemInput = {
   itemName: string;
   metalTypeId?: string | null;
   purity?: PurityType | null;
+  // The real per-Metal Purity's own label — see StoreMetalPurity in
+  // schema.prisma and InvoiceItem.purityLabel's own doc comment. `purity`
+  // above stays populated on a best-effort basis for anything not yet
+  // reading this.
+  purityLabel?: string | null;
   quantity: number;
   grossWeight?: number | null;
   netWeight?: number | null;
@@ -261,6 +266,7 @@ export type InvoiceItemView = {
   itemName: string;
   metalTypeId: string | null;
   purity: PurityType | null;
+  purityLabel: string | null;
   quantity: number;
   grossWeight: number | null;
   netWeight: number | null;
@@ -353,6 +359,7 @@ function mapInvoice(invoice: any) {
       itemName: item.itemName,
       metalTypeId: item.metalTypeId,
       purity: item.purity,
+      purityLabel: item.purityLabel ?? null,
       quantity: item.quantity,
       grossWeight: item.grossWeight ? Number(item.grossWeight) : null,
       netWeight: item.netWeight ? Number(item.netWeight) : null,
@@ -750,6 +757,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       ? { id: stock.metalType.id, name: stock.metalType.name }
       : null,
     purity: stock.purity,
+    purityLabel: stock.purityLabel,
     grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,
     netWeight: stock.netWeight ? Number(stock.netWeight) : null,
     stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
@@ -807,6 +815,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       hsnCode: stock.product.hsnCode,
       metalType: stock.metalType ? { id: stock.metalType.id, name: stock.metalType.name } : null,
       purity: stock.purity,
+      purityLabel: stock.purityLabel,
       grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,
       netWeight: stock.netWeight ? Number(stock.netWeight) : null,
       stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
@@ -1126,6 +1135,7 @@ export async function createInvoice(
               itemName: item.itemName,
               metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
+              purityLabel: item.purityLabel ?? undefined,
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
@@ -1742,6 +1752,7 @@ export async function updateInvoice(
               itemName: item.itemName,
               metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
+              purityLabel: item.purityLabel ?? undefined,
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
@@ -2316,7 +2327,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
       },
       items: invoice.items.map((item) => ({
         itemName: item.itemName,
-        purity: item.purity,
+        purity: item.purityLabel ?? item.purity,
         quantity: item.quantity,
         netWeight: item.netWeight ? Number(item.netWeight) : null,
         rate: item.rate ? Number(item.rate) : null,

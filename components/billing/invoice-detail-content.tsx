@@ -149,6 +149,16 @@ export function InvoiceDetailContent({
             )}
           </div>
 
+          {invoice.deliveryState && (
+            <div>
+              <p className="text-sm text-muted-foreground">Delivery Location</p>
+              <p className="font-medium">
+                {invoice.deliveryState}
+                {invoice.deliveryStateCode ? ` (${invoice.deliveryStateCode})` : ""}
+              </p>
+            </div>
+          )}
+
           <div>
             <p className="text-sm text-muted-foreground">QR Code</p>
             <InvoiceQrCard dataUrl={invoice.qrDataUrl} invoiceNumber={invoice.invoiceNumber} />

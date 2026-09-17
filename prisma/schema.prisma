@@ -787,6 +787,19 @@ model Invoice {
   irnNumber              String?
   ackNumber              String?
   ackDate                DateTime?
+  // Delivery Location — where the goods are actually being shipped, which
+  // may differ from the Customer's own registered address (Customer.state)
+  // for an out-of-state delivery. Snapshotted as plain strings (name +
+  // State.isoCode) rather than an FK to State, same convention as
+  // gstRateName/gstRatePercent on InvoiceItem — survives a later rename/
+  // deletion of the State row. Defaults from the store's own
+  // BusinessSettings.state/stateCode, freely overridable per invoice (see
+  // DeliveryLocationSelect). This — not Customer.state — is what
+  // computeGst() (lib/gst.ts) compares against the store's own state to
+  // decide CGST+SGST vs IGST; Customer.state is left untouched for
+  // everything else that already reads it (the printed billing address).
+  deliveryState          String?
+  deliveryStateCode      String?
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
   store                  Store          @relation(fields: [storeId], references: [id])

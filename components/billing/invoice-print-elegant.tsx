@@ -267,6 +267,13 @@ export function InvoicePrintElegant({ invoice, settings }: InvoicePrintElegantPr
                     <span className="font-semibold">Status:</span> {STATUS_LABELS[invoice.status] ?? invoice.status}
                   </p>
                 )}
+                {invoice.deliveryState && (
+                  <p>
+                    <span className="font-semibold">Place of Supply:</span>{" "}
+                    {invoice.deliveryStateCode ? `${invoice.deliveryStateCode}-` : ""}
+                    {invoice.deliveryState}
+                  </p>
+                )}
               </div>
             </div>
 

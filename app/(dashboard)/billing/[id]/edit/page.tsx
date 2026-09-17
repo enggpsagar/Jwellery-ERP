@@ -8,6 +8,7 @@ import {
   getInvoiceFormStockItems,
 } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
+import { getStates } from "@/lib/actions/location-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap, getMetalSellingRateMap } from "@/lib/actions/purity-actions"
@@ -47,7 +48,7 @@ export default async function EditInvoicePage({ params }: Props) {
     redirect(`/billing/${id}`)
   }
 
-  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates, metalSellingRates, gstRates] =
+  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates, metalSellingRates, gstRates, states] =
     await Promise.all([
       getInvoiceFormCustomers(),
       getInvoiceFormStockItems(id),
@@ -58,6 +59,7 @@ export default async function EditInvoicePage({ params }: Props) {
       getCaratConversionRateMap(),
       getMetalSellingRateMap(),
       getGstRates(),
+      getStates(),
     ])
 
   // Weight fields on a saved invoice item are persisted in that line's own
@@ -146,6 +148,10 @@ export default async function EditInvoicePage({ params }: Props) {
         hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
         gstScheme={businessSettings.gstScheme}
         storeState={businessSettings.state}
+        storeStateCode={businessSettings.stateCode}
+        states={states}
+        initialDeliveryState={invoice.deliveryState}
+        initialDeliveryStateCode={invoice.deliveryStateCode}
         initialCustomerId={invoice.customer?.id}
         initialLocationId={invoice.locationId ?? undefined}
         initialItems={initialItems}

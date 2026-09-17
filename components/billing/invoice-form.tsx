@@ -12,6 +12,10 @@ import { ScanToAddPanel } from "@/components/billing/scan-to-add-panel"
 import { todayForDateInput } from "@/lib/date-input"
 import { playScanBeep } from "@/lib/scan-beep"
 import { computeGst } from "@/lib/gst"
+import {
+  DeliveryLocationSelect,
+  type DeliveryLocationStateOption,
+} from "@/components/shared/delivery-location-select"
 import { computeRoundOff } from "@/lib/round-off"
 
 import { Input } from "@/components/ui/input"
@@ -241,9 +245,21 @@ type InvoiceFormProps = {
   /** Drives whether GST can be charged at all (never, for Composition) and
    * how it's split — see computeGst()'s own doc comment in lib/gst.ts. */
   gstScheme: GstScheme
-  /** The store's own state, compared against the selected customer's state
-   * to tell an inter-state sale (IGST) from an intra-state one (SGST+CGST). */
+  /** The store's own state — Delivery Location defaults to this, and
+   * whichever state ends up selected there (not the customer's own
+   * registered state) is what computeGst() compares it against to tell an
+   * inter-state sale (IGST) from an intra-state one (SGST+CGST). */
   storeState?: string | null
+  /** The store's own GST state code (BusinessSettings.stateCode) — Delivery
+   * Location's own code defaults from this. */
+  storeStateCode?: string | null
+  /** Every state + its GST state code, for the Delivery Location picker —
+   * see components/shared/delivery-location-select.tsx. */
+  states: DeliveryLocationStateOption[]
+  /** Prefill for editing/replacing an existing invoice — defaults to
+   * storeState/storeStateCode when unset (a fresh invoice). */
+  initialDeliveryState?: string | null
+  initialDeliveryStateCode?: string | null
   /** Prefill from a cancelled invoice being replaced — see
    * app/(dashboard)/billing/[id]/replace/page.tsx. All optional; a fresh
    * "New Invoice" passes none of these. */
@@ -280,6 +296,10 @@ export function InvoiceForm({
   hallmarkChargePerPiece = 0,
   gstScheme,
   storeState,
+  storeStateCode,
+  states,
+  initialDeliveryState,
+  initialDeliveryStateCode,
   initialCustomerId,
   initialLocationId,
   initialItems,
@@ -373,7 +393,14 @@ export function InvoiceForm({
     ? legacyPaidAmount
     : paymentRows.reduce((sum, row) => sum + (row.amount || 0), 0)
 
-  const selectedCustomer = customers.find((customer) => customer.id === customerId)
+  // Delivery Location — where the goods are actually being shipped, which
+  // decides CGST+SGST vs IGST (see computeGst() below), independent of
+  // the Party's own registered address. Defaults to the store's own state/
+  // code (or whatever this invoice already had, when editing/replacing).
+  const [deliveryState, setDeliveryState] = useState(initialDeliveryState ?? storeState ?? "")
+  const [deliveryStateCode, setDeliveryStateCode] = useState(
+    initialDeliveryStateCode ?? storeStateCode ?? "",
+  )
 
   const [state, formAction, pending] = useActionState(
     editInvoiceId ? updateInvoice.bind(null, editInvoiceId) : createInvoice,
@@ -852,7 +879,7 @@ export function InvoiceForm({
   // of rate, IGST-only on an inter-state sale, SGST+CGST split otherwise —
   // see computeGst()'s own doc comment in lib/gst.ts.
   const lineGst = (item: LineItem) => {
-    const breakdown = computeGst(taxableValue(item), lineGstRatePercent(item), gstScheme, storeState, selectedCustomer?.state)
+    const breakdown = computeGst(taxableValue(item), lineGstRatePercent(item), gstScheme, storeState, deliveryState)
     const round = (value: number) => Math.round(value * 100) / 100
     return {
       sgst: round(breakdown.sgst),
@@ -891,7 +918,7 @@ export function InvoiceForm({
         return sum + sgst + cgst + igst
       }, 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, gstRate, gstScheme, storeState, selectedCustomer?.state],
+    [items, gstRate, gstScheme, storeState, deliveryState],
   )
   // Aggregated once here instead of shown per-line — a line's own SGST/CGST/
   // IGST split used to render as three extra read-only boxes in every line
@@ -913,7 +940,7 @@ export function InvoiceForm({
         { sgst: 0, cgst: 0, igst: 0, isInterState: false },
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, gstRate, gstScheme, storeState, selectedCustomer?.state],
+    [items, gstRate, gstScheme, storeState, deliveryState],
   )
   const rawTotal =
     subtotal +
@@ -1095,6 +1122,17 @@ export function InvoiceForm({
             name="locationId"
             defaultValue={locationId}
             onChange={setLocationId}
+          />
+        </div>
+
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40 md:col-span-2">
+          <DeliveryLocationSelect
+            states={states}
+            value={deliveryState}
+            onChange={(name, code) => {
+              setDeliveryState(name)
+              setDeliveryStateCode(code)
+            }}
           />
         </div>
       </div>

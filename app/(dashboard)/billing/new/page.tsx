@@ -5,6 +5,7 @@ import {
   getInvoiceFormStockItems,
 } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
+import { getStates } from "@/lib/actions/location-actions"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap, getMetalSellingRateMap } from "@/lib/actions/purity-actions"
@@ -24,7 +25,7 @@ type Props = {
 
 export default async function NewInvoicePage({ searchParams }: Props) {
   const params = await searchParams
-  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates, metalSellingRates, defaultLocationId, gstRates] =
+  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates, metalSellingRates, defaultLocationId, gstRates, states] =
     await Promise.all([
       getInvoiceFormCustomers(),
       getInvoiceFormStockItems(),
@@ -36,6 +37,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
       getMetalSellingRateMap(),
       getDefaultLocationId(),
       getGstRates(),
+      getStates(),
     ])
 
   // Arriving from a customer's own Sale action (see CustomerRowActions) —
@@ -76,6 +78,8 @@ export default async function NewInvoicePage({ searchParams }: Props) {
           hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
           gstScheme={businessSettings.gstScheme}
           storeState={businessSettings.state}
+          storeStateCode={businessSettings.stateCode}
+          states={states}
           defaultNotes={businessSettings.invoiceNotes || undefined}
         />
       </ResetFormWrapper>

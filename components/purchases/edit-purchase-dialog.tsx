@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
+import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select"
 
 const initialState: PurchaseFormState = { success: false, message: "" }
 
@@ -54,6 +54,7 @@ export function EditPurchaseDialog({
 }: EditPurchaseDialogProps) {
   const router = useRouter()
   const toast = useToast()
+  const showLocationField = useShowLocationField(locations.length)
 
   const updatePurchaseWithId = updatePurchase.bind(null, purchaseId)
   const [state, formAction, pending] = useActionState(updatePurchaseWithId, initialState)
@@ -107,7 +108,7 @@ export function EditPurchaseDialog({
           </div>
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            {locations.length > 1 && <Label>Store Location</Label>}
+            {showLocationField && <Label>Store Location</Label>}
             <LocationSelect locations={locations} name="locationId" defaultValue={locationId ?? ""} />
           </div>
 

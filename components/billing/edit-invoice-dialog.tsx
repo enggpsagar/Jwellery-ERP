@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
+import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select"
 
 const initialState: InvoiceFormState = { success: false, message: "" }
 
@@ -96,6 +96,7 @@ export function EditInvoiceDialog({
 }: EditInvoiceDialogProps) {
   const [open, setOpen] = useState(false)
   const router = useRouter()
+  const showLocationField = useShowLocationField(locations.length)
   const toast = useToast()
 
   const updateInvoiceWithId = updateInvoice.bind(null, invoiceId)
@@ -167,7 +168,7 @@ export function EditInvoiceDialog({
           </div>
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            {locations.length > 1 && <Label>Store Location</Label>}
+            {showLocationField && <Label>Store Location</Label>}
             <LocationSelect locations={locations} name="locationId" defaultValue={locationId ?? ""} />
           </div>
 

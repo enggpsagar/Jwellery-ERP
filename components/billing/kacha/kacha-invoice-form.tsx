@@ -28,7 +28,7 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { RequiredMark } from "@/components/shared/required-mark"
-import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
+import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select"
 import { PaidNowFields } from "@/components/shared/paid-now-fields"
 import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
 import { PURITY_SELECT_OPTIONS, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
@@ -191,6 +191,7 @@ export function KachaInvoiceForm({
 }: KachaInvoiceFormProps) {
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
+  const showLocationField = useShowLocationField(locations.length)
   const metalById = useMemo(() => new Map(metals.map((m) => [m.id, m])), [metals])
   // Stone components are tracked by name (stoneMetalTypeName), not id — no
   // stoneMetalTypeId field exists — so the stone-rate fallback needs its
@@ -568,7 +569,7 @@ export function KachaInvoiceForm({
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          {locations.length > 1 && <Label>Store Location</Label>}
+          {showLocationField && <Label>Store Location</Label>}
           <LocationSelect
             locations={locations}
             name="locationId"

@@ -10,7 +10,7 @@ import {
   type DraftOrderFormState,
 } from "@/lib/actions/draft-order-actions"
 import { KarigarSelect, type KarigarOption } from "@/components/karigars/karigar-select"
-import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
+import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select"
 import { todayForDateInput } from "@/lib/date-input"
 import { useToast } from "@/components/providers/toast-provider"
 
@@ -47,6 +47,7 @@ export function SendToKarigarDialog({
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const router = useRouter()
   const toast = useToast()
+  const showLocationField = useShowLocationField(locations.length)
 
   const sendWithId = sendDraftOrderToKarigar.bind(null, orderId)
   const [state, formAction, pending] = useActionState(sendWithId, initialState)
@@ -102,7 +103,7 @@ export function SendToKarigarDialog({
           </div>
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            {locations.length > 1 && <Label>Location</Label>}
+            {showLocationField && <Label>Location</Label>}
             <LocationSelect
               locations={locations}
               name="locationId"

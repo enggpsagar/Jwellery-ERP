@@ -11,7 +11,7 @@ import {
   type DraftOrderItemInput,
 } from "@/lib/actions/draft-order-actions"
 import { CustomerSelect, type CustomerOption } from "@/components/customers/customer-select"
-import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
+import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select"
 import { PURITY_SELECT_OPTIONS } from "@/lib/purity"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import type { PurityType } from "@prisma/client"
@@ -93,6 +93,7 @@ export function DraftOrderForm({
   const [items, setItems] = useState<ItemRow[]>([emptyItem("initial")])
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
+  const showLocationField = useShowLocationField(locations.length)
 
   const [state, formAction, pending] = useActionState(createDraftOrder, initialState)
 
@@ -175,7 +176,7 @@ export function DraftOrderForm({
             <Input name="expectedDate" type="date" />
           </div>
           <div className="space-y-1.5">
-            {locations.length > 1 && <Label>Location</Label>}
+            {showLocationField && <Label>Location</Label>}
             <LocationSelect
               locations={locations}
               name="locationId"

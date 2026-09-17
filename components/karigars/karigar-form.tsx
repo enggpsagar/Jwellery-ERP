@@ -13,7 +13,7 @@ import type { Karigar } from "@/lib/actions/karigar-actions"
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { getCitiesByStateId } from "@/lib/actions/location-actions"
-import { LocationSelect } from "@/components/shared/location-select"
+import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { gstinRequired, defaultPartyGstType } from "@/lib/gst"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
@@ -59,6 +59,7 @@ export function KarigarForm({
   gstScheme,
 }: Props) {
   const toast = useToast()
+  const showLocationField = useShowLocationField(locations.length)
   const [imageUrl, setImageUrl] = useState(karigar?.imageUrl ?? "")
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -530,7 +531,7 @@ export function KarigarForm({
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          {locations.length > 1 && <Label>Store Location</Label>}
+          {showLocationField && <Label>Store Location</Label>}
           <LocationSelect
             locations={locations}
             name="locationId"

@@ -29,7 +29,7 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { RequiredMark } from "@/components/shared/required-mark"
-import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
+import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select"
 import { PaidNowFields } from "@/components/shared/paid-now-fields"
 import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
 import { PURITY_SELECT_OPTIONS, isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
@@ -290,6 +290,7 @@ export function InvoiceForm({
 }: InvoiceFormProps) {
   const router = useRouter()
   const toast = useToast()
+  const showLocationField = useShowLocationField(locations.length)
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
 
@@ -1088,7 +1089,7 @@ export function InvoiceForm({
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          {locations.length > 1 && <Label>Store Location</Label>}
+          {showLocationField && <Label>Store Location</Label>}
           <LocationSelect
             locations={locations}
             name="locationId"

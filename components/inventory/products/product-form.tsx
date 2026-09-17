@@ -14,7 +14,7 @@ import {
 } from "@/lib/actions/taxonomy-actions";
 import { classifyPurityFamily, type PurityFamily } from "@/lib/business-units";
 import { resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity";
-import { LocationSelect, type LocationOption } from "@/components/shared/location-select";
+import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select";
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle";
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields";
 import { AddCategoryDialog } from "@/components/inventory/shared/add-category-dialog";
@@ -153,6 +153,7 @@ export function ProductForm({
   skuFormat,
   styleFieldEnabled = true,
 }: ProductFormProps) {
+  const showLocationField = useShowLocationField(locations.length);
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? "");
 
   const [categoryTypeId, setCategoryTypeId] = useState(
@@ -1356,14 +1357,14 @@ export function ProductForm({
               </div>
 
               <div>
-                {locations.length > 1 && <Label htmlFor="locationId">Location</Label>}
+                {showLocationField && <Label htmlFor="locationId">Location</Label>}
                 <LocationSelect
                   locations={locations}
                   name="locationId"
                   defaultValue={defaultLocationId}
                   placeholder="Select location (optional)"
                 />
-                {locations.length > 1 && (
+                {showLocationField && (
                   <p className="mt-1.5 text-xs text-muted-foreground">
                     Optional — left blank, the same default a full Add Stock
                     entry would use is applied automatically.

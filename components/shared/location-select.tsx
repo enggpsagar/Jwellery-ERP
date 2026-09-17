@@ -30,6 +30,28 @@ export type LocationOption = {
   name: string
 }
 
+/**
+ * Mirrors LocationSelect's own collapse condition (see below) so a caller's
+ * own <Label>Location</Label> — rendered *outside* this component, next to
+ * it — can hide in sync instead of being left floating over an invisible
+ * hidden input. Pass the same `locations.length` each caller already checks.
+ */
+export function useShowLocationField(locationCount: number): boolean {
+  const [role, setRole] = useState<UserRole | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getCurrentUserRole().then((value) => {
+      if (!cancelled) setRole(value)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return locationCount > 1 && !(role && UNRESTRICTED_ROLES.includes(role))
+}
+
 type LocationSelectProps = {
   locations: LocationOption[]
   /** Omit when the caller manages the selected value itself (e.g. one row

@@ -15,7 +15,7 @@ import {
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { classifyMetalName } from "@/lib/business-units"
 import { GRAMS_PER_CARAT, toPrimaryUnit } from "@/lib/purity"
-import { LocationSelect } from "@/components/shared/location-select"
+import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
 import { useToast } from "@/components/providers/toast-provider"
 import { ProductSelect, type ProductOption } from "@/components/inventory/shared/product-select"
 
@@ -213,6 +213,7 @@ export function ReceiveItemsForm({
   defaultLocationId,
   draftOrderItems = [],
 }: ReceiveItemsFormProps) {
+  const showLocationField = useShowLocationField(locations.length)
   const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
   // The job's own issued metal always wins when set — a karigar job can only
   // ever be received back in the metal it was issued in. Falls back to the
@@ -931,7 +932,7 @@ export function ReceiveItemsForm({
                     </div>
 
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      {locations.length > 1 && <Label className="text-xs">Location</Label>}
+                      {showLocationField && <Label className="text-xs">Location</Label>}
                       <LocationSelect
                         locations={locations}
                         defaultValue={item.locationId}

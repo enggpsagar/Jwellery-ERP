@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 
 import { getCustomers } from "@/lib/actions/customer-actions"
 import { getStates } from "@/lib/actions/location-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { CustomersClient } from "@/components/customers/customers-client"
 
 export const metadata: Metadata = {
@@ -35,9 +36,10 @@ export default async function CustomersPage({
   const dateFrom = params.dateFrom || undefined
   const dateTo = params.dateTo || undefined
 
-  const [{ customers, pagination }, states] = await Promise.all([
+  const [{ customers, pagination }, states, settings] = await Promise.all([
     getCustomers({ page, pageSize, search, sortBy, sortOrder, dateFrom, dateTo }),
     getStates(),
+    getBusinessSettings(),
   ])
 
   return (
@@ -45,6 +47,7 @@ export default async function CustomersPage({
       customers={customers}
       states={states}
       pagination={pagination}
+      vendorsModuleEnabled={settings.vendorsModuleEnabled}
     />
   )
 }

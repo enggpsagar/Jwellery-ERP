@@ -40,6 +40,12 @@ type VendorCreateFormProps = {
    * — freely changeable per vendor afterward. */
   defaultState?: string
   defaultCity?: string
+  /** BusinessSettings.vendorsModuleEnabled — off relabels this page's own
+   * "Vendor" copy to "Supplier" (reached only via Purchases/Payment Out's
+   * "Add New Supplier" once the standalone module is hidden) and drops the
+   * "also a party" linking toggle, since that's part of the same hidden
+   * Vendor-management/linking feature. */
+  vendorsModuleEnabled?: boolean
 }
 
 /**
@@ -54,7 +60,9 @@ export function VendorCreateForm({
   gstScheme,
   defaultState,
   defaultCity,
+  vendorsModuleEnabled = true,
 }: VendorCreateFormProps) {
+  const vendorTermLabel = vendorsModuleEnabled ? "Vendor" : "Supplier"
   const [gstType, setGstType] = useState(defaultPartyGstType(gstScheme))
   const gstinRequiredNow = gstinRequired(gstScheme, gstType)
 
@@ -72,7 +80,7 @@ export function VendorCreateForm({
 
   useEffect(() => {
     if (state.success) {
-      toast.success(state.message || "Vendor added successfully")
+      toast.success(state.message || `${vendorTermLabel} added successfully`)
 
       async function finish() {
         // Best-effort: the vendor itself is already saved either way, so a
@@ -174,7 +182,7 @@ export function VendorCreateForm({
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
             <label className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4 text-muted-foreground" />
-              Vendor Name <RequiredMark />
+              {vendorTermLabel} Name <RequiredMark />
             </label>
             <input
               name="name"
@@ -331,24 +339,26 @@ export function VendorCreateForm({
             />
           </div>
 
-          <div className="md:col-span-2">
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={alsoCreateCustomer}
-                onChange={(e) => setAlsoCreateCustomer(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-input"
-              />
-              <span>
-                <span className="font-medium">This vendor is also a party</span>
-                <span className="block text-xs text-muted-foreground">
-                  Creates a linked Party record with the same details — you can buy from and sell to the
-                  same business without entering it twice. Linked records can be unlinked later from either
-                  one&apos;s detail page.
+          {vendorsModuleEnabled && (
+            <div className="md:col-span-2">
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={alsoCreateCustomer}
+                  onChange={(e) => setAlsoCreateCustomer(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-input"
+                />
+                <span>
+                  <span className="font-medium">This vendor is also a party</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Creates a linked Party record with the same details — you can buy from and sell to the
+                    same business without entering it twice. Linked records can be unlinked later from either
+                    one&apos;s detail page.
+                  </span>
                 </span>
-              </span>
-            </label>
-          </div>
+              </label>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2 md:col-span-2">
             <Button
@@ -360,7 +370,7 @@ export function VendorCreateForm({
               Cancel
             </Button>
             <Button type="submit" disabled={pending}>
-              {pending ? "Saving..." : "Save Vendor"}
+              {pending ? "Saving..." : `Save ${vendorTermLabel}`}
             </Button>
           </div>
         </form>

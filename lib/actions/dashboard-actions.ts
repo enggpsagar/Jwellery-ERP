@@ -214,7 +214,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
       tone: "outstanding",
     },
     {
-      label: "Total Vendor Purchases",
+      label: "Total Purchases",
       value: `₹${totalPurchases.toLocaleString("en-IN")}`,
       change: "",
       trend: "up",

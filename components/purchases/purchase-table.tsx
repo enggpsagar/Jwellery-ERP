@@ -35,9 +35,13 @@ type PurchaseTableProps = {
    * link navigating away. Same convention as CustomersTable. */
   activePurchaseId?: string | null
   onActivate?: (id: string) => void
+  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop
+   * comment. Swaps this table's "Vendor" column/labels for "Supplier". */
+  vendorsModuleEnabled?: boolean
 }
 
-export function PurchaseTable({ purchases, activePurchaseId, onActivate }: PurchaseTableProps) {
+export function PurchaseTable({ purchases, activePurchaseId, onActivate, vendorsModuleEnabled = true }: PurchaseTableProps) {
+  const vendorTermLabel = vendorsModuleEnabled ? "Vendor" : "Supplier"
   if (!purchases.length) {
     return (
       <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
@@ -59,7 +63,7 @@ export function PurchaseTable({ purchases, activePurchaseId, onActivate }: Purch
                   column is hidden instead of silently scrolling out of view.
                   Purchase #, Vendor, Status, Total, Balance stay visible. */}
               <SortableTableHead label="Date" sortKey="purchaseDate" defaultSortBy="purchaseDate" className="hidden sm:table-cell" />
-              <th className="px-4 py-3 text-left font-medium">Vendor</th>
+              <th className="px-4 py-3 text-left font-medium">{vendorTermLabel}</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <SortableTableHead label="Total" sortKey="totalAmount" defaultSortBy="purchaseDate" />
               <th className="px-4 py-3 text-left font-medium">Balance</th>
@@ -93,7 +97,7 @@ export function PurchaseTable({ purchases, activePurchaseId, onActivate }: Purch
                             label: "Date",
                             value: formatShortDate(purchase.purchaseDate),
                           },
-                          { label: "Vendor", value: purchase.vendor?.name },
+                          { label: vendorTermLabel, value: purchase.vendor?.name },
                           { label: "Phone", value: purchase.vendor?.phone },
                           { label: "Status", value: purchase.status },
                         ],

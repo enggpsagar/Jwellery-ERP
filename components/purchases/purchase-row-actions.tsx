@@ -24,9 +24,11 @@ import type { LocationOption } from "@/components/shared/location-select"
 type PurchaseRowActionsProps = {
   purchase: Purchase
   locations: LocationOption[]
+  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
+  vendorsModuleEnabled?: boolean
 }
 
-export function PurchaseRowActions({ purchase, locations }: PurchaseRowActionsProps) {
+export function PurchaseRowActions({ purchase, locations, vendorsModuleEnabled = true }: PurchaseRowActionsProps) {
   const router = useRouter()
   const toast = useToast()
 
@@ -103,6 +105,7 @@ export function PurchaseRowActions({ purchase, locations }: PurchaseRowActionsPr
         locations={locations}
         open={editOpen}
         onOpenChange={setEditOpen}
+        vendorsModuleEnabled={vendorsModuleEnabled}
       />
 
       <Dialog

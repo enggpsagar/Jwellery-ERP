@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { cache } from "react"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 
 import { getVendorById } from "@/lib/actions/vendor-actions"
 import { getStates } from "@/lib/actions/location-actions"
@@ -43,6 +43,12 @@ export default async function EditVendorPage({
     getStates(),
     getBusinessSettings(),
   ])
+
+  // Module toggled off in Settings — same standalone vendor-management
+  // gate as the detail page.
+  if (!businessSettings.vendorsModuleEnabled) {
+    redirect("/dashboard")
+  }
 
   if (!vendor) notFound()
 

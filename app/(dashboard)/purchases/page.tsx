@@ -3,6 +3,7 @@ import { InvoiceStatus } from "@prisma/client"
 
 import { getPurchases } from "@/lib/actions/purchase-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { PurchasesClient } from "@/components/purchases/purchases-client"
 
 export const metadata: Metadata = {
@@ -37,12 +38,18 @@ export default async function PurchasesPage({ searchParams }: PurchasesPageProps
   const dateFrom = params.dateFrom || undefined
   const dateTo = params.dateTo || undefined
 
-  const [{ purchases, pagination }, locations] = await Promise.all([
+  const [{ purchases, pagination }, locations, settings] = await Promise.all([
     getPurchases({ page, pageSize, search, sortBy, sortOrder, status, dateFrom, dateTo }),
     getStoreLocations(),
+    getBusinessSettings(),
   ])
 
   return (
-    <PurchasesClient purchases={purchases} locations={locations} pagination={pagination} />
+    <PurchasesClient
+      purchases={purchases}
+      locations={locations}
+      pagination={pagination}
+      vendorsModuleEnabled={settings.vendorsModuleEnabled}
+    />
   )
 }

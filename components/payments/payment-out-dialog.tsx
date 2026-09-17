@@ -34,6 +34,8 @@ type PartyType = "VENDOR" | "KARIGAR"
 type PaymentOutDialogProps = {
   vendors: PaymentVendorOption[]
   karigars: PaymentKarigarOption[]
+  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
+  vendorsModuleEnabled?: boolean
 }
 
 /**
@@ -47,7 +49,8 @@ type PaymentOutDialogProps = {
  * "Pay Now" link) — same query-param-opens-the-dialog convention as the
  * sidebar's ?new=1, just naming which vendor too.
  */
-export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
+export function PaymentOutDialog({ vendors, karigars, vendorsModuleEnabled = true }: PaymentOutDialogProps) {
+  const vendorTermLabel = vendorsModuleEnabled ? "Vendor" : "Supplier"
   const searchParams = useSearchParams()
   const initialVendorId = searchParams.get("vendorId") ?? ""
   // Lets the sidebar's own "+" quick-add (?new=1) open this straight away,
@@ -149,7 +152,7 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
                     : "text-muted-foreground hover:bg-accent"
                 }`}
               >
-                Vendor
+                {vendorTermLabel}
               </button>
               <button
                 type="button"
@@ -169,13 +172,14 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
           </div>
 
           <div className="space-y-2">
-            <Label required>{partyType === "VENDOR" ? "Vendor" : "Artisan"}</Label>
+            <Label required>{partyType === "VENDOR" ? vendorTermLabel : "Artisan"}</Label>
             {partyType === "VENDOR" ? (
               <VendorSelect
                 vendors={vendors}
                 name="vendorId"
                 defaultValue={partyId}
                 onChange={setPartyId}
+                termLabel={vendorTermLabel}
               />
             ) : (
               <KarigarSelect

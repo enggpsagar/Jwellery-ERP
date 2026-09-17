@@ -22,7 +22,15 @@ function inr(value: number) {
  * full data (this list is never server-paginated), so this is a plain
  * presentational component, not a client-fetched panel.
  */
-export function PaymentOutDetailPanel({ row }: { row: PaymentOutRow | null }) {
+export function PaymentOutDetailPanel({
+  row,
+  vendorsModuleEnabled = true,
+}: {
+  row: PaymentOutRow | null
+  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
+  vendorsModuleEnabled?: boolean
+}) {
+  const vendorTermLabel = vendorsModuleEnabled ? "Vendor" : "Supplier"
   if (!row) {
     return (
       <div className="flex h-full min-h-[24rem] flex-col items-center justify-center gap-2 rounded-xl border bg-card p-6 text-center text-muted-foreground">
@@ -43,7 +51,7 @@ export function PaymentOutDetailPanel({ row }: { row: PaymentOutRow | null }) {
 
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div>
-          <p className="text-muted-foreground">{row.partyType === "VENDOR" ? "Vendor" : "Artisan"}</p>
+          <p className="text-muted-foreground">{row.partyType === "VENDOR" ? vendorTermLabel : "Artisan"}</p>
           <Link href={partyHref} className="font-medium hover:underline">
             {row.partyName}
           </Link>

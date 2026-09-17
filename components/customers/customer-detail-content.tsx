@@ -30,12 +30,17 @@ export function CustomerDetailContent({
   customer,
   ledger,
   onLinkChanged,
+  vendorsModuleEnabled = true,
 }: {
   customer: Customer
   states: StateItem[]
   ledger: React.ReactNode
   /** See CustomerVendorLinkCard's own doc comment on its onChanged prop. */
   onLinkChanged?: () => void
+  /** BusinessSettings.vendorsModuleEnabled — hides the whole Register-as-
+   * Vendor/Link-to-Vendor/View-Vendor card below when off, same as every
+   * other standalone vendor-management surface. */
+  vendorsModuleEnabled?: boolean
 }) {
   const money = (value: unknown) => `₹ ${Number(value || 0).toLocaleString("en-IN")}`
 
@@ -69,11 +74,13 @@ export function CustomerDetailContent({
           @container below (a single level, no stacking) is unaffected and
           stays as-is — this only reverts the OUTER grid. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <CustomerVendorLinkCard
-          customerId={customer.id}
-          linkedVendor={customer.linkedVendor ?? null}
-          onChanged={onLinkChanged}
-        />
+        {vendorsModuleEnabled && (
+          <CustomerVendorLinkCard
+            customerId={customer.id}
+            linkedVendor={customer.linkedVendor ?? null}
+            onChanged={onLinkChanged}
+          />
+        )}
 
         <DetailSection
           title="Party Information"

@@ -29,6 +29,8 @@ type PurchasesClientProps = {
     totalCount: number
     totalPages: number
   }
+  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
+  vendorsModuleEnabled?: boolean
 }
 
 /**
@@ -37,7 +39,7 @@ type PurchasesClientProps = {
  * shows its full detail (with Edit/Delete/Record Payment) in the panel on
  * the right, instead of every action requiring a full navigation.
  */
-export function PurchasesClient({ purchases, locations, pagination }: PurchasesClientProps) {
+export function PurchasesClient({ purchases, locations, pagination, vendorsModuleEnabled = true }: PurchasesClientProps) {
   // Defaults to the first row on this page/search result so the panel is
   // never empty on load, matching CustomersClient.
   const [activePurchaseId, setActivePurchaseId] = React.useState<string | null>(
@@ -77,6 +79,7 @@ export function PurchasesClient({ purchases, locations, pagination }: PurchasesC
             purchases={purchases}
             activePurchaseId={activePurchaseId}
             onActivate={setActivePurchaseId}
+            vendorsModuleEnabled={vendorsModuleEnabled}
           />
 
           <DataTablePagination
@@ -89,7 +92,11 @@ export function PurchasesClient({ purchases, locations, pagination }: PurchasesC
           />
         </div>
 
-        <PurchaseDetailPanel purchaseId={activePurchaseId} locations={locations} />
+        <PurchaseDetailPanel
+          purchaseId={activePurchaseId}
+          locations={locations}
+          vendorsModuleEnabled={vendorsModuleEnabled}
+        />
       </div>
     </main>
   )

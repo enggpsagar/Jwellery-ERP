@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 
-import { PurityType, type SkuFormat } from "@prisma/client";
+import { PurityType } from "@prisma/client";
 
 import type { ProductFormState } from "@/lib/inventory/product-types";
-import { buildSkuPrefix } from "@/lib/inventory/product-sku";
 import {
   getStoreCategoryTypes,
   getStoreMetalOrigins,
@@ -128,15 +127,9 @@ type ProductFormProps = {
    * new product doesn't start with it blank. Not used in edit mode: an
    * existing stock entry's saved location is untouched by this. */
   defaultLocationId?: string;
-  /** Create-only — the store's configured SKU layout (Settings > Metals,
-   * Stones & Categories > SKU Format), so this preview never disagrees with
-   * what createProduct actually generates. Undefined in edit mode, where
-   * productCode is immutable and just displayed as-is. */
-  skuFormat?: SkuFormat;
   /** Settings > Metals, Stones & Categories > "Require Style on products" —
-   * hides the Style field entirely and skips it from the SKU preview when
-   * off. Defaults true so a caller that hasn't been updated still shows it,
-   * matching today's behavior. */
+   * hides the Style field entirely when off. Defaults true so a caller
+   * that hasn't been updated still shows it, matching today's behavior. */
   styleFieldEnabled?: boolean;
 };
 
@@ -158,7 +151,6 @@ export function ProductForm({
   caratConversionRates,
   locations = [],
   defaultLocationId,
-  skuFormat,
   styleFieldEnabled = true,
 }: ProductFormProps) {
   const showLocationField = useShowLocationField(locations.length);
@@ -262,25 +254,6 @@ export function ProductForm({
     : Object.values(PurityType);
 
   const [puritySearch, setPuritySearch] = useState("");
-
-  // Live preview of the auto-generated SKU (see buildSkuPrefix's own doc
-  // comment) — the actual sequence number ("-001") is only known once the
-  // product is saved (it depends on how many other products already share
-  // this exact prefix), so this shows the prefix alone with a placeholder.
-  const selectedCategoryType = types.find((item) => item.id === categoryTypeId);
-  const selectedCategory = categories.find((item) => item.id === categoryId);
-  const selectedStyle = styles.find((item) => item.id === targetStyleId);
-  const skuPreview =
-    selectedMetal && (targetStyleId || !styleFieldEnabled)
-      ? buildSkuPrefix({
-          metalName: selectedMetal.name,
-          purity: defaultPurity === "__none__" ? null : (defaultPurity as PurityType),
-          targetStyleName: selectedStyle?.name ?? null,
-          categoryTypeName: selectedCategoryType?.name ?? null,
-          categoryName: selectedCategory?.name ?? null,
-          format: skuFormat,
-        })
-      : null;
 
   const filteredPurities = useMemo(() => {
     const query = puritySearch.trim().toLowerCase();
@@ -629,6 +602,64 @@ export function ProductForm({
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div>
+            {/* Gemstones are deliberately excluded from this list (see
+                selectableMetals above) — a product's stone is picked via
+                "Includes a Stone" further down instead, so this stays a
+                plain metal picker rather than mixing the two concepts. Leads
+                the form (ahead of Category) since it's the first thing that
+                narrows every field after it — Default Purity, and the SKU
+                itself, are both derived from it. */}
+            <Label>Metal Type <RequiredMark /></Label>
+
+            <div className="flex gap-1.5">
+              <Select value={metalTypeId} onValueChange={setMetalTypeId}>
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue placeholder="Select metal type" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search metal types..."
+                      value={metalSearch}
+                      onChange={(event) => setMetalSearch(event.target.value)}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    />
+                  </div>
+
+                  {filteredMetals.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      No metal types found{metalSearch ? ` for "${metalSearch}"` : ""}
+                    </div>
+                  ) : (
+                    filteredMetals.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                        {!item.isActive ? " (Disabled)" : ""}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                className="h-11 w-9 shrink-0 px-0"
+                title="Add Metal Type"
+                onClick={() => setAddMetalOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <input type="hidden" name="metalTypeId" value={metalTypeId} />
+
+            <ErrorText error={state.errors.metalTypeId} />
+          </div>
+
+          <div>
             <Label>Category <RequiredMark /></Label>
 
             <div className="flex gap-1.5">
@@ -764,38 +795,6 @@ export function ProductForm({
             <ErrorText error={state.errors.name} />
           </div>
 
-          <div>
-            <Label htmlFor="productCode">SKU / Product Code</Label>
-
-            {mode === "edit" ? (
-              <div
-                id="productCode"
-                className="flex h-11 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground"
-              >
-                {product?.productCode}
-              </div>
-            ) : (
-              <>
-                <div
-                  id="productCode"
-                  className="flex h-11 items-center rounded-md border border-dashed bg-muted/40 px-3 text-sm text-muted-foreground"
-                >
-                  {skuPreview ? (
-                    <span className="font-medium text-foreground">{skuPreview}-###</span>
-                  ) : (
-                    `Select Metal, Purity${styleFieldEnabled ? ", Style" : ""} and Category to preview`
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Generated automatically from Metal + Purity{styleFieldEnabled ? " + Style" : ""} + Category — the
-                  final number is assigned when you save.
-                </p>
-              </>
-            )}
-
-            <ErrorText error={state.errors.productCode} />
-          </div>
-
           {styleFieldEnabled && (
             <div>
               <Label htmlFor="targetStyle">Style <RequiredMark /></Label>
@@ -853,61 +852,6 @@ export function ProductForm({
         <h3 className="mb-6 text-lg font-semibold">Metal Details</h3>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          <div>
-            {/* Gemstones are deliberately excluded from this list (see
-                selectableMetals above) — a product's stone is picked via
-                "Includes a Stone" below instead, so this stays a plain
-                metal picker rather than mixing the two concepts. */}
-            <Label>Metal Type <RequiredMark /></Label>
-
-            <div className="flex gap-1.5">
-              <Select value={metalTypeId} onValueChange={setMetalTypeId}>
-                <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="Select metal type" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      placeholder="Search metal types..."
-                      value={metalSearch}
-                      onChange={(event) => setMetalSearch(event.target.value)}
-                      onKeyDown={(event) => event.stopPropagation()}
-                    />
-                  </div>
-
-                  {filteredMetals.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No metal types found{metalSearch ? ` for "${metalSearch}"` : ""}
-                    </div>
-                  ) : (
-                    filteredMetals.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name}
-                        {!item.isActive ? " (Disabled)" : ""}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon"
-                className="h-11 w-9 shrink-0 px-0"
-                title="Add Metal Type"
-                onClick={() => setAddMetalOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <input type="hidden" name="metalTypeId" value={metalTypeId} />
-
-            <ErrorText error={state.errors.metalTypeId} />
-          </div>
-
           <div>
             <Label>Default Purity</Label>
 

@@ -61,7 +61,6 @@ export default async function NewProductPage({
           locations={locations}
           defaultLocationId={defaultLocationId ?? undefined}
           returnTo={returnTo}
-          skuFormat={businessSettings.skuFormat}
           styleFieldEnabled={businessSettings.styleFieldEnabled}
         />
       </ResetFormWrapper>

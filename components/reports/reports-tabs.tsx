@@ -170,11 +170,6 @@ type ReportsTabsProps = {
   vendorPurchase: VendorPurchase
   itemLedger: ItemLedger
   financialYears: number[]
-  /** BusinessSettings.vendorsModuleEnabled — hides the Vendor Purchase tab
-   * entirely when off, same as every other standalone vendor-management
-   * surface (this report is fundamentally "purchases grouped by vendor",
-   * not something a Purchase-only/Supplier-labeled store needs). */
-  vendorsModuleEnabled?: boolean
 }
 
 function reportDate(value: string | null) {
@@ -249,9 +244,7 @@ export function ReportsTabs({
   vendorPurchase,
   itemLedger,
   financialYears,
-  vendorsModuleEnabled = true,
 }: ReportsTabsProps) {
-  const visibleTabs = vendorsModuleEnabled ? TABS : TABS.filter((tab) => tab.key !== "vendorPurchase")
   const [activeTab, setActiveTab] = useState<TabKey>("sales")
   const searchParams = useSearchParams()
   const toast = useToast()
@@ -425,7 +418,7 @@ export function ReportsTabs({
             horizontal page-level overflow: with no scroll container, the
             tab row's real content width pushed the whole page wider. */}
         <div className="flex gap-2 overflow-x-auto">
-          {visibleTabs.map((tab) => (
+          {TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}

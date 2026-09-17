@@ -10,7 +10,6 @@ import { getLocationScope, locationWhere } from "@/lib/location-scope"
 
 export type SidebarCounts = {
   customers: number
-  vendors: number
   products: number
   stock: number
   purchases: number
@@ -27,7 +26,6 @@ export type SidebarCounts = {
 
 const EMPTY_COUNTS: SidebarCounts = {
   customers: 0,
-  vendors: 0,
   products: 0,
   stock: 0,
   purchases: 0,
@@ -72,7 +70,6 @@ export async function getSidebarCounts(
 
   const [
     customers,
-    vendors,
     products,
     stock,
     purchases,
@@ -87,7 +84,6 @@ export async function getSidebarCounts(
     stores,
   ] = await Promise.all([
     prisma.customer.count({ where: { storeId, isArchived: false } }),
-    prisma.vendor.count({ where: { storeId, isArchived: false } }),
     prisma.product.count({ where: { storeId } }),
     prisma.inventoryStock.count({ where: { storeId, ...withLocation } }),
     prisma.purchase.count({ where: { storeId, ...withLocation } }),
@@ -114,7 +110,6 @@ export async function getSidebarCounts(
 
   return {
     customers,
-    vendors,
     products,
     stock,
     purchases,

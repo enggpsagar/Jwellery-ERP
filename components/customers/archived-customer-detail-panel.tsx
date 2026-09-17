@@ -18,8 +18,6 @@ type StateItem = {
 type ArchivedCustomerDetailPanelProps = {
   customerId: string | null
   states: StateItem[]
-  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
-  vendorsModuleEnabled?: boolean
 }
 
 /**
@@ -28,7 +26,7 @@ type ArchivedCustomerDetailPanelProps = {
  * shows, just with Restore in place of Edit/Archive/Delete in the header
  * (those don't apply to an already-archived record).
  */
-export function ArchivedCustomerDetailPanel({ customerId, states, vendorsModuleEnabled = true }: ArchivedCustomerDetailPanelProps) {
+export function ArchivedCustomerDetailPanel({ customerId, states }: ArchivedCustomerDetailPanelProps) {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -85,7 +83,6 @@ export function ArchivedCustomerDetailPanel({ customerId, states, vendorsModuleE
       <CustomerDetailContent
         customer={customer}
         states={states}
-        vendorsModuleEnabled={vendorsModuleEnabled}
         ledger={
           <CustomerLedgerCardClient
             customerId={customer.id}

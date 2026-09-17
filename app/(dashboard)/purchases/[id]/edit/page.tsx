@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation"
 
 import {
   getPurchaseById,
-  getPurchaseFormVendors,
+  getPurchaseFormParties,
   getPurchaseFormProducts,
   type Purchase,
 } from "@/lib/actions/purchase-actions"
@@ -52,7 +52,7 @@ export default async function EditPurchasePage({ params }: Props) {
 
   const [vendors, products, locations, businessSettings, metals, origins, caratConversionRates, gstRates] =
     await Promise.all([
-      getPurchaseFormVendors(),
+      getPurchaseFormParties(),
       getPurchaseFormProducts(),
       getStoreLocations(),
       getBusinessSettings(),
@@ -139,7 +139,6 @@ export default async function EditPurchasePage({ params }: Props) {
             defaultVendorInvoiceNumber={purchase.vendorInvoiceNumber ?? undefined}
             defaultNotes={purchase.notes ?? undefined}
             defaultPaidAmount={purchase.paidAmount}
-            vendorsModuleEnabled={businessSettings.vendorsModuleEnabled}
           />
         </Suspense>
       </ResetFormWrapper>

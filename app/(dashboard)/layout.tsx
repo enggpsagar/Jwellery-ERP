@@ -163,7 +163,7 @@ export default async function DashboardLayout({
           select: {
             name: true,
             planExpiresAt: true,
-            businessSettings: { select: { logoUrl: true, vendorsModuleEnabled: true } },
+            businessSettings: { select: { logoUrl: true } },
           },
         })
       : Promise.resolve(null),
@@ -294,7 +294,6 @@ export default async function DashboardLayout({
       storeLogoUrl={storeInfo?.businessSettings?.logoUrl}
       counts={sidebarCounts}
       side={sidebarSide}
-      vendorsModuleEnabled={storeInfo?.businessSettings?.vendorsModuleEnabled ?? true}
     />
   );
 

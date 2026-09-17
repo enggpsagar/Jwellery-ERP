@@ -597,22 +597,25 @@ export async function getPurchaseById(id: string) {
   return mapPurchase(purchase);
 }
 
-/** Lightweight vendor list for the purchase form's vendor picker. */
-export async function getPurchaseFormVendors() {
+/** Lightweight party list for the purchase form's supplier picker — every
+ * Party (not just ones already used as a supplier) is offered, since
+ * picking one and saving the purchase is what marks it as a supplier (see
+ * createPurchase's isVendor auto-flip). */
+export async function getPurchaseFormParties() {
   const storeId = await requireStoreScope();
 
-  const vendors = await prisma.vendor.findMany({
+  const parties = await prisma.customer.findMany({
     where: { storeId, isActive: true, isArchived: false },
     orderBy: { name: "asc" },
     // `state` rides along so the form can tell an inter-state purchase from
     // an intra-state one (computePurchaseGst's isInterState) without a
     // second round trip. `gstType` rides along too — a purchase's GST is
-    // computed from the VENDOR's own registration, not the store's, see
+    // computed from the PARTY's own registration, not the store's, see
     // computePurchaseGst() in lib/gst.ts.
     select: { id: true, name: true, phone: true, vendorCode: true, state: true, gstType: true },
   });
 
-  return vendors;
+  return parties;
 }
 
 /** Product picker for purchase line items — every line creates brand new stock. */
@@ -776,9 +779,9 @@ export async function createPurchase(
     // snapshot null instead of failing the save.
     const gstRateSnapshot = await resolveGstRateSnapshot(storeId, gstRateId);
 
-    const vendor = await prisma.vendor.findFirst({
+    const vendor = await prisma.customer.findFirst({
       where: { id: vendorId, storeId },
-      select: { id: true, name: true, gstType: true },
+      select: { id: true, name: true, gstType: true, isVendor: true },
     });
     if (!vendor) {
       return { success: false, message: "Please select a vendor" };
@@ -1044,6 +1047,13 @@ export async function createPurchase(
             description: index === 0 ? `Payment made for ${purchaseNumber}` : undefined,
           },
         });
+      }
+
+      // A Party becomes a "supplier" (Customer.isVendor) the moment it's
+      // actually used as one — never a user-facing choice, see
+      // Customer.isVendor's doc comment in schema.prisma.
+      if (!vendor.isVendor) {
+        await tx.customer.update({ where: { id: vendorId }, data: { isVendor: true } });
       }
 
       return created;
@@ -1312,7 +1322,7 @@ export async function updatePurchase(
 
     const gstRateSnapshot = await resolveGstRateSnapshot(storeId, gstRateId);
 
-    const vendor = await prisma.vendor.findFirst({
+    const vendor = await prisma.customer.findFirst({
       where: { id: purchase.vendorId, storeId },
       select: { id: true, name: true, gstType: true },
     });

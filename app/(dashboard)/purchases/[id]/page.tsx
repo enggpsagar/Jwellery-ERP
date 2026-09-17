@@ -4,7 +4,6 @@ import { notFound } from "next/navigation"
 
 import { getPurchaseById } from "@/lib/actions/purchase-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
-import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { PurchaseDetailContent } from "@/components/purchases/purchase-detail-content"
 import { PurchaseRowActions } from "@/components/purchases/purchase-row-actions"
 import { RecordPurchasePaymentDialog } from "@/components/purchases/record-purchase-payment-dialog"
@@ -28,10 +27,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PurchaseDetailPage({ params }: Props) {
   const { id } = await params
-  const [purchase, locations, settings] = await Promise.all([
+  const [purchase, locations] = await Promise.all([
     getPurchase(id),
     getStoreLocations(),
-    getBusinessSettings(),
   ])
 
   if (!purchase) notFound()
@@ -52,13 +50,12 @@ export default async function PurchaseDetailPage({ params }: Props) {
             <PurchaseRowActions
               purchase={purchase}
               locations={locations}
-              vendorsModuleEnabled={settings.vendorsModuleEnabled}
             />
           </div>
         }
       />
 
-      <PurchaseDetailContent purchase={purchase} vendorsModuleEnabled={settings.vendorsModuleEnabled} />
+      <PurchaseDetailContent purchase={purchase} />
     </main>
   )
 }

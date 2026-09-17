@@ -39,7 +39,6 @@ export default async function NewCustomerPage({
           gstScheme={settings.gstScheme}
           defaultState={settings.state}
           defaultCity={settings.city}
-          vendorsModuleEnabled={settings.vendorsModuleEnabled}
         />
       </ResetFormWrapper>
     </main>

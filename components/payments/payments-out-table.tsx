@@ -37,13 +37,9 @@ function inr(value: number) {
 
 export function PaymentsOutTable({
   rows,
-  vendorsModuleEnabled = true,
 }: {
   rows: PaymentOutRow[]
-  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
-  vendorsModuleEnabled?: boolean
 }) {
-  const vendorTermLabel = vendorsModuleEnabled ? "Vendor" : "Supplier"
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
   // Defaults to the first row on load so the panel is never empty —
@@ -145,13 +141,13 @@ export function PaymentsOutTable({
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <Link
-                          href={row.partyType === "VENDOR" ? `/vendors/${row.partyId}` : `/karigars/${row.partyId}`}
+                          href={row.partyType === "VENDOR" ? `/customers/${row.partyId}` : `/karigars/${row.partyId}`}
                           className="hover:underline"
                         >
                           {row.partyName}
                         </Link>
                         <Badge variant="outline" className="font-normal">
-                          {row.partyType === "VENDOR" ? vendorTermLabel : "Artisan"}
+                          {row.partyType === "VENDOR" ? "Supplier" : "Artisan"}
                         </Badge>
                       </div>
                     </TableCell>
@@ -209,7 +205,7 @@ export function PaymentsOutTable({
       </Card>
     </div>
 
-      <PaymentOutDetailPanel row={activeRow} vendorsModuleEnabled={vendorsModuleEnabled} />
+      <PaymentOutDetailPanel row={activeRow} />
     </div>
   )
 }

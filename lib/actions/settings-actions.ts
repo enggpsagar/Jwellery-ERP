@@ -62,12 +62,6 @@ export type BusinessSettings = {
   // comment. Only gates starting a *new* send; existing artisans/jobs/
   // ledger/reports stay visible regardless of this flag.
   sendToArtisanEnabled: boolean;
-  // Whether the Vendors module shows up in this store's app at all — see
-  // prisma/schema.prisma's BusinessSettings.vendorsModuleEnabled doc
-  // comment. Only hides the module's own nav/list/create/archived/export
-  // surfaces; Vendor data, Purchases' vendor picker, and a Customer's
-  // linked-vendor balance keep working regardless of this flag.
-  vendorsModuleEnabled: boolean;
   // Whether the E-way Bill section/button/card/print-block shows up on an
   // invoice at all — see prisma/schema.prisma's BusinessSettings.
   // ewayBillEnabled doc comment. Independent of eInvoiceEnabled below.
@@ -152,7 +146,6 @@ function mapSettings(settings: any): BusinessSettings {
     hallmarkChargePerPiece: Number(settings.hallmarkChargePerPiece ?? 45),
     returnWindowEnabled: settings.returnWindowEnabled ?? true,
     sendToArtisanEnabled: settings.sendToArtisanEnabled ?? true,
-    vendorsModuleEnabled: settings.vendorsModuleEnabled ?? true,
     ewayBillEnabled: settings.ewayBillEnabled ?? true,
     eInvoiceEnabled: settings.eInvoiceEnabled ?? true,
     showDueDate: settings.showDueDate ?? true,
@@ -338,7 +331,6 @@ export async function updateBusinessSettings(
         ),
         returnWindowEnabled: formData.get("returnWindowEnabled") === "on",
         sendToArtisanEnabled: formData.get("sendToArtisanEnabled") === "on",
-        vendorsModuleEnabled: formData.get("vendorsModuleEnabled") === "on",
         ewayBillEnabled: formData.get("ewayBillEnabled") === "on",
         eInvoiceEnabled: formData.get("eInvoiceEnabled") === "on",
         showDueDate: formData.get("showDueDate") === "on",
@@ -383,7 +375,6 @@ export async function updateBusinessSettings(
         ),
         returnWindowEnabled: formData.get("returnWindowEnabled") === "on",
         sendToArtisanEnabled: formData.get("sendToArtisanEnabled") === "on",
-        vendorsModuleEnabled: formData.get("vendorsModuleEnabled") === "on",
         ewayBillEnabled: formData.get("ewayBillEnabled") === "on",
         eInvoiceEnabled: formData.get("eInvoiceEnabled") === "on",
         showDueDate: formData.get("showDueDate") === "on",

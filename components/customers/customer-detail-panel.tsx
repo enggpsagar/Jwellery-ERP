@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { Users } from "lucide-react"
 
 import { getCustomerById, type Customer } from "@/lib/actions/customer-actions"
@@ -18,8 +18,6 @@ type StateItem = {
 type CustomerDetailPanelProps = {
   customerId: string | null
   states: StateItem[]
-  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
-  vendorsModuleEnabled?: boolean
 }
 
 /**
@@ -31,14 +29,9 @@ type CustomerDetailPanelProps = {
  * standalone page, which re-renders the list — the selection itself is
  * cleared by the parent's own effect watching the customers prop.
  */
-export function CustomerDetailPanel({ customerId, states, vendorsModuleEnabled = true }: CustomerDetailPanelProps) {
+export function CustomerDetailPanel({ customerId, states }: CustomerDetailPanelProps) {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(false)
-
-  const reload = useCallback(() => {
-    if (!customerId) return
-    getCustomerById(customerId).then((result) => setCustomer(result))
-  }, [customerId])
 
   useEffect(() => {
     if (!customerId) {
@@ -90,8 +83,6 @@ export function CustomerDetailPanel({ customerId, states, vendorsModuleEnabled =
       <CustomerDetailContent
         customer={customer}
         states={states}
-        onLinkChanged={reload}
-        vendorsModuleEnabled={vendorsModuleEnabled}
         ledger={
           <CustomerLedgerCardClient
             customerId={customer.id}

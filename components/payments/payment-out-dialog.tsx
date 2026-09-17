@@ -7,7 +7,7 @@ import { Plus } from "lucide-react"
 
 import { recordPaymentOut, type PaymentFormState } from "@/lib/actions/payments-actions"
 import type { PaymentKarigarOption, PaymentVendorOption } from "@/lib/actions/payments-actions"
-import { VendorSelect } from "@/components/vendors/vendor-select"
+import { CustomerSelect } from "@/components/customers/customer-select"
 import { KarigarSelect } from "@/components/karigars/karigar-select"
 import { useToast } from "@/components/providers/toast-provider"
 
@@ -34,8 +34,6 @@ type PartyType = "VENDOR" | "KARIGAR"
 type PaymentOutDialogProps = {
   vendors: PaymentVendorOption[]
   karigars: PaymentKarigarOption[]
-  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
-  vendorsModuleEnabled?: boolean
 }
 
 /**
@@ -49,8 +47,7 @@ type PaymentOutDialogProps = {
  * "Pay Now" link) — same query-param-opens-the-dialog convention as the
  * sidebar's ?new=1, just naming which vendor too.
  */
-export function PaymentOutDialog({ vendors, karigars, vendorsModuleEnabled = true }: PaymentOutDialogProps) {
-  const vendorTermLabel = vendorsModuleEnabled ? "Vendor" : "Supplier"
+export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
   const searchParams = useSearchParams()
   const initialVendorId = searchParams.get("vendorId") ?? ""
   // Lets the sidebar's own "+" quick-add (?new=1) open this straight away,
@@ -152,7 +149,7 @@ export function PaymentOutDialog({ vendors, karigars, vendorsModuleEnabled = tru
                     : "text-muted-foreground hover:bg-accent"
                 }`}
               >
-                {vendorTermLabel}
+                Supplier
               </button>
               <button
                 type="button"
@@ -172,14 +169,14 @@ export function PaymentOutDialog({ vendors, karigars, vendorsModuleEnabled = tru
           </div>
 
           <div className="space-y-2">
-            <Label required>{partyType === "VENDOR" ? vendorTermLabel : "Artisan"}</Label>
+            <Label required>{partyType === "VENDOR" ? "Supplier" : "Artisan"}</Label>
             {partyType === "VENDOR" ? (
-              <VendorSelect
-                vendors={vendors}
+              <CustomerSelect
+                customers={vendors}
                 name="vendorId"
                 defaultValue={partyId}
                 onChange={setPartyId}
-                termLabel={vendorTermLabel}
+                termLabel="supplier"
               />
             ) : (
               <KarigarSelect

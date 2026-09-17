@@ -398,6 +398,12 @@ model Customer {
   id             String         @id @default(cuid())
   storeId        String
   customerCode   String?
+  // Parallel to customerCode — preserved from the pre-merge Vendor table's
+  // own code sequence for any Party that started life as a Vendor. Never
+  // both blank by design (a Party has at least one of the two codes), but
+  // nothing stops a Party from eventually having both once it's acted as
+  // customer and supplier.
+  vendorCode     String?
   name           String
   phone          String?
   alternatePhone String?
@@ -435,27 +441,31 @@ model Customer {
   // API/MCP-created customer has no human User behind it at all.
   createdById    String?
   createdByName  String?
-  // Optional link to a Vendor row representing the SAME real-world person
-  // or business — lets someone the store both sells to and buys from (a
-  // customer who also sells old gold back, a wholesaler who's also a
-  // retail buyer) be recorded once on each side while staying connected.
-  // The FK lives here rather than on both sides so there's one source of
-  // truth for the pairing; @unique makes it a true 1:1 — at most one
-  // Customer can claim a given Vendor. Each side keeps its own independent
-  // invoices/purchases/ledger exactly as before; this is purely a display-
-  // level cross-reference. See lib/actions/party-link-actions.ts.
-  linkedVendorId String?        @unique
-  linkedVendor   Vendor?        @relation("CustomerVendorLink", fields: [linkedVendorId], references: [id])
+  // Whether this Party has ever been used as a Purchase's supplier — set
+  // automatically by createPurchase the first time it's picked there, never
+  // a user-facing choice. A Party can be a pure customer (false), a pure
+  // supplier, or both; there is no separate Vendor table anymore (merged in
+  // — see the migration named merge_vendor_into_customer).
+  isVendor       Boolean        @default(false)
   createdBy      User?          @relation("CustomerCreatedBy", fields: [createdById], references: [id])
   store          Store          @relation(fields: [storeId], references: [id])
   invoices       Invoice[]
   kachaInvoices  KachaInvoice[]
-  ledgerEntries  LedgerEntry[]
+  ledgerEntries  LedgerEntry[]    @relation("LedgerEntryCustomer")
   quotations     Quotation[]
   creditNotes    CreditNote[]
   draftOrders    DraftOrder[]
+  // "As vendor/supplier" back-relations — same Party row, referenced by
+  // Purchases/Stock/Ledger through their own vendorId column (kept as-is
+  // through the merge; only the relation's target model changed from the
+  // old standalone Vendor table to Customer). See the "PurchaseVendor" /
+  // "InventoryStockVendor" / "LedgerEntryVendor" relation names below.
+  purchasesAsVendor      Purchase[]       @relation("PurchaseVendor")
+  inventoryStockAsVendor InventoryStock[] @relation("InventoryStockVendor")
+  ledgerEntriesAsVendor  LedgerEntry[]    @relation("LedgerEntryVendor")
 
   @@unique([storeId, customerCode])
+  @@unique([storeId, vendorCode])
   @@unique([storeId, phone])
   @@index([name])
   @@index([phone])
@@ -699,7 +709,8 @@ model InventoryStock {
   invoiceItems        InvoiceItem[]
   kachaInvoiceItems   KachaInvoiceItem[]
   karigarJobs         KarigarJob[]
-  vendor              Vendor?                @relation(fields: [vendorId], references: [id])
+  // Points at Customer (see Purchase.vendor's doc comment — same merge).
+  vendor              Customer?              @relation("InventoryStockVendor", fields: [vendorId], references: [id])
   vendorId            String?
   purchaseItems       PurchaseItem[]
   karigarReceiptItems KarigarReceiptItem[]
@@ -1139,12 +1150,16 @@ model LedgerEntry {
   updatedAt        DateTime         @updatedAt
   store            Store            @relation(fields: [storeId], references: [id])
   createdBy        User?            @relation("LedgerEntryCreatedBy", fields: [createdByUserId], references: [id])
-  customer         Customer?        @relation(fields: [customerId], references: [id])
+  customer         Customer?        @relation("LedgerEntryCustomer", fields: [customerId], references: [id])
   invoice          Invoice?         @relation(fields: [invoiceId], references: [id])
   creditNote       CreditNote?      @relation(fields: [creditNoteId], references: [id])
   karigar          Karigar?         @relation(fields: [karigarId], references: [id])
   purchase         Purchase?        @relation(fields: [purchaseId], references: [id])
-  vendor           Vendor?          @relation(fields: [vendorId], references: [id])
+  // Points at Customer, same merge as Purchase.vendor/InventoryStock.vendor
+  // above — a LedgerEntry can have customerId set (sale-side activity),
+  // vendorId set (purchase-side activity), or (now that both sides can be
+  // the same Party row) neither/either independently of one another.
+  vendor           Customer?        @relation("LedgerEntryVendor", fields: [vendorId], references: [id])
   metalType        StoreMetal?      @relation(fields: [metalTypeId], references: [id])
   locationId       String?
   location         StoreLocation?   @relation(fields: [locationId], references: [id])
@@ -1205,6 +1220,14 @@ model KarigarJob {
   @@index([locationId])
 }
 
+// Superseded by Customer (see Customer.isVendor and the
+// merge_vendor_into_customer migration) — every Vendor row has been copied
+// or merged into Customer, and Purchase/InventoryStock/LedgerEntry.vendorId
+// now point at Customer instead of here. Kept as an unreferenced historical
+// table for one release as a rollback safety net; scheduled to be dropped
+// (along with this model) in a follow-up migration once the merge is
+// confirmed stable in production. Nothing in the app reads or writes this
+// model anymore.
 model Vendor {
   id             String           @id @default(cuid())
   storeId        String
@@ -1235,13 +1258,6 @@ model Vendor {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   store          Store            @relation(fields: [storeId], references: [id])
-  purchases      Purchase[]
-  ledgerEntries  LedgerEntry[]
-  inventoryStock InventoryStock[]
-  // Back-relation for Customer.linkedVendorId — see that field's doc
-  // comment. At most one Customer can hold this link (enforced there by
-  // @unique on linkedVendorId), so this is a real 1:1, not a list.
-  linkedCustomer Customer?        @relation("CustomerVendorLink")
 
   @@unique([storeId, vendorCode])
   @@index([name])
@@ -1306,7 +1322,11 @@ model Purchase {
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   store               Store          @relation(fields: [storeId], references: [id])
-  vendor              Vendor         @relation(fields: [vendorId], references: [id])
+  // Points at Customer, not the (now-superseded) Vendor table — see
+  // Customer.isVendor's doc comment. Field/relation name kept as "vendor"
+  // through the merge so every existing `purchase.vendor.*` read keeps
+  // compiling unchanged.
+  vendor              Customer       @relation("PurchaseVendor", fields: [vendorId], references: [id])
   gstRate             GstRate?       @relation(fields: [gstRateId], references: [id])
   items               PurchaseItem[]
   ledgerEntries       LedgerEntry[]
@@ -1836,15 +1856,10 @@ model BusinessSettings {
   // returnWindowEnabled above.
   sendToArtisanEnabled Boolean @default(true)
 
-  // Whether the Vendors module shows up in this store's app at all —
-  // defaults to true so nothing changes for existing stores. Turning it off
-  // hides the "Vendors" sidebar item and blocks the list/create/archived/
-  // export pages, but deliberately does NOT touch Vendor rows themselves:
-  // Purchases still needs vendors to exist and still lets staff pick/create
-  // one, a Customer's linked-vendor balance still computes correctly, and a
-  // vendor's own detail/edit page stays reachable via that one direct link
-  // (same "hide the module's own UI, keep existing data/relationships
-  // working" precedent as sendToArtisanEnabled above).
+  // DEPRECATED — the standalone Vendors module this once gated no longer
+  // exists (Vendor was merged into Customer; see Customer.isVendor). Column
+  // kept but unread by the app to avoid a churny drop-column migration;
+  // safe to remove in a later cleanup pass.
   vendorsModuleEnabled Boolean @default(true)
 
   // Whether the E-way Bill fields/button show up on an invoice at all.

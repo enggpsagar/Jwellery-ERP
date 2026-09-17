@@ -52,27 +52,13 @@ export type CustomerRecord = {
   lastPaymentDate?: string;
   notes?: string;
   createdAt?: string;
-  /** Set only when this customer is linked to a Vendor row for the same
-   *  real-world person/business — see Customer.linkedVendorId's doc
-   *  comment in schema.prisma. Only meaningfully populated by
-   *  getCustomerByIdCore (the detail view); a list row always maps this to
-   *  null since it only ever gets the minimal balance-only shape from
-   *  CUSTOMER_LIST_INCLUDE, never the full display shape (name/code/
-   *  isActive) — see mapCustomer's own check. Not because the customer
-   *  definitely has no link. */
-  linkedVendor?: {
-    id: string;
-    name: string;
-    vendorCode: string | null;
-    isActive: boolean;
-    /** The linked Vendor's own ledger-derived currentBalance (see
-     *  vendor-actions.ts mapVendor) — already folded into this customer's
-     *  own currentBalance/balanceType above; exposed here too so the
-     *  "Vendor Relationship" card can show it labeled correctly instead of
-     *  the flatly-wrong document-based figure it used to. */
-    currentBalance: number;
-    balanceType: "Advance" | "Payable";
-  } | null;
+  /** Whether this Party has ever been used as a Purchase's supplier — set
+   *  automatically by createPurchase, never a user-facing choice. See
+   *  Customer.isVendor's doc comment in schema.prisma. */
+  isVendor?: boolean;
+  /** Parallel to customerCode, carried over for a Party that started life
+   *  as a standalone Vendor row before the merge, or assigned since. */
+  vendorCode?: string | null;
 };
 
 export type CustomerFormState = {
@@ -216,33 +202,18 @@ export const CUSTOMER_LIST_INCLUDE = {
     select: { id: true, amount: true, type: true, entryDate: true },
     orderBy: { entryDate: "desc" as const },
   },
-  // Minimal linked-Vendor balance fields — just enough for mapCustomer to
-  // fold the linked Vendor's own outstanding into this row's currentBalance
-  // (see mapCustomer's combinedBalance). Kept to only openingBalance +
-  // ledgerEntries (not name/code/isActive, which nothing on the list page
-  // renders) so a paginated Customers list doesn't pay for a full display
-  // join on every row — CUSTOMER_DETAIL_INCLUDE below adds those for the
-  // one row a detail view actually shows a "Vendor Relationship" card for.
-  linkedVendor: {
-    select: {
-      openingBalance: true,
-      ledgerEntries: { select: { amount: true, type: true } },
-    },
+  // This same Party's own supplier-side ledger activity (LedgerEntry rows
+  // where vendorId, not customerId, points at this row) — folded into
+  // currentBalance below (see mapCustomer's combinedBalance) now that a
+  // Party's customer-side and supplier-side activity live on one row
+  // instead of two linked ones.
+  ledgerEntriesAsVendor: {
+    select: { amount: true, type: true },
   },
 };
 
 export const CUSTOMER_DETAIL_INCLUDE = {
   ...CUSTOMER_LIST_INCLUDE,
-  linkedVendor: {
-    select: {
-      id: true,
-      name: true,
-      vendorCode: true,
-      isActive: true,
-      openingBalance: true,
-      ledgerEntries: { select: { amount: true, type: true } },
-    },
-  },
 };
 
 export function mapCustomer(customer: any): CustomerRecord {
@@ -297,28 +268,23 @@ export function mapCustomer(customer: any): CustomerRecord {
 
   const ownBalance = Number(customer.openingBalance ?? 0) + ledgerBalanceDelta;
 
-  // The same real person can also exist as a Vendor row (Customer.
-  // linkedVendorId) — e.g. paid too much on a purchase, leaving a Vendor-
-  // side balance that's actually owed BACK to the store, with no payout
-  // flow to settle it directly. That amount doesn't vanish just because
-  // it's sitting on the other record: a Vendor-side Advance (vendor owes
-  // us) becomes a Receivable here, and a Vendor-side Payable (we owe them)
-  // reduces what this same person nets out owing us. Computed fresh from
-  // the linked row's own ledger every time (never written into
-  // openingBalance), so it can't drift out of sync or get double-counted —
-  // see mapVendor's mirror-image comment for the reverse direction.
-  // linkedVendor is undefined/null for the ~all customers with no link, so
-  // this is a no-op for them.
-  const linkedVendorBalance = customer.linkedVendor
-    ? Number(customer.linkedVendor.openingBalance ?? 0) +
-      (customer.linkedVendor.ledgerEntries ?? []).reduce(
-        (sum: number, entry: any) =>
-          sum + (entry.type === "CREDIT" ? Number(entry.amount ?? 0) : -Number(entry.amount ?? 0)),
-        0,
-      )
-    : 0;
+  // This same Party's own supplier-side ledger activity (LedgerEntry rows
+  // where vendorId is this row — e.g. Purchases bought from them, Payments
+  // Out made to them) nets against its customer-side balance above, since
+  // it's the same real-world person/business rather than a separately
+  // linked row now. Purchase-side CREDIT (an amount owed TO them) reduces
+  // what they net out owing the store; a Payment Out DEBIT restores it —
+  // the opposite polarity from customer-side DEBIT/CREDIT above, same
+  // convention recordPaymentOut always used for vendor-side entries. There
+  // is only one openingBalance field now (no separate Vendor-side one to
+  // add), so it's not included a second time here.
+  const vendorSideBalance = (customer.ledgerEntriesAsVendor ?? []).reduce(
+    (sum: number, entry: any) =>
+      sum + (entry.type === "CREDIT" ? Number(entry.amount ?? 0) : -Number(entry.amount ?? 0)),
+    0,
+  );
 
-  const combinedBalance = ownBalance - linkedVendorBalance;
+  const combinedBalance = ownBalance - vendorSideBalance;
 
   return {
     id: customer.id,
@@ -365,20 +331,8 @@ export function mapCustomer(customer: any): CustomerRecord {
     lastPaymentDate,
     notes: customer.notes ?? "",
     createdAt: customer.createdAt.toISOString(),
-    // Only the detail-shape query (CUSTOMER_DETAIL_INCLUDE) selects `name` —
-    // the list-shape one (CUSTOMER_LIST_INCLUDE) only fetches the balance
-    // fields above for combinedBalance's sake, so a list row keeps this
-    // null exactly as before.
-    linkedVendor: customer.linkedVendor?.name !== undefined
-      ? {
-          id: customer.linkedVendor.id,
-          name: customer.linkedVendor.name,
-          vendorCode: customer.linkedVendor.vendorCode,
-          isActive: customer.linkedVendor.isActive,
-          currentBalance: linkedVendorBalance,
-          balanceType: linkedVendorBalance < 0 ? "Advance" : "Payable",
-        }
-      : null,
+    isVendor: customer.isVendor ?? false,
+    vendorCode: customer.vendorCode ?? null,
   };
 }
 

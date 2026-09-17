@@ -24,13 +24,9 @@ function inr(value: number) {
  */
 export function PaymentOutDetailPanel({
   row,
-  vendorsModuleEnabled = true,
 }: {
   row: PaymentOutRow | null
-  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
-  vendorsModuleEnabled?: boolean
 }) {
-  const vendorTermLabel = vendorsModuleEnabled ? "Vendor" : "Supplier"
   if (!row) {
     return (
       <div className="flex h-full min-h-[24rem] flex-col items-center justify-center gap-2 rounded-xl border bg-card p-6 text-center text-muted-foreground">
@@ -40,7 +36,7 @@ export function PaymentOutDetailPanel({
     )
   }
 
-  const partyHref = row.partyType === "VENDOR" ? `/vendors/${row.partyId}` : `/karigars/${row.partyId}`
+  const partyHref = row.partyType === "VENDOR" ? `/customers/${row.partyId}` : `/karigars/${row.partyId}`
 
   return (
     <div className="space-y-4 rounded-xl border bg-card p-6">
@@ -51,7 +47,7 @@ export function PaymentOutDetailPanel({
 
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div>
-          <p className="text-muted-foreground">{row.partyType === "VENDOR" ? vendorTermLabel : "Artisan"}</p>
+          <p className="text-muted-foreground">{row.partyType === "VENDOR" ? "Supplier" : "Artisan"}</p>
           <Link href={partyHref} className="font-medium hover:underline">
             {row.partyName}
           </Link>

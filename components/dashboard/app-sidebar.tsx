@@ -17,7 +17,6 @@ import {
   ChevronRight,
   Store,
   ClipboardList,
-  Truck,
   PackagePlus,
   FileText,
   CreditCard,
@@ -106,13 +105,6 @@ const mainNav: NavItem[] = [
     quickAddHref: "/customers/new",
   },
   {
-    title: "Vendors",
-    href: "/vendors",
-    icon: Truck,
-    countKey: "vendors",
-    quickAddHref: "/vendors/new",
-  },
-  {
     title: "Draft Orders",
     href: "/orders",
     icon: Phone,
@@ -182,11 +174,10 @@ const karigarNav: NavItem[] = [
   },
 ];
 
-function getNavForRole(role?: string, permissions: string[] = [], vendorsModuleEnabled = true) {
+function getNavForRole(role?: string, permissions: string[] = []) {
   if (role === "KARIGAR") return karigarNav;
 
   return mainNav.filter((item) => {
-    if (item.href === "/vendors") return vendorsModuleEnabled;
     if (item.href === "/stores" || item.href === "/plans") {
       return role === "SUPER_ADMIN";
     }
@@ -417,15 +408,10 @@ type AppSidebarProps = {
    *  rather than read from useSidebar()'s context here, since <Sidebar
    *  side=...> itself takes it as a direct prop, not from context. */
   side?: "left" | "right";
-  /** BusinessSettings.vendorsModuleEnabled — hides the "Vendors" nav item
-   *  when a store has switched the module off from Settings. Defaults true
-   *  so every existing caller not yet passing this keeps showing it. */
-  vendorsModuleEnabled?: boolean;
 };
 
 const EMPTY_COUNTS: SidebarCounts = {
   customers: 0,
-  vendors: 0,
   products: 0,
   stock: 0,
   purchases: 0,
@@ -445,12 +431,11 @@ export function AppSidebar({
   storeLogoUrl,
   counts = EMPTY_COUNTS,
   side = "left",
-  vendorsModuleEnabled = true,
 }: AppSidebarProps = {}) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const role = session?.user?.role;
-  const navItems = getNavForRole(role, session?.user?.permissions, vendorsModuleEnabled);
+  const navItems = getNavForRole(role, session?.user?.permissions);
 
   const [openMenu, setOpenMenu] = useState<OpenMenu>(undefined);
 

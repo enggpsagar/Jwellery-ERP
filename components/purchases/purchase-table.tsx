@@ -35,13 +35,9 @@ type PurchaseTableProps = {
    * link navigating away. Same convention as CustomersTable. */
   activePurchaseId?: string | null
   onActivate?: (id: string) => void
-  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop
-   * comment. Swaps this table's "Vendor" column/labels for "Supplier". */
-  vendorsModuleEnabled?: boolean
 }
 
-export function PurchaseTable({ purchases, activePurchaseId, onActivate, vendorsModuleEnabled = true }: PurchaseTableProps) {
-  const vendorTermLabel = vendorsModuleEnabled ? "Vendor" : "Supplier"
+export function PurchaseTable({ purchases, activePurchaseId, onActivate }: PurchaseTableProps) {
   if (!purchases.length) {
     return (
       <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
@@ -63,7 +59,7 @@ export function PurchaseTable({ purchases, activePurchaseId, onActivate, vendors
                   column is hidden instead of silently scrolling out of view.
                   Purchase #, Vendor, Status, Total, Balance stay visible. */}
               <SortableTableHead label="Date" sortKey="purchaseDate" defaultSortBy="purchaseDate" className="hidden sm:table-cell" />
-              <th className="px-4 py-3 text-left font-medium">{vendorTermLabel}</th>
+              <th className="px-4 py-3 text-left font-medium">Supplier</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <SortableTableHead label="Total" sortKey="totalAmount" defaultSortBy="purchaseDate" />
               <th className="px-4 py-3 text-left font-medium">Balance</th>
@@ -97,7 +93,7 @@ export function PurchaseTable({ purchases, activePurchaseId, onActivate, vendors
                             label: "Date",
                             value: formatShortDate(purchase.purchaseDate),
                           },
-                          { label: vendorTermLabel, value: purchase.vendor?.name },
+                          { label: "Supplier", value: purchase.vendor?.name },
                           { label: "Phone", value: purchase.vendor?.phone },
                           { label: "Status", value: purchase.status },
                         ],
@@ -126,7 +122,7 @@ export function PurchaseTable({ purchases, activePurchaseId, onActivate, vendors
                   {purchase.vendor ? (
                     <RecordHoverCard
                       label={purchase.vendor.name}
-                      href={`/vendors/${purchase.vendor.id}`}
+                      href={`/customers/${purchase.vendor.id}`}
                       title={purchase.vendor.name}
                       subtitle={purchase.vendor.phone ?? undefined}
                       footerLabel="View vendor"

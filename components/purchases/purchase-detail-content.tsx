@@ -13,16 +13,9 @@ import { PurchaseStatusBadge } from "@/components/purchases/purchase-status-badg
  */
 export function PurchaseDetailContent({
   purchase,
-  vendorsModuleEnabled = true,
 }: {
   purchase: Purchase
-  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop
-   * comment. Also drops the link to the (now-hidden) Vendor detail page,
-   * showing the name as plain text instead. */
-  vendorsModuleEnabled?: boolean
 }) {
-  const vendorTermLabel = vendorsModuleEnabled ? "Vendor" : "Supplier"
-
   return (
     <div className="space-y-6">
       <div className="rounded-xl border bg-card p-6 space-y-4">
@@ -40,22 +33,15 @@ export function PurchaseDetailContent({
           </div>
 
           <div>
-            <p className="text-sm text-muted-foreground">{vendorTermLabel}</p>
+            <p className="text-sm text-muted-foreground">Supplier</p>
             {purchase.vendor ? (
-              vendorsModuleEnabled ? (
-                <Link
-                  href={`/vendors/${purchase.vendor.id}?from=${encodeURIComponent(`/purchases/${purchase.id}`)}`}
-                  className="font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  {purchase.vendor.name}
-                  {purchase.vendor.phone ? ` (${purchase.vendor.phone})` : ""}
-                </Link>
-              ) : (
-                <p className="font-medium">
-                  {purchase.vendor.name}
-                  {purchase.vendor.phone ? ` (${purchase.vendor.phone})` : ""}
-                </p>
-              )
+              <Link
+                href={`/customers/${purchase.vendor.id}?from=${encodeURIComponent(`/purchases/${purchase.id}`)}`}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {purchase.vendor.name}
+                {purchase.vendor.phone ? ` (${purchase.vendor.phone})` : ""}
+              </Link>
             ) : (
               <p className="font-medium">—</p>
             )}
@@ -63,7 +49,7 @@ export function PurchaseDetailContent({
 
           {purchase.vendorInvoiceNumber && (
             <div>
-              <p className="text-sm text-muted-foreground">{vendorTermLabel} Invoice Number</p>
+              <p className="text-sm text-muted-foreground">Supplier Invoice Number</p>
               <p className="font-medium">{purchase.vendorInvoiceNumber}</p>
             </div>
           )}

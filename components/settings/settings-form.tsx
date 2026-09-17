@@ -119,7 +119,6 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
   const [loadingCities, setLoadingCities] = useState(false)
   const [returnWindowEnabled, setReturnWindowEnabled] = useState(settings.returnWindowEnabled)
   const [sendToArtisanEnabled, setSendToArtisanEnabled] = useState(settings.sendToArtisanEnabled)
-  const [vendorsModuleEnabled, setVendorsModuleEnabled] = useState(settings.vendorsModuleEnabled)
   const [ewayBillEnabled, setEwayBillEnabled] = useState(settings.ewayBillEnabled)
   const [eInvoiceEnabled, setEInvoiceEnabled] = useState(settings.eInvoiceEnabled)
   const [showDueDate, setShowDueDate] = useState(settings.showDueDate)
@@ -639,25 +638,6 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               for work. Turning this off hides the Send to Artisan button on
               Draft Orders — your artisan list, past jobs, ledger, and
               reports stay exactly as they are either way.
-            </p>
-          </div>
-
-          <div className="space-y-1.5 pt-4">
-            <div className="flex items-center gap-3">
-              <Switch
-                id="vendorsModuleEnabled"
-                checked={vendorsModuleEnabled}
-                onCheckedChange={setVendorsModuleEnabled}
-              />
-              <input type="hidden" name="vendorsModuleEnabled" value={vendorsModuleEnabled ? "on" : ""} />
-              <Label htmlFor="vendorsModuleEnabled">Show Vendors module</Label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Whether the Vendors module shows up at all. Turning this off
-              hides "Vendors" from the sidebar and blocks its list/create/
-              archived/export pages — a vendor already linked to a Purchase
-              or a Customer, and Purchases' own vendor picker, keep working
-              either way.
             </p>
           </div>
 

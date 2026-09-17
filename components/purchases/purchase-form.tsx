@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { VendorSelect } from "@/components/vendors/vendor-select"
+import { CustomerSelect } from "@/components/customers/customer-select"
 import { ProductSelect } from "@/components/inventory/shared/product-select"
 import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
 
@@ -226,13 +226,6 @@ type PurchaseFormProps = {
    * full-item-edit branch never rewrites existing payments (see its own
    * doc comment), so this form has no way to change it either. */
   defaultPaidAmount?: number
-  /** BusinessSettings.vendorsModuleEnabled — off swaps every "Vendor" label
-   * on this form for "Supplier" (VendorSelect's copy included) without
-   * touching the underlying Vendor table/vendorId field at all; Purchases
-   * still needs a real vendor to exist even with the standalone Vendors
-   * module hidden. Defaults true so an existing caller not yet passing
-   * this keeps showing "Vendor" exactly as before. */
-  vendorsModuleEnabled?: boolean
 }
 
 /**
@@ -276,9 +269,7 @@ export function PurchaseForm({
   defaultVendorInvoiceNumber,
   defaultNotes,
   defaultPaidAmount,
-  vendorsModuleEnabled = true,
 }: PurchaseFormProps) {
-  const vendorTermLabel = vendorsModuleEnabled ? "Vendor" : "Supplier"
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
   const router = useRouter()
@@ -406,7 +397,7 @@ export function PurchaseForm({
     if (restoredRef.current) return
     restoredRef.current = true
 
-    const newVendorId = searchParams.get("newVendorId")
+    const newPartyId = searchParams.get("newCustomerId")
     const newProductId = searchParams.get("newProductId")
 
     let raw: string | null = null
@@ -427,7 +418,7 @@ export function PurchaseForm({
     }
 
     if (draft) {
-      setVendorId(newVendorId || draft.vendorId || "")
+      setVendorId(newPartyId || draft.vendorId || "")
       setDiscount(draft.discount ?? 0)
       setPaymentRows(draft.paymentRows ?? [])
 
@@ -496,14 +487,14 @@ export function PurchaseForm({
       })
 
       toast.success("Picked up where you left off")
-    } else if (newVendorId) {
-      setVendorId(newVendorId)
+    } else if (newPartyId) {
+      setVendorId(newPartyId)
       setVendorSelectKey((key) => key + 1)
     }
 
     // Strip the one-shot params via history rather than router.replace, so
     // Next doesn't re-render the route and undo what we just restored.
-    if (newVendorId || newProductId) {
+    if (newPartyId || newProductId) {
       window.history.replaceState({}, "", RETURN_TO)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -879,7 +870,7 @@ export function PurchaseForm({
           the GST Type hint text below it. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <div className="space-y-2 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <Label>{vendorTermLabel} <RequiredMark /></Label>
+          <Label>Supplier <RequiredMark /></Label>
           {editPurchaseId ? (
             // Moving a purchase's stock/ledger history to a different vendor
             // is a distinct operation nobody asked for — same lock/reasoning
@@ -891,20 +882,19 @@ export function PurchaseForm({
               <input type="hidden" name="vendorId" value={vendorId} />
             </>
           ) : (
-            <VendorSelect
+            <CustomerSelect
               key={vendorSelectKey}
-              vendors={vendors}
+              customers={vendors}
               name="vendorId"
               defaultValue={vendorId}
               onChange={(id) => setVendorId(id)}
-              addNewHref={`/vendors/new?returnTo=${encodeURIComponent(RETURN_TO)}`}
               onBeforeAddNew={() => saveDraft()}
-              termLabel={vendorTermLabel}
+              termLabel="supplier"
             />
           )}
           {selectedVendor ? (
             <p className="text-xs text-muted-foreground">
-              {vendorTermLabel} GST Type: <span className="font-medium">{partyGstTypeLabel(selectedVendor.gstType)}</span>
+              Supplier GST Type: <span className="font-medium">{partyGstTypeLabel(selectedVendor.gstType)}</span>
               {!isVendorGstApplicable(selectedVendor.gstType)
                 ? " — their invoice can't carry GST, so each line's GST Rate is disabled."
                 : ""}
@@ -922,10 +912,10 @@ export function PurchaseForm({
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <Label>{vendorTermLabel} Invoice Number</Label>
+          <Label>Supplier Invoice Number</Label>
           <Input
             name="vendorInvoiceNumber"
-            placeholder={`${vendorTermLabel}'s own invoice/bill number`}
+            placeholder="Supplier's own invoice/bill number"
             defaultValue={defaultVendorInvoiceNumber ?? ""}
           />
         </div>

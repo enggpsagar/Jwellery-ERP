@@ -3,9 +3,8 @@ import type { Metadata } from "next"
 import {
   getPaymentsOut,
   getPaymentFormKarigars,
-  getPaymentFormVendorsWithBalance,
+  getPaymentFormPartiesWithBalance,
 } from "@/lib/actions/payments-actions"
-import { getBusinessSettings } from "@/lib/actions/settings-actions"
 
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { PaymentOutDialog } from "@/components/payments/payment-out-dialog"
@@ -18,11 +17,10 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function PaymentOutPage() {
-  const [rows, vendors, karigars, settings] = await Promise.all([
+  const [rows, vendors, karigars] = await Promise.all([
     getPaymentsOut(),
-    getPaymentFormVendorsWithBalance(),
+    getPaymentFormPartiesWithBalance(),
     getPaymentFormKarigars(),
-    getBusinessSettings(),
   ])
 
   return (
@@ -36,12 +34,11 @@ export default async function PaymentOutPage() {
           <PaymentOutDialog
             vendors={vendors}
             karigars={karigars}
-            vendorsModuleEnabled={settings.vendorsModuleEnabled}
           />
         }
       />
 
-      <PaymentsOutTable rows={rows} vendorsModuleEnabled={settings.vendorsModuleEnabled} />
+      <PaymentsOutTable rows={rows} />
     </main>
   )
 }

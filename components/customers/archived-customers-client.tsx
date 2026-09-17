@@ -25,8 +25,6 @@ type ArchivedCustomersClientProps = {
     hasNextPage: boolean
     hasPrevPage: boolean
   }
-  /** BusinessSettings.vendorsModuleEnabled — see PurchaseForm's own prop comment. */
-  vendorsModuleEnabled?: boolean
 }
 
 /**
@@ -40,7 +38,6 @@ export function ArchivedCustomersClient({
   customers,
   states,
   pagination,
-  vendorsModuleEnabled = true,
 }: ArchivedCustomersClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -100,7 +97,6 @@ export function ArchivedCustomersClient({
         <ArchivedCustomerDetailPanel
           customerId={activeCustomerId}
           states={states}
-          vendorsModuleEnabled={vendorsModuleEnabled}
         />
       </div>
     </main>

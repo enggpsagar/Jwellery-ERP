@@ -2,12 +2,12 @@ import { IndianRupee, MapPin, User } from "lucide-react"
 
 import type { Customer } from "@/lib/actions/customer-actions"
 import { toTitleCase } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
 import {
   DetailField,
   DetailGrid,
   DetailSection,
 } from "@/components/shared/detail-section"
-import { CustomerVendorLinkCard } from "@/components/customers/customer-vendor-link-card"
 
 type StateItem = {
   id: string
@@ -29,20 +29,10 @@ type StateItem = {
 export function CustomerDetailContent({
   customer,
   ledger,
-  onLinkChanged,
-  vendorsModuleEnabled = true,
 }: {
   customer: Customer
   states: StateItem[]
   ledger: React.ReactNode
-  /** See CustomerVendorLinkCard's own doc comment on its onChanged prop. */
-  onLinkChanged?: () => void
-  /** Settings > toggle for the Vendors module — see BusinessSettings.vendorsModuleEnabled's
-   * own schema doc comment. Hides the Vendor Relationship card's "start a new link" actions
-   * when off, unless this party is already linked (that link, and its balance, keeps working
-   * regardless of the flag — only *starting* a new one is gated). Defaults true so a caller
-   * that hasn't been updated still shows it, matching today's behavior. */
-  vendorsModuleEnabled?: boolean
 }) {
   const money = (value: unknown) => `₹ ${Number(value || 0).toLocaleString("en-IN")}`
 
@@ -76,14 +66,6 @@ export function CustomerDetailContent({
           @container below (a single level, no stacking) is unaffected and
           stays as-is — this only reverts the OUTER grid. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {(vendorsModuleEnabled || customer.linkedVendor) && (
-          <CustomerVendorLinkCard
-            customerId={customer.id}
-            linkedVendor={customer.linkedVendor ?? null}
-            onChanged={onLinkChanged}
-          />
-        )}
-
         <DetailSection
           title="Party Information"
           icon={User}
@@ -95,6 +77,10 @@ export function CustomerDetailContent({
             <DetailField label="Email" value={customer.email} />
             <DetailField label="GST Number" value={customer.gstNumber} />
             <DetailField label="Party Type" value={customer.customerType} />
+            <DetailField
+              label="Also a Supplier"
+              value={customer.isVendor ? <Badge variant="outline">Supplier</Badge> : undefined}
+            />
           </DetailGrid>
         </DetailSection>
 

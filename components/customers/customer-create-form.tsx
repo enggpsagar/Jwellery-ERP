@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { User, Phone, Mail, MapPin, Hash, IndianRupee } from "lucide-react"
 
 import { addCustomer, type CustomerFormState } from "@/lib/actions/customer-actions"
-import { createLinkedVendorFromCustomer } from "@/lib/actions/party-link-actions"
 import { getCitiesByStateId } from "@/lib/actions/location-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -40,9 +39,6 @@ type CustomerCreateFormProps = {
    * them — freely changeable per customer afterward. */
   defaultState?: string
   defaultCity?: string
-  /** BusinessSettings.vendorsModuleEnabled — hides the "also a vendor"
-   * linking toggle below when off, same as its mirror on VendorCreateForm. */
-  vendorsModuleEnabled?: boolean
 }
 
 function FieldError({ errors }: { errors?: string[] }) {
@@ -64,7 +60,6 @@ export function CustomerCreateForm({
   gstScheme,
   defaultState,
   defaultCity,
-  vendorsModuleEnabled = true,
 }: CustomerCreateFormProps) {
   // Starting point only — a Wholesaler & Manufacturer store still routinely
   // has individual, non-registered buyers, so this stays freely editable
@@ -80,7 +75,6 @@ export function CustomerCreateForm({
   )
   const [cities, setCities] = useState<CityItem[]>([])
   const [loadingCities, setLoadingCities] = useState(false)
-  const [alsoCreateVendor, setAlsoCreateVendor] = useState(false)
 
   const [state, formAction, pending] = useActionState(addCustomer, initialState)
 
@@ -94,18 +88,6 @@ export function CustomerCreateForm({
       toast.success(state.message || "Party added successfully")
 
       async function finish() {
-        // Best-effort: the party itself is already saved either way, so a
-        // failure here (e.g. its phone number already belongs to some other
-        // vendor) is surfaced but never blocks navigating away.
-        if (alsoCreateVendor && state.customer) {
-          const linkResult = await createLinkedVendorFromCustomer(state.customer.id)
-          if (linkResult.success) {
-            toast.success(linkResult.message || "Also registered as a vendor")
-          } else {
-            toast.error(linkResult.message || "Party saved, but registering as a vendor failed")
-          }
-        }
-
         // Hand the new id back to whoever sent us here so it can be selected
         // straight away, rather than making the user hunt for it in the list.
         if (returnTo && state.customer) {
@@ -340,27 +322,6 @@ export function CustomerCreateForm({
               placeholder="0.00"
             />
           </div>
-
-          {vendorsModuleEnabled && (
-            <div className="md:col-span-2">
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={alsoCreateVendor}
-                  onChange={(e) => setAlsoCreateVendor(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-input"
-                />
-                <span>
-                  <span className="font-medium">This party is also a vendor</span>
-                  <span className="block text-xs text-muted-foreground">
-                    Creates a linked Vendor record with the same details — you can buy from and sell to the
-                    same business without entering it twice. Linked records can be unlinked later from either
-                    one&apos;s detail page.
-                  </span>
-                </span>
-              </label>
-            </div>
-          )}
 
           <div className="flex justify-end gap-3 pt-2 md:col-span-2">
             <Button type="submit" disabled={pending} size="lg">

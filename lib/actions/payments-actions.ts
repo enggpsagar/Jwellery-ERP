@@ -228,7 +228,7 @@ export type PaymentKarigarOption = {
 }
 
 /** Lightweight, unpaginated karigar list for the Payment Out party picker —
- * mirrors getInvoiceFormCustomers/getPurchaseFormVendors' own shape. */
+ * mirrors getInvoiceFormCustomers/getPurchaseFormParties' own shape. */
 export async function getPaymentFormKarigars(): Promise<PaymentKarigarOption[]> {
   const storeId = await requireStoreScope()
 
@@ -247,26 +247,27 @@ export type PaymentVendorOption = {
   /** Sum of every unpaid/partial purchase's own balanceAmount — used only
    * to decide which purchases a specific payment applies against
    * (allocatePaymentOldestFirst), NOT for display — see currentBalance for
-   * that (this can be ₹0 for a vendor with real money outstanding purely
-   * on the ledger, e.g. a linked-party advance with no open purchase to
-   * apply it to). */
+   * that. Deliberately excludes openingBalance now that it's one shared
+   * field on the merged Party row (see Customer.isVendor's doc comment) —
+   * there's no way to attribute how much of it was ever specifically a
+   * supplier-side debt, so it's left out of this purchase-allocation sum
+   * rather than risk contaminating it with the wrong sign. */
   pendingAmount: number
-  /** The real, ledger-derived outstanding shown to whoever is paying —
-   * same figure and same linked-Customer blend as vendor-actions.ts'
-   * mapVendor, so this picker can never disagree with the Vendors list for
-   * the exact same vendor (it used to, back when this showed pendingAmount
-   * instead: a vendor whose every purchase was settled but who also held a
-   * standalone advance via a linked Customer showed a flatly wrong ₹0). */
+  /** The real, ledger-derived outstanding shown to whoever is paying — same
+   * combined-balance formula as lib/core/customer.ts' mapCustomer, just
+   * negated (mapCustomer's combinedBalance is receivable-direction; this is
+   * payable-direction), so this picker can never disagree with the Parties
+   * list for the exact same party. */
   currentBalance: number
   balanceType: "Advance" | "Payable"
 }
 
-/** Vendor list for the Payment Out party picker, carrying each vendor's
+/** Party list for the Payment Out supplier picker, carrying each party's
  * outstanding balance alongside the usual name/phone. */
-export async function getPaymentFormVendorsWithBalance(): Promise<PaymentVendorOption[]> {
+export async function getPaymentFormPartiesWithBalance(): Promise<PaymentVendorOption[]> {
   const storeId = await requireStoreScope()
 
-  const vendors = await prisma.vendor.findMany({
+  const parties = await prisma.customer.findMany({
     where: { storeId, isActive: true, isArchived: false },
     orderBy: { name: "asc" },
     select: {
@@ -275,49 +276,39 @@ export async function getPaymentFormVendorsWithBalance(): Promise<PaymentVendorO
       phone: true,
       vendorCode: true,
       openingBalance: true,
-      purchases: { select: { balanceAmount: true, status: true } },
+      purchasesAsVendor: { select: { balanceAmount: true, status: true } },
       ledgerEntries: { select: { amount: true, type: true } },
-      linkedCustomer: {
-        select: {
-          openingBalance: true,
-          ledgerEntries: { select: { amount: true, type: true } },
-        },
-      },
+      ledgerEntriesAsVendor: { select: { amount: true, type: true } },
     },
   })
 
-  return vendors.map((vendor) => {
-    // Same fix as mapVendor's own pendingAmount (vendor-actions.ts) — this
-    // used to ignore openingBalance and any CANCELLED purchase entirely.
-    const pendingAmount =
-      vendor.purchases.reduce(
-        (sum, p) => (p.status === "CANCELLED" ? sum : sum + Number(p.balanceAmount || 0)),
-        0,
-      ) + Number(vendor.openingBalance ?? 0)
+  return parties.map((party) => {
+    const pendingAmount = party.purchasesAsVendor.reduce(
+      (sum, p) => (p.status === "CANCELLED" ? sum : sum + Number(p.balanceAmount || 0)),
+      0,
+    )
 
-    // Identical formula to mapVendor's combinedBalance — see that
-    // function's own comment for why the linked Customer's balance factors
-    // in here too.
-    const ownBalance =
-      Number(vendor.openingBalance ?? 0) +
-      vendor.ledgerEntries.reduce(
-        (sum, e) => sum + (e.type === "CREDIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
+    // Same formula as mapCustomer's combinedBalance, negated (payable
+    // direction instead of receivable) — see that function's own comment.
+    // openingBalance is counted once, in receivable direction, so it
+    // subtracts here rather than adds.
+    const customerSideBalance =
+      Number(party.openingBalance ?? 0) +
+      party.ledgerEntries.reduce(
+        (sum, e) => sum + (e.type === "DEBIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
         0,
       )
-    const linkedCustomerBalance = vendor.linkedCustomer
-      ? Number(vendor.linkedCustomer.openingBalance ?? 0) +
-        vendor.linkedCustomer.ledgerEntries.reduce(
-          (sum, e) => sum + (e.type === "DEBIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
-          0,
-        )
-      : 0
-    const currentBalance = ownBalance - linkedCustomerBalance
+    const vendorSideBalance = party.ledgerEntriesAsVendor.reduce(
+      (sum, e) => sum + (e.type === "CREDIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
+      0,
+    )
+    const currentBalance = vendorSideBalance - customerSideBalance
 
     return {
-      id: vendor.id,
-      name: vendor.name,
-      phone: vendor.phone,
-      vendorCode: vendor.vendorCode,
+      id: party.id,
+      name: party.name,
+      phone: party.phone,
+      vendorCode: party.vendorCode,
       pendingAmount,
       currentBalance,
       balanceType: currentBalance < 0 ? "Advance" : "Payable",
@@ -335,8 +326,9 @@ export type PaymentCustomerOption = {
    * for why, mirrored for the customer side. */
   pendingAmount: number
   /** The real, ledger-derived outstanding shown to whoever is recording the
-   * payment — same figure and linked-Vendor blend as lib/core/customer.ts'
-   * mapCustomer. See PaymentVendorOption.currentBalance's own comment. */
+   * payment — same figure as lib/core/customer.ts' mapCustomer. See
+   * PaymentVendorOption.currentBalance's own comment for the payable-side
+   * mirror of this. */
   currentBalance: number
   balanceType: "Advance" | "Receivable"
 }
@@ -358,12 +350,7 @@ export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCusto
       invoices: { select: { balanceAmount: true, status: true } },
       kachaInvoices: { select: { balanceAmount: true, status: true } },
       ledgerEntries: { select: { amount: true, type: true } },
-      linkedVendor: {
-        select: {
-          openingBalance: true,
-          ledgerEntries: { select: { amount: true, type: true } },
-        },
-      },
+      ledgerEntriesAsVendor: { select: { amount: true, type: true } },
     },
   })
 
@@ -383,22 +370,19 @@ export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCusto
       Number(customer.openingBalance ?? 0)
 
     // Identical formula to mapCustomer's combinedBalance — see that
-    // function's own comment for why the linked Vendor's balance factors
-    // in here too.
+    // function's own comment for why this same Party's own supplier-side
+    // ledger activity (ledgerEntriesAsVendor) factors in here too.
     const ownBalance =
       Number(customer.openingBalance ?? 0) +
       customer.ledgerEntries.reduce(
         (sum, e) => sum + (e.type === "DEBIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
         0,
       )
-    const linkedVendorBalance = customer.linkedVendor
-      ? Number(customer.linkedVendor.openingBalance ?? 0) +
-        customer.linkedVendor.ledgerEntries.reduce(
-          (sum, e) => sum + (e.type === "CREDIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
-          0,
-        )
-      : 0
-    const currentBalance = ownBalance - linkedVendorBalance
+    const vendorSideBalance = customer.ledgerEntriesAsVendor.reduce(
+      (sum, e) => sum + (e.type === "CREDIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
+      0,
+    )
+    const currentBalance = ownBalance - vendorSideBalance
 
     return {
       id: customer.id,
@@ -573,11 +557,17 @@ export async function recordPaymentOut(
       const vendorId = String(formData.get("vendorId") || "").trim()
       if (!vendorId) return { success: false, message: "Select a vendor" }
 
-      const vendor = await prisma.vendor.findFirst({
+      const vendor = await prisma.customer.findFirst({
         where: { id: vendorId, storeId },
-        select: { id: true, name: true },
+        select: { id: true, name: true, isVendor: true },
       })
       if (!vendor) return { success: false, message: "Vendor not found" }
+
+      // Same auto-flip as createPurchase — paying a party as a supplier is
+      // itself evidence of a supplier relationship, never a user choice.
+      if (!vendor.isVendor) {
+        await prisma.customer.update({ where: { id: vendorId }, data: { isVendor: true } })
+      }
 
       const totalAmount = payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
 
@@ -623,7 +613,7 @@ export async function recordPaymentOut(
 
       revalidatePath("/payments/out")
       revalidatePath("/ledger")
-      revalidatePath(`/vendors/${vendorId}`)
+      revalidatePath(`/customers/${vendorId}`)
       revalidatePath("/dashboard")
       revalidatePath("/purchases")
 

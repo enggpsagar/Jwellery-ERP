@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { Suspense } from "react"
 
 import {
-  getPurchaseFormVendors,
+  getPurchaseFormParties,
   getPurchaseFormProducts,
 } from "@/lib/actions/purchase-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 export default async function NewPurchasePage() {
   const [vendors, products, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, gstRates] =
     await Promise.all([
-      getPurchaseFormVendors(),
+      getPurchaseFormParties(),
       getPurchaseFormProducts(),
       getStoreLocations(),
       getDefaultLocationId(),
@@ -34,7 +34,7 @@ export default async function NewPurchasePage() {
 
   return (
     <main className="mx-auto min-w-0 max-w-6xl space-y-6 p-6">
-      {/* PurchaseForm reads ?newVendorId / ?newProductId via useSearchParams,
+      {/* PurchaseForm reads ?newCustomerId / ?newProductId via useSearchParams,
           which needs a Suspense boundary to avoid opting the whole route out
           of static optimisation. */}
       <ResetFormWrapper
@@ -58,7 +58,6 @@ export default async function NewPurchasePage() {
             defaultGstRate={businessSettings.defaultGstRate}
             storeState={businessSettings.state}
             initialLocationId={defaultLocationId}
-            vendorsModuleEnabled={businessSettings.vendorsModuleEnabled}
           />
         </Suspense>
       </ResetFormWrapper>

@@ -28,12 +28,25 @@ export type CustomerOption = {
   customerCode?: string | null
 }
 
+const TERM_LABELS = {
+  party: { singular: "party", plural: "parties" },
+  supplier: { singular: "supplier", plural: "suppliers" },
+} as const
+
 type CustomerSelectProps = {
   customers: CustomerOption[]
   name?: string
   defaultValue?: string
   placeholder?: string
   onChange?: (customerId: string, customer: CustomerOption | undefined) => void
+  /** Fires right before navigating to "Add New" — e.g. to stash an
+   * in-progress draft, same purpose as the old VendorSelect's own prop. */
+  onBeforeAddNew?: () => void
+  /** Purely a copy choice ("Select a party" vs "Select a supplier" etc.) —
+   * every context reads from the same underlying Customer/Party table
+   * either way. Defaults to "party" (Sales/Billing/Draft Orders/
+   * Quotations); Purchases/Payment Out pass "supplier". */
+  termLabel?: keyof typeof TERM_LABELS
 }
 
 /**
@@ -52,9 +65,13 @@ export function CustomerSelect({
   customers,
   name = "customerId",
   defaultValue,
-  placeholder = "Select a party",
+  placeholder,
   onChange,
+  onBeforeAddNew,
+  termLabel = "party",
 }: CustomerSelectProps) {
+  const { singular: termSingular, plural: termPlural } = TERM_LABELS[termLabel]
+  const resolvedPlaceholder = placeholder ?? `Select a ${termSingular}`
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState(defaultValue ?? "")
   const [selectOpen, setSelectOpen] = useState(false)
@@ -115,6 +132,7 @@ export function CustomerSelect({
             // Not a selection — leave `selected` alone so coming back without
             // creating anything keeps whatever was already chosen.
             setSelectOpen(false)
+            onBeforeAddNew?.()
             router.push(addNewHref)
             return
           }
@@ -124,7 +142,7 @@ export function CustomerSelect({
         }}
       >
         <SelectTrigger className="h-11 w-full">
-          <SelectValue placeholder={placeholder} />
+          <SelectValue placeholder={resolvedPlaceholder} />
         </SelectTrigger>
 
         <SelectContent>
@@ -139,7 +157,7 @@ export function CustomerSelect({
 
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
-              No parties found{search ? ` for "${search}"` : ""}
+              No {termPlural} found{search ? ` for "${search}"` : ""}
             </div>
           ) : (
             filtered.map((customer) => (
@@ -157,7 +175,7 @@ export function CustomerSelect({
           <div className="my-1 border-t" />
           <SelectItem value={ADD_NEW_VALUE} className="font-medium text-primary">
             <UserPlus className="mr-1 h-4 w-4" />
-            Create new party
+            Create new {termSingular}
           </SelectItem>
         </SelectContent>
       </Select>
@@ -174,15 +192,18 @@ export function CustomerSelect({
       {customers.length === 0 && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-dashed px-3 py-2">
           <span className="text-sm text-muted-foreground">
-            No parties yet.
+            No {termPlural} yet.
           </span>
           <button
             type="button"
-            onClick={() => router.push(addNewHref)}
+            onClick={() => {
+              onBeforeAddNew?.()
+              router.push(addNewHref)
+            }}
             className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
           >
             <UserPlus className="h-3.5 w-3.5" />
-            Add your first party
+            Add your first {termSingular}
           </button>
         </div>
       )}

@@ -81,6 +81,7 @@ export default async function EditInvoicePage({ params }: Props) {
     itemName: item.itemName,
     metalTypeId: item.metalTypeId ?? "",
     purity: item.purity ?? "",
+    purityLabel: item.purityLabel ?? "",
     quantity: item.quantity,
     grossWeight: toGrams(item.grossWeight),
     grossWeightUnit: unit,

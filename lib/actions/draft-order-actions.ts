@@ -2,7 +2,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { PurityType, LedgerEntryType, LedgerSourceType } from "@prisma/client";
+import { PurityType, LedgerEntryType, LedgerSourceType, PaymentMethod } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
@@ -68,6 +68,12 @@ export type DraftOrderRow = {
   customer: { id: string; name: string; phone: string | null } | null;
   itemCount: number;
   karigarJob: { id: string; jobNumber: string | null; karigarId: string } | null;
+  /** Rough weight×rate total at order time — see DraftOrder.estimatedTotal's schema comment. */
+  estimatedTotal: number;
+  /** Advance collected at order-creation time — see DraftOrder.paidAmount's schema comment. */
+  paidAmount: number;
+  /** estimatedTotal - paidAmount, floored at 0 (a paid-in-full-or-more advance never reads negative here). */
+  balanceAmount: number;
 };
 
 function mapDraftOrder(order: {
@@ -78,9 +84,14 @@ function mapDraftOrder(order: {
   status: string;
   customer: { id: string; name: string; phone: string | null } | null;
   karigarJob: { id: string; jobNumber: string | null; karigarId: string } | null;
+  estimatedTotal: unknown;
+  paidAmount: unknown;
   items?: unknown[];
   _count?: { items: number };
 }): DraftOrderRow {
+  const estimatedTotal = Number(order.estimatedTotal ?? 0);
+  const paidAmount = Number(order.paidAmount ?? 0);
+
   return {
     id: order.id,
     orderNumber: order.orderNumber,
@@ -90,6 +101,9 @@ function mapDraftOrder(order: {
     customer: order.customer,
     itemCount: order._count?.items ?? order.items?.length ?? 0,
     karigarJob: order.karigarJob,
+    estimatedTotal,
+    paidAmount,
+    balanceAmount: Math.max(0, estimatedTotal - paidAmount),
   };
 }
 
@@ -390,6 +404,45 @@ export async function getDraftOrderById(id: string): Promise<DraftOrderDetail | 
   };
 }
 
+export type PaymentEntryInput = {
+  method: string;
+  amount: number;
+  reference?: string | null;
+  bankName?: string | null;
+  attachmentUrl?: string | null;
+};
+
+/**
+ * Same shape/validation as invoice-actions.ts's parseOptionalPayments (0-2
+ * rows, a real PaymentMethod, a positive amount) — zero rows is valid, a
+ * Draft Order with no advance collected is the common case. Duplicated per
+ * action file, same convention as this codebase's other per-file helpers
+ * (e.g. each generateXNumber).
+ */
+function parseOptionalPayments(raw: string): PaymentEntryInput[] | null {
+  let payments: PaymentEntryInput[];
+  try {
+    payments = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (!Array.isArray(payments) || payments.length > 2) {
+    return null;
+  }
+
+  for (const payment of payments) {
+    if (!Object.values(PaymentMethod).includes(payment.method as PaymentMethod)) {
+      return null;
+    }
+    if (!(Number(payment.amount) > 0)) {
+      return null;
+    }
+  }
+
+  return payments;
+}
+
 export async function createDraftOrder(
   prevState: DraftOrderFormState = initialState,
   formData: FormData,
@@ -444,35 +497,87 @@ export async function createDraftOrder(
       }
     }
 
+    const payments = parseOptionalPayments(String(formData.get("paymentsJson") || "[]"));
+    if (!payments) {
+      return { success: false, message: "Invalid payment details" };
+    }
+
+    const estimatedTotal = items.reduce(
+      (sum, item) => sum + (Number(item.estimatedWeight) || 0) * (Number(item.estimatedRate) || 0),
+      0,
+    );
+    const paidAmount = payments.reduce((sum, payment) => sum + payment.amount, 0);
+
+    if (estimatedTotal > 0 && paidAmount > estimatedTotal) {
+      return {
+        success: false,
+        message: `Payment (₹${paidAmount.toFixed(2)}) can't exceed the estimated total (₹${estimatedTotal.toFixed(2)}).`,
+      };
+    }
+
     const orderNumber = await generateOrderNumber(storeId);
 
-    const order = await prisma.draftOrder.create({
-      data: {
-        storeId,
-        orderNumber,
-        customerId,
-        expectedDate: expectedDateRaw ? new Date(expectedDateRaw) : undefined,
-        locationId: locationId ?? undefined,
-        notes,
-        status: "DRAFT",
-        createdById: currentUser?.id,
-        createdByName: currentUser?.name ?? undefined,
-        items: {
-          create: items.map((item) => ({
-            itemName: item.itemName.trim(),
-            metalTypeId: item.metalTypeId || undefined,
-            purity: item.purity || undefined,
-            quantity: item.quantity || 1,
-            estimatedWeight: item.estimatedWeight ?? undefined,
-            estimatedRate: item.estimatedRate ?? undefined,
-            designNotes: item.designNotes?.trim() || undefined,
-          })),
+    const order = await prisma.$transaction(async (tx) => {
+      const created = await tx.draftOrder.create({
+        data: {
+          storeId,
+          orderNumber,
+          customerId,
+          expectedDate: expectedDateRaw ? new Date(expectedDateRaw) : undefined,
+          locationId: locationId ?? undefined,
+          notes,
+          status: "DRAFT",
+          estimatedTotal,
+          paidAmount,
+          createdById: currentUser?.id,
+          createdByName: currentUser?.name ?? undefined,
+          items: {
+            create: items.map((item) => ({
+              itemName: item.itemName.trim(),
+              metalTypeId: item.metalTypeId || undefined,
+              purity: item.purity || undefined,
+              quantity: item.quantity || 1,
+              estimatedWeight: item.estimatedWeight ?? undefined,
+              estimatedRate: item.estimatedRate ?? undefined,
+              designNotes: item.designNotes?.trim() || undefined,
+            })),
+          },
         },
-      },
-      select: { id: true },
-    });
+        select: { id: true },
+      });
+
+      // An advance collected before the piece even exists — a plain CREDIT
+      // against the party, linked to this order via draftOrderId. No
+      // matching DEBIT: unlike createInvoice's totalAmount DEBIT (a sale
+      // owed in full the moment it's raised), a Draft Order isn't a
+      // completed sale, so there's nothing yet for a DEBIT to net against —
+      // see DraftOrder.paidAmount's schema comment for the "apply this
+      // manually once a real Invoice is eventually raised" caveat.
+      for (const [index, payment] of payments.entries()) {
+        await tx.ledgerEntry.create({
+          data: {
+            storeId,
+            type: LedgerEntryType.CREDIT,
+            sourceType: LedgerSourceType.PAYMENT_IN,
+            customerId,
+            draftOrderId: created.id,
+            amount: payment.amount,
+            paymentMethod: payment.method as PaymentMethod,
+            paymentReference: payment.reference ?? undefined,
+            bankName: payment.bankName ?? undefined,
+            attachmentUrl: payment.attachmentUrl ?? undefined,
+            locationId: locationId ?? undefined,
+            description: index === 0 ? `Advance received for Draft Order ${orderNumber}` : undefined,
+          },
+        });
+      }
+
+      return created;
+    }, { timeout: 15000 });
 
     revalidatePath("/orders");
+    revalidatePath("/customers");
+    revalidatePath("/ledger");
 
     return { success: true, message: `Draft Order ${orderNumber} created`, orderId: order.id };
   } catch (error) {

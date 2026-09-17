@@ -66,6 +66,22 @@ export function DraftOrderDetailContent({ order }: DraftOrderDetailContentProps)
               </div>
             </div>
           ) : null}
+          {order.estimatedTotal > 0 || order.paidAmount > 0 ? (
+            <>
+              <div>
+                <div className="text-muted-foreground">Estimated Total</div>
+                <div className="mt-1 font-medium">₹{order.estimatedTotal.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Advance Paid</div>
+                <div className="mt-1 font-medium text-green-700">₹{order.paidAmount.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Balance</div>
+                <div className="mt-1 font-medium">₹{order.balanceAmount.toFixed(2)}</div>
+              </div>
+            </>
+          ) : null}
           {order.notes ? (
             <div className="md:col-span-3">
               <div className="text-muted-foreground">Notes</div>

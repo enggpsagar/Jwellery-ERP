@@ -18,6 +18,8 @@ type StateItem = {
 type CustomerDetailPanelProps = {
   customerId: string | null
   states: StateItem[]
+  /** See the same prop on CustomerDetailContent. */
+  vendorsModuleEnabled?: boolean
 }
 
 /**
@@ -29,7 +31,7 @@ type CustomerDetailPanelProps = {
  * standalone page, which re-renders the list — the selection itself is
  * cleared by the parent's own effect watching the customers prop.
  */
-export function CustomerDetailPanel({ customerId, states }: CustomerDetailPanelProps) {
+export function CustomerDetailPanel({ customerId, states, vendorsModuleEnabled }: CustomerDetailPanelProps) {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -89,6 +91,7 @@ export function CustomerDetailPanel({ customerId, states }: CustomerDetailPanelP
         customer={customer}
         states={states}
         onLinkChanged={reload}
+        vendorsModuleEnabled={vendorsModuleEnabled}
         ledger={
           <CustomerLedgerCardClient
             customerId={customer.id}

@@ -27,12 +27,15 @@ type CustomersClientProps = {
     hasNextPage: boolean
     hasPrevPage: boolean
   }
+  /** See the same prop on CustomerDetailContent. */
+  vendorsModuleEnabled?: boolean
 }
 
 export function CustomersClient({
   customers,
   states,
   pagination,
+  vendorsModuleEnabled,
 }: CustomersClientProps) {
   const [selectedCustomerIds, setSelectedCustomerIds] = React.useState<string[]>([])
   // Which row's full detail shows in the right-hand panel — defaults to
@@ -107,7 +110,7 @@ export function CustomersClient({
           />
         </div>
 
-        <CustomerDetailPanel customerId={activeCustomerId} states={states} />
+        <CustomerDetailPanel customerId={activeCustomerId} states={states} vendorsModuleEnabled={vendorsModuleEnabled} />
       </div>
     </main>
   )

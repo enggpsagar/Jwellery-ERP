@@ -40,6 +40,10 @@ type CustomerCreateFormProps = {
    * them — freely changeable per customer afterward. */
   defaultState?: string
   defaultCity?: string
+  /** Settings > toggle for the Vendors module — hides the "This party is also a
+   * vendor" checkbox when off (nothing to register a new vendor into). See
+   * BusinessSettings.vendorsModuleEnabled's own schema doc comment. */
+  vendorsModuleEnabled?: boolean
 }
 
 function FieldError({ errors }: { errors?: string[] }) {
@@ -61,6 +65,7 @@ export function CustomerCreateForm({
   gstScheme,
   defaultState,
   defaultCity,
+  vendorsModuleEnabled = true,
 }: CustomerCreateFormProps) {
   // Starting point only — a Wholesaler & Manufacturer store still routinely
   // has individual, non-registered buyers, so this stays freely editable
@@ -337,24 +342,26 @@ export function CustomerCreateForm({
             />
           </div>
 
-          <div className="md:col-span-2">
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={alsoCreateVendor}
-                onChange={(e) => setAlsoCreateVendor(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-input"
-              />
-              <span>
-                <span className="font-medium">This party is also a vendor</span>
-                <span className="block text-xs text-muted-foreground">
-                  Creates a linked Vendor record with the same details — you can buy from and sell to the
-                  same business without entering it twice. Linked records can be unlinked later from either
-                  one&apos;s detail page.
+          {vendorsModuleEnabled && (
+            <div className="md:col-span-2">
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={alsoCreateVendor}
+                  onChange={(e) => setAlsoCreateVendor(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-input"
+                />
+                <span>
+                  <span className="font-medium">This party is also a vendor</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Creates a linked Vendor record with the same details — you can buy from and sell to the
+                    same business without entering it twice. Linked records can be unlinked later from either
+                    one&apos;s detail page.
+                  </span>
                 </span>
-              </span>
-            </label>
-          </div>
+              </label>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-2 md:col-span-2">
             <Button type="submit" disabled={pending} size="lg">

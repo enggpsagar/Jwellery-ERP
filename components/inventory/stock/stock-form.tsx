@@ -111,8 +111,6 @@ type Stock = {
   locationId: string | null;
 
   remarks: string | null;
-
-  isActive: boolean;
 };
 
 type StockFormProps = {
@@ -181,10 +179,6 @@ export function StockForm({
 
   const [finish, setFinish] = useState(
     stock?.finish ?? InventoryFinish.KACHA,
-  );
-
-  const [isActive, setIsActive] = useState(
-    stock?.isActive === false ? "false" : "true",
   );
 
   // Controlled so `MakingChargeInput` can react to them live for its %
@@ -376,7 +370,6 @@ export function StockForm({
       selectedProductId,
       status,
       finish,
-      isActive,
       locationId,
       weightUnit,
       weightsTouched,
@@ -443,7 +436,6 @@ export function StockForm({
     setSelectedProductId(newProductId);
     setStatus(str("status", InventoryStockStatus.IN_STOCK) as InventoryStockStatus);
     setFinish(str("finish", InventoryFinish.KACHA) as InventoryFinish);
-    setIsActive(str("isActive", "true"));
     setLocationId(str("locationId"));
     setWeightUnit(str("weightUnit", "GRAM") as "GRAM" | "CARAT");
     setWeightsTouched(bool("weightsTouched", true));
@@ -970,25 +962,6 @@ export function StockForm({
             <ErrorText error={state.errors.locationId} />
           </div>
 
-          <div>
-            <Label>Status</Label>
-
-            <Select value={isActive} onValueChange={setIsActive}>
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="true">Active</SelectItem>
-
-                <SelectItem value="false">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <input type="hidden" name="isActive" value={isActive} />
-
-            <ErrorText error={state.errors.isActive} />
-          </div>
         </div>
 
         <div className="mt-6">

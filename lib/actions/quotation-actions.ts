@@ -433,7 +433,10 @@ export async function getQuotationFormStockItems() {
   const storeId = await requireStoreScope();
 
   const stockItems = await prisma.inventoryStock.findMany({
-    where: { storeId, status: InventoryStockStatus.IN_STOCK, isActive: true },
+    // Same fix as getInvoiceFormStockItems (invoice-actions.ts) — Stock has
+    // no Active/Inactive concept of its own; availability is purely
+    // quantity-driven.
+    where: { storeId, status: InventoryStockStatus.IN_STOCK, quantity: { gt: 0 } },
     orderBy: { stockCode: "asc" },
     include: {
       product: { select: { name: true, productCode: true } },

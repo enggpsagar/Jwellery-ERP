@@ -728,7 +728,11 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
   const storeId = await requireStoreScope();
 
   const stockItems = await prisma.inventoryStock.findMany({
-    where: { storeId, status: InventoryStockStatus.IN_STOCK, isActive: true },
+    // Stock has no Active/Inactive concept of its own (that belongs to
+    // Product) — availability here is purely quantity-driven: a piece with
+    // nothing left to sell shouldn't appear in the picker regardless of
+    // what its status field says.
+    where: { storeId, status: InventoryStockStatus.IN_STOCK, quantity: { gt: 0 } },
     orderBy: { stockCode: "asc" },
     include: {
       product: { select: { name: true, hsnCode: true, productCode: true } },

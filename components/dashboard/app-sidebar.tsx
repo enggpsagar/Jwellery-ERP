@@ -182,10 +182,11 @@ const karigarNav: NavItem[] = [
   },
 ];
 
-function getNavForRole(role?: string, permissions: string[] = []) {
+function getNavForRole(role?: string, permissions: string[] = [], vendorsModuleEnabled = true) {
   if (role === "KARIGAR") return karigarNav;
 
   return mainNav.filter((item) => {
+    if (item.href === "/vendors") return vendorsModuleEnabled;
     if (item.href === "/stores" || item.href === "/plans") {
       return role === "SUPER_ADMIN";
     }
@@ -416,6 +417,10 @@ type AppSidebarProps = {
    *  rather than read from useSidebar()'s context here, since <Sidebar
    *  side=...> itself takes it as a direct prop, not from context. */
   side?: "left" | "right";
+  /** BusinessSettings.vendorsModuleEnabled — hides the "Vendors" nav item
+   *  when a store has switched the module off from Settings. Defaults true
+   *  so every existing caller not yet passing this keeps showing it. */
+  vendorsModuleEnabled?: boolean;
 };
 
 const EMPTY_COUNTS: SidebarCounts = {
@@ -435,11 +440,17 @@ const EMPTY_COUNTS: SidebarCounts = {
   stores: 0,
 };
 
-export function AppSidebar({ storeName, storeLogoUrl, counts = EMPTY_COUNTS, side = "left" }: AppSidebarProps = {}) {
+export function AppSidebar({
+  storeName,
+  storeLogoUrl,
+  counts = EMPTY_COUNTS,
+  side = "left",
+  vendorsModuleEnabled = true,
+}: AppSidebarProps = {}) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const role = session?.user?.role;
-  const navItems = getNavForRole(role, session?.user?.permissions);
+  const navItems = getNavForRole(role, session?.user?.permissions, vendorsModuleEnabled);
 
   const [openMenu, setOpenMenu] = useState<OpenMenu>(undefined);
 

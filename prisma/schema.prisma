@@ -1076,6 +1076,11 @@ model LedgerEntry {
   creditNoteId     String?
   purchaseId       String?
   vendorId         String?
+  // An advance collected while creating a Draft Order (see DraftOrder.
+  // paidAmount's own comment) — same nullable-FK-per-document-type shape
+  // as invoiceId/purchaseId above, just for a document that isn't a
+  // completed sale yet.
+  draftOrderId     String?
   metalTypeId      String?
   metalWeight      Decimal?         @db.Decimal(12, 5)
   metalWeightFine  Decimal?         @db.Decimal(12, 5)
@@ -1107,6 +1112,7 @@ model LedgerEntry {
   metalType        StoreMetal?      @relation(fields: [metalTypeId], references: [id])
   locationId       String?
   location         StoreLocation?   @relation(fields: [locationId], references: [id])
+  draftOrder       DraftOrder?      @relation(fields: [draftOrderId], references: [id])
 
   @@index([entryDate])
   @@index([customerId])
@@ -1115,6 +1121,7 @@ model LedgerEntry {
   @@index([creditNoteId])
   @@index([purchaseId])
   @@index([vendorId])
+  @@index([draftOrderId])
   @@index([type])
   @@index([sourceType])
   @@index([storeId])
@@ -1486,16 +1493,32 @@ model DraftOrder {
   karigarJobId  String?   @unique
   locationId    String?
   notes         String?
+  // Rough total from each item's estimatedWeight × estimatedRate at order
+  // time, not a priced/billed amount — the real total lands on whatever
+  // Invoice eventually gets raised once the piece is received (see
+  // DraftOrderItem's own comment). Exists only so an advance paid now
+  // (paidAmount below) has something sane to be capped against/compared to.
+  estimatedTotal Decimal  @default(0) @db.Decimal(12, 2)
+  // Sum of every PAYMENT_IN LedgerEntry linked to this order via
+  // LedgerEntry.draftOrderId (below) — an advance collected before the
+  // piece even exists, not a payment against a finished sale. Deliberately
+  // has no matching DEBIT the way Invoice.totalAmount does: a Draft Order
+  // isn't a completed sale, so nothing is "owed" yet for the ledger to net
+  // against — this is a plain CREDIT (an on-account advance) until a real
+  // Invoice is eventually raised. Whoever bills that Invoice must apply
+  // this advance manually today; there is no automatic carry-forward.
+  paidAmount     Decimal  @default(0) @db.Decimal(12, 2)
   createdById   String?
   createdByName String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  store      Store            @relation(fields: [storeId], references: [id])
-  customer   Customer         @relation(fields: [customerId], references: [id])
-  karigarJob KarigarJob?      @relation(fields: [karigarJobId], references: [id])
-  location   StoreLocation?   @relation(fields: [locationId], references: [id])
-  items      DraftOrderItem[]
+  store         Store            @relation(fields: [storeId], references: [id])
+  customer      Customer         @relation(fields: [customerId], references: [id])
+  karigarJob    KarigarJob?      @relation(fields: [karigarJobId], references: [id])
+  location      StoreLocation?   @relation(fields: [locationId], references: [id])
+  items         DraftOrderItem[]
+  ledgerEntries LedgerEntry[]
 
   @@unique([storeId, orderNumber])
   @@index([storeId, status])
@@ -1776,6 +1799,17 @@ model BusinessSettings {
   // sendDraftOrderToKarigar(), same "don't trust the client" pattern as
   // returnWindowEnabled above.
   sendToArtisanEnabled Boolean @default(true)
+
+  // Whether the Vendors module shows up in this store's app at all —
+  // defaults to true so nothing changes for existing stores. Turning it off
+  // hides the "Vendors" sidebar item and blocks the list/create/archived/
+  // export pages, but deliberately does NOT touch Vendor rows themselves:
+  // Purchases still needs vendors to exist and still lets staff pick/create
+  // one, a Customer's linked-vendor balance still computes correctly, and a
+  // vendor's own detail/edit page stays reachable via that one direct link
+  // (same "hide the module's own UI, keep existing data/relationships
+  // working" precedent as sendToArtisanEnabled above).
+  vendorsModuleEnabled Boolean @default(true)
 
   // Financial year
   financialYearStartMonth Int @default(4) // April = 4, common in India

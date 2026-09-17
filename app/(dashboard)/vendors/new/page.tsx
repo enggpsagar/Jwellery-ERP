@@ -19,6 +19,11 @@ export default async function NewVendorPage({ searchParams }: NewVendorPageProps
   const params = (await searchParams) ?? {}
   const returnTo = safeReturnTo(params.returnTo)
 
+  // Deliberately NOT gated by vendorsModuleEnabled, unlike the Vendors list/
+  // archived/export pages — Purchases and Payment Out both quick-create a
+  // vendor through this same route (VendorSelect's "Add New Vendor"), and
+  // that ability shouldn't disappear just because the standalone module's
+  // own nav/list is hidden.
   const [states, businessSettings] = await Promise.all([getStates(), getBusinessSettings()])
 
   return (

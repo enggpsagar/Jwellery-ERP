@@ -14,6 +14,7 @@ import { CustomerSelect, type CustomerOption } from "@/components/customers/cust
 import { LocationSelect, type LocationOption } from "@/components/shared/location-select"
 import { PURITY_SELECT_OPTIONS } from "@/lib/purity"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import type { PurityType } from "@prisma/client"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { PaidNowFields } from "@/components/shared/paid-now-fields"
+import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
 import {
   Select,
   SelectContent,
@@ -32,7 +35,13 @@ import { RequiredMark } from "@/components/shared/required-mark"
 
 const initialState: DraftOrderFormState = { success: false, message: "" }
 
-type ItemRow = DraftOrderItemInput & { key: string }
+type ItemRow = DraftOrderItemInput & {
+  key: string
+  // Escape hatch so the purity/metal-driven rate auto-fill (below) never
+  // clobbers a rate the user typed in by hand — same "touched" idiom as
+  // invoice-form.tsx's hmChargeTouched/stoneChargeTouched.
+  rateTouched: boolean
+}
 
 // `key` defaults to a fresh UUID for every "Add Item" click (client-only,
 // safe to randomize), but the very first row is seeded once from
@@ -50,7 +59,14 @@ function emptyItem(key: string = crypto.randomUUID()): ItemRow {
     estimatedWeight: null,
     estimatedRate: null,
     designNotes: "",
+    rateTouched: false,
   }
+}
+
+/** ₹ per gram → 2-decimal currency, blank for nothing entered yet. */
+function formatEstimatedAmount(weight: number | null | undefined, rate: number | null | undefined) {
+  if (!weight || !rate) return null
+  return weight * rate
 }
 
 type DraftOrderFormProps = {
@@ -58,6 +74,11 @@ type DraftOrderFormProps = {
   metals: StoreMetalRow[]
   locations?: LocationOption[]
   defaultLocationId?: string | null
+  /** Store's configured Metal Selling Rate per purity (Settings > Purity &
+   * Carat) — same source Invoice/Kacha/Quotation prefill from. Falls back to
+   * the metal's own flat Selling Price (Settings > Taxonomy) for a metal with
+   * no purity concept (e.g. Diamond), same two-step chain those forms use. */
+  metalSellingRates?: Partial<Record<PurityType, number>>
 }
 
 export function DraftOrderForm({
@@ -65,11 +86,13 @@ export function DraftOrderForm({
   metals,
   locations = [],
   defaultLocationId = null,
+  metalSellingRates = {},
 }: DraftOrderFormProps) {
   const router = useRouter()
   const toast = useToast()
   const [items, setItems] = useState<ItemRow[]>([emptyItem("initial")])
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
+  const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
 
   const [state, formAction, pending] = useActionState(createDraftOrder, initialState)
 
@@ -95,7 +118,35 @@ export function DraftOrderForm({
     setItems((prev) => (prev.length > 1 ? prev.filter((item) => item.key !== key) : prev))
   }
 
-  const itemsJson = JSON.stringify(items.map(({ key: _key, ...rest }) => rest))
+  const itemsJson = JSON.stringify(
+    items.map(({ key: _key, rateTouched: _rateTouched, ...rest }) => rest),
+  )
+
+  // Rough order-level total from each line's estimatedWeight × estimatedRate —
+  // purely a client-side preview (matches how createDraftOrder computes its
+  // own estimatedTotal server-side from the same two fields), not billed
+  // amounts. Lines missing either figure just contribute 0, same as
+  // formatEstimatedAmount's per-line display returning null for them.
+  const estimatedOrderTotal = items.reduce(
+    (sum, item) => sum + (formatEstimatedAmount(item.estimatedWeight, item.estimatedRate) ?? 0),
+    0,
+  )
+
+  // Zero-amount rows (a split row opened but never filled in) are dropped
+  // here rather than sent through — same convention as invoice-form.tsx's
+  // own paymentsJson, matching parseOptionalPayments' server-side
+  // requirement that any row it does receive have a real amount.
+  const paymentsJson = JSON.stringify(
+    paymentRows
+      .filter((row) => row.amount > 0)
+      .map((row) => ({
+        method: row.method,
+        amount: row.amount,
+        reference: row.reference || null,
+        bankName: row.bankName || null,
+        attachmentUrl: row.attachmentUrl || null,
+      })),
+  )
 
   return (
     <form
@@ -106,6 +157,7 @@ export function DraftOrderForm({
       className="space-y-6"
     >
       <input type="hidden" name="itemsJson" value={itemsJson} />
+      <input type="hidden" name="paymentsJson" value={paymentsJson} />
 
       <Card>
         <CardHeader>
@@ -145,6 +197,7 @@ export function DraftOrderForm({
         <CardContent className="space-y-4">
           {items.map((item, index) => {
             const selectedMetal = metals.find((m) => m.id === item.metalTypeId)
+            const estimatedAmount = formatEstimatedAmount(item.estimatedWeight, item.estimatedRate)
 
             return (
               <div key={item.key} className="space-y-3 rounded-lg border p-4">
@@ -181,9 +234,22 @@ export function DraftOrderForm({
                     <Label>Metal</Label>
                     <Select
                       value={item.metalTypeId ?? ""}
-                      onValueChange={(value) =>
-                        updateItem(item.key, { metalTypeId: value, purity: null })
-                      }
+                      onValueChange={(value) => {
+                        const metal = metals.find((m) => m.id === value)
+                        // A metal with no purity concept (e.g. Diamond) has
+                        // nothing for the Purity select below to fire its own
+                        // auto-fill on, so prefill from the metal's flat
+                        // Selling Price right here instead.
+                        const autoRate =
+                          !item.rateTouched && metal && !metal.hasPurity
+                            ? metal.sellingPrice ?? null
+                            : undefined
+                        updateItem(item.key, {
+                          metalTypeId: value,
+                          purity: null,
+                          ...(autoRate !== undefined ? { estimatedRate: autoRate } : {}),
+                        })
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select metal" />
@@ -205,9 +271,24 @@ export function DraftOrderForm({
                       <Label>Purity</Label>
                       <Select
                         value={item.purity ?? ""}
-                        onValueChange={(value) =>
-                          updateItem(item.key, { purity: value as DraftOrderItemInput["purity"] })
-                        }
+                        onValueChange={(value) => {
+                          const purity = value as PurityType
+                          updateItem(item.key, {
+                            purity: purity as DraftOrderItemInput["purity"],
+                            // Store's configured per-purity Selling Rate,
+                            // falling back to the metal's own flat Selling
+                            // Price — same two-step chain Invoice/Kacha/
+                            // Quotation already prefill rate from. Skipped
+                            // once the user has hand-edited the rate so this
+                            // never overwrites a deliberate override.
+                            ...(!item.rateTouched
+                              ? {
+                                  estimatedRate:
+                                    metalSellingRates[purity] ?? selectedMetal?.sellingPrice ?? null,
+                                }
+                              : {}),
+                          })
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select purity" />
@@ -260,9 +341,15 @@ export function DraftOrderForm({
                       onChange={(event) =>
                         updateItem(item.key, {
                           estimatedRate: event.target.value ? Number(event.target.value) : null,
+                          rateTouched: true,
                         })
                       }
                     />
+                    {estimatedAmount !== null && (
+                      <p className="text-xs text-muted-foreground">
+                        Estimated amount: ₹{estimatedAmount.toFixed(2)}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5 md:col-span-2">
@@ -285,6 +372,26 @@ export function DraftOrderForm({
             <Plus className="h-4 w-4" />
             Add Item
           </Button>
+
+          {estimatedOrderTotal > 0 && (
+            <div className="flex justify-end border-t pt-3 text-sm">
+              <span className="text-muted-foreground">Estimated Total:&nbsp;</span>
+              <span className="font-medium">₹{estimatedOrderTotal.toFixed(2)}</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Advance Payment</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PaidNowFields
+            rows={paymentRows}
+            onRowsChange={setPaymentRows}
+            maxAmount={estimatedOrderTotal > 0 ? estimatedOrderTotal : undefined}
+          />
         </CardContent>
       </Card>
 

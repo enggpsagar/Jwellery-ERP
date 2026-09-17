@@ -637,6 +637,7 @@ export async function createInventoryStock(
         id: true,
         metalTypeId: true,
         defaultPurity: true,
+        storeMetalPurity: { select: { label: true } },
         defaultMakingCharge: true,
         defaultMakingChargeType: true,
         defaultStoneCharge: true,
@@ -703,6 +704,7 @@ export async function createInventoryStock(
 
     const metalTypeId = product.metalTypeId
     const purity = product.defaultPurity
+    const purityLabel = product.storeMetalPurity?.label ?? null
     const makingCharge = product.defaultMakingCharge
     const makingChargeType = product.defaultMakingChargeType
     // A composite product's stone value is auto-computed from this piece's
@@ -756,6 +758,7 @@ export async function createInventoryStock(
           tagNumber,
           metalTypeId,
           purity,
+          purityLabel,
           status,
           finish,
           quantity,
@@ -842,6 +845,7 @@ export async function updateInventoryStock(
         // null out metal/purity/charges on save.
         metalTypeId: true,
         purity: true,
+        purityLabel: true,
         makingCharge: true,
         makingChargeType: true,
         stoneCharge: true,
@@ -884,6 +888,7 @@ export async function updateInventoryStock(
     // when the row is still editable, otherwise kept exactly as-is.
     let metalTypeId = existingStock.metalTypeId
     let purity = existingStock.purity
+    let purityLabel = existingStock.purityLabel
     let makingCharge = existingStock.makingCharge
     let makingChargeType = existingStock.makingChargeType
     let stoneCharge = existingStock.stoneCharge
@@ -1025,6 +1030,7 @@ export async function updateInventoryStock(
           id: true,
           metalTypeId: true,
           defaultPurity: true,
+          storeMetalPurity: { select: { label: true } },
           defaultMakingCharge: true,
           defaultMakingChargeType: true,
           defaultStoneCharge: true,
@@ -1058,6 +1064,7 @@ export async function updateInventoryStock(
 
       metalTypeId = product.metalTypeId
       purity = product.defaultPurity
+      purityLabel = product.storeMetalPurity?.label ?? null
       makingCharge = product.defaultMakingCharge
       makingChargeType = product.defaultMakingChargeType
       stoneRate = product.hasStoneComponent ? product.defaultStoneRate : null
@@ -1106,6 +1113,7 @@ export async function updateInventoryStock(
         tagNumber,
         metalTypeId,
         purity,
+        purityLabel,
         status,
         finish,
         quantity,
@@ -1326,6 +1334,7 @@ export async function importInventoryStockFromExcel(
           productCode: true,
           metalTypeId: true,
           defaultPurity: true,
+          storeMetalPurity: { select: { label: true } },
           defaultMakingCharge: true,
           defaultMakingChargeType: true,
           defaultStoneCharge: true,
@@ -1421,6 +1430,7 @@ export async function importInventoryStockFromExcel(
         quantity: Math.trunc(quantity),
         metalTypeId: product.metalTypeId,
         purity: product.defaultPurity,
+        purityLabel: product.storeMetalPurity?.label ?? undefined,
         makingCharge: product.defaultMakingCharge ?? undefined,
         makingChargeType: product.defaultMakingChargeType,
         stoneCharge: product.hasStoneComponent ? product.defaultStoneCharge ?? undefined : undefined,

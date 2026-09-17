@@ -223,7 +223,7 @@ export function InvoicePrintClassic({ invoice, settings }: InvoicePrintClassicPr
             <p>
               <span className="font-semibold">Date:</span> {fmtDate(invoice.invoiceDate)}
             </p>
-            {invoice.dueDate && (
+            {settings.showDueDate && invoice.dueDate && (
               <p>
                 <span className="font-semibold">Due Date:</span> {fmtDate(invoice.dueDate)}
               </p>

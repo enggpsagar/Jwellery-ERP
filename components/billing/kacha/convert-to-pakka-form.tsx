@@ -58,12 +58,17 @@ type ConvertToPakkaFormProps = {
   /** Legacy last-resort fallback (BusinessSettings.defaultGstRate) — see
    * the same prop on InvoiceForm. */
   defaultGstRate: number
+  /** BusinessSettings.showDueDate — hides the Due Date field when off.
+   * Defaults true so an existing caller not yet passing this keeps
+   * showing it. */
+  showDueDate?: boolean
 }
 
 export function ConvertToPakkaForm({
   kachaInvoice,
   gstRates,
   defaultGstRate,
+  showDueDate = true,
 }: ConvertToPakkaFormProps) {
   const router = useRouter()
   const toast = useToast()
@@ -191,10 +196,12 @@ export function ConvertToPakkaForm({
             </Select>
           </div>
 
-          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <Label>Due Date</Label>
-            <Input type="date" name="dueDate" min={todayForDateInput()} />
-          </div>
+          {showDueDate && (
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+              <Label>Due Date</Label>
+              <Input type="date" name="dueDate" min={todayForDateInput()} />
+            </div>
+          )}
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">

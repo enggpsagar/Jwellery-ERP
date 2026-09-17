@@ -59,6 +59,7 @@ type InvoiceActionsBarProps = {
   returnWindowDays: number
   ewayBillEnabled?: boolean
   eInvoiceEnabled?: boolean
+  showDueDate?: boolean
   locations: LocationOption[]
   /** Whether any line item still has something left to return — when the
    * invoice is otherwise return-eligible (status + window) but every item
@@ -90,6 +91,7 @@ export function InvoiceActionsBar({
   returnWindowDays,
   ewayBillEnabled = true,
   eInvoiceEnabled = true,
+  showDueDate = true,
   locations,
   hasReturnableItems,
 }: InvoiceActionsBarProps) {
@@ -169,6 +171,7 @@ export function InvoiceActionsBar({
             ackDate={invoice.ackDate}
             ewayBillEnabled={ewayBillEnabled}
             eInvoiceEnabled={eInvoiceEnabled}
+            showDueDate={showDueDate}
           />
         </>
       )}

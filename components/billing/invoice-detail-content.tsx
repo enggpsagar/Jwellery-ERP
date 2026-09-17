@@ -25,6 +25,10 @@ type InvoiceDetailContentProps = {
   returnWindowDays: number
   ewayBillEnabled?: boolean
   eInvoiceEnabled?: boolean
+  /** BusinessSettings.showDueDate — hides the Due Date row and the "set a
+   * due date" nudge banner when off. Defaults true so an existing caller
+   * not yet passing this keeps showing both. */
+  showDueDate?: boolean
 }
 
 /**
@@ -43,6 +47,7 @@ export function InvoiceDetailContent({
   returnWindowDays,
   ewayBillEnabled = true,
   eInvoiceEnabled = true,
+  showDueDate = true,
 }: InvoiceDetailContentProps) {
   const isCancelled = invoice.status === "CANCELLED"
   const isCancellable = invoice.status === "DRAFT" || invoice.status === "PARTIAL"
@@ -56,7 +61,7 @@ export function InvoiceDetailContent({
 
   return (
     <div className="space-y-4">
-      {!isCancelled && invoice.balanceAmount > 0 && !invoice.dueDate && (
+      {showDueDate && !isCancelled && invoice.balanceAmount > 0 && !invoice.dueDate && (
         <InvoiceDueDatePrompt invoiceId={invoice.id} balanceAmount={invoice.balanceAmount} />
       )}
 
@@ -96,7 +101,7 @@ export function InvoiceDetailContent({
             </div>
           </div>
 
-          {invoice.dueDate && (
+          {showDueDate && invoice.dueDate && (
             <div>
               <p className="text-sm text-muted-foreground">Due Date</p>
               <p className="font-medium">{formatShortDate(invoice.dueDate)}</p>

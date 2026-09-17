@@ -149,6 +149,7 @@ export default async function EditInvoicePage({ params }: Props) {
         gstScheme={businessSettings.gstScheme}
         storeState={businessSettings.state}
         storeStateCode={businessSettings.stateCode}
+        showDueDate={businessSettings.showDueDate}
         states={states}
         initialDeliveryState={invoice.deliveryState}
         initialDeliveryStateCode={invoice.deliveryStateCode}

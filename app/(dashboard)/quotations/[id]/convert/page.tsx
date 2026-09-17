@@ -65,6 +65,7 @@ export default async function ConvertQuotationToInvoicePage({ params }: Props) {
         quotation={quotation}
         gstRates={gstRates}
         defaultTaxAmount={defaultTaxAmount}
+        showDueDate={businessSettings.showDueDate}
       />
     </main>
   )

@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select"
+import { cn } from "@/lib/utils"
 
 const initialState: InvoiceFormState = { success: false, message: "" }
 
@@ -53,6 +54,10 @@ type EditInvoiceDialogProps = {
    * showing both, same as before these settings existed. */
   ewayBillEnabled?: boolean
   eInvoiceEnabled?: boolean
+  /** BusinessSettings.showDueDate — hides the Due Date field when off.
+   * Defaults true so an existing caller not yet passing this keeps
+   * showing it. */
+  showDueDate?: boolean
   /** Smaller trigger (still labeled "E-way Bill", not just a bare pencil)
    * for a table row's Actions column — distinguishes it from "Edit Items"
    * (also a pencil icon, but full line-item editing) sitting elsewhere in
@@ -100,6 +105,7 @@ export function EditInvoiceDialog({
   ackDate,
   ewayBillEnabled = true,
   eInvoiceEnabled = true,
+  showDueDate = true,
   compact = false,
 }: EditInvoiceDialogProps) {
   const [open, setOpen] = useState(false)
@@ -191,15 +197,17 @@ export function EditInvoiceDialog({
             <div className="text-red-600 text-sm">{state.message}</div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className={cn("grid gap-3", showDueDate ? "grid-cols-2" : "grid-cols-1")}>
             <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
               <Label>Invoice Date</Label>
               <Input type="date" name="invoiceDate" defaultValue={invoiceDate.slice(0, 10)} />
             </div>
-            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-              <Label>Due Date</Label>
-              <Input type="date" name="dueDate" defaultValue={dueDate?.slice(0, 10) ?? ""} />
-            </div>
+            {showDueDate && (
+              <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+                <Label>Due Date</Label>
+                <Input type="date" name="dueDate" defaultValue={dueDate?.slice(0, 10) ?? ""} />
+              </div>
+            )}
           </div>
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">

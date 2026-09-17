@@ -79,6 +79,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
           gstScheme={businessSettings.gstScheme}
           storeState={businessSettings.state}
           storeStateCode={businessSettings.stateCode}
+          showDueDate={businessSettings.showDueDate}
           states={states}
           defaultNotes={businessSettings.invoiceNotes || undefined}
         />

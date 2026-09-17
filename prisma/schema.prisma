@@ -1860,6 +1860,16 @@ model BusinessSettings {
   // Same convention as ewayBillEnabled, for the E-Invoice (IRN) fields.
   eInvoiceEnabled Boolean @default(true)
 
+  // Whether Invoice.dueDate is shown/settable anywhere — the create/edit
+  // forms' Due Date field, the invoice detail page's Due Date row and its
+  // "set a due date" nudge banner, the four A4 print templates' Due Date
+  // line, and the Calendar's "invoice due" entries all gate on this.
+  // Defaults true so nothing changes for existing stores. Off never clears
+  // or touches any invoice's already-saved dueDate — only its display
+  // (and the ability to set a new one) is hidden; re-enabling shows
+  // whatever was already there, exactly as before.
+  showDueDate Boolean @default(true)
+
   // Financial year
   financialYearStartMonth Int @default(4) // April = 4, common in India
 

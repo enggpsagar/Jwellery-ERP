@@ -56,6 +56,7 @@ export default async function ConvertKachaToPakkaPage({ params }: Props) {
         kachaInvoice={kachaInvoice}
         gstRates={gstRates}
         defaultGstRate={businessSettings.defaultGstRate}
+        showDueDate={businessSettings.showDueDate}
       />
     </main>
   )

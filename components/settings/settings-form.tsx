@@ -110,6 +110,7 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
   const [vendorsModuleEnabled, setVendorsModuleEnabled] = useState(settings.vendorsModuleEnabled)
   const [ewayBillEnabled, setEwayBillEnabled] = useState(settings.ewayBillEnabled)
   const [eInvoiceEnabled, setEInvoiceEnabled] = useState(settings.eInvoiceEnabled)
+  const [showDueDate, setShowDueDate] = useState(settings.showDueDate)
   const [printLayout, setPrintLayout] = useState<PrintLayout>(settings.printLayout)
   const [invoiceTemplate, setInvoiceTemplate] = useState<InvoiceTemplate>(settings.invoiceTemplate)
   const stateNameMap = useMemo(
@@ -759,6 +760,23 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
               max={12}
               defaultValue={settings.financialYearStartMonth}
             />
+          </div>
+
+          <div className="space-y-1.5 md:col-span-2">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="showDueDate"
+                checked={showDueDate}
+                onCheckedChange={setShowDueDate}
+              />
+              <input type="hidden" name="showDueDate" value={showDueDate ? "on" : ""} />
+              <Label htmlFor="showDueDate">Show Due Date</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Whether an invoice's Due Date field, detail-page row, print line, and
+              Calendar reminders show up at all. Off hides it everywhere — it never
+              clears or changes any due date already saved, just its display.
+            </p>
           </div>
 
           <div className="space-y-1.5 md:col-span-2">

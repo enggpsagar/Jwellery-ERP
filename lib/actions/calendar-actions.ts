@@ -10,6 +10,7 @@ import { actionErrorMessage } from "@/lib/action-error";
 import { getCurrentUser, hasPermission, requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { getLocationScope, locationWhere, resolveWritableLocationId } from "@/lib/location-scope";
+import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { getIndianHolidays } from "@/lib/india-holidays";
 import { logger } from "@/lib/logger";
 
@@ -63,12 +64,13 @@ export async function getCalendarEvents(year: number, month: number): Promise<Ca
   const rangeEnd = new Date(year, month, 1);
   const now = new Date();
 
-  const [canViewBilling, canViewQuotations, canViewKarigars, currentUser, scope] = await Promise.all([
+  const [canViewBilling, canViewQuotations, canViewKarigars, currentUser, scope, businessSettings] = await Promise.all([
     hasPermission(PERMISSIONS.BILLING_VIEW),
     hasPermission(PERMISSIONS.QUOTATION_VIEW),
     hasPermission(PERMISSIONS.KARIGAR_VIEW),
     getCurrentUser(),
     getLocationScope(),
+    getBusinessSettings(),
   ]);
 
   // Plan/subscription info is billing information for the store — same
@@ -77,7 +79,11 @@ export async function getCalendarEvents(year: number, month: number): Promise<Ca
 
   const events: CalendarEvent[] = [];
 
-  if (canViewBilling) {
+  // BusinessSettings.showDueDate off means invoices' due dates are hidden
+  // everywhere, including here — see its own schema comment. The
+  // underlying Invoice.dueDate values are untouched; this only skips
+  // generating calendar entries from them.
+  if (canViewBilling && businessSettings.showDueDate) {
     const dueInvoices = await prisma.invoice.findMany({
       where: {
         storeId,

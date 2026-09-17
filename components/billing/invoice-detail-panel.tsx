@@ -38,6 +38,7 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
   const [returnWindowDays, setReturnWindowDays] = useState(0)
   const [ewayBillEnabled, setEwayBillEnabled] = useState(true)
   const [eInvoiceEnabled, setEInvoiceEnabled] = useState(true)
+  const [showDueDate, setShowDueDate] = useState(true)
   const [hasReturnableItems, setHasReturnableItems] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -64,6 +65,7 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
         setReturnWindowDays(settings.returnWindowDays)
         setEwayBillEnabled(settings.ewayBillEnabled)
         setEInvoiceEnabled(settings.eInvoiceEnabled)
+        setShowDueDate(settings.showDueDate)
         setHasReturnableItems((returnableItems ?? []).length > 0)
       })
       .finally(() => {
@@ -107,6 +109,7 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
         returnWindowDays={returnWindowDays}
         ewayBillEnabled={ewayBillEnabled}
         eInvoiceEnabled={eInvoiceEnabled}
+        showDueDate={showDueDate}
         locations={locations}
         hasReturnableItems={hasReturnableItems}
       />
@@ -118,6 +121,7 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
         returnWindowDays={returnWindowDays}
         ewayBillEnabled={ewayBillEnabled}
         eInvoiceEnabled={eInvoiceEnabled}
+        showDueDate={showDueDate}
       />
     </div>
   )

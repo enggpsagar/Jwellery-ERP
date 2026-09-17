@@ -70,6 +70,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         returnWindowDays={settings.returnWindowDays}
         ewayBillEnabled={settings.ewayBillEnabled}
         eInvoiceEnabled={settings.eInvoiceEnabled}
+        showDueDate={settings.showDueDate}
         locations={locations}
         hasReturnableItems={hasReturnableItems}
       />
@@ -81,6 +82,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         returnWindowDays={settings.returnWindowDays}
         ewayBillEnabled={settings.ewayBillEnabled}
         eInvoiceEnabled={settings.eInvoiceEnabled}
+        showDueDate={settings.showDueDate}
       />
     </main>
   )

@@ -59,12 +59,17 @@ type ConvertToInvoiceFormProps = {
   /** Last-resort fallback (BusinessSettings.defaultGstRate) — only used to
    * seed Tax Amount when the store somehow has zero GstRate rows. */
   defaultTaxAmount?: number
+  /** BusinessSettings.showDueDate — hides the Due Date field when off.
+   * Defaults true so an existing caller not yet passing this keeps
+   * showing it. */
+  showDueDate?: boolean
 }
 
 export function ConvertToInvoiceForm({
   quotation,
   gstRates,
   defaultTaxAmount = 0,
+  showDueDate = true,
 }: ConvertToInvoiceFormProps) {
   const router = useRouter()
   const toast = useToast()
@@ -211,10 +216,12 @@ export function ConvertToInvoiceForm({
             />
           </div>
 
-          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <Label>Due Date</Label>
-            <Input type="date" name="dueDate" min={todayForDateInput()} />
-          </div>
+          {showDueDate && (
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+              <Label>Due Date</Label>
+              <Input type="date" name="dueDate" min={todayForDateInput()} />
+            </div>
+          )}
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">

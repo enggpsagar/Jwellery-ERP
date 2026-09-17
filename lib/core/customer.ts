@@ -52,13 +52,23 @@ export type CustomerRecord = {
   lastPaymentDate?: string;
   notes?: string;
   createdAt?: string;
-  /** Whether this Party has ever been used as a Purchase's supplier — set
-   *  automatically by createPurchase, never a user-facing choice. See
-   *  Customer.isVendor's doc comment in schema.prisma. */
-  isVendor?: boolean;
+  /** Whether this Party is also tracked as a supplier — see
+   *  Customer.isSupplier's doc comment in schema.prisma. Only actionable
+   *  (an explicit "Also Supplier" toggle) while
+   *  BusinessSettings.supplierModuleEnabled is on; the flag itself can
+   *  still be true from earlier Purchase/Payment-Out use even while off. */
+  isSupplier?: boolean;
   /** Parallel to customerCode, carried over for a Party that started life
    *  as a standalone Vendor row before the merge, or assigned since. */
   vendorCode?: string | null;
+  /** This same Party's own supplier-side ledger balance — tracked
+   *  independently from currentBalance above (customer/receivable side),
+   *  not netted against it. Only meaningful once isSupplier is true;
+   *  undefined for a pure customer. Positive = the store owes them
+   *  (Payable); negative = they owe the store (Advance) — see
+   *  supplierBalanceType. */
+  supplierBalance?: number;
+  supplierBalanceType?: "Advance" | "Payable";
 };
 
 export type CustomerFormState = {
@@ -86,6 +96,9 @@ export type GetCustomersParams = {
   archived?: boolean;
   dateFrom?: string;
   dateTo?: string;
+  /** Set true to list only Parties tagged isSupplier — the Suppliers page's
+   *  own list, backed by this same Customer table/query. */
+  supplierOnly?: boolean;
 };
 
 export type CustomersListResponse = {
@@ -145,6 +158,7 @@ export function getCustomerWhere(
   archived = false,
   dateFrom?: string,
   dateTo?: string,
+  supplierOnly = false,
 ) {
   const query = String(search || "").trim();
   const from = parseDateRangeBoundary(dateFrom, false);
@@ -153,6 +167,7 @@ export function getCustomerWhere(
   return {
     storeId,
     isArchived: archived,
+    ...(supplierOnly ? { isSupplier: true } : {}),
     ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(query
       ? {
@@ -269,22 +284,25 @@ export function mapCustomer(customer: any): CustomerRecord {
   const ownBalance = Number(customer.openingBalance ?? 0) + ledgerBalanceDelta;
 
   // This same Party's own supplier-side ledger activity (LedgerEntry rows
-  // where vendorId is this row — e.g. Purchases bought from them, Payments
-  // Out made to them) nets against its customer-side balance above, since
-  // it's the same real-world person/business rather than a separately
-  // linked row now. Purchase-side CREDIT (an amount owed TO them) reduces
-  // what they net out owing the store; a Payment Out DEBIT restores it —
-  // the opposite polarity from customer-side DEBIT/CREDIT above, same
-  // convention recordPaymentOut always used for vendor-side entries. There
-  // is only one openingBalance field now (no separate Vendor-side one to
-  // add), so it's not included a second time here.
-  const vendorSideBalance = (customer.ledgerEntriesAsVendor ?? []).reduce(
+  // where vendorId, not customerId, is this row — Purchases bought from
+  // them, Payments Out made to them) is tracked as its OWN independent
+  // balance (supplierBalance below), not netted into the customer-side
+  // figure above — the Supplier module's own spec calls for the two to be
+  // "maintained separately"/"tracked independently," since a store owner
+  // reasoning about what it owes a supplier doesn't want that number
+  // silently offset by an unrelated sale to the same party. Purchase-side
+  // CREDIT (an amount owed TO them) increases what's owed; a Payment Out
+  // DEBIT reduces it — the opposite polarity from customer-side DEBIT/
+  // CREDIT above. openingBalance is a single shared field, already spent
+  // above on the customer-side figure, so it isn't counted a second time
+  // here — a party's opening balance predates this merge and was always a
+  // receivable-direction number in practice (see the merge migration's own
+  // notes on this).
+  const supplierLedgerBalance = (customer.ledgerEntriesAsVendor ?? []).reduce(
     (sum: number, entry: any) =>
       sum + (entry.type === "CREDIT" ? Number(entry.amount ?? 0) : -Number(entry.amount ?? 0)),
     0,
   );
-
-  const combinedBalance = ownBalance - vendorSideBalance;
 
   return {
     id: customer.id,
@@ -309,11 +327,11 @@ export function mapCustomer(customer: any): CustomerRecord {
     // right figure for "which specific documents are still open," used by
     // the Payment In picker's allocator — a different question that happens
     // to usually match this one in a fully consistent ledger.
-    currentBalance: combinedBalance,
+    currentBalance: ownBalance,
     // Was hardcoded to "Receivable" for every customer regardless of sign —
     // a customer who has prepaid (currentBalance < 0) is owed money BY the
     // store, not the other way around.
-    balanceType: combinedBalance < 0 ? "Advance" : "Receivable",
+    balanceType: ownBalance < 0 ? "Advance" : "Receivable",
     goldBalance: 0,
     silverBalance: 0,
     creditLimit: "",
@@ -331,8 +349,10 @@ export function mapCustomer(customer: any): CustomerRecord {
     lastPaymentDate,
     notes: customer.notes ?? "",
     createdAt: customer.createdAt.toISOString(),
-    isVendor: customer.isVendor ?? false,
+    isSupplier: customer.isSupplier ?? false,
     vendorCode: customer.vendorCode ?? null,
+    supplierBalance: supplierLedgerBalance,
+    supplierBalanceType: supplierLedgerBalance < 0 ? "Advance" : "Payable",
   };
 }
 
@@ -345,7 +365,14 @@ export async function getCustomersCore(
   const sortBy: CustomerSortBy = params.sortBy || "createdAt";
   const sortOrder: SortOrder = params.sortOrder || "desc";
 
-  const where = getCustomerWhere(storeId, params.search, params.archived, params.dateFrom, params.dateTo);
+  const where = getCustomerWhere(
+    storeId,
+    params.search,
+    params.archived,
+    params.dateFrom,
+    params.dateTo,
+    params.supplierOnly,
+  );
   const orderBy = getCustomerOrderBy(sortBy, sortOrder);
 
   const [totalCount, customers] = await Promise.all([
@@ -539,4 +566,33 @@ export async function updateCustomerCore(
     logger.error("updateCustomerCore error", error);
     return { success: false, message: "Failed to update party" };
   }
+}
+
+/**
+ * The "Also Supplier" action on a Party's detail page — an explicit,
+ * user-triggered mark/unmark, distinct from the automatic flip
+ * createPurchase/recordPaymentOut already do the first time a Party is
+ * actually used as one. Caller (lib/actions/customer-actions.ts) is
+ * responsible for checking BusinessSettings.supplierModuleEnabled first;
+ * this core function doesn't know about Settings at all, same separation
+ * as every other core function in this file.
+ */
+export async function setCustomerSupplierStatusCore(
+  id: string,
+  storeId: string,
+  isSupplier: boolean,
+): Promise<CustomerFormState> {
+  const { count } = await prisma.customer.updateMany({
+    where: { id, storeId },
+    data: { isSupplier },
+  });
+
+  if (count === 0) {
+    return { success: false, message: "Party not found" };
+  }
+
+  return {
+    success: true,
+    message: isSupplier ? "Marked as a supplier" : "Removed supplier status",
+  };
 }

@@ -504,22 +504,27 @@ model Customer {
   // convention as Invoice.createdById/createdByName. Nullable: customers
   // created before this was tracked genuinely have no answer, and an
   // API/MCP-created customer has no human User behind it at all.
-  createdById            String?
-  createdByName          String?
-  // Whether this Party has ever been used as a Purchase's supplier — set
-  // automatically by createPurchase the first time it's picked there, never
-  // a user-facing choice. A Party can be a pure customer (false), a pure
-  // supplier, or both; there is no separate Vendor table anymore (merged in
-  // — see the migration named merge_vendor_into_customer).
-  isVendor               Boolean          @default(false)
-  createdBy              User?            @relation("CustomerCreatedBy", fields: [createdById], references: [id])
-  store                  Store            @relation(fields: [storeId], references: [id])
-  invoices               Invoice[]
-  kachaInvoices          KachaInvoice[]
-  ledgerEntries          LedgerEntry[]    @relation("LedgerEntryCustomer")
-  quotations             Quotation[]
-  creditNotes            CreditNote[]
-  draftOrders            DraftOrder[]
+  createdById    String?
+  createdByName  String?
+  // Whether this Party is also tracked as a supplier — flips to true
+  // automatically the first time it's actually picked on a Purchase/
+  // Payment Out (see createPurchase/recordPaymentOut), and can also be set
+  // explicitly via toggleCustomerSupplierStatus once BusinessSettings.
+  // supplierModuleEnabled is on (the "Also Supplier" action on a Party's
+  // detail page — hidden while the module is off, though the flag itself
+  // and any data behind it are never touched by that toggle). A Party can
+  // be a pure customer (false), a pure supplier, or both; there is no
+  // separate Vendor/Supplier table — merged into this one, see the
+  // migration named merge_vendor_into_customer.
+  isSupplier     Boolean        @default(false)
+  createdBy      User?          @relation("CustomerCreatedBy", fields: [createdById], references: [id])
+  store          Store          @relation(fields: [storeId], references: [id])
+  invoices       Invoice[]
+  kachaInvoices  KachaInvoice[]
+  ledgerEntries  LedgerEntry[]    @relation("LedgerEntryCustomer")
+  quotations     Quotation[]
+  creditNotes    CreditNote[]
+  draftOrders    DraftOrder[]
   // "As vendor/supplier" back-relations — same Party row, referenced by
   // Purchases/Stock/Ledger through their own vendorId column (kept as-is
   // through the merge; only the relation's target model changed from the
@@ -1301,7 +1306,7 @@ model KarigarJob {
   @@index([locationId])
 }
 
-// Superseded by Customer (see Customer.isVendor and the
+// Superseded by Customer (see Customer.isSupplier and the
 // merge_vendor_into_customer migration) — every Vendor row has been copied
 // or merged into Customer, and Purchase/InventoryStock/LedgerEntry.vendorId
 // now point at Customer instead of here. Kept as an unreferenced historical
@@ -1404,7 +1409,7 @@ model Purchase {
   updatedAt           DateTime       @updatedAt
   store               Store          @relation(fields: [storeId], references: [id])
   // Points at Customer, not the (now-superseded) Vendor table — see
-  // Customer.isVendor's doc comment. Field/relation name kept as "vendor"
+  // Customer.isSupplier's doc comment. Field/relation name kept as "vendor"
   // through the merge so every existing `purchase.vendor.*` read keeps
   // compiling unchanged.
   vendor              Customer       @relation("PurchaseVendor", fields: [vendorId], references: [id])
@@ -1942,7 +1947,7 @@ model BusinessSettings {
   sendToArtisanEnabled Boolean @default(true)
 
   // DEPRECATED — the standalone Vendors module this once gated no longer
-  // exists (Vendor was merged into Customer; see Customer.isVendor). Column
+  // exists (Vendor was merged into Customer; see Customer.isSupplier). Column
   // kept but unread by the app to avoid a churny drop-column migration;
   // safe to remove in a later cleanup pass.
   vendorsModuleEnabled Boolean @default(true)
@@ -1976,6 +1981,18 @@ model BusinessSettings {
   // a handful of states. Holds State.id values. Empty (the default) means
   // "no curation yet" and shows every State — never an empty picker.
   allowedDeliveryStateIds String[] @default([])
+
+  // Whether the Supplier module's own UI shows up at all — the "Suppliers"
+  // sidebar item, its list page, the "Also Supplier" action on a Party's
+  // detail page, and any supplier-specific ledger/balance section. Off by
+  // default (new, opt-in module) since not every store buys from suppliers
+  // it wants to track this way. Turning it off never touches
+  // Customer.isSupplier or any Purchase/Payment-Out data underneath —
+  // Purchases keeps working exactly as before either way (it doesn't
+  // depend on this flag at all, only the standalone Supplier-tracking UI
+  // does), same "hide the module's own UI, keep data/relationships intact"
+  // precedent as sendToArtisanEnabled/the old vendorsModuleEnabled.
+  supplierModuleEnabled Boolean @default(false)
 
   // Financial year
   financialYearStartMonth Int @default(4) // April = 4, common in India

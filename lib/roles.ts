@@ -143,9 +143,14 @@ export const MODULE_DEFINITIONS: {
     ],
   },
   {
+    // Key left as "vendors" (not renamed to "suppliers") since a Staff
+    // user's saved per-module permission customization is keyed by this
+    // string — renaming it would silently drop any store's existing
+    // Vendors/Suppliers access grant. Label/href updated to match the
+    // Supplier module's own current naming.
     key: "vendors",
-    label: "Vendors",
-    href: "/vendors",
+    label: "Suppliers",
+    href: "/suppliers",
     permissions: [
       PERMISSIONS.SUPPLIER_VIEW,
       PERMISSIONS.SUPPLIER_CREATE,

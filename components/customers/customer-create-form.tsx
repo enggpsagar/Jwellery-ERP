@@ -4,7 +4,11 @@ import { useActionState, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { User, Phone, Mail, MapPin, Hash, IndianRupee } from "lucide-react"
 
-import { addCustomer, type CustomerFormState } from "@/lib/actions/customer-actions"
+import {
+  addCustomer,
+  toggleCustomerSupplierStatus,
+  type CustomerFormState,
+} from "@/lib/actions/customer-actions"
 import { getCitiesByStateId } from "@/lib/actions/location-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -30,6 +34,14 @@ type CustomerCreateFormProps = {
    * screen can select it on arrival.
    */
   returnTo?: string
+  /** Set only when arriving from the Suppliers page's own "Add Supplier"
+   * link — a follow-up toggleCustomerSupplierStatus call after this same
+   * addCustomer save succeeds, rather than a field on this form itself,
+   * since there's no user-facing "is this a supplier?" choice at creation
+   * time (see Customer.isSupplier's doc comment in schema.prisma) — this
+   * exists purely so a party created from the Suppliers list doesn't
+   * immediately vanish from the filtered list it was created from. */
+  markAsSupplier?: boolean
   /** Sets this customer's own initial GST type — see defaultPartyGstType's
    *  doc comment in lib/gst.ts. Freely editable per customer afterward, not
    *  a store-wide restriction. */
@@ -57,6 +69,7 @@ function FieldError({ errors }: { errors?: string[] }) {
 export function CustomerCreateForm({
   states,
   returnTo,
+  markAsSupplier,
   gstScheme,
   defaultState,
   defaultCity,
@@ -88,6 +101,14 @@ export function CustomerCreateForm({
       toast.success(state.message || "Party added successfully")
 
       async function finish() {
+        if (markAsSupplier && state.customer) {
+          // Best-effort — the party itself already saved either way; a
+          // failure here just means they land on Suppliers without it
+          // showing up yet, same as any other best-effort follow-up call
+          // in this app (e.g. the old alsoCreateVendor checkbox).
+          await toggleCustomerSupplierStatus(state.customer.id, true)
+        }
+
         // Hand the new id back to whoever sent us here so it can be selected
         // straight away, rather than making the user hunt for it in the list.
         if (returnTo && state.customer) {

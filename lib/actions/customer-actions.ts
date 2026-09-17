@@ -22,6 +22,7 @@ import {
   getCustomerByIdCore,
   createCustomerCore,
   updateCustomerCore,
+  setCustomerSupplierStatusCore,
   validateCustomerInput,
   getCustomerWhere,
   getCustomerOrderBy,
@@ -35,6 +36,7 @@ import {
   type CustomersListResponse as CoreCustomersListResponse,
   type CustomerInput,
 } from "@/lib/core/customer"
+import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { logger } from "@/lib/logger";
 
 // Re-declared (not re-exported via `export type {...} from`, which Next's
@@ -304,6 +306,42 @@ export async function unarchiveCustomer(id: string): Promise<CustomerFormState> 
     return {
       success: false,
       message: actionErrorMessage(error, "Failed to restore party"),
+    }
+  }
+}
+
+/**
+ * The "Also Supplier" action on a Party's detail page — see
+ * setCustomerSupplierStatusCore's own doc comment. Refuses outright while
+ * the Supplier module is off, same as that action's own UI being hidden
+ * then — a direct call here (bypassing the UI) shouldn't work either.
+ */
+export async function toggleCustomerSupplierStatus(
+  id: string,
+  isSupplier: boolean,
+): Promise<CustomerFormState> {
+  try {
+    const storeId = await requireStoreScope()
+
+    const settings = await getBusinessSettings()
+    if (!settings.supplierModuleEnabled) {
+      return { success: false, message: "The Supplier module is turned off in Settings" }
+    }
+
+    const result = await setCustomerSupplierStatusCore(id, storeId, isSupplier)
+
+    if (result.success) {
+      revalidatePath("/customers")
+      revalidatePath("/suppliers")
+      revalidatePath(`/customers/${id}`)
+    }
+
+    return result
+  } catch (error) {
+    logger.error("toggleCustomerSupplierStatus error", error)
+    return {
+      success: false,
+      message: actionErrorMessage(error, "Failed to update supplier status"),
     }
   }
 }

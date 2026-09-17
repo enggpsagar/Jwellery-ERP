@@ -264,3 +264,44 @@ export async function emailLedgerStatementAction(
     return { success: false, message: actionErrorMessage(error, "Failed to email statement") }
   }
 }
+
+export type SupplierLedgerEntryItem = {
+  id: string
+  type: "DEBIT" | "CREDIT"
+  sourceType: string
+  description: string
+  amount: number
+  entryDate: string
+  entryDateISO: string
+}
+
+/**
+ * This same Party's own supplier-side ledger (LedgerEntry rows where
+ * vendorId, not customerId, is this row) — kept as its own simple money-
+ * only list, deliberately not sharing getCustomerLedgerEntries' richer
+ * shape (metal/weight columns, invoice/credit-note links) since Purchases/
+ * Payment Out never track non-money units or link to those document
+ * types. Tracked independently from the Customer ledger above, see
+ * lib/core/customer.ts' mapCustomer doc comment on why the two balances
+ * are never netted together.
+ */
+export async function getSupplierLedgerEntries(
+  customerId: string
+): Promise<SupplierLedgerEntryItem[]> {
+  const storeId = await getStoreIdForRead()
+
+  const entries = await prisma.ledgerEntry.findMany({
+    where: { vendorId: customerId, storeId },
+    orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
+  })
+
+  return entries.map((entry) => ({
+    id: entry.id,
+    type: entry.type,
+    sourceType: formatLedgerSource(entry.sourceType),
+    description: entry.description ?? "",
+    amount: Number(entry.amount ?? 0),
+    entryDate: formatDate(entry.entryDate),
+    entryDateISO: entry.entryDate.toISOString(),
+  }))
+}

@@ -27,12 +27,36 @@ type CustomersClientProps = {
     hasNextPage: boolean
     hasPrevPage: boolean
   }
+  /** BusinessSettings.supplierModuleEnabled — threaded down to the detail
+   * panel's "Also Supplier"/Supplier Ledger section. */
+  supplierModuleEnabled?: boolean
+  /** Overrides so the Suppliers list page (a filtered view of this same
+   * Customer table/component) can reuse this client wholesale instead of
+   * forking a near-identical copy — every field below defaults to the
+   * normal Parties-page copy. */
+  title?: string
+  itemLabelSingular?: string
+  itemLabelPlural?: string
+  addLabel?: string
+  addHref?: string
+  archivedHref?: string
+  archivedLabel?: string
+  showImport?: boolean
 }
 
 export function CustomersClient({
   customers,
   states,
   pagination,
+  supplierModuleEnabled = false,
+  title = "Parties",
+  itemLabelSingular = "party",
+  itemLabelPlural = "parties",
+  addLabel = "Add Party",
+  addHref = "/customers/new",
+  archivedHref = "/customers/archived",
+  archivedLabel = "Archived Parties",
+  showImport = true,
 }: CustomersClientProps) {
   const [selectedCustomerIds, setSelectedCustomerIds] = React.useState<string[]>([])
   // Which row's full detail shows in the right-hand panel — defaults to
@@ -54,23 +78,23 @@ export function CustomersClient({
     <main className="space-y-6 p-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Parties</h1>
+          <h1 className="text-2xl font-semibold">{title}</h1>
           <p className="text-sm text-muted-foreground">
-            Showing {customers.length} of {pagination.totalCount} parties
+            Showing {customers.length} of {pagination.totalCount} {itemLabelPlural}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Link href="/customers/archived">
-            <Button variant="outline">Archived Parties</Button>
+          <Link href={archivedHref}>
+            <Button variant="outline">{archivedLabel}</Button>
           </Link>
 
-          <CustomerImportDialog />
+          {showImport && <CustomerImportDialog />}
 
           {/* A page, not a dialog — same as Vendors. The form is long enough
               that a modal fights the on-screen keyboard on a phone. */}
-          <Link href="/customers/new">
-            <Button>Add Party</Button>
+          <Link href={addHref}>
+            <Button>{addLabel}</Button>
           </Link>
         </div>
       </div>
@@ -88,8 +112,8 @@ export function CustomersClient({
             bulkActions={
               <BulkDeleteButton
                 selectedIds={selectedCustomerIds}
-                itemLabelSingular="party"
-                itemLabelPlural="parties"
+                itemLabelSingular={itemLabelSingular}
+                itemLabelPlural={itemLabelPlural}
                 getDisplayName={(id) => customers.find((customer) => customer.id === id)?.name ?? id}
                 onDelete={bulkDeleteCustomers}
                 onDone={() => setSelectedCustomerIds([])}
@@ -110,6 +134,7 @@ export function CustomersClient({
         <CustomerDetailPanel
           customerId={activeCustomerId}
           states={states}
+          supplierModuleEnabled={supplierModuleEnabled}
         />
       </div>
     </main>

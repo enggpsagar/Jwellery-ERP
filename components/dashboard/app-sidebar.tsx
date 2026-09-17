@@ -23,6 +23,7 @@ import {
   Plus,
   Wallet,
   Phone,
+  Truck,
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
@@ -96,6 +97,13 @@ const mainNav: NavItem[] = [
     icon: PackagePlus,
     countKey: "purchases",
     quickAddHref: "/purchases/new",
+  },
+  {
+    title: "Suppliers",
+    href: "/suppliers",
+    icon: Truck,
+    countKey: "suppliers",
+    quickAddHref: "/customers/new?returnTo=%2Fsuppliers&markAsSupplier=1",
   },
   {
     title: "Parties",
@@ -174,10 +182,11 @@ const karigarNav: NavItem[] = [
   },
 ];
 
-function getNavForRole(role?: string, permissions: string[] = []) {
+function getNavForRole(role?: string, permissions: string[] = [], supplierModuleEnabled = false) {
   if (role === "KARIGAR") return karigarNav;
 
   return mainNav.filter((item) => {
+    if (item.href === "/suppliers") return supplierModuleEnabled;
     if (item.href === "/stores" || item.href === "/plans") {
       return role === "SUPER_ADMIN";
     }
@@ -408,6 +417,10 @@ type AppSidebarProps = {
    *  rather than read from useSidebar()'s context here, since <Sidebar
    *  side=...> itself takes it as a direct prop, not from context. */
   side?: "left" | "right";
+  /** BusinessSettings.supplierModuleEnabled — hides the "Suppliers" nav
+   * item when off. Defaults false, matching the module's own opt-in
+   * default. */
+  supplierModuleEnabled?: boolean;
 };
 
 const EMPTY_COUNTS: SidebarCounts = {
@@ -424,6 +437,7 @@ const EMPTY_COUNTS: SidebarCounts = {
   paymentsOut: 0,
   users: 0,
   stores: 0,
+  suppliers: 0,
 };
 
 export function AppSidebar({
@@ -431,11 +445,12 @@ export function AppSidebar({
   storeLogoUrl,
   counts = EMPTY_COUNTS,
   side = "left",
+  supplierModuleEnabled = false,
 }: AppSidebarProps = {}) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const role = session?.user?.role;
-  const navItems = getNavForRole(role, session?.user?.permissions);
+  const navItems = getNavForRole(role, session?.user?.permissions, supplierModuleEnabled);
 
   const [openMenu, setOpenMenu] = useState<OpenMenu>(undefined);
 

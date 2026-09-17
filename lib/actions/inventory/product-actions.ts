@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ChargeType, PurityType, TargetStyle, Prisma } from "@prisma/client";
+import { ChargeType, PurityType, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
@@ -9,7 +9,7 @@ import { actionErrorMessage } from "@/lib/action-error";
 import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scope";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import type { ProductFormState } from "@/lib/inventory/product-types";
-import { buildSkuPrefix, TARGET_STYLE_LABEL } from "@/lib/inventory/product-sku";
+import { buildSkuPrefix } from "@/lib/inventory/product-sku";
 import { PURITY_LABELS } from "@/lib/purity";
 import {
   buildExcelExport,
@@ -64,7 +64,7 @@ function serializeProduct(product: {
   categoryId: string | null;
   categoryTypeId: string | null;
   metalTypeId: string | null;
-  targetStyle: TargetStyle | null;
+  targetStyleId: string | null;
   stoneOriginOptionId: string | null;
   category: { id: string; name: string } | null;
   categoryType: { id: string; name: string } | null;
@@ -74,6 +74,7 @@ function serializeProduct(product: {
     isGemstone: boolean;
   } | null;
   stoneOriginOption: { id: string; name: string } | null;
+  targetStyle: { id: string; name: string } | null;
   defaultPurity: PurityType | null;
   defaultMakingCharge: { toString(): string } | null;
   defaultMakingChargeType: ChargeType;
@@ -102,11 +103,12 @@ function serializeProduct(product: {
     categoryId: product.categoryId,
     categoryTypeId: product.categoryTypeId,
     metalTypeId: product.metalTypeId,
-    targetStyle: product.targetStyle,
+    targetStyleId: product.targetStyleId,
     stoneOriginOptionId: product.stoneOriginOptionId,
     category: product.category,
     categoryType: product.categoryType,
     metalType: product.metalType,
+    targetStyle: product.targetStyle,
     stoneOriginOption: product.stoneOriginOption,
     defaultPurity: product.defaultPurity,
     defaultMakingCharge: product.defaultMakingCharge?.toString() ?? null,
@@ -138,6 +140,7 @@ const PRODUCT_RELATIONS = {
     select: { id: true, name: true, isGemstone: true },
   },
   stoneOriginOption: { select: { id: true, name: true } },
+  targetStyle: { select: { id: true, name: true } },
 } as const;
 
 export type ProductSortBy =
@@ -250,7 +253,7 @@ function mapProductRow(row: {
   category: { name: string } | null;
   categoryType: { name: string } | null;
   metalType: { name: string } | null;
-  targetStyle: TargetStyle | null;
+  targetStyle: { id: string; name: string } | null;
   defaultPurity: PurityType | null;
   defaultMakingCharge: { toString(): string } | null;
   defaultMakingChargeType: ChargeType;
@@ -495,10 +498,11 @@ async function validateTaxonomySelection(
   metalTypeId: string,
   categoryTypeId: string | null,
   stoneOriginOptionId: string | null,
+  targetStyleId: string | null,
 ): Promise<Record<string, string[]>> {
   const errors: Record<string, string[]> = {};
 
-  const [categoryRow, metalRow, typeRow, originRow] = await Promise.all([
+  const [categoryRow, metalRow, typeRow, originRow, styleRow] = await Promise.all([
     categoryId
       ? prisma.storeCategory.findFirst({
           where: { id: categoryId, storeId },
@@ -520,6 +524,12 @@ async function validateTaxonomySelection(
     stoneOriginOptionId
       ? prisma.storeMetalOrigin.findFirst({
           where: { id: stoneOriginOptionId, storeId, storeMetalId: metalTypeId || undefined },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    targetStyleId
+      ? prisma.storeStyle.findFirst({
+          where: { id: targetStyleId, storeId },
           select: { id: true },
         })
       : Promise.resolve(null),
@@ -545,6 +555,10 @@ async function validateTaxonomySelection(
     errors.stoneOriginOptionId = ["Selected Stone Type is invalid for this metal"];
   }
 
+  if (targetStyleId && !styleRow) {
+    errors.targetStyleId = ["Selected style is invalid"];
+  }
+
   return errors;
 }
 
@@ -568,10 +582,7 @@ export async function createProduct(
       formData.get("stoneOriginOptionId"),
     );
 
-    const targetStyle = parseOptionalEnum(
-      formData.get("targetStyle"),
-      Object.values(TargetStyle),
-    ) as TargetStyle | null;
+    const targetStyleId = parseNullableString(formData.get("targetStyleId"));
 
     const defaultPurity = parseOptionalEnum(
       formData.get("defaultPurity"),
@@ -637,8 +648,8 @@ export async function createProduct(
       errors.name = ["Product name is required"];
     }
 
-    if (businessSettings?.styleFieldEnabled !== false && !targetStyle) {
-      errors.targetStyle = ["Style is required"];
+    if (businessSettings?.styleFieldEnabled !== false && !targetStyleId) {
+      errors.targetStyleId = ["Style is required"];
     }
 
     if (defaultGrossWeight === null) {
@@ -657,6 +668,7 @@ export async function createProduct(
         metalTypeId,
         categoryTypeId,
         stoneOriginOptionId,
+        targetStyleId,
       ),
     );
 
@@ -673,18 +685,21 @@ export async function createProduct(
     // lookup rather than re-plumbing names through from the client, which
     // can't be trusted anyway (a stale/tampered label would silently mint
     // a wrong-looking SKU).
-    const [metalRow, categoryTypeRow, categoryRow] = await Promise.all([
+    const [metalRow, categoryTypeRow, categoryRow, styleRow] = await Promise.all([
       prisma.storeMetal.findFirst({ where: { id: metalTypeId, storeId }, select: { name: true } }),
       categoryTypeId
         ? prisma.storeCategoryType.findFirst({ where: { id: categoryTypeId, storeId }, select: { name: true } })
         : Promise.resolve(null),
       prisma.storeCategory.findFirst({ where: { id: categoryId, storeId }, select: { name: true } }),
+      targetStyleId
+        ? prisma.storeStyle.findFirst({ where: { id: targetStyleId, storeId }, select: { name: true } })
+        : Promise.resolve(null),
     ]);
 
     const skuPrefix = buildSkuPrefix({
       metalName: metalRow?.name ?? "X",
       purity: defaultPurity,
-      targetStyle,
+      targetStyleName: styleRow?.name ?? null,
       categoryTypeName: categoryTypeRow?.name ?? null,
       categoryName: categoryRow?.name ?? null,
       format: businessSettings?.skuFormat,
@@ -720,7 +735,7 @@ export async function createProduct(
             categoryId,
             categoryTypeId,
             metalTypeId,
-            targetStyle: targetStyle as TargetStyle,
+            targetStyleId,
             stoneOriginOptionId,
             defaultPurity,
             defaultMakingCharge,
@@ -907,10 +922,7 @@ export async function updateProduct(
       formData.get("stoneOriginOptionId"),
     );
 
-    const targetStyle = parseOptionalEnum(
-      formData.get("targetStyle"),
-      Object.values(TargetStyle),
-    ) as TargetStyle | null;
+    const targetStyleId = parseNullableString(formData.get("targetStyleId"));
 
     const defaultPurity = parseOptionalEnum(
       formData.get("defaultPurity"),
@@ -993,6 +1005,7 @@ export async function updateProduct(
         metalTypeId,
         categoryTypeId,
         stoneOriginOptionId,
+        targetStyleId,
       ),
     );
 
@@ -1011,7 +1024,7 @@ export async function updateProduct(
     categoryId,
     categoryTypeId,
     metalTypeId,
-    targetStyle,
+    targetStyleId,
     stoneOriginOptionId,
     defaultPurity,
     defaultMakingCharge,
@@ -1347,7 +1360,7 @@ export async function importProductsFromExcel(
       return { success: false, message: "That file has no rows to import." };
     }
 
-    const [categories, metals, categoryTypes, metalOrigins, locations, businessSettings] = await Promise.all([
+    const [categories, metals, categoryTypes, metalOrigins, locations, styles, businessSettings] = await Promise.all([
       prisma.storeCategory.findMany({ where: { storeId }, select: { id: true, name: true } }),
       prisma.storeMetal.findMany({ where: { storeId }, select: { id: true, name: true } }),
       prisma.storeCategoryType.findMany({
@@ -1359,12 +1372,14 @@ export async function importProductsFromExcel(
         select: { id: true, name: true, storeMetalId: true },
       }),
       prisma.storeLocation.findMany({ where: { storeId }, select: { id: true, name: true } }),
+      prisma.storeStyle.findMany({ where: { storeId }, select: { id: true, name: true } }),
       prisma.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true, styleFieldEnabled: true } }),
     ]);
 
     const categoryByName = new Map(categories.map((c) => [c.name.trim().toLowerCase(), c]));
     const metalByName = new Map(metals.map((m) => [m.name.trim().toLowerCase(), m]));
     const locationByName = new Map(locations.map((l) => [l.name.trim().toLowerCase(), l.id]));
+    const styleByName = new Map(styles.map((s) => [s.name.trim().toLowerCase(), s]));
     const locationScope = await getLocationScope();
 
     const categoryTypesByCategory = new Map<string, Map<string, { id: string; name: string }>>();
@@ -1389,13 +1404,6 @@ export async function importProductsFromExcel(
         value,
       ]),
     );
-    const styleByLabel = new Map(
-      (Object.entries(TARGET_STYLE_LABEL) as [TargetStyle, string][]).map(([value, label]) => [
-        label.toLowerCase(),
-        value,
-      ]),
-    );
-
     type ResolvedRow = {
       skuPrefix: string;
       fields: Omit<Prisma.ProductCreateManyInput, "storeId" | "productCode">;
@@ -1427,11 +1435,11 @@ export async function importProductsFromExcel(
       else if (!metal) rowErrors.push(`No metal type found named "${metalName}"`);
 
       const styleRaw = productImportCell(row, "Style");
-      const targetStyle = styleRaw ? styleByLabel.get(styleRaw.toLowerCase()) : undefined;
+      const style = styleRaw ? styleByName.get(styleRaw.toLowerCase()) : undefined;
       if (!styleRaw) {
         if (businessSettings?.styleFieldEnabled !== false) rowErrors.push("Style is required");
-      } else if (!targetStyle) {
-        rowErrors.push(`"${styleRaw}" is not a valid Style — use Ladies, Gents, Kids, or Unisex`);
+      } else if (!style) {
+        rowErrors.push(`No style found named "${styleRaw}"`);
       }
 
       const categoryTypeName = productImportCell(row, "Category Type");
@@ -1550,19 +1558,19 @@ export async function importProductsFromExcel(
 
       // Every check above passed, so category/metal are guaranteed non-null
       // here even though TypeScript can't tell from the control flow alone.
-      // targetStyle stays possibly-undefined on purpose — a missing Style
-      // only reached here without a row error when the store has turned
-      // the Style field off (styleFieldEnabled === false).
+      // style stays possibly-undefined on purpose — a missing Style only
+      // reached here without a row error when the store has turned the
+      // Style field off (styleFieldEnabled === false).
       const resolvedCategory = category!;
       const resolvedMetal = metal!;
-      const resolvedTargetStyle = targetStyle;
+      const resolvedStyle = style;
       const hasStoneComponent = productImportYesNo(row, "Has Stone Component", false);
       const isActive = productImportYesNo(row, "Active", true);
 
       const skuPrefix = buildSkuPrefix({
         metalName: resolvedMetal.name,
         purity: defaultPurity,
-        targetStyle: resolvedTargetStyle,
+        targetStyleName: resolvedStyle?.name ?? null,
         categoryTypeName: categoryType?.name ?? null,
         categoryName: resolvedCategory.name,
         format: businessSettings?.skuFormat,
@@ -1577,7 +1585,7 @@ export async function importProductsFromExcel(
           categoryId: resolvedCategory.id,
           categoryTypeId: categoryType?.id ?? null,
           metalTypeId: resolvedMetal.id,
-          targetStyle: resolvedTargetStyle,
+          targetStyleId: resolvedStyle?.id ?? null,
           stoneOriginOptionId: stoneOrigin?.id ?? null,
           defaultPurity,
           defaultMakingCharge: numericFields["Making Charge"],

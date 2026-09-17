@@ -16,6 +16,7 @@ import {
   ProductForm,
   type StoreCategoryOption,
   type StoreMetalOption,
+  type StoreStyleOption,
 } from "./product-form";
 
 type EditProductFormProps = {
@@ -26,7 +27,7 @@ type EditProductFormProps = {
     categoryId: string | null;
     categoryTypeId: string | null;
     metalTypeId: string | null;
-    targetStyle: string | null;
+    targetStyleId: string | null;
     stoneOriginOptionId: string | null;
     defaultPurity: string | null;
     defaultMakingCharge: string | null;
@@ -51,6 +52,7 @@ type EditProductFormProps = {
   };
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
+  styles: StoreStyleOption[];
   caratConversionRates: Record<PurityType, number>;
   origins: StoreMetalOriginRow[];
   /** Settings > Metals, Stones & Categories > "Require Style on products" — see the same prop on ProductForm. */
@@ -61,6 +63,7 @@ export function EditProductForm({
   product,
   metals,
   categories,
+  styles,
   caratConversionRates,
   origins,
   styleFieldEnabled,
@@ -119,6 +122,7 @@ export function EditProductForm({
         pending={pending}
         metals={metals}
         categories={categories}
+        styles={styles}
         caratConversionRates={caratConversionRates}
         origins={origins}
         styleFieldEnabled={styleFieldEnabled}

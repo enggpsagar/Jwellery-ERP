@@ -102,6 +102,7 @@ model Store {
   quotations           Quotation[]
   storeMetals          StoreMetal[]
   storeCategories      StoreCategory[]
+  storeStyles          StoreStyle[]
   storeLocations       StoreLocation[]
   apiKeys              ApiKey[]
   supportTickets       SupportTicket[]
@@ -361,6 +362,24 @@ model StoreCategory {
   @@unique([storeId, name])
 }
 
+// Real, admin-managed master data for Product.targetStyle — replaces the old
+// hardcoded TargetStyle enum (LADIES/GENTS/KIDS/UNISEX) so a store can
+// add/rename/deactivate its own style values instead of being stuck with
+// exactly those four forever. Same shape as StoreCategory (no sub-level,
+// unlike Category's StoreCategoryType — Style never needed one).
+model StoreStyle {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  store     Store    @relation(fields: [storeId], references: [id])
+  products  Product[]
+
+  @@unique([storeId, name])
+}
+
 model StoreCategoryType {
   id         String        @id @default(cuid())
   storeId    String
@@ -542,11 +561,13 @@ model Product {
   categoryId                String?
   categoryTypeId            String?
   metalTypeId               String?
-  // "Ladies"/"Gents"/"Kids"/"Unisex" — see TargetStyle's own doc comment.
+  // "Ladies"/"Gents"/"Kids"/"Unisex" (store-managed — see StoreStyle) or
+  // whatever else this store has added/renamed under Settings > Taxonomy.
   // Nullable so pre-existing products (created before this field shipped)
   // aren't retroactively forced to pick one; the create form requires it
-  // for every new product since the SKU generator needs it.
-  targetStyle               TargetStyle?
+  // for every new product (when styleFieldEnabled) since the SKU generator
+  // needs it.
+  targetStyleId             String?
   // Only meaningful when metalType.isGemstone is true — mirrors
   // categoryTypeId's role exactly: metalTypeId stays the stone selector
   // (Diamond, Ruby, ...), this is the finer-grained pick of which of that
@@ -600,12 +621,14 @@ model Product {
   categoryType              StoreCategoryType?   @relation(fields: [categoryTypeId], references: [id])
   metalType                 StoreMetal?          @relation(fields: [metalTypeId], references: [id])
   stoneOriginOption         StoreMetalOrigin?    @relation(fields: [stoneOriginOptionId], references: [id])
+  targetStyle               StoreStyle?          @relation(fields: [targetStyleId], references: [id])
 
   @@unique([storeId, productCode])
   @@index([categoryId])
   @@index([categoryTypeId])
   @@index([metalTypeId])
   @@index([stoneOriginOptionId])
+  @@index([targetStyleId])
   @@index([name])
   @@index([productCode])
   @@index([designCode])
@@ -2496,18 +2519,6 @@ enum ChargeType {
   PERCENTAGE
 }
 
-// Who a design is made for — the one piece of a Product's SKU (see
-// Product.productCode's own doc comment) with no other home in the schema:
-// Category/Type already names the item shape (Ring, Chain, ...), Metal/
-// Purity already name the material, but nothing previously captured
-// "Ladies" vs "Gents" vs "Kids" vs "Unisex" — a real, independent axis a
-// store designs against (the same Ring category spans all four).
-enum TargetStyle {
-  LADIES
-  GENTS
-  KIDS
-  UNISEX
-}
 
 // Which structured layout createProduct's SKU generator uses — a
 // store-picked preset (Settings > Business Settings > SKU Format), not a

@@ -5,21 +5,7 @@
 // Settings). Kept dependency-free (no Prisma import) so it's safe in a
 // client component.
 
-import { PurityType, SkuFormat, TargetStyle } from "@prisma/client";
-
-export const TARGET_STYLE_INITIAL: Record<TargetStyle, string> = {
-  LADIES: "L",
-  GENTS: "G",
-  KIDS: "K",
-  UNISEX: "U",
-};
-
-export const TARGET_STYLE_LABEL: Record<TargetStyle, string> = {
-  LADIES: "Ladies",
-  GENTS: "Gents",
-  KIDS: "Kids",
-  UNISEX: "Unisex",
-};
+import { PurityType, SkuFormat } from "@prisma/client";
 
 /** One row per selectable preset — drives the Settings picker's radio list
  * (label/description) and, together with composeSkuPrefix, its live
@@ -113,10 +99,12 @@ export function composeSkuPrefix(
 export function buildSkuPrefix(params: {
   metalName: string;
   purity: PurityType | null | undefined;
-  /** Null when the store has Style turned off (Settings > Taxonomy) — that
-   * segment is simply omitted from the SKU, same "blank group dropped"
-   * convention joinGroups already uses for a missing purity number. */
-  targetStyle: TargetStyle | null | undefined;
+  /** Null/blank when the store has Style turned off (Settings > Taxonomy)
+   * or this product has no style set — that segment is simply omitted from
+   * the SKU, same "blank group dropped" convention joinGroups already uses
+   * for a missing purity number. The store's own StoreStyle.name (e.g.
+   * "Ladies"), not a fixed enum value — see Product.targetStyleId. */
+  targetStyleName: string | null | undefined;
   categoryTypeName: string | null | undefined;
   categoryName: string | null | undefined;
   format?: SkuFormat;
@@ -126,7 +114,7 @@ export function buildSkuPrefix(params: {
   return composeSkuPrefix(params.format ?? "METAL_PURITY_STYLE_CATEGORY", {
     metalInitial: initial(params.metalName),
     purityDigits: purityNumber(params.purity) ?? "",
-    targetInitial: params.targetStyle ? TARGET_STYLE_INITIAL[params.targetStyle] : "",
+    targetInitial: params.targetStyleName ? initial(params.targetStyleName) : "",
     categoryInitial: initial(typeLabel),
   });
 }
@@ -146,7 +134,7 @@ export function exampleSkuForFormat(
   const prefix = composeSkuPrefix(format, {
     metalInitial: initial(sample.metalName, "G"),
     purityDigits: "22",
-    targetInitial: TARGET_STYLE_INITIAL.LADIES,
+    targetInitial: initial("Ladies"),
     categoryInitial: initial(sample.categoryName, "R"),
   });
   return `${prefix}-001`;

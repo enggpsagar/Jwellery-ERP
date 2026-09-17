@@ -46,6 +46,12 @@ export type StoreCategoryRow = {
   isActive: boolean;
 };
 
+export type StoreStyleRow = {
+  id: string;
+  name: string;
+  isActive: boolean;
+};
+
 export type StoreCategoryTypeRow = {
   id: string;
   categoryId: string;
@@ -705,6 +711,177 @@ export async function deleteStoreCategory(id: string): Promise<TaxonomyFormState
   } catch (error) {
     logger.error("deleteStoreCategory error", error);
     return { success: false, message: actionErrorMessage(error, "Failed to delete category") };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Store Styles ("Ladies"/"Gents"/"Kids"/"Unisex" by default, store-managed —
+// see Product.targetStyleId's own schema comment). Same 4-function CRUD
+// shape as StoreCategory above, minus a sub-level (Style never needed one).
+// ---------------------------------------------------------------------------
+
+export async function getStoreStyles(): Promise<StoreStyleRow[]> {
+  const storeId = await requireStoreScope();
+
+  const styles = await prisma.storeStyle.findMany({
+    where: { storeId },
+    orderBy: { name: "asc" },
+  });
+
+  return styles.map((style) => ({
+    id: style.id,
+    name: style.name,
+    isActive: style.isActive,
+  }));
+}
+
+export async function upsertStoreStyle(
+  prevState: TaxonomyFormState,
+  formData: FormData,
+): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return {
+      success: false,
+      message: "Only the Store Owner can update these settings.",
+    };
+  }
+
+  try {
+    const id = String(formData.get("id") || "").trim();
+    const name = String(formData.get("name") || "").trim();
+
+    if (!name) {
+      return {
+        success: false,
+        message: "Please fix the form errors",
+        errors: { name: ["Style name is required"] },
+      };
+    }
+
+    const storeId = await requireStoreScope();
+
+    const existing = await prisma.storeStyle.findFirst({
+      where: { storeId, name, NOT: id ? { id } : undefined },
+      select: { id: true },
+    });
+
+    if (existing) {
+      return {
+        success: false,
+        message: "A style with this name already exists",
+        errors: { name: ["A style with this name already exists"] },
+      };
+    }
+
+    let savedId = id;
+
+    if (id) {
+      const { count } = await prisma.storeStyle.updateMany({
+        where: { id, storeId },
+        data: { name },
+      });
+
+      if (count === 0) {
+        return { success: false, message: "Style not found" };
+      }
+    } else {
+      const created = await prisma.storeStyle.create({
+        data: { storeId, name },
+        select: { id: true },
+      });
+      savedId = created.id;
+    }
+
+    revalidatePath(TAXONOMY_PATH);
+
+    return {
+      success: true,
+      id: savedId,
+      message: id ? "Style updated successfully" : "Style added successfully",
+    };
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return {
+        success: false,
+        message: "A style with this name already exists",
+        errors: { name: ["A style with this name already exists"] },
+      };
+    }
+    logger.error("upsertStoreStyle error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to save style") };
+  }
+}
+
+export async function toggleStoreStyleActive(
+  id: string,
+  isActive: boolean,
+): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return {
+      success: false,
+      message: "Only the Store Owner can update these settings.",
+    };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const { count } = await prisma.storeStyle.updateMany({
+      where: { id, storeId },
+      data: { isActive },
+    });
+
+    if (count === 0) {
+      return { success: false, message: "Style not found" };
+    }
+
+    revalidatePath(TAXONOMY_PATH);
+
+    return {
+      success: true,
+      message: isActive ? "Style activated" : "Style deactivated",
+    };
+  } catch (error) {
+    logger.error("toggleStoreStyleActive error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to update style") };
+  }
+}
+
+export async function deleteStoreStyle(id: string): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return { success: false, message: "Only a Store Admin or Super Admin can delete a style." };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const style = await prisma.storeStyle.findFirst({
+      where: { id, storeId },
+      include: { _count: { select: { products: true } } },
+    });
+
+    if (!style) return { success: false, message: "Style not found" };
+
+    if (style._count.products > 0) {
+      return {
+        success: false,
+        message: `This style is used by ${style._count.products} product(s) and cannot be deleted. Disable it instead.`,
+      };
+    }
+
+    await prisma.storeStyle.delete({ where: { id } });
+    revalidatePath(TAXONOMY_PATH);
+
+    return { success: true, message: "Style deleted" };
+  } catch (error) {
+    logger.error("deleteStoreStyle error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to delete style") };
   }
 }
 

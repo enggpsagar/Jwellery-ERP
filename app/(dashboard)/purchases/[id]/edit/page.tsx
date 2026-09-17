@@ -78,6 +78,15 @@ export default async function EditPurchasePage({ params }: Props) {
       key: crypto.randomUUID(),
       productId: item.productId,
       itemName: item.itemName,
+      // A line saved with stone fields populated (stoneMetalTypeName) was
+      // either entered under the new Stone mode, or is a gemstone-Product
+      // line auto-derived the same way applyProductToItem does — either
+      // way it belongs in Stone mode on reload. A pre-existing
+      // Diamond-via-Purity line (purity === "DIAMOND", no
+      // stoneMetalTypeName) has no stone-mode equivalent to derive from,
+      // so it keeps loading as METAL — same fields, same behavior as
+      // before this mode existed; not migrated.
+      itemKind: item.stoneMetalTypeName ? "STONE" : "METAL",
       metalTypeId: item.metalTypeId ?? "",
       purity: item.purity ?? "",
       quantity: item.quantity,

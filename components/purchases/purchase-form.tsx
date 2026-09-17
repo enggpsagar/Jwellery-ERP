@@ -70,6 +70,15 @@ export type LineItem = {
   key: string
   productId: string
   itemName: string
+  /** Explicit "what is this line" choice, shown as the "Metals & Stones"
+   * field first in Details. METAL covers both Metal-Only and Metal+Stone
+   * (the existing "Includes a Stone" toggle still applies within it,
+   * unchanged) — STONE is a standalone stone/diamond purchase, rendered
+   * entirely via StoneComponentFields (stoneMetalTypeName etc. below),
+   * with metalTypeId/purity/weights/making charge all irrelevant and
+   * hidden. Defaults METAL, matching every line's behavior before this
+   * field existed. */
+  itemKind: "METAL" | "STONE"
   metalTypeId: string
   purity: string
   quantity: number
@@ -123,7 +132,12 @@ export type LineItem = {
   productLinkDecided: boolean
 }
 
-const PURITY_OPTIONS = PURITY_SELECT_OPTIONS
+// DIAMOND is deliberately excluded here — a diamond (or any other stone) is
+// now always entered via the "Metals & Stones" = Stone branch and
+// StoneComponentFields' own Stone picker (Settings > Taxonomy gemstone
+// rows), not as a Purity value. This list backs the Metal-mode Purity
+// dropdown only.
+const PURITY_OPTIONS = PURITY_SELECT_OPTIONS.filter((option) => option.value !== "DIAMOND")
 
 // `key` defaults to a fresh UUID for every "Add Item" click (client-only,
 // safe to randomize), but the very first row is seeded once from
@@ -136,6 +150,7 @@ function emptyLineItem(defaultGstRateId?: string, key: string = crypto.randomUUI
     key,
     productId: "",
     itemName: "",
+    itemKind: "METAL",
     metalTypeId: "",
     purity: "",
     quantity: 1,
@@ -534,27 +549,49 @@ export function PurchaseForm({
 
     // Just picks which unit the toggle starts on for this fresh line, not a
     // value conversion — every weight field below starts at 0 regardless.
-    const unit = metalById.get(product.metalType?.id ?? "")?.primaryUnit ?? "GRAM"
+    const productMetal = metalById.get(product.metalType?.id ?? "")
+    const unit = productMetal?.primaryUnit ?? "GRAM"
+    // The product's own metal answers "Metal vs Stone" for us — a gemstone
+    // product (isGemstone) is a standalone stone/diamond purchase, same as
+    // if the user had picked Stone by hand. Its metal *name* seeds
+    // StoneComponentFields' own Stone picker (keyed by name, not id — see
+    // that component's own stoneMetalTypeName doc comment), overriding
+    // whatever defaultStoneMetalTypeName (the *embedded*-stone default)
+    // would otherwise apply.
+    const isGemstoneProduct = productMetal?.isGemstone ?? false
 
     updateItem(key, {
       productId,
       productLinkDecided: true,
       itemName: product.name,
-      metalTypeId: product.metalType?.id ?? "",
-      purity: product.defaultPurity ?? "",
+      itemKind: isGemstoneProduct ? "STONE" : "METAL",
+      metalTypeId: isGemstoneProduct ? "" : product.metalType?.id ?? "",
+      purity: isGemstoneProduct ? "" : product.defaultPurity ?? "",
+      // A prior selection on this same row (before this product was picked)
+      // may have left Gross/Net Weight non-zero while in Metal mode — both
+      // are hidden and irrelevant once a gemstone product switches the row
+      // to Stone mode, so clear them rather than silently keep submitting
+      // a stale value through a now-hidden field. Left untouched for a
+      // regular metal product, same as before this field existed — weight
+      // still needs entering by hand either way.
+      ...(isGemstoneProduct ? { grossWeight: 0, netWeight: 0, netTouched: false } : {}),
       grossWeightUnit: unit,
       netWeightUnit: unit,
       dmoWeightUnit: unit,
       stoneWeightUnit: unit,
-      makingCharge: product.defaultMakingCharge ?? 0,
+      makingCharge: isGemstoneProduct ? 0 : product.defaultMakingCharge ?? 0,
       makingChargeType: product.defaultMakingChargeType ?? "FIXED",
       stoneCharge: product.hasStoneComponent && product.defaultStoneRate != null && product.defaultCaratWeight != null
         ? Number((product.defaultStoneRate * product.defaultCaratWeight).toFixed(2))
         : product.defaultStoneCharge ?? 0,
       stoneRate: product.hasStoneComponent ? product.defaultStoneRate ?? 0 : 0,
-      hasStoneComponent: product.hasStoneComponent,
+      hasStoneComponent: isGemstoneProduct ? true : product.hasStoneComponent,
       stoneChargeTouched: false,
-      stoneMetalTypeName: product.hasStoneComponent ? product.defaultStoneMetalTypeName ?? "" : "",
+      stoneMetalTypeName: isGemstoneProduct
+        ? product.metalType?.name ?? ""
+        : product.hasStoneComponent
+          ? product.defaultStoneMetalTypeName ?? ""
+          : "",
       stoneTypeNames:
         product.hasStoneComponent && product.defaultStoneTypeNames
           ? product.defaultStoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
@@ -1147,6 +1184,55 @@ export function PurchaseForm({
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {/* First field in this section, per the explicit ask —
+                          replaces "which Purity did you pick" as the signal
+                          for what this line even is. Switching modes resets
+                          the fields the OTHER mode owns (metal weights/
+                          making charge vs. stone fields) so a hidden field
+                          can't silently keep submitting stale data, same
+                          reasoning as the Includes-a-Stone toggle below. */}
+                      <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                        <Label className="text-xs">Metals &amp; Stones</Label>
+                        <Select
+                          value={item.itemKind}
+                          onValueChange={(value) => {
+                            const itemKind = value as "METAL" | "STONE"
+                            updateItem(
+                              item.key,
+                              itemKind === "STONE"
+                                ? {
+                                    itemKind,
+                                    hasStoneComponent: true,
+                                    metalTypeId: "",
+                                    purity: "",
+                                    grossWeight: 0,
+                                    makingCharge: 0,
+                                  }
+                                : {
+                                    itemKind,
+                                    hasStoneComponent: false,
+                                    stoneWeightInput: 0,
+                                    netStoneWeightTouched: false,
+                                    stoneCharge: 0,
+                                    stoneChargeTouched: false,
+                                    stoneMetalTypeName: "",
+                                    stoneTypeNames: [],
+                                    caratWeight: 0,
+                                  },
+                            )
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="METAL">Metal</SelectItem>
+                            <SelectItem value="STONE">Stone</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {item.itemKind === "METAL" && (
                       <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                         <Label className="text-xs">Purity</Label>
                         <Select
@@ -1165,7 +1251,9 @@ export function PurchaseForm({
                           </SelectContent>
                         </Select>
                       </div>
+                      )}
 
+                      {item.itemKind === "METAL" && (
                       <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                         <Label className="text-xs">Gross Weight</Label>
                         <div className="flex gap-1">
@@ -1211,7 +1299,16 @@ export function PurchaseForm({
                           </Select>
                         </div>
                       </div>
+                      )}
 
+                      {/* Legacy-only from here: a line saved before this
+                          Metals & Stones field existed, whose Purity is
+                          still "DIAMOND" (item.itemKind stays "METAL" for
+                          those — see the edit page's own derivation), keeps
+                          rendering through this same old inline block
+                          exactly as before. A NEW Stone-mode line never
+                          reaches here (itemKind !== "METAL"); it renders via
+                          StoneComponentFields further down instead. */}
                       {/* For a carat-weighed line (no "Includes a Stone"
                           toggle applies there at all — see below), Net
                           Stone Weight has no gating concept and always
@@ -1221,7 +1318,7 @@ export function PurchaseForm({
                           while off, it stays fully hidden (not shown here)
                           rather than relocated, per the toggle's on/off
                           gating. */}
-                      {isCaratLine(item) && (
+                      {item.itemKind === "METAL" && isCaratLine(item) && (
                         <div className="space-y-1">
                           <Label className="text-xs">Net Stone Weight</Label>
                           <div className="flex gap-1">
@@ -1257,7 +1354,7 @@ export function PurchaseForm({
                         </div>
                       )}
 
-                      {isCaratLine(item) && (
+                      {item.itemKind === "METAL" && isCaratLine(item) && (
                         <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                           <Label className="text-xs">Carat Weight (ct)</Label>
                           <Input
@@ -1274,14 +1371,16 @@ export function PurchaseForm({
                         </div>
                       )}
 
-                      <MakingChargeInput
-                        rate={item.rate}
-                        netWeight={item.netWeight}
-                        value={item.makingCharge}
-                        onChange={(v) => updateItem(item.key, { makingCharge: v })}
-                        chargeType={item.makingChargeType}
-                        onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
-                      />
+                      {item.itemKind === "METAL" && (
+                        <MakingChargeInput
+                          rate={item.rate}
+                          netWeight={item.netWeight}
+                          value={item.makingCharge}
+                          onChange={(v) => updateItem(item.key, { makingCharge: v })}
+                          chargeType={item.makingChargeType}
+                          onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
+                        />
+                      )}
 
                       {/* For a carat-weighed line (no "Includes a Stone"
                           toggle applies there at all), Stone Charge always
@@ -1290,7 +1389,7 @@ export function PurchaseForm({
                           that toggle's own box below — while off, no stone
                           means nothing to charge for, so it stays fully
                           hidden here. */}
-                      {isCaratLine(item) && (
+                      {item.itemKind === "METAL" && isCaratLine(item) && (
                         <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                           <Label className="text-xs">Stone Charge</Label>
                           <Input
@@ -1311,7 +1410,7 @@ export function PurchaseForm({
                           since it needs the room. No toggle applies to a
                           carat-weighed line at all (see below), so this
                           cell is simply empty there. */}
-                      {!isCaratLine(item) && (
+                      {item.itemKind === "METAL" && !isCaratLine(item) && (
                         <div className="flex items-end pb-2">
                           <IncludesStoneToggle
                             checked={item.hasStoneComponent}
@@ -1337,7 +1436,45 @@ export function PurchaseForm({
                       )}
                     </div>
 
-                    {!isCaratLine(item) && item.hasStoneComponent && (
+                    {item.itemKind === "METAL" && !isCaratLine(item) && item.hasStoneComponent && (
+                      <div className="rounded-md border-2 border-dashed border-emerald-400 bg-emerald-50 p-3">
+                        <StoneComponentFields
+                          metals={metals}
+                          origins={origins}
+                          onMetalsChange={setMetals}
+                          onOriginsChange={setOrigins}
+                          stoneMetalTypeName={item.stoneMetalTypeName}
+                          onStoneChange={(name, typeNames) =>
+                            updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
+                          }
+                          selectedTypeNames={item.stoneTypeNames}
+                          onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
+                          caratWeight={item.caratWeight}
+                          onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
+                          stoneRate={item.stoneRate}
+                          onStoneRateChange={(value) => handleStoneRateChange(item, value)}
+                          stoneCharge={item.stoneCharge}
+                          onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
+                          stoneChargeTouched={item.stoneChargeTouched}
+                          stoneWeightInput={toPrimaryUnit(
+                            item.stoneWeightInput,
+                            "GRAM",
+                            item.stoneWeightUnit,
+                            resolveGramsPerCarat(item.purity, caratConversionRates),
+                          )}
+                          onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
+                          stoneWeightUnit={item.stoneWeightUnit}
+                          onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
+                          netStoneWeightTouched={item.netStoneWeightTouched}
+                        />
+                      </div>
+                    )}
+
+                    {/* Stone mode's entire field set — the same shared
+                        component as the embedded case above, just always
+                        rendered (no toggle to gate it) since Stone is
+                        already this line's primary — and only — item. */}
+                    {item.itemKind === "STONE" && (
                       <div className="rounded-md border-2 border-dashed border-emerald-400 bg-emerald-50 p-3">
                         <StoneComponentFields
                           metals={metals}

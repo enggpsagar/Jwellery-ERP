@@ -19,6 +19,8 @@ export type ProductFormState = {
     defaultStoneWeight?: string[]
     defaultCaratWeight?: string[]
     defaultStoneRate?: string[]
+    metalComponentsJson?: string[]
+    stoneComponentsJson?: string[]
     designCode?: string[]
     hsnCode?: string[]
     description?: string[]

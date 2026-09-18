@@ -54,6 +54,112 @@ function parseBoolean(value: FormDataEntryValue | null) {
   return String(value || "") === "true";
 }
 
+function toChargeTypeInput(value: unknown): ChargeType {
+  return value === ChargeType.PERCENTAGE ? ChargeType.PERCENTAGE : ChargeType.FIXED;
+}
+
+function toNumberOrNull(value: unknown): number | null {
+  const num = Number(value);
+  return typeof value === "number" || typeof value === "string"
+    ? (Number.isFinite(num) ? num : null)
+    : null;
+}
+
+// Client-submitted shape for one row of the Product form's Metal/Stone
+// component repeaters (see metalComponentsJson/stoneComponentsJson below) —
+// mirrors PurchaseLineItemInput's own "trust the ids, validate ownership,
+// coerce everything else" convention (lib/actions/purchase-actions.ts).
+type MetalComponentInput = {
+  metalTypeId?: string;
+  storeMetalPurityId?: string | null;
+  grossWeight?: number | string | null;
+  netWeight?: number | string | null;
+};
+
+type StoneComponentInput = {
+  stoneMetalTypeName?: string;
+  stoneTypeNames?: string | null;
+  caratWeight?: number | string | null;
+  stoneWeight?: number | string | null;
+  stoneRate?: number | string | null;
+  stoneCharge?: number | string | null;
+  stoneChargeType?: string;
+};
+
+/**
+ * Parses metalComponentsJson off the submitted FormData and validates each
+ * row's metalTypeId/storeMetalPurityId are real, store-scoped rows — the
+ * same ownership check validateTaxonomySelection already does for the
+ * single legacy metalTypeId field, just per-row. Requires at least one row,
+ * matching today's "Metal type is required" rule on the single field.
+ */
+async function parseAndValidateMetalComponents(
+  storeId: string,
+  formData: FormData,
+): Promise<{ components: MetalComponentInput[]; error: string | null }> {
+  let components: MetalComponentInput[] = [];
+  try {
+    components = JSON.parse(String(formData.get("metalComponentsJson") || "[]"));
+  } catch {
+    return { components: [], error: "Invalid metal components." };
+  }
+
+  if (!Array.isArray(components) || components.length === 0) {
+    return { components: [], error: "Add at least one metal." };
+  }
+
+  const rows = await Promise.all(
+    components.map(async (component) => {
+      const metalTypeId = String(component.metalTypeId || "").trim();
+      const storeMetalPurityId = component.storeMetalPurityId
+        ? String(component.storeMetalPurityId).trim()
+        : null;
+
+      if (!metalTypeId) return null;
+
+      const metalRow = await prisma.storeMetal.findFirst({
+        where: { id: metalTypeId, storeId },
+        select: { id: true },
+      });
+      if (!metalRow) return null;
+
+      if (storeMetalPurityId) {
+        const purityRow = await prisma.storeMetalPurity.findFirst({
+          where: { id: storeMetalPurityId, storeId, storeMetalId: metalTypeId },
+          select: { id: true },
+        });
+        if (!purityRow) return null;
+      }
+
+      return { metalTypeId, storeMetalPurityId };
+    }),
+  );
+
+  if (rows.some((row) => row === null)) {
+    return { components: [], error: "One or more metal components are invalid." };
+  }
+
+  return { components: components as MetalComponentInput[], error: null };
+}
+
+function parseStoneComponents(formData: FormData): { components: StoneComponentInput[]; error: string | null } {
+  let components: StoneComponentInput[] = [];
+  try {
+    components = JSON.parse(String(formData.get("stoneComponentsJson") || "[]"));
+  } catch {
+    return { components: [], error: "Invalid stone components." };
+  }
+
+  if (!Array.isArray(components)) {
+    return { components: [], error: "Invalid stone components." };
+  }
+
+  // A row missing its own stone name is dropped rather than rejected — the
+  // same forgiving handling the single-stone form already gave a blank
+  // "Includes a Stone" toggle left half-filled.
+  return { components: components.filter((component) => String(component.stoneMetalTypeName || "").trim()), error: null };
+}
+
 /**
  * Convert Prisma product row into plain JSON-safe object
  * so it can be passed from Server Component to Client Component.
@@ -97,6 +203,28 @@ function serializeProduct(product: {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  // Only present when fetched via getProductById (see its own include) —
+  // the paginated list/export queries never load these, so this function
+  // stays usable for both without them.
+  metalComponents?: {
+    id: string;
+    metalTypeId: string;
+    metalType: { id: string; name: string };
+    storeMetalPurityId: string | null;
+    storeMetalPurity: { id: string; label: string } | null;
+    grossWeight: { toString(): string } | null;
+    netWeight: { toString(): string } | null;
+  }[];
+  stoneComponents?: {
+    id: string;
+    stoneMetalTypeName: string;
+    stoneTypeNames: string | null;
+    caratWeight: { toString(): string } | null;
+    stoneWeight: { toString(): string } | null;
+    stoneRate: { toString(): string } | null;
+    stoneCharge: { toString(): string } | null;
+    stoneChargeType: ChargeType;
+  }[];
 }) {
   return {
     id: product.id,
@@ -133,6 +261,25 @@ function serializeProduct(product: {
     isActive: product.isActive,
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),
+    metalComponents: (product.metalComponents ?? []).map((component) => ({
+      id: component.id,
+      metalTypeId: component.metalTypeId,
+      metalTypeName: component.metalType.name,
+      storeMetalPurityId: component.storeMetalPurityId,
+      storeMetalPurityLabel: component.storeMetalPurity?.label ?? null,
+      grossWeight: component.grossWeight?.toString() ?? null,
+      netWeight: component.netWeight?.toString() ?? null,
+    })),
+    stoneComponents: (product.stoneComponents ?? []).map((component) => ({
+      id: component.id,
+      stoneMetalTypeName: component.stoneMetalTypeName,
+      stoneTypeNames: component.stoneTypeNames,
+      caratWeight: component.caratWeight?.toString() ?? null,
+      stoneWeight: component.stoneWeight?.toString() ?? null,
+      stoneRate: component.stoneRate?.toString() ?? null,
+      stoneCharge: component.stoneCharge?.toString() ?? null,
+      stoneChargeType: component.stoneChargeType,
+    })),
   };
 }
 
@@ -483,7 +630,17 @@ export async function getProductById(id: string) {
 
   const product = await prisma.product.findFirst({
     where: { id, storeId },
-    include: PRODUCT_RELATIONS,
+    include: {
+      ...PRODUCT_RELATIONS,
+      // Only fetched here (not on the paginated list/export queries that
+      // also use PRODUCT_RELATIONS) — the full breakdown only matters on
+      // the single-product edit form and detail page.
+      metalComponents: {
+        orderBy: { sortOrder: "asc" },
+        include: { metalType: { select: { id: true, name: true } }, storeMetalPurity: { select: { id: true, label: true } } },
+      },
+      stoneComponents: { orderBy: { sortOrder: "asc" } },
+    },
   });
 
   if (!product) return null;
@@ -677,6 +834,19 @@ export async function createProduct(
       ),
     );
 
+    // The metal/stone component repeaters — see their own doc comments.
+    // metalTypeId/defaultGrossWeight etc. above already carry the FIRST
+    // (primary) component's own values, submitted by the client under
+    // those same legacy field names, so every check/lookup above this line
+    // is untouched; these two arrays are purely additive, persisted as
+    // child rows once the Product itself is created below.
+    const { components: metalComponents, error: metalComponentsError } =
+      await parseAndValidateMetalComponents(storeId, formData);
+    if (metalComponentsError) errors.metalComponentsJson = [metalComponentsError];
+    const { components: stoneComponents, error: stoneComponentsError } =
+      parseStoneComponents(formData);
+    if (stoneComponentsError) errors.stoneComponentsJson = [stoneComponentsError];
+
     if (Object.keys(errors).length > 0) {
       return {
         success: false,
@@ -794,6 +964,35 @@ export async function createProduct(
         message: "Could not generate a unique SKU — please try again.",
         errors: {},
       };
+    }
+
+    if (metalComponents.length > 0) {
+      await prisma.productMetalComponent.createMany({
+        data: metalComponents.map((component, index) => ({
+          productId: createdProduct!.id,
+          metalTypeId: String(component.metalTypeId),
+          storeMetalPurityId: component.storeMetalPurityId || null,
+          grossWeight: toNumberOrNull(component.grossWeight),
+          netWeight: toNumberOrNull(component.netWeight),
+          sortOrder: index,
+        })),
+      });
+    }
+
+    if (stoneComponents.length > 0) {
+      await prisma.productStoneComponent.createMany({
+        data: stoneComponents.map((component, index) => ({
+          productId: createdProduct!.id,
+          stoneMetalTypeName: String(component.stoneMetalTypeName),
+          stoneTypeNames: component.stoneTypeNames ? String(component.stoneTypeNames) : null,
+          caratWeight: toNumberOrNull(component.caratWeight),
+          stoneWeight: toNumberOrNull(component.stoneWeight),
+          stoneRate: toNumberOrNull(component.stoneRate),
+          stoneCharge: toNumberOrNull(component.stoneCharge),
+          stoneChargeType: toChargeTypeInput(component.stoneChargeType),
+          sortOrder: index,
+        })),
+      });
     }
 
     // Optional stock entry, opted into on the product form. Everything the
@@ -1035,6 +1234,16 @@ export async function updateProduct(
       ),
     );
 
+    // See createProduct's identical comment — these arrays are purely
+    // additive alongside the legacy metalTypeId/defaultGrossWeight etc.
+    // fields above, which already carry the first component's own values.
+    const { components: metalComponents, error: metalComponentsError } =
+      await parseAndValidateMetalComponents(storeId, formData);
+    if (metalComponentsError) errors.metalComponentsJson = [metalComponentsError];
+    const { components: stoneComponents, error: stoneComponentsError } =
+      parseStoneComponents(formData);
+    if (stoneComponentsError) errors.stoneComponentsJson = [stoneComponentsError];
+
     if (Object.keys(errors).length > 0) {
       return {
         success: false,
@@ -1059,36 +1268,78 @@ export async function updateProduct(
       ? (matchLegacyPurityType(metalRow ? classifyPurityFamily(metalRow) : null, storeMetalPurityRow.label) ?? defaultPurity)
       : defaultPurity;
 
-   const { count } = await prisma.product.updateMany({
-  where: { id, storeId },
-  data: {
-    name,
-    categoryId,
-    categoryTypeId,
-    metalTypeId,
-    targetStyleId,
-    stoneOriginOptionId,
-    defaultPurity: resolvedDefaultPurity,
-    storeMetalPurityId,
-    defaultMakingCharge,
-    defaultMakingChargeType,
-    defaultStoneCharge,
-    defaultStoneChargeType,
-    defaultGrossWeight,
-    defaultNetWeight,
-    defaultStoneWeight,
-    defaultCaratWeight,
-    hasStoneComponent,
-    defaultStoneRate,
-    defaultStoneMetalTypeName,
-    defaultStoneTypeNames,
-    designCode,
-    hsnCode,
-    description,
-    notes,
-    isActive,
-  },
-})
+   // Same replace-on-update pattern as PurchaseItem (lib/actions/
+   // purchase-actions.ts) — drop every old component row and recreate from
+   // the submitted arrays, inside the same transaction as the Product row
+   // update itself so a failure partway through never leaves the two out
+   // of sync.
+   const { count } = await prisma.$transaction(async (tx) => {
+    const updated = await tx.product.updateMany({
+      where: { id, storeId },
+      data: {
+        name,
+        categoryId,
+        categoryTypeId,
+        metalTypeId,
+        targetStyleId,
+        stoneOriginOptionId,
+        defaultPurity: resolvedDefaultPurity,
+        storeMetalPurityId,
+        defaultMakingCharge,
+        defaultMakingChargeType,
+        defaultStoneCharge,
+        defaultStoneChargeType,
+        defaultGrossWeight,
+        defaultNetWeight,
+        defaultStoneWeight,
+        defaultCaratWeight,
+        hasStoneComponent,
+        defaultStoneRate,
+        defaultStoneMetalTypeName,
+        defaultStoneTypeNames,
+        designCode,
+        hsnCode,
+        description,
+        notes,
+        isActive,
+      },
+    })
+
+    if (updated.count === 0) return updated
+
+    await tx.productMetalComponent.deleteMany({ where: { productId: id } })
+    if (metalComponents.length > 0) {
+      await tx.productMetalComponent.createMany({
+        data: metalComponents.map((component, index) => ({
+          productId: id,
+          metalTypeId: String(component.metalTypeId),
+          storeMetalPurityId: component.storeMetalPurityId || null,
+          grossWeight: toNumberOrNull(component.grossWeight),
+          netWeight: toNumberOrNull(component.netWeight),
+          sortOrder: index,
+        })),
+      })
+    }
+
+    await tx.productStoneComponent.deleteMany({ where: { productId: id } })
+    if (stoneComponents.length > 0) {
+      await tx.productStoneComponent.createMany({
+        data: stoneComponents.map((component, index) => ({
+          productId: id,
+          stoneMetalTypeName: String(component.stoneMetalTypeName),
+          stoneTypeNames: component.stoneTypeNames ? String(component.stoneTypeNames) : null,
+          caratWeight: toNumberOrNull(component.caratWeight),
+          stoneWeight: toNumberOrNull(component.stoneWeight),
+          stoneRate: toNumberOrNull(component.stoneRate),
+          stoneCharge: toNumberOrNull(component.stoneCharge),
+          stoneChargeType: toChargeTypeInput(component.stoneChargeType),
+          sortOrder: index,
+        })),
+      })
+    }
+
+    return updated
+   })
 
     if (count === 0) {
       return {

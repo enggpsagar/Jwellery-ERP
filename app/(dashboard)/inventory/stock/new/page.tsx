@@ -26,8 +26,7 @@ export default async function NewStockPage() {
   ]);
 
   return (
-    <main className="space-y-6 p-6">
-
+    <main className="mx-auto w-full min-w-0 max-w-6xl space-y-6 p-6">
       <ResetFormWrapper
         header={{
           title: "Add Stock",

@@ -10,8 +10,7 @@ import {
   issueMaterialToKarigar,
   type StockActionState,
 } from "@/lib/actions/inventory-stock-actions"
-import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
-import { classifyMetalName } from "@/lib/business-units"
+import { getStoreMetalPurities, type StoreMetalRow, type StoreMetalPurityRow } from "@/lib/actions/taxonomy-actions"
 import { GRAMS_PER_CARAT, toPrimaryUnit } from "@/lib/purity"
 import { todayForDateInput } from "@/lib/date-input"
 import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
@@ -38,17 +37,6 @@ import {
 import { RequiredMark } from "@/components/shared/required-mark"
 
 const initialState: StockActionState = { success: false, message: "" }
-
-const PURITY_OPTIONS: { value: string; label: string }[] = [
-  { value: "GOLD_24K", label: "Gold 24K" },
-  { value: "GOLD_22K", label: "Gold 22K" },
-  { value: "GOLD_20K", label: "Gold 20K" },
-  { value: "GOLD_18K", label: "Gold 18K" },
-  { value: "SILVER_999", label: "Silver 999" },
-  { value: "SILVER_925", label: "Silver 925" },
-  { value: "PLATINUM_950", label: "Platinum 950" },
-  { value: "PLATINUM_900", label: "Platinum 900" },
-]
 
 type LocationOption = {
   id: string
@@ -102,7 +90,8 @@ export function IssueMaterialDialog({
 
   const [open, setOpen] = useState(false)
   const [metalTypeId, setMetalTypeId] = useState(defaultMetalId)
-  const [issuePurity, setIssuePurity] = useState("GOLD_22K")
+  const [issueStoreMetalPurityId, setIssueStoreMetalPurityId] = useState("")
+  const [metalPurities, setMetalPurities] = useState<StoreMetalPurityRow[]>([])
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const router = useRouter()
   const toast = useToast()
@@ -147,29 +136,25 @@ export function IssueMaterialDialog({
     setIssueWeightGrams(String(toPrimaryUnit(Number(typed), weightUnit, "GRAM", GRAMS_PER_CARAT)))
   }
 
-  // Purity options depend on which metal is selected — Silver should never
-  // offer Gold purities and vice versa. classifyMetalName's own return type
-  // (GOLD | SILVER | DIAMOND | OTHER) has no Platinum bucket, so Platinum is
-  // matched separately by name here rather than widening that shared
-  // classifier (see the same reasoning in product-form.tsx).
-  const metalFamily = selectedMetal?.name.toLowerCase().includes("platinum")
-    ? "PLATINUM"
-    : classifyMetalName(selectedMetal?.name)
-  const purityOptions = useMemo(() => {
-    if (metalFamily === "GOLD") return PURITY_OPTIONS.filter((o) => o.value.startsWith("GOLD_"))
-    if (metalFamily === "SILVER") return PURITY_OPTIONS.filter((o) => o.value.startsWith("SILVER_"))
-    if (metalFamily === "PLATINUM") return PURITY_OPTIONS.filter((o) => o.value.startsWith("PLATINUM_"))
-    return PURITY_OPTIONS
-  }, [metalFamily])
-
-  // Keep the selected purity valid whenever the metal (and so the available
-  // options) changes — e.g. switching Gold -> Silver must not silently submit
-  // a leftover "GOLD_22K".
+  // Real per-Metal Purity options (Settings > Taxonomy > Purities),
+  // replacing the old hardcoded PURITY_OPTIONS list — fetched for whichever
+  // metal is currently selected.
   useEffect(() => {
-    if (!purityOptions.some((option) => option.value === issuePurity)) {
-      setIssuePurity(purityOptions[0]?.value ?? "")
+    let cancelled = false
+    setIssueStoreMetalPurityId("")
+    if (!metalTypeId) {
+      setMetalPurities([])
+      return
     }
-  }, [purityOptions, issuePurity])
+    getStoreMetalPurities(metalTypeId)
+      .then((data) => {
+        if (!cancelled) setMetalPurities(data)
+      })
+      .catch((err) => console.error("Failed to load purities:", err))
+    return () => {
+      cancelled = true
+    }
+  }, [metalTypeId])
 
   const issueMaterialWithId = issueMaterialToKarigar.bind(null, karigarId)
   const [state, formAction, pending] = useActionState(issueMaterialWithId, initialState)
@@ -239,7 +224,9 @@ export function IssueMaterialDialog({
                 : String(toPrimaryUnit(Number(issueWeightGrams), "GRAM", primaryUnit, GRAMS_PER_CARAT))
             }
           />
-          {isPreciousMetal && <input type="hidden" name="issuePurity" value={issuePurity} />}
+          {isPreciousMetal && (
+            <input type="hidden" name="issueStoreMetalPurityId" value={issueStoreMetalPurityId} />
+          )}
 
           {!state.success && state.message && (
             <div className="text-sm text-red-600">{state.message}</div>
@@ -265,13 +252,13 @@ export function IssueMaterialDialog({
             {isPreciousMetal && (
               <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
                 <Label>Purity</Label>
-                <Select value={issuePurity} onValueChange={setIssuePurity}>
+                <Select value={issueStoreMetalPurityId} onValueChange={setIssueStoreMetalPurityId}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select purity" />
                   </SelectTrigger>
                   <SelectContent>
-                    {purityOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
+                    {metalPurities.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
                         {option.label}
                       </SelectItem>
                     ))}

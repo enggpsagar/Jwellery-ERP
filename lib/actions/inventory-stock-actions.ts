@@ -17,7 +17,8 @@ import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
-import { getFinenessMap, toFineWeight } from "@/lib/purity";
+import { getFinenessMap, toFineWeight, matchLegacyPurityType } from "@/lib/purity";
+import { classifyPurityFamily } from "@/lib/business-units";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
 
@@ -357,6 +358,7 @@ export async function issueMaterialToKarigar(
 
     const metalTypeId = String(formData.get("metalTypeId") || "").trim();
     const issuePurityRaw = String(formData.get("issuePurity") || "");
+    const issueStoreMetalPurityId = String(formData.get("issueStoreMetalPurityId") || "").trim();
     const issueWeight = toDecimalOrNull(formData.get("issueWeight"));
     const expectedDateRaw = String(formData.get("expectedDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
@@ -401,16 +403,32 @@ export async function issueMaterialToKarigar(
     }
 
     let issuePurity: PurityType | null = null;
+    let issuePurityLabel: string | null = null;
     let issueFineWeight: number | null = null;
 
     if (isPreciousMetal) {
-      issuePurity = issuePurityRaw as PurityType;
-      if (!Object.values(PurityType).includes(issuePurity)) {
-        return { success: false, message: "Select a valid purity" };
-      }
+      const storeMetalPurity = issueStoreMetalPurityId
+        ? await prisma.storeMetalPurity.findFirst({
+            where: { id: issueStoreMetalPurityId, storeId, storeMetalId: storeMetal.id },
+            select: { label: true, finenessPercent: true },
+          })
+        : null;
 
-      const fineness = await getFinenessMap(storeId);
-      issueFineWeight = toFineWeight(issueWeight, issuePurity, fineness);
+      if (storeMetalPurity) {
+        issuePurityLabel = storeMetalPurity.label;
+        issuePurity = matchLegacyPurityType(classifyPurityFamily(storeMetal), storeMetalPurity.label);
+        issueFineWeight = (issueWeight * Number(storeMetalPurity.finenessPercent)) / 100;
+      } else {
+        // Fallback for a metal with no per-Metal Purity configured yet
+        // (Settings > Taxonomy > Purities) — same legacy path as before.
+        issuePurity = issuePurityRaw as PurityType;
+        if (!Object.values(PurityType).includes(issuePurity)) {
+          return { success: false, message: "Select a valid purity" };
+        }
+
+        const fineness = await getFinenessMap(storeId);
+        issueFineWeight = toFineWeight(issueWeight, issuePurity, fineness);
+      }
     }
 
     const jobNumber = await generateJobNumber(storeId);
@@ -423,6 +441,7 @@ export async function issueMaterialToKarigar(
           jobNumber,
           metalTypeId: storeMetal.id,
           issuePurity: issuePurity ?? undefined,
+          issuePurityLabel: issuePurityLabel ?? undefined,
           issueWeight,
           issueFineWeight: issueFineWeight ?? undefined,
           expectedDate: expectedDateRaw ? new Date(expectedDateRaw) : undefined,
@@ -491,6 +510,7 @@ export async function recordMaterialReceiptFromKarigar(
 
     const metalTypeId = String(formData.get("metalTypeId") || "").trim();
     const receivePurityRaw = String(formData.get("receivePurity") || "");
+    const receiveStoreMetalPurityId = String(formData.get("receiveStoreMetalPurityId") || "").trim();
     const receiveWeight = toDecimalOrNull(formData.get("receiveWeight"));
     const notes = String(formData.get("notes") || "").trim() || null;
     const locationId = String(formData.get("locationId") || "").trim() || null;
@@ -537,16 +557,30 @@ export async function recordMaterialReceiptFromKarigar(
     }
 
     let receivePurity: PurityType | null = null;
+    let receivePurityLabel: string | null = null;
     let receiveFineWeight: number | null = null;
 
     if (isPreciousMetal) {
-      receivePurity = receivePurityRaw as PurityType;
-      if (!Object.values(PurityType).includes(receivePurity)) {
-        return { success: false, message: "Select a valid purity" };
-      }
+      const storeMetalPurity = receiveStoreMetalPurityId
+        ? await prisma.storeMetalPurity.findFirst({
+            where: { id: receiveStoreMetalPurityId, storeId, storeMetalId: storeMetal.id },
+            select: { label: true, finenessPercent: true },
+          })
+        : null;
 
-      const fineness = await getFinenessMap(storeId);
-      receiveFineWeight = toFineWeight(receiveWeight, receivePurity, fineness);
+      if (storeMetalPurity) {
+        receivePurityLabel = storeMetalPurity.label;
+        receivePurity = matchLegacyPurityType(classifyPurityFamily(storeMetal), storeMetalPurity.label);
+        receiveFineWeight = (receiveWeight * Number(storeMetalPurity.finenessPercent)) / 100;
+      } else {
+        receivePurity = receivePurityRaw as PurityType;
+        if (!Object.values(PurityType).includes(receivePurity)) {
+          return { success: false, message: "Select a valid purity" };
+        }
+
+        const fineness = await getFinenessMap(storeId);
+        receiveFineWeight = toFineWeight(receiveWeight, receivePurity, fineness);
+      }
     }
 
     await prisma.ledgerEntry.create({
@@ -560,7 +594,7 @@ export async function recordMaterialReceiptFromKarigar(
         metalWeightFine: isPreciousMetal ? (receiveFineWeight ?? undefined) : undefined,
         amount: 0,
         description: isPreciousMetal
-          ? `${receiveWeight}g ${receivePurity} received against outstanding balance (${(receiveFineWeight ?? 0).toFixed(3)}g fine)${notes ? ` — ${notes}` : ""}`
+          ? `${receiveWeight}g ${receivePurityLabel ?? receivePurity} received against outstanding balance (${(receiveFineWeight ?? 0).toFixed(3)}g fine)${notes ? ` — ${notes}` : ""}`
           : `${receiveWeight}g ${notes ? notes : storeMetal.name} received against outstanding balance`,
         createdByUserId: currentUser?.id,
         locationId: locationId ?? undefined,

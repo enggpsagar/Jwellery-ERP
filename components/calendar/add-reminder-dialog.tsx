@@ -25,13 +25,21 @@ import { RequiredMark } from "@/components/shared/required-mark"
 
 const initialState: ReminderFormState = { success: false, message: "" }
 
+type AddReminderDialogProps = {
+  /** The day already selected on the calendar grid, if any — prefills the
+      Date field with it instead of always defaulting to today, so adding a
+      reminder for a day the user just clicked doesn't require re-typing the
+      date they were already looking at. */
+  defaultDate?: string
+}
+
 /**
  * The catch-all "other important task/deadline" entry point for the
  * Calendar View — everything else on the calendar (invoice due dates,
  * karigar returns, quotation expiry, plan renewal) comes from a date field
  * that already exists elsewhere; a Reminder is for the things that don't.
  */
-export function AddReminderDialog() {
+export function AddReminderDialog({ defaultDate }: AddReminderDialogProps) {
   const [open, setOpen] = useState(false)
   const router = useRouter()
   const toast = useToast()
@@ -79,7 +87,7 @@ export function AddReminderDialog() {
 
           <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label htmlFor="dueDate">Date <RequiredMark /></Label>
-            <Input id="dueDate" name="dueDate" type="date" defaultValue={todayForDateInput()} required />
+            <Input id="dueDate" name="dueDate" type="date" defaultValue={defaultDate ?? todayForDateInput()} required />
           </div>
 
           <div className="space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">

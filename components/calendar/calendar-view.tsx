@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import Link from "next/link"
 import { Trash2 } from "lucide-react"
 
@@ -45,14 +45,17 @@ type CalendarViewProps = {
   year: number
   month: number
   events: CalendarEvent[]
+  /** Lifted up to the page-level wrapper (components/calendar/calendar-page-content.tsx)
+      so the header's Add Reminder dialog can prefill its Date field with
+      whichever day is currently selected here, instead of the two staying
+      unaware of each other. */
+  selectedDate: string | null
+  onSelectDate: (key: string) => void
 }
 
-export function CalendarView({ year, month, events }: CalendarViewProps) {
+export function CalendarView({ year, month, events, selectedDate, onSelectDate }: CalendarViewProps) {
   const toast = useToast()
   const todayKey = dateKey(new Date())
-  const [selectedDate, setSelectedDate] = useState<string | null>(
-    events.find((event) => dateKey(event.date) === todayKey) ? todayKey : null,
-  )
 
   const cells = useMemo(() => buildMonthGrid(year, month), [year, month])
 
@@ -109,7 +112,7 @@ export function CalendarView({ year, month, events }: CalendarViewProps) {
               <button
                 key={index}
                 type="button"
-                onClick={() => setSelectedDate(key)}
+                onClick={() => onSelectDate(key)}
                 className={cn(
                   "flex min-h-32 w-full flex-col items-stretch gap-1 border-b border-r p-1.5 text-left align-top transition-colors hover:bg-accent",
                   isSelected && "bg-accent",

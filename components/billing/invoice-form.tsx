@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useActionState } from "react"
-import { Trash2, ChevronDown, ChevronRight, Search } from "lucide-react"
+import { Trash2, ChevronDown, ChevronRight, Search, Plus } from "lucide-react"
 import type { GstScheme, PurityType } from "@prisma/client"
 
 import { createInvoice, updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
@@ -48,6 +48,8 @@ import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
 import { StockItemSelect } from "@/components/inventory/shared/stock-item-select"
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
+import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
+import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog"
 
 type CustomerOption = {
   id: string
@@ -333,6 +335,12 @@ export function InvoiceForm({
   const showLocationField = useShowLocationField(locations.length)
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
+  // Which line item's own "Add Metal Type" / "Add Purity" quick-create is
+  // open, if any — a per-line inline dialog (see AddMetalDialog/
+  // AddPurityDialog's own doc comments), not a page navigation, so nothing
+  // else already typed on this form is ever at risk.
+  const [addMetalForKey, setAddMetalForKey] = useState<string | null>(null)
+  const [addPurityForKey, setAddPurityForKey] = useState<string | null>(null)
 
   const [customerId, setCustomerId] = useState(initialCustomerId ?? "")
   const [locationId, setLocationId] = useState(initialLocationId ?? "")
@@ -1487,48 +1495,74 @@ export function InvoiceForm({
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Metal Type</Label>
-                      <Select
-                        value={item.metalTypeId}
-                        onValueChange={(value) => {
-                          ensureMetalPurities(value)
-                          updateItem(item.key, { metalTypeId: value, purity: "", purityLabel: "" })
-                        }}
-                        disabled={isLinked}
-                      >
-                        <SelectTrigger className="h-11 w-full">
-                          <SelectValue placeholder="Select metal" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {metals
-                            .filter((metal) => !metal.isGemstone && (metal.isActive || metal.id === item.metalTypeId))
-                            .map((metal) => (
-                              <SelectItem key={metal.id} value={metal.id}>
-                                {metal.name}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-1.5">
+                        <Select
+                          value={item.metalTypeId}
+                          onValueChange={(value) => {
+                            ensureMetalPurities(value)
+                            updateItem(item.key, { metalTypeId: value, purity: "", purityLabel: "" })
+                          }}
+                          disabled={isLinked}
+                        >
+                          <SelectTrigger className="h-11 w-full">
+                            <SelectValue placeholder="Select metal" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {metals
+                              .filter((metal) => !metal.isGemstone && (metal.isActive || metal.id === item.metalTypeId))
+                              .map((metal) => (
+                                <SelectItem key={metal.id} value={metal.id}>
+                                  {metal.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          className="h-11 w-9 shrink-0 px-0"
+                          title="Add Metal Type"
+                          disabled={isLinked}
+                          onClick={() => setAddMetalForKey(item.key)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Purity</Label>
-                      <Select
-                        value={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
-                        onValueChange={(value) => selectPurity(item, value === "__none__" ? "" : value)}
-                        disabled={isLinked || !item.metalTypeId}
-                      >
-                        <SelectTrigger className="h-11 w-full">
-                          <SelectValue placeholder={item.metalTypeId ? "Select purity" : "Select a metal first"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">None</SelectItem>
-                          {(metalPuritiesCache[item.metalTypeId] ?? []).map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-1.5">
+                        <Select
+                          value={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
+                          onValueChange={(value) => selectPurity(item, value === "__none__" ? "" : value)}
+                          disabled={isLinked || !item.metalTypeId}
+                        >
+                          <SelectTrigger className="h-11 w-full">
+                            <SelectValue placeholder={item.metalTypeId ? "Select purity" : "Select a metal first"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">None</SelectItem>
+                            {(metalPuritiesCache[item.metalTypeId] ?? []).map((option) => (
+                              <SelectItem key={option.id} value={option.id}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          className="h-11 w-9 shrink-0 px-0"
+                          title="Add Purity"
+                          disabled={isLinked || !item.metalTypeId}
+                          onClick={() => setAddPurityForKey(item.key)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -1945,6 +1979,51 @@ export function InvoiceForm({
               : "Create Invoice"}
         </Button>
       </div>
+
+      {/* Rendered via Radix's own portal, so being inside <form> in the JSX
+          tree doesn't nest them in the actual <form> DOM node — no submit/
+          bubbling conflict with either dialog's own Cancel/Add buttons. */}
+      <AddMetalDialog
+        open={addMetalForKey !== null}
+        onOpenChange={(open) => { if (!open) setAddMetalForKey(null) }}
+        isGemstone={false}
+        onCreated={(metal) => {
+          setMetals((prev) => [...prev, metal])
+          if (addMetalForKey) {
+            updateItem(addMetalForKey, { metalTypeId: metal.id, purity: "", purityLabel: "" })
+            ensureMetalPurities(metal.id)
+          }
+          setAddMetalForKey(null)
+        }}
+      />
+
+      {addPurityForKey && (() => {
+        const targetItem = items.find((item) => item.key === addPurityForKey)
+        if (!targetItem || !targetItem.metalTypeId) return null
+        const metalTypeId = targetItem.metalTypeId
+        return (
+          <AddPurityDialog
+            open
+            onOpenChange={(open) => { if (!open) setAddPurityForKey(null) }}
+            storeMetalId={metalTypeId}
+            onCreated={(purity) => {
+              setMetalPuritiesCache((prev) => ({
+                ...prev,
+                [metalTypeId]: [...(prev[metalTypeId] ?? []), purity],
+              }))
+              const metal = metalById.get(metalTypeId)
+              const family = metal ? classifyPurityFamily(metal) : null
+              const legacyPurity = matchLegacyPurityType(family, purity.label) ?? ""
+              const patch: Partial<LineItem> = { purityLabel: purity.label, purity: legacyPurity }
+              if (!targetItem.hmChargeTouched && (purity.isHallmarkable || isHallmarkablePurity(legacyPurity))) {
+                patch.hmCharge = hallmarkChargePerPiece
+              }
+              updateItem(targetItem.key, patch)
+              setAddPurityForKey(null)
+            }}
+          />
+        )
+      })()}
     </form>
   )
 }

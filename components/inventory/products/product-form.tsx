@@ -1046,47 +1046,65 @@ export function ProductForm({
           <div>
             <Label>Category <RequiredMark /></Label>
 
-            <div className="flex gap-1.5">
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
+            {categories.length > 0 ? (
+              <div className="flex gap-1.5">
+                <Select value={categoryId} onValueChange={setCategoryId}>
+                  <SelectTrigger className="h-11 w-full">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
 
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      placeholder="Search categories..."
-                      value={categorySearch}
-                      onChange={(event) => setCategorySearch(event.target.value)}
-                      onKeyDown={(event) => event.stopPropagation()}
-                    />
-                  </div>
-
-                  {filteredCategories.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No categories found{categorySearch ? ` for "${categorySearch}"` : ""}
+                  <SelectContent>
+                    <div className="p-2">
+                      <Input
+                        placeholder="Search categories..."
+                        value={categorySearch}
+                        onChange={(event) => setCategorySearch(event.target.value)}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      />
                     </div>
-                  ) : (
-                    filteredCategories.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
 
+                    {filteredCategories.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        No categories found{categorySearch ? ` for "${categorySearch}"` : ""}
+                      </div>
+                    ) : (
+                      filteredCategories.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  className="h-11 w-9 shrink-0 px-0"
+                  title="Add Category"
+                  onClick={() => setAddCategoryOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              // Nothing to pick from — this store has no category that's
+              // either universal or tagged to the current Metal/Stone yet
+              // (see getStoreCategoriesForMetal). A dropdown with only "no
+              // categories found" is clutter; a plain "Add Category" prompt
+              // gets a store past this the first time, and the real picker
+              // appears the moment one exists — same "hide until there's
+              // something to show" reasoning as the Type field below.
               <Button
                 type="button"
-                variant="secondary"
-                size="icon"
-                className="h-11 w-9 shrink-0 px-0"
-                title="Add Category"
+                variant="outline"
+                className="h-11 w-full justify-start text-muted-foreground"
                 onClick={() => setAddCategoryOpen(true)}
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-4 w-4 mr-1.5" /> Add a category to get started
               </Button>
-            </div>
+            )}
 
             <input type="hidden" name="categoryId" value={categoryId} />
 

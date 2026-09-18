@@ -59,33 +59,30 @@ export function DeliveryLocationSelect({
       <input type="hidden" name={stateCodeFieldName} value={stateCode} />
 
       <Label>Delivery Location</Label>
-      <div className="flex gap-2">
-        <Select
-          value={value}
-          onValueChange={(name) => {
-            const state = states.find((s) => s.name === name)
-            onChange(name, state?.isoCode ?? "")
-          }}
-        >
-          <SelectTrigger className="flex-1">
-            <SelectValue placeholder="Select state" />
-          </SelectTrigger>
-          <SelectContent>
-            {states.map((s) => (
-              <SelectItem key={s.id} value={s.name}>
-                {s.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div
-          className="flex w-16 shrink-0 items-center justify-center rounded-md border bg-muted text-sm text-muted-foreground"
-          title="GST State Code"
-        >
-          {stateCode || "—"}
-        </div>
-      </div>
+      {/* The GST state code used to sit in its own box next to the
+          dropdown, forcing this control to span two grid columns just to
+          fit both. Folded into the dropdown's own label ("Odisha - OD")
+          instead, so a single column is enough and this can share the
+          first row with Party/Invoice Date rather than always wrapping to
+          a row of its own. */}
+      <Select
+        value={value}
+        onValueChange={(name) => {
+          const state = states.find((s) => s.name === name)
+          onChange(name, state?.isoCode ?? "")
+        }}
+      >
+        <SelectTrigger className="h-11 w-full">
+          <SelectValue placeholder="Select state" />
+        </SelectTrigger>
+        <SelectContent>
+          {states.map((s) => (
+            <SelectItem key={s.id} value={s.name}>
+              {s.name} - {s.isoCode}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       <p className="text-xs text-muted-foreground">
         Defaults to your store&apos;s own state — change this only when delivering to a different state.

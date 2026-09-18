@@ -1346,7 +1346,7 @@ export function InvoiceForm({
           />
         </div>
 
-        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40 md:col-span-2">
+        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <DeliveryLocationSelect
             states={states}
             value={deliveryState}

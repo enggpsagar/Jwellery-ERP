@@ -672,7 +672,7 @@ async function validateTaxonomySelection(
     metalTypeId
       ? prisma.storeMetal.findFirst({
           where: { id: metalTypeId, storeId },
-          select: { id: true },
+          select: { id: true, isGemstone: true },
         })
       : Promise.resolve(null),
     categoryTypeId
@@ -695,8 +695,15 @@ async function validateTaxonomySelection(
       : Promise.resolve(null),
   ]);
 
+  // Category is an ornament-shape concept (Ring/Bangle/Necklace...) — a
+  // loose Diamond/Stone product isn't itself an ornament, so it's never
+  // required for the gemstone family, only ever optional if a store has
+  // set one up anyway (see getStoreCategoriesForMetal, which already lets
+  // a category be tagged to a gemstone metal for exactly that case).
   if (!categoryId) {
-    errors.categoryId = ["Category is required"];
+    if (!metalRow?.isGemstone) {
+      errors.categoryId = ["Category is required"];
+    }
   } else if (!categoryRow) {
     errors.categoryId = ["Selected category is invalid"];
   }

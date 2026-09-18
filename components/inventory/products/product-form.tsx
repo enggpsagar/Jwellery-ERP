@@ -1044,7 +1044,12 @@ export function ProductForm({
           )}
 
           <div>
-            <Label>Category <RequiredMark /></Label>
+            {/* Not required for the gemstone family — a loose Diamond/Stone
+                product isn't itself an ornament shape (Ring/Bangle/...), so
+                a store with no category tagged to that metal shouldn't be
+                blocked on picking one. Still shown/optional in case a store
+                does tag one anyway (see getStoreCategoriesForMetal). */}
+            <Label>Category {productKind !== "STONE" && <RequiredMark />}</Label>
 
             {categories.length > 0 ? (
               <div className="flex gap-1.5">

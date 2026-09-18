@@ -102,13 +102,15 @@ export function KarigarDetailContent({
           <KarigarStatusCard karigarId={karigar.id} isActive={karigar.isActive} />
         )}
 
-        {/* col-span-2: with Status now living inline next to Edit in the
-            split-panel view (see hideStatusCard above) rather than a grid
-            card of its own, Metal/Stone are the two card types most worth
-            the freed-up room -- a checkbox list reads more comfortably at
-            two columns wide than squeezed into one fifth of the row. */}
+        {/* Single column, not col-span-2 -- that squeezed the metal-balance
+            ribbon cards after it (e.g. "Yellow Gold Balance") down into too
+            little width for their own large tabular-nums figure, which then
+            overflowed the card's edge instead of wrapping. The checkbox
+            list here already wraps safely at one column wide (see
+            ExpandableCheckboxList's own min-w-0/break-words), so it doesn't
+            need the extra room the ribbon cards actually do. */}
         {activeMetalsOnly.length > 0 && (
-          <Card size="sm" className="lg:col-span-2">
+          <Card size="sm">
             <CardHeader>
               <CardTitle className="text-sm text-muted-foreground">Metal</CardTitle>
             </CardHeader>
@@ -122,7 +124,7 @@ export function KarigarDetailContent({
         )}
 
         {activeStonesOnly.length > 0 && (
-          <Card size="sm" className="lg:col-span-2">
+          <Card size="sm">
             <CardHeader>
               <CardTitle className="text-sm text-muted-foreground">Stone</CardTitle>
             </CardHeader>
@@ -162,7 +164,7 @@ export function KarigarDetailContent({
               <div className="p-4 pt-3">
                 <p
                   className={cn(
-                    "text-2xl font-bold tabular-nums",
+                    "break-words text-2xl font-bold tabular-nums",
                     isOwed ? "text-red-700" : isCredit ? "text-emerald-700" : "text-foreground",
                   )}
                 >

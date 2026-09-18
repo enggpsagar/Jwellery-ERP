@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useActionState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Plus, Trash2 } from "lucide-react"
 
 import {
@@ -90,6 +90,24 @@ type DraftOrderFormProps = {
   metalSellingRates?: Partial<Record<PurityType, number>>
 }
 
+/**
+ * Where an in-progress draft order is parked while the user is away creating
+ * a party. sessionStorage (not localStorage) so it dies with the tab and
+ * can never resurrect a stale draft days later.
+ */
+const DRAFT_KEY = "draft-order-form-draft"
+
+const RETURN_TO = "/orders/new"
+
+type DraftOrderDraft = {
+  customerId: string
+  items: ItemRow[]
+  locationId: string
+  paymentRows: PaymentMethodValue[]
+  expectedDate: string
+  notes: string
+}
+
 export function DraftOrderForm({
   customers,
   metals,
@@ -98,8 +116,17 @@ export function DraftOrderForm({
   metalSellingRates = {},
 }: DraftOrderFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const toast = useToast()
+  const formRef = useRef<HTMLFormElement>(null)
   const [items, setItems] = useState<ItemRow[]>([emptyItem("initial")])
+
+  const [customerId, setCustomerId] = useState("")
+  // CustomerSelect/LocationSelect both seed their own selection from
+  // `defaultValue` into internal state, so changing that prop alone will
+  // not move them once a restored value needs to show.
+  const [customerSelectKey, setCustomerSelectKey] = useState(0)
+  const [locationSelectKey, setLocationSelectKey] = useState(0)
 
   // Real per-Metal Purity options (Settings > Taxonomy > Purities),
   // replacing the old global PURITY_SELECT_OPTIONS enum list — cached per
@@ -141,6 +168,100 @@ export function DraftOrderForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
+
+  /**
+   * Parks the whole in-progress draft order before we navigate off to create
+   * a party. Without this, "Create new party" would silently throw away
+   * every requested item the user had already entered.
+   *
+   * Expected Date and Notes are uncontrolled inputs, so they are read off
+   * the form element rather than from state.
+   */
+  const saveDraft = () => {
+    const formData = formRef.current ? new FormData(formRef.current) : null
+
+    const draft: DraftOrderDraft = {
+      customerId,
+      items,
+      locationId,
+      paymentRows,
+      expectedDate: formData ? String(formData.get("expectedDate") ?? "") : "",
+      notes: formData ? String(formData.get("notes") ?? "") : "",
+    }
+
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    } catch {
+      // A full or blocked sessionStorage shouldn't stop the user getting to
+      // the create page — they just lose the draft, same as before.
+    }
+  }
+
+  // Restore-on-return. Runs once: reads any parked draft, then selects the
+  // party that was just created. Deliberately not dependent on
+  // searchParams — re-running after the URL is cleaned would wipe edits
+  // made since.
+  const restoredRef = useRef(false)
+
+  useEffect(() => {
+    if (restoredRef.current) return
+    restoredRef.current = true
+
+    const newPartyId = searchParams.get("newCustomerId")
+
+    let raw: string | null = null
+    try {
+      raw = sessionStorage.getItem(DRAFT_KEY)
+      if (raw) sessionStorage.removeItem(DRAFT_KEY)
+    } catch {
+      raw = null
+    }
+
+    let draft: DraftOrderDraft | null = null
+    if (raw) {
+      try {
+        draft = JSON.parse(raw) as DraftOrderDraft
+      } catch {
+        draft = null
+      }
+    }
+
+    if (draft) {
+      setCustomerId(newPartyId || draft.customerId || "")
+      setItems(draft.items && draft.items.length ? draft.items : [emptyItem()])
+      setLocationId(draft.locationId ?? "")
+      setPaymentRows(draft.paymentRows ?? [])
+
+      if (formRef.current) {
+        const expectedDateInput = formRef.current.elements.namedItem(
+          "expectedDate",
+        ) as HTMLInputElement | null
+        if (expectedDateInput && draft.expectedDate) expectedDateInput.value = draft.expectedDate
+
+        const notesInput = formRef.current.elements.namedItem(
+          "notes",
+        ) as HTMLTextAreaElement | null
+        if (notesInput && draft.notes) notesInput.value = draft.notes
+      }
+
+      // Both pickers seed their selection from `defaultValue` into internal
+      // state, so a restored value only shows once they remount.
+      setCustomerSelectKey((key) => key + 1)
+      setLocationSelectKey((key) => key + 1)
+
+      toast.success("Picked up where you left off")
+    } else if (newPartyId) {
+      setCustomerId(newPartyId)
+      setCustomerSelectKey((key) => key + 1)
+    }
+
+    // Strip the one-shot param via history rather than router.replace, so
+    // Next doesn't re-render the route and undo what we just restored.
+    if (newPartyId) {
+      window.history.replaceState({}, "", RETURN_TO)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function updateItem(key: string, patch: Partial<ItemRow>) {
     setItems((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)))
@@ -186,6 +307,7 @@ export function DraftOrderForm({
 
   return (
     <form
+      ref={formRef}
       onSubmit={(event) => {
         event.preventDefault()
         formAction(new FormData(event.currentTarget))
@@ -204,7 +326,13 @@ export function DraftOrderForm({
             <Label>
               Party <RequiredMark />
             </Label>
-            <CustomerSelect customers={customers} />
+            <CustomerSelect
+              key={customerSelectKey}
+              customers={customers}
+              defaultValue={customerId}
+              onChange={(id) => setCustomerId(id)}
+              onBeforeAddNew={() => saveDraft()}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Expected Date</Label>
@@ -213,6 +341,7 @@ export function DraftOrderForm({
           <div className="space-y-1.5">
             {showLocationField && <Label>Location</Label>}
             <LocationSelect
+              key={locationSelectKey}
               locations={locations}
               name="locationId"
               defaultValue={locationId}

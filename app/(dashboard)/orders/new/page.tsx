@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { Suspense } from "react"
 
 import { getQuotationFormCustomers } from "@/lib/actions/quotation-actions"
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions"
@@ -32,13 +33,18 @@ export default async function NewDraftOrderPage() {
           backLabel: "Back to Draft Orders",
         }}
       >
-        <DraftOrderForm
-          customers={customers}
-          metals={metals}
-          locations={locations}
-          defaultLocationId={defaultLocationId}
-          metalSellingRates={metalSellingRates}
-        />
+        {/* DraftOrderForm reads ?newCustomerId via useSearchParams, which
+            needs a Suspense boundary to avoid opting the whole route out
+            of static optimisation — same as PurchaseForm's own page. */}
+        <Suspense fallback={null}>
+          <DraftOrderForm
+            customers={customers}
+            metals={metals}
+            locations={locations}
+            defaultLocationId={defaultLocationId}
+            metalSellingRates={metalSellingRates}
+          />
+        </Suspense>
       </ResetFormWrapper>
     </main>
   )

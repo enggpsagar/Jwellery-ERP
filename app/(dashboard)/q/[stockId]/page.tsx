@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
+import { Suspense } from "react"
 import { ScanLine, ShieldAlert } from "lucide-react"
 
 import { verifyQuickSaleToken } from "@/lib/quick-sale-token"
@@ -248,7 +249,12 @@ export default async function QuickSalePage({
         </p>
       </div>
 
-      <QuickSaleForm target={target} customers={customers} token={token} />
+      {/* QuickSaleForm reads ?newCustomerId via useSearchParams, which
+          needs a Suspense boundary to avoid opting the whole route out of
+          static optimisation — same as PurchaseForm's own page. */}
+      <Suspense fallback={null}>
+        <QuickSaleForm target={target} customers={customers} token={token} />
+      </Suspense>
     </main>
   )
 }

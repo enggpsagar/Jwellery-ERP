@@ -1,7 +1,8 @@
 "use client"
 
-import { useActionState, useState } from "react"
+import { useActionState, useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { usePathname, useSearchParams } from "next/navigation"
 import {
   AlertTriangle,
   ArrowLeft,
@@ -17,6 +18,7 @@ import {
   type QuickSaleState,
   type QuickSaleTarget,
 } from "@/lib/actions/quick-sale-actions"
+import { useToast } from "@/components/providers/toast-provider"
 import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/loader"
 import { Card, CardContent } from "@/components/ui/card"
@@ -40,6 +42,24 @@ const PURITY_LABELS: Record<string, string> = {
   PLATINUM_950: "Pt950",
   DIAMOND: "Diamond",
   OTHER: "",
+}
+
+/**
+ * Where an in-progress quick sale is parked while the user is away creating
+ * a party. sessionStorage (not localStorage) so it dies with the tab and
+ * can never resurrect a stale sale days later.
+ */
+const DRAFT_KEY = "quick-sale-form-draft"
+
+type QuickSaleDraft = {
+  /** Which scanned piece this belongs to — a leftover draft from a
+   * different tag's quick sale must never apply here. */
+  stockId: string
+  customerId: string
+  customerName: string
+  price: string
+  quantity: string
+  fullyPaid: boolean
 }
 
 function money(value: number) {
@@ -100,6 +120,9 @@ export function QuickSaleForm({
     completeQuickSale,
     initialState,
   )
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const toast = useToast()
 
   const [price, setPrice] = useState(
     target.suggestedPrice ? String(target.suggestedPrice) : "",
@@ -109,10 +132,100 @@ export function QuickSaleForm({
   const [quantity, setQuantity] = useState("1")
   const [fullyPaid, setFullyPaid] = useState(true)
 
+  // CustomerSelect seeds its own selection from `defaultValue` into internal
+  // state, so changing that prop alone will not move it once a restored
+  // value needs to show.
+  const [customerSelectKey, setCustomerSelectKey] = useState(0)
+
   // Review is a step, not a separate route: going back must not lose what was
   // typed, and on a phone a round trip to the server between "enter" and
   // "confirm" is the difference between quick and not.
   const [reviewing, setReviewing] = useState(false)
+
+  /**
+   * Parks the whole in-progress sale before we navigate off to create a
+   * party. Without this, "Create new party" would silently throw away the
+   * price/quantity/payment choice already entered for this scanned piece.
+   */
+  const saveDraft = () => {
+    const draft: QuickSaleDraft = {
+      stockId: target.stockId,
+      customerId,
+      customerName,
+      price,
+      quantity,
+      fullyPaid,
+    }
+
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    } catch {
+      // A full or blocked sessionStorage shouldn't stop the user getting to
+      // the create page — they just lose the draft, same as before.
+    }
+  }
+
+  // Restore-on-return. Runs once: reads any parked draft, then selects the
+  // party that was just created. Deliberately not dependent on
+  // searchParams — re-running after the URL is cleaned would wipe edits
+  // made since.
+  const restoredRef = useRef(false)
+
+  useEffect(() => {
+    if (restoredRef.current) return
+    restoredRef.current = true
+
+    const newPartyId = searchParams.get("newCustomerId")
+
+    let raw: string | null = null
+    try {
+      raw = sessionStorage.getItem(DRAFT_KEY)
+      if (raw) sessionStorage.removeItem(DRAFT_KEY)
+    } catch {
+      raw = null
+    }
+
+    let draft: QuickSaleDraft | null = null
+    if (raw) {
+      try {
+        draft = JSON.parse(raw) as QuickSaleDraft
+      } catch {
+        draft = null
+      }
+    }
+
+    // A parked draft only applies to the scanned piece it was saved for —
+    // otherwise this is a leftover from a different tag's quick sale.
+    if (draft && draft.stockId !== target.stockId) draft = null
+
+    if (draft) {
+      setPrice(draft.price || "")
+      setQuantity(draft.quantity || "1")
+      setFullyPaid(draft.fullyPaid ?? true)
+      setCustomerName(draft.customerName || "")
+      setCustomerId(newPartyId || draft.customerId || "")
+      setCustomerSelectKey((key) => key + 1)
+
+      toast.success("Picked up where you left off")
+    } else if (newPartyId) {
+      const created = customers.find((customer) => customer.id === newPartyId)
+      setCustomerId(newPartyId)
+      setCustomerName(created?.name ?? "")
+      setCustomerSelectKey((key) => key + 1)
+    }
+
+    // Strip the one-shot param via history rather than router.replace, so
+    // Next doesn't re-render the route and undo what we just restored —
+    // but keep every other query param (namely `t`, the scan token this
+    // page cannot work without).
+    if (newPartyId) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete("newCustomerId")
+      const next = params.toString() ? `${pathname}?${params.toString()}` : pathname
+      window.history.replaceState({}, "", next)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const priceValue = Number(price)
   const priceIsUsable = Number.isFinite(priceValue) && priceValue > 0
@@ -327,6 +440,7 @@ export function QuickSaleForm({
                       mounted through the review step. Letting the picker
                       unmount with the field would submit an empty customer. */}
                   <CustomerSelect
+                    key={customerSelectKey}
                     name="__customerPicker"
                     customers={customers as CustomerOption[]}
                     defaultValue={customerId}
@@ -334,6 +448,7 @@ export function QuickSaleForm({
                       setCustomerId(id)
                       setCustomerName(entry?.name ?? "")
                     }}
+                    onBeforeAddNew={() => saveDraft()}
                   />
                 </div>
 

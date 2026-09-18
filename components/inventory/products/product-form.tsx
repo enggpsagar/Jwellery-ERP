@@ -660,13 +660,56 @@ export function ProductForm({
   return (
     <div className="space-y-8">
       <div className="rounded-xl border p-6">
-        <h3 className="mb-6 text-lg font-semibold">Basic Information</h3>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold">Basic Information</h3>
+
+          {/* Opposite the card title, top-right — redundant once the
+              product's own type IS a stone, so it only shows for Metal
+              (there's no separate "embedded stone" to include on top of
+              itself), and sits up here instead of taking its own grid
+              slot below, to minimize space. */}
+          {productKind === "METAL" && (
+            <div className="flex items-center gap-2">
+              <IncludesStoneToggle
+                checked={hasStoneComponent}
+                onChange={(checked) => {
+                  setHasStoneComponent(checked)
+                  // Stone Weight is now hidden once the toggle is off (see
+                  // below) — clear it so a hidden field can't silently keep
+                  // submitting whatever was last typed while it was visible.
+                  if (!checked) {
+                    setStoneWeight("")
+                    setStoneWeightTouched(false)
+                  }
+                }}
+              />
+              <input
+                type="hidden"
+                name="hasStoneComponent"
+                value={hasStoneComponent ? "true" : "false"}
+              />
+            </div>
+          )}
+        </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <Label htmlFor="name">Product Name <RequiredMark /></Label>
+
+            <Input
+              id="name"
+              name="name"
+              defaultValue={product?.name ?? ""}
+              placeholder="Ladies Ring"
+            />
+
+            <ErrorText error={state.errors.name} />
+          </div>
+
           <div>
-            {/* Leads the form (ahead of Category) since it decides which
-                list the field beside it offers, and — through Default
-                Purity below — the SKU itself. */}
+            {/* Leads the rest of the form (ahead of Category) since it
+                decides which list the field beside it offers, and —
+                through Default Purity below — the SKU itself. */}
             <Label>Metal / Stone <RequiredMark /></Label>
 
             <Select
@@ -873,31 +916,6 @@ export function ProductForm({
             </div>
           )}
 
-          {/* Redundant once the product's own type IS a stone — there's no
-              separate "embedded stone" to include on top of itself. */}
-          {productKind === "METAL" && (
-          <div className="flex items-end pb-2">
-            <IncludesStoneToggle
-              checked={hasStoneComponent}
-              onChange={(checked) => {
-                setHasStoneComponent(checked)
-                // Stone Weight is now hidden once the toggle is off (see
-                // below) — clear it so a hidden field can't silently keep
-                // submitting whatever was last typed while it was visible.
-                if (!checked) {
-                  setStoneWeight("")
-                  setStoneWeightTouched(false)
-                }
-              }}
-            />
-            <input
-              type="hidden"
-              name="hasStoneComponent"
-              value={hasStoneComponent ? "true" : "false"}
-            />
-          </div>
-          )}
-
           <div>
             <Label>Category <RequiredMark /></Label>
 
@@ -1019,19 +1037,6 @@ export function ProductForm({
             />
 
             <ErrorText error={state.errors.categoryTypeId} />
-          </div>
-
-          <div>
-            <Label htmlFor="name">Product Name <RequiredMark /></Label>
-
-            <Input
-              id="name"
-              name="name"
-              defaultValue={product?.name ?? ""}
-              placeholder="Ladies Ring"
-            />
-
-            <ErrorText error={state.errors.name} />
           </div>
 
           {styleFieldEnabled && (

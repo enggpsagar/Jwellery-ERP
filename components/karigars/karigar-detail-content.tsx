@@ -69,7 +69,11 @@ export function KarigarDetailContent({
           because they used to be two separate <div>s. Specialization moved
           to the header's top-right corner (see KarigarDetailPanel/the
           standalone page's own header) instead of taking a card slot here. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* items-start: a CSS grid item defaults to stretching to the tallest
+          card in its row, which visibly bloated the compact metal-balance
+          ribbon cards below to match Metal/Stone's taller checkbox lists.
+          Each card now sizes to its own content instead. */}
+      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {hasOpeningGold && (
             <Card size="sm">
               <CardHeader>

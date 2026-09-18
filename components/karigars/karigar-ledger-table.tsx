@@ -616,7 +616,12 @@ export function KarigarLedgerTable({
                 sortDir={financialSortDir}
                 onSort={handleFinancialSort}
               />
-              <TableHead>Issued By</TableHead>
+              {/* Hidden below sm, same reasoning as the Parties list
+                  (customers-table.tsx): this table sits in overflow-x-auto
+                  with no visible scroll affordance, so on a narrow phone
+                  the amount/balance columns that actually matter here stay
+                  on-screen instead of silently scrolling out with the rest. */}
+              <TableHead className="hidden sm:table-cell">Issued By</TableHead>
               <SortableHead
                 label="Cash Amount"
                 sortKey="amount"
@@ -649,7 +654,7 @@ export function KarigarLedgerTable({
                     <TableCell>
                       <Badge variant={isDebit ? "destructive" : "secondary"}>{row.type}</Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       {row.createdByName ?? row.sourceLabel}
                       {row.paymentMethod ? (
                         <span className="block text-xs text-muted-foreground">

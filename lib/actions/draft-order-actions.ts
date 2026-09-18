@@ -35,6 +35,7 @@ export type DraftOrderItemInput = {
   metalTypeId?: string | null;
   purity?: PurityType | null;
   purityLabel?: string | null;
+  stoneTypeName?: string | null;
   quantity: number;
   estimatedWeight?: number | null;
   estimatedRate?: number | null;
@@ -346,6 +347,7 @@ export type DraftOrderItemRow = {
   metalName: string | null;
   purity: PurityType | null;
   purityLabel: string | null;
+  stoneTypeName: string | null;
   quantity: number;
   estimatedWeight: number | null;
   estimatedRate: number | null;
@@ -396,6 +398,7 @@ export async function getDraftOrderById(id: string): Promise<DraftOrderDetail | 
       metalName: item.metalType?.name ?? null,
       purity: item.purity,
       purityLabel: item.purityLabel,
+      stoneTypeName: item.stoneTypeName,
       quantity: item.quantity,
       estimatedWeight: item.estimatedWeight ? Number(item.estimatedWeight) : null,
       estimatedRate: item.estimatedRate ? Number(item.estimatedRate) : null,
@@ -540,6 +543,7 @@ export async function createDraftOrder(
               metalTypeId: item.metalTypeId || undefined,
               purity: item.purity || undefined,
               purityLabel: item.purityLabel || undefined,
+              stoneTypeName: item.stoneTypeName || undefined,
               quantity: item.quantity || 1,
               estimatedWeight: item.estimatedWeight ?? undefined,
               estimatedRate: item.estimatedRate ?? undefined,

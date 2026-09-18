@@ -14,7 +14,13 @@ import { CustomerSelect, type CustomerOption } from "@/components/customers/cust
 import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select"
 import { matchLegacyPurityType } from "@/lib/purity"
 import { classifyPurityFamily } from "@/lib/business-units"
-import { getStoreMetalPurities, type StoreMetalRow, type StoreMetalPurityRow } from "@/lib/actions/taxonomy-actions"
+import {
+  getStoreMetalPurities,
+  getStoreMetalOrigins,
+  type StoreMetalRow,
+  type StoreMetalPurityRow,
+  type StoreMetalOriginRow,
+} from "@/lib/actions/taxonomy-actions"
 import type { PurityType } from "@prisma/client"
 import { useToast } from "@/components/providers/toast-provider"
 
@@ -57,6 +63,7 @@ function emptyItem(key: string = crypto.randomUUID()): ItemRow {
     metalTypeId: "",
     purity: null,
     purityLabel: null,
+    stoneTypeName: null,
     quantity: 1,
     estimatedWeight: null,
     estimatedRate: null,
@@ -106,6 +113,19 @@ export function DraftOrderForm({
       .catch((err) => console.error("Failed to load purities:", err))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metalPuritiesCache])
+
+  // Stone Types (Settings > Taxonomy > Stone Types) for whichever gemstone
+  // is picked as an item's own "Metal / Stone" — same cache-per-id pattern
+  // as metalPuritiesCache above.
+  const [stoneTypesCache, setStoneTypesCache] = useState<Record<string, StoreMetalOriginRow[]>>({})
+
+  const ensureStoneTypes = useCallback((storeMetalId: string) => {
+    if (!storeMetalId || stoneTypesCache[storeMetalId]) return
+    getStoreMetalOrigins(storeMetalId)
+      .then((data) => setStoneTypesCache((prev) => ({ ...prev, [storeMetalId]: data })))
+      .catch((err) => console.error("Failed to load Stone Types:", err))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stoneTypesCache])
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
   const showLocationField = useShowLocationField(locations.length)
@@ -247,16 +267,17 @@ export function DraftOrderForm({
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label>Metal</Label>
+                    <Label>Metal / Stone</Label>
                     <Select
                       value={item.metalTypeId ?? ""}
                       onValueChange={(value) => {
                         const metal = metals.find((m) => m.id === value)
-                        if (metal?.hasPurity) ensureMetalPurities(value)
-                        // A metal with no purity concept (e.g. Diamond) has
-                        // nothing for the Purity select below to fire its own
-                        // auto-fill on, so prefill from the metal's flat
-                        // Selling Price right here instead.
+                        if (metal?.isGemstone) ensureStoneTypes(value)
+                        else if (metal?.hasPurity) ensureMetalPurities(value)
+                        // A metal with no purity concept (e.g. a gemstone)
+                        // has nothing for the Purity select below to fire
+                        // its own auto-fill on, so prefill from the metal's
+                        // flat Selling Price right here instead.
                         const autoRate =
                           !item.rateTouched && metal && !metal.hasPurity
                             ? metal.sellingPrice ?? null
@@ -265,12 +286,13 @@ export function DraftOrderForm({
                           metalTypeId: value,
                           purity: null,
                           purityLabel: null,
+                          stoneTypeName: null,
                           ...(autoRate !== undefined ? { estimatedRate: autoRate } : {}),
                         })
                       }}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select metal" />
+                        <SelectValue placeholder="Select metal or stone" />
                       </SelectTrigger>
                       <SelectContent>
                         {metals
@@ -283,6 +305,30 @@ export function DraftOrderForm({
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {selectedMetal?.isGemstone && (
+                    <div className="space-y-1.5">
+                      <Label>Stone Type</Label>
+                      <Select
+                        value={item.stoneTypeName ?? "__none__"}
+                        onValueChange={(value) =>
+                          updateItem(item.key, { stoneTypeName: value === "__none__" ? null : value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Stone Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {(stoneTypesCache[item.metalTypeId ?? ""] ?? []).map((origin) => (
+                            <SelectItem key={origin.id} value={origin.name}>
+                              {origin.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   {selectedMetal?.hasPurity && (
                     <div className="space-y-1.5">

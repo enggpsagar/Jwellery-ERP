@@ -984,78 +984,80 @@ export function ProductForm({
             <ErrorText error={state.errors.categoryId} />
           </div>
 
-          <div>
-            <Label>Type</Label>
+          {/* Most Categories have no Types configured at all (Settings ->
+              Taxonomy) — showing this picker with nothing but "None" to
+              choose from is just clutter, so it only renders once the
+              selected Category actually has Types, or while that's still
+              being checked (avoids a flash of the field appearing then
+              disappearing on a fast category switch). */}
+          {categoryId && (loadingTypes || types.length > 0) && (
+            <div>
+              <Label>Type</Label>
 
-            <div className="flex gap-1.5">
-              <Select
-                value={categoryTypeId || "__none__"}
-                onValueChange={(value) =>
-                  setCategoryTypeId(value === "__none__" ? "" : value)
-                }
-                disabled={!categoryId || loadingTypes}
-              >
-                <SelectTrigger className="h-11 w-full">
-                  <SelectValue
-                    placeholder={
-                      !categoryId
-                        ? "Select a category first"
-                        : loadingTypes
-                          ? "Loading types..."
-                          : "Select Type"
-                    }
-                  />
-                </SelectTrigger>
+              <div className="flex gap-1.5">
+                <Select
+                  value={categoryTypeId || "__none__"}
+                  onValueChange={(value) =>
+                    setCategoryTypeId(value === "__none__" ? "" : value)
+                  }
+                  disabled={loadingTypes}
+                >
+                  <SelectTrigger className="h-11 w-full">
+                    <SelectValue
+                      placeholder={loadingTypes ? "Loading types..." : "Select Type"}
+                    />
+                  </SelectTrigger>
 
-                <SelectContent>
-                  {types.length > 3 && (
-                    <div className="p-2">
-                      <Input
-                        placeholder="Search types..."
-                        value={typeSearch}
-                        onChange={(event) => setTypeSearch(event.target.value)}
-                        onKeyDown={(event) => event.stopPropagation()}
-                      />
-                    </div>
-                  )}
+                  <SelectContent>
+                    {types.length > 3 && (
+                      <div className="p-2">
+                        <Input
+                          placeholder="Search types..."
+                          value={typeSearch}
+                          onChange={(event) => setTypeSearch(event.target.value)}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        />
+                      </div>
+                    )}
 
-                  <SelectItem value="__none__">None</SelectItem>
+                    <SelectItem value="__none__">None</SelectItem>
 
-                  {filteredTypes.length === 0 && typeSearch ? (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No types found for "{typeSearch}"
-                    </div>
-                  ) : (
-                    filteredTypes.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+                    {filteredTypes.length === 0 && typeSearch ? (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        No types found for "{typeSearch}"
+                      </div>
+                    ) : (
+                      filteredTypes.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
 
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon"
-                className="h-11 w-9 shrink-0 px-0"
-                title="Add Type"
-                disabled={!categoryId || loadingTypes}
-                onClick={() => setAddTypeOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  className="h-11 w-9 shrink-0 px-0"
+                  title="Add Type"
+                  disabled={loadingTypes}
+                  onClick={() => setAddTypeOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <ErrorText error={state.errors.categoryTypeId} />
             </div>
+          )}
 
-            <input
-              type="hidden"
-              name="categoryTypeId"
-              value={categoryTypeId}
-            />
-
-            <ErrorText error={state.errors.categoryTypeId} />
-          </div>
+          <input
+            type="hidden"
+            name="categoryTypeId"
+            value={categoryTypeId}
+          />
 
           {styleFieldEnabled && (
             <div>

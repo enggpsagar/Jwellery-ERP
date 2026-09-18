@@ -10,17 +10,29 @@ import { otpEmail } from "@/lib/email-templates";
 import { resolveStoreName } from "@/lib/invite-email";
 import { APP_NAME } from "@/lib/constants/app";
 import { logger } from "@/lib/logger";
+import { OTP_TTL_MS } from "@/lib/auth/otp-policy";
+import { assertNotLocked, OtpLockedError } from "@/lib/auth/otp-lockout";
 
-const OTP_TTL_MS = 5 * 60 * 1000;
-
-// A "Resend OTP" button has no cooldown on its own — this is what actually
+// A "Resend OTP" button has no cooldown of its own — this is what actually
 // stops it being spammed (each resend is a real SMS/email send). Checked
 // against whichever LOGIN-purpose code (consumed or not) for this
 // phone/email was created most recently, before that row gets replaced.
-// Phone gets a longer window than email — an SMS is slower to arrive and
-// costs more per send than an email does.
-const PHONE_RESEND_COOLDOWN_MS = 2 * 60 * 1000;
-const EMAIL_RESEND_COOLDOWN_MS = 30 * 1000;
+// Deliberately the SAME duration as OTP_TTL_MS, and identical for both
+// Mobile and Email — "Resend OTP" only ever becomes available once the
+// current code has actually expired, never before and never with a
+// separate per-channel wait.
+const RESEND_COOLDOWN_MS = OTP_TTL_MS;
+
+function lockedResponse(lockedUntil: Date) {
+  const lockedForSeconds = Math.max(1, Math.ceil((lockedUntil.getTime() - Date.now()) / 1000));
+  return NextResponse.json(
+    {
+      error: "Too many failed attempts. Please try again after 24 hours.",
+      lockedForSeconds,
+    },
+    { status: 423 },
+  );
+}
 
 // Shown instead of sending a code when the phone/email has no matching
 // User row — deliberately reveals account existence (a change from this
@@ -62,6 +74,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: NO_ACCOUNT_MESSAGE }, { status: 404 });
       }
 
+      try {
+        await assertNotLocked(phone, OtpPurpose.LOGIN);
+      } catch (error) {
+        if (error instanceof OtpLockedError) return lockedResponse(error.lockedUntil);
+        throw error;
+      }
+
       const lastCode = await prisma.otpCode.findFirst({
         where: { phone, purpose: OtpPurpose.LOGIN },
         orderBy: { createdAt: "desc" },
@@ -69,8 +88,8 @@ export async function POST(request: NextRequest) {
       });
       if (lastCode) {
         const elapsed = Date.now() - lastCode.createdAt.getTime();
-        if (elapsed < PHONE_RESEND_COOLDOWN_MS) {
-          return cooldownResponse(PHONE_RESEND_COOLDOWN_MS - elapsed);
+        if (elapsed < RESEND_COOLDOWN_MS) {
+          return cooldownResponse(RESEND_COOLDOWN_MS - elapsed);
         }
       }
 
@@ -105,6 +124,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: NO_ACCOUNT_MESSAGE }, { status: 404 });
       }
 
+      try {
+        await assertNotLocked(normalizedEmail, OtpPurpose.LOGIN);
+      } catch (error) {
+        if (error instanceof OtpLockedError) return lockedResponse(error.lockedUntil);
+        throw error;
+      }
+
       const lastCode = await prisma.otpCode.findFirst({
         where: { email: normalizedEmail, purpose: OtpPurpose.LOGIN },
         orderBy: { createdAt: "desc" },
@@ -112,8 +138,8 @@ export async function POST(request: NextRequest) {
       });
       if (lastCode) {
         const elapsed = Date.now() - lastCode.createdAt.getTime();
-        if (elapsed < EMAIL_RESEND_COOLDOWN_MS) {
-          return cooldownResponse(EMAIL_RESEND_COOLDOWN_MS - elapsed);
+        if (elapsed < RESEND_COOLDOWN_MS) {
+          return cooldownResponse(RESEND_COOLDOWN_MS - elapsed);
         }
       }
 
@@ -158,6 +184,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "OTP sent successfully.",
+      // Lets the client seed its countdown from the same number the server
+      // just used, rather than a hardcoded constant that could drift from
+      // OTP_TTL_MS.
+      expiresInSeconds: Math.round(OTP_TTL_MS / 1000),
     });
   } catch (error) {
     logger.error("SEND OTP ERROR", error);

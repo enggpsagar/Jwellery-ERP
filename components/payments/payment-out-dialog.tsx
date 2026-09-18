@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useActionState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Plus } from "lucide-react"
@@ -31,6 +31,21 @@ const initialState: PaymentFormState = { success: false, message: "" }
 
 type PartyType = "VENDOR" | "KARIGAR"
 
+/**
+ * Where an in-progress Payment Out is parked while the user is away
+ * creating a new vendor. sessionStorage (not localStorage) so it dies with
+ * the tab and can never resurrect a stale draft days later. Only the Vendor
+ * half of this dialog ever navigates away like this — the Karigar half has
+ * its own in-page AddKarigarDialog modal and never touches this.
+ */
+const DRAFT_KEY = "payment-out-dialog-draft"
+
+type PaymentOutDraft = {
+  rows: PaymentMethodValue[]
+  notes: string
+  partyType: PartyType
+}
+
 type PaymentOutDialogProps = {
   vendors: PaymentVendorOption[]
   karigars: PaymentKarigarOption[]
@@ -51,9 +66,15 @@ type PaymentOutDialogProps = {
 export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
   const searchParams = useSearchParams()
   const initialVendorId = searchParams.get("vendorId") ?? ""
+  // Set when we're bounced back here from creating a brand new vendor (see
+  // saveDraft/the restore effect below) — also implies opening, same as
+  // ?vendorId=.
+  const newPartyIdParam = searchParams.get("newCustomerId")
   // Lets the sidebar's own "+" quick-add (?new=1) open this straight away,
   // same as PaymentInDialog — a named ?vendorId= also implies opening.
-  const [open, setOpen] = useState(() => searchParams.get("new") === "1" || !!initialVendorId)
+  const [open, setOpen] = useState(
+    () => searchParams.get("new") === "1" || !!initialVendorId || !!newPartyIdParam,
+  )
   const [partyType, setPartyType] = useState<PartyType>("VENDOR")
   const [partyId, setPartyId] = useState(initialVendorId)
   // Own copy so a karigar created via KarigarSelect's "+" mid-form shows up
@@ -66,6 +87,9 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
   const selectedVendor = partyType === "VENDOR" ? vendors.find((v) => v.id === partyId) : undefined
 
   const [rows, setRows] = useState<PaymentMethodValue[]>([emptyPaymentMethodValue()])
+  // Uncontrolled originally; now controlled so saveDraft/the restore effect
+  // below can read and rewrite it without reaching into the DOM.
+  const [notes, setNotes] = useState("")
 
   const [state, formAction, pending] = useActionState(recordPaymentOut, initialState)
 
@@ -85,10 +109,81 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
       setPartyType("VENDOR")
       setPartyId(initialVendorId)
       setRows([emptyPaymentMethodValue()])
+      setNotes("")
       setKarigarList(karigars)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  /**
+   * Parks the in-progress payment (split rows + notes + which party tab was
+   * active) before navigating off to create a new vendor. Without this,
+   * "Create new party" inside the nested CustomerSelect would silently
+   * discard everything already entered in this dialog — see CustomerSelect's
+   * own onBeforeAddNew doc comment. Only wired to the Vendor path; the
+   * Karigar path's AddKarigarDialog is a real in-page modal and never loses
+   * this state to begin with.
+   */
+  const saveDraft = () => {
+    const draft: PaymentOutDraft = { rows, notes, partyType }
+
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    } catch {
+      // A full or blocked sessionStorage shouldn't stop the user getting to
+      // the create page — they just lose the draft, same as before.
+    }
+  }
+
+  // Restore-on-return. Runs once: if we're back here because a new vendor
+  // was just created (newCustomerId), pick it up and restore whatever draft
+  // saveDraft parked. Deliberately not dependent on searchParams —
+  // re-running after the URL is cleaned would wipe edits made since.
+  const draftRestoredRef = useRef(false)
+
+  useEffect(() => {
+    if (draftRestoredRef.current) return
+    draftRestoredRef.current = true
+
+    const newPartyId = searchParams.get("newCustomerId")
+
+    let raw: string | null = null
+    try {
+      raw = sessionStorage.getItem(DRAFT_KEY)
+      if (raw) sessionStorage.removeItem(DRAFT_KEY)
+    } catch {
+      raw = null
+    }
+
+    let draft: PaymentOutDraft | null = null
+    if (raw) {
+      try {
+        draft = JSON.parse(raw) as PaymentOutDraft
+      } catch {
+        draft = null
+      }
+    }
+
+    if (newPartyId) {
+      // CustomerSelect (the "Create new party" affordance that led here) is
+      // only ever wired up on the Vendor half of this dialog, so the party
+      // just created is always a vendor.
+      setPartyType(draft?.partyType ?? "VENDOR")
+      setPartyId(newPartyId)
+      if (draft) {
+        setRows(draft.rows && draft.rows.length ? draft.rows : [emptyPaymentMethodValue()])
+        setNotes(draft.notes ?? "")
+      }
+
+      // Strip the one-shot param via history rather than router.replace, so
+      // Next doesn't re-render the route and undo what we just restored.
+      const params = new URLSearchParams(window.location.search)
+      params.delete("newCustomerId")
+      const query = params.toString()
+      window.history.replaceState({}, "", window.location.pathname + (query ? `?${query}` : ""))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const updateRow = (index: number, patch: Partial<PaymentMethodValue>) => {
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)))
@@ -182,6 +277,7 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
                 name="vendorId"
                 defaultValue={partyId}
                 onChange={setPartyId}
+                onBeforeAddNew={() => saveDraft()}
                 termLabel="supplier"
               />
             ) : (
@@ -257,7 +353,13 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Notes</Label>
-            <Textarea name="notes" rows={2} placeholder="Optional notes..." />
+            <Textarea
+              name="notes"
+              rows={2}
+              placeholder="Optional notes..."
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+            />
           </div>
 
           <DialogFooter>

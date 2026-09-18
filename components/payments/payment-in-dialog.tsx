@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useActionState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Plus } from "lucide-react"
@@ -31,6 +31,18 @@ import {
 
 const initialState: PaymentFormState = { success: false, message: "" }
 
+/**
+ * Where an in-progress Payment In is parked while the user is away creating
+ * a new party. sessionStorage (not localStorage) so it dies with the tab
+ * and can never resurrect a stale draft days later.
+ */
+const DRAFT_KEY = "payment-in-dialog-draft"
+
+type PaymentInDraft = {
+  rows: PaymentMethodValue[]
+  notes: string
+}
+
 type PaymentInDialogProps = {
   customers: PaymentCustomerOption[]
 }
@@ -47,11 +59,17 @@ type PaymentInDialogProps = {
 export function PaymentInDialog({ customers }: PaymentInDialogProps) {
   const searchParams = useSearchParams()
   const initialCustomerId = searchParams.get("customerId") ?? ""
+  // Set when we're bounced back here from creating a brand new party (see
+  // saveDraft/the restore effect below) — also implies opening, same as
+  // ?customerId=.
+  const newCustomerIdParam = searchParams.get("newCustomerId")
   // Lets the sidebar's own "+" quick-add (?new=1) open this straight away,
   // same as every other section's quick-add landing on a real /new page —
   // this dialog is the closest equivalent Payment In has to one. A named
   // ?customerId= also implies opening.
-  const [open, setOpen] = useState(() => searchParams.get("new") === "1" || !!initialCustomerId)
+  const [open, setOpen] = useState(
+    () => searchParams.get("new") === "1" || !!initialCustomerId || !!newCustomerIdParam,
+  )
   const [customerId, setCustomerId] = useState(initialCustomerId)
   const router = useRouter()
   const toast = useToast()
@@ -59,6 +77,9 @@ export function PaymentInDialog({ customers }: PaymentInDialogProps) {
   const selectedCustomer = customers.find((c) => c.id === customerId)
 
   const [rows, setRows] = useState<PaymentMethodValue[]>([emptyPaymentMethodValue()])
+  // Uncontrolled originally; now controlled so saveDraft/the restore effect
+  // below can read and rewrite it without reaching into the DOM.
+  const [notes, setNotes] = useState("")
 
   const [state, formAction, pending] = useActionState(recordCustomerPayment, initialState)
 
@@ -77,9 +98,74 @@ export function PaymentInDialog({ customers }: PaymentInDialogProps) {
     if (open) {
       setCustomerId(initialCustomerId)
       setRows([emptyPaymentMethodValue()])
+      setNotes("")
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  /**
+   * Parks the in-progress payment (split rows + notes) before navigating
+   * off to create a new party. Without this, "Create new party" inside the
+   * nested CustomerSelect would silently discard everything already
+   * entered in this dialog — see CustomerSelect's own onBeforeAddNew doc
+   * comment.
+   */
+  const saveDraft = () => {
+    const draft: PaymentInDraft = { rows, notes }
+
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    } catch {
+      // A full or blocked sessionStorage shouldn't stop the user getting to
+      // the create page — they just lose the draft, same as before.
+    }
+  }
+
+  // Restore-on-return. Runs once: if we're back here because a new party
+  // was just created (newCustomerId), pick it up and restore whatever draft
+  // saveDraft parked. Deliberately not dependent on searchParams —
+  // re-running after the URL is cleaned would wipe edits made since.
+  const draftRestoredRef = useRef(false)
+
+  useEffect(() => {
+    if (draftRestoredRef.current) return
+    draftRestoredRef.current = true
+
+    const newPartyId = searchParams.get("newCustomerId")
+
+    let raw: string | null = null
+    try {
+      raw = sessionStorage.getItem(DRAFT_KEY)
+      if (raw) sessionStorage.removeItem(DRAFT_KEY)
+    } catch {
+      raw = null
+    }
+
+    let draft: PaymentInDraft | null = null
+    if (raw) {
+      try {
+        draft = JSON.parse(raw) as PaymentInDraft
+      } catch {
+        draft = null
+      }
+    }
+
+    if (newPartyId) {
+      setCustomerId(newPartyId)
+      if (draft) {
+        setRows(draft.rows && draft.rows.length ? draft.rows : [emptyPaymentMethodValue()])
+        setNotes(draft.notes ?? "")
+      }
+
+      // Strip the one-shot param via history rather than router.replace, so
+      // Next doesn't re-render the route and undo what we just restored.
+      const params = new URLSearchParams(window.location.search)
+      params.delete("newCustomerId")
+      const query = params.toString()
+      window.history.replaceState({}, "", window.location.pathname + (query ? `?${query}` : ""))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const updateRow = (index: number, patch: Partial<PaymentMethodValue>) => {
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)))
@@ -138,6 +224,7 @@ export function PaymentInDialog({ customers }: PaymentInDialogProps) {
               name="customerId"
               defaultValue={customerId}
               onChange={setCustomerId}
+              onBeforeAddNew={() => saveDraft()}
             />
             {selectedCustomer && (
               <p className="text-sm text-muted-foreground">
@@ -198,7 +285,13 @@ export function PaymentInDialog({ customers }: PaymentInDialogProps) {
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             <Label>Notes</Label>
-            <Textarea name="notes" rows={2} placeholder="Optional notes..." />
+            <Textarea
+              name="notes"
+              rows={2}
+              placeholder="Optional notes..."
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+            />
           </div>
 
           <DialogFooter>

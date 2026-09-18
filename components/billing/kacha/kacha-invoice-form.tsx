@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
 
@@ -165,6 +165,26 @@ function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: nu
 
 const initialState: KachaInvoiceFormState = { success: false, message: "" }
 
+/**
+ * Where an in-progress Kacha estimate is parked while the user is away
+ * creating a party via CustomerSelect's "+"/"Create new party". Without
+ * this, that round trip silently drops every line item and everything
+ * else already typed — sessionStorage (not localStorage) so it dies with
+ * the tab and can never resurrect a stale draft days later. Mirrors
+ * draft-order-form.tsx's own DRAFT_KEY/DraftOrderDraft.
+ */
+const DRAFT_KEY = "kacha-invoice-form-draft"
+
+type KachaInvoiceDraft = {
+  customerId: string
+  locationId: string
+  items: LineItem[]
+  discount: number
+  paymentRows: PaymentMethodValue[]
+  invoiceDate: string
+  notes: string
+}
+
 type KachaInvoiceFormProps = {
   customers: CustomerOption[]
   stockItems: StockOption[]
@@ -261,7 +281,15 @@ export function KachaInvoiceForm({
   // regardless of what unit is currently toggled for display/entry.
   const primaryUnitFor = (item: LineItem) => metalById.get(item.metalTypeId)?.primaryUnit ?? "GRAM"
   const router = useRouter()
+  const searchParams = useSearchParams()
   const toast = useToast()
+  const formRef = useRef<HTMLFormElement>(null)
+
+  // CustomerSelect/LocationSelect both seed their own selection from
+  // `defaultValue` into internal state, so changing that prop alone will
+  // not move them once a restored value needs to show.
+  const [customerSelectKey, setCustomerSelectKey] = useState(0)
+  const [locationSelectKey, setLocationSelectKey] = useState(0)
 
   const [customerId, setCustomerId] = useState("")
   const [locationId, setLocationId] = useState(initialLocationId ?? "")
@@ -288,6 +316,114 @@ export function KachaInvoiceForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
+
+  /**
+   * Parks the whole in-progress estimate before we navigate off to create a
+   * party. Without this, "Create new party" would silently throw away every
+   * line item and everything else already typed — see this file's own
+   * DRAFT_KEY doc comment.
+   *
+   * Slip Date and Notes are uncontrolled inputs, so they are read off the
+   * form element rather than from state.
+   */
+  const saveDraft = () => {
+    const formData = formRef.current ? new FormData(formRef.current) : null
+
+    const draft: KachaInvoiceDraft = {
+      customerId,
+      locationId,
+      items,
+      discount,
+      paymentRows,
+      invoiceDate: formData ? String(formData.get("invoiceDate") ?? "") : "",
+      notes: formData ? String(formData.get("notes") ?? "") : "",
+    }
+
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    } catch {
+      // A full or blocked sessionStorage shouldn't stop the user getting to
+      // the create page — they just lose the draft, same as before.
+    }
+  }
+
+  // Restore-on-return. Runs once: reads any parked draft, then selects the
+  // party that was just created. Deliberately not dependent on
+  // searchParams — re-running after the URL is cleaned would wipe edits
+  // made since. Mirrors draft-order-form.tsx's own restore effect.
+  const restoredRef = useRef(false)
+
+  useEffect(() => {
+    if (restoredRef.current) return
+    restoredRef.current = true
+
+    const newCustomerId = searchParams.get("newCustomerId")
+
+    let raw: string | null = null
+    try {
+      raw = sessionStorage.getItem(DRAFT_KEY)
+      if (raw) sessionStorage.removeItem(DRAFT_KEY)
+    } catch {
+      raw = null
+    }
+
+    let draft: KachaInvoiceDraft | null = null
+    if (raw) {
+      try {
+        draft = JSON.parse(raw) as KachaInvoiceDraft
+      } catch {
+        draft = null
+      }
+    }
+
+    if (draft) {
+      setCustomerId(newCustomerId || draft.customerId || "")
+      const restoredItems = draft.items && draft.items.length ? draft.items : [emptyLineItem()]
+      setItems(restoredItems)
+      setLocationId(draft.locationId ?? "")
+      setDiscount(draft.discount ?? 0)
+      setPaymentRows(draft.paymentRows ?? [])
+
+      // Purity options for each restored line's metal need loading too — a
+      // line restored with a metalTypeId already picked would otherwise show
+      // an empty Purity dropdown despite purityLabel being set, until
+      // something else happens to trigger a fetch. Same fix as
+      // receive-items-form.tsx's own restore effect.
+      const uniqueMetalTypeIds = Array.from(
+        new Set(restoredItems.map((item) => item.metalTypeId).filter(Boolean)),
+      )
+      for (const id of uniqueMetalTypeIds) ensureMetalPurities(id)
+
+      if (formRef.current) {
+        const invoiceDateInput = formRef.current.elements.namedItem(
+          "invoiceDate",
+        ) as HTMLInputElement | null
+        if (invoiceDateInput && draft.invoiceDate) invoiceDateInput.value = draft.invoiceDate
+
+        const notesInput = formRef.current.elements.namedItem(
+          "notes",
+        ) as HTMLTextAreaElement | null
+        if (notesInput && draft.notes) notesInput.value = draft.notes
+      }
+
+      // Both pickers seed their selection from `defaultValue` into internal
+      // state, so a restored value only shows once they remount.
+      setCustomerSelectKey((key) => key + 1)
+      setLocationSelectKey((key) => key + 1)
+
+      toast.success("Picked up where you left off")
+    } else if (newCustomerId) {
+      setCustomerId(newCustomerId)
+      setCustomerSelectKey((key) => key + 1)
+    }
+
+    // Strip the one-shot param via history rather than router.replace, so
+    // Next doesn't re-render the route and undo what we just restored.
+    if (newCustomerId) {
+      window.history.replaceState({}, "", window.location.pathname)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const updateItem = (key: string, patch: Partial<LineItem>) => {
     setItems((prev) =>
@@ -573,6 +709,7 @@ export function KachaInvoiceForm({
 
   return (
     <form
+      ref={formRef}
       onSubmit={(event) => {
         // Deliberately not `action={formAction}` directly on the form:
         // React resets a form's uncontrolled fields once an action-bound
@@ -596,9 +733,11 @@ export function KachaInvoiceForm({
         <div className="space-y-2 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Party <RequiredMark /></Label>
           <CustomerSelect
+            key={customerSelectKey}
             customers={customers}
             defaultValue={customerId}
             onChange={(id) => setCustomerId(id)}
+            onBeforeAddNew={() => saveDraft()}
             name="customerId"
           />
         </div>
@@ -615,6 +754,7 @@ export function KachaInvoiceForm({
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           {showLocationField && <Label>Store Location</Label>}
           <LocationSelect
+            key={locationSelectKey}
             locations={locations}
             name="locationId"
             defaultValue={locationId}

@@ -737,7 +737,7 @@ export function KachaInvoiceForm({
                   <div className="flex gap-1">
                     <Input
                       type="number"
-                      step="0.00001"
+                      step="any"
                       className="flex-1"
                       value={
                         item.grossWeight === 0
@@ -781,7 +781,7 @@ export function KachaInvoiceForm({
                   <div className="flex gap-1">
                     <Input
                       type="number"
-                      step="0.00001"
+                      step="any"
                       className="flex-1"
                       value={
                         item.netWeight === 0
@@ -826,7 +826,7 @@ export function KachaInvoiceForm({
                     <div className="flex gap-1">
                       <Input
                         type="number"
-                        step="0.00001"
+                        step="any"
                         className="flex-1"
                         value={
                           item.stoneWeightInput === 0
@@ -861,7 +861,7 @@ export function KachaInvoiceForm({
                     <Label className="text-xs">Carat Weight (ct)</Label>
                     <Input
                       type="number"
-                      step="0.001"
+                      step="any"
                       value={item.caratWeight === 0 ? "" : item.caratWeight}
                       onChange={(e) => handleCaratWeightChange(item, e.target.value)}
                     />
@@ -878,7 +878,7 @@ export function KachaInvoiceForm({
                   <div className="flex gap-1">
                     <Input
                       type="number"
-                      step="0.00001"
+                      step="any"
                       className="flex-1"
                       value={
                         item.dmoWeight === 0

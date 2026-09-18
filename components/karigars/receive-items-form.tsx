@@ -659,7 +659,7 @@ export function ReceiveItemsForm({
                       <Label className="text-xs">Gross Weight</Label>
                       <Input
                         type="number"
-                        step="0.00001"
+                        step="any"
                         value={
                           item.grossWeight === 0
                             ? ""
@@ -687,7 +687,7 @@ export function ReceiveItemsForm({
                       <Label className="text-xs">Less Weight</Label>
                       <Input
                         type="number"
-                        step="0.00001"
+                        step="any"
                         value={
                           item.lessWeight === 0
                             ? ""
@@ -715,7 +715,7 @@ export function ReceiveItemsForm({
                       <Label className="text-xs">Net Weight <RequiredMark /></Label>
                       <Input
                         type="number"
-                        step="0.00001"
+                        step="any"
                         value={
                           item.netWeight === 0
                             ? ""
@@ -739,7 +739,7 @@ export function ReceiveItemsForm({
                       <Label className="text-xs">Stone Weight</Label>
                       <Input
                         type="number"
-                        step="0.00001"
+                        step="any"
                         value={
                           item.stoneWeight === 0
                             ? ""
@@ -767,7 +767,7 @@ export function ReceiveItemsForm({
                       <Label className="text-xs">Dust/Making/Other Wt</Label>
                       <Input
                         type="number"
-                        step="0.00001"
+                        step="any"
                         value={
                           item.dmoWeight === 0
                             ? ""

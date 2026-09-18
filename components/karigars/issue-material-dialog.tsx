@@ -273,7 +273,7 @@ export function IssueMaterialDialog({
             <div className="flex gap-1">
               <Input
                 type="number"
-                step="0.001"
+                step="any"
                 min="0"
                 required
                 className="flex-1"

@@ -205,7 +205,7 @@ export function StoneComponentFields({
           <Label className="text-xs">Stone Carat Weight (ct)</Label>
           <Input
             type="number"
-            step="0.001"
+            step="any"
             value={caratWeight === 0 ? "" : caratWeight}
             onChange={(event) => onCaratWeightChange(event.target.value)}
             readOnly={lockPhysicalFields}
@@ -246,7 +246,7 @@ export function StoneComponentFields({
           <div className="flex gap-1">
             <Input
               type="number"
-              step="0.00001"
+              step="any"
               className={lockPhysicalFields ? "flex-1 bg-muted" : "flex-1"}
               value={stoneWeightInput === 0 ? "" : stoneWeightInput}
               onChange={(event) => onStoneWeightInputChange(event.target.value)}

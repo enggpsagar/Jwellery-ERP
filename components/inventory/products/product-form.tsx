@@ -1184,7 +1184,7 @@ export function ProductForm({
               <Input
                 id="defaultGrossWeight"
                 type="number"
-                step="0.00001"
+                step="any"
                 min="0"
                 className="flex-1"
                 value={displayWeight(grossWeight)}
@@ -1232,7 +1232,7 @@ export function ProductForm({
                 id="defaultCaratWeight"
                 name="defaultCaratWeight"
                 type="number"
-                step="0.001"
+                step="any"
                 min="0"
                 value={caratWeight}
                 onChange={(event) =>
@@ -1268,7 +1268,7 @@ export function ProductForm({
               <Input
                 id="defaultNetWeight"
                 type="number"
-                step="0.00001"
+                step="any"
                 min="0"
                 className={!netTouched && derivedNet !== null ? "flex-1 border-emerald-300 bg-emerald-50" : "flex-1"}
                 value={displayWeight(netWeight)}

@@ -151,7 +151,7 @@ function InvoiceItemRowView({
       <td className="px-4 py-3">
         <Input
           type="number"
-          step="0.001"
+          step="any"
           min="0"
           value={weightInput}
           onChange={(event) => setWeightInput(event.target.value)}

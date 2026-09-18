@@ -385,7 +385,7 @@ export function DraftOrderForm({
                     <Label>Estimated Weight (g)</Label>
                     <Input
                       type="number"
-                      step="0.001"
+                      step="any"
                       min="0"
                       value={item.estimatedWeight ?? ""}
                       onChange={(event) =>

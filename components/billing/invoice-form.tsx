@@ -1403,7 +1403,7 @@ export function InvoiceForm({
                   <div className="flex gap-1">
                     <Input
                       type="number"
-                      step="0.00001"
+                      step="any"
                       className={isLinked ? "flex-1 bg-muted" : "flex-1"}
                       value={
                         item.netWeight === 0
@@ -1536,7 +1536,7 @@ export function InvoiceForm({
                       <div className="flex gap-1">
                         <Input
                           type="number"
-                          step="0.00001"
+                          step="any"
                           className={isLinked ? "h-11 flex-1 bg-muted" : "h-11 flex-1"}
                           value={
                             item.grossWeight === 0
@@ -1582,7 +1582,7 @@ export function InvoiceForm({
                         <Label className="text-xs">Carat Weight (ct)</Label>
                         <Input
                           type="number"
-                          step="0.001"
+                          step="any"
                           value={item.caratWeight === 0 ? "" : item.caratWeight}
                           readOnly={isLinked}
                           className={isLinked ? "bg-muted" : undefined}
@@ -1760,7 +1760,7 @@ export function InvoiceForm({
                         <div className="flex gap-1">
                           <Input
                             type="number"
-                            step="0.00001"
+                            step="any"
                             className={isLinked ? "flex-1 bg-muted" : "flex-1"}
                             value={
                               item.stoneWeightInput === 0

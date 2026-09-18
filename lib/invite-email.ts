@@ -6,6 +6,7 @@ import {
   inviteUserEmail,
   disabledAccountEmail,
   storeArchivedEmail,
+  failedMobileOtpEmail,
 } from "@/lib/email-templates";
 import { APP_NAME } from "@/lib/constants/app";
 import { ROLE_LABELS } from "@/lib/roles";
@@ -113,6 +114,43 @@ export async function sendDisabledAccountEmailSafely(params: {
     return result.sent;
   } catch (error) {
     logger.error("sendDisabledAccountEmailSafely error", error);
+    return false;
+  }
+}
+
+/**
+ * Best-effort notice sent to a user's email when a Mobile OTP sign-in
+ * attempt against their phone entered the wrong code — never throws, since
+ * this runs inline in the sign-in path and a failed/skipped send must
+ * never block the rejection itself. Silently no-ops for a phone-only
+ * account with no email on file — there's currently no other channel to
+ * reach it (see lib/auth/otp.ts's own comment: no SMS provider is wired up
+ * yet either).
+ */
+export async function sendFailedMobileOtpEmailSafely(params: {
+  email: string | null;
+  name: string;
+  phone: string;
+  storeId: string | null;
+  locked: boolean;
+}): Promise<boolean> {
+  if (!params.email) return false;
+
+  try {
+    const storeName = params.storeId ? await resolveStoreName(params.storeId) : "the platform";
+
+    const { subject, html } = failedMobileOtpEmail({
+      name: params.name,
+      storeName,
+      phone: params.phone,
+      appName: APP_NAME,
+      locked: params.locked,
+    });
+
+    const result = await sendMail({ to: params.email, subject, html });
+    return result.sent;
+  } catch (error) {
+    logger.error("sendFailedMobileOtpEmailSafely error", error);
     return false;
   }
 }

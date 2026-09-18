@@ -165,10 +165,12 @@ export function otpEmail(params: {
           <td style="padding: 8px 0; font-size: 13px; color: #111827; font-weight: bold; border-bottom: 1px solid #f3f4f6;">${value}</td>
         </tr>`;
 
+  const validForLabel = `${expiryMinutes} minute${expiryMinutes === 1 ? "" : "s"}`;
+
   const details = [
     storeName ? detailRow("Store", storeName) : "",
     detailRow("Application", appName),
-    detailRow("Valid for", `${expiryMinutes} minutes`),
+    detailRow("Valid for", validForLabel),
   ].join("");
 
   const body = `
@@ -211,7 +213,7 @@ export function otpEmail(params: {
     // that drops the absent store line flattens those too.
     ...(storeName ? [`Store: ${storeName}`] : []),
     `Application: ${appName}`,
-    `Valid for: ${expiryMinutes} minutes`,
+    `Valid for: ${validForLabel}`,
     "",
     `Keep this code to yourself. ${appName} will never ask you for it by phone, email or message. Anyone who has this code can sign in as you.`,
     "",
@@ -224,6 +226,53 @@ export function otpEmail(params: {
       : `Verify your new email address for ${scopeLabel}`,
     html: wrapEmail(scopeLabel, heading, body),
     text,
+  };
+}
+
+/**
+ * Sent to a user's email whenever a Mobile OTP sign-in attempt against
+ * their phone number enters the wrong code — a phone-only account has no
+ * SMS provider today (see lib/auth/otp.ts's own send-side comment) and no
+ * other way to be warned that someone is guessing at its code. `locked`
+ * distinguishes the attempt that actually tripped the 5-attempt/24h lock
+ * from an ordinary wrong guess, since the follow-up action reads
+ * differently either way.
+ */
+export function failedMobileOtpEmail(params: {
+  name: string;
+  storeName: string;
+  phone: string;
+  appName: string;
+  locked: boolean;
+}) {
+  const { name, storeName, phone, appName, locked } = params;
+
+  const lastFour = phone.slice(-4);
+
+  const body = locked
+    ? `
+    <p style="margin-top: 0;">Hi ${name},</p>
+    <p>Someone entered an incorrect one-time code too many times while trying to sign in to your <strong>${storeName}</strong> account using the mobile number ending in <strong>${lastFour}</strong>.</p>
+    <div style="padding: 14px 16px; background: #fef2f2; border-left: 3px solid #dc2626; border-radius: 0 6px 6px 0; margin: 16px 0;">
+      <p style="margin: 0; font-size: 13px; color: #7f1d1d; line-height: 1.6;">
+        <strong>Sign-in with this number has been temporarily blocked for 24 hours</strong> as a security precaution.
+      </p>
+    </div>
+    <p style="margin-bottom: 0; font-size: 13px; color: #6b7280;">
+      If this wasn't you, no action is needed — the block clears on its own after 24 hours. If it keeps happening, ask your ${appName} admin to review who has access to this number.
+    </p>`
+    : `
+    <p style="margin-top: 0;">Hi ${name},</p>
+    <p>Someone entered an incorrect one-time code while trying to sign in to your <strong>${storeName}</strong> account using the mobile number ending in <strong>${lastFour}</strong>.</p>
+    <p style="margin-bottom: 0; font-size: 13px; color: #6b7280;">
+      If this wasn't you, no action is needed — the code expires on its own. If wrong attempts continue, sign-in with this number will be temporarily blocked after 5 failed tries.
+    </p>`;
+
+  return {
+    subject: locked
+      ? `Mobile sign-in temporarily blocked — ${storeName}`
+      : `Failed sign-in attempt on your ${storeName} account`,
+    html: wrapEmail(storeName, "Sign-in attempt failed", body),
   };
 }
 

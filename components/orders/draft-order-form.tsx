@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
 import { Plus, Trash2 } from "lucide-react"
@@ -12,8 +12,9 @@ import {
 } from "@/lib/actions/draft-order-actions"
 import { CustomerSelect, type CustomerOption } from "@/components/customers/customer-select"
 import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select"
-import { PURITY_SELECT_OPTIONS } from "@/lib/purity"
-import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import { matchLegacyPurityType } from "@/lib/purity"
+import { classifyPurityFamily } from "@/lib/business-units"
+import { getStoreMetalPurities, type StoreMetalRow, type StoreMetalPurityRow } from "@/lib/actions/taxonomy-actions"
 import type { PurityType } from "@prisma/client"
 import { useToast } from "@/components/providers/toast-provider"
 
@@ -55,6 +56,7 @@ function emptyItem(key: string = crypto.randomUUID()): ItemRow {
     itemName: "",
     metalTypeId: "",
     purity: null,
+    purityLabel: null,
     quantity: 1,
     estimatedWeight: null,
     estimatedRate: null,
@@ -91,6 +93,19 @@ export function DraftOrderForm({
   const router = useRouter()
   const toast = useToast()
   const [items, setItems] = useState<ItemRow[]>([emptyItem("initial")])
+
+  // Real per-Metal Purity options (Settings > Taxonomy > Purities),
+  // replacing the old global PURITY_SELECT_OPTIONS enum list — cached per
+  // metalTypeId since several items can each have their own metal.
+  const [metalPuritiesCache, setMetalPuritiesCache] = useState<Record<string, StoreMetalPurityRow[]>>({})
+
+  const ensureMetalPurities = useCallback((metalTypeId: string) => {
+    if (!metalTypeId || metalPuritiesCache[metalTypeId]) return
+    getStoreMetalPurities(metalTypeId)
+      .then((data) => setMetalPuritiesCache((prev) => ({ ...prev, [metalTypeId]: data })))
+      .catch((err) => console.error("Failed to load purities:", err))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metalPuritiesCache])
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
   const showLocationField = useShowLocationField(locations.length)
@@ -237,6 +252,7 @@ export function DraftOrderForm({
                       value={item.metalTypeId ?? ""}
                       onValueChange={(value) => {
                         const metal = metals.find((m) => m.id === value)
+                        if (metal?.hasPurity) ensureMetalPurities(value)
                         // A metal with no purity concept (e.g. Diamond) has
                         // nothing for the Purity select below to fire its own
                         // auto-fill on, so prefill from the metal's flat
@@ -248,6 +264,7 @@ export function DraftOrderForm({
                         updateItem(item.key, {
                           metalTypeId: value,
                           purity: null,
+                          purityLabel: null,
                           ...(autoRate !== undefined ? { estimatedRate: autoRate } : {}),
                         })
                       }}
@@ -271,22 +288,22 @@ export function DraftOrderForm({
                     <div className="space-y-1.5">
                       <Label>Purity</Label>
                       <Select
-                        value={item.purity ?? ""}
+                        value={(metalPuritiesCache[item.metalTypeId ?? ""] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
                         onValueChange={(value) => {
-                          const purity = value as PurityType
+                          const options = metalPuritiesCache[item.metalTypeId ?? ""] ?? []
+                          const selected = options.find((option) => option.id === value)
+                          const family = selectedMetal ? classifyPurityFamily(selectedMetal) : null
                           updateItem(item.key, {
-                            purity: purity as DraftOrderItemInput["purity"],
-                            // Store's configured per-purity Selling Rate,
+                            purityLabel: selected?.label ?? null,
+                            purity: (matchLegacyPurityType(family, selected?.label) ?? null) as DraftOrderItemInput["purity"],
+                            // Store's configured per-Purity Selling Price,
                             // falling back to the metal's own flat Selling
                             // Price — same two-step chain Invoice/Kacha/
                             // Quotation already prefill rate from. Skipped
                             // once the user has hand-edited the rate so this
                             // never overwrites a deliberate override.
                             ...(!item.rateTouched
-                              ? {
-                                  estimatedRate:
-                                    metalSellingRates[purity] ?? selectedMetal?.sellingPrice ?? null,
-                                }
+                              ? { estimatedRate: selected?.sellingPrice ?? selectedMetal?.sellingPrice ?? null }
                               : {}),
                           })
                         }}
@@ -295,8 +312,9 @@ export function DraftOrderForm({
                           <SelectValue placeholder="Select purity" />
                         </SelectTrigger>
                         <SelectContent>
-                          {PURITY_SELECT_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {(metalPuritiesCache[item.metalTypeId ?? ""] ?? []).map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
                               {option.label}
                             </SelectItem>
                           ))}

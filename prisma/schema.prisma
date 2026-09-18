@@ -325,6 +325,7 @@ model StoreMetal {
   // Type (origins above), which carries its own gramsPerCarat instead.
   purities            StoreMetalPurity[]
   categoryTags        StoreCategoryMetal[]
+  productMetalComponents ProductMetalComponent[]
 
   @@unique([storeId, name])
 }
@@ -390,6 +391,7 @@ model StoreMetalPurity {
   updatedAt       DateTime   @updatedAt
   storeMetal      StoreMetal @relation(fields: [storeMetalId], references: [id], onDelete: Cascade)
   products        Product[]
+  productMetalComponents ProductMetalComponent[]
 
   @@unique([storeMetalId, label])
 }
@@ -702,6 +704,16 @@ model Product {
   stockItems                InventoryStock[]
   purchaseItems             PurchaseItem[]
   karigarReceiptItems       KarigarReceiptItem[]
+  // The full metal/stone breakdown for a genuinely multi-metal (e.g.
+  // two-tone) or multi-stone piece. The scalar fields above (metalTypeId,
+  // defaultGrossWeight, hasStoneComponent, etc.) stay populated too — as a
+  // computed summary from the PRIMARY (first) component of each list, never
+  // summed for weight — so every existing single-metal/single-stone reader
+  // (Stock/Purchase line-item prefill, exports, reports) keeps working
+  // unchanged. See ProductMetalComponent's own doc comment for why weight
+  // specifically must never be summed across components.
+  metalComponents           ProductMetalComponent[]
+  stoneComponents           ProductStoneComponent[]
   category                  StoreCategory?       @relation(fields: [categoryId], references: [id])
   categoryType              StoreCategoryType?   @relation(fields: [categoryTypeId], references: [id])
   metalType                 StoreMetal?          @relation(fields: [metalTypeId], references: [id])
@@ -720,6 +732,57 @@ model Product {
   @@index([productCode])
   @@index([designCode])
   @@index([storeId])
+}
+
+/// One row per metal making up a Product — almost always exactly one, but a
+/// genuinely multi-metal piece (e.g. a two-tone ring: Gold + Silver) gets one
+/// row per metal. `Product.metalTypeId`/`defaultGrossWeight`/`defaultNetWeight`
+/// mirror ONLY component[0] (the "primary" metal) — never a sum across
+/// components — because a Stock entry created from this product multiplies
+/// that single weight by that single purity's fineness % into the ledger's
+/// fine-weight figure (see toFineWeight in lib/purity.ts); summing weights
+/// across components of different purities would silently corrupt that real
+/// financial number, not just a cosmetic default. Stock/Purchase/Invoice/
+/// Kacha/Quotation line items deliberately stay single-metal/single-stone
+/// (out of scope) — this table only enriches the Product catalog entry
+/// itself and its own detail view.
+model ProductMetalComponent {
+  id                 String            @id @default(cuid())
+  productId          String
+  metalTypeId        String
+  storeMetalPurityId String?
+  grossWeight        Decimal?          @db.Decimal(12, 5)
+  netWeight          Decimal?          @db.Decimal(12, 5)
+  sortOrder          Int               @default(0)
+  createdAt          DateTime          @default(now())
+  product            Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  metalType          StoreMetal        @relation(fields: [metalTypeId], references: [id])
+  storeMetalPurity   StoreMetalPurity? @relation(fields: [storeMetalPurityId], references: [id])
+
+  @@index([productId])
+  @@index([metalTypeId])
+  @@index([storeMetalPurityId])
+}
+
+/// One row per embedded stone on a Product — same "component list" reasoning
+/// as ProductMetalComponent, but stone weight/charge (flat amounts, not
+/// weight × fineness) ARE safe to sum into Product.defaultStoneWeight/
+/// defaultStoneCharge; only metal weight carries the fine-weight risk.
+model ProductStoneComponent {
+  id                 String     @id @default(cuid())
+  productId          String
+  stoneMetalTypeName String
+  stoneTypeNames     String?
+  caratWeight        Decimal?   @db.Decimal(10, 3)
+  stoneWeight        Decimal?   @db.Decimal(12, 5)
+  stoneRate          Decimal?   @db.Decimal(12, 2)
+  stoneCharge        Decimal?   @db.Decimal(12, 2)
+  stoneChargeType    ChargeType @default(FIXED)
+  sortOrder          Int        @default(0)
+  createdAt          DateTime   @default(now())
+  product            Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
 }
 
 model InventoryStock {

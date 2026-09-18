@@ -2588,6 +2588,29 @@ model OtpCode {
   @@index([userId])
 }
 
+/// Tracks failed OTP verification attempts per phone/email, independent of
+/// any single OtpCode row — a resend replaces the OtpCode row (see
+/// send-otp/route.ts's own deleteMany) but must NOT reset how many wrong
+/// guesses have already been made against it, or the 5-attempt cap could be
+/// trivially bypassed by just requesting a fresh code after every 4th
+/// failure. `identifier` is whichever one of phone/email the LOGIN OTP used
+/// — always exactly one, mirroring OtpCode's own split. Cleared entirely on
+/// a successful verification.
+model OtpLockout {
+  id             String     @id @default(cuid())
+  identifier     String
+  purpose        OtpPurpose
+  failedAttempts Int        @default(0)
+  /// Set once failedAttempts reaches the cap (see lib/auth/otp-policy.ts) —
+  /// both sending a new OTP and verifying one are refused while this is in
+  /// the future.
+  lockedUntil    DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([identifier, purpose])
+}
+
 model Employee {
   id           String    @id @default(cuid())
   employeeCode String    @unique

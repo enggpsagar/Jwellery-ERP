@@ -2025,7 +2025,7 @@ export function InvoiceForm({
           same convention as the header's Sale/Purchase buttons) so the
           three don't blur into one long strip and each stays easy to find
           at a glance. */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-2 rounded-lg border border-[color-mix(in_oklab,var(--chart-2)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-2)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-2)_12%,transparent)]">
           <PercentOrFlatInput
             base={subtotal + makingChargesTotal + stoneChargesTotal}

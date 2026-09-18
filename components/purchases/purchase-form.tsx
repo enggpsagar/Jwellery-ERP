@@ -1691,7 +1691,7 @@ export function PurchaseForm({
           treatment as the Invoice form — GST no longer has a document-level
           box here at all, each line now picks its own rate in its own
           Details region above. */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-2 rounded-lg border border-[color-mix(in_oklab,var(--chart-2)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-2)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-2)_12%,transparent)]">
           <PercentOrFlatInput
             base={subtotal + makingChargesTotal + stoneChargesTotal}

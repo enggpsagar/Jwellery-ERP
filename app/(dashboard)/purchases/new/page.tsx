@@ -39,7 +39,7 @@ export default async function NewPurchasePage({ searchParams }: Props) {
     ])
 
   return (
-    <main className="mx-auto min-w-0 max-w-6xl space-y-6 p-6">
+    <main className="mx-auto w-full min-w-0 max-w-6xl space-y-6 p-6">
       {/* PurchaseForm reads ?newCustomerId / ?newProductId via useSearchParams,
           which needs a Suspense boundary to avoid opting the whole route out
           of static optimisation. */}

@@ -334,31 +334,32 @@ export function UserFormDialog({
       <form onSubmit={handleSubmit} className="space-y-6">
       <input type="hidden" name="image" value={imageUrl} />
 
-      {/* A compact left-aligned row, same treatment as the Artisan form's
-          own photo section — click/hover the avatar itself to upload
-          instead of a separate "Upload Photo" button spreading this out;
-          Remove stays an explicit button since it isn't something hovering
-          the avatar should also mean. */}
-      <div className="flex items-center gap-4">
+      {/* Its own bordered box, same footprint as the self-service Profile
+          page's own photo card — a bigger, centered avatar reads better
+          there than a small one left-aligned in a bare row. Click/hover
+          the avatar itself to upload; Remove stays an explicit button
+          since it isn't something hovering the avatar should also mean. */}
+      <Card>
+        <CardContent className="flex flex-col items-center gap-3 py-6">
         <button
           type="button"
-          className="group relative h-14 w-14 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="group relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           disabled={uploadingPhoto}
           onClick={() => photoInputRef.current?.click()}
           title="Upload photo"
         >
-          <Avatar className="h-14 w-14 border-2 shadow-sm">
+          <Avatar className="h-24 w-24 border-2 shadow-sm">
             <AvatarImage src={imageUrl || ""} />
-            <AvatarFallback style={avatarColor(user?.name).style}>
+            <AvatarFallback className="text-2xl" style={avatarColor(user?.name).style}>
               {initialsOf(user?.name)}
             </AvatarFallback>
           </Avatar>
 
           <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
             {uploadingPhoto ? (
-              <Loader className="h-4 w-4 text-white" />
+              <Loader className="h-5 w-5 text-white" />
             ) : (
-              <Camera className="h-4 w-4 text-white" />
+              <Camera className="h-5 w-5 text-white" />
             )}
           </span>
         </button>
@@ -383,7 +384,8 @@ export function UserFormDialog({
             Remove
           </Button>
         )}
-      </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">

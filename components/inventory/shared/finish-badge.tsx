@@ -4,16 +4,16 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const FINISH_LABELS: Record<InventoryFinish, string> = {
-  KACHA: "Kacha",
-  PAKKA: "Pakka / Hallmarked",
+  KACHA: "Unfinished",
+  PAKKA: "Finished / Hallmarked",
 };
 
 // Same text on every screen except PAKKA, whose full label is what breaks
 // the stock table's layout on narrow screens — shortened there, with the
 // full label always still available via the tooltip.
 const FINISH_SHORT_LABELS: Record<InventoryFinish, string> = {
-  KACHA: "Kacha",
-  PAKKA: "Pakka",
+  KACHA: "Unfinished",
+  PAKKA: "Finished",
 };
 
 const FINISH_STYLES: Record<InventoryFinish, string> = {

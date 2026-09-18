@@ -97,9 +97,18 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
                       type="checkbox"
                       checked={karigar.assignedMetalTypeIds.includes(metal.id)}
                       disabled
-                      className="h-4 w-4"
+                      className="h-4 w-4 shrink-0"
                     />
-                    {metal.name}
+                    {/* min-w-0 lets this flex item shrink below its
+                        single-word content size (flex items default to
+                        min-width: auto), and break-words gives that word
+                        somewhere to go instead of overflowing the card's
+                        clipped edge -- this card renders inside the narrow
+                        Karigars master-detail side panel as well as the
+                        full-width standalone page, so a long gemstone name
+                        (Aquamarine, Tanzanite...) can end up far narrower
+                        than its own text here. */}
+                    <span className="min-w-0 break-words">{metal.name}</span>
                   </label>
                 ))}
               </div>
@@ -120,9 +129,10 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
                       type="checkbox"
                       checked={karigar.assignedMetalTypeIds.includes(stone.id)}
                       disabled
-                      className="h-4 w-4"
+                      className="h-4 w-4 shrink-0"
                     />
-                    {stone.name}
+                    {/* Same overflow fix as the Metal list above. */}
+                    <span className="min-w-0 break-words">{stone.name}</span>
                   </label>
                 ))}
               </div>

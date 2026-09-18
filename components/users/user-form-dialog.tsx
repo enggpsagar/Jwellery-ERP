@@ -80,10 +80,15 @@ type UserFormDialogProps = {
   asPage?: boolean
 }
 
+// Artisan (KARIGAR) is deliberately not creatable here — /karigars/new is
+// the dedicated flow that creates the Artisan record and its linked login
+// together, so this generic Add User form doesn't offer it as a role to
+// pick from scratch. Kept selectable when editing an existing Artisan user
+// (see roleOptions below) so their role isn't silently dropped from the
+// list they're currently on.
 const ASSIGNABLE_ROLES: UserRole[] = [
   UserRole.ADMIN,
   UserRole.STAFF,
-  UserRole.KARIGAR,
 ]
 
 export function UserFormDialog({
@@ -202,9 +207,13 @@ export function UserFormDialog({
   const router = useRouter()
   const toast = useToast()
 
-  const roleOptions = allowSuperAdmin
-    ? [UserRole.SUPER_ADMIN, ...ASSIGNABLE_ROLES]
-    : ASSIGNABLE_ROLES
+  const roleOptions = [
+    ...(allowSuperAdmin ? [UserRole.SUPER_ADMIN] : []),
+    ...ASSIGNABLE_ROLES,
+    // Only reappears when editing a user who is already an Artisan --
+    // never as a choice for a brand-new user (see ASSIGNABLE_ROLES above).
+    ...(mode === "edit" && user?.role === UserRole.KARIGAR ? [UserRole.KARIGAR] : []),
+  ]
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()

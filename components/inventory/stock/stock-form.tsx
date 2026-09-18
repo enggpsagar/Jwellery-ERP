@@ -613,44 +613,51 @@ export function StockForm({
             <ErrorText error={state.errors.metalTypeId} />
           </div>
 
-          <div>
-            <Label>Status</Label>
+          {/* Status and Finish are the only two fields in this row -- on a
+              3-column grid that leaves a third, empty column dragging them
+              to the left instead of centered. Wrapped in their own
+              full-width 2-column sub-grid so the pair splits the row evenly
+              instead of sitting stranded on one side. */}
+          <div className="grid gap-6 sm:grid-cols-2 lg:col-span-3">
+            <div>
+              <Label>Status</Label>
 
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue />
-              </SelectTrigger>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue />
+                </SelectTrigger>
 
-              <SelectContent>
-                {Object.values(InventoryStockStatus).map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item.replaceAll("_", " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <SelectContent>
+                  {Object.values(InventoryStockStatus).map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {item.replaceAll("_", " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <input type="hidden" name="status" value={status} />
-          </div>
+              <input type="hidden" name="status" value={status} />
+            </div>
 
-          <div>
-            <Label>Finish</Label>
+            <div>
+              <Label>Finish</Label>
 
-            <Select value={finish} onValueChange={setFinish}>
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue />
-              </SelectTrigger>
+              <Select value={finish} onValueChange={setFinish}>
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue />
+                </SelectTrigger>
 
-              <SelectContent>
-                {Object.values(InventoryFinish).map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item === "PAKKA" ? "Pakka / Hallmarked" : "Kacha"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <SelectContent>
+                  {Object.values(InventoryFinish).map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {item === "PAKKA" ? "Finished / Hallmarked" : "Unfinished"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <input type="hidden" name="finish" value={finish} />
+              <input type="hidden" name="finish" value={finish} />
+            </div>
           </div>
         </div>
       </div>

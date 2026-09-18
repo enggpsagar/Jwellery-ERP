@@ -71,9 +71,13 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
 
   return (
     <div className="space-y-4 rounded-xl border bg-card p-6">
-      {/* Specialization sits in its own top-right corner, above the action
-          buttons — it's a short descriptive label, not something that needs
-          a full card slot in the grid below (see KarigarDetailContent). */}
+      {/* Edit/View/Delete moved up here, top-right, instead of sitting at
+          the end of the action-button row below — that row was getting
+          crowded, and these three are page-chrome (manage this artisan's
+          record) rather than actions on its material/payment data, so they
+          read more naturally beside the name than mixed in with Issue/
+          Receive/Record Payment. Specialization stacks below them, still
+          in the same top-right corner it always occupied. */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">{toTitleCase(karigar.name)}</h2>
@@ -81,11 +85,23 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
             Code: {karigar.code || "-"} · Mobile: {karigar.mobile || "-"}
           </p>
         </div>
-        {karigar.specialization && (
-          <span className="rounded-full border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-            {karigar.specialization}
-          </span>
-        )}
+        <div className="flex flex-col items-end gap-2">
+          <KarigarRowActions
+            karigarId={karigar.id}
+            karigarName={karigar.name}
+            metals={metals}
+            assignedMetalTypeIds={karigar.assignedMetalTypeIds}
+            locations={locations}
+            defaultLocationId={defaultLocationId}
+            showView={false}
+            showIssueMaterial={false}
+          />
+          {karigar.specialization && (
+            <span className="rounded-full border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+              {karigar.specialization}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
@@ -107,16 +123,6 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
           />
           <RecordKarigarPaymentDialog karigarId={karigar.id} />
           <ArtisanActiveToggle karigarId={karigar.id} isActive={karigar.isActive} />
-          <KarigarRowActions
-            karigarId={karigar.id}
-            karigarName={karigar.name}
-            metals={metals}
-            assignedMetalTypeIds={karigar.assignedMetalTypeIds}
-            locations={locations}
-            defaultLocationId={defaultLocationId}
-            showView={false}
-            showIssueMaterial={false}
-          />
       </div>
 
       <KarigarDetailContent bundle={bundle} hideStatusCard />

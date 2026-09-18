@@ -40,7 +40,6 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
   // a karigar with no specialization recorded is clutter, not information.
   const hasOpeningGold = karigar.openingGold !== 0
   const hasOpeningCash = karigar.openingCash !== 0
-  const hasSpecialization = Boolean(karigar.specialization)
 
   // Same Metals/Stones split as KarigarForm's own "Assigned Metals &
   // Stones" picker (isGemstone flag) — shown here read-only, checked
@@ -52,10 +51,12 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
 
   return (
     <div className="space-y-6">
-      {/* One grid, not two stacked ones — Opening Gold/Cash/Specialization/
-          Status and the live metal balance ribbons all need to read as a
-          single row of at-a-glance cards, not visually split across a hard
-          row break just because they used to be two separate <div>s. */}
+      {/* One grid, not two stacked ones — Opening Gold/Cash/Status and the
+          live metal balance ribbons all need to read as a single row of
+          at-a-glance cards, not visually split across a hard row break just
+          because they used to be two separate <div>s. Specialization moved
+          to the header's top-right corner (see KarigarDetailPanel/the
+          standalone page's own header) instead of taking a card slot here. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {hasOpeningGold && (
             <Card size="sm">
@@ -77,17 +78,6 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
                 <div className="text-xl font-semibold">
                   ₹ {karigar.openingCash.toLocaleString("en-IN")}
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {hasSpecialization && (
-            <Card size="sm">
-              <CardHeader>
-                <CardTitle className="text-sm text-muted-foreground">Specialization</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-semibold">{karigar.specialization}</div>
               </CardContent>
             </Card>
           )}

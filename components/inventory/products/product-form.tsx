@@ -1313,9 +1313,11 @@ export function ProductForm({
             </div>
 
             <p className="mt-1 text-xs text-muted-foreground">
-              {!netTouched && derivedNet !== null
-                ? "Gross − stone — edit to override"
-                : "Manually entered"}
+              {netTouched
+                ? "Manually entered"
+                : derivedNet !== null
+                  ? "Gross − stone — edit to override"
+                  : "Auto-calculated from Gross Weight"}
             </p>
 
             <ErrorText error={state.errors.defaultNetWeight} />

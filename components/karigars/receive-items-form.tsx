@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -12,9 +12,13 @@ import {
   receiveItemsFromKarigar,
   type StockActionState,
 } from "@/lib/actions/inventory-stock-actions"
-import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
-import { classifyMetalName } from "@/lib/business-units"
-import { GRAMS_PER_CARAT, toPrimaryUnit } from "@/lib/purity"
+import {
+  getStoreMetalPurities,
+  type StoreMetalRow,
+  type StoreMetalPurityRow,
+} from "@/lib/actions/taxonomy-actions"
+import { GRAMS_PER_CARAT, toPrimaryUnit, matchLegacyPurityType } from "@/lib/purity"
+import { classifyPurityFamily } from "@/lib/business-units"
 import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
 import { useToast } from "@/components/providers/toast-provider"
 import { ProductSelect, type ProductOption } from "@/components/inventory/shared/product-select"
@@ -36,26 +40,13 @@ import { RequiredMark } from "@/components/shared/required-mark"
 
 const initialState: StockActionState = { success: false, message: "" }
 
-// "OTHER" is intentionally not in this list — it's no longer a value a user
-// picks from a dropdown, it's auto-applied when the selected metal has no
-// purity (see the per-item Metal Type <Select> below).
-const PURITY_OPTIONS: { value: string; label: string }[] = [
-  { value: "GOLD_24K", label: "Gold 24K" },
-  { value: "GOLD_22K", label: "Gold 22K" },
-  { value: "GOLD_20K", label: "Gold 20K" },
-  { value: "GOLD_18K", label: "Gold 18K" },
-  { value: "SILVER_999", label: "Silver 999" },
-  { value: "SILVER_925", label: "Silver 925" },
-  { value: "PLATINUM_950", label: "Platinum 950" },
-  { value: "PLATINUM_900", label: "Platinum 900" },
-]
-
 type ReceiptItem = {
   key: string
   itemName: string
   productId: string
   metalTypeId: string
   purity: string
+  purityLabel: string
   quantity: number
   /** Always in grams internally, regardless of weightUnit — that only picks
    * what's displayed/typed (converted via toPrimaryUnit on the way in and
@@ -136,14 +127,8 @@ function emptyReceiptItem(
     itemName: "",
     productId: "",
     metalTypeId: defaultMetal?.id ?? "",
-    purity:
-      defaultMetal && !defaultMetal.hasPurity
-        ? "OTHER"
-        : defaultMetal?.name.toLowerCase().includes("platinum")
-          ? "PLATINUM_950"
-          : classifyMetalName(defaultMetal?.name) === "SILVER"
-            ? "SILVER_999"
-            : "GOLD_22K",
+    purity: defaultMetal && !defaultMetal.hasPurity ? "OTHER" : "",
+    purityLabel: "",
     weightUnit: defaultMetal?.primaryUnit ?? "GRAM",
     quantity: 1,
     grossWeight: 0,
@@ -235,6 +220,24 @@ export function ReceiveItemsForm({
     emptyReceiptItem(defaultMetal, defaultLocationId, "initial"),
   ])
   const [labourCharge, setLabourCharge] = useState(0)
+
+  // Real per-Metal Purity options (Settings > Taxonomy > Purities),
+  // replacing the old hardcoded PURITY_OPTIONS list — cached per
+  // metalTypeId since several items can each have their own metal.
+  const [metalPuritiesCache, setMetalPuritiesCache] = useState<Record<string, StoreMetalPurityRow[]>>({})
+
+  const ensureMetalPurities = useCallback((metalTypeId: string) => {
+    if (!metalTypeId || metalPuritiesCache[metalTypeId]) return
+    getStoreMetalPurities(metalTypeId)
+      .then((data) => setMetalPuritiesCache((prev) => ({ ...prev, [metalTypeId]: data })))
+      .catch((err) => console.error("Failed to load purities:", err))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metalPuritiesCache])
+
+  useEffect(() => {
+    if (defaultMetal?.id) ensureMetalPurities(defaultMetal.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultMetal?.id])
   const [editingQuantityKeys, setEditingQuantityKeys] = useState<Set<string>>(new Set())
   const router = useRouter()
   const toast = useToast()
@@ -267,39 +270,35 @@ export function ReceiveItemsForm({
     setItems((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)))
   }
 
-  // Purity values are Gold-only or Silver-only (see PURITY_OPTIONS below) —
-  // switching metal must re-pick a purity that's actually valid for the new
-  // metal, not just keep whatever was set for the old one (e.g. Gold ->
-  // Silver must not leave "GOLD_22K" silently selected).
-  const purityOptionsForMetal = (metal: StoreMetalRow | undefined) => {
-    if (metal?.name.toLowerCase().includes("platinum")) {
-      return PURITY_OPTIONS.filter((o) => o.value.startsWith("PLATINUM_"))
-    }
-    const family = classifyMetalName(metal?.name)
-    if (family === "SILVER") return PURITY_OPTIONS.filter((o) => o.value.startsWith("SILVER_"))
-    if (family === "GOLD") return PURITY_OPTIONS.filter((o) => o.value.startsWith("GOLD_"))
-    return PURITY_OPTIONS
+  // Selecting a real Purity updates purityLabel (the true value) and keeps
+  // the legacy `purity` enum in sync (matchLegacyPurityType) — the latter
+  // stays required since KarigarReceiptItem.purity is non-nullable.
+  const selectPurity = (item: ReceiptItem, storeMetalPurityId: string) => {
+    const options = metalPuritiesCache[item.metalTypeId] ?? []
+    const selected = options.find((option) => option.id === storeMetalPurityId)
+    const metal = metalById.get(item.metalTypeId)
+    const family = metal ? classifyPurityFamily(metal) : null
+    updateItem(item.key, {
+      purityLabel: selected?.label ?? "",
+      purity: matchLegacyPurityType(family, selected?.label) ?? "",
+    })
   }
 
   const updateItemMetal = (key: string, metalTypeId: string) => {
     const metal = metalById.get(metalTypeId)
     const weightUnit = metal?.primaryUnit ?? "GRAM"
+    if (metal?.hasPurity) ensureMetalPurities(metalTypeId)
     setItems((prev) =>
       prev.map((item) => {
         if (item.key !== key) return item
         if (!metal || metal.hasPurity) {
-          // Switching into (or staying in) a hasPurity metal: keep the
-          // current purity only if it's still valid for this metal's family,
-          // otherwise fall back to that family's first option.
-          const validOptions = purityOptionsForMetal(metal)
-          const purity = validOptions.some((o) => o.value === item.purity)
-            ? item.purity
-            : (validOptions[0]?.value ?? "GOLD_22K")
-          return { ...item, metalTypeId, purity, weightUnit }
+          // Metal changed — the previous purity almost certainly doesn't
+          // belong to the new metal, so it's cleared rather than kept.
+          return { ...item, metalTypeId, purity: "", purityLabel: "", weightUnit }
         }
         // hasPurity=false: purity has no meaning, force the sentinel value
         // the backend requires (KarigarReceiptItem.purity is non-nullable).
-        return { ...item, metalTypeId, purity: "OTHER", weightUnit }
+        return { ...item, metalTypeId, purity: "OTHER", purityLabel: "", weightUnit }
       }),
     )
   }
@@ -314,15 +313,7 @@ export function ReceiveItemsForm({
     // Type is being converted to the same StoreMetal relation in a parallel
     // change, so this dialog doesn't couple to that field's shape and lets
     // the user pick Metal Type per returned item directly instead.
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.key !== key) return item
-        const metal = metalById.get(item.metalTypeId)
-        const nextPurity =
-          metal && !metal.hasPurity ? item.purity : product.defaultPurity ?? item.purity
-        return { ...item, productId, itemName: product.name, purity: nextPurity }
-      }),
-    )
+    updateItem(key, { productId, itemName: product.name })
   }
 
   const removeItem = (key: string) => {
@@ -345,7 +336,10 @@ export function ReceiveItemsForm({
   // fineWeight (pure embedded-metal calc) + wastage% on top of it, so the preview
   // shown before submit matches what actually gets stored/credited.
   const fineWeightOf = (item: ReceiptItem) => {
-    const percent = fineness[item.purity] ?? 100
+    const fromNewSource = (metalPuritiesCache[item.metalTypeId] ?? []).find(
+      (option) => option.label === item.purityLabel,
+    )?.finenessPercent
+    const percent = fromNewSource ?? fineness[item.purity] ?? 100
     const fineWeight = (item.netWeight * percent) / 100
     return fineWeight + (fineWeight * (item.wastagePercent || 0)) / 100
   }
@@ -368,7 +362,7 @@ export function ReceiveItemsForm({
   const totalFineWeight = useMemo(
     () => items.reduce((sum, item) => sum + fineWeightOf(item), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, fineness],
+    [items, fineness, metalPuritiesCache],
   )
   // Basis for Labour Charge's "% of metal value" mode — sum of each item's
   // own purchaseRate x netWeight, i.e. the same per-line "metal value"
@@ -390,6 +384,7 @@ export function ReceiveItemsForm({
       productId: item.productId || null,
       metalTypeId: item.metalTypeId,
       purity: item.purity,
+      purityLabel: item.purityLabel || null,
       quantity: item.quantity || 1,
       grossWeight: toUnit(item.grossWeight) || null,
       lessWeight: toUnit(item.lessWeight) || null,
@@ -583,15 +578,16 @@ export function ReceiveItemsForm({
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Purity</Label>
                       <Select
-                        value={item.purity}
-                        onValueChange={(value) => updateItem(item.key, { purity: value })}
+                        value={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
+                        onValueChange={(value) => selectPurity(item, value === "__none__" ? "" : value)}
                       >
                         <SelectTrigger className="h-11 w-full">
-                          <SelectValue />
+                          <SelectValue placeholder="Select purity" />
                         </SelectTrigger>
                         <SelectContent>
-                          {purityOptionsForMetal(selectedMetal).map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {(metalPuritiesCache[item.metalTypeId] ?? []).map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
                               {option.label}
                             </SelectItem>
                           ))}

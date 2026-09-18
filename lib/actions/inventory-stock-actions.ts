@@ -259,6 +259,7 @@ export type KarigarReceiptItemInput = {
   productId?: string | null;
   metalTypeId: string;
   purity: PurityType;
+  purityLabel?: string | null;
   quantity: number;
   grossWeight?: number | null;
   lessWeight?: number | null;
@@ -729,6 +730,18 @@ export async function receiveItemsFromKarigar(
     const labourCharge = toDecimalOrNull(formData.get("labourCharge")) ?? 0;
 
     const fineness = await getFinenessMap(storeId);
+    // Real per-Metal Purity fineness (Settings > Taxonomy > Purities) —
+    // preferred over the legacy per-enum map above when an item's purity
+    // went through the new picker (see purityLabel), which is more accurate
+    // for a store that's since customized a purity's fineness at the
+    // per-metal level.
+    const storeMetalPurityRows = await prisma.storeMetalPurity.findMany({
+      where: { storeId, storeMetalId: { in: [...new Set(items.map((item) => item.metalTypeId))] } },
+      select: { storeMetalId: true, label: true, finenessPercent: true },
+    });
+    const finenessByMetalAndLabel = new Map(
+      storeMetalPurityRows.map((row) => [`${row.storeMetalId}:${row.label}`, Number(row.finenessPercent)]),
+    );
     const year = new Date().getFullYear();
     const baseStockCount = await prisma.inventoryStock.count({
       where: { storeId, stockCode: { startsWith: `STK-${year}-` } },
@@ -777,7 +790,11 @@ export async function receiveItemsFromKarigar(
         const netWeight = item.netWeight ?? 0;
         // Pure embedded-metal calc — stored as-is on KarigarReceiptItem.fineWeight,
         // unaffected by wastage%.
-        const fineWeight = toFineWeight(netWeight, item.purity, fineness);
+        const finenessPercent =
+          finenessByMetalAndLabel.get(`${item.metalTypeId}:${item.purityLabel}`) ??
+          fineness[item.purity] ??
+          100;
+        const fineWeight = (netWeight * finenessPercent) / 100;
         // Wastage is a % on top of the item's own embedded fine weight (standard
         // jewellery-trade convention: e.g. 10g fine metal with 8% wastage means
         // 10.8g of fine metal was actually consumed/lost in making it). This
@@ -801,6 +818,7 @@ export async function receiveItemsFromKarigar(
             tagNumber: item.tagNumber || undefined,
             metalTypeId: item.metalTypeId,
             purity: item.purity,
+            purityLabel: item.purityLabel ?? undefined,
             quantity: item.quantity || 1,
             status: InventoryStockStatus.IN_STOCK,
             finish: InventoryFinish.PAKKA,
@@ -844,6 +862,7 @@ export async function receiveItemsFromKarigar(
             productId,
             metalTypeId: item.metalTypeId,
             purity: item.purity,
+            purityLabel: item.purityLabel ?? undefined,
             quantity: item.quantity || 1,
             grossWeight: item.grossWeight ?? undefined,
             netWeight: item.netWeight ?? undefined,

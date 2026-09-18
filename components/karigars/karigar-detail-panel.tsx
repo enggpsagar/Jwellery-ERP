@@ -70,14 +70,24 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
 
   return (
     <div className="space-y-4 rounded-xl border bg-card p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Specialization sits in its own top-right corner, above the action
+          buttons — it's a short descriptive label, not something that needs
+          a full card slot in the grid below (see KarigarDetailContent). */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">{toTitleCase(karigar.name)}</h2>
           <p className="text-sm text-muted-foreground">
             Code: {karigar.code || "-"} · Mobile: {karigar.mobile || "-"}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        {karigar.specialization && (
+          <span className="rounded-full border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+            {karigar.specialization}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-wrap justify-end gap-2">
           <IssueMaterialDialog
             karigarId={karigar.id}
             metals={metals}
@@ -105,7 +115,6 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
             showView={false}
             showIssueMaterial={false}
           />
-        </div>
       </div>
 
       <KarigarDetailContent bundle={bundle} />

@@ -9,8 +9,7 @@ import {
   recordMaterialReceiptFromKarigar,
   type StockActionState,
 } from "@/lib/actions/inventory-stock-actions"
-import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
-import { classifyMetalName } from "@/lib/business-units"
+import { getStoreMetalPurities, type StoreMetalRow, type StoreMetalPurityRow } from "@/lib/actions/taxonomy-actions"
 import { GRAMS_PER_CARAT, toPrimaryUnit } from "@/lib/purity"
 import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
 import { useToast } from "@/components/providers/toast-provider"
@@ -36,17 +35,6 @@ import {
 import { RequiredMark } from "@/components/shared/required-mark"
 
 const initialState: StockActionState = { success: false, message: "" }
-
-const PURITY_OPTIONS: { value: string; label: string }[] = [
-  { value: "GOLD_24K", label: "Gold 24K" },
-  { value: "GOLD_22K", label: "Gold 22K" },
-  { value: "GOLD_20K", label: "Gold 20K" },
-  { value: "GOLD_18K", label: "Gold 18K" },
-  { value: "SILVER_999", label: "Silver 999" },
-  { value: "SILVER_925", label: "Silver 925" },
-  { value: "PLATINUM_950", label: "Platinum 950" },
-  { value: "PLATINUM_900", label: "Platinum 900" },
-]
 
 type LocationOption = {
   id: string
@@ -93,7 +81,8 @@ export function ReceiveMaterialDialog({
 
   const [open, setOpen] = useState(false)
   const [metalTypeId, setMetalTypeId] = useState(defaultMetalId)
-  const [receivePurity, setReceivePurity] = useState("GOLD_22K")
+  const [receiveStoreMetalPurityId, setReceiveStoreMetalPurityId] = useState("")
+  const [metalPurities, setMetalPurities] = useState<StoreMetalPurityRow[]>([])
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const router = useRouter()
   const toast = useToast()
@@ -135,21 +124,25 @@ export function ReceiveMaterialDialog({
     setReceiveWeightGrams(String(toPrimaryUnit(Number(typed), weightUnit, "GRAM", GRAMS_PER_CARAT)))
   }
 
-  const metalFamily = selectedMetal?.name.toLowerCase().includes("platinum")
-    ? "PLATINUM"
-    : classifyMetalName(selectedMetal?.name)
-  const purityOptions = useMemo(() => {
-    if (metalFamily === "GOLD") return PURITY_OPTIONS.filter((o) => o.value.startsWith("GOLD_"))
-    if (metalFamily === "SILVER") return PURITY_OPTIONS.filter((o) => o.value.startsWith("SILVER_"))
-    if (metalFamily === "PLATINUM") return PURITY_OPTIONS.filter((o) => o.value.startsWith("PLATINUM_"))
-    return PURITY_OPTIONS
-  }, [metalFamily])
-
+  // Real per-Metal Purity options (Settings > Taxonomy > Purities),
+  // replacing the old hardcoded PURITY_OPTIONS list — fetched for whichever
+  // metal is currently selected.
   useEffect(() => {
-    if (!purityOptions.some((option) => option.value === receivePurity)) {
-      setReceivePurity(purityOptions[0]?.value ?? "")
+    let cancelled = false
+    setReceiveStoreMetalPurityId("")
+    if (!metalTypeId) {
+      setMetalPurities([])
+      return
     }
-  }, [purityOptions, receivePurity])
+    getStoreMetalPurities(metalTypeId)
+      .then((data) => {
+        if (!cancelled) setMetalPurities(data)
+      })
+      .catch((err) => console.error("Failed to load purities:", err))
+    return () => {
+      cancelled = true
+    }
+  }, [metalTypeId])
 
   const receiveMaterialWithId = recordMaterialReceiptFromKarigar.bind(null, karigarId)
   const [state, formAction, pending] = useActionState(receiveMaterialWithId, initialState)
@@ -217,7 +210,9 @@ export function ReceiveMaterialDialog({
           className="space-y-4"
         >
           <input type="hidden" name="metalTypeId" value={metalTypeId} />
-          {isPreciousMetal && <input type="hidden" name="receivePurity" value={receivePurity} />}
+          {isPreciousMetal && (
+            <input type="hidden" name="receiveStoreMetalPurityId" value={receiveStoreMetalPurityId} />
+          )}
           <input
             type="hidden"
             name="receiveWeight"
@@ -252,13 +247,13 @@ export function ReceiveMaterialDialog({
             {isPreciousMetal && (
               <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
                 <Label>Purity</Label>
-                <Select value={receivePurity} onValueChange={setReceivePurity}>
+                <Select value={receiveStoreMetalPurityId} onValueChange={setReceiveStoreMetalPurityId}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select purity" />
                   </SelectTrigger>
                   <SelectContent>
-                    {purityOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
+                    {metalPurities.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
                         {option.label}
                       </SelectItem>
                     ))}
@@ -273,7 +268,7 @@ export function ReceiveMaterialDialog({
             <div className="flex gap-1">
               <Input
                 type="number"
-                step="0.001"
+                step="any"
                 min="0"
                 required
                 className="flex-1"

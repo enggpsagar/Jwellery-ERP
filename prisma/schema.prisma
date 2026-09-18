@@ -504,8 +504,8 @@ model Customer {
   // convention as Invoice.createdById/createdByName. Nullable: customers
   // created before this was tracked genuinely have no answer, and an
   // API/MCP-created customer has no human User behind it at all.
-  createdById    String?
-  createdByName  String?
+  createdById            String?
+  createdByName          String?
   // Whether this Party is also tracked as a supplier — flips to true
   // automatically the first time it's actually picked on a Purchase/
   // Payment Out (see createPurchase/recordPaymentOut), and can also be set
@@ -516,15 +516,15 @@ model Customer {
   // be a pure customer (false), a pure supplier, or both; there is no
   // separate Vendor/Supplier table — merged into this one, see the
   // migration named merge_vendor_into_customer.
-  isSupplier     Boolean        @default(false)
-  createdBy      User?          @relation("CustomerCreatedBy", fields: [createdById], references: [id])
-  store          Store          @relation(fields: [storeId], references: [id])
-  invoices       Invoice[]
-  kachaInvoices  KachaInvoice[]
-  ledgerEntries  LedgerEntry[]    @relation("LedgerEntryCustomer")
-  quotations     Quotation[]
-  creditNotes    CreditNote[]
-  draftOrders    DraftOrder[]
+  isSupplier             Boolean          @default(false)
+  createdBy              User?            @relation("CustomerCreatedBy", fields: [createdById], references: [id])
+  store                  Store            @relation(fields: [storeId], references: [id])
+  invoices               Invoice[]
+  kachaInvoices          KachaInvoice[]
+  ledgerEntries          LedgerEntry[]    @relation("LedgerEntryCustomer")
+  quotations             Quotation[]
+  creditNotes            CreditNote[]
+  draftOrders            DraftOrder[]
   // "As vendor/supplier" back-relations — same Party row, referenced by
   // Purchases/Stock/Ledger through their own vendorId column (kept as-is
   // through the merge; only the relation's target model changed from the
@@ -1680,6 +1680,11 @@ model DraftOrderItem {
   metalTypeId          String?
   purity               PurityType?
   purityLabel          String?
+  // Which Stone Type (a StoreMetalOrigin row, e.g. "Natural"/"Lab-Grown")
+  // this item's own metal is, when that metal is a gemstone — denormalized
+  // name, not an FK, same convention as Product.defaultStoneMetalTypeName.
+  // Meaningless for a real (non-gemstone) metal.
+  stoneTypeName        String?
   quantity             Int         @default(1)
   estimatedWeight      Decimal?    @db.Decimal(12, 5)
   estimatedRate        Decimal?    @db.Decimal(12, 2)

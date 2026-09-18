@@ -107,6 +107,68 @@ function lineTotal(item: QuotationLineItemInput) {
   );
 }
 
+/**
+ * Once a line item is linked to an InventoryStock row, every field
+ * describing what the piece physically IS (name, metal, purity, weights,
+ * embedded stone) becomes read-only in the form — sourced from that stock
+ * record, only quantity/rate/charges stay editable. A disabled <input> is
+ * only a UI courtesy: a direct/tampered POST can still submit any value it
+ * wants for a "locked" field, so this overwrites those fields from the
+ * trusted InventoryStock row before anything else reads them. Same pattern
+ * as purchase-actions.ts's lockLinkedProductFields, but simpler — Quotation
+ * links to InventoryStock (nullable, no placeholder-substitution complexity
+ * like Purchase's non-nullable Product FK) rather than Product directly,
+ * and QuotationItem has no hsnCode column at all (the UI never wired one
+ * up), so unlike Purchase's set this one leaves HSN out entirely. Items
+ * with no inventoryStockId are a genuinely manual line and pass through
+ * unchanged.
+ */
+async function lockLinkedStockFields(
+  storeId: string,
+  items: QuotationLineItemInput[],
+  explicitStockIds: ReadonlySet<string>,
+): Promise<QuotationLineItemInput[]> {
+  if (explicitStockIds.size === 0) return items;
+
+  const stockRows = await prisma.inventoryStock.findMany({
+    where: { id: { in: [...explicitStockIds] }, storeId },
+    select: {
+      id: true,
+      metalTypeId: true,
+      purity: true,
+      purityLabel: true,
+      grossWeight: true,
+      netWeight: true,
+      caratWeight: true,
+      stoneWeight: true,
+      stoneMetalTypeName: true,
+      stoneTypeNames: true,
+      product: { select: { name: true } },
+    },
+  });
+  const stockById = new Map(stockRows.map((stock) => [stock.id, stock]));
+
+  return items.map((item) => {
+    if (!item.inventoryStockId) return item;
+    const stock = stockById.get(item.inventoryStockId);
+    if (!stock) return item;
+
+    return {
+      ...item,
+      itemName: stock.product.name,
+      metalTypeId: stock.metalTypeId,
+      purity: stock.purity,
+      purityLabel: stock.purityLabel,
+      grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,
+      netWeight: stock.netWeight ? Number(stock.netWeight) : null,
+      caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
+      stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
+      stoneMetalTypeName: stock.stoneMetalTypeName,
+      stoneTypeNames: stock.stoneTypeNames,
+    };
+  });
+}
+
 async function generateQuotationNumber(storeId: string) {
   const year = new Date().getFullYear();
   const count = await prisma.quotation.count({
@@ -502,6 +564,24 @@ export async function createQuotation(
       return { success: false, message: "Add at least one line item" };
     }
 
+    // Resolved early (this action used to only need it much later, right
+    // before the DB write) so it's available for lockLinkedStockFields
+    // below — which itself must run before any total/subtotal is computed
+    // from `items`, since a Quotation's subtotal is priced off Net/Carat
+    // Weight (see lineQuantity) and a tampered POST could otherwise still
+    // submit its own weight for a "locked" field.
+    const storeId = await requireStoreScope();
+
+    // Captured directly off the freshly-parsed items, before anything else
+    // touches them — Quotation's inventoryStockId is nullable (a manual
+    // line legitimately has none), so unlike Purchase there's no
+    // placeholder-substitution step to worry about jumbling this with.
+    const explicitStockIds = new Set(
+      items.map((item) => item.inventoryStockId).filter((id): id is string => !!id),
+    );
+
+    items = await lockLinkedStockFields(storeId, items, explicitStockIds);
+
     const discount = toNumber(formData.get("discount"));
     const taxAmount = toNumber(formData.get("taxAmount"));
     // Computed client-side by computeGst() (lib/gst.ts) — sgst+cgst on an
@@ -532,8 +612,6 @@ export async function createQuotation(
     // comment. Server-derived only: the client never submits a round-off
     // value, it just previews the same computation.
     const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
-
-    const storeId = await requireStoreScope();
 
     // Re-resolved against the store's own current GstRate row rather than
     // trusted from the client — see resolveGstRateSnapshot's own doc

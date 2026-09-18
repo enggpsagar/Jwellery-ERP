@@ -230,6 +230,70 @@ function lineTotal(item: InvoiceLineItemInput) {
 }
 
 /**
+ * A disabled input on invoice-form.tsx (and Kacha Invoice/Quotation, which
+ * share the same "linked line locks to the master record" pattern) is a UI
+ * courtesy, not enforcement — a direct/tampered POST can still submit
+ * anything for a field the UI locks once a real stock item is picked. This
+ * overwrites every physical field (item name, metal/purity, weights,
+ * embedded stone, HSN) with that InventoryStock row's own saved values
+ * before they ever reach the DB, for every line that explicitly linked one.
+ * Unlike Purchase's lockLinkedProductFields, a line with no
+ * `inventoryStockId` at all is always a genuinely manual entry here — there
+ * is no placeholder-product substitution step to worry about racing against,
+ * so `explicitStockIds` can be captured straight off `items` with no
+ * ordering trap. A stock id that doesn't resolve (wrong store, deleted,
+ * tampered) is left unmatched here — `validStockIds` downstream then drops
+ * it to a manual line rather than this function guessing at a fallback.
+ * Mirrors invoice-form.tsx's own applyStockToItem field-for-field.
+ */
+async function lockLinkedStockFields(
+  storeId: string,
+  items: InvoiceLineItemInput[],
+  explicitStockIds: ReadonlySet<string>,
+): Promise<InvoiceLineItemInput[]> {
+  if (explicitStockIds.size === 0) return items;
+
+  const stocks = await prisma.inventoryStock.findMany({
+    where: { id: { in: [...explicitStockIds] }, storeId },
+    select: {
+      id: true,
+      metalTypeId: true,
+      purity: true,
+      purityLabel: true,
+      grossWeight: true,
+      netWeight: true,
+      caratWeight: true,
+      stoneWeight: true,
+      stoneMetalTypeName: true,
+      stoneTypeNames: true,
+      product: { select: { name: true, hsnCode: true } },
+    },
+  });
+  const stockById = new Map(stocks.map((stock) => [stock.id, stock]));
+
+  return items.map((item) => {
+    if (!item.inventoryStockId) return item;
+    const stock = stockById.get(item.inventoryStockId);
+    if (!stock) return item;
+
+    return {
+      ...item,
+      itemName: stock.product.name,
+      metalTypeId: stock.metalTypeId,
+      purity: stock.purity,
+      purityLabel: stock.purityLabel,
+      grossWeight: stock.grossWeight !== null ? Number(stock.grossWeight) : null,
+      netWeight: stock.netWeight !== null ? Number(stock.netWeight) : null,
+      caratWeight: stock.caratWeight !== null ? Number(stock.caratWeight) : null,
+      stoneWeight: stock.stoneWeight !== null ? Number(stock.stoneWeight) : null,
+      stoneMetalTypeName: stock.stoneMetalTypeName,
+      stoneTypeNames: stock.stoneTypeNames,
+      hsnCode: stock.product.hsnCode,
+    };
+  });
+}
+
+/**
  * `{prefix}-{YYYYMMDD}-{padded sequence}`, e.g. `MJJ-20260904-0001` — unlike
  * the old `{prefix}-{year}-{padded count}` shape, the full date is encoded
  * directly into the number so it's readable at a glance without opening the
@@ -877,6 +941,33 @@ export async function createInvoice(
       };
     }
 
+    // A caller may name the store explicitly — the QR scan-to-sell path does,
+    // because it resolves the shop from the scanned piece rather than from
+    // whichever store the phone happened to have active. `resolveActingStoreId`
+    // honours it only for a store the user is genuinely a member of, so this
+    // is no weaker than the store switcher; with nothing named it falls back
+    // to the active store exactly as before. Resolved here, up front, rather
+    // than further down where it used to live — lockLinkedStockFields (and
+    // every total below that reads weight/purity off `items`) needs it
+    // first.
+    const storeId = await resolveActingStoreId(
+      String(formData.get("storeId") || "") || null,
+    );
+
+    // Captured directly off the parsed items — no placeholder-substitution
+    // step exists for Invoice (see lockLinkedStockFields' own doc comment),
+    // so this can be done in one line with no ordering trap.
+    const explicitStockIds = new Set(
+      items.filter((item) => item.inventoryStockId).map((item) => item.inventoryStockId as string),
+    );
+
+    // Must happen before every total below is computed from `items` — an
+    // Invoice's own subtotal/GST is priced off Net/Carat Weight (see
+    // lineQuantity), which this can change, so pricing has to see the
+    // locked, trustworthy value rather than whatever the client submitted
+    // for a field the UI no longer lets it edit.
+    items = await lockLinkedStockFields(storeId, items, explicitStockIds);
+
     const manualDiscount = toNumber(formData.get("discount"));
 
     // paymentsJson (1-2 method rows, or none for a fully-on-credit sale) is
@@ -955,16 +1046,6 @@ export async function createInvoice(
     let status: InvoiceStatus = InvoiceStatus.PAID;
     if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
     else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
-
-    // A caller may name the store explicitly — the QR scan-to-sell path does,
-    // because it resolves the shop from the scanned piece rather than from
-    // whichever store the phone happened to have active. `resolveActingStoreId`
-    // honours it only for a store the user is genuinely a member of, so this
-    // is no weaker than the store switcher; with nothing named it falls back
-    // to the active store exactly as before.
-    const storeId = await resolveActingStoreId(
-      String(formData.get("storeId") || "") || null,
-    );
 
     // Re-resolved against the store's own current GstRate row rather than
     // trusted from the client — see resolveGstRateSnapshot's own doc
@@ -1589,6 +1670,16 @@ export async function updateInvoice(
         message: `Enter a selling price for "${invalidRateItem.itemName || "an item"}" before saving.`,
       };
     }
+
+    // Same lock-before-totals requirement as createInvoice — `storeId` is
+    // already resolved above (before items are even parsed here), so this
+    // just needs to run before the subtotal/tax computation below, which is
+    // priced off weight/purity read from `items`. See lockLinkedStockFields'
+    // own doc comment.
+    const explicitStockIds = new Set(
+      items.filter((item) => item.inventoryStockId).map((item) => item.inventoryStockId as string),
+    );
+    items = await lockLinkedStockFields(storeId, items, explicitStockIds);
 
     // Same Composition-scheme guard as createInvoice — a store that can't
     // charge GST at creation can't gain it back by editing line items either.

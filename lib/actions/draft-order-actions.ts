@@ -34,6 +34,8 @@ export type DraftOrderItemInput = {
   itemName: string;
   metalTypeId?: string | null;
   purity?: PurityType | null;
+  purityLabel?: string | null;
+  stoneTypeName?: string | null;
   quantity: number;
   estimatedWeight?: number | null;
   estimatedRate?: number | null;
@@ -344,6 +346,8 @@ export type DraftOrderItemRow = {
   metalTypeId: string | null;
   metalName: string | null;
   purity: PurityType | null;
+  purityLabel: string | null;
+  stoneTypeName: string | null;
   quantity: number;
   estimatedWeight: number | null;
   estimatedRate: number | null;
@@ -393,6 +397,8 @@ export async function getDraftOrderById(id: string): Promise<DraftOrderDetail | 
       metalTypeId: item.metalTypeId,
       metalName: item.metalType?.name ?? null,
       purity: item.purity,
+      purityLabel: item.purityLabel,
+      stoneTypeName: item.stoneTypeName,
       quantity: item.quantity,
       estimatedWeight: item.estimatedWeight ? Number(item.estimatedWeight) : null,
       estimatedRate: item.estimatedRate ? Number(item.estimatedRate) : null,
@@ -536,6 +542,8 @@ export async function createDraftOrder(
               itemName: item.itemName.trim(),
               metalTypeId: item.metalTypeId || undefined,
               purity: item.purity || undefined,
+              purityLabel: item.purityLabel || undefined,
+              stoneTypeName: item.stoneTypeName || undefined,
               quantity: item.quantity || 1,
               estimatedWeight: item.estimatedWeight ?? undefined,
               estimatedRate: item.estimatedRate ?? undefined,
@@ -715,7 +723,9 @@ export async function sendDraftOrderToKarigar(
     if (!karigar) return { success: false, message: "Artisan not found" };
 
     const metalTypeIds = new Set(order.items.map((item) => item.metalTypeId).filter(Boolean));
-    const purities = new Set(order.items.map((item) => item.purity).filter(Boolean));
+    const purities = new Set(
+      order.items.map((item) => item.purityLabel ?? item.purity).filter(Boolean),
+    );
     if (metalTypeIds.size > 1 || purities.size > 1) {
       return {
         success: false,
@@ -761,15 +771,32 @@ export async function sendDraftOrderToKarigar(
 
     const isPreciousMetal = storeMetal.hasPurity;
     let issuePurity: PurityType | null = null;
+    let issuePurityLabel: string | null = null;
     let issueFineWeight: number | null = null;
 
     if (isPreciousMetal) {
       issuePurity = order.items[0].purity;
-      if (!issuePurity) {
+      issuePurityLabel = order.items[0].purityLabel;
+      if (!issuePurity && !issuePurityLabel) {
         return { success: false, message: "Select a purity on the order's items first" };
       }
-      const fineness = await getFinenessMap(storeId);
-      issueFineWeight = toFineWeight(issueWeight, issuePurity, fineness);
+
+      const storeMetalPurity = issuePurityLabel
+        ? await prisma.storeMetalPurity.findFirst({
+            where: { storeId, storeMetalId: storeMetal.id, label: issuePurityLabel },
+            select: { finenessPercent: true },
+          })
+        : null;
+
+      if (storeMetalPurity) {
+        issueFineWeight = (issueWeight * Number(storeMetalPurity.finenessPercent)) / 100;
+      } else {
+        if (!issuePurity) {
+          return { success: false, message: "Select a purity on the order's items first" };
+        }
+        const fineness = await getFinenessMap(storeId);
+        issueFineWeight = toFineWeight(issueWeight, issuePurity, fineness);
+      }
     }
 
     const itemSummary = order.items
@@ -790,6 +817,7 @@ export async function sendDraftOrderToKarigar(
           jobNumber,
           metalTypeId: storeMetal.id,
           issuePurity: issuePurity ?? undefined,
+          issuePurityLabel: issuePurityLabel ?? undefined,
           issueWeight,
           issueFineWeight: issueFineWeight ?? undefined,
           expectedDate: expectedDateRaw ? new Date(expectedDateRaw) : (order.expectedDate ?? undefined),

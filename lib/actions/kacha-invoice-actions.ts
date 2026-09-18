@@ -159,6 +159,66 @@ function lineTotal(item: KachaInvoiceLineItemInput) {
   );
 }
 
+/**
+ * A disabled input on kacha-invoice-form.tsx is a UI courtesy, not
+ * enforcement — a direct/tampered request can still submit anything for a
+ * field the UI locks once a real InventoryStock row is picked. This
+ * overwrites every physical field (item name, metal/purity, weights,
+ * embedded stone) with that stock row's own saved values before they ever
+ * reach the DB, for every line that explicitly picked one.
+ * Deliberately no HSN Code here — unlike InvoiceItem, KachaInvoiceItem has
+ * no hsnCode column at all (the Kacha form never wires one up). Unlike
+ * Purchase's lockLinkedProductFields, no placeholder-substitution carve-out
+ * is needed either — inventoryStockId is nullable and a manual line
+ * legitimately has none, so an item with no id at all simply passes
+ * through untouched. Mirrors purchase-actions.ts's own
+ * lockLinkedProductFields, adapted for InventoryStock instead of Product.
+ */
+async function lockLinkedStockFields(
+  storeId: string,
+  items: KachaInvoiceLineItemInput[],
+  explicitStockIds: ReadonlySet<string>,
+): Promise<KachaInvoiceLineItemInput[]> {
+  if (explicitStockIds.size === 0) return items;
+
+  const stockRows = await prisma.inventoryStock.findMany({
+    where: { id: { in: [...explicitStockIds] }, storeId },
+    select: {
+      id: true,
+      metalTypeId: true,
+      purity: true,
+      purityLabel: true,
+      grossWeight: true,
+      netWeight: true,
+      caratWeight: true,
+      stoneWeight: true,
+      stoneMetalTypeName: true,
+      stoneTypeNames: true,
+      product: { select: { name: true } },
+    },
+  });
+  const stockById = new Map(stockRows.map((stock) => [stock.id, stock]));
+
+  return items.map((item) => {
+    const stock = item.inventoryStockId ? stockById.get(item.inventoryStockId) : undefined;
+    if (!stock) return item;
+
+    return {
+      ...item,
+      itemName: stock.product.name,
+      metalTypeId: stock.metalTypeId,
+      purity: stock.purity,
+      purityLabel: stock.purityLabel,
+      grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,
+      netWeight: stock.netWeight ? Number(stock.netWeight) : null,
+      caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
+      stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
+      stoneMetalTypeName: stock.stoneMetalTypeName,
+      stoneTypeNames: stock.stoneTypeNames,
+    };
+  });
+}
+
 async function generateSlipNumber(storeId: string) {
   const year = new Date().getFullYear();
   const count = await prisma.kachaInvoice.count({
@@ -470,6 +530,27 @@ export async function createKachaInvoice(
       makingChargeType: toChargeType(item.makingChargeType),
     }));
 
+    // Moved ahead of every total below — see lockLinkedStockFields' call
+    // just below for why storeId has to be available before subtotal is
+    // computed from `items`, not only from its later use (customer lookup,
+    // location resolution, etc).
+    const storeId = await requireStoreScope();
+
+    // Captured directly off the freshly-parsed items — a Kacha line's
+    // inventoryStockId is nullable and a manual line legitimately has none,
+    // so no placeholder-substitution carve-out is needed the way Purchase's
+    // explicitProductIds requires.
+    const explicitStockIds = new Set(
+      items.filter((item) => item.inventoryStockId).map((item) => item.inventoryStockId as string),
+    );
+
+    // Must happen before every total below is computed from `items` — a
+    // Kacha slip's own subtotal is priced off Net/Carat Weight (see
+    // lineQuantity), which this can change, so pricing has to see the
+    // locked, trustworthy value rather than whatever the client submitted
+    // for a field the UI no longer lets it edit.
+    items = await lockLinkedStockFields(storeId, items, explicitStockIds);
+
     const discount = toNumber(formData.get("discount"));
 
     // paymentsJson (1-2 method rows, or none for a fully-on-credit slip) is
@@ -516,7 +597,9 @@ export async function createKachaInvoice(
     if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
     else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
 
-    const storeId = await requireStoreScope();
+    // storeId was already resolved above (ahead of the subtotal/totals
+    // calculation, so lockLinkedStockFields could run before them) — not
+    // re-resolved here.
 
     const customer = await prisma.customer.findFirst({
       where: { id: customerId, storeId },

@@ -279,6 +279,79 @@ async function resolveManualEntryProductId(storeId: string): Promise<string> {
   return created.id;
 }
 
+/**
+ * A disabled input on purchase-form.tsx is a UI courtesy, not enforcement —
+ * a direct/tampered request can still submit anything for a field the UI
+ * locks once a real Product is picked. This overwrites every physical field
+ * (item name, metal/purity, weights, embedded stone, HSN) with that
+ * Product's own saved values before they ever reach the DB, for every line
+ * that explicitly picked one — `explicitProductIds` must be captured BEFORE
+ * resolveManualEntryProductId's placeholder substitution, so a genuinely
+ * manual line (no product picked at all) is never touched. Mirrors
+ * purchase-form.tsx's own applyProductToItem field-for-field.
+ */
+async function lockLinkedProductFields(
+  storeId: string,
+  items: PurchaseLineItemInput[],
+  explicitProductIds: ReadonlySet<string>,
+): Promise<PurchaseLineItemInput[]> {
+  if (explicitProductIds.size === 0) return items;
+
+  const products = await prisma.product.findMany({
+    where: { id: { in: [...explicitProductIds] }, storeId },
+    select: {
+      id: true,
+      name: true,
+      metalTypeId: true,
+      metalType: { select: { name: true, isGemstone: true } },
+      defaultPurity: true,
+      storeMetalPurity: { select: { label: true } },
+      hasStoneComponent: true,
+      defaultGrossWeight: true,
+      defaultNetWeight: true,
+      defaultStoneWeight: true,
+      defaultCaratWeight: true,
+      defaultStoneMetalTypeName: true,
+      defaultStoneTypeNames: true,
+      hsnCode: true,
+    },
+  });
+  const productById = new Map(products.map((product) => [product.id, product]));
+
+  return items.map((item) => {
+    const product = productById.get(item.productId);
+    if (!product) return item;
+
+    const isGemstoneProduct = product.metalType?.isGemstone ?? false;
+
+    return {
+      ...item,
+      itemName: product.name,
+      metalTypeId: isGemstoneProduct ? null : product.metalTypeId,
+      purity: isGemstoneProduct ? null : product.defaultPurity,
+      purityLabel: isGemstoneProduct ? null : product.storeMetalPurity?.label ?? null,
+      grossWeight: isGemstoneProduct ? 0 : product.defaultGrossWeight !== null ? Number(product.defaultGrossWeight) : 0,
+      netWeight: isGemstoneProduct ? 0 : product.defaultNetWeight !== null ? Number(product.defaultNetWeight) : 0,
+      caratWeight: product.defaultCaratWeight !== null ? Number(product.defaultCaratWeight) : 0,
+      // Server field `stoneWeight` is the Net Stone Weight the form calls
+      // stoneWeightInput — see purchase-form.tsx's identical
+      // isGemstoneProduct/hasStoneComponent branching in applyProductToItem.
+      stoneWeight: isGemstoneProduct
+        ? (product.defaultNetWeight !== null ? Number(product.defaultNetWeight) : 0)
+        : product.hasStoneComponent
+          ? (product.defaultStoneWeight !== null ? Number(product.defaultStoneWeight) : 0)
+          : null,
+      stoneMetalTypeName: isGemstoneProduct
+        ? product.metalType?.name ?? null
+        : product.hasStoneComponent
+          ? product.defaultStoneMetalTypeName ?? null
+          : null,
+      stoneTypeNames: product.hasStoneComponent ? product.defaultStoneTypeNames ?? null : null,
+      hsnCode: product.hsnCode ?? null,
+    };
+  });
+}
+
 async function generatePurchaseNumber(storeId: string) {
   const year = new Date().getFullYear();
   const count = await prisma.purchase.count({
@@ -646,6 +719,9 @@ export async function getPurchaseFormProducts() {
       hasStoneComponent: true,
       defaultStoneRate: true,
       defaultCaratWeight: true,
+      defaultGrossWeight: true,
+      defaultNetWeight: true,
+      defaultStoneWeight: true,
       defaultStoneMetalTypeName: true,
       defaultStoneTypeNames: true,
       hsnCode: true,
@@ -666,6 +742,12 @@ export async function getPurchaseFormProducts() {
       product.defaultStoneRate !== null ? Number(product.defaultStoneRate) : null,
     defaultCaratWeight:
       product.defaultCaratWeight !== null ? Number(product.defaultCaratWeight) : null,
+    defaultGrossWeight:
+      product.defaultGrossWeight !== null ? Number(product.defaultGrossWeight) : null,
+    defaultNetWeight:
+      product.defaultNetWeight !== null ? Number(product.defaultNetWeight) : null,
+    defaultStoneWeight:
+      product.defaultStoneWeight !== null ? Number(product.defaultStoneWeight) : null,
   }));
 }
 
@@ -719,6 +801,43 @@ export async function createPurchase(
       ...item,
       makingChargeType: toChargeType(item.makingChargeType),
     }));
+
+    const storeId = await requireStoreScope();
+
+    // Captured before resolveManualEntryProductId's placeholder substitution
+    // below — see lockLinkedProductFields' own doc comment for why a
+    // genuinely manual line must never be included here.
+    const explicitProductIds = new Set(
+      items.filter((item) => item.productId).map((item) => item.productId),
+    );
+
+    // A line with no product picked (the form's own "Enter Manually (No
+    // Product)" choice) still needs a real Product row under the hood —
+    // InventoryStock/PurchaseItem.productId is a hard, non-nullable FK — see
+    // resolveManualEntryProductId's own doc comment for the fuller
+    // reasoning. Resolved to one lazily-created placeholder per store.
+    if (items.some((item) => !item.productId)) {
+      const manualEntryProductId = await resolveManualEntryProductId(storeId);
+      items = items.map((item) =>
+        item.productId ? item : { ...item, productId: manualEntryProductId },
+      );
+    }
+
+    const productIds = [...new Set(items.map((item) => item.productId))];
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds }, storeId },
+      select: { id: true },
+    });
+    if (products.length !== productIds.length) {
+      return { success: false, message: "One or more selected products are invalid" };
+    }
+
+    // Must happen before every total below is computed from `items` — a
+    // Purchase's own subtotal/GST is priced off Net/Carat Weight (see
+    // lineQuantity), which this can change, so pricing has to see the
+    // locked, trustworthy value rather than whatever the client submitted
+    // for a field the UI no longer lets it edit.
+    items = await lockLinkedProductFields(storeId, items, explicitProductIds);
 
     const discount = toNumber(formData.get("discount"));
     // Recomputed from each line's own sgst/cgst/igst rather than trusted
@@ -777,8 +896,6 @@ export async function createPurchase(
     if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
     else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
 
-    const storeId = await requireStoreScope();
-
     // Re-resolved against the store's own current GstRate row rather than
     // trusted from the client — see resolveGstRateSnapshot's own doc
     // comment. A missing/invalid id (e.g. an unregistered vendor, whose GST
@@ -810,30 +927,6 @@ export async function createPurchase(
         success: false,
         message: `This vendor is ${partyGstTypeLabel(vendor.gstType).toLowerCase()} and cannot charge GST on a purchase.`,
       };
-    }
-
-    // A line with no product picked (the form's own "Enter Manually (No
-    // Product)" choice) still needs a real Product row under the hood —
-    // InventoryStock/PurchaseItem.productId is a hard, non-nullable FK, and
-    // making it nullable would ripple into every other place that reads
-    // stock.product.name/hsnCode (the Invoice/Quotation stock pickers, the
-    // item-ledger report, My Jobs...) — see resolveManualEntryProductId's
-    // own doc comment for the fuller reasoning. Resolved to one
-    // lazily-created placeholder per store instead.
-    if (items.some((item) => !item.productId)) {
-      const manualEntryProductId = await resolveManualEntryProductId(storeId);
-      items = items.map((item) =>
-        item.productId ? item : { ...item, productId: manualEntryProductId },
-      );
-    }
-
-    const productIds = [...new Set(items.map((item) => item.productId))];
-    const products = await prisma.product.findMany({
-      where: { id: { in: productIds }, storeId },
-      select: { id: true },
-    });
-    if (products.length !== productIds.length) {
-      return { success: false, message: "One or more selected products are invalid" };
     }
 
     // See resolveWritableLocationId's own doc comment — without this, a
@@ -1301,6 +1394,33 @@ export async function updatePurchase(
       makingChargeType: toChargeType(item.makingChargeType),
     }));
 
+    // Captured before resolveManualEntryProductId's placeholder substitution
+    // below — see lockLinkedProductFields' own doc comment for why a
+    // genuinely manual line must never be included here.
+    const explicitProductIds = new Set(
+      items.filter((item) => item.productId).map((item) => item.productId),
+    );
+
+    if (items.some((item) => !item.productId)) {
+      const manualEntryProductId = await resolveManualEntryProductId(storeId);
+      items = items.map((item) =>
+        item.productId ? item : { ...item, productId: manualEntryProductId },
+      );
+    }
+
+    const productIds = [...new Set(items.map((item) => item.productId))];
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds }, storeId },
+      select: { id: true },
+    });
+    if (products.length !== productIds.length) {
+      return { success: false, message: "One or more selected products are invalid" };
+    }
+
+    // Must happen before every total below is computed from `items` — see
+    // createPurchase's identical comment.
+    items = await lockLinkedProductFields(storeId, items, explicitProductIds);
+
     const discount = toNumber(formData.get("discount"));
     const sgstAmount = items.reduce((sum, item) => sum + toNumber(item.sgstAmount), 0);
     const cgstAmount = items.reduce((sum, item) => sum + toNumber(item.cgstAmount), 0);
@@ -1346,22 +1466,6 @@ export async function updatePurchase(
         success: false,
         message: `This vendor is ${partyGstTypeLabel(vendor.gstType).toLowerCase()} and cannot charge GST on a purchase.`,
       };
-    }
-
-    if (items.some((item) => !item.productId)) {
-      const manualEntryProductId = await resolveManualEntryProductId(storeId);
-      items = items.map((item) =>
-        item.productId ? item : { ...item, productId: manualEntryProductId },
-      );
-    }
-
-    const productIds = [...new Set(items.map((item) => item.productId))];
-    const products = await prisma.product.findMany({
-      where: { id: { in: productIds }, storeId },
-      select: { id: true },
-    });
-    if (products.length !== productIds.length) {
-      return { success: false, message: "One or more selected products are invalid" };
     }
 
     const perLineGstRateSnapshots = await resolvePerLineGstRateSnapshots(storeId, items);

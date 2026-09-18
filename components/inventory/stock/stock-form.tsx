@@ -700,7 +700,7 @@ export function StockForm({
             <Input
               id="grossWeight"
               type="number"
-              step="0.00001"
+              step="any"
               required
               value={displayWeight(grossWeight)}
               onChange={(event) => editGrossWeight(toGramsString(event.target.value))}
@@ -716,7 +716,7 @@ export function StockForm({
             <Input
               id="lessWeight"
               type="number"
-              step="0.00001"
+              step="any"
               value={displayWeight(lessWeight)}
               onChange={(event) => editLessWeight(toGramsString(event.target.value))}
             />
@@ -731,7 +731,7 @@ export function StockForm({
             <Input
               id="netWeight"
               type="number"
-              step="0.00001"
+              step="any"
               required
               value={displayWeight(netWeight)}
               onChange={(event) => editNetWeight(toGramsString(event.target.value))}
@@ -752,7 +752,7 @@ export function StockForm({
             <Input
               id="stoneWeight"
               type="number"
-              step="0.00001"
+              step="any"
               value={displayWeight(stoneWeight)}
               onChange={(event) => editStoneWeight(toGramsString(event.target.value))}
             />
@@ -768,7 +768,7 @@ export function StockForm({
                 id="caratWeight"
                 name="caratWeight"
                 type="number"
-                step="0.001"
+                step="any"
                 min="0"
                 value={caratWeight}
                 onChange={(event) => editCaratWeight(event.target.value)}
@@ -789,7 +789,7 @@ export function StockForm({
             <Input
               id="dmoWeight"
               type="number"
-              step="0.00001"
+              step="any"
               value={displayWeight(dmoWeight)}
               onChange={(event) => editDmoWeight(toGramsString(event.target.value))}
             />

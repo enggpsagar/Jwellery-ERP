@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
 import { Plus, Trash2 } from "lucide-react"
@@ -12,8 +12,15 @@ import {
 } from "@/lib/actions/draft-order-actions"
 import { CustomerSelect, type CustomerOption } from "@/components/customers/customer-select"
 import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select"
-import { PURITY_SELECT_OPTIONS } from "@/lib/purity"
-import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import { matchLegacyPurityType } from "@/lib/purity"
+import { classifyPurityFamily } from "@/lib/business-units"
+import {
+  getStoreMetalPurities,
+  getStoreMetalOrigins,
+  type StoreMetalRow,
+  type StoreMetalPurityRow,
+  type StoreMetalOriginRow,
+} from "@/lib/actions/taxonomy-actions"
 import type { PurityType } from "@prisma/client"
 import { useToast } from "@/components/providers/toast-provider"
 
@@ -55,6 +62,8 @@ function emptyItem(key: string = crypto.randomUUID()): ItemRow {
     itemName: "",
     metalTypeId: "",
     purity: null,
+    purityLabel: null,
+    stoneTypeName: null,
     quantity: 1,
     estimatedWeight: null,
     estimatedRate: null,
@@ -91,6 +100,32 @@ export function DraftOrderForm({
   const router = useRouter()
   const toast = useToast()
   const [items, setItems] = useState<ItemRow[]>([emptyItem("initial")])
+
+  // Real per-Metal Purity options (Settings > Taxonomy > Purities),
+  // replacing the old global PURITY_SELECT_OPTIONS enum list — cached per
+  // metalTypeId since several items can each have their own metal.
+  const [metalPuritiesCache, setMetalPuritiesCache] = useState<Record<string, StoreMetalPurityRow[]>>({})
+
+  const ensureMetalPurities = useCallback((metalTypeId: string) => {
+    if (!metalTypeId || metalPuritiesCache[metalTypeId]) return
+    getStoreMetalPurities(metalTypeId)
+      .then((data) => setMetalPuritiesCache((prev) => ({ ...prev, [metalTypeId]: data })))
+      .catch((err) => console.error("Failed to load purities:", err))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metalPuritiesCache])
+
+  // Stone Types (Settings > Taxonomy > Stone Types) for whichever gemstone
+  // is picked as an item's own "Metal / Stone" — same cache-per-id pattern
+  // as metalPuritiesCache above.
+  const [stoneTypesCache, setStoneTypesCache] = useState<Record<string, StoreMetalOriginRow[]>>({})
+
+  const ensureStoneTypes = useCallback((storeMetalId: string) => {
+    if (!storeMetalId || stoneTypesCache[storeMetalId]) return
+    getStoreMetalOrigins(storeMetalId)
+      .then((data) => setStoneTypesCache((prev) => ({ ...prev, [storeMetalId]: data })))
+      .catch((err) => console.error("Failed to load Stone Types:", err))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stoneTypesCache])
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
   const showLocationField = useShowLocationField(locations.length)
@@ -232,15 +267,17 @@ export function DraftOrderForm({
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label>Metal</Label>
+                    <Label>Metal / Stone</Label>
                     <Select
                       value={item.metalTypeId ?? ""}
                       onValueChange={(value) => {
                         const metal = metals.find((m) => m.id === value)
-                        // A metal with no purity concept (e.g. Diamond) has
-                        // nothing for the Purity select below to fire its own
-                        // auto-fill on, so prefill from the metal's flat
-                        // Selling Price right here instead.
+                        if (metal?.isGemstone) ensureStoneTypes(value)
+                        else if (metal?.hasPurity) ensureMetalPurities(value)
+                        // A metal with no purity concept (e.g. a gemstone)
+                        // has nothing for the Purity select below to fire
+                        // its own auto-fill on, so prefill from the metal's
+                        // flat Selling Price right here instead.
                         const autoRate =
                           !item.rateTouched && metal && !metal.hasPurity
                             ? metal.sellingPrice ?? null
@@ -248,12 +285,14 @@ export function DraftOrderForm({
                         updateItem(item.key, {
                           metalTypeId: value,
                           purity: null,
+                          purityLabel: null,
+                          stoneTypeName: null,
                           ...(autoRate !== undefined ? { estimatedRate: autoRate } : {}),
                         })
                       }}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select metal" />
+                        <SelectValue placeholder="Select metal or stone" />
                       </SelectTrigger>
                       <SelectContent>
                         {metals
@@ -267,26 +306,50 @@ export function DraftOrderForm({
                     </Select>
                   </div>
 
+                  {selectedMetal?.isGemstone && (
+                    <div className="space-y-1.5">
+                      <Label>Stone Type</Label>
+                      <Select
+                        value={item.stoneTypeName ?? "__none__"}
+                        onValueChange={(value) =>
+                          updateItem(item.key, { stoneTypeName: value === "__none__" ? null : value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Stone Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {(stoneTypesCache[item.metalTypeId ?? ""] ?? []).map((origin) => (
+                            <SelectItem key={origin.id} value={origin.name}>
+                              {origin.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   {selectedMetal?.hasPurity && (
                     <div className="space-y-1.5">
                       <Label>Purity</Label>
                       <Select
-                        value={item.purity ?? ""}
+                        value={(metalPuritiesCache[item.metalTypeId ?? ""] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
                         onValueChange={(value) => {
-                          const purity = value as PurityType
+                          const options = metalPuritiesCache[item.metalTypeId ?? ""] ?? []
+                          const selected = options.find((option) => option.id === value)
+                          const family = selectedMetal ? classifyPurityFamily(selectedMetal) : null
                           updateItem(item.key, {
-                            purity: purity as DraftOrderItemInput["purity"],
-                            // Store's configured per-purity Selling Rate,
+                            purityLabel: selected?.label ?? null,
+                            purity: (matchLegacyPurityType(family, selected?.label) ?? null) as DraftOrderItemInput["purity"],
+                            // Store's configured per-Purity Selling Price,
                             // falling back to the metal's own flat Selling
                             // Price — same two-step chain Invoice/Kacha/
                             // Quotation already prefill rate from. Skipped
                             // once the user has hand-edited the rate so this
                             // never overwrites a deliberate override.
                             ...(!item.rateTouched
-                              ? {
-                                  estimatedRate:
-                                    metalSellingRates[purity] ?? selectedMetal?.sellingPrice ?? null,
-                                }
+                              ? { estimatedRate: selected?.sellingPrice ?? selectedMetal?.sellingPrice ?? null }
                               : {}),
                           })
                         }}
@@ -295,8 +358,9 @@ export function DraftOrderForm({
                           <SelectValue placeholder="Select purity" />
                         </SelectTrigger>
                         <SelectContent>
-                          {PURITY_SELECT_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {(metalPuritiesCache[item.metalTypeId ?? ""] ?? []).map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
                               {option.label}
                             </SelectItem>
                           ))}
@@ -321,7 +385,7 @@ export function DraftOrderForm({
                     <Label>Estimated Weight (g)</Label>
                     <Input
                       type="number"
-                      step="0.001"
+                      step="any"
                       min="0"
                       value={item.estimatedWeight ?? ""}
                       onChange={(event) =>

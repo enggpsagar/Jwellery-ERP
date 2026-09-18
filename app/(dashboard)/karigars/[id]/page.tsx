@@ -44,24 +44,31 @@ export default async function KarigarDetailPage({ params }: Props) {
         backHref="/karigars"
         backLabel="Back to Artisans"
         action={
-          <div className="flex flex-wrap gap-2">
-            <IssueMaterialDialog
-              karigarId={id}
-              metals={metals}
-              assignedMetalTypeIds={karigar.assignedMetalTypeIds}
-              locations={locations}
-              defaultLocationId={defaultLocationId}
-              count={materialCounts.issuedCount}
-            />
-            <ReceiveMaterialDialog
-              karigarId={id}
-              metals={metals}
-              assignedMetalTypeIds={karigar.assignedMetalTypeIds}
-              locations={locations}
-              defaultLocationId={defaultLocationId}
-              count={materialCounts.receivedCount}
-            />
-            <RecordKarigarPaymentDialog karigarId={id} />
+          <div className="flex flex-col items-end gap-2">
+            {karigar.specialization && (
+              <span className="rounded-full border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                {karigar.specialization}
+              </span>
+            )}
+            <div className="flex flex-wrap justify-end gap-2">
+              <IssueMaterialDialog
+                karigarId={id}
+                metals={metals}
+                assignedMetalTypeIds={karigar.assignedMetalTypeIds}
+                locations={locations}
+                defaultLocationId={defaultLocationId}
+                count={materialCounts.issuedCount}
+              />
+              <ReceiveMaterialDialog
+                karigarId={id}
+                metals={metals}
+                assignedMetalTypeIds={karigar.assignedMetalTypeIds}
+                locations={locations}
+                defaultLocationId={defaultLocationId}
+                count={materialCounts.receivedCount}
+              />
+              <RecordKarigarPaymentDialog karigarId={id} />
+            </div>
           </div>
         }
       />

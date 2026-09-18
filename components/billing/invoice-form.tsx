@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
 import { Trash2, ChevronDown, ChevronRight, Search, Plus } from "lucide-react"
 import type { GstScheme, PurityType } from "@prisma/client"
@@ -217,6 +217,34 @@ function emptyLineItem(defaultGstRateId?: string, key: string = crypto.randomUUI
   }
 }
 
+/**
+ * Where an in-progress invoice is parked while the user is away creating a
+ * new party via CustomerSelect's "+" (onBeforeAddNew below) — same purpose
+ * and shape as DraftOrderForm's own DRAFT_KEY
+ * (components/orders/draft-order-form.tsx). sessionStorage (not
+ * localStorage) so it dies with the tab and can never resurrect a stale
+ * draft days later. Only ever written/read on the create flow (CustomerSelect
+ * is not rendered at all once editInvoiceId is set — see the Party field
+ * below), so nothing here needs to account for full-edit-only fields like
+ * legacyPaidAmount.
+ */
+const DRAFT_KEY = "invoice-form-draft"
+
+type InvoiceFormDraft = {
+  customerId: string
+  items: LineItem[]
+  expandedKeys: string[]
+  locationId: string
+  deliveryState: string
+  deliveryStateCode: string
+  discount: number
+  roundOffOverride: number | null
+  paymentRows: PaymentMethodValue[]
+  invoiceDate: string
+  dueDate: string
+  notes: string
+}
+
 const initialState: InvoiceFormState = { success: false, message: "" }
 
 type InvoiceFormProps = {
@@ -331,7 +359,9 @@ export function InvoiceForm({
   defaultNotes,
 }: InvoiceFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const toast = useToast()
+  const formRef = useRef<HTMLFormElement>(null)
   const showLocationField = useShowLocationField(locations.length)
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
@@ -344,6 +374,13 @@ export function InvoiceForm({
 
   const [customerId, setCustomerId] = useState(initialCustomerId ?? "")
   const [locationId, setLocationId] = useState(initialLocationId ?? "")
+  // CustomerSelect/LocationSelect both seed their own selection from
+  // `defaultValue` into internal state, so changing that prop alone will
+  // not move them once a restored value needs to show — bumping this key
+  // forces a remount that re-seeds from the new defaultValue. Same pattern
+  // as DraftOrderForm's own customerSelectKey/locationSelectKey.
+  const [customerSelectKey, setCustomerSelectKey] = useState(0)
+  const [locationSelectKey, setLocationSelectKey] = useState(0)
   // Shared by both the `items` initial state below and `gstRateId` itself
   // (declared further down) — a plain function, not a hook, so it can be
   // called from either initializer regardless of declaration order. A
@@ -444,6 +481,42 @@ export function InvoiceForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
+
+  /**
+   * Parks the whole in-progress invoice before navigating off to create a
+   * new party via CustomerSelect's "+" (wired as its onBeforeAddNew below).
+   * Without this, every line item, GST/location selection, notes and
+   * everything else already entered was silently dropped on return — same
+   * bug/fix as DraftOrderForm's own saveDraft.
+   *
+   * Invoice Date, Due Date and Notes are uncontrolled inputs, so they are
+   * read off the form element rather than from state.
+   */
+  const saveDraft = () => {
+    const formData = formRef.current ? new FormData(formRef.current) : null
+
+    const draft: InvoiceFormDraft = {
+      customerId,
+      items,
+      expandedKeys: Array.from(expandedKeys),
+      locationId,
+      deliveryState,
+      deliveryStateCode,
+      discount,
+      roundOffOverride,
+      paymentRows,
+      invoiceDate: formData ? String(formData.get("invoiceDate") ?? "") : "",
+      dueDate: formData ? String(formData.get("dueDate") ?? "") : "",
+      notes: formData ? String(formData.get("notes") ?? "") : "",
+    }
+
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    } catch {
+      // A full or blocked sessionStorage shouldn't stop the user getting to
+      // the create page — they just lose the draft, same as before.
+    }
+  }
 
   const updateItem = (key: string, patch: Partial<LineItem>) => {
     setItems((prev) =>
@@ -767,6 +840,91 @@ export function InvoiceForm({
   useEffect(() => {
     const uniqueMetalTypeIds = Array.from(new Set(items.map((item) => item.metalTypeId).filter(Boolean)))
     for (const id of uniqueMetalTypeIds) ensureMetalPurities(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Restore-on-return. Runs once: reads any parked draft (see saveDraft
+  // above), then selects the party that was just created. Deliberately not
+  // dependent on searchParams — re-running after the URL is cleaned would
+  // wipe edits made since.
+  const restoredRef = useRef(false)
+
+  useEffect(() => {
+    if (restoredRef.current) return
+    restoredRef.current = true
+
+    const newCustomerId = searchParams.get("newCustomerId")
+
+    let raw: string | null = null
+    try {
+      raw = sessionStorage.getItem(DRAFT_KEY)
+      if (raw) sessionStorage.removeItem(DRAFT_KEY)
+    } catch {
+      raw = null
+    }
+
+    let draft: InvoiceFormDraft | null = null
+    if (raw) {
+      try {
+        draft = JSON.parse(raw) as InvoiceFormDraft
+      } catch {
+        draft = null
+      }
+    }
+
+    if (draft) {
+      setCustomerId(newCustomerId || draft.customerId || "")
+      if (draft.items && draft.items.length) setItems(draft.items)
+      setExpandedKeys(new Set(draft.expandedKeys ?? []))
+      setLocationId(draft.locationId ?? "")
+      setDeliveryState(draft.deliveryState ?? "")
+      setDeliveryStateCode(draft.deliveryStateCode ?? "")
+      setDiscount(draft.discount ?? 0)
+      setRoundOffOverride(draft.roundOffOverride ?? null)
+      setPaymentRows(draft.paymentRows ?? [])
+
+      // The Purity dropdown for a restored line only has options once its
+      // metal's purities are loaded — the mount effect just above already
+      // ran (empty-handed, against the form's original blank row) before
+      // this restore replaced `items`.
+      for (const item of draft.items ?? []) {
+        if (item.metalTypeId) ensureMetalPurities(item.metalTypeId)
+      }
+
+      if (formRef.current) {
+        const invoiceDateInput = formRef.current.elements.namedItem(
+          "invoiceDate",
+        ) as HTMLInputElement | null
+        if (invoiceDateInput && draft.invoiceDate) invoiceDateInput.value = draft.invoiceDate
+
+        const dueDateInput = formRef.current.elements.namedItem(
+          "dueDate",
+        ) as HTMLInputElement | null
+        if (dueDateInput && draft.dueDate) dueDateInput.value = draft.dueDate
+
+        const notesInput = formRef.current.elements.namedItem(
+          "notes",
+        ) as HTMLTextAreaElement | null
+        if (notesInput && draft.notes) notesInput.value = draft.notes
+      }
+
+      // CustomerSelect/LocationSelect both seed their selection from
+      // `defaultValue` into internal state, so a restored value only shows
+      // once they remount.
+      setCustomerSelectKey((key) => key + 1)
+      setLocationSelectKey((key) => key + 1)
+
+      toast.success("Picked up where you left off")
+    } else if (newCustomerId) {
+      setCustomerId(newCustomerId)
+      setCustomerSelectKey((key) => key + 1)
+    }
+
+    // Strip the one-shot param via history rather than router.replace, so
+    // Next doesn't re-render the route and undo what we just restored.
+    if (newCustomerId) {
+      window.history.replaceState({}, "", window.location.pathname)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -1094,6 +1252,7 @@ export function InvoiceForm({
 
   return (
     <form
+      ref={formRef}
       onSubmit={(event) => {
         // Deliberately not `action={formAction}` directly on the form:
         // React resets a form's uncontrolled fields once an action-bound
@@ -1149,9 +1308,11 @@ export function InvoiceForm({
             </>
           ) : (
             <CustomerSelect
+              key={customerSelectKey}
               customers={customers}
               defaultValue={customerId}
               onChange={(id) => setCustomerId(id)}
+              onBeforeAddNew={saveDraft}
               name="customerId"
             />
           )}
@@ -1177,6 +1338,7 @@ export function InvoiceForm({
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           {showLocationField && <Label>Store Location</Label>}
           <LocationSelect
+            key={locationSelectKey}
             locations={locations}
             name="locationId"
             defaultValue={locationId}

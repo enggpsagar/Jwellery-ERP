@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
 import { Plus, Trash2 } from "lucide-react"
 import type { GstScheme, PurityType } from "@prisma/client"
@@ -148,6 +148,27 @@ function emptyLineItem(key: string = crypto.randomUUID()): LineItem {
 
 const initialState: QuotationFormState = { success: false, message: "" }
 
+/**
+ * Where an in-progress quotation is parked while the user is away creating a
+ * new party via CustomerSelect's "+" — sessionStorage (not localStorage) so
+ * it dies with the tab and can never resurrect a stale draft days later.
+ * Mirrors DraftOrderForm's own DRAFT_KEY/DraftOrderDraft.
+ */
+const DRAFT_KEY = "quotation-form-draft"
+
+const RETURN_TO = "/quotations/new"
+
+type QuotationDraft = {
+  customerId: string
+  locationId: string
+  items: LineItem[]
+  discount: number
+  gstRateId: string
+  quotationDate: string
+  validUntil: string
+  notes: string
+}
+
 type LocationOption = {
   id: string
   name: string
@@ -207,7 +228,9 @@ export function QuotationForm({
   storeState,
 }: QuotationFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const toast = useToast()
+  const formRef = useRef<HTMLFormElement>(null)
   const showLocationField = useShowLocationField(locations.length)
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
@@ -273,6 +296,11 @@ export function QuotationForm({
   // this must already be resolved by the time this component first renders,
   // not set later via an effect.
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
+  // CustomerSelect/LocationSelect both seed their own selection from
+  // `defaultValue` into internal state, so changing that prop alone will
+  // not move them once a restored value needs to show.
+  const [customerSelectKey, setCustomerSelectKey] = useState(0)
+  const [locationSelectKey, setLocationSelectKey] = useState(0)
   const [items, setItems] = useState<LineItem[]>([emptyLineItem("initial")])
   const [discount, setDiscount] = useState(0)
   // A Composition-scheme store can never charge GST — so no rate is
@@ -311,6 +339,120 @@ export function QuotationForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
+
+  /**
+   * Parks the whole in-progress quotation before we navigate off to create a
+   * party. Without this, CustomerSelect's "+" would silently throw away
+   * every line item and everything else already typed — see this file's own
+   * DRAFT_KEY doc comment.
+   *
+   * Quotation Date, Valid Until and Notes are uncontrolled inputs, so they
+   * are read off the form element rather than from state.
+   */
+  const saveDraft = () => {
+    const formData = formRef.current ? new FormData(formRef.current) : null
+
+    const draft: QuotationDraft = {
+      customerId,
+      locationId,
+      items,
+      discount,
+      gstRateId,
+      quotationDate: formData ? String(formData.get("quotationDate") ?? "") : "",
+      validUntil: formData ? String(formData.get("validUntil") ?? "") : "",
+      notes: formData ? String(formData.get("notes") ?? "") : "",
+    }
+
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    } catch {
+      // A full or blocked sessionStorage shouldn't stop the user getting to
+      // the create page — they just lose the draft, same as before.
+    }
+  }
+
+  // Restore-on-return. Runs once: reads any parked draft, then selects the
+  // party that was just created. Deliberately not dependent on
+  // searchParams — re-running after the URL is cleaned would wipe edits
+  // made since. Mirrors DraftOrderForm's own restore effect.
+  const restoredRef = useRef(false)
+
+  useEffect(() => {
+    if (restoredRef.current) return
+    restoredRef.current = true
+
+    const newCustomerId = searchParams.get("newCustomerId")
+
+    let raw: string | null = null
+    try {
+      raw = sessionStorage.getItem(DRAFT_KEY)
+      if (raw) sessionStorage.removeItem(DRAFT_KEY)
+    } catch {
+      raw = null
+    }
+
+    let draft: QuotationDraft | null = null
+    if (raw) {
+      try {
+        draft = JSON.parse(raw) as QuotationDraft
+      } catch {
+        draft = null
+      }
+    }
+
+    if (draft) {
+      const nextItems = draft.items && draft.items.length ? draft.items : [emptyLineItem()]
+
+      setCustomerId(newCustomerId || draft.customerId || "")
+      setItems(nextItems)
+      setLocationId(draft.locationId ?? "")
+      setDiscount(draft.discount ?? 0)
+      if (draft.gstRateId) setGstRateId(draft.gstRateId)
+
+      if (formRef.current) {
+        const quotationDateInput = formRef.current.elements.namedItem(
+          "quotationDate",
+        ) as HTMLInputElement | null
+        if (quotationDateInput && draft.quotationDate) quotationDateInput.value = draft.quotationDate
+
+        const validUntilInput = formRef.current.elements.namedItem(
+          "validUntil",
+        ) as HTMLInputElement | null
+        if (validUntilInput && draft.validUntil) validUntilInput.value = draft.validUntil
+
+        const notesInput = formRef.current.elements.namedItem(
+          "notes",
+        ) as HTMLTextAreaElement | null
+        if (notesInput && draft.notes) notesInput.value = draft.notes
+      }
+
+      // Purity options for each restored line's metal need loading too — a
+      // line restored with a metalTypeId already picked would otherwise
+      // show an empty Purity dropdown until something else happens to
+      // trigger a fetch. Mirrors ReceiveItemsForm's own restore effect.
+      const uniqueMetalTypeIds = Array.from(
+        new Set(nextItems.map((item) => item.metalTypeId).filter(Boolean)),
+      )
+      for (const id of uniqueMetalTypeIds) ensureMetalPurities(id)
+
+      // Both pickers seed their selection from `defaultValue` into internal
+      // state, so a restored value only shows once they remount.
+      setCustomerSelectKey((key) => key + 1)
+      setLocationSelectKey((key) => key + 1)
+
+      toast.success("Picked up where you left off")
+    } else if (newCustomerId) {
+      setCustomerId(newCustomerId)
+      setCustomerSelectKey((key) => key + 1)
+    }
+
+    // Strip the one-shot param via history rather than router.replace, so
+    // Next doesn't re-render the route and undo what we just restored.
+    if (newCustomerId) {
+      window.history.replaceState({}, "", RETURN_TO)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const updateItem = (key: string, patch: Partial<LineItem>) => {
     setItems((prev) =>
@@ -557,6 +699,7 @@ export function QuotationForm({
 
   return (
     <form
+      ref={formRef}
       onSubmit={(event) => {
         // Deliberately not `action={formAction}` directly on the form:
         // React resets a form's uncontrolled fields once an action-bound
@@ -583,9 +726,11 @@ export function QuotationForm({
         <div className="space-y-2 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label>Party <RequiredMark /></Label>
           <CustomerSelect
+            key={customerSelectKey}
             customers={customers}
             defaultValue={customerId}
             onChange={(id) => setCustomerId(id)}
+            onBeforeAddNew={() => saveDraft()}
             name="customerId"
           />
         </div>
@@ -607,6 +752,7 @@ export function QuotationForm({
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           {showLocationField && <Label>Store Location</Label>}
           <LocationSelect
+            key={locationSelectKey}
             locations={locations}
             name="locationId"
             defaultValue={locationId}

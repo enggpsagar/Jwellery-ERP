@@ -1167,45 +1167,40 @@ export function ProductForm({
       ============================= */}
 
       <div className="rounded-xl border p-6">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold">Weights</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Typical weights for this design. They prefill the stock entry, and
-              each piece can still be corrected against the scale afterwards.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Label htmlFor="weightUnit" className="text-xs text-muted-foreground">
-              Weight Unit
-            </Label>
-            <Select value={weightUnit} onValueChange={(unit) => setWeightUnit(unit as "GRAM" | "CARAT")}>
-              <SelectTrigger id="weightUnit" className="h-9 w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="GRAM">Gram</SelectItem>
-                <SelectItem value="CARAT">Carat</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold">Weights</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Typical weights for this design. They prefill the stock entry, and
+            each piece can still be corrected against the scale afterwards.
+          </p>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-2">
           <div>
             <Label htmlFor="defaultGrossWeight">Gross Weight <RequiredMark /></Label>
 
             <input type="hidden" name="defaultGrossWeight" value={submittedWeight(grossWeight)} />
-            <Input
-              id="defaultGrossWeight"
-              type="number"
-              step="0.00001"
-              min="0"
-              value={displayWeight(grossWeight)}
-              onChange={(event) => setGrossWeight(toGramsString(event.target.value))}
-              placeholder="0.000"
-            />
+            <div className="flex gap-1">
+              <Input
+                id="defaultGrossWeight"
+                type="number"
+                step="0.00001"
+                min="0"
+                className="flex-1"
+                value={displayWeight(grossWeight)}
+                onChange={(event) => setGrossWeight(toGramsString(event.target.value))}
+                placeholder="0.000"
+              />
+              <Select value={weightUnit} onValueChange={(unit) => setWeightUnit(unit as "GRAM" | "CARAT")}>
+                <SelectTrigger className="w-16">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GRAM">g</SelectItem>
+                  <SelectItem value="CARAT">ct</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             <ErrorText error={state.errors.defaultGrossWeight} />
           </div>
@@ -1222,29 +1217,6 @@ export function ProductForm({
           {!hasStoneComponent && (
             <input type="hidden" name="defaultStoneWeight" value={submittedWeight(stoneWeight)} />
           )}
-
-          <div>
-            <Label htmlFor="defaultNetWeight">Net Weight <RequiredMark /></Label>
-
-            <input type="hidden" name="defaultNetWeight" value={submittedWeight(netWeight)} />
-            <Input
-              id="defaultNetWeight"
-              type="number"
-              step="0.00001"
-              min="0"
-              value={displayWeight(netWeight)}
-              onChange={(event) => handleNetWeightChange(toGramsString(event.target.value))}
-              placeholder="0.000"
-            />
-
-            {!netTouched && derivedNet !== null ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Gross &minus; stone. Type to override.
-              </p>
-            ) : null}
-
-            <ErrorText error={state.errors.defaultNetWeight} />
-          </div>
 
           {/* Carat Weight for a genuinely carat-weighed item (a loose
               Diamond/Stone product, its own entire weight) stays here.
@@ -1276,6 +1248,46 @@ export function ProductForm({
               <ErrorText error={state.errors.defaultCaratWeight} />
             </div>
           )}
+
+          {/* Net Weight sits at the bottom, spanning the full width — it's
+              derived from Gross minus stone, not a peer entry field, so it
+              reads last and gets the same "auto-filled" green treatment as
+              Net Stone Weight above once it hasn't been hand-edited. */}
+          <div className="lg:col-span-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="defaultNetWeight">Net Weight <RequiredMark /></Label>
+              {!netTouched && derivedNet !== null && (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  Auto-filled
+                </span>
+              )}
+            </div>
+
+            <input type="hidden" name="defaultNetWeight" value={submittedWeight(netWeight)} />
+            <div className="flex gap-1">
+              <Input
+                id="defaultNetWeight"
+                type="number"
+                step="0.00001"
+                min="0"
+                className={!netTouched && derivedNet !== null ? "flex-1 border-emerald-300 bg-emerald-50" : "flex-1"}
+                value={displayWeight(netWeight)}
+                onChange={(event) => handleNetWeightChange(toGramsString(event.target.value))}
+                placeholder="0.000"
+              />
+              <div className="flex h-9 w-16 items-center justify-center rounded-md border bg-muted text-sm text-muted-foreground">
+                {weightUnit === "GRAM" ? "g" : "ct"}
+              </div>
+            </div>
+
+            <p className="mt-1 text-xs text-muted-foreground">
+              {!netTouched && derivedNet !== null
+                ? "Gross − stone — edit to override"
+                : "Manually entered"}
+            </p>
+
+            <ErrorText error={state.errors.defaultNetWeight} />
+          </div>
         </div>
       </div>
 

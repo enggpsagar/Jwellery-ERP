@@ -102,33 +102,48 @@ export function DashboardGrid({
   }
 
   return (
-    <div ref={containerRef}>
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          Drag the handle at the top of a card to rearrange it, or its bottom-right corner to resize.
-        </p>
-        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={handleReset}>
-          <RotateCcw className="size-3.5" />
-          Reset layout
-        </Button>
+    <div>
+      {/* Below `lg` there isn't enough width for the drag/resize grid to keep
+          its desktop column proportions (an 8/12-col widget next to a
+          4/12-col one both shrink to slivers rather than stacking), so the
+          whole grid — hint text, reset button, and all — is desktop-only.
+          The same widgets render again just below as a plain stacked list;
+          each already brings its own <Card> chrome, so no extra frame is
+          needed there. */}
+      <div className="hidden lg:block" ref={containerRef}>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            Drag the handle at the top of a card to rearrange it, or its bottom-right corner to resize.
+          </p>
+          <Button type="button" variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={handleReset}>
+            <RotateCcw className="size-3.5" />
+            Reset layout
+          </Button>
+        </div>
+
+        {mounted && (
+          <GridLayout
+            width={width}
+            layout={layout}
+            gridConfig={{ cols: COLS, rowHeight: ROW_HEIGHT, margin: MARGIN, containerPadding: [0, 0], maxRows: Infinity }}
+            dragConfig={{ handle: ".dashboard-widget-drag-handle" }}
+            resizeConfig={{ handles: ["se"] }}
+            onLayoutChange={handleLayoutChange}
+          >
+            {DEFAULT_LAYOUT.map((item) => (
+              <div key={item.i}>
+                <WidgetFrame>{widgets[item.i as DashboardWidgetId]}</WidgetFrame>
+              </div>
+            ))}
+          </GridLayout>
+        )}
       </div>
 
-      {mounted && (
-        <GridLayout
-          width={width}
-          layout={layout}
-          gridConfig={{ cols: COLS, rowHeight: ROW_HEIGHT, margin: MARGIN, containerPadding: [0, 0], maxRows: Infinity }}
-          dragConfig={{ handle: ".dashboard-widget-drag-handle" }}
-          resizeConfig={{ handles: ["se"] }}
-          onLayoutChange={handleLayoutChange}
-        >
-          {DEFAULT_LAYOUT.map((item) => (
-            <div key={item.i}>
-              <WidgetFrame>{widgets[item.i as DashboardWidgetId]}</WidgetFrame>
-            </div>
-          ))}
-        </GridLayout>
-      )}
+      <div className="flex flex-col gap-4 lg:hidden">
+        {DEFAULT_LAYOUT.map((item) => (
+          <div key={item.i}>{widgets[item.i as DashboardWidgetId]}</div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -1224,105 +1224,95 @@ export function ProductForm({
       )}
 
       {/* ============================
-          WEIGHTS
+          NET WEIGHT — no card of its own. Renders right where it always
+          has (this exact spot, right after the conditional Stone Pricing
+          block above), which already gives the two positions asked for:
+          directly after Basic Information when there's no embedded stone,
+          and after Stone Pricing once "Includes a Stone" is checked — a
+          separate bordered "Weights" box here just for one derived field
+          (Gross Weight now lives in Basic Information) was redundant.
       ============================= */}
 
-      <div className="rounded-xl border p-6">
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold">Weights</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Typical weights for this design. They prefill the stock entry, and
-            each piece can still be corrected against the scale afterwards.
+      {/* Stone Weight is only ever visibly editable once "Includes a
+          Stone" is checked — it then lives in the Stone Pricing box
+          above, as "Net Stone Weight" next to the Stone Carat Weight it
+          mirrors. While the toggle is off, the field stays fully hidden
+          (its value is cleared when the toggle turns off — see the
+          toggle's own onChange above) rather than shown here for a plain
+          metal item; this hidden input is only what keeps
+          defaultStoneWeight in the submitted form shape (as an empty/null
+          value) for that off case. */}
+      {!hasStoneComponent && (
+        <input type="hidden" name="defaultStoneWeight" value={submittedWeight(stoneWeight)} />
+      )}
+
+      {/* Carat Weight for a genuinely carat-weighed item (a loose Diamond/
+          Stone product, its own entire weight). Once "Includes a Stone"
+          is also checked on top of that, this same field moves into the
+          Stone Pricing box instead (as the embedded stone's own carat
+          weight) so there is one Carat Weight input, not two bound to the
+          same value. */}
+      {isCaratFamily && !hasStoneComponent && (
+        <div className="max-w-sm">
+          <Label htmlFor="defaultCaratWeight">Carat Weight (ct)</Label>
+
+          <Input
+            id="defaultCaratWeight"
+            name="defaultCaratWeight"
+            type="number"
+            step="any"
+            min="0"
+            value={caratWeight}
+            onChange={(event) =>
+              handleCaratWeightChange(event.target.value)
+            }
+            placeholder="0.000"
+          />
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            1 ct = 0.2 g. Converts with Net Weight automatically.
           </p>
+
+          <ErrorText error={state.errors.defaultCaratWeight} />
+        </div>
+      )}
+
+      <div className="max-w-sm">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="defaultNetWeight">Net Weight <RequiredMark /></Label>
+          {!netTouched && derivedNet !== null && (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              Auto-filled
+            </span>
+          )}
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Stone Weight is only ever visibly editable once "Includes a
-              Stone" is checked — it then lives in the Stone Pricing box
-              below, as "Net Stone Weight" next to the Stone Carat Weight it
-              mirrors. While the toggle is off, the field stays fully
-              hidden (its value is cleared when the toggle turns off — see
-              the toggle's own onChange below) rather than shown here for a
-              plain metal item; this hidden input is only what keeps
-              defaultStoneWeight in the submitted form shape (as an empty/
-              null value) for that off case. */}
-          {!hasStoneComponent && (
-            <input type="hidden" name="defaultStoneWeight" value={submittedWeight(stoneWeight)} />
-          )}
-
-          {/* Carat Weight for a genuinely carat-weighed item (a loose
-              Diamond/Stone product, its own entire weight) stays here.
-              Once "Includes a Stone" is also checked on top of that, this
-              same field moves into the Stone Pricing box below instead
-              (as the embedded stone's own carat weight) so there is one
-              Carat Weight input, not two bound to the same value. */}
-          {isCaratFamily && !hasStoneComponent && (
-            <div>
-              <Label htmlFor="defaultCaratWeight">Carat Weight (ct)</Label>
-
-              <Input
-                id="defaultCaratWeight"
-                name="defaultCaratWeight"
-                type="number"
-                step="any"
-                min="0"
-                value={caratWeight}
-                onChange={(event) =>
-                  handleCaratWeightChange(event.target.value)
-                }
-                placeholder="0.000"
-              />
-
-              <p className="mt-1 text-xs text-muted-foreground">
-                1 ct = 0.2 g. Converts with Net Weight automatically.
-              </p>
-
-              <ErrorText error={state.errors.defaultCaratWeight} />
-            </div>
-          )}
-
-          {/* Net Weight sits at the bottom, spanning the full width — it's
-              derived from Gross minus stone, not a peer entry field, so it
-              reads last and gets the same "auto-filled" green treatment as
-              Net Stone Weight above once it hasn't been hand-edited. */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="defaultNetWeight">Net Weight <RequiredMark /></Label>
-              {!netTouched && derivedNet !== null && (
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                  Auto-filled
-                </span>
-              )}
-            </div>
-
-            <input type="hidden" name="defaultNetWeight" value={submittedWeight(netWeight)} />
-            <div className="flex gap-1">
-              <Input
-                id="defaultNetWeight"
-                type="number"
-                step="any"
-                min="0"
-                className={!netTouched && derivedNet !== null ? "flex-1 border-emerald-300 bg-emerald-50" : "flex-1"}
-                value={displayWeight(netWeight)}
-                onChange={(event) => handleNetWeightChange(toGramsString(event.target.value))}
-                placeholder="0.000"
-              />
-              <div className="flex h-9 w-16 items-center justify-center rounded-md border bg-muted text-sm text-muted-foreground">
-                {weightUnit === "GRAM" ? "g" : "ct"}
-              </div>
-            </div>
-
-            <p className="mt-1 text-xs text-muted-foreground">
-              {netTouched
-                ? "Manually entered"
-                : derivedNet !== null
-                  ? "Gross − stone — edit to override"
-                  : "Auto-calculated from Gross Weight"}
-            </p>
-
-            <ErrorText error={state.errors.defaultNetWeight} />
+        <input type="hidden" name="defaultNetWeight" value={submittedWeight(netWeight)} />
+        <div className="flex gap-1">
+          <Input
+            id="defaultNetWeight"
+            type="number"
+            step="any"
+            min="0"
+            className={!netTouched && derivedNet !== null ? "flex-1 border-emerald-300 bg-emerald-50" : "flex-1"}
+            value={displayWeight(netWeight)}
+            onChange={(event) => handleNetWeightChange(toGramsString(event.target.value))}
+            placeholder="0.000"
+          />
+          <div className="flex h-9 w-16 items-center justify-center rounded-md border bg-muted text-sm text-muted-foreground">
+            {weightUnit === "GRAM" ? "g" : "ct"}
           </div>
         </div>
+
+        <p className="mt-1 text-xs text-muted-foreground">
+          {netTouched
+            ? "Manually entered"
+            : derivedNet !== null
+              ? "Gross − stone — edit to override"
+              : "Auto-calculated from Gross Weight"}
+        </p>
+
+        <ErrorText error={state.errors.defaultNetWeight} />
       </div>
 
       {/* ============================

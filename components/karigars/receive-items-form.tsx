@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useActionState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Plus, Trash2 } from "lucide-react"
 
@@ -155,6 +155,23 @@ function emptyReceiptItem(
   }
 }
 
+/**
+ * Where an in-progress "receive items" job is parked while the user is away
+ * creating a brand-new Product for one of its returned-item rows. Mirrors
+ * PurchaseForm's own DRAFT_KEY/PurchaseDraft — sessionStorage (not
+ * localStorage) so it dies with the tab and can never resurrect a stale
+ * draft days later.
+ */
+const DRAFT_KEY = "receive-items-form-draft"
+
+type ReceiveItemsDraft = {
+  items: ReceiptItem[]
+  labourCharge: number
+  /** Which returned-item row asked for the new product, so it lands on the
+   * right row once created. */
+  pendingProductForKey?: string
+}
+
 type LocationOption = {
   id: string
   name: string
@@ -221,6 +238,12 @@ export function ReceiveItemsForm({
   ])
   const [labourCharge, setLabourCharge] = useState(0)
 
+  // ProductSelect only seeds its own selection from `defaultValue` once, so
+  // a restored/newly-created product only shows up once its row's picker
+  // remounts — same remount-key mechanism as PurchaseForm's
+  // productSelectKeys.
+  const [productSelectKeys, setProductSelectKeys] = useState<Record<string, number>>({})
+
   // Real per-Metal Purity options (Settings > Taxonomy > Purities),
   // replacing the old hardcoded PURITY_OPTIONS list — cached per
   // metalTypeId since several items can each have their own metal.
@@ -240,7 +263,14 @@ export function ReceiveItemsForm({
   }, [defaultMetal?.id])
   const [editingQuantityKeys, setEditingQuantityKeys] = useState<Set<string>>(new Set())
   const router = useRouter()
+  const searchParams = useSearchParams()
   const toast = useToast()
+
+  // This job's own URL — static per job (no meaningful query params), so it
+  // can be computed from props rather than read via usePathname(). Used
+  // both as ProductSelect's addNewHref return target and to strip the
+  // one-shot newProductId param after a restore.
+  const returnTo = `/karigars/${karigarId}/receive-items/${jobId}`
 
   const receiveItemsWithId = receiveItemsFromKarigar.bind(null, jobId)
   const [state, formAction, pending] = useActionState(receiveItemsWithId, initialState)
@@ -265,6 +295,108 @@ export function ReceiveItemsForm({
       toast.error(state.message)
     }
   }, [state, router, toast])
+
+  /**
+   * Parks the whole in-progress "receive items" job before navigating off to
+   * create a Product for one of its rows. Without this, "Add New Product"
+   * would silently throw away every other row/field the user had already
+   * entered — see this file's own DRAFT_KEY doc comment.
+   */
+  const saveDraft = (pendingProductForKey?: string) => {
+    const draft: ReceiveItemsDraft = {
+      items,
+      labourCharge,
+      pendingProductForKey,
+    }
+
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    } catch {
+      // A full or blocked sessionStorage shouldn't stop the user getting to
+      // the create page — they just lose the draft, same as before.
+    }
+  }
+
+  // Restore-on-return. Runs once: reads any parked draft, then applies the
+  // record that was just created to the row that asked for it. Deliberately
+  // not dependent on searchParams — re-running after the URL is cleaned
+  // would wipe edits made since. Mirrors PurchaseForm's own restore effect.
+  const restoredRef = useRef(false)
+
+  useEffect(() => {
+    if (restoredRef.current) return
+    restoredRef.current = true
+
+    const newProductId = searchParams.get("newProductId")
+
+    let raw: string | null = null
+    try {
+      raw = sessionStorage.getItem(DRAFT_KEY)
+      if (raw) sessionStorage.removeItem(DRAFT_KEY)
+    } catch {
+      raw = null
+    }
+
+    let draft: ReceiveItemsDraft | null = null
+    if (raw) {
+      try {
+        draft = JSON.parse(raw) as ReceiveItemsDraft
+      } catch {
+        draft = null
+      }
+    }
+
+    if (draft) {
+      let nextItems = draft.items && draft.items.length ? draft.items : items
+
+      // The page refetched on the way back in, so a product created a
+      // moment ago is already in `products` — it only needs applying to the
+      // row that went looking for it. Mirrors applyProductToItem's own
+      // minimal field set (just productId + itemName).
+      if (newProductId && draft.pendingProductForKey) {
+        const product = products.find((p) => p.id === newProductId)
+
+        if (product) {
+          nextItems = nextItems.map((item) =>
+            item.key === draft?.pendingProductForKey
+              ? { ...item, productId: product.id, itemName: item.itemName || product.name }
+              : item,
+          )
+        }
+      }
+
+      setItems(nextItems)
+      setLabourCharge(draft.labourCharge ?? 0)
+
+      // Purity options for each restored row's metal need loading too — a
+      // row restored with a metalTypeId already picked (free-choice metal,
+      // i.e. no jobMetalTypeId lock) would otherwise show an empty Purity
+      // dropdown until something else happens to trigger a fetch.
+      const uniqueMetalTypeIds = Array.from(
+        new Set(nextItems.map((item) => item.metalTypeId).filter(Boolean)),
+      )
+      for (const id of uniqueMetalTypeIds) ensureMetalPurities(id)
+
+      // ProductSelect seeds its selection from `defaultValue` into internal
+      // state, so a restored/new value only shows once its row remounts.
+      setProductSelectKeys((prev) => {
+        const next = { ...prev }
+        nextItems.forEach((item) => {
+          next[item.key] = (next[item.key] ?? 0) + 1
+        })
+        return next
+      })
+
+      toast.success("Picked up where you left off")
+    }
+
+    // Strip the one-shot param via history rather than router.replace, so
+    // Next doesn't re-render the route and undo what we just restored.
+    if (newProductId) {
+      window.history.replaceState({}, "", returnTo)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const updateItem = (key: string, patch: Partial<ReceiptItem>) => {
     setItems((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)))
@@ -499,6 +631,7 @@ export function ReceiveItemsForm({
                   <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Product</Label>
                     <ProductSelect
+                      key={productSelectKeys[item.key] ?? 0}
                       products={productsFor(item)}
                       name={`product-${item.key}`}
                       defaultValue={item.productId}
@@ -506,6 +639,8 @@ export function ReceiveItemsForm({
                       onChange={(productId, product) =>
                         applyProductToItem(item.key, productId, product)
                       }
+                      addNewHref={`/inventory/products/new?returnTo=${encodeURIComponent(returnTo)}`}
+                      onBeforeAddNew={() => saveDraft(item.key)}
                     />
                   </div>
 

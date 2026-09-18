@@ -33,7 +33,7 @@ export default async function DraftOrderDetailPage({ params }: Props) {
   ])
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-6">
+    <main className="mx-auto w-full max-w-5xl space-y-6 p-6">
       <PageBackHeader
         title={`Draft Order ${order.orderNumber}`}
         description={order.customer ? `For ${order.customer.name}` : undefined}

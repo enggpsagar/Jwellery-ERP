@@ -27,14 +27,18 @@ export function PageBackHeader({
       </Link>
 
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
+        <div className="min-w-0">
           <h1 className="font-heading text-2xl font-semibold tracking-tight">{title}</h1>
           {description ? (
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           ) : null}
         </div>
 
-        {action ? <div>{action}</div> : null}
+        {/* min-w-0 so the action slot (often a row of buttons with
+            shrink-0) is forced to respect the available width and wrap
+            instead of pushing the page wider than the viewport — a plain
+            flex child's default min-width is its content size, not 0. */}
+        {action ? <div className="min-w-0">{action}</div> : null}
       </div>
     </div>
   )

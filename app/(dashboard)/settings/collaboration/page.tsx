@@ -31,7 +31,7 @@ export default async function CollaborationSettingsPage() {
   ])
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-6">
+    <main className="mx-auto w-full max-w-5xl space-y-6 p-6">
       <PageBackHeader
         title="Collaboration"
         description="Control when a Super Admin can access this store's data — they need a code from you first, every time you choose to grant it."

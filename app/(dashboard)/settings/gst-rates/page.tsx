@@ -25,7 +25,7 @@ export default async function GstRateSettingsPage() {
   const rates = await getGstRates();
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-6">
+    <main className="mx-auto w-full max-w-5xl space-y-6 p-6">
       <PageBackHeader
         title="GST Rates"
         description="Define the GST rates your store applies on Invoices, Purchases, and Quotations."

@@ -46,7 +46,7 @@ export default async function EditCustomerPage({
   if (!customer) notFound()
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-6">
+    <main className="mx-auto w-full max-w-4xl space-y-6 p-6">
       <PageBackHeader
         title={`Edit ${customer.name}`}
         description="Update this party's contact and account details."

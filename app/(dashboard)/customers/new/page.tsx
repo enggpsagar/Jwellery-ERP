@@ -28,7 +28,7 @@ export default async function NewCustomerPage({
   const [states, settings] = await Promise.all([getStates(), getBusinessSettings()])
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-6">
+    <main className="mx-auto w-full max-w-4xl space-y-6 p-6">
       <ResetFormWrapper
         header={{
           title: markAsSupplier ? "Add Supplier" : "Add Party",

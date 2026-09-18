@@ -55,7 +55,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   const hasReturnableItems = (returnableItems ?? []).length > 0
 
   return (
-    <main className="mx-auto max-w-5xl space-y-4 p-6">
+    <main className="mx-auto w-full max-w-5xl space-y-4 p-6">
       <PageBackHeader
         title={invoice.invoiceNumber}
         description={invoice.customer?.name ? toTitleCase(invoice.customer.name) : ""}

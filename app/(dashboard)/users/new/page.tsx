@@ -49,7 +49,7 @@ export default async function NewUserPage() {
   const isSuperAdmin = currentUser?.role === UserRole.SUPER_ADMIN;
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-6">
+    <main className="mx-auto w-full max-w-4xl space-y-6 p-6">
       <ResetFormWrapper
         header={{
           title: "Add User",

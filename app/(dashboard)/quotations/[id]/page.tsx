@@ -34,7 +34,7 @@ export default async function QuotationDetailPage({ params }: Props) {
   if (!quotation) notFound()
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-6">
+    <main className="mx-auto w-full max-w-5xl space-y-6 p-6">
       <PageBackHeader
         title={quotation.quotationNumber}
         description={quotation.customer?.name ?? ""}

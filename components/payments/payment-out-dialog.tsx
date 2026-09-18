@@ -56,6 +56,10 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
   const [open, setOpen] = useState(() => searchParams.get("new") === "1" || !!initialVendorId)
   const [partyType, setPartyType] = useState<PartyType>("VENDOR")
   const [partyId, setPartyId] = useState(initialVendorId)
+  // Own copy so a karigar created via KarigarSelect's "+" mid-form shows up
+  // immediately, without a page refetch — same as product-form.tsx's own
+  // metals/purities lists fed by AddMetalDialog/AddPurityDialog.
+  const [karigarList, setKarigarList] = useState<PaymentKarigarOption[]>(karigars)
   const router = useRouter()
   const toast = useToast()
 
@@ -81,6 +85,7 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
       setPartyType("VENDOR")
       setPartyId(initialVendorId)
       setRows([emptyPaymentMethodValue()])
+      setKarigarList(karigars)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -181,10 +186,16 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
               />
             ) : (
               <KarigarSelect
-                karigars={karigars}
+                karigars={karigarList}
                 name="karigarId"
                 defaultValue={partyId}
                 onChange={setPartyId}
+                onCreated={(karigar) =>
+                  setKarigarList((prev) => [
+                    ...prev,
+                    { id: karigar.id, name: karigar.name, mobile: karigar.mobile ?? null, code: karigar.code ?? null },
+                  ])
+                }
               />
             )}
             {selectedVendor && (

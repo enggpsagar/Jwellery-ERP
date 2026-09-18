@@ -74,6 +74,8 @@ export type KarigarFormState = {
   success: boolean;
   message: string;
   errors?: Record<string, string[]>;
+  /** Set only by createKarigar, on success — the new row's id. */
+  id?: string;
 };
 
 export type KarigarSortBy = "name" | "code" | "createdAt";
@@ -540,12 +542,12 @@ export async function createKarigar(
     // A mobile or email doubles as the karigar's login — create their User
     // account in the same step, matching how a Store's initial Admin is
     // created alongside the Store itself.
-    await prisma.$transaction(async (tx) => {
-      const karigar = await tx.karigar.create({ data: { ...data, code, storeId } });
+    const karigar = await prisma.$transaction(async (tx) => {
+      const created = await tx.karigar.create({ data: { ...data, code, storeId } });
 
       if (assignedMetalTypeIds.length > 0) {
         await tx.karigarMetal.createMany({
-          data: assignedMetalTypeIds.map((metalTypeId) => ({ karigarId: karigar.id, metalTypeId })),
+          data: assignedMetalTypeIds.map((metalTypeId) => ({ karigarId: created.id, metalTypeId })),
         });
       }
 
@@ -559,10 +561,12 @@ export async function createKarigar(
             status: UserStatus.INVITED,
             isActive: true,
             storeId,
-            karigarId: karigar.id,
+            karigarId: created.id,
           },
         });
       }
+
+      return created;
     });
 
     revalidatePath("/karigars");
@@ -581,6 +585,10 @@ export async function createKarigar(
 
     return {
       success: true,
+      // Only createKarigar sets this — lets a caller doing a quick-create
+      // (see AddKarigarDialog) pull the new row's id back out without a
+      // refetch, same as upsertStoreMetal/upsertStoreMetalPurity's own id.
+      id: karigar.id,
       message:
         data.mobile || data.email
           ? data.email && emailSent

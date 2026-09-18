@@ -45,6 +45,10 @@ export function SendToKarigarDialog({
   const [open, setOpen] = useState(false)
   const [karigarId, setKarigarId] = useState("")
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
+  // Own copy so a karigar created via KarigarSelect's "+" mid-form shows up
+  // immediately, without a page refetch — same as product-form.tsx's own
+  // metals/purities lists fed by AddMetalDialog/AddPurityDialog.
+  const [karigarList, setKarigarList] = useState<KarigarOption[]>(karigars)
   const router = useRouter()
   const toast = useToast()
   const showLocationField = useShowLocationField(locations.length)
@@ -62,6 +66,13 @@ export function SendToKarigarDialog({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
+
+  // Picks up a refreshed `karigars` prop (e.g. after router.refresh() above)
+  // each time this dialog is reopened, so a stale local copy can't linger.
+  useEffect(() => {
+    if (open) setKarigarList(karigars)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -94,7 +105,12 @@ export function SendToKarigarDialog({
             <Label>
               Artisan <RequiredMark />
             </Label>
-            <KarigarSelect karigars={karigars} defaultValue={karigarId} onChange={setKarigarId} />
+            <KarigarSelect
+              karigars={karigarList}
+              defaultValue={karigarId}
+              onChange={setKarigarId}
+              onCreated={(karigar) => setKarigarList((prev) => [...prev, karigar])}
+            />
           </div>
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">

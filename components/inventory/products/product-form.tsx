@@ -935,6 +935,35 @@ export function ProductForm({
           )}
 
           <div>
+            <Label htmlFor="defaultGrossWeight">Gross Weight <RequiredMark /></Label>
+
+            <input type="hidden" name="defaultGrossWeight" value={submittedWeight(grossWeight)} />
+            <div className="flex gap-1">
+              <Input
+                id="defaultGrossWeight"
+                type="number"
+                step="any"
+                min="0"
+                className="h-11 flex-1"
+                value={displayWeight(grossWeight)}
+                onChange={(event) => setGrossWeight(toGramsString(event.target.value))}
+                placeholder="0.000"
+              />
+              <Select value={weightUnit} onValueChange={(unit) => setWeightUnit(unit as "GRAM" | "CARAT")}>
+                <SelectTrigger className="h-11 w-16">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GRAM">g</SelectItem>
+                  <SelectItem value="CARAT">ct</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <ErrorText error={state.errors.defaultGrossWeight} />
+          </div>
+
+          <div>
             <Label>Category <RequiredMark /></Label>
 
             <div className="flex gap-1.5">
@@ -1208,35 +1237,6 @@ export function ProductForm({
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <div>
-            <Label htmlFor="defaultGrossWeight">Gross Weight <RequiredMark /></Label>
-
-            <input type="hidden" name="defaultGrossWeight" value={submittedWeight(grossWeight)} />
-            <div className="flex gap-1">
-              <Input
-                id="defaultGrossWeight"
-                type="number"
-                step="any"
-                min="0"
-                className="flex-1"
-                value={displayWeight(grossWeight)}
-                onChange={(event) => setGrossWeight(toGramsString(event.target.value))}
-                placeholder="0.000"
-              />
-              <Select value={weightUnit} onValueChange={(unit) => setWeightUnit(unit as "GRAM" | "CARAT")}>
-                <SelectTrigger className="w-16">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GRAM">g</SelectItem>
-                  <SelectItem value="CARAT">ct</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <ErrorText error={state.errors.defaultGrossWeight} />
-          </div>
-
           {/* Stone Weight is only ever visibly editable once "Includes a
               Stone" is checked — it then lives in the Stone Pricing box
               below, as "Net Stone Weight" next to the Stone Carat Weight it

@@ -14,15 +14,11 @@ import { safeReturnTo } from "@/lib/safe-return-to";
 
 type Mode = "phone" | "email";
 
-// Mirrors PHONE_RESEND_COOLDOWN_MS / EMAIL_RESEND_COOLDOWN_MS in
-// app/api/auth/send-otp/route.ts — the server is the real enforcement (a 429
-// with the actual seconds left overrides this on mismatch), this is just
-// what the button counts down from right after a send succeeds, before that
-// response would even matter.
-const RESEND_COOLDOWN_SECONDS: Record<Mode, number> = {
-  phone: 120,
-  email: 30,
-};
+// What survives a refresh/revisit — just enough to re-ask the server "where
+// was I", never the code itself. Everything else (countdown, attempts
+// remaining, lockout) is re-fetched from /api/auth/otp-status on mount, so
+// this app is never the source of truth for anything security-relevant.
+const OTP_SESSION_KEY = "jwellery-erp-otp-session";
 
 type Notice = { tone: "error" | "info"; title: string; body: string };
 
@@ -82,6 +78,42 @@ function noticeFor(code: string | null | undefined): Notice | null {
   );
 }
 
+/** "23h 59m" / "5m 12s" / "38s" — precise enough to be useful without
+ * ticking a 24-hour countdown down second by second on screen. */
+function formatDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+type OtpStatus = {
+  otpActive: boolean;
+  expiresInSeconds: number;
+  resendAvailableInSeconds: number;
+  attemptsRemaining: number;
+  lockedForSeconds: number;
+};
+
+type StoredSession = { mode: Mode; identifier: string };
+
+function readStoredSession(): StoredSession | null {
+  try {
+    const raw = window.localStorage.getItem(OTP_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.identifier && (parsed.mode === "phone" || parsed.mode === "email")) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("phone");
   const [identifier, setIdentifier] = useState("");
@@ -89,15 +121,23 @@ export default function LoginPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [resendCooldown, setResendCooldown] = useState(0);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
 
-  // Ticks resendCooldown down to 0, one second at a time, while it's active.
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const id = window.setTimeout(() => setResendCooldown((seconds) => seconds - 1), 1000);
-    return () => window.clearTimeout(id);
-  }, [resendCooldown]);
+  // One countdown drives both "code still valid for..." and "Resend OTP"
+  // becoming available — they're the same window by design (see
+  // send-otp/route.ts's RESEND_COOLDOWN_MS comment): a user is never left
+  // mid-way through a still-valid code with Resend already tempting them
+  // to throw it away, and never left without Resend the moment it expires.
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
+  // 0 = not locked. Counts down in whole seconds even though the window is
+  // 24h, so a page left open through the block clears itself without a
+  // manual refresh.
+  const [lockedForSeconds, setLockedForSeconds] = useState(0);
+  // True only while restoring a persisted session on first mount — avoids
+  // flashing the plain "Send OTP" screen for the instant before a refetch
+  // reveals there's actually an active code (or a lockout) to show instead.
+  const [restoring, setRestoring] = useState(true);
 
   // Where to go once signed in. Middleware puts the blocked path in
   // `callbackUrl`, and honouring it is what makes a scanned QR work on a
@@ -121,13 +161,102 @@ export default function LoginPage() {
     if (target && !target.startsWith("/login")) setCallbackUrl(target);
   }, []);
 
+  async function fetchStatus(fetchMode: Mode, fetchIdentifier: string) {
+    try {
+      const query =
+        fetchMode === "phone"
+          ? `phone=${encodeURIComponent(fetchIdentifier)}`
+          : `email=${encodeURIComponent(fetchIdentifier)}`;
+      const response = await fetch(`/api/auth/otp-status?${query}`);
+      if (!response.ok) return;
+
+      const data: OtpStatus = await response.json();
+
+      setAttemptsRemaining(data.attemptsRemaining);
+      setLockedForSeconds(data.lockedForSeconds);
+
+      if (data.lockedForSeconds > 0) {
+        setOtpSent(false);
+        setSecondsLeft(0);
+        return;
+      }
+
+      if (data.otpActive) {
+        setOtpSent(true);
+        setSecondsLeft(data.expiresInSeconds);
+      } else {
+        // Nothing active and not locked — the persisted session (if any)
+        // is stale, and there's nothing left worth restoring.
+        setOtpSent(false);
+        setSecondsLeft(0);
+        clearSession();
+      }
+    } catch {
+      // Best-effort — a failed status check just leaves whatever the UI
+      // was already showing; the next real send/verify still enforces
+      // everything correctly server-side regardless.
+    }
+  }
+
+  // Restores an in-progress OTP session — or an active lockout — after a
+  // refresh or revisit. Only "which phone/email + channel" ever persists;
+  // the numbers themselves always come fresh from the server.
+  useEffect(() => {
+    const stored = readStoredSession();
+    if (!stored) {
+      setRestoring(false);
+      return;
+    }
+
+    setMode(stored.mode);
+    setIdentifier(stored.identifier);
+    fetchStatus(stored.mode, stored.identifier).finally(() => setRestoring(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Ticks both countdowns down together, one second at a time, whichever
+  // is active — a single timer covers "code expires in X" / "Resend
+  // available in X" and the 24h lockout alike.
+  useEffect(() => {
+    if (secondsLeft <= 0 && lockedForSeconds <= 0) return;
+    const id = window.setTimeout(() => {
+      setSecondsLeft((s) => Math.max(0, s - 1));
+      setLockedForSeconds((s) => Math.max(0, s - 1));
+    }, 1000);
+    return () => window.clearTimeout(id);
+  }, [secondsLeft, lockedForSeconds]);
+
+  function persistSession(nextMode: Mode, nextIdentifier: string) {
+    try {
+      window.localStorage.setItem(
+        OTP_SESSION_KEY,
+        JSON.stringify({ mode: nextMode, identifier: nextIdentifier }),
+      );
+    } catch {
+      // Best-effort — a private window or blocked storage just means this
+      // session won't survive a refresh, not that it can't proceed now.
+    }
+  }
+
+  function clearSession() {
+    try {
+      window.localStorage.removeItem(OTP_SESSION_KEY);
+    } catch {
+      // Nothing to do — see persistSession's own comment.
+    }
+  }
+
   function switchMode(next: Mode) {
     setMode(next);
     setIdentifier("");
     setOtp("");
     setOtpSent(false);
-    setResendCooldown(0);
+    setSecondsLeft(0);
+    setAttemptsRemaining(null);
+    setLockedForSeconds(0);
     setResendNotice(null);
+    setNotice(null);
+    clearSession();
   }
 
   // Also the "Resend OTP" handler — same request, sent again. `wasAlreadySent`
@@ -139,7 +268,8 @@ export default function LoginPage() {
       alert(mode === "phone" ? "Please enter your mobile number." : "Please enter your email.");
       return;
     }
-    if (resendCooldown > 0) return;
+    if (lockedForSeconds > 0) return;
+    if (otpSent && secondsLeft > 0) return;
 
     const wasAlreadySent = otpSent;
     setLoading(true);
@@ -156,10 +286,19 @@ export default function LoginPage() {
 
       const data = await response.json();
 
+      if (response.status === 423) {
+        // Locked out — the server's own 24h window, keyed off phone/email,
+        // not anything this tab already knew.
+        setLockedForSeconds(data.lockedForSeconds ?? 24 * 60 * 60);
+        setOtpSent(false);
+        setResendNotice(data.error);
+        return;
+      }
+
       if (response.status === 429) {
         // The server's own cooldown, not just this tab's — could be shorter
         // or longer than what's left here (a second tab, a page refresh).
-        setResendCooldown(data.retryAfterSeconds ?? RESEND_COOLDOWN_SECONDS[mode]);
+        setSecondsLeft(data.retryAfterSeconds ?? 60);
         setResendNotice(data.error);
         return;
       }
@@ -170,12 +309,11 @@ export default function LoginPage() {
       }
 
       setOtpSent(true);
-      setResendCooldown(RESEND_COOLDOWN_SECONDS[mode]);
-      if (wasAlreadySent) {
-        setResendNotice("A new code has been sent.");
-      } else {
-        alert("OTP sent successfully.");
-      }
+      setOtp("");
+      setSecondsLeft(data.expiresInSeconds ?? 60);
+      setAttemptsRemaining(5);
+      persistSession(mode, identifier);
+      setResendNotice(wasAlreadySent ? "A new code has been sent." : "Code sent — check your messages.");
     } catch {
       alert("Unable to send OTP.");
     } finally {
@@ -186,6 +324,15 @@ export default function LoginPage() {
   async function loginWithOTP() {
     if (!identifier || !otp) {
       alert(mode === "phone" ? "Please enter both mobile number and OTP." : "Please enter both email and OTP.");
+      return;
+    }
+
+    if (secondsLeft <= 0) {
+      setNotice({
+        tone: "error",
+        title: "This code has expired",
+        body: "Request a new one below.",
+      });
       return;
     }
 
@@ -204,9 +351,16 @@ export default function LoginPage() {
 
       if (result?.error) {
         setNotice(noticeFor(result.error));
+        setOtp("");
+        // The real attempts-remaining/lockout numbers live server-side,
+        // keyed off phone/email — NextAuth's Credentials provider collapses
+        // every otp-auth.ts throw to one generic code here, so they're
+        // fetched fresh rather than guessed at from that string.
+        await fetchStatus(mode, identifier);
         return;
       }
 
+      clearSession();
       window.location.href = callbackUrl;
     } catch {
       setNotice(noticeFor("AccessDenied"));
@@ -214,6 +368,8 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
+
+  const identifierLabel = mode === "phone" ? "mobile number" : "email";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
@@ -310,24 +466,49 @@ export default function LoginPage() {
               placeholder={mode === "phone" ? "9876543210" : "you@example.com"}
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              className="w-full rounded-md border px-3 py-2"
+              disabled={lockedForSeconds > 0}
+              className="w-full rounded-md border px-3 py-2 disabled:bg-muted disabled:text-muted-foreground"
             />
           </div>
 
-          {!otpSent ? (
+          {restoring ? (
+            <p className="py-2 text-center text-sm text-muted-foreground">
+              Checking sign-in status…
+            </p>
+          ) : lockedForSeconds > 0 ? (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+              <div className="flex gap-2.5">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+                <div>
+                  <p className="text-sm font-semibold text-destructive">
+                    Too many failed attempts
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-destructive/90">
+                    Sign-in with this {identifierLabel} is temporarily blocked for security.
+                    Try again in <span className="font-medium">{formatDuration(lockedForSeconds)}</span>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : !otpSent ? (
             <button
               onClick={sendOTP}
               disabled={loading}
-              className="w-full rounded-md bg-[var(--chart-2)] text-white transition-colors hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)] px-4 py-2 font-medium"
+              className="w-full rounded-md bg-[var(--chart-2)] text-white transition-colors hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)] px-4 py-2 font-medium disabled:opacity-60"
             >
               {loading ? "Sending..." : "Send OTP"}
             </button>
           ) : (
             <>
               <div className="rounded-lg transition-colors focus-within:bg-accent/40">
-                <label className="mb-1 block text-sm font-medium">
-                  Enter OTP
-                </label>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="block text-sm font-medium">
+                    Enter OTP
+                  </label>
+                  <span className={`text-xs ${secondsLeft > 0 ? "text-muted-foreground" : "font-medium text-destructive"}`}>
+                    {secondsLeft > 0 ? `Expires in ${secondsLeft}s` : "Code expired"}
+                  </span>
+                </div>
 
                 <input
                   type="text"
@@ -335,14 +516,39 @@ export default function LoginPage() {
                   value={otp}
                   onChange={(e) => setOtp(e.target.value)}
                   className="w-full rounded-md border px-3 py-2"
+                  autoFocus
                 />
               </div>
 
+              {resendNotice && (
+                <p className="text-sm text-muted-foreground">{resendNotice}</p>
+              )}
+
+              {attemptsRemaining !== null && attemptsRemaining < 5 && attemptsRemaining > 0 && (
+                <p className="text-sm font-medium text-amber-600">
+                  {attemptsRemaining} attempt{attemptsRemaining === 1 ? "" : "s"} remaining before a 24-hour lock.
+                </p>
+              )}
+
               <button
                 onClick={loginWithOTP}
-                className="w-full rounded-md bg-[var(--chart-2)] text-white transition-colors hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)] px-4 py-2 font-medium"
+                disabled={loading || secondsLeft <= 0}
+                className="w-full rounded-md bg-[var(--chart-2)] text-white transition-colors hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)] px-4 py-2 font-medium disabled:opacity-60"
               >
-                Login
+                {loading ? "Verifying..." : "Login"}
+              </button>
+
+              {/* The user should never be left without a way to get a fresh
+                  code — always rendered once a code has been sent, just
+                  disabled (with a live countdown) until the current one's
+                  validity window actually runs out. */}
+              <button
+                type="button"
+                onClick={sendOTP}
+                disabled={loading || secondsLeft > 0}
+                className="w-full rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {secondsLeft > 0 ? `Resend OTP in ${secondsLeft}s` : "Resend OTP"}
               </button>
             </>
           )}

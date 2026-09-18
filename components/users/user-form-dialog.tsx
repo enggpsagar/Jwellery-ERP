@@ -12,6 +12,7 @@ import {
 } from "@/app/(dashboard)/users/actions"
 
 import { ROLE_LABELS, MODULE_DEFINITIONS, type ModuleKey } from "@/lib/roles"
+import { avatarColor, initialsOf } from "@/lib/avatar-color"
 
 import { useToast } from "@/components/providers/toast-provider"
 
@@ -333,13 +334,34 @@ export function UserFormDialog({
       <form onSubmit={handleSubmit} className="space-y-6">
       <input type="hidden" name="image" value={imageUrl} />
 
-      <div className="flex flex-col items-center gap-3">
-        <Avatar className="h-24 w-24 border-4 shadow-sm">
-          <AvatarImage src={imageUrl || ""} />
-          <AvatarFallback className="text-2xl">
-            {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
-          </AvatarFallback>
-        </Avatar>
+      {/* A compact left-aligned row, same treatment as the Artisan form's
+          own photo section — click/hover the avatar itself to upload
+          instead of a separate "Upload Photo" button spreading this out;
+          Remove stays an explicit button since it isn't something hovering
+          the avatar should also mean. */}
+      <div className="flex items-center gap-4">
+        <button
+          type="button"
+          className="group relative h-14 w-14 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          disabled={uploadingPhoto}
+          onClick={() => photoInputRef.current?.click()}
+          title="Upload photo"
+        >
+          <Avatar className="h-14 w-14 border-2 shadow-sm">
+            <AvatarImage src={imageUrl || ""} />
+            <AvatarFallback style={avatarColor(user?.name).style}>
+              {initialsOf(user?.name)}
+            </AvatarFallback>
+          </Avatar>
+
+          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+            {uploadingPhoto ? (
+              <Loader className="h-4 w-4 text-white" />
+            ) : (
+              <Camera className="h-4 w-4 text-white" />
+            )}
+          </span>
+        </button>
 
         <input
           ref={photoInputRef}
@@ -349,35 +371,18 @@ export function UserFormDialog({
           onChange={handlePhotoUpload}
         />
 
-        <div className="flex gap-2">
+        {imageUrl && (
           <Button
             type="button"
             variant="outline"
             size="sm"
             disabled={uploadingPhoto}
-            onClick={() => photoInputRef.current?.click()}
+            onClick={() => setImageUrl("")}
           >
-            {uploadingPhoto ? (
-              <Loader className="mr-2 h-4 w-4" />
-            ) : (
-              <Camera className="mr-2 h-4 w-4" />
-            )}
-            {uploadingPhoto ? "Uploading..." : "Upload Photo"}
+            <Trash2 className="mr-2 h-4 w-4" />
+            Remove
           </Button>
-
-          {imageUrl && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={uploadingPhoto}
-              onClick={() => setImageUrl("")}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Remove
-            </Button>
-          )}
-        </div>
+        )}
       </div>
 
       <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">

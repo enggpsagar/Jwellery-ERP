@@ -1246,73 +1246,82 @@ export function ProductForm({
         <input type="hidden" name="defaultStoneWeight" value={submittedWeight(stoneWeight)} />
       )}
 
-      {/* Carat Weight for a genuinely carat-weighed item (a loose Diamond/
-          Stone product, its own entire weight). Once "Includes a Stone"
-          is also checked on top of that, this same field moves into the
-          Stone Pricing box instead (as the embedded stone's own carat
-          weight) so there is one Carat Weight input, not two bound to the
-          same value. */}
-      {isCaratFamily && !hasStoneComponent && (
-        <div className="max-w-sm">
-          <Label htmlFor="defaultCaratWeight">Carat Weight (ct)</Label>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Carat Weight for a genuinely carat-weighed item (a loose Diamond/
+            Stone product, its own entire weight). Once "Includes a Stone"
+            is also checked on top of that, this same field moves into the
+            Stone Pricing box instead (as the embedded stone's own carat
+            weight) so there is one Carat Weight input, not two bound to the
+            same value. */}
+        {isCaratFamily && !hasStoneComponent && (
+          <div>
+            <Label htmlFor="defaultCaratWeight">Carat Weight (ct)</Label>
 
-          <Input
-            id="defaultCaratWeight"
-            name="defaultCaratWeight"
-            type="number"
-            step="any"
-            min="0"
-            value={caratWeight}
-            onChange={(event) =>
-              handleCaratWeightChange(event.target.value)
-            }
-            placeholder="0.000"
-          />
+            <Input
+              id="defaultCaratWeight"
+              name="defaultCaratWeight"
+              type="number"
+              step="any"
+              min="0"
+              value={caratWeight}
+              onChange={(event) =>
+                handleCaratWeightChange(event.target.value)
+              }
+              placeholder="0.000"
+            />
+
+            <p className="mt-1 text-xs text-muted-foreground">
+              1 ct = 0.2 g. Converts with Net Weight automatically.
+            </p>
+
+            <ErrorText error={state.errors.defaultCaratWeight} />
+          </div>
+        )}
+
+        {/* Net Weight — derived from Gross minus stone, not a peer entry
+            field, so it reads last and gets the same "auto-filled" green
+            treatment as Net Stone Weight above once it hasn't been
+            hand-edited. Placed in the right-hand column at desktop width
+            (rather than the left) so it doesn't sit flush left with a
+            large empty gap on the carat-less, no-Carat-Weight case where
+            it's the row's only field. */}
+        <div className="lg:col-start-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="defaultNetWeight">Net Weight <RequiredMark /></Label>
+            {!netTouched && derivedNet !== null && (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                Auto-filled
+              </span>
+            )}
+          </div>
+
+          <input type="hidden" name="defaultNetWeight" value={submittedWeight(netWeight)} />
+          <div className="flex gap-1">
+            <Input
+              id="defaultNetWeight"
+              type="number"
+              step="any"
+              min="0"
+              className={!netTouched && derivedNet !== null ? "flex-1 border-emerald-300 bg-emerald-50" : "flex-1"}
+              value={displayWeight(netWeight)}
+              onChange={(event) => handleNetWeightChange(toGramsString(event.target.value))}
+              placeholder="0.000"
+            />
+            <div className="flex h-9 w-16 items-center justify-center rounded-md border bg-muted text-sm text-muted-foreground">
+              {weightUnit === "GRAM" ? "g" : "ct"}
+            </div>
+          </div>
 
           <p className="mt-1 text-xs text-muted-foreground">
-            1 ct = 0.2 g. Converts with Net Weight automatically.
+            {netTouched
+              ? "Manually entered"
+              : derivedNet !== null
+                ? "Gross − stone — edit to override"
+                : "Auto-calculated from Gross Weight"}
           </p>
 
-          <ErrorText error={state.errors.defaultCaratWeight} />
+          <ErrorText error={state.errors.defaultNetWeight} />
         </div>
-      )}
-
-      <div className="max-w-sm">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="defaultNetWeight">Net Weight <RequiredMark /></Label>
-          {!netTouched && derivedNet !== null && (
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-              Auto-filled
-            </span>
-          )}
-        </div>
-
-        <input type="hidden" name="defaultNetWeight" value={submittedWeight(netWeight)} />
-        <div className="flex gap-1">
-          <Input
-            id="defaultNetWeight"
-            type="number"
-            step="any"
-            min="0"
-            className={!netTouched && derivedNet !== null ? "flex-1 border-emerald-300 bg-emerald-50" : "flex-1"}
-            value={displayWeight(netWeight)}
-            onChange={(event) => handleNetWeightChange(toGramsString(event.target.value))}
-            placeholder="0.000"
-          />
-          <div className="flex h-9 w-16 items-center justify-center rounded-md border bg-muted text-sm text-muted-foreground">
-            {weightUnit === "GRAM" ? "g" : "ct"}
-          </div>
-        </div>
-
-        <p className="mt-1 text-xs text-muted-foreground">
-          {netTouched
-            ? "Manually entered"
-            : derivedNet !== null
-              ? "Gross − stone — edit to override"
-              : "Auto-calculated from Gross Weight"}
-        </p>
-
-        <ErrorText error={state.errors.defaultNetWeight} />
       </div>
 
       {/* ============================

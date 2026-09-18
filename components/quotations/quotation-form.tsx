@@ -621,7 +621,12 @@ export function QuotationForm({
         </div>
 
         <div className="space-y-3">
-          {items.map((item) => (
+          {items.map((item) => {
+            // Once a line is linked to a Stock Item, the physical facts
+            // about that piece come from Inventory and are locked here,
+            // same as Invoice already does — see isLinked there.
+            const isLinked = Boolean(item.inventoryStockId)
+            return (
             <div key={item.key} className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="md:col-span-2 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -643,6 +648,8 @@ export function QuotationForm({
                   <Input
                     value={item.itemName}
                     onChange={(e) => updateItem(item.key, { itemName: e.target.value })}
+                    readOnly={isLinked}
+                    className={isLinked ? "bg-muted" : undefined}
                   />
                 </div>
 
@@ -672,6 +679,7 @@ export function QuotationForm({
                   <Label className="text-xs">Metal Type</Label>
                   <Select
                     value={item.metalTypeId}
+                    disabled={isLinked}
                     onValueChange={(value) => {
                       ensureMetalPurities(value)
                       updateItem(item.key, { metalTypeId: value, purity: "", purityLabel: "" })
@@ -697,7 +705,7 @@ export function QuotationForm({
                   <Select
                     value={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
                     onValueChange={(value) => selectPurity(item, value === "__none__" ? "" : value)}
-                    disabled={!item.metalTypeId}
+                    disabled={isLinked || !item.metalTypeId}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder={item.metalTypeId ? "Select purity" : "Select a metal first"} />
@@ -719,7 +727,8 @@ export function QuotationForm({
                     <Input
                       type="number"
                       step="any"
-                      className="flex-1"
+                      className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                      readOnly={isLinked}
                       value={
                         item.netWeight === 0
                           ? ""
@@ -734,6 +743,7 @@ export function QuotationForm({
                     />
                     <Select
                       value={item.netWeightUnit}
+                      disabled={isLinked}
                       onValueChange={(unit) => updateItem(item.key, { netWeightUnit: unit as "GRAM" | "CARAT" })}
                     >
                       <SelectTrigger className="w-16">
@@ -761,7 +771,8 @@ export function QuotationForm({
                       <Input
                         type="number"
                         step="any"
-                        className="flex-1"
+                        className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                        readOnly={isLinked}
                         value={
                           item.stoneWeightInput === 0
                             ? ""
@@ -776,6 +787,7 @@ export function QuotationForm({
                       />
                       <Select
                         value={item.stoneWeightUnit}
+                        disabled={isLinked}
                         onValueChange={(unit) =>
                           updateItem(item.key, { stoneWeightUnit: unit as "GRAM" | "CARAT" })
                         }
@@ -798,6 +810,8 @@ export function QuotationForm({
                     <Input
                       type="number"
                       step="any"
+                      readOnly={isLinked}
+                      className={isLinked ? "bg-muted" : undefined}
                       value={item.caratWeight === 0 ? "" : item.caratWeight}
                       onChange={(e) => handleCaratWeightChange(item, e.target.value)}
                     />
@@ -871,7 +885,7 @@ export function QuotationForm({
                   Diamond/Stone — kept as its own toggled strip rather than
                   wedged into the grid above, so a plain Gold line's fields
                   don't reflow every time this gets checked/unchecked. */}
-              {!isCaratLine(item) && (
+              {!isCaratLine(item) && (!isLinked || item.hasStoneComponent) && (
                 <div
                   className={cn(
                     "flex flex-col gap-3 rounded-md border border-dashed p-3 transition-colors",
@@ -880,6 +894,7 @@ export function QuotationForm({
                 >
                   <IncludesStoneToggle
                     checked={item.hasStoneComponent}
+                    disabled={isLinked}
                     onChange={(checked) =>
                       updateItem(item.key, {
                         hasStoneComponent: checked,
@@ -928,6 +943,7 @@ export function QuotationForm({
                       stoneWeightUnit={item.stoneWeightUnit}
                       onStoneWeightUnitChange={(unit) => updateItem(item.key, { stoneWeightUnit: unit })}
                       netStoneWeightTouched={item.netStoneWeightTouched}
+                      lockPhysicalFields={isLinked}
                     />
                   )}
                 </div>
@@ -943,7 +959,8 @@ export function QuotationForm({
                 </button>
               )}
             </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 

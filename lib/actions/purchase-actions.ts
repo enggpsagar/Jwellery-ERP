@@ -646,6 +646,9 @@ export async function getPurchaseFormProducts() {
       hasStoneComponent: true,
       defaultStoneRate: true,
       defaultCaratWeight: true,
+      defaultGrossWeight: true,
+      defaultNetWeight: true,
+      defaultStoneWeight: true,
       defaultStoneMetalTypeName: true,
       defaultStoneTypeNames: true,
       hsnCode: true,
@@ -666,6 +669,12 @@ export async function getPurchaseFormProducts() {
       product.defaultStoneRate !== null ? Number(product.defaultStoneRate) : null,
     defaultCaratWeight:
       product.defaultCaratWeight !== null ? Number(product.defaultCaratWeight) : null,
+    defaultGrossWeight:
+      product.defaultGrossWeight !== null ? Number(product.defaultGrossWeight) : null,
+    defaultNetWeight:
+      product.defaultNetWeight !== null ? Number(product.defaultNetWeight) : null,
+    defaultStoneWeight:
+      product.defaultStoneWeight !== null ? Number(product.defaultStoneWeight) : null,
   }));
 }
 

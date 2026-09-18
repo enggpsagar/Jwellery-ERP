@@ -67,6 +67,13 @@ type ProductOption = {
   hasStoneComponent: boolean
   defaultStoneRate: number | null
   defaultCaratWeight: number | null
+  /** Same "typical weight for this design" fields Product's own form and
+   * Stock's "New Stock from Product" picker already seed from — Purchase
+   * now locks to these too (see applyProductToItem), always stored in
+   * grams same as LineItem.grossWeight/netWeight/stoneWeightInput. */
+  defaultGrossWeight: number | null
+  defaultNetWeight: number | null
+  defaultStoneWeight: number | null
   defaultStoneMetalTypeName: string | null
   defaultStoneTypeNames: string | null
   hsnCode: string | null
@@ -571,14 +578,15 @@ export function PurchaseForm({
       metalTypeId: isGemstoneProduct ? "" : product.metalType?.id ?? "",
       purity: isGemstoneProduct ? "" : product.defaultPurity ?? "",
       purityLabel: isGemstoneProduct ? "" : product.storeMetalPurity?.label ?? "",
-      // A prior selection on this same row (before this product was picked)
-      // may have left Gross/Net Weight non-zero while in Metal mode — both
-      // are hidden and irrelevant once a gemstone product switches the row
-      // to Stone mode, so clear them rather than silently keep submitting
-      // a stale value through a now-hidden field. Left untouched for a
-      // regular metal product, same as before this field existed — weight
-      // still needs entering by hand either way.
-      ...(isGemstoneProduct ? { grossWeight: 0, netWeight: 0, netTouched: false } : {}),
+      // Once a real Product is linked, weight is locked to its saved
+      // defaults too (see isLinked below), same as Invoice already does
+      // for a linked stock item — no longer left blank for hand entry.
+      // Gross/Net Weight belong to the Metal-mode fields (StoneComponentFields
+      // owns the Stone-mode weight below instead), so both stay 0 for a
+      // gemstone product.
+      grossWeight: isGemstoneProduct ? 0 : product.defaultGrossWeight ?? 0,
+      netWeight: isGemstoneProduct ? 0 : product.defaultNetWeight ?? 0,
+      netTouched: true,
       grossWeightUnit: unit,
       netWeightUnit: unit,
       dmoWeightUnit: unit,
@@ -591,6 +599,17 @@ export function PurchaseForm({
       stoneRate: product.hasStoneComponent ? product.defaultStoneRate ?? 0 : 0,
       hasStoneComponent: isGemstoneProduct ? true : product.hasStoneComponent,
       stoneChargeTouched: false,
+      // Net Stone Weight: for an embedded stone this is the Product's own
+      // defaultStoneWeight; for a standalone gemstone product (no embedded
+      // component — see product-form.tsx's isCaratFamily && !hasStoneComponent
+      // branch) the stone's own weight is saved as defaultNetWeight instead,
+      // same convention Product Master itself uses.
+      stoneWeightInput: isGemstoneProduct
+        ? product.defaultNetWeight ?? 0
+        : product.hasStoneComponent
+          ? product.defaultStoneWeight ?? 0
+          : 0,
+      netStoneWeightTouched: true,
       stoneMetalTypeName: isGemstoneProduct
         ? product.metalType?.name ?? ""
         : product.hasStoneComponent
@@ -603,8 +622,8 @@ export function PurchaseForm({
       caratWeight: product.defaultCaratWeight ?? 0,
       hsnCode: product.hsnCode ?? "",
     })
-    // A product only supplies defaults (making charge, stone, HSN) — weight
-    // and rate still need entering by hand, so expand right away instead of
+    // Rate/cost still needs entering by hand even though everything else is
+    // now locked to the Product's own record — expand right away instead of
     // making the user hunt for the chevron to find what's still blank.
     setExpandedKeys((prev) => new Set(prev).add(key))
   }
@@ -1061,6 +1080,12 @@ export function PurchaseForm({
               const isExpanded = expandedKeys.has(item.key)
               const gst = lineGst(item)
               const gstTotal = gst.isInterState ? gst.igst : gst.sgst + gst.cgst
+              // Once a real Product is linked, everything describing what
+              // the piece physically IS comes from that Product Master and
+              // is locked here — only quantity/rate/charges stay editable.
+              // Mirrors Invoice's own isLinked, keyed on productId instead
+              // of inventoryStockId since Purchase reads from Product.
+              const isLinked = Boolean(item.productId)
 
               return (
               <div key={item.key} className="rounded-lg border">
@@ -1138,7 +1163,8 @@ export function PurchaseForm({
                       <Input
                         type="number"
                         step="any"
-                        className="flex-1"
+                        className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                        readOnly={isLinked}
                         value={
                           item.netWeight === 0
                             ? ""
@@ -1153,6 +1179,7 @@ export function PurchaseForm({
                       />
                       <Select
                         value={item.netWeightUnit}
+                        disabled={isLinked}
                         onValueChange={(unit) => updateItem(item.key, { netWeightUnit: unit as "GRAM" | "CARAT" })}
                       >
                         <SelectTrigger className="w-14" size="sm">
@@ -1210,6 +1237,8 @@ export function PurchaseForm({
                         <Input
                           value={item.itemName}
                           onChange={(e) => updateItem(item.key, { itemName: e.target.value })}
+                          readOnly={isLinked}
+                          className={isLinked ? "bg-muted" : undefined}
                         />
                       </div>
 
@@ -1219,6 +1248,8 @@ export function PurchaseForm({
                           value={item.hsnCode}
                           onChange={(e) => updateItem(item.key, { hsnCode: e.target.value })}
                           placeholder="e.g. 7113"
+                          readOnly={isLinked}
+                          className={isLinked ? "bg-muted" : undefined}
                         />
                       </div>
                     </div>
@@ -1235,6 +1266,7 @@ export function PurchaseForm({
                         <Label className="text-xs">Metals &amp; Stones</Label>
                         <Select
                           value={item.itemKind}
+                          disabled={isLinked}
                           onValueChange={(value) => {
                             const itemKind = value as "METAL" | "STONE"
                             updateItem(
@@ -1278,6 +1310,7 @@ export function PurchaseForm({
                         <Label className="text-xs">Metal Type</Label>
                         <Select
                           value={item.metalTypeId}
+                          disabled={isLinked}
                           onValueChange={(value) => {
                             ensureMetalPurities(value)
                             updateItem(item.key, { metalTypeId: value, purity: "", purityLabel: "" })
@@ -1305,7 +1338,7 @@ export function PurchaseForm({
                         <Select
                           value={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
                           onValueChange={(value) => selectPurity(item, value === "__none__" ? "" : value)}
-                          disabled={!item.metalTypeId}
+                          disabled={isLinked || !item.metalTypeId}
                         >
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder={item.metalTypeId ? "Select purity" : "Select a metal first"} />
@@ -1329,7 +1362,8 @@ export function PurchaseForm({
                           <Input
                             type="number"
                             step="any"
-                            className="flex-1"
+                            className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                            readOnly={isLinked}
                             value={
                               item.grossWeight === 0
                                 ? ""
@@ -1356,6 +1390,7 @@ export function PurchaseForm({
                           />
                           <Select
                             value={item.grossWeightUnit}
+                            disabled={isLinked}
                             onValueChange={(unit) => updateItem(item.key, { grossWeightUnit: unit as "GRAM" | "CARAT" })}
                           >
                             <SelectTrigger className="w-16">
@@ -1394,7 +1429,8 @@ export function PurchaseForm({
                             <Input
                               type="number"
                               step="any"
-                              className="flex-1"
+                              className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                              readOnly={isLinked}
                               value={
                                 item.stoneWeightInput === 0
                                   ? ""
@@ -1409,6 +1445,7 @@ export function PurchaseForm({
                             />
                             <Select
                               value={item.stoneWeightUnit}
+                              disabled={isLinked}
                               onValueChange={(unit) => handleStoneWeightUnitChange(item, unit as "GRAM" | "CARAT")}
                             >
                               <SelectTrigger className="w-16">
@@ -1429,6 +1466,8 @@ export function PurchaseForm({
                           <Input
                             type="number"
                             step="any"
+                            readOnly={isLinked}
+                            className={isLinked ? "bg-muted" : undefined}
                             value={item.caratWeight === 0 ? "" : item.caratWeight}
                             onChange={(e) => handleCaratWeightChange(item, e.target.value)}
                           />
@@ -1483,6 +1522,7 @@ export function PurchaseForm({
                         <div className="flex items-end pb-2">
                           <IncludesStoneToggle
                             checked={item.hasStoneComponent}
+                            disabled={isLinked}
                             onChange={(checked) =>
                               updateItem(item.key, {
                                 hasStoneComponent: checked,
@@ -1535,6 +1575,7 @@ export function PurchaseForm({
                           stoneWeightUnit={item.stoneWeightUnit}
                           onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
                           netStoneWeightTouched={item.netStoneWeightTouched}
+                          lockPhysicalFields={isLinked}
                         />
                       </div>
                     )}
@@ -1573,6 +1614,7 @@ export function PurchaseForm({
                           stoneWeightUnit={item.stoneWeightUnit}
                           onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
                           netStoneWeightTouched={item.netStoneWeightTouched}
+                          lockPhysicalFields={isLinked}
                         />
                       </div>
                     )}

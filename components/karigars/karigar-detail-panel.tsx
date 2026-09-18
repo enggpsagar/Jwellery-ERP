@@ -9,6 +9,7 @@ import { ReceiveMaterialDialog } from "@/components/karigars/receive-material-di
 import { RecordKarigarPaymentDialog } from "@/components/karigars/record-karigar-payment-dialog"
 import { KarigarDetailContent } from "@/components/karigars/karigar-detail-content"
 import { KarigarRowActions } from "@/components/karigars/karigar-row-actions"
+import { ArtisanActiveToggle } from "@/components/karigars/artisan-active-toggle"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toTitleCase } from "@/lib/utils"
 
@@ -87,7 +88,7 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
         )}
       </div>
 
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
           <IssueMaterialDialog
             karigarId={karigar.id}
             metals={metals}
@@ -105,6 +106,7 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
             count={materialCounts.receivedCount}
           />
           <RecordKarigarPaymentDialog karigarId={karigar.id} />
+          <ArtisanActiveToggle karigarId={karigar.id} isActive={karigar.isActive} />
           <KarigarRowActions
             karigarId={karigar.id}
             karigarName={karigar.name}
@@ -117,7 +119,7 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
           />
       </div>
 
-      <KarigarDetailContent bundle={bundle} />
+      <KarigarDetailContent bundle={bundle} hideStatusCard />
     </div>
   )
 }

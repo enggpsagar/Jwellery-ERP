@@ -2,6 +2,7 @@ import type { KarigarDetailBundle } from "@/lib/actions/karigar-actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { KarigarLedgerTabs } from "@/components/karigars/karigar-ledger-tabs"
 import { KarigarStatusCard } from "@/components/karigars/karigar-status-card"
+import { ExpandableCheckboxList } from "@/components/karigars/expandable-checkbox-list"
 import { ExportMenu } from "@/components/shared/export-menu"
 import { classifyMetalName } from "@/lib/business-units"
 import { cn } from "@/lib/utils"
@@ -33,7 +34,18 @@ function metalRibbonColor(metalLabel: string): string {
  * "Open Jobs" section — Issue/Receive Material's own counts and the ledger
  * below already cover that.
  */
-export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }) {
+export function KarigarDetailContent({
+  bundle,
+  hideStatusCard = false,
+}: {
+  bundle: KarigarDetailBundle
+  /** Off inside the Karigars list's split-panel view, which shows the same
+   * ArtisanActiveToggle inline next to Edit instead (see
+   * karigar-detail-panel.tsx) rather than spending a grid card slot on it
+   * there too. Defaults on for the standalone /karigars/[id] page, which
+   * has no Edit button of its own to sit that toggle next to. */
+  hideStatusCard?: boolean
+}) {
   const { karigar, ledger, metals } = bundle
 
   // Only what's actually set/nonzero — an unused Opening Gold/Cash field or
@@ -82,60 +94,39 @@ export function KarigarDetailContent({ bundle }: { bundle: KarigarDetailBundle }
             </Card>
           )}
 
-        <KarigarStatusCard karigarId={karigar.id} isActive={karigar.isActive} />
+        {!hideStatusCard && (
+          <KarigarStatusCard karigarId={karigar.id} isActive={karigar.isActive} />
+        )}
 
+        {/* col-span-2: with Status now living inline next to Edit in the
+            split-panel view (see hideStatusCard above) rather than a grid
+            card of its own, Metal/Stone are the two card types most worth
+            the freed-up room -- a checkbox list reads more comfortably at
+            two columns wide than squeezed into one fifth of the row. */}
         {activeMetalsOnly.length > 0 && (
-          <Card size="sm">
+          <Card size="sm" className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="text-sm text-muted-foreground">Metal</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-1.5">
-                {activeMetalsOnly.map((metal) => (
-                  <label key={metal.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={karigar.assignedMetalTypeIds.includes(metal.id)}
-                      disabled
-                      className="h-4 w-4 shrink-0"
-                    />
-                    {/* min-w-0 lets this flex item shrink below its
-                        single-word content size (flex items default to
-                        min-width: auto), and break-words gives that word
-                        somewhere to go instead of overflowing the card's
-                        clipped edge -- this card renders inside the narrow
-                        Karigars master-detail side panel as well as the
-                        full-width standalone page, so a long gemstone name
-                        (Aquamarine, Tanzanite...) can end up far narrower
-                        than its own text here. */}
-                    <span className="min-w-0 break-words">{metal.name}</span>
-                  </label>
-                ))}
-              </div>
+              <ExpandableCheckboxList
+                items={activeMetalsOnly}
+                checkedIds={karigar.assignedMetalTypeIds}
+              />
             </CardContent>
           </Card>
         )}
 
         {activeStonesOnly.length > 0 && (
-          <Card size="sm">
+          <Card size="sm" className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="text-sm text-muted-foreground">Stone</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-1.5">
-                {activeStonesOnly.map((stone) => (
-                  <label key={stone.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={karigar.assignedMetalTypeIds.includes(stone.id)}
-                      disabled
-                      className="h-4 w-4 shrink-0"
-                    />
-                    {/* Same overflow fix as the Metal list above. */}
-                    <span className="min-w-0 break-words">{stone.name}</span>
-                  </label>
-                ))}
-              </div>
+              <ExpandableCheckboxList
+                items={activeStonesOnly}
+                checkedIds={karigar.assignedMetalTypeIds}
+              />
             </CardContent>
           </Card>
         )}

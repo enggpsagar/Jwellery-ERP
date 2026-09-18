@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
-import { Plus, Trash2, ChevronDown, ChevronRight, Search } from "lucide-react"
+import { Plus, Trash2, ChevronDown, ChevronRight, Search, MoveHorizontal } from "lucide-react"
 import type { PartyGstType, PurityType } from "@prisma/client"
 
 import { createPurchase, updatePurchase, type PurchaseFormState } from "@/lib/actions/purchase-actions"
@@ -1054,6 +1054,14 @@ export function PurchaseForm({
             <Plus className="h-4 w-4 mr-1" /> Add Item
           </Button>
         </div>
+
+        {/* Same fixed-width "spreadsheet" tradeoff as Invoice's own row —
+            only fits without scrolling at lg:+, and a bare native scrollbar
+            is too easy to miss for GST/Amount to just silently go unseen. */}
+        <p className="flex items-center gap-1 text-xs text-muted-foreground lg:hidden">
+          <MoveHorizontal className="h-3.5 w-3.5" />
+          Scroll sideways to see GST and Amount
+        </p>
 
         <div className="overflow-x-auto">
           <div className="min-w-[900px] space-y-2">

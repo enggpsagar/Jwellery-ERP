@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
-import { Trash2, ChevronDown, ChevronRight, Search, Plus } from "lucide-react"
+import { Trash2, ChevronDown, ChevronRight, Search, Plus, MoveHorizontal } from "lucide-react"
 import type { GstScheme, PurityType } from "@prisma/client"
 
 import { createInvoice, updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
@@ -1417,6 +1417,18 @@ export function InvoiceForm({
           onScanned={addScannedStock}
           onAddManualItem={() => setItems((prev) => [...prev, emptyLineItem(gstRateId)])}
         />
+
+        {/* This row is a fixed-width "spreadsheet" (see compactRowGridCols's
+            own comment) that only fits without scrolling at lg:+ — below
+            that, overflow-x-auto below scrolls it, but a native scrollbar
+            alone is easy to miss (invisible-until-touched on iOS/Android,
+            thin/subtle on some desktop browsers too), so this hint makes
+            "there's more to the right" obvious instead of the GST/Amount
+            columns just silently never being seen. */}
+        <p className="flex items-center gap-1 text-xs text-muted-foreground lg:hidden">
+          <MoveHorizontal className="h-3.5 w-3.5" />
+          Scroll sideways to see GST and Amount
+        </p>
 
         <div className="overflow-x-auto">
           <div className="min-w-[900px] space-y-2">

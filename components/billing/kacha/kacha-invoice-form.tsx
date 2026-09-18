@@ -842,7 +842,7 @@ export function KachaInvoiceForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Metal Type</Label>
                   <div className="flex gap-1.5">

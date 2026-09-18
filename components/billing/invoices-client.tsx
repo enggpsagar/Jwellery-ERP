@@ -77,7 +77,7 @@ export function InvoicesClient({ invoices, locations, pagination }: InvoicesClie
       {/* List + detail side by side, matching the Customers/Purchases
           pages' own layout — stacks on narrow viewports since there's no
           room for both. */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:items-start">
         <div className="space-y-4">
           <InvoicesToolbar />
 

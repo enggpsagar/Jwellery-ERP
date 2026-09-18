@@ -73,7 +73,7 @@ export function DraftOrdersClient({
   }, [orders])
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:items-start">
       <div className="space-y-3">
         <DataTableToolbar
           searchPlaceholder="Search by order number, party..."

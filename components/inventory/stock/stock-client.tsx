@@ -106,7 +106,7 @@ export function StockClient({ stockItems, pagination, metals, showLocation }: St
           both. The toolbar lives inside the table's own column (not
           spanning the detail panel too) — it filters/sorts/exports the
           table, so it belongs with the table, not the whole page. */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:items-start">
         <div className="space-y-4">
           <StockToolbar
             selectedIds={selectedIds}

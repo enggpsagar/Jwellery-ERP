@@ -70,7 +70,7 @@ export function ArchivedProductsClient({
         backLabel="Back to Products"
       />
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:items-start">
         <div className="space-y-4">
           <div className="max-w-sm">
             <Input

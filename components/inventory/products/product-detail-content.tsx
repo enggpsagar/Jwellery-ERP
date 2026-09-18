@@ -38,7 +38,15 @@ export function ProductDetailContent({
   const caratWeight = formatCarat(product.defaultCaratWeight)
   const stoneRate = formatCharge(product.defaultStoneRate, "FIXED")
 
-  const hasMetalDetails = Boolean(product.metalType?.name) || Boolean(product.defaultPurity)
+  // A product saved with the metal/stone component repeaters has real
+  // child rows to list in full; a legacy product (saved before this
+  // feature existed) has none, and falls back to the scalar-only
+  // rendering below exactly as it always rendered.
+  const hasMetalComponents = (product.metalComponents?.length ?? 0) > 0
+  const hasStoneComponents = (product.stoneComponents?.length ?? 0) > 0
+
+  const hasMetalDetails =
+    hasMetalComponents || Boolean(product.metalType?.name) || Boolean(product.defaultPurity)
   const hasCharges = Boolean(makingCharge) || Boolean(stoneCharge)
   const hasWeights = Boolean(grossWeight) || Boolean(stoneWeight) || Boolean(netWeight)
   // A piece carries stone info either as a stand-alone gemstone product
@@ -47,6 +55,7 @@ export function ProductDetailContent({
   // Weights section already shows Stone Weight either way, but this is
   // where the rest of that stone's own description lives.
   const hasStoneDetails =
+    hasStoneComponents ||
     Boolean(stoneWeight) ||
     product.hasStoneComponent ||
     Boolean(product.stoneOriginOption?.name)
@@ -72,11 +81,29 @@ export function ProductDetailContent({
 
       {hasMetalDetails ? (
         <Section title="Metal Details">
-          <Field label="Metal Type" value={product.metalType?.name} />
-          <Field
-            label="Default Purity"
-            value={product.defaultPurity?.replaceAll("_", " ")}
-          />
+          {hasMetalComponents ? (
+            product.metalComponents!.map((component, index) => (
+              <Field
+                key={component.id}
+                label={product.metalComponents!.length > 1 ? `Metal ${index + 1}` : "Metal Type"}
+                value={
+                  <span>
+                    {component.metalTypeName}
+                    {component.storeMetalPurityLabel ? ` (${component.storeMetalPurityLabel})` : ""}
+                    {component.netWeight ? ` — ${formatWeight(component.netWeight)} net` : ""}
+                  </span>
+                }
+              />
+            ))
+          ) : (
+            <>
+              <Field label="Metal Type" value={product.metalType?.name} />
+              <Field
+                label="Default Purity"
+                value={product.defaultPurity?.replaceAll("_", " ")}
+              />
+            </>
+          )}
         </Section>
       ) : null}
 
@@ -117,24 +144,43 @@ export function ProductDetailContent({
 
       {hasStoneDetails ? (
         <Section title="Stone Details">
-          <Field label="Carat Weight" value={caratWeight} />
-          {product.metalType?.isGemstone ? (
-            <Field
-              label="Stone Type"
-              value={
-                <Badge variant="secondary">
-                  {product.stoneOriginOption?.name ?? "Not set"}
-                </Badge>
-              }
-            />
-          ) : null}
-          {product.hasStoneComponent ? (
+          {hasStoneComponents ? (
+            product.stoneComponents!.map((component, index) => (
+              <Field
+                key={component.id}
+                label={product.stoneComponents!.length > 1 ? `Stone ${index + 1}` : "Embedded Stone"}
+                value={
+                  <span>
+                    {component.stoneMetalTypeName}
+                    {component.stoneTypeNames ? ` (${component.stoneTypeNames})` : ""}
+                    {component.caratWeight ? ` — ${formatCarat(component.caratWeight)}` : ""}
+                    {formatCharge(component.stoneRate, "FIXED") ? ` @ ${formatCharge(component.stoneRate, "FIXED")}/ct` : ""}
+                  </span>
+                }
+              />
+            ))
+          ) : (
             <>
-              <Field label="Embedded Stone" value={product.defaultStoneMetalTypeName} />
-              <Field label="Embedded Stone Type" value={product.defaultStoneTypeNames} />
-              <Field label="Stone Rate (per ct)" value={stoneRate} />
+              <Field label="Carat Weight" value={caratWeight} />
+              {product.metalType?.isGemstone ? (
+                <Field
+                  label="Stone Type"
+                  value={
+                    <Badge variant="secondary">
+                      {product.stoneOriginOption?.name ?? "Not set"}
+                    </Badge>
+                  }
+                />
+              ) : null}
+              {product.hasStoneComponent ? (
+                <>
+                  <Field label="Embedded Stone" value={product.defaultStoneMetalTypeName} />
+                  <Field label="Embedded Stone Type" value={product.defaultStoneTypeNames} />
+                  <Field label="Stone Rate (per ct)" value={stoneRate} />
+                </>
+              ) : null}
             </>
-          ) : null}
+          )}
         </Section>
       ) : null}
 

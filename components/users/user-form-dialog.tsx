@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { UserRole } from "@prisma/client"
-import { Camera } from "lucide-react"
+import { Camera, Trash2 } from "lucide-react"
 
 import {
   createUserAction,
@@ -349,20 +349,35 @@ export function UserFormDialog({
           onChange={handlePhotoUpload}
         />
 
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={uploadingPhoto}
-          onClick={() => photoInputRef.current?.click()}
-        >
-          {uploadingPhoto ? (
-            <Loader className="mr-2 h-4 w-4" />
-          ) : (
-            <Camera className="mr-2 h-4 w-4" />
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={uploadingPhoto}
+            onClick={() => photoInputRef.current?.click()}
+          >
+            {uploadingPhoto ? (
+              <Loader className="mr-2 h-4 w-4" />
+            ) : (
+              <Camera className="mr-2 h-4 w-4" />
+            )}
+            {uploadingPhoto ? "Uploading..." : "Upload Photo"}
+          </Button>
+
+          {imageUrl && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={uploadingPhoto}
+              onClick={() => setImageUrl("")}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Remove
+            </Button>
           )}
-          {uploadingPhoto ? "Uploading..." : "Upload Photo"}
-        </Button>
+        </div>
       </div>
 
       <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">

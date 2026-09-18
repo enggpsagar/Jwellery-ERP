@@ -901,6 +901,12 @@ export function ProductForm({
                 setStoneOriginOptionId("");
                 setMetalComponents([emptyMetalComponent()]);
                 setStoneComponents([]);
+                // Category/Type are hidden entirely for Stone (see below) —
+                // clear them on every switch so a category picked while on
+                // Metal doesn't silently keep submitting behind the
+                // now-hidden fields once switched to Stone.
+                setCategoryId("");
+                setCategoryTypeId("");
               }}
             >
               <SelectTrigger className="h-11 w-full">
@@ -1043,13 +1049,16 @@ export function ProductForm({
             </>
           )}
 
+          {/* Hidden entirely for the gemstone family — a loose Diamond/
+              Stone product isn't itself an ornament shape (Ring/Bangle/
+              ...), and showing Category/Type with no sensible options for
+              it was just confusing. Category/Type are cleared (see the
+              Metal/Stone switch above) whenever this hides, so nothing
+              stale submits behind it. */}
+          {productKind !== "STONE" && (
+          <>
           <div>
-            {/* Not required for the gemstone family — a loose Diamond/Stone
-                product isn't itself an ornament shape (Ring/Bangle/...), so
-                a store with no category tagged to that metal shouldn't be
-                blocked on picking one. Still shown/optional in case a store
-                does tag one anyway (see getStoreCategoriesForMetal). */}
-            <Label>Category {productKind !== "STONE" && <RequiredMark />}</Label>
+            <Label>Category <RequiredMark /></Label>
 
             {categories.length > 0 ? (
               <div className="flex gap-1.5">
@@ -1183,6 +1192,8 @@ export function ProductForm({
 
               <ErrorText error={state.errors.categoryTypeId} />
             </div>
+          )}
+          </>
           )}
 
           <input

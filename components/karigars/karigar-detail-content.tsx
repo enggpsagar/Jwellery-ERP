@@ -153,7 +153,7 @@ export function KarigarDetailContent({
               className="overflow-hidden rounded-xl border bg-card shadow-sm"
             >
               <div
-                className="px-4 py-2 text-xs font-semibold uppercase tracking-wide"
+                className="px-3 py-2 text-[11px] font-semibold uppercase leading-tight"
                 style={{
                   backgroundColor: `color-mix(in oklab, ${accent} 18%, transparent)`,
                   color: accent,
@@ -161,10 +161,10 @@ export function KarigarDetailContent({
               >
                 {group.metalLabel} Balance
               </div>
-              <div className="p-4 pt-3">
+              <div className="p-3 pt-2.5">
                 <p
                   className={cn(
-                    "break-words text-2xl font-bold tabular-nums",
+                    "break-words text-lg font-bold tabular-nums",
                     isOwed ? "text-red-700" : isCredit ? "text-emerald-700" : "text-foreground",
                   )}
                 >

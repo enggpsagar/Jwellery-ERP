@@ -59,6 +59,7 @@ const USER_SELECT = {
   name: true,
   email: true,
   phone: true,
+  image: true,
   role: true,
   status: true,
   isActive: true,

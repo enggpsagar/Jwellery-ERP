@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { avatarColor, initialsOf } from "@/lib/avatar-color"
 import { Loader } from "@/components/ui/loader"
@@ -198,13 +197,13 @@ export function KarigarForm({
 
       <input type="hidden" name="imageUrl" value={imageUrl} />
 
-      {/* Its own bordered box, same footprint as the self-service Profile
-          page's own photo card, and the same treatment as the Add/Edit
-          User form's photo section for a uniform feel — a bigger, centered
-          avatar reads better here than a small one left-aligned in a bare
-          row. Click/hover the avatar itself to upload. */}
-      <Card>
-        <CardContent className="flex flex-col items-center gap-3 py-6">
+      {/* No border of its own -- the form as a whole already sits in one
+          box (see KarigarCreateForm/KarigarEditForm), so a second, nested
+          box just around the photo looked like two stacked containers. A
+          bigger, centered avatar still reads better than a small one
+          left-aligned in a bare row. Click/hover the avatar itself to
+          upload, same treatment as the Add/Edit User form. */}
+      <div className="flex flex-col items-center gap-3">
         <button
           type="button"
           className="group relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -235,8 +234,7 @@ export function KarigarForm({
           accept="image/*"
           onChange={handlePhotoUpload}
         />
-        </CardContent>
-      </Card>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 

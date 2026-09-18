@@ -334,13 +334,14 @@ export function UserFormDialog({
       <form onSubmit={handleSubmit} className="space-y-6">
       <input type="hidden" name="image" value={imageUrl} />
 
-      {/* Its own bordered box, same footprint as the self-service Profile
-          page's own photo card — a bigger, centered avatar reads better
-          there than a small one left-aligned in a bare row. Click/hover
-          the avatar itself to upload; Remove stays an explicit button
-          since it isn't something hovering the avatar should also mean. */}
-      <Card>
-        <CardContent className="flex flex-col items-center gap-3 py-6">
+      {/* No border of its own -- the form as a whole already sits in one
+          box (the asPage Card below, or the Dialog surface), so a second,
+          nested box just around the photo looked like two stacked
+          containers. A bigger, centered avatar still reads better than a
+          small one left-aligned in a bare row. Click/hover the avatar
+          itself to upload; Remove stays an explicit button since it isn't
+          something hovering the avatar should also mean. */}
+      <div className="flex flex-col items-center gap-3">
         <button
           type="button"
           className="group relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -384,8 +385,7 @@ export function UserFormDialog({
             Remove
           </Button>
         )}
-        </CardContent>
-      </Card>
+      </div>
 
       <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">

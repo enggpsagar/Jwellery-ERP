@@ -196,10 +196,14 @@ export function KarigarForm({
 
       <input type="hidden" name="imageUrl" value={imageUrl} />
 
-      <div className="flex flex-col items-center gap-3">
-        <Avatar className="h-24 w-24 border-4 shadow-sm">
+      {/* A compact left-aligned row instead of a big centered stack — the
+          latter spread across the full form width just to hold one small
+          avatar and a button, adding a lot of vertical space to a form
+          that's already long. */}
+      <div className="flex items-center gap-4">
+        <Avatar className="h-14 w-14 border-2 shadow-sm">
           <AvatarImage src={imageUrl || ""} />
-          <AvatarFallback className="text-2xl">
+          <AvatarFallback>
             {karigar?.name ? karigar.name.charAt(0).toUpperCase() : "A"}
           </AvatarFallback>
         </Avatar>

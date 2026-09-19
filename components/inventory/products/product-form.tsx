@@ -1272,37 +1272,6 @@ export function ProductForm({
             })}
           </div>
 
-          {/* One Net Weight for the whole piece, not per metal row (see
-              derivedNet's own doc comment for why splitting the stone
-              deduction across rows was wrong) — same "Auto-filled, edit to
-              override" convention as everywhere else on this form. */}
-          <div className="mt-4 max-w-sm border-t pt-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="metalNetWeight">Net Weight (g) <RequiredMark /></Label>
-              {!netTouched && derivedNet !== null && (
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                  Auto-filled
-                </span>
-              )}
-            </div>
-            <Input
-              id="metalNetWeight"
-              type="number"
-              step="any"
-              min="0"
-              className={!netTouched && derivedNet !== null ? "border-emerald-300 bg-emerald-50" : undefined}
-              value={netWeight}
-              onChange={(event) => handleNetWeightChange(event.target.value)}
-              placeholder="0.000"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              {netTouched
-                ? "Manually entered"
-                : "Total Gross Weight above, minus the Stone Pricing box's total — edit to override"}
-            </p>
-            <ErrorText error={state.errors.defaultNetWeight} />
-          </div>
-
           <ErrorText error={state.errors.metalComponentsJson} />
         </div>
       )}
@@ -1506,21 +1475,21 @@ export function ProductForm({
       )}
 
       {/* ============================
-          NET WEIGHT (productKind "STONE" only) — a loose gemstone's own
-          total weight, summed from every stone row above (no separate
-          Gross Weight of its own anymore — see stoneWeightSum's own doc
-          comment). The "METAL" repeater's own per-row Net Weight fields
-          above replace this entirely.
+          NET WEIGHT (productKind "METAL" or "STONE") — ONE combined field
+          below both the Metals and Stone Pricing boxes, so every weight on
+          the piece reads together in one place instead of Net Weight
+          sitting mid-form, separated from the stones it's netted against.
+          METAL: Total Gross Weight (all metal rows) minus the Stone
+          Pricing box's total. STONE: sum of every stone row's own Net
+          Stone Weight — a loose gemstone has no separate Gross Weight of
+          its own to subtract from. No separate Carat Weight field either
+          way — for a genuinely carat-weighed item it's the exact same
+          physical quantity as Net Weight, which already has its own g/ct
+          toggle here; defaultCaratWeight is still derived below (for
+          product-detail-content.tsx's display and any other reader)
+          directly from Net Weight, not a second manually-entered field.
       ============================= */}
-
-      {/* No separate Carat Weight field here anymore -- for a genuinely
-          carat-weighed item (a loose Diamond/Stone product, its own entire
-          weight) it's the exact same physical quantity as Net Weight,
-          which already has its own g/ct unit toggle here. defaultCaratWeight
-          is still derived below (for product-detail-content.tsx's display
-          and any other reader) directly from Net Weight, not from a second
-          manually-entered field. */}
-      {productKind === "STONE" && (
+      {(productKind === "METAL" || productKind === "STONE") && (
         <div className="max-w-sm">
           <div className="flex items-center justify-between">
             <Label htmlFor="defaultNetWeight">Net Weight <RequiredMark /></Label>
@@ -1542,22 +1511,33 @@ export function ProductForm({
               onChange={(event) => handleNetWeightChange(toGramsString(event.target.value))}
               placeholder="0.000"
             />
-            <Select value={weightUnit} onValueChange={(unit) => setWeightUnit(unit as "GRAM" | "CARAT")}>
-              <SelectTrigger className="h-9 w-16">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="GRAM">g</SelectItem>
-                <SelectItem value="CARAT">ct</SelectItem>
-              </SelectContent>
-            </Select>
+            {productKind === "STONE" ? (
+              <Select value={weightUnit} onValueChange={(unit) => setWeightUnit(unit as "GRAM" | "CARAT")}>
+                <SelectTrigger className="h-9 w-16">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GRAM">g</SelectItem>
+                  <SelectItem value="CARAT">ct</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              // A real (non-gemstone) metal is always gram-based in this
+              // app's own data model — no carat option to offer, so this
+              // is a fixed label rather than the STONE-kind toggle above.
+              <div className="flex h-9 w-16 items-center justify-center rounded-md border bg-muted text-sm text-muted-foreground">
+                g
+              </div>
+            )}
           </div>
 
           <p className="mt-1 text-xs text-muted-foreground">
             {netTouched
               ? "Manually entered"
               : derivedNet !== null
-                ? "Sum of every stone's Net Stone Weight above — edit to override"
+                ? productKind === "METAL"
+                  ? "Total Gross Weight above, minus the Stone Pricing box's total — edit to override"
+                  : "Sum of every stone's Net Stone Weight above — edit to override"
                 : "Auto-calculated from the stones added above"}
           </p>
 

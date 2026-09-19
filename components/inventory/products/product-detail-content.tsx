@@ -18,6 +18,7 @@ export function ProductDetailContent({
   product,
   canEdit = false,
   hideStatusField = false,
+  onStatusChanged,
 }: {
   product: Product
   /** Gates the Status field between a plain read-only badge and the
@@ -28,6 +29,13 @@ export function ProductDetailContent({
    * ProductDetailPanel puts it beside the View/Edit/Delete icons) — skips
    * the Basic Information row so it isn't shown twice. */
   hideStatusField?: boolean
+  /** Passed straight through to the embedded ProductStatusToggle's own
+   * onSuccess — needed only when this content is fed by a caller that
+   * fetches its own data client-side keyed on productId (e.g.
+   * ArchivedProductDetailPanel), which never re-fetches on its own just
+   * because router.refresh() ran. The standalone server-rendered
+   * /inventory/products/[id] page doesn't need this at all. */
+  onStatusChanged?: () => void
 }) {
   const makingCharge = formatCharge(
     product.defaultMakingCharge,
@@ -77,7 +85,7 @@ export function ProductDetailContent({
             label="Status"
             value={
               canEdit ? (
-                <ProductStatusToggle productId={product.id} isActive={product.isActive} />
+                <ProductStatusToggle productId={product.id} isActive={product.isActive} onSuccess={onStatusChanged} />
               ) : (
                 <ActiveBadge isActive={product.isActive} />
               )

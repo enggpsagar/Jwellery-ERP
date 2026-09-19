@@ -7,6 +7,9 @@ import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Input } from "@/components/ui/input"
 import { ProductsTable } from "@/components/inventory/products/products-table"
 import { ArchivedProductDetailPanel } from "@/components/inventory/products/archived-product-detail-panel"
+import { BulkUnarchiveProductsButton } from "@/components/inventory/products/bulk-unarchive-products-button"
+import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
+import { bulkDeleteProducts } from "@/lib/actions/inventory/product-actions"
 
 type ProductRow = React.ComponentProps<typeof ProductsTable>["products"][number]
 
@@ -43,6 +46,12 @@ export function ArchivedProductsClient({
   const [activeProductId, setActiveProductId] = React.useState<string | null>(
     products[0]?.id ?? null,
   )
+  // Forces ArchivedProductDetailPanel to re-fetch even when the selected id
+  // hasn't changed — a bulk Unarchive/Delete from this list's own toolbar
+  // can change the currently-viewed product's status without ever touching
+  // activeProductId (see ProductDetailPanel's own identical pattern on the
+  // main Products page).
+  const [detailRefreshToken, setDetailRefreshToken] = React.useState(0)
 
   React.useEffect(() => {
     setSelectedIds([])
@@ -72,11 +81,32 @@ export function ArchivedProductsClient({
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:items-start">
         <div className="space-y-4">
-          <div className="max-w-sm">
-            <Input
-              placeholder="Search archived products..."
-              value={search}
-              onChange={(e) => updateSearch(e.target.value)}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="max-w-sm flex-1">
+              <Input
+                placeholder="Search archived products..."
+                value={search}
+                onChange={(e) => updateSearch(e.target.value)}
+              />
+            </div>
+
+            <BulkUnarchiveProductsButton
+              selectedIds={selectedIds}
+              onDone={() => {
+                setSelectedIds([])
+                setDetailRefreshToken((token) => token + 1)
+              }}
+            />
+            <BulkDeleteButton
+              selectedIds={selectedIds}
+              itemLabelSingular="product"
+              itemLabelPlural="products"
+              getDisplayName={(id) => products.find((product) => product.id === id)?.name ?? id}
+              onDelete={bulkDeleteProducts}
+              onDone={() => {
+                setSelectedIds([])
+                setDetailRefreshToken((token) => token + 1)
+              }}
             />
           </div>
 
@@ -90,7 +120,7 @@ export function ArchivedProductsClient({
           />
         </div>
 
-        <ArchivedProductDetailPanel productId={activeProductId} canEdit={canEdit} />
+        <ArchivedProductDetailPanel productId={activeProductId} canEdit={canEdit} refreshToken={detailRefreshToken} />
       </div>
     </main>
   )

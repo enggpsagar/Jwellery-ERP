@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Package } from "lucide-react"
 
 import { getProductById } from "@/lib/actions/inventory/product-actions"
@@ -15,6 +15,13 @@ type ArchivedProductDetailPanelProps = {
    * read-only badge (see ProductDetailContent), same gate the active
    * Products page's own panel uses. */
   canEdit?: boolean
+  /** Bumped by the parent after a list-level bulk action (Unarchive/Delete
+   * Selected) that may have changed the currently-viewed product without
+   * changing which id is selected — this panel fetches its own data
+   * client-side keyed on productId, so a plain router.refresh() from
+   * elsewhere never reaches it on its own. Any changing value forces the
+   * re-fetch below. */
+  refreshToken?: number
 }
 
 /**
@@ -26,30 +33,33 @@ type ArchivedProductDetailPanelProps = {
  * toggle (already rendered inside ProductDetailContent when canEdit),
  * not a second "Restore" control here.
  */
-export function ArchivedProductDetailPanel({ productId, canEdit = false }: ArchivedProductDetailPanelProps) {
+export function ArchivedProductDetailPanel({ productId, canEdit = false, refreshToken }: ArchivedProductDetailPanelProps) {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (!productId) {
-      setProduct(null)
-      return
-    }
-
+  const fetchProduct = useCallback((id: string) => {
     let cancelled = false
     setLoading(true)
-    getProductById(productId)
+    getProductById(id)
       .then((result) => {
         if (!cancelled) setProduct(result)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
-
     return () => {
       cancelled = true
     }
-  }, [productId])
+  }, [])
+
+  useEffect(() => {
+    if (!productId) {
+      setProduct(null)
+      return
+    }
+    return fetchProduct(productId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId, refreshToken])
 
   if (!productId) {
     return (
@@ -74,7 +84,11 @@ export function ArchivedProductDetailPanel({ productId, canEdit = false }: Archi
     <div className="space-y-4 rounded-xl border bg-card p-6">
       <h2 className="text-lg font-semibold">{product.name}</h2>
 
-      <ProductDetailContent product={product} canEdit={canEdit} />
+      <ProductDetailContent
+        product={product}
+        canEdit={canEdit}
+        onStatusChanged={() => fetchProduct(product.id)}
+      />
     </div>
   )
 }

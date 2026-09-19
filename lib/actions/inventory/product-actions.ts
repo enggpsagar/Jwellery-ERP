@@ -1563,6 +1563,23 @@ export async function bulkArchiveProducts(ids: string[]): Promise<{ count: numbe
   return { count };
 }
 
+/** Marks every selected product Active again in one go — the bulk
+ * counterpart to enableProduct's own single-row toggle, for the Archived
+ * Products page. */
+export async function bulkUnarchiveProducts(ids: string[]): Promise<{ count: number }> {
+  const storeId = await requireStoreScope();
+
+  const { count } = await prisma.product.updateMany({
+    where: { id: { in: ids }, storeId },
+    data: { isActive: true },
+  });
+
+  revalidatePath("/inventory/products");
+  revalidatePath("/inventory/products/archived");
+
+  return { count };
+}
+
 export type ProductImportResult = {
   success: boolean;
   message: string;

@@ -36,7 +36,7 @@ import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select"
 import { PaidNowFields } from "@/components/shared/paid-now-fields"
 import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
-import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit, matchLegacyPurityType } from "@/lib/purity"
+import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit, matchLegacyPurityType, resolveLegacyPurityLabel } from "@/lib/purity"
 import { classifyPurityFamily } from "@/lib/business-units"
 import {
   getStoreMetalPurities,
@@ -460,12 +460,17 @@ export function InvoiceForm({
 
   // Delivery Location — where the goods are actually being shipped, which
   // decides CGST+SGST vs IGST (see computeGst() below), independent of
-  // the Party's own registered address. Defaults to the store's own state/
-  // code (or whatever this invoice already had, when editing/replacing).
-  const [deliveryState, setDeliveryState] = useState(initialDeliveryState ?? storeState ?? "")
-  const [deliveryStateCode, setDeliveryStateCode] = useState(
-    initialDeliveryStateCode ?? storeStateCode ?? "",
-  )
+  // the Party's own registered address. Left blank until this invoice
+  // already had one (editing/replacing) or the user explicitly picks one —
+  // a blank delivery state is treated as intra-state by computeGst/splitGst
+  // exactly like a matching state would be, so there's no need to default
+  // it to the store's own state just to make the math work.
+  const [deliveryState, setDeliveryState] = useState(initialDeliveryState ?? "")
+  const [deliveryStateCode, setDeliveryStateCode] = useState(initialDeliveryStateCode ?? "")
+  // Keeps the picker open once the user has explicitly opened it, even if
+  // they then clear the state back to blank — reappearing as a plain "Add"
+  // button mid-edit would be a jarring rug-pull.
+  const [showDeliveryPicker, setShowDeliveryPicker] = useState(Boolean(initialDeliveryState))
 
   const [state, formAction, pending] = useActionState(
     editInvoiceId ? updateInvoice.bind(null, editInvoiceId) : createInvoice,
@@ -843,6 +848,21 @@ export function InvoiceForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // A stock item saved before per-metal Purities existed carries only the
+  // legacy `purity` enum, with `purityLabel` blank — once that metal's real
+  // Purity options load, this backfills the label so the Purity dropdown
+  // shows the right selection instead of "None" for that line. Only touches
+  // items still missing a label, so it never overwrites a real choice.
+  useEffect(() => {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.purityLabel || !item.purity || !item.metalTypeId) return item
+        const match = resolveLegacyPurityLabel(item.purity, metalPuritiesCache[item.metalTypeId] ?? [])
+        return match ? { ...item, purityLabel: match.label } : item
+      }),
+    )
+  }, [metalPuritiesCache])
+
   // Restore-on-return. Runs once: reads any parked draft (see saveDraft
   // above), then selects the party that was just created. Deliberately not
   // dependent on searchParams — re-running after the URL is cleaned would
@@ -879,6 +899,7 @@ export function InvoiceForm({
       setLocationId(draft.locationId ?? "")
       setDeliveryState(draft.deliveryState ?? "")
       setDeliveryStateCode(draft.deliveryStateCode ?? "")
+      if (draft.deliveryState) setShowDeliveryPicker(true)
       setDiscount(draft.discount ?? 0)
       setRoundOffOverride(draft.roundOffOverride ?? null)
       setPaymentRows(draft.paymentRows ?? [])
@@ -1347,14 +1368,30 @@ export function InvoiceForm({
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          <DeliveryLocationSelect
-            states={states}
-            value={deliveryState}
-            onChange={(name, code) => {
-              setDeliveryState(name)
-              setDeliveryStateCode(code)
-            }}
-          />
+          {showDeliveryPicker ? (
+            <DeliveryLocationSelect
+              states={states}
+              value={deliveryState}
+              onChange={(name, code) => {
+                setDeliveryState(name)
+                setDeliveryStateCode(code)
+              }}
+            />
+          ) : (
+            <>
+              <Label>Delivery Location</Label>
+              <input type="hidden" name="deliveryState" value="" />
+              <input type="hidden" name="deliveryStateCode" value="" />
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 w-full justify-start text-muted-foreground"
+                onClick={() => setShowDeliveryPicker(true)}
+              >
+                <Plus className="h-4 w-4 mr-1.5" /> Add a delivery location
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

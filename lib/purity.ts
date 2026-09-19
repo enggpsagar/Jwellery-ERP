@@ -265,6 +265,27 @@ export function matchLegacyPurityType(
 }
 
 /**
+ * Recovers a real per-Metal Purity's label (e.g. "22K") for a line item
+ * that only carries the legacy PurityType enum (e.g. "GOLD_22K") and has
+ * no `purityLabel` of its own — a data-migration-era InventoryStock row
+ * saved before per-metal Purities existed. Matched purely on the digits
+ * (22, 925, ...), since that's the one thing guaranteed comparable between
+ * the old enum and a store's own label. Returns null when nothing lines
+ * up (a genuinely custom label, or the store hasn't configured this
+ * metal's purities at all) — callers leave the field blank in that case,
+ * same as today.
+ */
+export function resolveLegacyPurityLabel<T extends { label: string }>(
+  purity: string | null | undefined,
+  purities: T[],
+): T | null {
+  if (!purity) return null;
+  const digits = /_(\d+)/.exec(purity)?.[1];
+  if (!digits) return null;
+  return purities.find((p) => p.label.replace(/[^0-9]/g, "") === digits) ?? null;
+}
+
+/**
  * Grams-per-carat for a specific Stone Type (StoreMetalOrigin), replacing
  * the old global-per-PurityType resolveGramsPerCarat for anywhere a real
  * Stone Type has been selected. Falls back to the universal 0.2g/ct

@@ -480,6 +480,25 @@ export function StockForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Pre-selects the Product when arriving here from the Stock list with a
+  // row already selected (its Add Stock button carries ?productId=...) --
+  // a much simpler case than the newProductId restore above, since there's
+  // no in-progress draft to restore, just a starting pick to seed once.
+  useEffect(() => {
+    if (mode !== "create") return;
+
+    const productId = searchParams.get("productId");
+    if (!productId) return;
+
+    setSelectedProductId(productId);
+    // ProductSelect only seeds its own selection from `defaultValue` on
+    // first mount -- remount it so the pre-selected pick actually shows.
+    setProductSelectKey((key) => key + 1);
+
+    window.history.replaceState({}, "", "/inventory/stock/new");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // `ProductSelect` is a shared component whose `ProductOption` type
   // expects `category`/`ornamentType`/`metalType` as display strings, not
   // the relation objects this form works with — flatten to names for it,

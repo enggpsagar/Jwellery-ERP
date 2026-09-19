@@ -55,6 +55,13 @@ export function StockClient({ stockItems, pagination, metals, showLocation }: St
   const router = useRouter()
   const [scanning, setScanning] = React.useState(false)
 
+  // Carries the selected row's Product into Add Stock so adding another
+  // unit of the same design doesn't require re-picking it from scratch.
+  const activeProductId = stockItems.find((item) => item.id === activeStockId)?.product?.id
+  const addStockHref = activeProductId
+    ? `/inventory/stock/new?productId=${activeProductId}`
+    : "/inventory/stock/new"
+
   return (
     <main className="space-y-6 p-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -79,7 +86,7 @@ export function StockClient({ stockItems, pagination, metals, showLocation }: St
 
           <StockImportDialog />
 
-          <Link href="/inventory/stock/new">
+          <Link href={addStockHref}>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               Add Stock

@@ -1,13 +1,15 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Package } from "lucide-react"
+import Link from "next/link"
+import { Package, PackagePlus } from "lucide-react"
 
 import { getProductById } from "@/lib/actions/inventory/product-actions"
 import { ProductRowActions } from "@/components/inventory/products/product-row-actions"
 import { ProductDetailContent } from "@/components/inventory/products/product-detail-content"
 import { ProductStatusToggle } from "@/components/inventory/products/product-status-toggle"
 import { ActiveBadge } from "@/components/shared/active-badge"
+import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 
 type Product = NonNullable<Awaited<ReturnType<typeof getProductById>>>
@@ -76,6 +78,12 @@ export function ProductDetailPanel({ productId, canEdit = false }: ProductDetail
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{product.name}</h2>
         <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" className="gap-1.5" asChild>
+            <Link href={`/inventory/stock/new?productId=${product.id}`}>
+              <PackagePlus className="h-4 w-4" />
+              Add Stock
+            </Link>
+          </Button>
           {canEdit ? (
             <ProductStatusToggle productId={product.id} isActive={product.isActive} />
           ) : (

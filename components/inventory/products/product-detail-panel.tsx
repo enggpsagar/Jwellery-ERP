@@ -90,7 +90,14 @@ export function ProductDetailPanel({ productId, canEdit = false, refreshToken }:
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{product.name}</h2>
         <div className="flex items-center gap-2">
-          <Button variant="warning" size="sm" className="gap-1.5" asChild>
+          <Button
+            size="sm"
+            // Same blue (chart-1) as the top-bar "Purchase" button — both
+            // are "bring more inventory in" actions, so they share a hue
+            // distinct from the toggle/eye/edit/delete icons beside it.
+            className="gap-1.5 bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
+            asChild
+          >
             <Link href={`/inventory/stock/new?productId=${product.id}`}>
               <PackagePlus className="h-4 w-4" />
               Add Stock

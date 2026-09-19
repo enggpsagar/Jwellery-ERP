@@ -5,8 +5,7 @@ import * as React from "react"
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
-import { ActiveBadge } from "@/components/shared/active-badge"
-import { cn } from "@/lib/utils"
+import { cn, formatShortDate } from "@/lib/utils"
 
 type ProductRow = {
   id: string
@@ -113,7 +112,8 @@ export function ProductsTable({
               <SortableTableHead label="Product Code" sortKey="productCode" defaultSortBy="createdAt" />
               <th className="px-4 py-3 text-left font-medium">Stock Qty</th>
               <SortableTableHead label="Title" sortKey="name" defaultSortBy="createdAt" />
-              <SortableTableHead label="Active" sortKey="isActive" defaultSortBy="createdAt" />
+              <SortableTableHead label="Net Weight" sortKey="defaultNetWeight" defaultSortBy="createdAt" />
+              <SortableTableHead label="Created Date" sortKey="createdAt" defaultSortBy="createdAt" />
             </tr>
           </thead>
 
@@ -202,8 +202,16 @@ export function ProductsTable({
 
                   <td className="px-4 py-3 text-foreground">{product.name}</td>
 
-                  <td className="px-4 py-3">
-                    <ActiveBadge isActive={product.isActive} />
+                  <td className="px-4 py-3 text-foreground">
+                    {product.defaultNetWeight != null ? (
+                      `${product.defaultNetWeight.toFixed(3)} g`
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {formatShortDate(product.createdAt)}
                   </td>
                 </tr>
               )

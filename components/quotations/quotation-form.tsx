@@ -28,7 +28,7 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
-import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, resolveStockSellingRate, toPrimaryUnit, matchLegacyPurityType } from "@/lib/purity"
+import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, resolveStockSellingRate, toPrimaryUnit, matchLegacyPurityType, resolveLegacyPurityLabel } from "@/lib/purity"
 import { classifyPurityFamily } from "@/lib/business-units"
 import { RequiredMark } from "@/components/shared/required-mark"
 import {
@@ -259,6 +259,18 @@ export function QuotationForm({
     for (const id of uniqueMetalTypeIds) ensureMetalPurities(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Backfills a legacy-only stock item's Purity label once its metal's real
+  // Purity options load — see resolveLegacyPurityLabel's own doc comment.
+  useEffect(() => {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.purityLabel || !item.purity || !item.metalTypeId) return item
+        const match = resolveLegacyPurityLabel(item.purity, metalPuritiesCache[item.metalTypeId] ?? [])
+        return match ? { ...item, purityLabel: match.label } : item
+      }),
+    )
+  }, [metalPuritiesCache])
 
   // Selecting a real Purity updates purityLabel (the true value), keeps the
   // legacy `purity` enum in sync (matchLegacyPurityType) purely so anything

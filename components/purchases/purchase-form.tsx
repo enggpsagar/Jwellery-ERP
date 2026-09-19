@@ -7,7 +7,7 @@ import { Plus, Trash2, ChevronDown, ChevronRight, Search, MoveHorizontal } from 
 import type { PartyGstType, PurityType } from "@prisma/client"
 
 import { createPurchase, updatePurchase, type PurchaseFormState } from "@/lib/actions/purchase-actions"
-import { isCaratWeighedMetal, resolveGramsPerCarat, toPrimaryUnit, matchLegacyPurityType } from "@/lib/purity"
+import { isCaratWeighedMetal, resolveGramsPerCarat, toPrimaryUnit, matchLegacyPurityType, resolveLegacyPurityLabel } from "@/lib/purity"
 import { classifyPurityFamily } from "@/lib/business-units"
 import { useToast } from "@/components/providers/toast-provider"
 import { computePurchaseGst, isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst"
@@ -670,6 +670,18 @@ export function PurchaseForm({
     for (const id of uniqueMetalTypeIds) ensureMetalPurities(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Backfills a legacy-only stock item's Purity label once its metal's real
+  // Purity options load — see resolveLegacyPurityLabel's own doc comment.
+  useEffect(() => {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.purityLabel || !item.purity || !item.metalTypeId) return item
+        const match = resolveLegacyPurityLabel(item.purity, metalPuritiesCache[item.metalTypeId] ?? [])
+        return match ? { ...item, purityLabel: match.label } : item
+      }),
+    )
+  }, [metalPuritiesCache])
 
   // Selecting a real Purity updates purityLabel (the true value) and
   // keeps the legacy `purity` enum in sync (matchLegacyPurityType) purely

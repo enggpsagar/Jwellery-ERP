@@ -1442,6 +1442,7 @@ export function ProductForm({
             </div>
           )}
 
+          <ErrorText error={state.errors.stoneComponentsJson} />
           <ErrorText error={state.errors.defaultCaratWeight} />
           <ErrorText error={state.errors.defaultStoneRate} />
           <ErrorText error={state.errors.defaultStoneCharge} />

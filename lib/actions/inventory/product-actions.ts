@@ -157,7 +157,21 @@ function parseStoneComponents(formData: FormData): { components: StoneComponentI
   // A row missing its own stone name is dropped rather than rejected — the
   // same forgiving handling the single-stone form already gave a blank
   // "Includes a Stone" toggle left half-filled.
-  return { components: components.filter((component) => String(component.stoneMetalTypeName || "").trim()), error: null };
+  const named = components.filter((component) => String(component.stoneMetalTypeName || "").trim());
+
+  // A row that DOES name a Stone must also name at least one Stone Type —
+  // Stone Types no longer default to "all checked" (see
+  // StoneComponentFields' own doc comment), so a store owner has to make
+  // an actual choice rather than silently submitting none at all.
+  const missingType = named.find((component) => !String(component.stoneTypeNames || "").trim());
+  if (missingType) {
+    return {
+      components: [],
+      error: `Select at least one Stone Type for ${missingType.stoneMetalTypeName}.`,
+    };
+  }
+
+  return { components: named, error: null };
 }
 
 /**

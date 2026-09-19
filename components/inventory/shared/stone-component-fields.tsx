@@ -10,6 +10,7 @@ import { AddStoneTypeDialog } from "@/components/inventory/shared/add-stone-type
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { RequiredMark } from "@/components/shared/required-mark"
 import {
   Select,
   SelectContent,
@@ -74,11 +75,12 @@ type StoneComponentFieldsProps = {
  * its own search box and an inline "Add" that doesn't navigate away from
  * the in-progress document — see AddMetalDialog's own comment for why.
  *
- * Picking a Stone defaults every one of its Stone Types to checked — most
- * pieces are simply "Diamond", but a piece can genuinely mix e.g. natural
- * and lab-grown melee, so starting from "all of them" and letting the user
- * uncheck what doesn't apply is the fewer-clicks default for the common
- * single-type case while still allowing the mixed one.
+ * Picking a Stone leaves every one of its Stone Types unchecked — the
+ * store owner picks exactly what applies rather than un-picking what
+ * doesn't, since a wrong default silently left checked (e.g. "Natural"
+ * on a piece that's actually Lab Grown) is easy to miss. At least one
+ * Stone Type is required once a Stone is selected — see the callers'
+ * own validation (e.g. product-actions.ts's parseStoneComponents).
  */
 export function StoneComponentFields({
   metals,
@@ -136,11 +138,10 @@ export function StoneComponentFields({
   }, [typesForStone, typeSearch])
 
   function handleStoneSelect(name: string) {
-    const stone = stones.find((s) => s.name === name)
-    const defaultTypes = stone
-      ? origins.filter((o) => o.storeMetalId === stone.id && o.isActive).map((o) => o.name)
-      : []
-    onStoneChange(name, defaultTypes)
+    // Unchecked by default (see this component's own doc comment) —
+    // switching Stone always clears any Stone Types picked for the
+    // previous one, since they belong to a different Stone entirely.
+    onStoneChange(name, [])
   }
 
   function toggleType(name: string, checked: boolean) {
@@ -207,7 +208,7 @@ export function StoneComponentFields({
           {selectedStone && (
             <div className="space-y-1.5 rounded-md bg-muted/40 p-2.5">
               <div className="flex items-center justify-between">
-                <Label className="text-xs">Stone Types</Label>
+                <Label className="text-xs">Stone Types <RequiredMark /></Label>
                 {!lockPhysicalFields && (
                   <Button
                     type="button"
@@ -249,6 +250,10 @@ export function StoneComponentFields({
                     </label>
                   ))}
                 </div>
+              )}
+
+              {selectedTypeNames.length === 0 && typesForStone.length > 0 && (
+                <p className="text-xs text-destructive">Select at least one Stone Type</p>
               )}
             </div>
           )}

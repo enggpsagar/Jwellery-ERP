@@ -679,12 +679,14 @@ export function ProductForm({
         String(Number(stoneWeightSum.toFixed(5)))
       : null;
 
-  // Re-subtracts the embedded stone's weight out of every untouched METAL-
-  // kind row's Net Weight whenever the Stone Pricing box's own total
+  // Re-subtracts the embedded stone's weight out of the untouched PRIMARY
+  // METAL-kind row's Net Weight whenever the Stone Pricing box's own total
   // changes — the row's own Gross Weight onChange (below, in the JSX)
   // already does this the moment Gross Weight itself is retyped, but
   // adding/editing a stone AFTER Gross Weight was already entered
-  // wouldn't otherwise ever re-trigger that subtraction.
+  // wouldn't otherwise ever re-trigger that subtraction. Only index 0 —
+  // see that same onChange's own comment for why every other metal row is
+  // left alone.
   const skippedFirstStoneWeightRecalc = useRef(false);
   useEffect(() => {
     if (!skippedFirstStoneWeightRecalc.current) {
@@ -692,8 +694,8 @@ export function ProductForm({
       return;
     }
     setMetalComponents((prev) =>
-      prev.map((row) => {
-        if (row.netTouched || row.grossWeight.trim() === "") return row;
+      prev.map((row, index) => {
+        if (index !== 0 || row.netTouched || row.grossWeight.trim() === "") return row;
         const gross = Number(row.grossWeight);
         if (!Number.isFinite(gross)) return row;
         return { ...row, netWeight: String(Number(Math.max(0, gross - stoneWeightSum).toFixed(5))) };
@@ -1233,11 +1235,19 @@ export function ProductForm({
                           // in the Stone Pricing box below. Was previously
                           // just copying Gross Weight verbatim, silently
                           // overstating Net Weight by the stone's own
-                          // weight whenever one was attached.
+                          // weight whenever one was attached. Only the
+                          // PRIMARY row (index 0) ever deducts it — a
+                          // physical stone sits in one place on the piece,
+                          // so subtracting the same weight from every
+                          // metal row on a multi-metal piece would remove
+                          // it that many times over instead of once. Any
+                          // other row's Net Weight stays its own plain
+                          // Gross Weight, untouched by Stone Pricing.
                           if (!row.netTouched) {
                             const gross = Number(value);
+                            const deduction = index === 0 ? stoneWeightSum : 0;
                             patch.netWeight = Number.isFinite(gross)
-                              ? String(Number(Math.max(0, gross - stoneWeightSum).toFixed(5)))
+                              ? String(Number(Math.max(0, gross - deduction).toFixed(5)))
                               : value;
                           }
                           updateMetalComponent(row.key, patch);
@@ -1522,9 +1532,15 @@ export function ProductForm({
               onChange={(event) => handleNetWeightChange(toGramsString(event.target.value))}
               placeholder="0.000"
             />
-            <div className="flex h-9 w-16 items-center justify-center rounded-md border bg-muted text-sm text-muted-foreground">
-              {weightUnit === "GRAM" ? "g" : "ct"}
-            </div>
+            <Select value={weightUnit} onValueChange={(unit) => setWeightUnit(unit as "GRAM" | "CARAT")}>
+              <SelectTrigger className="h-9 w-16">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="GRAM">g</SelectItem>
+                <SelectItem value="CARAT">ct</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <p className="mt-1 text-xs text-muted-foreground">

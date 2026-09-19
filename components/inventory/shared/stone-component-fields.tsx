@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useId, useMemo, useState } from "react"
 import { Plus } from "lucide-react"
 
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
@@ -105,6 +105,11 @@ export function StoneComponentFields({
   netStoneWeightTouched,
   lockPhysicalFields = false,
 }: StoneComponentFieldsProps) {
+  // Scopes the Stone Type radios to THIS component instance — the same
+  // Stone (e.g. "Diamond") can appear in more than one repeater row, and a
+  // shared HTML radio `name` across rows would let picking a type in one
+  // row silently uncheck another row's own selection.
+  const radioGroupId = useId()
   const [stoneSearch, setStoneSearch] = useState("")
   const [typeSearch, setTypeSearch] = useState("")
   const [addStoneOpen, setAddStoneOpen] = useState(false)
@@ -144,10 +149,13 @@ export function StoneComponentFields({
     onStoneChange(name, [])
   }
 
-  function toggleType(name: string, checked: boolean) {
-    onTypesChange(
-      checked ? [...selectedTypeNames, name] : selectedTypeNames.filter((n) => n !== name),
-    )
+  // Single-select — a piece is one Stone Type or the other (Natural vs
+  // Lab-Grown), never both at once, so picking one replaces whatever was
+  // selected rather than adding to it. selectedTypeNames stays an array
+  // (never more than one entry) purely so callers/the wire format don't
+  // need their own separate shape for this.
+  function selectType(name: string) {
+    onTypesChange([name])
   }
 
   return (
@@ -241,9 +249,10 @@ export function StoneComponentFields({
                   {filteredTypes.map((type) => (
                     <label key={type.id} className="flex items-center gap-1.5 text-xs">
                       <input
-                        type="checkbox"
-                        checked={selectedTypeNames.includes(type.name)}
-                        onChange={(event) => toggleType(type.name, event.target.checked)}
+                        type="radio"
+                        name={radioGroupId}
+                        checked={selectedTypeNames[0] === type.name}
+                        onChange={() => selectType(type.name)}
                         disabled={lockPhysicalFields}
                       />
                       {type.name}
@@ -350,7 +359,7 @@ export function StoneComponentFields({
           storeMetalName={selectedStone.name}
           onCreated={(origin) => {
             onOriginsChange([...origins, origin])
-            onTypesChange([...selectedTypeNames, origin.name])
+            onTypesChange([origin.name])
           }}
         />
       )}

@@ -1350,8 +1350,24 @@ export function InvoiceForm({
           </div>
         )}
 
-        <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-          {showLocationField && <Label>Store Location</Label>}
+        {showLocationField ? (
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+            <Label>Store Location</Label>
+            <LocationSelect
+              key={locationSelectKey}
+              locations={locations}
+              name="locationId"
+              defaultValue={locationId}
+              onChange={setLocationId}
+            />
+          </div>
+        ) : (
+          // Collapsed (single location, or an unrestricted role that skips
+          // picking one — see LocationSelect's own doc comment): renders
+          // only a hidden input, nothing visible — so it's kept OUTSIDE any
+          // grid-column wrapper here, rather than one still reserving an
+          // empty-looking slot next to Due Date for a field with nothing
+          // to show.
           <LocationSelect
             key={locationSelectKey}
             locations={locations}
@@ -1359,7 +1375,7 @@ export function InvoiceForm({
             defaultValue={locationId}
             onChange={setLocationId}
           />
-        </div>
+        )}
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           {showDeliveryPicker ? (

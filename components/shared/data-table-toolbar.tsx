@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Download, X } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 import { Button } from "@/components/ui/button"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { CollapsibleSearch } from "@/components/shared/collapsible-search"
 import {
   Select,
@@ -173,6 +174,32 @@ export function DataTableToolbar({
     })
   }
 
+  // Sets dateFrom/dateTo together in a single navigation — the range picker
+  // reports a whole {from, to} pair from one interaction, and two separate
+  // updateParam calls back-to-back would each build off the same
+  // pre-navigation searchParams snapshot and clobber each other (the second
+  // call would win, silently dropping the first field).
+  const updateDateRange = (from: string, to: string) => {
+    startTransition(() => {
+      const params = new URLSearchParams(searchParams.toString())
+
+      if (from) {
+        params.set("dateFrom", from)
+      } else {
+        params.delete("dateFrom")
+      }
+
+      if (to) {
+        params.set("dateTo", to)
+      } else {
+        params.delete("dateTo")
+      }
+
+      params.set("page", "1")
+      router.replace(`${pathname}?${params.toString()}`)
+    })
+  }
+
   const hasSelection = !!selectedIds && selectedIds.length > 0
 
   /**
@@ -273,26 +300,13 @@ export function DataTableToolbar({
         ) : null}
 
         {dateField ? (
-          <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-input px-2.5 py-1">
-            <span className="whitespace-nowrap text-sm text-muted-foreground">{dateField}</span>
-            <input
-              type="date"
-              aria-label={`${dateField} from`}
-              className="h-7 rounded-md border-0 bg-transparent text-sm outline-none"
-              value={currentDateFrom}
-              max={currentDateTo || undefined}
-              onChange={(e) => updateParam("dateFrom", e.target.value)}
+          <div className="flex items-center gap-1">
+            <DateRangePicker
+              value={{ from: currentDateFrom, to: currentDateTo }}
+              onChange={({ from, to }) => updateDateRange(from, to)}
+              placeholder={dateField}
               disabled={isPending}
-            />
-            <span className="text-sm text-muted-foreground">to</span>
-            <input
-              type="date"
-              aria-label={`${dateField} to`}
-              className="h-7 rounded-md border-0 bg-transparent text-sm outline-none"
-              value={currentDateTo}
-              min={currentDateFrom || undefined}
-              onChange={(e) => updateParam("dateTo", e.target.value)}
-              disabled={isPending}
+              className="w-[190px]"
             />
             {currentDateFrom || currentDateTo ? (
               <button

@@ -112,14 +112,27 @@ export async function getCustomerById(id: string): Promise<Customer | null> {
  * (getCustomers({ supplierOnly: true })), but that one is paginated for a
  * table and this needs every active supplier at once, same shape as
  * getPurchaseFormParties() in purchase-actions.ts.
+ *
+ * With the Supplier module off, isSupplier can never actually be set on any
+ * party — toggleCustomerSupplierStatus above refuses while it's off, same
+ * as the module's own UI being hidden then — so filtering on it here would
+ * silently return nothing for a store in that mode. Falls back to every
+ * active party in that case, same "no distinction, any party can be a
+ * vendor" shape getPurchaseFormParties() already always uses.
  */
 export async function getSupplierOptions(): Promise<
   { id: string; name: string; phone: string | null }[]
 > {
   const storeId = await requireStoreScope()
+  const settings = await getBusinessSettings()
 
   return prisma.customer.findMany({
-    where: { storeId, isSupplier: true, isActive: true, isArchived: false },
+    where: {
+      storeId,
+      isActive: true,
+      isArchived: false,
+      ...(settings.supplierModuleEnabled ? { isSupplier: true } : {}),
+    },
     orderBy: { name: "asc" },
     select: { id: true, name: true, phone: true },
   })

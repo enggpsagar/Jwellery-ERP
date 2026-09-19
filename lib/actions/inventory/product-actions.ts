@@ -1541,6 +1541,28 @@ export async function bulkDeleteProducts(ids: string[]): Promise<BulkDeleteResul
   return { deletedCount, failures };
 }
 
+/**
+ * Marks every selected product Inactive in one go — the bulk counterpart
+ * to disableProduct's own single-row toggle. Unlike bulkDeleteProducts,
+ * this never fails per-item: deactivating carries none of hard-delete's
+ * dependency risk (linked stock/invoice/karigar-job history is untouched
+ * and stays fully intact), so a product with real transaction history —
+ * which blocks deletion — can still always be archived this way instead.
+ */
+export async function bulkArchiveProducts(ids: string[]): Promise<{ count: number }> {
+  const storeId = await requireStoreScope();
+
+  const { count } = await prisma.product.updateMany({
+    where: { id: { in: ids }, storeId },
+    data: { isActive: false },
+  });
+
+  revalidatePath("/inventory/products");
+  revalidatePath("/inventory/products/archived");
+
+  return { count };
+}
+
 export type ProductImportResult = {
   success: boolean;
   message: string;

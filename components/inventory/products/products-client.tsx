@@ -7,6 +7,7 @@ import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
 import { DataTableToolbar } from "@/components/shared/data-table-toolbar"
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
+import { BulkArchiveProductsButton } from "@/components/inventory/products/bulk-archive-products-button"
 import { ProductsTable } from "@/components/inventory/products/products-table"
 import { ProductDetailPanel } from "@/components/inventory/products/product-detail-panel"
 import { ProductImportDialog } from "@/components/inventory/products/product-import-dialog"
@@ -124,14 +125,20 @@ export function ProductsClient({
               { value: UNASSIGNED_METAL_TYPE, label: "Unassigned" },
             ]}
             bulkActions={
-              <BulkDeleteButton
-                selectedIds={selectedIds}
-                itemLabelSingular="product"
-                itemLabelPlural="products"
-                getDisplayName={(id) => products.find((product) => product.id === id)?.name ?? id}
-                onDelete={bulkDeleteProducts}
-                onDone={() => setSelectedIds([])}
-              />
+              <>
+                <BulkArchiveProductsButton
+                  selectedIds={selectedIds}
+                  onDone={() => setSelectedIds([])}
+                />
+                <BulkDeleteButton
+                  selectedIds={selectedIds}
+                  itemLabelSingular="product"
+                  itemLabelPlural="products"
+                  getDisplayName={(id) => products.find((product) => product.id === id)?.name ?? id}
+                  onDelete={bulkDeleteProducts}
+                  onDone={() => setSelectedIds([])}
+                />
+              </>
             }
           />
 

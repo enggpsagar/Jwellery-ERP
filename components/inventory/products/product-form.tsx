@@ -679,6 +679,29 @@ export function ProductForm({
         String(Number(stoneWeightSum.toFixed(5)))
       : null;
 
+  // Re-subtracts the embedded stone's weight out of every untouched METAL-
+  // kind row's Net Weight whenever the Stone Pricing box's own total
+  // changes — the row's own Gross Weight onChange (below, in the JSX)
+  // already does this the moment Gross Weight itself is retyped, but
+  // adding/editing a stone AFTER Gross Weight was already entered
+  // wouldn't otherwise ever re-trigger that subtraction.
+  const skippedFirstStoneWeightRecalc = useRef(false);
+  useEffect(() => {
+    if (!skippedFirstStoneWeightRecalc.current) {
+      skippedFirstStoneWeightRecalc.current = true;
+      return;
+    }
+    setMetalComponents((prev) =>
+      prev.map((row) => {
+        if (row.netTouched || row.grossWeight.trim() === "") return row;
+        const gross = Number(row.grossWeight);
+        if (!Number.isFinite(gross)) return row;
+        return { ...row, netWeight: String(Number(Math.max(0, gross - stoneWeightSum).toFixed(5))) };
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stoneWeightSum]);
+
   // Kept in an effect rather than derived straight into the input, because
   // the field has to stay editable once the user takes it over. Skips its
   // very first run: on an edit page, gross/stone are already populated from
@@ -1204,7 +1227,19 @@ export function ProductForm({
                         onChange={(event) => {
                           const value = event.target.value;
                           const patch: Partial<MetalComponentRow> = { grossWeight: value };
-                          if (!row.netTouched) patch.netWeight = value;
+                          // Net = Gross − embedded stone weight, same
+                          // subtraction a jeweller does by hand — a metal's
+                          // own Net Weight never includes the stone(s) set
+                          // in the Stone Pricing box below. Was previously
+                          // just copying Gross Weight verbatim, silently
+                          // overstating Net Weight by the stone's own
+                          // weight whenever one was attached.
+                          if (!row.netTouched) {
+                            const gross = Number(value);
+                            patch.netWeight = Number.isFinite(gross)
+                              ? String(Number(Math.max(0, gross - stoneWeightSum).toFixed(5)))
+                              : value;
+                          }
                           updateMetalComponent(row.key, patch);
                         }}
                       />

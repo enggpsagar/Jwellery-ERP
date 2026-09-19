@@ -65,6 +65,15 @@ type StoneComponentFieldsProps = {
    * (pricing, not physical) stay editable. Not used by the Product form,
    * where this component's fields are the source of truth being defined. */
   lockPhysicalFields?: boolean
+  /** Product form only: Stone Charge there is just an estimate that now
+   * feeds the form's own bottom-of-page total breakdown instead of a real
+   * money field the way it is on Invoice/Kacha/Purchase (an actual sale/
+   * purchase document), so it's hidden here rather than shown twice. The
+   * caller still computes and submits the value the same as ever — this
+   * only hides the input. Also switches Stone Type to a single compact
+   * dropdown instead of the boxed radio list, so the whole row fits on one
+   * line. */
+  compact?: boolean
 }
 
 /**
@@ -104,6 +113,7 @@ export function StoneComponentFields({
   onStoneWeightUnitChange,
   netStoneWeightTouched,
   lockPhysicalFields = false,
+  compact = false,
 }: StoneComponentFieldsProps) {
   // Scopes the Stone Type radios to THIS component instance — the same
   // Stone (e.g. "Diamond") can appear in more than one repeater row, and a
@@ -158,43 +168,182 @@ export function StoneComponentFields({
     onTypesChange([name])
   }
 
+  const stoneSelect = (
+    <Select
+      value={stoneMetalTypeName}
+      onValueChange={handleStoneSelect}
+      disabled={lockPhysicalFields}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder="Select a stone" />
+      </SelectTrigger>
+      <SelectContent>
+        <div className="p-2">
+          <Input
+            placeholder="Search stones..."
+            value={stoneSearch}
+            onChange={(event) => setStoneSearch(event.target.value)}
+            onKeyDown={(event) => event.stopPropagation()}
+          />
+        </div>
+
+        {filteredStones.length === 0 ? (
+          <div className="px-3 py-2 text-sm text-muted-foreground">
+            No stones found{stoneSearch ? ` for "${stoneSearch}"` : ""}
+          </div>
+        ) : (
+          filteredStones.map((stone) => (
+            <SelectItem key={stone.id} value={stone.name}>
+              {stone.name}
+            </SelectItem>
+          ))
+        )}
+      </SelectContent>
+    </Select>
+  )
+
+  if (compact) {
+    return (
+      <div className="space-y-1.5">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          <div className="space-y-1">
+            <Label className="text-xs">Stone</Label>
+            <div className="flex gap-1.5">
+              {stoneSelect}
+              {!lockPhysicalFields && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  title="Add Stone"
+                  onClick={() => setAddStoneOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs">Stone Type <RequiredMark /></Label>
+            <div className="flex gap-1.5">
+              <Select
+                value={selectedTypeNames[0] ?? ""}
+                onValueChange={selectType}
+                disabled={lockPhysicalFields || !selectedStone}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={selectedStone ? "Select type" : "Select a stone first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {typesForStone.map((type) => (
+                    <SelectItem key={type.id} value={type.name}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!lockPhysicalFields && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  title="Add Stone Type"
+                  disabled={!selectedStone}
+                  onClick={() => setAddTypeOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            {selectedStone && selectedTypeNames.length === 0 && (
+              <p className="text-xs text-destructive">Required</p>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs">Carat Wt (ct)</Label>
+            <Input
+              type="number"
+              step="any"
+              value={caratWeight === 0 ? "" : caratWeight}
+              onChange={(event) => onCaratWeightChange(event.target.value)}
+              readOnly={lockPhysicalFields}
+              className={lockPhysicalFields ? "bg-muted" : undefined}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs">Rate (₹/ct)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={stoneRate === 0 ? "" : stoneRate}
+              onChange={(event) => onStoneRateChange(event.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs">Net Wt</Label>
+            <div className="flex gap-1">
+              <Input
+                type="number"
+                step="any"
+                className={lockPhysicalFields ? "flex-1 bg-muted" : "flex-1"}
+                value={stoneWeightInput === 0 ? "" : stoneWeightInput}
+                onChange={(event) => onStoneWeightInputChange(event.target.value)}
+                readOnly={lockPhysicalFields}
+              />
+              <Select
+                value={stoneWeightUnit}
+                onValueChange={(unit) => onStoneWeightUnitChange(unit as "GRAM" | "CARAT")}
+                disabled={lockPhysicalFields}
+              >
+                <SelectTrigger className="w-14">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GRAM">g</SelectItem>
+                  <SelectItem value="CARAT">ct</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <AddMetalDialog
+          open={addStoneOpen}
+          onOpenChange={setAddStoneOpen}
+          isGemstone
+          onCreated={(stone) => {
+            onMetalsChange([...metals, stone])
+            handleStoneSelect(stone.name)
+          }}
+        />
+
+        {selectedStone && (
+          <AddStoneTypeDialog
+            open={addTypeOpen}
+            onOpenChange={setAddTypeOpen}
+            storeMetalId={selectedStone.id}
+            storeMetalName={selectedStone.name}
+            onCreated={(origin) => {
+              onOriginsChange([...origins, origin])
+              onTypesChange([origin.name])
+            }}
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="col-span-2 space-y-1">
           <Label className="text-xs">Stone</Label>
           <div className="flex gap-1.5">
-            <Select
-              value={stoneMetalTypeName}
-              onValueChange={handleStoneSelect}
-              disabled={lockPhysicalFields}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a stone" />
-              </SelectTrigger>
-              <SelectContent>
-                <div className="p-2">
-                  <Input
-                    placeholder="Search stones..."
-                    value={stoneSearch}
-                    onChange={(event) => setStoneSearch(event.target.value)}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  />
-                </div>
-
-                {filteredStones.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">
-                    No stones found{stoneSearch ? ` for "${stoneSearch}"` : ""}
-                  </div>
-                ) : (
-                  filteredStones.map((stone) => (
-                    <SelectItem key={stone.id} value={stone.name}>
-                      {stone.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+            {stoneSelect}
 
             {!lockPhysicalFields && (
               <Button

@@ -168,12 +168,16 @@ type MetalComponentRow = {
   // there's no unit toggle here the way the single top-level Gross/Net
   // Weight fields (productKind "STONE") need one.
   grossWeight: string;
-  netWeight: string;
-  netTouched: boolean;
+  // Per-row estimate only — never submitted (Selling Price for a real sale
+  // resolves from Settings' Purity-level rate, see resolveStockSellingRate
+  // in lib/purity.ts). Feeds only the on-screen Estimated Value breakdown
+  // at the bottom of this form, so a store owner can sanity-check the
+  // total before saving.
+  metalRate: string;
 };
 
 function emptyMetalComponent(key: string = crypto.randomUUID()): MetalComponentRow {
-  return { key, metalTypeId: "", storeMetalPurityId: "", grossWeight: "", netWeight: "", netTouched: false };
+  return { key, metalTypeId: "", storeMetalPurityId: "", grossWeight: "", metalRate: "" };
 }
 
 // One row of the "Stone" repeater — replaces the old single "Includes a
@@ -205,6 +209,10 @@ function emptyStoneComponent(key: string = crypto.randomUUID()): StoneComponentR
     stoneWeightTouched: false,
     stoneWeightUnit: "GRAM",
   };
+}
+
+function inr(value: number): string {
+  return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }
 
 export function ProductForm({
@@ -272,11 +280,7 @@ export function ProductForm({
         metalTypeId: component.metalTypeId,
         storeMetalPurityId: component.storeMetalPurityId ?? "",
         grossWeight: component.grossWeight ?? "",
-        netWeight: component.netWeight ?? "",
-        // A saved value is authoritative — don't let the gross-driven
-        // auto-calc effect silently recompute over it the instant this
-        // page loads.
-        netTouched: true,
+        metalRate: "",
       }));
     }
     if (product && !initialMetals.find((item) => item.id === product.metalTypeId)?.isGemstone) {
@@ -286,8 +290,7 @@ export function ProductForm({
           metalTypeId: product.metalTypeId ?? "",
           storeMetalPurityId: product.storeMetalPurityId ?? "",
           grossWeight: product.defaultGrossWeight ?? "",
-          netWeight: product.defaultNetWeight ?? "",
-          netTouched: Boolean(product.defaultNetWeight),
+          metalRate: "",
         },
       ];
     }
@@ -664,45 +667,30 @@ export function ProductForm({
     setNetWeight(value);
   }
 
-  // A Stone-kind product's own Net Weight is the sum of every stone row's
-  // own Net Stone Weight — there's no separate top-level Gross Weight to
-  // subtract from anymore (removed; a loose stone parcel has no gross-vs-
-  // net distinction of its own, unlike a metal piece with an embedded
-  // stone). stoneComponents' own stoneWeight is always stored in grams,
-  // same convention as netWeight itself.
+  // stoneComponents' own stoneWeight is always stored in grams, same
+  // convention as netWeight itself.
   const stoneWeightSum = stoneComponents.reduce((sum, row) => sum + (Number(row.stoneWeight) || 0), 0);
 
-  const derivedNet =
-    stoneWeightSum > 0
-      ? // Trailing zeros trimmed so the box reads 5.5 rather than 5.500,
-        // while still respecting the column's three decimals.
-        String(Number(stoneWeightSum.toFixed(5)))
-      : null;
+  // Net Weight is now always ONE top-level field regardless of productKind
+  // (replacing the old per-metal-row Net Weight, which subtracted the same
+  // stone weight from every row on a multi-metal piece instead of once) —
+  // METAL: sum of every metal row's own Gross Weight, minus the Stone
+  // Pricing box's total (the stone sits in the piece as a whole, not any
+  // one row specifically). STONE: sum of every stone row's own Net Stone
+  // Weight, unchanged from before — a loose stone parcel has no separate
+  // Gross Weight of its own to subtract from.
+  const metalGrossWeightSum = metalComponents.reduce((sum, row) => sum + (Number(row.grossWeight) || 0), 0);
 
-  // Re-subtracts the embedded stone's weight out of the untouched PRIMARY
-  // METAL-kind row's Net Weight whenever the Stone Pricing box's own total
-  // changes — the row's own Gross Weight onChange (below, in the JSX)
-  // already does this the moment Gross Weight itself is retyped, but
-  // adding/editing a stone AFTER Gross Weight was already entered
-  // wouldn't otherwise ever re-trigger that subtraction. Only index 0 —
-  // see that same onChange's own comment for why every other metal row is
-  // left alone.
-  const skippedFirstStoneWeightRecalc = useRef(false);
-  useEffect(() => {
-    if (!skippedFirstStoneWeightRecalc.current) {
-      skippedFirstStoneWeightRecalc.current = true;
-      return;
-    }
-    setMetalComponents((prev) =>
-      prev.map((row, index) => {
-        if (index !== 0 || row.netTouched || row.grossWeight.trim() === "") return row;
-        const gross = Number(row.grossWeight);
-        if (!Number.isFinite(gross)) return row;
-        return { ...row, netWeight: String(Number(Math.max(0, gross - stoneWeightSum).toFixed(5))) };
-      }),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stoneWeightSum]);
+  const derivedNet =
+    productKind === "METAL"
+      ? metalGrossWeightSum > 0
+        ? String(Number(Math.max(0, metalGrossWeightSum - stoneWeightSum).toFixed(5)))
+        : null
+      : // Trailing zeros trimmed so the box reads 5.5 rather than 5.500,
+        // while still respecting the column's three decimals.
+        stoneWeightSum > 0
+        ? String(Number(stoneWeightSum.toFixed(5)))
+        : null;
 
   // Kept in an effect rather than derived straight into the input, because
   // the field has to stay editable once the user takes it over. Skips its
@@ -792,15 +780,31 @@ export function ProductForm({
     productKind === "METAL" ? (primaryMetalComponent?.storeMetalPurityId ?? "") : storeMetalPurityId;
   const submittedDefaultPurity =
     productKind === "METAL" ? (stoneConversionPurity === "__none__" ? "" : stoneConversionPurity) : (defaultPurity === "__none__" ? "" : defaultPurity);
-  const submittedNetWeight = productKind === "METAL" ? (primaryMetalComponent?.netWeight ?? "") : submittedWeight(netWeight);
-  // No separate Gross Weight of its own anymore for a Stone-kind product —
-  // submits the same value as Net Weight (see stoneWeightSum's own doc
-  // comment above), which also keeps the still-required defaultGrossWeight
-  // column satisfied server-side.
-  const submittedGrossWeight = productKind === "METAL" ? (primaryMetalComponent?.grossWeight ?? "") : submittedNetWeight;
+  // Net Weight is one top-level field for both kinds now (see derivedNet's
+  // own doc comment) — always grams for METAL, so no unit conversion
+  // needed there; STONE still runs through submittedWeight for its own
+  // g/ct toggle.
+  const submittedNetWeight = productKind === "METAL" ? String(Number(netWeight) || 0) : submittedWeight(netWeight);
+  // METAL: sum of every metal row's own Gross Weight (always grams). STONE:
+  // no separate Gross Weight of its own — submits the same value as Net
+  // Weight, which also keeps the still-required defaultGrossWeight column
+  // satisfied server-side.
+  const submittedGrossWeight = productKind === "METAL" ? String(Number(metalGrossWeightSum.toFixed(5))) : submittedNetWeight;
 
   const stoneChargeSum = stoneComponents.reduce((sum, row) => sum + (Number(row.stoneCharge) || 0), 0);
   const primaryStone = stoneComponents[0];
+
+  // Estimated Value breakdown (bottom of the form) — a live, on-screen-only
+  // calculator so a store owner can sanity-check the total before saving,
+  // same spirit as Invoice's own totals block. Never submitted: metalRate
+  // has no column on Product/ProductMetalComponent (Selling Price for a
+  // real sale still resolves from Settings' Purity-level rate — see
+  // resolveStockSellingRate in lib/purity.ts).
+  const metalValueSum = metalComponents.reduce(
+    (sum, row) => sum + (Number(row.grossWeight) || 0) * (Number(row.metalRate) || 0),
+    0,
+  );
+  const estimatedTotal = metalValueSum + stoneChargeSum;
 
   const submittedHasStoneComponent = productKind === "METAL" && hasStoneComponent;
   const submittedStoneWeight =
@@ -830,7 +834,11 @@ export function ProductForm({
             metalTypeId: row.metalTypeId,
             storeMetalPurityId: row.storeMetalPurityId || null,
             grossWeight: row.grossWeight || null,
-            netWeight: row.netWeight || null,
+            // No separate per-row Net Weight anymore (see MetalComponentRow's
+            // own doc comment) — the authoritative total lives on the
+            // product's own defaultNetWeight (submittedNetWeight) instead;
+            // each component row just mirrors its own Gross Weight here.
+            netWeight: row.grossWeight || null,
           }))
       : metalTypeId
         ? [{ metalTypeId, storeMetalPurityId: null, grossWeight: submittedWeight(grossWeight) || null, netWeight: submittedWeight(netWeight) || null }]
@@ -1226,53 +1234,23 @@ export function ProductForm({
                         min="0"
                         value={row.grossWeight}
                         placeholder="0.000"
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          const patch: Partial<MetalComponentRow> = { grossWeight: value };
-                          // Net = Gross − embedded stone weight, same
-                          // subtraction a jeweller does by hand — a metal's
-                          // own Net Weight never includes the stone(s) set
-                          // in the Stone Pricing box below. Was previously
-                          // just copying Gross Weight verbatim, silently
-                          // overstating Net Weight by the stone's own
-                          // weight whenever one was attached. Only the
-                          // PRIMARY row (index 0) ever deducts it — a
-                          // physical stone sits in one place on the piece,
-                          // so subtracting the same weight from every
-                          // metal row on a multi-metal piece would remove
-                          // it that many times over instead of once. Any
-                          // other row's Net Weight stays its own plain
-                          // Gross Weight, untouched by Stone Pricing.
-                          if (!row.netTouched) {
-                            const gross = Number(value);
-                            const deduction = index === 0 ? stoneWeightSum : 0;
-                            patch.netWeight = Number.isFinite(gross)
-                              ? String(Number(Math.max(0, gross - deduction).toFixed(5)))
-                              : value;
-                          }
-                          updateMetalComponent(row.key, patch);
-                        }}
+                        onChange={(event) => updateMetalComponent(row.key, { grossWeight: event.target.value })}
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs">Net Weight (g) <RequiredMark /></Label>
-                        {!row.netTouched && row.grossWeight && (
-                          <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
-                            Auto
-                          </span>
-                        )}
-                      </div>
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">Metal Rate (₹/g)</Label>
                       <Input
                         type="number"
-                        step="any"
+                        step="0.01"
                         min="0"
-                        value={row.netWeight}
-                        placeholder="0.000"
-                        className={!row.netTouched && row.grossWeight ? "border-emerald-300 bg-emerald-50" : undefined}
-                        onChange={(event) => updateMetalComponent(row.key, { netWeight: event.target.value, netTouched: true })}
+                        value={row.metalRate}
+                        placeholder="0.00"
+                        onChange={(event) => updateMetalComponent(row.key, { metalRate: event.target.value })}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Estimate only — feeds the total below, not saved
+                      </p>
                     </div>
                   </div>
 
@@ -1292,6 +1270,37 @@ export function ProductForm({
                 </div>
               );
             })}
+          </div>
+
+          {/* One Net Weight for the whole piece, not per metal row (see
+              derivedNet's own doc comment for why splitting the stone
+              deduction across rows was wrong) — same "Auto-filled, edit to
+              override" convention as everywhere else on this form. */}
+          <div className="mt-4 max-w-sm border-t pt-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="metalNetWeight">Net Weight (g) <RequiredMark /></Label>
+              {!netTouched && derivedNet !== null && (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  Auto-filled
+                </span>
+              )}
+            </div>
+            <Input
+              id="metalNetWeight"
+              type="number"
+              step="any"
+              min="0"
+              className={!netTouched && derivedNet !== null ? "border-emerald-300 bg-emerald-50" : undefined}
+              value={netWeight}
+              onChange={(event) => handleNetWeightChange(event.target.value)}
+              placeholder="0.000"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {netTouched
+                ? "Manually entered"
+                : "Total Gross Weight above, minus the Stone Pricing box's total — edit to override"}
+            </p>
+            <ErrorText error={state.errors.defaultNetWeight} />
           </div>
 
           <ErrorText error={state.errors.metalComponentsJson} />
@@ -1411,6 +1420,7 @@ export function ProductForm({
               {stoneComponents.map((row) => (
                 <div key={row.key} className="rounded-lg border border-emerald-200 bg-white p-4">
                   <StoneComponentFields
+                    compact
                     metals={metals}
                     origins={origins}
                     onMetalsChange={setMetals}
@@ -1708,6 +1718,36 @@ export function ProductForm({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {(metalValueSum > 0 || stoneChargeSum > 0) && (
+        <div className="rounded-xl border bg-muted/30 p-6">
+          <h3 className="mb-1 text-lg font-semibold">Estimated Value</h3>
+          <p className="mb-4 text-sm text-muted-foreground">
+            A live total from the Metal Rate/Stone Rate above, purely to sanity-check before
+            saving — neither the rates nor this total are stored on the product. The store's
+            actual Selling Price still resolves from Settings whenever this product is sold.
+          </p>
+
+          <div className="space-y-2 text-sm">
+            {productKind === "METAL" && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Metal Value ({metalGrossWeightSum.toFixed(3)} g)</span>
+                <span className="font-medium">{inr(metalValueSum)}</span>
+              </div>
+            )}
+            {stoneChargeSum > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Stone Value</span>
+                <span className="font-medium">{inr(stoneChargeSum)}</span>
+              </div>
+            )}
+            <div className="flex justify-between border-t pt-2 text-base font-semibold">
+              <span>Estimated Total</span>
+              <span>{inr(estimatedTotal)}</span>
+            </div>
+          </div>
         </div>
       )}
 

@@ -9,7 +9,6 @@ import type { ProductFormState } from "@/lib/inventory/product-types";
 import {
   getStoreCategoryTypes,
   getStoreCategoriesForMetal,
-  getStoreMetalOrigins,
   getStoreMetalPurities,
   type StoreMetalOriginRow,
   type StoreMetalPurityRow,
@@ -380,9 +379,6 @@ export function ProductForm({
     return types.filter((item) => item.name.toLowerCase().includes(query));
   }, [types, typeSearch]);
 
-  const [stoneOrigins, setStoneOrigins] = useState<StoreMetalOriginRow[]>([]);
-  const [loadingStoneOrigins, setLoadingStoneOrigins] = useState(false);
-
   // `metals`/`origins` are local state (not the raw props) so the various
   // inline "Add Metal"/"Add Stone"/"Add Stone Type" dialogs across this
   // form (single STONE-kind select, metal-component rows, stone-component
@@ -429,12 +425,54 @@ export function ProductForm({
         },
       ];
     }
+    // A Stone-kind product saved before this repeater replaced its single
+    // Stone/Stone Type select — its identity lives in metalTypeId/
+    // stoneOriginOptionId (real FKs) rather than any of the free-text
+    // fields above, so this seeds one row from those instead. Rate/Charge/
+    // Weight were never stored at the product level for this case (Selling
+    // Price resolves dynamically off the FK chain — see resolveStockSellingRate
+    // in lib/purity.ts), so they start blank for manual entry, same as any
+    // newly-added row.
+    const isExistingGemstone = initialMetals.find((item) => item.id === product?.metalTypeId)?.isGemstone;
+    if (isExistingGemstone) {
+      return [
+        {
+          key: "legacy-0",
+          stoneMetalTypeName: initialMetals.find((item) => item.id === product?.metalTypeId)?.name ?? "",
+          stoneTypeNames: [initialOrigins.find((item) => item.id === product?.stoneOriginOptionId)?.name].filter(
+            (name): name is string => Boolean(name),
+          ),
+          caratWeight: product?.defaultCaratWeight ?? "",
+          stoneRate: "",
+          stoneCharge: "",
+          stoneChargeTouched: false,
+          stoneWeight: product?.defaultNetWeight ?? "",
+          stoneWeightTouched: Boolean(product?.defaultNetWeight),
+          stoneWeightUnit: "GRAM" as const,
+        },
+      ];
+    }
     return [];
   });
 
   function updateStoneComponent(key: string, patch: Partial<StoneComponentRow>) {
     setStoneComponents((prev) => prev.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   }
+
+  // For productKind "STONE", metalTypeId (and everything it drives —
+  // Primary Unit, grams-per-carat conversion, Category's isGemstone
+  // exemption, taxonomy validation) now follows the Stone Pricing
+  // repeater's own first row instead of a dedicated top-level select —
+  // that row's stoneMetalTypeName is a free-text name (see
+  // StoneComponentFields' own doc comment), resolved back to the real
+  // StoreMetal id here the same way a name-only field always has to be.
+  useEffect(() => {
+    if (productKind !== "STONE") return;
+    const name = stoneComponents[0]?.stoneMetalTypeName ?? "";
+    const resolved = metals.find((item) => item.isGemstone && item.name === name);
+    setMetalTypeId(resolved?.id ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productKind, stoneComponents[0]?.stoneMetalTypeName, metals]);
 
   const previousCategoryIdRef = useRef(categoryId);
   const previousMetalTypeIdRef = useRef(metalTypeId);
@@ -466,18 +504,6 @@ export function ProductForm({
         (kind === "STONE" ? item.isGemstone : !item.isGemstone),
     );
   }
-
-  const selectableMetals = selectableMetalsFor(productKind, product?.metalTypeId);
-
-  const [metalSearch, setMetalSearch] = useState("");
-  const [addMetalOpen, setAddMetalOpen] = useState(false);
-  const [addPurityOpen, setAddPurityOpen] = useState(false);
-
-  const filteredMetals = useMemo(() => {
-    const query = metalSearch.trim().toLowerCase();
-    if (!query) return selectableMetals;
-    return selectableMetals.filter((item) => item.name.toLowerCase().includes(query));
-  }, [selectableMetals, metalSearch]);
 
   // Reflects whichever metal is actually "selected" right now for
   // purity-family classification — the STONE-kind single select, or the
@@ -714,46 +740,6 @@ export function ProductForm({
     }
   }, [categoryId]);
 
-  // Fetch the Store-Admin-defined Stone Type options (Natural, Lab-Grown,
-  // or anything else the store has added) for whichever gemstone Metal is
-  // currently selected — the exact same Category -> Type cascade above,
-  // just keyed off metalTypeId + isGemstone instead of categoryId.
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadStoneTypes() {
-      if (!metalTypeId || !selectedMetal?.isGemstone) {
-        setStoneOrigins([]);
-        return;
-      }
-
-      try {
-        setLoadingStoneOrigins(true);
-        const data = await getStoreMetalOrigins(metalTypeId);
-
-        if (!cancelled) {
-          setStoneOrigins(data || []);
-        }
-      } catch (err) {
-        console.error("Failed to load Stone Types:", err);
-        if (!cancelled) {
-          setStoneOrigins([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingStoneOrigins(false);
-        }
-      }
-    }
-
-    loadStoneTypes();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metalTypeId, selectedMetal?.isGemstone]);
-
   // Only reset the selected Stone Type/Purity when the Metal actually
   // changes as a result of user interaction — not on initial mount (edit
   // mode needs to keep the product's existing selection while options
@@ -821,20 +807,21 @@ export function ProductForm({
         : [],
   );
 
+  // Submitted for both kinds now — a Stone-kind product's own stone(s) are
+  // these same repeater rows (see the metalTypeId-sync effect near
+  // stoneComponents' own declaration), not a separate scalar selection.
   const stoneComponentsJson = JSON.stringify(
-    productKind === "METAL"
-      ? stoneComponents
-          .filter((row) => row.stoneMetalTypeName.trim())
-          .map((row) => ({
-            stoneMetalTypeName: row.stoneMetalTypeName,
-            stoneTypeNames: row.stoneTypeNames.join(","),
-            caratWeight: row.caratWeight || null,
-            stoneWeight: row.stoneWeight || null,
-            stoneRate: row.stoneRate || null,
-            stoneCharge: row.stoneCharge || null,
-            stoneChargeType: "FIXED",
-          }))
-      : [],
+    stoneComponents
+      .filter((row) => row.stoneMetalTypeName.trim())
+      .map((row) => ({
+        stoneMetalTypeName: row.stoneMetalTypeName,
+        stoneTypeNames: row.stoneTypeNames.join(","),
+        caratWeight: row.caratWeight || null,
+        stoneWeight: row.stoneWeight || null,
+        stoneRate: row.stoneRate || null,
+        stoneCharge: row.stoneCharge || null,
+        stoneChargeType: "FIXED",
+      })),
   );
 
   return (
@@ -876,7 +863,10 @@ export function ProductForm({
                 setMetalTypeId("");
                 setStoneOriginOptionId("");
                 setMetalComponents([emptyMetalComponent()]);
-                setStoneComponents([]);
+                // A Stone-kind product IS its stone(s) — starts with one row
+                // instead of empty, unlike the Metal-kind repeater below
+                // where an embedded stone stays genuinely optional.
+                setStoneComponents(kind === "STONE" ? [emptyStoneComponent()] : []);
                 // Category/Type are hidden entirely for Stone (see below) —
                 // clear them on every switch so a category picked while on
                 // Metal doesn't silently keep submitting behind the
@@ -897,103 +887,14 @@ export function ProductForm({
 
           {productKind === "STONE" && (
             <>
-              <div>
-                <Label>Stone <RequiredMark /></Label>
-
-                <div className="flex gap-1.5">
-                  <Select value={metalTypeId} onValueChange={setMetalTypeId}>
-                    <SelectTrigger className="h-11 w-full">
-                      <SelectValue placeholder="Select stone" />
-                    </SelectTrigger>
-
-                    <SelectContent>
-                      <div className="p-2">
-                        <Input
-                          placeholder="Search stones..."
-                          value={metalSearch}
-                          onChange={(event) => setMetalSearch(event.target.value)}
-                          onKeyDown={(event) => event.stopPropagation()}
-                        />
-                      </div>
-
-                      {filteredMetals.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">
-                          No stones found{metalSearch ? ` for "${metalSearch}"` : ""}
-                        </div>
-                      ) : (
-                        filteredMetals.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.name}
-                            {!item.isActive ? " (Disabled)" : ""}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="h-11 w-9 shrink-0 px-0"
-                    title="Add Stone"
-                    onClick={() => setAddMetalOpen(true)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <ErrorText error={state.errors.metalTypeId} />
-              </div>
-
-              {selectedMetal?.isGemstone && (
-                <div>
-                  <Label>Stone Type</Label>
-
-                  <Select
-                    value={stoneOriginOptionId || "__none__"}
-                    onValueChange={(value) =>
-                      setStoneOriginOptionId(value === "__none__" ? "" : value)
-                    }
-                    disabled={loadingStoneOrigins}
-                  >
-                    <SelectTrigger className="h-11 w-full">
-                      <SelectValue
-                        placeholder={
-                          loadingStoneOrigins
-                            ? "Loading Stone Types..."
-                            : "Select Stone Type"
-                        }
-                      />
-                    </SelectTrigger>
-
-                    <SelectContent>
-                      <SelectItem value="__none__">None</SelectItem>
-
-                      {stoneOrigins.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {!loadingStoneOrigins && stoneOrigins.length === 0 ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      No Stone Types set up for {selectedMetal.name} yet — add
-                      them under Settings → Taxonomy → Stone Types.
-                    </p>
-                  ) : null}
-
-                  <input
-                    type="hidden"
-                    name="stoneOriginOptionId"
-                    value={stoneOriginOptionId}
-                  />
-
-                  <ErrorText error={state.errors.stoneOriginOptionId} />
-                </div>
-              )}
+              {/* Which Stone(s) this product actually is now lives entirely
+                  in the Stone Pricing box below (one row per stone) —
+                  no separate top-level Stone/Stone Type select duplicating
+                  that same picker. metalTypeId itself is still submitted
+                  via the shared hidden input further below (submittedMetalTypeId),
+                  kept in sync with the repeater's first row — see the effect
+                  near where metalTypeId is declared. */}
+              <ErrorText error={state.errors.metalTypeId} />
 
               <div>
                 <Label htmlFor="defaultGrossWeight">Gross Weight <RequiredMark /></Label>
@@ -1411,29 +1312,6 @@ export function ProductForm({
         />
       )}
 
-      {/* STONE-kind single select's own "Add Stone"/"Add Purity" — unchanged. */}
-      <AddMetalDialog
-        open={addMetalOpen}
-        onOpenChange={setAddMetalOpen}
-        isGemstone={productKind === "STONE"}
-        onCreated={(metal) => {
-          setMetals((prev) => [...prev, metal]);
-          setMetalTypeId(metal.id);
-        }}
-      />
-
-      {selectedMetal && productKind === "STONE" && (
-        <AddPurityDialog
-          open={addPurityOpen}
-          onOpenChange={setAddPurityOpen}
-          storeMetalId={selectedMetal.id}
-          onCreated={(purity) => {
-            setMetalPurities((prev) => [...prev, purity]);
-            setStoreMetalPurityId(purity.id);
-          }}
-        />
-      )}
-
       {/* Metal-component repeater's own "Add Metal Type"/"Add Purity" —
           rendered via Radix's own portal, so being inside <form> in the
           JSX tree doesn't nest them in the actual <form> DOM node. */}
@@ -1473,19 +1351,22 @@ export function ProductForm({
       })()}
 
       {/* ============================
-          STONES — productKind "METAL" only. Replaces the old single
+          STONES — productKind "METAL" (optional, embedded stone) or "STONE"
+          (required, this IS the product — see the metalTypeId-sync effect
+          near stoneComponents' own declaration). Replaces the old single
           "Includes a Stone" toggle + one StoneComponentFields instance with
           a repeatable list; each row wraps that same component unchanged.
       ============================= */}
 
-      {productKind === "METAL" && (
+      {(productKind === "METAL" || productKind === "STONE") && (
         <div className="rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50 p-6">
           <div className="mb-6 flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold">Stone Pricing</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Optional — add one row per embedded stone (e.g. both a Ruby and
-                a Diamond on the same piece).
+                {productKind === "STONE"
+                  ? "Add one row per stone in this product (e.g. both a Ruby and a Diamond in the same parcel)."
+                  : "Optional — add one row per embedded stone (e.g. both a Ruby and a Diamond on the same piece)."}
               </p>
             </div>
             <Button
@@ -1499,7 +1380,9 @@ export function ProductForm({
           </div>
 
           {stoneComponents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No stones added yet.</p>
+            <p className="text-sm text-muted-foreground">
+              {productKind === "STONE" ? "Add at least one stone." : "No stones added yet."}
+            </p>
           ) : (
             <div className="space-y-4">
               {stoneComponents.map((row) => (
@@ -1559,17 +1442,23 @@ export function ProductForm({
                     netStoneWeightTouched={row.stoneWeightTouched}
                   />
 
-                  <div className="mt-3 flex justify-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => setStoneComponents((prev) => prev.filter((item) => item.key !== row.key))}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" /> Remove
-                    </Button>
-                  </div>
+                  {/* A Stone-kind product must always keep at least one
+                      row — that's the whole product, not an optional
+                      extra — so Remove hides on the last one instead of
+                      letting the box empty out. */}
+                  {(productKind !== "STONE" || stoneComponents.length > 1) && (
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setStoneComponents((prev) => prev.filter((item) => item.key !== row.key))}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" /> Remove
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

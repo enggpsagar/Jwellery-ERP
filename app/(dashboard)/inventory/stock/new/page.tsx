@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { getInventoryStockFormProducts } from "@/lib/actions/inventory/stock-actions";
+import { getInventoryStockFormProducts, getNextStockCode } from "@/lib/actions/inventory/stock-actions";
 import {
   getDefaultLocationId,
   getStoreLocations,
@@ -18,13 +18,14 @@ export const metadata: Metadata = {
 
 export default async function NewStockPage() {
 
-  const [products, locations, caratConversionRates, defaultLocationId, metals, suppliers] = await Promise.all([
+  const [products, locations, caratConversionRates, defaultLocationId, metals, suppliers, nextStockCode] = await Promise.all([
     getInventoryStockFormProducts(),
     getStoreLocations(),
     getCaratConversionRateMap(),
     getDefaultLocationId(),
     getStoreMetals(),
     getSupplierOptions(),
+    getNextStockCode(),
   ]);
 
   return (
@@ -44,6 +45,7 @@ export default async function NewStockPage() {
           defaultLocationId={defaultLocationId ?? undefined}
           metals={metals}
           suppliers={suppliers}
+          nextStockCode={nextStockCode}
         />
       </ResetFormWrapper>
 

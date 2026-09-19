@@ -24,9 +24,14 @@ type StockCreateFormProps = {
   defaultLocationId?: string;
   metals: StoreMetalRow[];
   suppliers: { id: string; name: string; phone: string | null }[];
+  /** The next sequential STK-{year}-{0001} code (see getNextStockCode) —
+   * pre-fills Stock Code so a new entry doesn't start with a blank
+   * required field, same "suggested, still editable" convention as
+   * Product's own SKU generation. */
+  nextStockCode?: string;
 };
 
-export function StockCreateForm({ products, locations, caratConversionRates, defaultLocationId, metals, suppliers }: StockCreateFormProps) {
+export function StockCreateForm({ products, locations, caratConversionRates, defaultLocationId, metals, suppliers, nextStockCode }: StockCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
   const formRef = useRef<HTMLFormElement>(null);
@@ -77,6 +82,7 @@ export function StockCreateForm({ products, locations, caratConversionRates, def
         defaultLocationId={defaultLocationId}
         metals={metals}
         suppliers={suppliers}
+        nextStockCode={nextStockCode}
         state={state}
         pending={pending}
         formRef={formRef}

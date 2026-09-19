@@ -138,6 +138,12 @@ type StockFormProps = {
    * own Vendor field. */
   suppliers: { id: string; name: string; phone: string | null }[];
 
+  /** Create-only — the next sequential STK-{year}-{0001} code (see
+   * getNextStockCode), pre-filling Stock Code so it's never a blank
+   * required field on a fresh entry. Still a plain editable text input —
+   * a store owner can always replace it with their own code. */
+  nextStockCode?: string;
+
   state: StockFormState;
 
   pending: boolean;
@@ -164,6 +170,7 @@ export function StockForm({
   caratConversionRates,
   metals,
   suppliers,
+  nextStockCode,
   state,
   pending,
   formRef,
@@ -617,7 +624,7 @@ export function StockForm({
             <Input
               id="stockCode"
               name="stockCode"
-              defaultValue={stock?.stockCode ?? ""}
+              defaultValue={stock?.stockCode ?? nextStockCode ?? ""}
               placeholder="STK-0001"
             />
 
@@ -1029,7 +1036,9 @@ export function StockForm({
               defaultValue={
                 stock?.purchaseDate
                   ? new Date(stock.purchaseDate).toISOString().substring(0, 10)
-                  : ""
+                  : mode === "create"
+                    ? new Date().toISOString().slice(0, 10)
+                    : ""
               }
             />
 

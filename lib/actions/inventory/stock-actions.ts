@@ -437,6 +437,28 @@ export async function getInventoryStockFormProducts() {
   }))
 }
 
+/** The next sequential Stock Code for this store — same STK-{year}-{0001}
+ * numbering and "highest existing wins" convention already used by the
+ * bulk Excel import, so a manually-created entry and an imported one
+ * never collide or diverge. Pre-fills the Add Stock form's own Stock
+ * Code field (still editable — this is a suggestion, not a lock). */
+export async function getNextStockCode(): Promise<string> {
+  const storeId = await requireStoreScope()
+
+  const existingCodes = await prisma.inventoryStock.findMany({
+    where: { storeId, stockCode: { startsWith: "STK-" } },
+    select: { stockCode: true },
+  })
+
+  const highestCode = existingCodes.reduce((max, row) => {
+    const match = /^STK-(?:\d{4}-)?(\d+)$/.exec(row.stockCode)
+    return match ? Math.max(max, Number(match[1])) : max
+  }, 0)
+
+  const year = new Date().getFullYear()
+  return `STK-${year}-${String(highestCode + 1).padStart(4, "0")}`
+}
+
 export async function getInventoryStockById(id: string) {
   // A read, called directly from the client-side Stock master-detail panel
   // (components/inventory/stock/stock-detail-panel.tsx) — see

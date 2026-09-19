@@ -31,8 +31,8 @@ const initialState: SettingsFormState = { success: false, message: "" };
  * Which of the four SKU layouts (see SkuFormat's own schema comment)
  * createProduct arranges Metal/Purity/Style/Category into. Its own small
  * form/action — same "separate widget, separate submit" convention as
- * CaratConversionForm/MetalSellingRateForm — so picking a format doesn't
- * require resubmitting the whole Business Settings form.
+ * CaratConversionForm — so picking a format doesn't require resubmitting
+ * the whole Business Settings form.
  */
 export function SkuFormatForm({
   skuFormat,

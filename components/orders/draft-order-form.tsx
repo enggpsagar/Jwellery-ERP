@@ -83,11 +83,6 @@ type DraftOrderFormProps = {
   metals: StoreMetalRow[]
   locations?: LocationOption[]
   defaultLocationId?: string | null
-  /** Store's configured Metal Selling Rate per purity (Settings > Purity &
-   * Carat) — same source Invoice/Kacha/Quotation prefill from. Falls back to
-   * the metal's own flat Selling Price (Settings > Taxonomy) for a metal with
-   * no purity concept (e.g. Diamond), same two-step chain those forms use. */
-  metalSellingRates?: Partial<Record<PurityType, number>>
 }
 
 /**
@@ -113,7 +108,6 @@ export function DraftOrderForm({
   metals,
   locations = [],
   defaultLocationId = null,
-  metalSellingRates = {},
 }: DraftOrderFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()

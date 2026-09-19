@@ -268,11 +268,6 @@ type InvoiceFormProps = {
    * Conversion Rules), resolved via resolveGramsPerCarat() wherever a
    * Carat Weight is converted to/from grams on this form. */
   caratConversionRates: Record<PurityType, number>
-  /** Store-configured selling price per Gold/Silver/Platinum purity
-   * (Settings > Purity > Metal Selling Rates) — resolved by a line's own
-   * `purity` and consulted before falling back to the linked metal's flat
-   * StoreMetal.sellingPrice when prefilling a stock-linked line's Rate. */
-  metalSellingRates: Partial<Record<PurityType, number>>
   /** The store's configured GST rates (Settings > GST Rates) — picked from
    * a dropdown per invoice, split into SGST+CGST (intra-state) or IGST
    * (inter-state) via computeGst() — see lib/gst.ts. Includes inactive rows
@@ -344,7 +339,6 @@ export function InvoiceForm({
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
-  metalSellingRates,
   gstRates,
   initialGstRateId,
   defaultGstRate = 0,

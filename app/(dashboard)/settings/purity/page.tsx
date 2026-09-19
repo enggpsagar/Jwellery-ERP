@@ -5,13 +5,11 @@ import { redirect } from "next/navigation";
 import {
   getPurityFineness,
   getCaratConversionRates,
-  getMetalSellingRates,
 } from "@/lib/actions/purity-actions";
 import { getCurrentUser } from "@/lib/auth/auth";
 
 import { PuritySettingsForm } from "@/components/settings/purity-settings-form";
 import { CaratConversionForm } from "@/components/settings/carat-conversion-form";
-import { MetalSellingRateForm } from "@/components/settings/metal-selling-rate-form";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { PageBackHeader } from "@/components/shared/page-back-header";
 
@@ -28,10 +26,9 @@ export default async function PuritySettingsPage() {
     currentUser?.role === UserRole.SUPER_ADMIN;
   if (!canEdit) redirect("/dashboard");
 
-  const [rows, caratRows, sellingRateRows] = await Promise.all([
+  const [rows, caratRows] = await Promise.all([
     getPurityFineness(),
     getCaratConversionRates(),
-    getMetalSellingRates(),
   ]);
 
   return (
@@ -48,8 +45,6 @@ export default async function PuritySettingsPage() {
       <PuritySettingsForm rows={rows} canEdit={canEdit} />
 
       <CaratConversionForm rows={caratRows} canEdit={canEdit} />
-
-      <MetalSellingRateForm rows={sellingRateRows} canEdit={canEdit} />
     </main>
   );
 }

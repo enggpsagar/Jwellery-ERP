@@ -197,11 +197,6 @@ type KachaInvoiceFormProps = {
   metals: StoreMetalRow[]
   origins: StoreMetalOriginRow[]
   caratConversionRates: Record<PurityType, number>
-  /** Store-configured selling price per Gold/Silver/Platinum purity
-   * (Settings > Purity > Metal Selling Rates) — resolved by a line's own
-   * `purity` and consulted before falling back to the linked metal's flat
-   * StoreMetal.sellingPrice when prefilling a stock-linked line's Rate. */
-  metalSellingRates: Partial<Record<PurityType, number>>
   /** Store's configured per-piece BIS hallmark charge (Settings > Hallmark
    * Charge) — auto-filled into a line's HM Charge the moment its Purity is
    * set to a Gold/Silver value (isHallmarkablePurity), while hmChargeTouched
@@ -221,7 +216,6 @@ export function KachaInvoiceForm({
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
-  metalSellingRates,
   hallmarkChargePerPiece = 0,
   initialLocationId,
 }: KachaInvoiceFormProps) {

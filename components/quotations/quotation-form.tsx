@@ -192,11 +192,6 @@ type QuotationFormProps = {
   metals: StoreMetalRow[]
   origins: StoreMetalOriginRow[]
   caratConversionRates: Record<PurityType, number>
-  /** Store-configured selling price per Gold/Silver/Platinum purity
-   * (Settings > Purity > Metal Selling Rates) — resolved by a line's own
-   * `purity` and consulted before falling back to the linked metal's flat
-   * StoreMetal.sellingPrice when prefilling a stock-linked line's Rate. */
-  metalSellingRates: Partial<Record<PurityType, number>>
   /** The store's configured GST rates (Settings > GST Rates) — see the
    * same prop on InvoiceForm for the full explanation. */
   gstRates: GstRateRow[]
@@ -225,7 +220,6 @@ export function QuotationForm({
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
-  metalSellingRates,
   gstRates,
   defaultGstRate = 0,
   hallmarkChargePerPiece = 0,

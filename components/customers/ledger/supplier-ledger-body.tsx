@@ -53,6 +53,13 @@ export function SupplierLedgerBody({ customerId, entries }: SupplierLedgerBodyPr
         <Button variant="success" asChild>
           <Link href={`/payments/out?vendorId=${customerId}`}>Pay Out</Link>
         </Button>
+        {/* Money coming back from this supplier (e.g. a purchase return
+            refund) — the inflow counterpart to Pay Out above, same
+            ?customerId= pre-fill convention PaymentInDialog already
+            supports (see customer-ledger-body.tsx's own "Receive Payment"). */}
+        <Button variant="warning" asChild>
+          <Link href={`/payments/in?customerId=${customerId}`}>Payment In</Link>
+        </Button>
       </div>
 
       {entries.length > 0 && (

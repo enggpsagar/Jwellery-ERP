@@ -102,6 +102,16 @@ export function CustomerLedgerBody({
           </Link>
         </Button>
         <CustomerReturnActions customerId={customerId} />
+        {/* This same Customer record can also be a Supplier (the merged
+            Vendor/Party model) — Payment Out here is the money-leaving
+            counterpart to Receive Payment above, reusing the exact same
+            ?vendorId= pre-fill convention PaymentOutDialog already supports
+            (see supplier-ledger-body.tsx's own "Pay Out" button). */}
+        <Button variant="warning" asChild>
+          <Link href={`/payments/out?vendorId=${customerId}`}>
+            Payment Out
+          </Link>
+        </Button>
       </div>
 
       {summary && (

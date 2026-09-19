@@ -586,12 +586,12 @@ export function ProductForm({
 
   // Diamonds and loose Stones are weighed by carat, not gram, but this form
   // only has one Weight field (Net Weight, shared with every other metal) —
-  // so a Diamond/Stone product's Carat Weight converts into it directly
-  // rather than getting a parallel weight of its own. 1 carat = 0.2 g, the
-  // standard used industry-wide.
-  const [caratWeight, setCaratWeight] = useState(
-    product?.defaultCaratWeight ?? "",
-  );
+  // a Diamond/Stone product's own Carat Weight is the exact same physical
+  // quantity as its Net Weight, just in a different unit (Gross Weight's
+  // own g/ct toggle already covers entering it that way), so it's derived
+  // straight from Net Weight at submission time (see submittedCaratWeight
+  // below) rather than kept as a second, separately-synced field. 1 carat
+  // = 0.2 g, the standard used industry-wide.
   const isCaratFamily = metalFamily === "DIAMOND" || metalFamily === "STONE";
 
   // The selected metal's configured Primary Unit (Settings > Taxonomy) —
@@ -633,40 +633,9 @@ export function ProductForm({
   // single toggle.
   const hasStoneComponent = stoneComponents.length > 0;
 
-  function handleCaratWeightChange(value: string) {
-    setCaratWeight(value);
-
-    // A genuinely carat-weighed item with no embedded stone (Diamond/Stone
-    // as the product's own metal, its whole weight) converts Carat Weight
-    // into Net Weight instead. Embedded-stone carat weight now lives on
-    // each stone-component row's own handler (handleStoneCaratWeightChange
-    // below) instead of sharing this one.
-    if (!isCaratFamily) return;
-
-    const caratNum = Number(value);
-    if (value.trim() !== "" && Number.isFinite(caratNum)) {
-      setNetTouched(true);
-      const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
-      setNetWeight(String(Number((caratNum * gramsPerCarat).toFixed(5))));
-    }
-  }
-
   function handleNetWeightChange(value: string) {
     setNetTouched(true);
     setNetWeight(value);
-
-    // Only reverse-syncs into Carat Weight for a genuinely carat-weighed
-    // item — the same isCaratFamily condition the standalone Carat Weight
-    // field itself is shown under.
-    if (!isCaratFamily) return;
-
-    const netNum = Number(value);
-    if (value.trim() !== "" && Number.isFinite(netNum)) {
-      const gramsPerCarat = resolveGramsPerCarat(defaultPurity, caratConversionRates);
-      setCaratWeight(String(Number((netNum / gramsPerCarat).toFixed(5))));
-    } else {
-      setCaratWeight("");
-    }
   }
 
   const gross = Number(grossWeight);
@@ -828,7 +797,14 @@ export function ProductForm({
   const submittedStoneTypeNames = submittedHasStoneComponent
     ? stoneComponents.map((row) => row.stoneTypeNames.join(",")).filter(Boolean).join(",")
     : "";
-  const submittedCaratWeight = productKind === "STONE" ? caratWeight : (primaryStone?.caratWeight ?? "");
+  // Derived straight from Net Weight rather than a separately-entered
+  // field -- see the comment on isCaratFamily above.
+  const netWeightNum = Number(netWeight);
+  const derivedCaratWeight =
+    netWeight.trim() !== "" && Number.isFinite(netWeightNum)
+      ? String(Number((netWeightNum / gramsPerCarat).toFixed(5)))
+      : "";
+  const submittedCaratWeight = productKind === "STONE" ? derivedCaratWeight : (primaryStone?.caratWeight ?? "");
 
   const metalComponentsJson = JSON.stringify(
     productKind === "METAL"
@@ -1612,68 +1588,49 @@ export function ProductForm({
           Net Weight fields above replace this entirely.
       ============================= */}
 
+      {/* No separate Carat Weight field here anymore -- for a genuinely
+          carat-weighed item (a loose Diamond/Stone product, its own entire
+          weight) it was the exact same physical quantity as Gross Weight,
+          which already has its own g/ct unit toggle above. defaultCaratWeight
+          is still derived below (for product-detail-content.tsx's display
+          and any other reader) directly from Net Weight, not from a second
+          manually-entered field. */}
       {productKind === "STONE" && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Carat Weight for a genuinely carat-weighed item (a loose
-              Diamond/Stone product, its own entire weight). */}
-          {isCaratFamily && (
-            <div>
-              <Label htmlFor="defaultCaratWeight">Carat Weight (ct)</Label>
-
-              <Input
-                id="defaultCaratWeight"
-                type="number"
-                step="any"
-                min="0"
-                value={caratWeight}
-                onChange={(event) => handleCaratWeightChange(event.target.value)}
-                placeholder="0.000"
-              />
-
-              <p className="mt-1 text-xs text-muted-foreground">
-                1 ct = 0.2 g. Converts with Net Weight automatically.
-              </p>
-
-              <ErrorText error={state.errors.defaultCaratWeight} />
-            </div>
-          )}
-
-          <div className={isCaratFamily ? "lg:col-start-2" : undefined}>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="defaultNetWeight">Net Weight <RequiredMark /></Label>
-              {!netTouched && derivedNet !== null && (
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                  Auto-filled
-                </span>
-              )}
-            </div>
-
-            <div className="flex gap-1">
-              <Input
-                id="defaultNetWeight"
-                type="number"
-                step="any"
-                min="0"
-                className={!netTouched && derivedNet !== null ? "flex-1 border-emerald-300 bg-emerald-50" : "flex-1"}
-                value={displayWeight(netWeight)}
-                onChange={(event) => handleNetWeightChange(toGramsString(event.target.value))}
-                placeholder="0.000"
-              />
-              <div className="flex h-9 w-16 items-center justify-center rounded-md border bg-muted text-sm text-muted-foreground">
-                {weightUnit === "GRAM" ? "g" : "ct"}
-              </div>
-            </div>
-
-            <p className="mt-1 text-xs text-muted-foreground">
-              {netTouched
-                ? "Manually entered"
-                : derivedNet !== null
-                  ? "Gross − stone — edit to override"
-                  : "Auto-calculated from Gross Weight"}
-            </p>
-
-            <ErrorText error={state.errors.defaultNetWeight} />
+        <div className="max-w-sm">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="defaultNetWeight">Net Weight <RequiredMark /></Label>
+            {!netTouched && derivedNet !== null && (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                Auto-filled
+              </span>
+            )}
           </div>
+
+          <div className="flex gap-1">
+            <Input
+              id="defaultNetWeight"
+              type="number"
+              step="any"
+              min="0"
+              className={!netTouched && derivedNet !== null ? "flex-1 border-emerald-300 bg-emerald-50" : "flex-1"}
+              value={displayWeight(netWeight)}
+              onChange={(event) => handleNetWeightChange(toGramsString(event.target.value))}
+              placeholder="0.000"
+            />
+            <div className="flex h-9 w-16 items-center justify-center rounded-md border bg-muted text-sm text-muted-foreground">
+              {weightUnit === "GRAM" ? "g" : "ct"}
+            </div>
+          </div>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            {netTouched
+              ? "Manually entered"
+              : derivedNet !== null
+                ? "Gross − stone — edit to override"
+                : "Auto-calculated from Gross Weight"}
+          </p>
+
+          <ErrorText error={state.errors.defaultNetWeight} />
         </div>
       )}
 

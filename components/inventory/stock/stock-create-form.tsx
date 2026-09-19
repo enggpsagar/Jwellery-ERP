@@ -23,9 +23,10 @@ type StockCreateFormProps = {
    * saved location is untouched by this. */
   defaultLocationId?: string;
   metals: StoreMetalRow[];
+  suppliers: { id: string; name: string; phone: string | null }[];
 };
 
-export function StockCreateForm({ products, locations, caratConversionRates, defaultLocationId, metals }: StockCreateFormProps) {
+export function StockCreateForm({ products, locations, caratConversionRates, defaultLocationId, metals, suppliers }: StockCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
   const formRef = useRef<HTMLFormElement>(null);
@@ -75,6 +76,7 @@ export function StockCreateForm({ products, locations, caratConversionRates, def
         caratConversionRates={caratConversionRates}
         defaultLocationId={defaultLocationId}
         metals={metals}
+        suppliers={suppliers}
         state={state}
         pending={pending}
         formRef={formRef}

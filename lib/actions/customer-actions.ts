@@ -106,6 +106,25 @@ export async function getCustomerById(id: string): Promise<Customer | null> {
   return getCustomerByIdCore(id, storeId)
 }
 
+/**
+ * Lightweight, unpaginated Supplier picker for a plain dropdown (Stock's
+ * own Vendor Name field) — same isSupplier scoping as the /suppliers list
+ * (getCustomers({ supplierOnly: true })), but that one is paginated for a
+ * table and this needs every active supplier at once, same shape as
+ * getPurchaseFormParties() in purchase-actions.ts.
+ */
+export async function getSupplierOptions(): Promise<
+  { id: string; name: string; phone: string | null }[]
+> {
+  const storeId = await requireStoreScope()
+
+  return prisma.customer.findMany({
+    where: { storeId, isSupplier: true, isActive: true, isArchived: false },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, phone: true },
+  })
+}
+
 async function getAllCustomersForExport(
   params: ExportCustomersParams = {}
 ): Promise<Customer[]> {

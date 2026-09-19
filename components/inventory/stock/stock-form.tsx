@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 
 import { ProductSelect } from "@/components/inventory/shared/product-select";
+import { CustomerSelect } from "@/components/customers/customer-select";
 import { LocationSelect, useShowLocationField } from "@/components/shared/location-select";
 import { RequiredMark } from "@/components/shared/required-mark"
 
@@ -82,10 +83,6 @@ type Stock = {
 
   caratWeight: string | null;
 
-  dmoWeight: string | null;
-
-  wastagePercent: string | null;
-
   purchaseRate: string | null;
 
   saleRate: string | null;
@@ -136,6 +133,11 @@ type StockFormProps = {
    * configured Primary Unit — see the Weight Unit toggle below. */
   metals: StoreMetalRow[];
 
+  /** Active Parties flagged as a Supplier, for the Vendor Name picker
+   * below — same isSupplier scoping as the Suppliers list/Purchases'
+   * own Vendor field. */
+  suppliers: { id: string; name: string; phone: string | null }[];
+
   state: StockFormState;
 
   pending: boolean;
@@ -161,6 +163,7 @@ export function StockForm({
   defaultLocationId,
   caratConversionRates,
   metals,
+  suppliers,
   state,
   pending,
   formRef,
@@ -186,22 +189,26 @@ export function StockForm({
   // calculation (rate x netWeight) — every other Pricing Details field stays
   // an uncontrolled `defaultValue` input, these two are the exception.
   const [purchaseRate, setPurchaseRate] = useState(stock?.purchaseRate ?? "");
+  // Vendor Name stays a free-text column (no schema change) -- the picker
+  // below just suggests names from the actual Supplier list instead of a
+  // blank text box, storing whichever name was picked (or typed via "Add
+  // New") straight into it.
+  const [vendorName, setVendorName] = useState(stock?.vendorName ?? "");
   const [netWeight, setNetWeight] = useState(stock?.netWeight ?? "");
   const [grossWeight, setGrossWeight] = useState(stock?.grossWeight ?? "");
   const [stoneWeight, setStoneWeight] = useState(stock?.stoneWeight ?? "");
   const [lessWeight, setLessWeight] = useState(stock?.lessWeight ?? "");
-  const [dmoWeight, setDmoWeight] = useState(stock?.dmoWeight ?? "");
 
   // Diamond/Stone stock is weighed by carat, not gram — converts into Net
   // Weight directly (same 1 ct = 0.2 g convention as the Product form and
   // every purchase/sale line-item form).
   const [caratWeight, setCaratWeight] = useState(stock?.caratWeight ?? "");
 
-  // Net = gross - less - stone - dust/making/other, the same subtraction a
-  // jeweller does by hand — mirrors the auto-fill on the Product form.
-  // Active on both create and edit (a change to any deduction field
-  // recomputes Net Weight even over an existing saved value); stops only
-  // once Net Weight itself is edited directly in this session.
+  // Net = gross - less - stone, the same subtraction a jeweller does by
+  // hand — mirrors the auto-fill on the Product form. Active on both
+  // create and edit (a change to any deduction field recomputes Net
+  // Weight even over an existing saved value); stops only once Net
+  // Weight itself is edited directly in this session.
   const [netTouched, setNetTouched] = useState(false);
 
   function toNum(value: string) {
@@ -209,9 +216,9 @@ export function StockForm({
     return trimmed === "" ? 0 : Number(trimmed);
   }
 
-  function deriveNet(gross: string, less: string, stone: string, dmo: string) {
+  function deriveNet(gross: string, less: string, stone: string) {
     if (gross.trim() === "" || !Number.isFinite(Number(gross))) return null;
-    const net = toNum(gross) - toNum(less) - toNum(stone) - toNum(dmo);
+    const net = toNum(gross) - toNum(less) - toNum(stone);
     return net >= 0 ? String(Number(net.toFixed(3))) : null;
   }
 
@@ -219,7 +226,7 @@ export function StockForm({
     setWeightsTouched(true);
     setGrossWeight(value);
     if (netTouched) return;
-    const derived = deriveNet(value, lessWeight, stoneWeight, dmoWeight);
+    const derived = deriveNet(value, lessWeight, stoneWeight);
     if (derived !== null) setNetWeight(derived);
   }
 
@@ -227,7 +234,7 @@ export function StockForm({
     setWeightsTouched(true);
     setLessWeight(value);
     if (netTouched) return;
-    const derived = deriveNet(grossWeight, value, stoneWeight, dmoWeight);
+    const derived = deriveNet(grossWeight, value, stoneWeight);
     if (derived !== null) setNetWeight(derived);
   }
 
@@ -235,15 +242,7 @@ export function StockForm({
     setWeightsTouched(true);
     setStoneWeight(value);
     if (netTouched) return;
-    const derived = deriveNet(grossWeight, lessWeight, value, dmoWeight);
-    if (derived !== null) setNetWeight(derived);
-  }
-
-  function editDmoWeight(value: string) {
-    setWeightsTouched(true);
-    setDmoWeight(value);
-    if (netTouched) return;
-    const derived = deriveNet(grossWeight, lessWeight, stoneWeight, value);
+    const derived = deriveNet(grossWeight, lessWeight, value);
     if (derived !== null) setNetWeight(derived);
   }
 
@@ -308,6 +307,31 @@ export function StockForm({
   // showing for entry convenience.
   const primaryUnit = metals.find((m) => m.id === selectedProduct?.metalType?.id)?.primaryUnit ?? "GRAM";
   const gramsPerCarat = resolveGramsPerCarat(selectedProduct?.defaultPurity, caratConversionRates);
+
+  // Picking a Product used to only inherit Metal/Purity/Making/Stone
+  // Charge (copied server-side at submission, never shown here) -- every
+  // weight field stayed blank, forcing a re-type of numbers the product
+  // already has on file. Now pulls the product's own typical Gross/Stone/
+  // Carat/Net Weight in as a starting point. Net Weight is deliberately
+  // left un-"touched" afterward (not marked netTouched) so it keeps
+  // auto-recomputing if this specific piece's Gross/Less/Stone weight
+  // ends up adjusted, same as any other product-defaults case. Guarded so
+  // it only runs once per product pick, never in edit mode (an existing
+  // stock row's own saved weights always win), and never over weights the
+  // user has already started typing.
+  const appliedProductDefaultsRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (mode !== "create" || !selectedProductId || !selectedProduct) return;
+    if (appliedProductDefaultsRef.current === selectedProductId) return;
+    appliedProductDefaultsRef.current = selectedProductId;
+    if (weightsTouched) return;
+
+    if (selectedProduct.defaultGrossWeight) setGrossWeight(selectedProduct.defaultGrossWeight);
+    if (selectedProduct.defaultStoneWeight) setStoneWeight(selectedProduct.defaultStoneWeight);
+    if (isCaratFamily && selectedProduct.defaultCaratWeight) setCaratWeight(selectedProduct.defaultCaratWeight);
+    if (selectedProduct.defaultNetWeight) setNetWeight(selectedProduct.defaultNetWeight);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProductId]);
 
   // One shared toggle for the whole Weight Details section, not one per
   // field — every weight here describes the same physical piece/metal, so
@@ -379,7 +403,6 @@ export function StockForm({
       lessWeight,
       netWeight,
       stoneWeight,
-      dmoWeight,
       caratWeight,
       purchaseRate,
       stockCode: field("stockCode"),
@@ -445,7 +468,6 @@ export function StockForm({
     setLessWeight(str("lessWeight"));
     setNetWeight(str("netWeight"));
     setStoneWeight(str("stoneWeight"));
-    setDmoWeight(str("dmoWeight"));
     setCaratWeight(str("caratWeight"));
     setPurchaseRate(str("purchaseRate"));
 
@@ -807,35 +829,6 @@ export function StockForm({
               <ErrorText error={state.errors.caratWeight} />
             </div>
           )}
-
-          <div>
-            <Label htmlFor="dmoWeight">Dust/Making/Other Wt</Label>
-
-            <input type="hidden" name="dmoWeight" value={submittedWeight(dmoWeight)} />
-            <Input
-              id="dmoWeight"
-              type="number"
-              step="any"
-              value={displayWeight(dmoWeight)}
-              onChange={(event) => editDmoWeight(toGramsString(event.target.value))}
-            />
-
-            <ErrorText error={state.errors.dmoWeight} />
-          </div>
-
-          <div>
-            <Label htmlFor="wastagePercent">Wastage %</Label>
-
-            <Input
-              id="wastagePercent"
-              name="wastagePercent"
-              type="number"
-              step="0.01"
-              defaultValue={stock?.wastagePercent ?? ""}
-            />
-
-            <ErrorText error={state.errors.wastagePercent} />
-          </div>
         </div>
       </div>
       {/* ============================
@@ -932,12 +925,19 @@ export function StockForm({
           <div>
             <Label htmlFor="vendorName">Vendor Name</Label>
 
-            <Input
-              id="vendorName"
-              name="vendorName"
-              defaultValue={stock?.vendorName ?? ""}
-              placeholder="Vendor Name"
+            {/* Suggests names from the actual Supplier list (Parties
+                flagged as a Supplier, same list Purchases' own Vendor
+                field uses) instead of a blank text box -- Vendor Name
+                itself stays free text (no schema change), so picking a
+                supplier here just fills it in with that name. */}
+            <CustomerSelect
+              customers={suppliers}
+              defaultValue={suppliers.find((supplier) => supplier.name === vendorName)?.id}
+              onChange={(_id, supplier) => setVendorName(supplier?.name ?? "")}
+              placeholder="Select or search a supplier"
+              termLabel="supplier"
             />
+            <input type="hidden" name="vendorName" value={vendorName} />
 
             <ErrorText error={state.errors.vendorName} />
           </div>

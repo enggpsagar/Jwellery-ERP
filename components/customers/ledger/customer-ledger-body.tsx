@@ -76,7 +76,7 @@ export function CustomerLedgerBody({
           appears when there's actually an address to send it to. Sale
           jumps straight to a real invoice with this customer already
           selected — no more separate lightweight "just note a sale
-          happened" entry unlinked to any actual invoice. Receive Payment
+          happened" entry unlinked to any actual invoice. Payment In
           mirrors Vendor's own "Pay Now" shortcut (same variant="success",
           same ?customerId= pre-fill convention into /payments/in — see
           payment-in-dialog.tsx's own doc comment) — this used to have no
@@ -98,13 +98,13 @@ export function CustomerLedgerBody({
         </Button>
         <Button variant="success" asChild>
           <Link href={`/payments/in?customerId=${customerId}`}>
-            Receive Payment
+            Payment In
           </Link>
         </Button>
         <CustomerReturnActions customerId={customerId} />
         {/* This same Customer record can also be a Supplier (the merged
             Vendor/Party model) — Payment Out here is the money-leaving
-            counterpart to Receive Payment above, reusing the exact same
+            counterpart to Payment In above, reusing the exact same
             ?vendorId= pre-fill convention PaymentOutDialog already supports
             (see supplier-ledger-body.tsx's own "Pay Out" button). */}
         <Button variant="warning" asChild>

@@ -25,7 +25,7 @@ type SupplierLedgerBodyProps = {
  * The supplier ledger's presentation — mirrors CustomerLedgerBody's own
  * action-bar + summary + collapsible-history shape, but for this same
  * Party's supplier-side activity. "New Purchase" / "Pay Out" are the
- * supplier-side equivalent of that component's "Sale" / "Receive Payment"
+ * supplier-side equivalent of that component's "Sale" / "Payment In"
  * — until these were added, there was no way to start a Purchase or record
  * a Payment Out from a party's own page at all; both had to be started
  * from scratch on /purchases/new or /payments/out and this party re-picked
@@ -56,7 +56,7 @@ export function SupplierLedgerBody({ customerId, entries }: SupplierLedgerBodyPr
         {/* Money coming back from this supplier (e.g. a purchase return
             refund) — the inflow counterpart to Pay Out above, same
             ?customerId= pre-fill convention PaymentInDialog already
-            supports (see customer-ledger-body.tsx's own "Receive Payment"). */}
+            supports (see customer-ledger-body.tsx's own "Payment In"). */}
         <Button variant="warning" asChild>
           <Link href={`/payments/in?customerId=${customerId}`}>Payment In</Link>
         </Button>

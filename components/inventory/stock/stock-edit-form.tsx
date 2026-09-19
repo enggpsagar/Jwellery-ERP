@@ -25,6 +25,7 @@ type StockEditFormProps = {
   locations: any[];
   caratConversionRates: Record<PurityType, number>;
   metals: StoreMetalRow[];
+  suppliers: { id: string; name: string; phone: string | null }[];
 };
 
 
@@ -34,6 +35,7 @@ export function StockEditForm({
   locations,
   caratConversionRates,
   metals,
+  suppliers,
 }: StockEditFormProps) {
 
   const router = useRouter();
@@ -102,6 +104,7 @@ export function StockEditForm({
         locations={locations}
         caratConversionRates={caratConversionRates}
         metals={metals}
+        suppliers={suppliers}
         state={state}
         pending={pending}
       />

@@ -69,7 +69,11 @@ export function KarigarDetailContent({
           because they used to be two separate <div>s. Specialization moved
           to the header's top-right corner (see KarigarDetailPanel/the
           standalone page's own header) instead of taking a card slot here. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* items-start: a CSS grid item defaults to stretching to the tallest
+          card in its row, which visibly bloated the compact metal-balance
+          ribbon cards below to match Metal/Stone's taller checkbox lists.
+          Each card now sizes to its own content instead. */}
+      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {hasOpeningGold && (
             <Card size="sm">
               <CardHeader>
@@ -98,13 +102,15 @@ export function KarigarDetailContent({
           <KarigarStatusCard karigarId={karigar.id} isActive={karigar.isActive} />
         )}
 
-        {/* col-span-2: with Status now living inline next to Edit in the
-            split-panel view (see hideStatusCard above) rather than a grid
-            card of its own, Metal/Stone are the two card types most worth
-            the freed-up room -- a checkbox list reads more comfortably at
-            two columns wide than squeezed into one fifth of the row. */}
+        {/* Single column, not col-span-2 -- that squeezed the metal-balance
+            ribbon cards after it (e.g. "Yellow Gold Balance") down into too
+            little width for their own large tabular-nums figure, which then
+            overflowed the card's edge instead of wrapping. The checkbox
+            list here already wraps safely at one column wide (see
+            ExpandableCheckboxList's own min-w-0/break-words), so it doesn't
+            need the extra room the ribbon cards actually do. */}
         {activeMetalsOnly.length > 0 && (
-          <Card size="sm" className="lg:col-span-2">
+          <Card size="sm">
             <CardHeader>
               <CardTitle className="text-sm text-muted-foreground">Metal</CardTitle>
             </CardHeader>
@@ -118,7 +124,7 @@ export function KarigarDetailContent({
         )}
 
         {activeStonesOnly.length > 0 && (
-          <Card size="sm" className="lg:col-span-2">
+          <Card size="sm">
             <CardHeader>
               <CardTitle className="text-sm text-muted-foreground">Stone</CardTitle>
             </CardHeader>
@@ -147,7 +153,7 @@ export function KarigarDetailContent({
               className="overflow-hidden rounded-xl border bg-card shadow-sm"
             >
               <div
-                className="px-4 py-2 text-xs font-semibold uppercase tracking-wide"
+                className="px-3 py-2 text-[11px] font-semibold uppercase leading-tight"
                 style={{
                   backgroundColor: `color-mix(in oklab, ${accent} 18%, transparent)`,
                   color: accent,
@@ -155,10 +161,10 @@ export function KarigarDetailContent({
               >
                 {group.metalLabel} Balance
               </div>
-              <div className="p-4 pt-3">
+              <div className="p-3 pt-2.5">
                 <p
                   className={cn(
-                    "text-2xl font-bold tabular-nums",
+                    "break-words text-lg font-bold tabular-nums",
                     isOwed ? "text-red-700" : isCredit ? "text-emerald-700" : "text-foreground",
                   )}
                 >

@@ -5,6 +5,31 @@ import { MODULE_DEFINITIONS } from "@/lib/roles";
 
 const KARIGAR_ALLOWED_PREFIXES = ["/my-jobs", "/profile", "/contact-faq"];
 
+/**
+ * Every gate below used to redirect a disallowed request straight to
+ * "/dashboard", a page every role could always reach — a safe assumption
+ * right up until Dashboard itself became a per-Staff-user toggleable module
+ * (see the "dashboard" entry in MODULE_DEFINITIONS). A Staff user with that
+ * module unchecked, blocked from some other page, would otherwise be
+ * bounced to "/dashboard", immediately fail that same module check, and
+ * bounce again — forever. Falls back to "/profile" instead for exactly that
+ * one case; every other role/permission combination still lands on
+ * "/dashboard" exactly as before.
+ */
+function safeFallbackUrl(request: NextRequest, role: string | undefined, permissions: string[]): URL {
+  if (role === "STAFF" && permissions.length > 0) {
+    const dashboardModule = MODULE_DEFINITIONS.find((definition) => definition.key === "dashboard");
+    if (
+      dashboardModule &&
+      !dashboardModule.permissions.every((permission) => permissions.includes(permission))
+    ) {
+      return new URL("/profile", request.url);
+    }
+  }
+
+  return new URL("/dashboard", request.url);
+}
+
 /** Hard cutoff from sign-in, not an idle timeout — see token.loginAt's own
  *  doc comment in lib/auth/auth-options.ts for why this can't just be
  *  NextAuth's session.maxAge on its own. */
@@ -47,6 +72,12 @@ export async function middleware(request: NextRequest) {
   }
 
   const role = token.role as string | undefined;
+  // Read once here and reused by every gate below via safeFallbackUrl, plus
+  // the module-access check further down — a legacy Staff account with no
+  // customization saved has an empty array, which means "full access"
+  // everywhere this is read, mirroring getEffectivePermissions() in
+  // lib/roles.ts.
+  const permissions = (token.permissions as string[] | undefined) ?? [];
 
   // Plan-expiry is deliberately NOT enforced here anymore. It was
   // originally (token.planExpired, redirecting on every request) — removed
@@ -65,7 +96,7 @@ export async function middleware(request: NextRequest) {
   // from a plain page view.
 
   if (pathname.startsWith("/stores") && role !== "SUPER_ADMIN") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(safeFallbackUrl(request, role, permissions));
   }
 
   // Settings (business profile, GST, purity, taxonomy, locations, API keys)
@@ -81,7 +112,7 @@ export async function middleware(request: NextRequest) {
     role !== "ADMIN" &&
     role !== "SUPER_ADMIN"
   ) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(safeFallbackUrl(request, role, permissions));
   }
 
   // The support ticket inbox is platform support, not a per-store feature —
@@ -89,7 +120,7 @@ export async function middleware(request: NextRequest) {
   // one's own (/contact-faq) stays open to every role; only the inbox that
   // sees every ticket across every store is restricted here.
   if (pathname.startsWith("/support-tickets") && role !== "SUPER_ADMIN") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(safeFallbackUrl(request, role, permissions));
   }
 
   // Branding (accent color/background/font/corner style) is store-owner
@@ -100,7 +131,7 @@ export async function middleware(request: NextRequest) {
     role !== "ADMIN" &&
     role !== "SUPER_ADMIN"
   ) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(safeFallbackUrl(request, role, permissions));
   }
 
   if (
@@ -117,15 +148,13 @@ export async function middleware(request: NextRequest) {
   // enforcement point must agree on this fallback or a legacy Staff user
   // would pass hasPermission() checks but get bounced here anyway.
   if (role === "STAFF") {
-    const permissions = (token.permissions as string[] | undefined) ?? [];
-
     if (permissions.length > 0) {
       const module = MODULE_DEFINITIONS.find((definition) =>
         pathname.startsWith(definition.href)
       );
 
       if (module && !module.permissions.every((permission) => permissions.includes(permission))) {
-        return NextResponse.redirect(new URL("/dashboard", request.url));
+        return NextResponse.redirect(safeFallbackUrl(request, role, permissions));
       }
     }
   }

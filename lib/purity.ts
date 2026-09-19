@@ -301,6 +301,47 @@ export function resolveGramsPerCaratFromOrigin(
   return origin?.gramsPerCarat ?? GRAMS_PER_CARAT;
 }
 
+/**
+ * A linked stock item's default line Rate, in priority order:
+ *   1. `saleRate` — this specific piece's own recorded sale price.
+ *   2. The correct real per-Metal Purity or per-Stone-Type configured
+ *      Selling Price (Settings > Taxonomy > Purities / Stone Types) —
+ *      `storeMetalPurityRate` (StoreMetalPurity.sellingPrice) for a normal
+ *      metal, `stoneOriginRate` (StoreMetalOrigin.sellingPrice) for a
+ *      gemstone. A product only ever has one of the two set (mutually
+ *      exclusive by StoreMetal.isGemstone — see Product.storeMetalPurityId/
+ *      stoneOriginOptionId's own schema comments), so nullish-coalescing
+ *      between them picks whichever actually applies without this needing
+ *      to separately check isGemstone.
+ *   3. The metal/stone's own flat legacy Selling Price (StoreMetal.
+ *      sellingPrice, Settings > Taxonomy's Metal/Stone-level field) — kept
+ *      only as a last-resort fallback for a Purity/Stone Type that hasn't
+ *      been individually priced yet, or a product created before the
+ *      storeMetalPurityId/stoneOriginOptionId FKs existed.
+ *   4. 0 — nothing configured anywhere, plain manual entry.
+ *
+ * Replaces the old two-step chain through the legacy global-PurityType
+ * `MetalSellingRate` table (`metalSellingRates[stock.purity]`), which could
+ * never reflect a store's own custom Purity/Stone Type list in the first
+ * place.
+ */
+export function resolveStockSellingRate(
+  stock: {
+    saleRate: number | null | undefined;
+    storeMetalPurityRate?: number | null;
+    stoneOriginRate?: number | null;
+  },
+  metalFlatRate: number | null | undefined,
+): number {
+  return (
+    stock.saleRate ??
+    stock.storeMetalPurityRate ??
+    stock.stoneOriginRate ??
+    metalFlatRate ??
+    0
+  );
+}
+
 /** Purities BIS hallmarking charges actually apply to — Gold and Silver
  * only, never Platinum/Diamond/Other (per BIS's own hallmarking scope).
  * Drives the per-piece BIS hallmark charge auto-fill (Settings' own

@@ -11,7 +11,7 @@ import {
   financialYearLabel,
   type QuickRangeKey,
 } from "@/lib/date-range"
-import { Input } from "@/components/ui/input"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -79,30 +79,13 @@ export function ReportDateFilter({ applies, financialYears }: ReportDateFilterPr
 
       <div className="mx-1 h-6 w-px bg-border" />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          From
-          <Input
-            type="date"
-            className="h-8 w-36"
-            value={from}
-            disabled={!applies}
-            max={to || undefined}
-            onChange={(e) => setRange({ from: e.target.value, to })}
-          />
-        </label>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          To
-          <Input
-            type="date"
-            className="h-8 w-36"
-            value={to}
-            disabled={!applies}
-            min={from || undefined}
-            onChange={(e) => setRange({ from, to: e.target.value })}
-          />
-        </label>
-      </div>
+      <DateRangePicker
+        value={{ from, to }}
+        onChange={(next) => setRange({ from: next.from || undefined, to: next.to || undefined })}
+        placeholder="Custom range"
+        disabled={!applies}
+        className="h-8 w-[190px]"
+      />
 
       {financialYears.length > 0 && (
         <>

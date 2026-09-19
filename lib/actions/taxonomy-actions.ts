@@ -153,16 +153,8 @@ export async function upsertStoreMetal(
             ? WeightUnit.CARAT
             : WeightUnit.GRAM;
 
-    // Blank means "not configured" (null) — never coerced to 0, which would
-    // wrongly read as "this metal sells for free" instead of "no default set".
-    const sellingPriceRaw = String(formData.get("sellingPrice") || "").trim();
-    const sellingPrice = sellingPriceRaw ? Number(sellingPriceRaw) : null;
-
     const errors: Record<string, string[]> = {};
     if (!name) errors.name = ["Name is required"];
-    if (sellingPriceRaw && (!Number.isFinite(sellingPrice) || (sellingPrice ?? 0) < 0)) {
-      errors.sellingPrice = ["Enter a valid selling price"];
-    }
 
     if (Object.keys(errors).length > 0) {
       return { success: false, message: "Please fix the form errors", errors };
@@ -185,9 +177,14 @@ export async function upsertStoreMetal(
     let savedId = id;
 
     if (id) {
+      // Selling Price is no longer editable at the Metal/Stone level (retired
+      // in favor of per-Purity/per-Stone-Type Selling Price) — deliberately
+      // left out of this update so a metal/stone's pre-existing flat rate,
+      // still read as resolveStockSellingRate's (lib/purity.ts) last-resort
+      // fallback, isn't silently wiped out by an unrelated edit.
       const { count } = await prisma.storeMetal.updateMany({
         where: { id, storeId },
-        data: { name, hasPurity, isGemstone, primaryUnit, sellingPrice },
+        data: { name, hasPurity, isGemstone, primaryUnit },
       });
 
       if (count === 0) {
@@ -195,7 +192,7 @@ export async function upsertStoreMetal(
       }
     } else {
       const created = await prisma.storeMetal.create({
-        data: { storeId, name, hasPurity, isGemstone, primaryUnit, sellingPrice },
+        data: { storeId, name, hasPurity, isGemstone, primaryUnit },
         select: { id: true },
       });
       savedId = created.id;

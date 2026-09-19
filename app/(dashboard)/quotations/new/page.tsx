@@ -7,7 +7,7 @@ import {
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getDefaultLocationId, getStoreLocations } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
-import { getCaratConversionRateMap, getMetalSellingRateMap } from "@/lib/actions/purity-actions"
+import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
 
 import { QuotationForm } from "@/components/quotations/quotation-form"
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 }
 
 export default async function NewQuotationPage() {
-  const [customers, stockItems, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, metalSellingRates, gstRates] =
+  const [customers, stockItems, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, gstRates] =
     await Promise.all([
       getQuotationFormCustomers(),
       getQuotationFormStockItems(),
@@ -28,7 +28,6 @@ export default async function NewQuotationPage() {
       getStoreMetals(),
       getAllStoreMetalOrigins(),
       getCaratConversionRateMap(),
-      getMetalSellingRateMap(),
       getGstRates(),
     ])
 
@@ -51,7 +50,6 @@ export default async function NewQuotationPage() {
           metals={metals}
           origins={origins}
           caratConversionRates={caratConversionRates}
-          metalSellingRates={metalSellingRates}
           gstRates={gstRates}
           defaultGstRate={businessSettings.defaultGstRate}
           hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}

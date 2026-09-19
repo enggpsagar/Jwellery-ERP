@@ -31,7 +31,7 @@ import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select"
 import { PaidNowFields } from "@/components/shared/paid-now-fields"
 import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
-import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit, matchLegacyPurityType, resolveLegacyPurityLabel } from "@/lib/purity"
+import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, resolveStockSellingRate, toPrimaryUnit, matchLegacyPurityType, resolveLegacyPurityLabel } from "@/lib/purity"
 import { classifyPurityFamily } from "@/lib/business-units"
 import type { PurityType } from "@prisma/client"
 import {
@@ -68,6 +68,11 @@ type StockOption = {
   stoneMetalTypeName: string | null
   stoneTypeNames: string | null
   saleRate: number | null
+  // See resolveStockSellingRate's own doc comment (lib/purity.ts) — exactly
+  // one of these two is ever non-null for a given product (mutually
+  // exclusive by StoreMetal.isGemstone).
+  storeMetalPurityRate: number | null
+  stoneOriginRate: number | null
   quantity: number
 }
 
@@ -192,11 +197,6 @@ type KachaInvoiceFormProps = {
   metals: StoreMetalRow[]
   origins: StoreMetalOriginRow[]
   caratConversionRates: Record<PurityType, number>
-  /** Store-configured selling price per Gold/Silver/Platinum purity
-   * (Settings > Purity > Metal Selling Rates) — resolved by a line's own
-   * `purity` and consulted before falling back to the linked metal's flat
-   * StoreMetal.sellingPrice when prefilling a stock-linked line's Rate. */
-  metalSellingRates: Partial<Record<PurityType, number>>
   /** Store's configured per-piece BIS hallmark charge (Settings > Hallmark
    * Charge) — auto-filled into a line's HM Charge the moment its Purity is
    * set to a Gold/Silver value (isHallmarkablePurity), while hmChargeTouched
@@ -216,7 +216,6 @@ export function KachaInvoiceForm({
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
-  metalSellingRates,
   hallmarkChargePerPiece = 0,
   initialLocationId,
 }: KachaInvoiceFormProps) {
@@ -483,11 +482,10 @@ export function KachaInvoiceForm({
       netWeightUnit: linkedUnit,
       dmoWeightUnit: linkedUnit,
       stoneWeightUnit: linkedUnit,
-      rate:
-        stock.saleRate ??
-        metalSellingRates[stock.purity as PurityType] ??
-        metalById.get(stock.metalType?.id ?? "")?.sellingPrice ??
-        0,
+      // See resolveStockSellingRate's own doc comment (lib/purity.ts) — the
+      // store's own configured per-Purity/per-Stone-Type Selling Price
+      // (Settings > Taxonomy) now wins over the legacy metal-level fallback.
+      rate: resolveStockSellingRate(stock, metalById.get(stock.metalType?.id ?? "")?.sellingPrice),
       quantity: available > 0 ? 1 : 0,
       caratWeight: stock.caratWeight ?? 0,
       stoneRate:

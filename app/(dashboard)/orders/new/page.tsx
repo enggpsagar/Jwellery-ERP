@@ -4,7 +4,6 @@ import { Suspense } from "react"
 import { getQuotationFormCustomers } from "@/lib/actions/quotation-actions"
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
-import { getMetalSellingRateMap } from "@/lib/actions/purity-actions"
 
 import { DraftOrderForm } from "@/components/orders/draft-order-form"
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
@@ -14,12 +13,11 @@ export const metadata: Metadata = {
 }
 
 export default async function NewDraftOrderPage() {
-  const [customers, metals, locations, defaultLocationId, metalSellingRates] = await Promise.all([
+  const [customers, metals, locations, defaultLocationId] = await Promise.all([
     getQuotationFormCustomers(),
     getStoreMetals(),
     getStoreLocations(),
     getDefaultLocationId(),
-    getMetalSellingRateMap(),
   ])
 
   return (
@@ -42,7 +40,6 @@ export default async function NewDraftOrderPage() {
             metals={metals}
             locations={locations}
             defaultLocationId={defaultLocationId}
-            metalSellingRates={metalSellingRates}
           />
         </Suspense>
       </ResetFormWrapper>

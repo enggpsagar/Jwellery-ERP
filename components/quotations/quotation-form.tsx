@@ -28,7 +28,7 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
-import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit, matchLegacyPurityType, resolveLegacyPurityLabel } from "@/lib/purity"
+import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, resolveStockSellingRate, toPrimaryUnit, matchLegacyPurityType, resolveLegacyPurityLabel } from "@/lib/purity"
 import { classifyPurityFamily } from "@/lib/business-units"
 import { RequiredMark } from "@/components/shared/required-mark"
 import {
@@ -67,6 +67,11 @@ type StockOption = {
   stoneMetalTypeName: string | null
   stoneTypeNames: string | null
   saleRate: number | null
+  // See resolveStockSellingRate's own doc comment (lib/purity.ts) — exactly
+  // one of these two is ever non-null for a given product (mutually
+  // exclusive by StoreMetal.isGemstone).
+  storeMetalPurityRate: number | null
+  stoneOriginRate: number | null
 }
 
 type LineItem = {
@@ -187,11 +192,6 @@ type QuotationFormProps = {
   metals: StoreMetalRow[]
   origins: StoreMetalOriginRow[]
   caratConversionRates: Record<PurityType, number>
-  /** Store-configured selling price per Gold/Silver/Platinum purity
-   * (Settings > Purity > Metal Selling Rates) — resolved by a line's own
-   * `purity` and consulted before falling back to the linked metal's flat
-   * StoreMetal.sellingPrice when prefilling a stock-linked line's Rate. */
-  metalSellingRates: Partial<Record<PurityType, number>>
   /** The store's configured GST rates (Settings > GST Rates) — see the
    * same prop on InvoiceForm for the full explanation. */
   gstRates: GstRateRow[]
@@ -220,7 +220,6 @@ export function QuotationForm({
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
-  metalSellingRates,
   gstRates,
   defaultGstRate = 0,
   hallmarkChargePerPiece = 0,
@@ -500,11 +499,10 @@ export function QuotationForm({
       netWeight: stock.netWeight ?? 0,
       netWeightUnit: linkedUnit,
       stoneWeightUnit: linkedUnit,
-      rate:
-        stock.saleRate ??
-        metalSellingRates[stock.purity as PurityType] ??
-        metalById.get(stock.metalType?.id ?? "")?.sellingPrice ??
-        0,
+      // See resolveStockSellingRate's own doc comment (lib/purity.ts) — the
+      // store's own configured per-Purity/per-Stone-Type Selling Price
+      // (Settings > Taxonomy) now wins over the legacy metal-level fallback.
+      rate: resolveStockSellingRate(stock, metalById.get(stock.metalType?.id ?? "")?.sellingPrice),
       caratWeight: stock.caratWeight ?? 0,
       stoneRate:
         stock.stoneRate ??

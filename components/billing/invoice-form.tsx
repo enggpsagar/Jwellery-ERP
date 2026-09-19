@@ -36,7 +36,7 @@ import { RequiredMark } from "@/components/shared/required-mark"
 import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select"
 import { PaidNowFields } from "@/components/shared/paid-now-fields"
 import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
-import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit, matchLegacyPurityType, resolveLegacyPurityLabel } from "@/lib/purity"
+import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, resolveStockSellingRate, toPrimaryUnit, matchLegacyPurityType, resolveLegacyPurityLabel } from "@/lib/purity"
 import { classifyPurityFamily } from "@/lib/business-units"
 import {
   getStoreMetalPurities,
@@ -76,6 +76,12 @@ type StockOption = {
   stoneMetalTypeName: string | null
   stoneTypeNames: string | null
   saleRate: number | null
+  // The real per-Metal Purity / per-Stone-Type configured Selling Price
+  // this piece's product is actually linked to — see resolveStockSellingRate
+  // (lib/purity.ts). Exactly one of these two is ever non-null for a given
+  // product (mutually exclusive by StoreMetal.isGemstone).
+  storeMetalPurityRate: number | null
+  stoneOriginRate: number | null
   makingCharge: number | null
   makingChargeType: "FIXED" | "PERCENTAGE"
   quantity: number
@@ -262,11 +268,6 @@ type InvoiceFormProps = {
    * Conversion Rules), resolved via resolveGramsPerCarat() wherever a
    * Carat Weight is converted to/from grams on this form. */
   caratConversionRates: Record<PurityType, number>
-  /** Store-configured selling price per Gold/Silver/Platinum purity
-   * (Settings > Purity > Metal Selling Rates) — resolved by a line's own
-   * `purity` and consulted before falling back to the linked metal's flat
-   * StoreMetal.sellingPrice when prefilling a stock-linked line's Rate. */
-  metalSellingRates: Partial<Record<PurityType, number>>
   /** The store's configured GST rates (Settings > GST Rates) — picked from
    * a dropdown per invoice, split into SGST+CGST (intra-state) or IGST
    * (inter-state) via computeGst() — see lib/gst.ts. Includes inactive rows
@@ -338,7 +339,6 @@ export function InvoiceForm({
   metals: initialMetals,
   origins: initialOrigins,
   caratConversionRates,
-  metalSellingRates,
   gstRates,
   initialGstRateId,
   defaultGstRate = 0,
@@ -575,16 +575,13 @@ export function InvoiceForm({
       stoneWeightInput: stock.stoneWeight ?? 0,
       stoneWeightUnit: linkedUnit,
       // A specific piece's own recorded sale rate wins when it has one;
-      // otherwise the store's configured per-purity Selling Price (Settings
-      // > Purity > Metal Selling Rates), then the metal's flat default
-      // Selling Price (Settings > Taxonomy) so the field isn't just
-      // silently 0 — still fully editable either way, and plain manual
-      // entry when none of these are set.
-      rate:
-        stock.saleRate ??
-        metalSellingRates[stock.purity as PurityType] ??
-        metalById.get(stock.metalType?.id ?? "")?.sellingPrice ??
-        0,
+      // otherwise the store's own configured per-Purity/per-Stone-Type
+      // Selling Price (Settings > Taxonomy > Purities / Stone Types), then
+      // the metal's flat legacy Selling Price (Settings > Taxonomy) so the
+      // field isn't just silently 0 — still fully editable either way, and
+      // plain manual entry when none of these are set. See
+      // resolveStockSellingRate (lib/purity.ts).
+      rate: resolveStockSellingRate(stock, metalById.get(stock.metalType?.id ?? "")?.sellingPrice),
       hsnCode: stock.hsnCode ?? "",
       caratWeight: stock.caratWeight ?? 0,
       stoneRate:
@@ -729,11 +726,8 @@ export function InvoiceForm({
           dmoWeightUnit: linkedUnit,
           stoneWeightInput: stock.stoneWeight ?? 0,
           stoneWeightUnit: linkedUnit,
-          rate:
-            stock.saleRate ??
-            metalSellingRates[stock.purity as PurityType] ??
-            metalById.get(stock.metalType?.id ?? "")?.sellingPrice ??
-            0,
+          // See applyStockToItem's identical comment above.
+          rate: resolveStockSellingRate(stock, metalById.get(stock.metalType?.id ?? "")?.sellingPrice),
           hsnCode: stock.hsnCode ?? "",
           caratWeight: stock.caratWeight ?? 0,
           stoneRate:

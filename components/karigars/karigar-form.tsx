@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { avatarColor, initialsOf } from "@/lib/avatar-color"
 import { Loader } from "@/components/ui/loader"
 import type { Karigar } from "@/lib/actions/karigar-actions"
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions"
@@ -196,13 +197,35 @@ export function KarigarForm({
 
       <input type="hidden" name="imageUrl" value={imageUrl} />
 
+      {/* No border of its own -- the form as a whole already sits in one
+          box (see KarigarCreateForm/KarigarEditForm), so a second, nested
+          box just around the photo looked like two stacked containers. A
+          bigger, centered avatar still reads better than a small one
+          left-aligned in a bare row. Click/hover the avatar itself to
+          upload, same treatment as the Add/Edit User form. */}
       <div className="flex flex-col items-center gap-3">
-        <Avatar className="h-24 w-24 border-4 shadow-sm">
-          <AvatarImage src={imageUrl || ""} />
-          <AvatarFallback className="text-2xl">
-            {karigar?.name ? karigar.name.charAt(0).toUpperCase() : "A"}
-          </AvatarFallback>
-        </Avatar>
+        <button
+          type="button"
+          className="group relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          disabled={uploadingPhoto}
+          onClick={() => photoInputRef.current?.click()}
+          title="Upload photo"
+        >
+          <Avatar className="h-24 w-24 border-2 shadow-sm">
+            <AvatarImage src={imageUrl || ""} />
+            <AvatarFallback className="text-2xl" style={avatarColor(karigar?.name).style}>
+              {initialsOf(karigar?.name)}
+            </AvatarFallback>
+          </Avatar>
+
+          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+            {uploadingPhoto ? (
+              <Loader className="h-5 w-5 text-white" />
+            ) : (
+              <Camera className="h-5 w-5 text-white" />
+            )}
+          </span>
+        </button>
 
         <input
           ref={photoInputRef}
@@ -211,21 +234,6 @@ export function KarigarForm({
           accept="image/*"
           onChange={handlePhotoUpload}
         />
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={uploadingPhoto}
-          onClick={() => photoInputRef.current?.click()}
-        >
-          {uploadingPhoto ? (
-            <Loader className="mr-2 h-4 w-4" />
-          ) : (
-            <Camera className="mr-2 h-4 w-4" />
-          )}
-          {uploadingPhoto ? "Uploading..." : "Upload Photo"}
-        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

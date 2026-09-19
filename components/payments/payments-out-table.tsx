@@ -17,8 +17,20 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { DateRangePicker, type DateRangeValue } from "@/components/ui/date-range-picker"
 import { PaymentOutDetailPanel } from "@/components/payments/payment-out-detail-panel"
 import { cn } from "@/lib/utils"
+
+/** "YYYY-MM-DD" range bound -> epoch ms, at the start or end of that local
+ * calendar day, so a range filter is inclusive of both endpoints. */
+function dateRangeBound(value: string, endOfDay: boolean): number | null {
+  if (!value) return null
+  const [y, m, d] = value.split("-").map(Number)
+  if (!y || !m || !d) return null
+  return endOfDay
+    ? new Date(y, m - 1, d, 23, 59, 59, 999).getTime()
+    : new Date(y, m - 1, d, 0, 0, 0, 0).getTime()
+}
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CASH: "Cash",
@@ -41,6 +53,7 @@ export function PaymentsOutTable({
   rows: PaymentOutRow[]
 }) {
   const [search, setSearch] = useState("")
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ from: "", to: "" })
   const [page, setPage] = useState(1)
   // Defaults to the first row on load so the panel is never empty —
   // matching CustomersClient/PurchasesClient/InvoicesClient.
@@ -55,13 +68,21 @@ export function PaymentsOutTable({
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return rows
-    return rows.filter((row) =>
-      `${row.partyName} ${row.purchaseNumber ?? ""} ${row.description}`
-        .toLowerCase()
-        .includes(query),
-    )
-  }, [rows, search])
+    const fromTime = dateRangeBound(dateRange.from, false)
+    const toTime = dateRangeBound(dateRange.to, true)
+    return rows.filter((row) => {
+      if (query) {
+        const haystack = `${row.partyName} ${row.purchaseNumber ?? ""} ${row.description}`.toLowerCase()
+        if (!haystack.includes(query)) return false
+      }
+      if (fromTime != null || toTime != null) {
+        const rowTime = new Date(row.dateISO).getTime()
+        if (fromTime != null && rowTime < fromTime) return false
+        if (toTime != null && rowTime > toTime) return false
+      }
+      return true
+    })
+  }, [rows, search, dateRange])
 
   const total = filtered.reduce((sum, row) => sum + row.amount, 0)
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
@@ -94,7 +115,7 @@ export function PaymentsOutTable({
       </div>
 
       <Card>
-        <CardHeader className="gap-3">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative sm:max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -107,6 +128,16 @@ export function PaymentsOutTable({
               className="h-9 pl-9"
             />
           </div>
+
+          <DateRangePicker
+            value={dateRange}
+            onChange={(value) => {
+              setDateRange(value)
+              setPage(1)
+            }}
+            placeholder="Date range"
+            className="w-[220px]"
+          />
         </CardHeader>
 
         <CardContent className="p-0">

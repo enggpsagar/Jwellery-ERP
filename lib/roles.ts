@@ -111,11 +111,14 @@ export const ROLE_BADGE_CLASSES: Record<UserRole, string> = {
 };
 
 /**
- * The 6 workspace sections an Admin can toggle on/off per Staff user.
- * Dashboard always stays visible; Users/Settings/Stores stay role-gated
- * (Admin/Super Admin only) rather than per-user customizable.
+ * The workspace sections an Admin can toggle on/off per Staff user.
+ * Dashboard is included (see the "dashboard" entry below) so an Admin can
+ * choose to hide it for a given Staff user same as any other module;
+ * Users/Settings/Stores stay role-gated (Admin/Super Admin only) rather
+ * than per-user customizable.
  */
 export type ModuleKey =
+  | "dashboard"
   | "customers"
   | "vendors"
   | "inventory"
@@ -132,6 +135,12 @@ export const MODULE_DEFINITIONS: {
   href: string;
   permissions: string[];
 }[] = [
+  {
+    key: "dashboard",
+    label: "Dashboard",
+    href: "/dashboard",
+    permissions: [PERMISSIONS.DASHBOARD_VIEW],
+  },
   {
     key: "customers",
     label: "Parties",

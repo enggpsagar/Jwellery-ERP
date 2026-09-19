@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { UserRole } from "@prisma/client"
-import { Camera } from "lucide-react"
+import { Camera, Trash2 } from "lucide-react"
 
 import {
   createUserAction,
@@ -12,6 +12,7 @@ import {
 } from "@/app/(dashboard)/users/actions"
 
 import { ROLE_LABELS, MODULE_DEFINITIONS, type ModuleKey } from "@/lib/roles"
+import { avatarColor, initialsOf } from "@/lib/avatar-color"
 
 import { useToast } from "@/components/providers/toast-provider"
 
@@ -333,13 +334,36 @@ export function UserFormDialog({
       <form onSubmit={handleSubmit} className="space-y-6">
       <input type="hidden" name="image" value={imageUrl} />
 
+      {/* No border of its own -- the form as a whole already sits in one
+          box (the asPage Card below, or the Dialog surface), so a second,
+          nested box just around the photo looked like two stacked
+          containers. A bigger, centered avatar still reads better than a
+          small one left-aligned in a bare row. Click/hover the avatar
+          itself to upload; Remove stays an explicit button since it isn't
+          something hovering the avatar should also mean. */}
       <div className="flex flex-col items-center gap-3">
-        <Avatar className="h-24 w-24 border-4 shadow-sm">
-          <AvatarImage src={imageUrl || ""} />
-          <AvatarFallback className="text-2xl">
-            {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
-          </AvatarFallback>
-        </Avatar>
+        <button
+          type="button"
+          className="group relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          disabled={uploadingPhoto}
+          onClick={() => photoInputRef.current?.click()}
+          title="Upload photo"
+        >
+          <Avatar className="h-24 w-24 border-2 shadow-sm">
+            <AvatarImage src={imageUrl || ""} />
+            <AvatarFallback className="text-2xl" style={avatarColor(user?.name).style}>
+              {initialsOf(user?.name)}
+            </AvatarFallback>
+          </Avatar>
+
+          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+            {uploadingPhoto ? (
+              <Loader className="h-5 w-5 text-white" />
+            ) : (
+              <Camera className="h-5 w-5 text-white" />
+            )}
+          </span>
+        </button>
 
         <input
           ref={photoInputRef}
@@ -349,20 +373,18 @@ export function UserFormDialog({
           onChange={handlePhotoUpload}
         />
 
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={uploadingPhoto}
-          onClick={() => photoInputRef.current?.click()}
-        >
-          {uploadingPhoto ? (
-            <Loader className="mr-2 h-4 w-4" />
-          ) : (
-            <Camera className="mr-2 h-4 w-4" />
-          )}
-          {uploadingPhoto ? "Uploading..." : "Upload Photo"}
-        </Button>
+        {imageUrl && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={uploadingPhoto}
+            onClick={() => setImageUrl("")}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Remove
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">

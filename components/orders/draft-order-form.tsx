@@ -403,12 +403,16 @@ export function DraftOrderForm({
                         const metal = metals.find((m) => m.id === value)
                         if (metal?.isGemstone) ensureStoneTypes(value)
                         else if (metal?.hasPurity) ensureMetalPurities(value)
-                        // A metal with no purity concept (e.g. a gemstone)
-                        // has nothing for the Purity select below to fire
-                        // its own auto-fill on, so prefill from the metal's
-                        // flat Selling Price right here instead.
+                        // A metal with no purity concept and no Stone Types
+                        // either (hasPurity=false, isGemstone=false) has
+                        // nothing else to fire an auto-fill on, so prefill
+                        // from the metal's flat Selling Price right here.
+                        // A gemstone instead waits for its own Stone Type
+                        // pick below (StoreMetalOrigin.sellingPrice) —
+                        // same "wait for the sub-level pick" pattern the
+                        // Purity select already uses for a regular metal.
                         const autoRate =
-                          !item.rateTouched && metal && !metal.hasPurity
+                          !item.rateTouched && metal && !metal.hasPurity && !metal.isGemstone
                             ? metal.sellingPrice ?? null
                             : undefined
                         updateItem(item.key, {
@@ -440,9 +444,21 @@ export function DraftOrderForm({
                       <Label>Stone Type</Label>
                       <Select
                         value={item.stoneTypeName ?? "__none__"}
-                        onValueChange={(value) =>
-                          updateItem(item.key, { stoneTypeName: value === "__none__" ? null : value })
-                        }
+                        onValueChange={(value) => {
+                          const options = stoneTypesCache[item.metalTypeId ?? ""] ?? []
+                          const selected = value === "__none__" ? undefined : options.find((option) => option.name === value)
+                          updateItem(item.key, {
+                            stoneTypeName: value === "__none__" ? null : value,
+                            // Store's configured per-Stone-Type Selling
+                            // Price, falling back to the metal's own flat
+                            // Selling Price — same chain the Purity select
+                            // uses below. Skipped once the user has
+                            // hand-edited the rate.
+                            ...(!item.rateTouched
+                              ? { estimatedRate: selected?.sellingPrice ?? selectedMetal?.sellingPrice ?? null }
+                              : {}),
+                          })
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select Stone Type" />

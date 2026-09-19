@@ -503,7 +503,18 @@ export async function getQuotationFormStockItems() {
     where: { storeId, status: InventoryStockStatus.IN_STOCK, quantity: { gt: 0 } },
     orderBy: { stockCode: "asc" },
     include: {
-      product: { select: { name: true, productCode: true } },
+      product: {
+        select: {
+          name: true,
+          productCode: true,
+          // See getInvoiceFormStockItems's identical comment
+          // (invoice-actions.ts) / resolveStockSellingRate (lib/purity.ts).
+          storeMetalPurityId: true,
+          storeMetalPurity: { select: { sellingPrice: true } },
+          stoneOriginOptionId: true,
+          stoneOriginOption: { select: { sellingPrice: true } },
+        },
+      },
       metalType: { select: { id: true, name: true } },
     },
   });
@@ -523,6 +534,14 @@ export async function getQuotationFormStockItems() {
     stoneMetalTypeName: stock.stoneMetalTypeName ?? null,
     stoneTypeNames: stock.stoneTypeNames ?? null,
     saleRate: stock.saleRate ? Number(stock.saleRate) : null,
+    storeMetalPurityRate:
+      stock.product.storeMetalPurity?.sellingPrice != null
+        ? Number(stock.product.storeMetalPurity.sellingPrice)
+        : null,
+    stoneOriginRate:
+      stock.product.stoneOriginOption?.sellingPrice != null
+        ? Number(stock.product.stoneOriginOption.sellingPrice)
+        : null,
   }));
 }
 

@@ -28,7 +28,7 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
-import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, toPrimaryUnit, matchLegacyPurityType } from "@/lib/purity"
+import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, resolveStockSellingRate, toPrimaryUnit, matchLegacyPurityType } from "@/lib/purity"
 import { classifyPurityFamily } from "@/lib/business-units"
 import { RequiredMark } from "@/components/shared/required-mark"
 import {
@@ -67,6 +67,11 @@ type StockOption = {
   stoneMetalTypeName: string | null
   stoneTypeNames: string | null
   saleRate: number | null
+  // See resolveStockSellingRate's own doc comment (lib/purity.ts) — exactly
+  // one of these two is ever non-null for a given product (mutually
+  // exclusive by StoreMetal.isGemstone).
+  storeMetalPurityRate: number | null
+  stoneOriginRate: number | null
 }
 
 type LineItem = {
@@ -488,11 +493,10 @@ export function QuotationForm({
       netWeight: stock.netWeight ?? 0,
       netWeightUnit: linkedUnit,
       stoneWeightUnit: linkedUnit,
-      rate:
-        stock.saleRate ??
-        metalSellingRates[stock.purity as PurityType] ??
-        metalById.get(stock.metalType?.id ?? "")?.sellingPrice ??
-        0,
+      // See resolveStockSellingRate's own doc comment (lib/purity.ts) — the
+      // store's own configured per-Purity/per-Stone-Type Selling Price
+      // (Settings > Taxonomy) now wins over the legacy metal-level fallback.
+      rate: resolveStockSellingRate(stock, metalById.get(stock.metalType?.id ?? "")?.sellingPrice),
       caratWeight: stock.caratWeight ?? 0,
       stoneRate:
         stock.stoneRate ??

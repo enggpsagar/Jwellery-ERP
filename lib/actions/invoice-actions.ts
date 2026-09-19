@@ -806,7 +806,22 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
     where: { storeId, status: InventoryStockStatus.IN_STOCK, quantity: { gt: 0 } },
     orderBy: { stockCode: "asc" },
     include: {
-      product: { select: { name: true, hsnCode: true, productCode: true } },
+      product: {
+        select: {
+          name: true,
+          hsnCode: true,
+          productCode: true,
+          // The real per-Metal Purity / per-Stone-Type configured Selling
+          // Price this piece's product is actually linked to — the new
+          // source of truth for the Rate auto-fill below, replacing the
+          // legacy global-PurityType MetalSellingRate lookup. See
+          // resolveStockSellingRate (lib/purity.ts).
+          storeMetalPurityId: true,
+          storeMetalPurity: { select: { sellingPrice: true } },
+          stoneOriginOptionId: true,
+          stoneOriginOption: { select: { sellingPrice: true } },
+        },
+      },
       metalType: { select: { id: true, name: true } },
     },
   });
@@ -830,6 +845,17 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
     stoneMetalTypeName: stock.stoneMetalTypeName ?? null,
     stoneTypeNames: stock.stoneTypeNames ?? null,
     saleRate: stock.saleRate ? Number(stock.saleRate) : null,
+    // See resolveStockSellingRate's own doc comment — exactly one of these
+    // two is ever non-null for a given product (mutually exclusive by
+    // StoreMetal.isGemstone).
+    storeMetalPurityRate:
+      stock.product.storeMetalPurity?.sellingPrice != null
+        ? Number(stock.product.storeMetalPurity.sellingPrice)
+        : null,
+    stoneOriginRate:
+      stock.product.stoneOriginOption?.sellingPrice != null
+        ? Number(stock.product.stoneOriginOption.sellingPrice)
+        : null,
     // Recorded at stock-creation time (Add Stock's own Making Charge
     // field) but never carried into the Sale form until now — a piece's
     // line item always started at 0/FIXED regardless of what was set
@@ -866,7 +892,17 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
     const stock = await prisma.inventoryStock.findFirst({
       where: { id: stockId, storeId },
       include: {
-        product: { select: { name: true, hsnCode: true, productCode: true } },
+        product: {
+          select: {
+            name: true,
+            hsnCode: true,
+            productCode: true,
+            storeMetalPurityId: true,
+            storeMetalPurity: { select: { sellingPrice: true } },
+            stoneOriginOptionId: true,
+            stoneOriginOption: { select: { sellingPrice: true } },
+          },
+        },
         metalType: { select: { id: true, name: true } },
       },
     });
@@ -888,6 +924,14 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       stoneMetalTypeName: stock.stoneMetalTypeName ?? null,
       stoneTypeNames: stock.stoneTypeNames ?? null,
       saleRate: stock.saleRate ? Number(stock.saleRate) : null,
+      storeMetalPurityRate:
+        stock.product.storeMetalPurity?.sellingPrice != null
+          ? Number(stock.product.storeMetalPurity.sellingPrice)
+          : null,
+      stoneOriginRate:
+        stock.product.stoneOriginOption?.sellingPrice != null
+          ? Number(stock.product.stoneOriginOption.sellingPrice)
+          : null,
       makingCharge: stock.makingCharge ? Number(stock.makingCharge) : null,
       makingChargeType: stock.makingChargeType,
       quantity: stock.quantity + claimed,

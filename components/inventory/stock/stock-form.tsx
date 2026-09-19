@@ -185,10 +185,18 @@ export function StockForm({
     stock?.finish ?? InventoryFinish.KACHA,
   );
 
-  // Controlled so `MakingChargeInput` can react to them live for its %
-  // calculation (rate x netWeight) — every other Pricing Details field stays
-  // an uncontrolled `defaultValue` input, these two are the exception.
+  // Controlled so Purchase/Sale Amount can auto-calculate from them live.
   const [purchaseRate, setPurchaseRate] = useState(stock?.purchaseRate ?? "");
+  const [saleRate, setSaleRate] = useState(stock?.saleRate ?? "");
+  const [otherCharge, setOtherCharge] = useState(stock?.otherCharge ?? "");
+  const [purchaseAmount, setPurchaseAmount] = useState(stock?.purchaseAmount ?? "");
+  const [saleAmount, setSaleAmount] = useState(stock?.saleAmount ?? "");
+  // Locks the auto-calc the moment the amount itself is hand-edited — same
+  // one-way "touched" convention as netTouched/weightsTouched below. Starts
+  // locked on an existing saved row so opening it for edit never silently
+  // recomputes a figure that came off a real bill.
+  const [purchaseAmountTouched, setPurchaseAmountTouched] = useState(Boolean(stock?.id));
+  const [saleAmountTouched, setSaleAmountTouched] = useState(Boolean(stock?.id));
   // Vendor Name stays a free-text column (no schema change) -- the picker
   // below just suggests names from the actual Supplier list instead of a
   // blank text box, storing whichever name was picked (or typed via "Add
@@ -308,6 +316,37 @@ export function StockForm({
   const primaryUnit = metals.find((m) => m.id === selectedProduct?.metalType?.id)?.primaryUnit ?? "GRAM";
   const gramsPerCarat = resolveGramsPerCarat(selectedProduct?.defaultPurity, caratConversionRates);
 
+  // The quantity Purchase/Sale Rate is actually priced against — carat for
+  // a Diamond/Stone piece (rate per carat), net weight (grams) otherwise,
+  // same convention invoice-form.tsx's lineQuantity uses.
+  const pricedWeight = isCaratFamily ? toNum(caratWeight) : toNum(netWeight);
+
+  // Purchase Amount = Purchase Rate × priced weight + Other Charge. Follows
+  // live while untouched, same one-way lock as Net Weight's own auto-fill —
+  // stops the moment Purchase Amount itself is hand-edited.
+  useEffect(() => {
+    if (purchaseAmountTouched) return;
+    if (purchaseRate.trim() === "" && otherCharge.trim() === "") {
+      setPurchaseAmount("");
+      return;
+    }
+    const amount = toNum(purchaseRate) * pricedWeight + toNum(otherCharge);
+    setPurchaseAmount(String(Number(amount.toFixed(2))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [purchaseRate, otherCharge, pricedWeight, purchaseAmountTouched]);
+
+  // Sale Amount = Sale Rate × priced weight. Same auto-fill/lock convention.
+  useEffect(() => {
+    if (saleAmountTouched) return;
+    if (saleRate.trim() === "") {
+      setSaleAmount("");
+      return;
+    }
+    const amount = toNum(saleRate) * pricedWeight;
+    setSaleAmount(String(Number(amount.toFixed(2))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saleRate, pricedWeight, saleAmountTouched]);
+
   // Picking a Product used to only inherit Metal/Purity/Making/Stone
   // Charge (copied server-side at submission, never shown here) -- every
   // weight field stayed blank, forcing a re-type of numbers the product
@@ -405,13 +444,15 @@ export function StockForm({
       stoneWeight,
       caratWeight,
       purchaseRate,
+      saleRate,
+      otherCharge,
+      purchaseAmount,
+      saleAmount,
+      purchaseAmountTouched,
+      saleAmountTouched,
       stockCode: field("stockCode"),
       tagNumber: field("tagNumber"),
       quantity: field("quantity"),
-      saleRate: field("saleRate"),
-      otherCharge: field("otherCharge"),
-      purchaseAmount: field("purchaseAmount"),
-      saleAmount: field("saleAmount"),
       vendorName: field("vendorName"),
       purchaseDate: field("purchaseDate"),
       manufactureDate: field("manufactureDate"),
@@ -470,6 +511,12 @@ export function StockForm({
     setStoneWeight(str("stoneWeight"));
     setCaratWeight(str("caratWeight"));
     setPurchaseRate(str("purchaseRate"));
+    setSaleRate(str("saleRate"));
+    setOtherCharge(str("otherCharge"));
+    setPurchaseAmountTouched(bool("purchaseAmountTouched"));
+    setSaleAmountTouched(bool("saleAmountTouched"));
+    setPurchaseAmount(str("purchaseAmount"));
+    setSaleAmount(str("saleAmount"));
 
     if (formRef?.current) {
       const restoreField = (name: string, value: string) => {
@@ -482,10 +529,6 @@ export function StockForm({
       restoreField("stockCode", str("stockCode"));
       restoreField("tagNumber", str("tagNumber"));
       restoreField("quantity", str("quantity"));
-      restoreField("saleRate", str("saleRate"));
-      restoreField("otherCharge", str("otherCharge"));
-      restoreField("purchaseAmount", str("purchaseAmount"));
-      restoreField("saleAmount", str("saleAmount"));
       restoreField("vendorName", str("vendorName"));
       restoreField("purchaseDate", str("purchaseDate"));
       restoreField("manufactureDate", str("manufactureDate"));
@@ -862,7 +905,8 @@ export function StockForm({
               name="saleRate"
               type="number"
               step="0.01"
-              defaultValue={stock?.saleRate ?? ""}
+              value={saleRate}
+              onChange={(event) => setSaleRate(event.target.value)}
             />
 
             <ErrorText error={state.errors.saleRate} />
@@ -879,36 +923,69 @@ export function StockForm({
               name="otherCharge"
               type="number"
               step="0.01"
-              defaultValue={stock?.otherCharge ?? ""}
+              value={otherCharge}
+              onChange={(event) => setOtherCharge(event.target.value)}
             />
 
             <ErrorText error={state.errors.otherCharge} />
           </div>
 
           <div>
-            <Label htmlFor="purchaseAmount">Purchase Amount</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="purchaseAmount">Purchase Amount</Label>
+              {!purchaseAmountTouched && purchaseAmount !== "" && (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  Auto-calculated
+                </span>
+              )}
+            </div>
 
             <Input
               id="purchaseAmount"
               name="purchaseAmount"
               type="number"
               step="0.01"
-              defaultValue={stock?.purchaseAmount ?? ""}
+              value={purchaseAmount}
+              onChange={(event) => {
+                setPurchaseAmountTouched(true);
+                setPurchaseAmount(event.target.value);
+              }}
             />
+            {!purchaseAmountTouched && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Purchase Rate × weight + Other Charge. Type to override.
+              </p>
+            )}
 
             <ErrorText error={state.errors.purchaseAmount} />
           </div>
 
           <div>
-            <Label htmlFor="saleAmount">Sale Amount</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="saleAmount">Sale Amount</Label>
+              {!saleAmountTouched && saleAmount !== "" && (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  Auto-calculated
+                </span>
+              )}
+            </div>
 
             <Input
               id="saleAmount"
               name="saleAmount"
               type="number"
               step="0.01"
-              defaultValue={stock?.saleAmount ?? ""}
+              value={saleAmount}
+              onChange={(event) => {
+                setSaleAmountTouched(true);
+                setSaleAmount(event.target.value);
+              }}
             />
+            {!saleAmountTouched && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Sale Rate × weight. Type to override.
+              </p>
+            )}
 
             <ErrorText error={state.errors.saleAmount} />
           </div>

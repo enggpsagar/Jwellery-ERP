@@ -90,7 +90,7 @@ export function ProductDetailPanel({ productId, canEdit = false, refreshToken }:
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{product.name}</h2>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" className="gap-1.5" asChild>
+          <Button variant="warning" size="sm" className="gap-1.5" asChild>
             <Link href={`/inventory/stock/new?productId=${product.id}`}>
               <PackagePlus className="h-4 w-4" />
               Add Stock

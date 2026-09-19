@@ -124,6 +124,11 @@ export function ProductsClient({
               { value: "ACTIVE", label: "Active" },
               { value: "INACTIVE", label: "Inactive" },
             ]}
+            // Archived products have their own dedicated page, so this list
+            // defaults to Active-only rather than a combined "All Statuses"
+            // view — the dropdown's resting label matches that (see
+            // page.tsx's own status resolution).
+            statusAllLabel="Active"
             typeOptions={[
               ...metals
                 .filter((metal) => metal.isActive)

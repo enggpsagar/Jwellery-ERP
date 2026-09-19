@@ -54,7 +54,12 @@ export default async function InventoryProductsPage({
   const validMetalTypeIds = new Set([...metals.map((m) => m.id), UNASSIGNED_METAL_TYPE]);
   const metalTypeId = params.type && validMetalTypeIds.has(params.type) ? params.type : undefined;
 
-  const status = params.status === "ACTIVE" || params.status === "INACTIVE" ? params.status : undefined;
+  // Archived (Inactive) products have their own dedicated page — defaulting
+  // this one to Active-only (rather than showing every status when the
+  // filter is untouched) keeps an archived product from still turning up
+  // here too. Picking "Inactive" from the filter still works as an
+  // explicit override for anyone who wants to check from this page anyway.
+  const status = params.status === "INACTIVE" ? "INACTIVE" : "ACTIVE";
   const dateFrom = params.dateFrom || undefined;
   const dateTo = params.dateTo || undefined;
 

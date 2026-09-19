@@ -664,17 +664,19 @@ export function ProductForm({
     setNetWeight(value);
   }
 
-  const gross = Number(grossWeight);
-  const stone = stoneWeight.trim() === "" ? 0 : Number(stoneWeight);
+  // A Stone-kind product's own Net Weight is the sum of every stone row's
+  // own Net Stone Weight — there's no separate top-level Gross Weight to
+  // subtract from anymore (removed; a loose stone parcel has no gross-vs-
+  // net distinction of its own, unlike a metal piece with an embedded
+  // stone). stoneComponents' own stoneWeight is always stored in grams,
+  // same convention as netWeight itself.
+  const stoneWeightSum = stoneComponents.reduce((sum, row) => sum + (Number(row.stoneWeight) || 0), 0);
 
   const derivedNet =
-    grossWeight.trim() !== "" &&
-    Number.isFinite(gross) &&
-    Number.isFinite(stone) &&
-    gross - stone >= 0
+    stoneWeightSum > 0
       ? // Trailing zeros trimmed so the box reads 5.5 rather than 5.500,
         // while still respecting the column's three decimals.
-        String(Number((gross - stone).toFixed(5)))
+        String(Number(stoneWeightSum.toFixed(5)))
       : null;
 
   // Kept in an effect rather than derived straight into the input, because
@@ -765,10 +767,13 @@ export function ProductForm({
     productKind === "METAL" ? (primaryMetalComponent?.storeMetalPurityId ?? "") : storeMetalPurityId;
   const submittedDefaultPurity =
     productKind === "METAL" ? (stoneConversionPurity === "__none__" ? "" : stoneConversionPurity) : (defaultPurity === "__none__" ? "" : defaultPurity);
-  const submittedGrossWeight = productKind === "METAL" ? (primaryMetalComponent?.grossWeight ?? "") : submittedWeight(grossWeight);
   const submittedNetWeight = productKind === "METAL" ? (primaryMetalComponent?.netWeight ?? "") : submittedWeight(netWeight);
+  // No separate Gross Weight of its own anymore for a Stone-kind product —
+  // submits the same value as Net Weight (see stoneWeightSum's own doc
+  // comment above), which also keeps the still-required defaultGrossWeight
+  // column satisfied server-side.
+  const submittedGrossWeight = productKind === "METAL" ? (primaryMetalComponent?.grossWeight ?? "") : submittedNetWeight;
 
-  const stoneWeightSum = stoneComponents.reduce((sum, row) => sum + (Number(row.stoneWeight) || 0), 0);
   const stoneChargeSum = stoneComponents.reduce((sum, row) => sum + (Number(row.stoneCharge) || 0), 0);
   const primaryStone = stoneComponents[0];
 
@@ -886,44 +891,17 @@ export function ProductForm({
           </div>
 
           {productKind === "STONE" && (
-            <>
-              {/* Which Stone(s) this product actually is now lives entirely
-                  in the Stone Pricing box below (one row per stone) —
-                  no separate top-level Stone/Stone Type select duplicating
-                  that same picker. metalTypeId itself is still submitted
-                  via the shared hidden input further below (submittedMetalTypeId),
-                  kept in sync with the repeater's first row — see the effect
-                  near where metalTypeId is declared. */}
-              <ErrorText error={state.errors.metalTypeId} />
-
-              <div>
-                <Label htmlFor="defaultGrossWeight">Gross Weight <RequiredMark /></Label>
-
-                <div className="flex gap-1">
-                  <Input
-                    id="defaultGrossWeight"
-                    type="number"
-                    step="any"
-                    min="0"
-                    className="h-11 flex-1"
-                    value={displayWeight(grossWeight)}
-                    onChange={(event) => setGrossWeight(toGramsString(event.target.value))}
-                    placeholder="0.000"
-                  />
-                  <Select value={weightUnit} onValueChange={(unit) => setWeightUnit(unit as "GRAM" | "CARAT")}>
-                    <SelectTrigger className="h-11 w-16">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="GRAM">g</SelectItem>
-                      <SelectItem value="CARAT">ct</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <ErrorText error={state.errors.defaultGrossWeight} />
-              </div>
-            </>
+            // Which Stone(s) this product actually is now lives entirely in
+            // the Stone Pricing box below (one row per stone) — no separate
+            // top-level Stone/Stone Type select duplicating that same
+            // picker, and no separate Gross Weight either (see
+            // stoneWeightSum's own doc comment — Net Weight below is now
+            // the sum of every row's own Net Stone Weight). metalTypeId
+            // itself is still submitted via the shared hidden input further
+            // below (submittedMetalTypeId), kept in sync with the
+            // repeater's first row — see the effect near where metalTypeId
+            // is declared.
+            <ErrorText error={state.errors.metalTypeId} />
           )}
 
           {/* Hidden entirely for the gemstone family — a loose Diamond/
@@ -1473,14 +1451,16 @@ export function ProductForm({
 
       {/* ============================
           NET WEIGHT (productKind "STONE" only) — a loose gemstone's own
-          single Gross/Net Weight pair. The "METAL" repeater's own per-row
-          Net Weight fields above replace this entirely.
+          total weight, summed from every stone row above (no separate
+          Gross Weight of its own anymore — see stoneWeightSum's own doc
+          comment). The "METAL" repeater's own per-row Net Weight fields
+          above replace this entirely.
       ============================= */}
 
       {/* No separate Carat Weight field here anymore -- for a genuinely
           carat-weighed item (a loose Diamond/Stone product, its own entire
-          weight) it was the exact same physical quantity as Gross Weight,
-          which already has its own g/ct unit toggle above. defaultCaratWeight
+          weight) it's the exact same physical quantity as Net Weight,
+          which already has its own g/ct unit toggle here. defaultCaratWeight
           is still derived below (for product-detail-content.tsx's display
           and any other reader) directly from Net Weight, not from a second
           manually-entered field. */}
@@ -1515,8 +1495,8 @@ export function ProductForm({
             {netTouched
               ? "Manually entered"
               : derivedNet !== null
-                ? "Gross − stone — edit to override"
-                : "Auto-calculated from Gross Weight"}
+                ? "Sum of every stone's Net Stone Weight above — edit to override"
+                : "Auto-calculated from the stones added above"}
           </p>
 
           <ErrorText error={state.errors.defaultNetWeight} />

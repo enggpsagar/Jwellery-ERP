@@ -199,6 +199,59 @@ export function StoneComponentFields({
               </Button>
             )}
           </div>
+
+          {/* Stacked directly under Stone itself — same column, rather than
+              a separate full-width block below the whole grid — so the
+              "which stone, and which of its types" picker reads as one
+              unit instead of two disconnected ones. */}
+          {selectedStone && (
+            <div className="space-y-1.5 rounded-md bg-muted/40 p-2.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Stone Types</Label>
+                {!lockPhysicalFields && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 gap-1 px-1.5 text-xs"
+                    onClick={() => setAddTypeOpen(true)}
+                  >
+                    <Plus className="h-3 w-3" />
+                    Add Stone Type
+                  </Button>
+                )}
+              </div>
+
+              {typesForStone.length > 3 && (
+                <Input
+                  placeholder="Search stone types..."
+                  value={typeSearch}
+                  onChange={(event) => setTypeSearch(event.target.value)}
+                  className="h-8"
+                />
+              )}
+
+              {typesForStone.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No Stone Types configured for {selectedStone.name} yet — add one above.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                  {filteredTypes.map((type) => (
+                    <label key={type.id} className="flex items-center gap-1.5 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={selectedTypeNames.includes(type.name)}
+                        onChange={(event) => toggleType(type.name, event.target.checked)}
+                        disabled={lockPhysicalFields}
+                      />
+                      {type.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -273,55 +326,6 @@ export function StoneComponentFields({
           </p>
         </div>
       </div>
-
-      {selectedStone && (
-        <div className="space-y-1.5 rounded-md bg-muted/40 p-2.5">
-          <div className="flex items-center justify-between">
-            <Label className="text-xs">Stone Types</Label>
-            {!lockPhysicalFields && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-6 gap-1 px-1.5 text-xs"
-                onClick={() => setAddTypeOpen(true)}
-              >
-                <Plus className="h-3 w-3" />
-                Add Stone Type
-              </Button>
-            )}
-          </div>
-
-          {typesForStone.length > 3 && (
-            <Input
-              placeholder="Search stone types..."
-              value={typeSearch}
-              onChange={(event) => setTypeSearch(event.target.value)}
-              className="h-8"
-            />
-          )}
-
-          {typesForStone.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              No Stone Types configured for {selectedStone.name} yet — add one above.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-              {filteredTypes.map((type) => (
-                <label key={type.id} className="flex items-center gap-1.5 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={selectedTypeNames.includes(type.name)}
-                    onChange={(event) => toggleType(type.name, event.target.checked)}
-                    disabled={lockPhysicalFields}
-                  />
-                  {type.name}
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       <AddMetalDialog
         open={addStoneOpen}

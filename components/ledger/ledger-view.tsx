@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
-  CalendarDays,
   ArrowRightLeft,
   ArrowDownCircle,
   ArrowUpCircle,
@@ -44,6 +43,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { DateRangePicker, type DateRangeValue } from "@/components/ui/date-range-picker"
 import { LedgerDetailDrawer } from "@/components/ledger/ledger-detail-drawer"
 import { ExportMenu } from "@/components/shared/export-menu"
 
@@ -79,20 +79,18 @@ function formatEntryValue(entry: LedgerEntryRow) {
   return formatCurrency(entry.amount)
 }
 
-function daysAgo(dateISO: string) {
-  const then = new Date(dateISO).getTime()
-  const now = Date.now()
-  return Math.floor((now - then) / (1000 * 60 * 60 * 24))
+/** "YYYY-MM-DD" range bound -> epoch ms, at the start or end of that local
+ * calendar day, so a range filter is inclusive of both endpoints. */
+function dateRangeBound(value: string, endOfDay: boolean): number | null {
+  if (!value) return null
+  const [y, m, d] = value.split("-").map(Number)
+  if (!y || !m || !d) return null
+  return endOfDay
+    ? new Date(y, m - 1, d, 23, 59, 59, 999).getTime()
+    : new Date(y, m - 1, d, 0, 0, 0, 0).getTime()
 }
 
 const pageSizeOptions = [10, 20, 50, 100]
-
-const dateRanges = [
-  { value: "7d", label: "Last 7 days" },
-  { value: "30d", label: "Last 30 days" },
-  { value: "90d", label: "Last 90 days" },
-  { value: "all", label: "All time" },
-]
 
 type LedgerViewProps = {
   entries: LedgerEntryRow[]
@@ -118,7 +116,7 @@ const POLARITY_TEXT: Record<"debit" | "credit" | "net", string> = {
 
 export function LedgerView({ entries, totals }: LedgerViewProps) {
   const [search, setSearch] = useState("")
-  const [dateRange, setDateRange] = useState("30d")
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ from: "", to: "" })
   const [account, setAccount] = useState("all")
   const [txnType, setTxnType] = useState("all")
   const [selected, setSelected] = useState<LedgerEntryRow | null>(null)
@@ -140,9 +138,12 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
     return entries.filter((entry) => {
       if (account !== "all" && entry.account !== account) return false
       if (txnType !== "all" && entry.sourceLabel !== txnType) return false
-      if (dateRange !== "all") {
-        const maxDays = dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : 90
-        if (daysAgo(entry.dateISO) > maxDays) return false
+      if (dateRange.from || dateRange.to) {
+        const entryTime = new Date(entry.dateISO).getTime()
+        const fromTime = dateRangeBound(dateRange.from, false)
+        const toTime = dateRangeBound(dateRange.to, true)
+        if (fromTime != null && entryTime < fromTime) return false
+        if (toTime != null && entryTime > toTime) return false
       }
       if (search) {
         const q = search.toLowerCase()
@@ -153,7 +154,8 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
     })
   }, [entries, account, txnType, dateRange, search])
 
-  const hasFilters = account !== "all" || txnType !== "all" || search.length > 0
+  const hasFilters =
+    account !== "all" || txnType !== "all" || search.length > 0 || Boolean(dateRange.from || dateRange.to)
 
   useEffect(() => {
     setPage(1)
@@ -172,6 +174,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
     setAccount("all")
     setTxnType("all")
     setSearch("")
+    setDateRange({ from: "", to: "" })
   }
 
   function openEntry(entry: LedgerEntryRow) {
@@ -338,21 +341,12 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger className="h-9 w-[160px]">
-                  <CalendarDays className="size-4 text-muted-foreground" />
-                  <SelectValue placeholder="Date range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {dateRanges.map((r) => (
-                      <SelectItem key={r.value} value={r.value}>
-                        {r.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <DateRangePicker
+                value={dateRange}
+                onChange={setDateRange}
+                placeholder="Date range"
+                className="w-[220px]"
+              />
 
               <Select value={account} onValueChange={setAccount}>
                 <SelectTrigger className="h-9 w-[170px]">

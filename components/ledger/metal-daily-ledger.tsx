@@ -19,38 +19,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { ExportMenu } from "@/components/shared/export-menu"
+import { DateRangePicker, type DateRangeValue } from "@/components/ui/date-range-picker"
 
-function daysAgo(dateISO: string) {
-  return Math.floor((Date.now() - new Date(dateISO).getTime()) / (1000 * 60 * 60 * 24))
+/** "YYYY-MM-DD" -> local-midnight epoch ms, so a row's date and a range
+ * bound compare on the same calendar day regardless of timezone. */
+function parseLocalDate(value: string): number | null {
+  if (!value) return null
+  const [y, m, d] = value.split("-").map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d).getTime()
 }
-
-const dateRanges = [
-  { value: "7d", label: "Last 7 days" },
-  { value: "30d", label: "Last 30 days" },
-  { value: "90d", label: "Last 90 days" },
-  { value: "all", label: "All time" },
-]
 
 type MetalDailyLedgerProps = {
   data: MetalDailyLedgerResult
 }
 
 export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
-  const [dateRange, setDateRange] = useState("30d")
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ from: "", to: "" })
 
   const rows = useMemo(() => {
-    if (dateRange === "all") return data.rows
-    const maxDays = dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : 90
-    return data.rows.filter((row) => daysAgo(row.dateISO) <= maxDays)
+    if (!dateRange.from && !dateRange.to) return data.rows
+    const fromTime = parseLocalDate(dateRange.from)
+    const toTime = parseLocalDate(dateRange.to)
+    return data.rows.filter((row) => {
+      const rowTime = parseLocalDate(row.dateISO)
+      if (rowTime == null) return true
+      if (fromTime != null && rowTime < fromTime) return false
+      if (toTime != null && rowTime > toTime) return false
+      return true
+    })
   }, [data.rows, dateRange])
 
   if (data.activeUnits.length === 0) {
@@ -77,20 +75,12 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
           <ExportMenu href="/ledger/export?scope=metal-wise" label="Export" iconOnly />
         </div>
 
-        <Select value={dateRange} onValueChange={setDateRange}>
-          <SelectTrigger className="h-9 w-[160px]">
-            <SelectValue placeholder="Date range" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {dateRanges.map((r) => (
-                <SelectItem key={r.value} value={r.value}>
-                  {r.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <DateRangePicker
+          value={dateRange}
+          onChange={setDateRange}
+          placeholder="Date range"
+          className="w-[220px]"
+        />
       </CardHeader>
 
       <CardContent className="overflow-x-auto p-0">

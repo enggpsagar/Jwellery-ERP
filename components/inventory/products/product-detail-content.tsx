@@ -17,12 +17,17 @@ type Product = NonNullable<Awaited<ReturnType<typeof getProductById>>>
 export function ProductDetailContent({
   product,
   canEdit = false,
+  hideStatusField = false,
 }: {
   product: Product
   /** Gates the Status field between a plain read-only badge and the
    * editable Active/Inactive switch (mirrors ProductRowActions' own
    * canEdit gate for Edit/Delete). */
   canEdit?: boolean
+  /** True when the caller renders its own Status toggle elsewhere (e.g.
+   * ProductDetailPanel puts it beside the View/Edit/Delete icons) — skips
+   * the Basic Information row so it isn't shown twice. */
+  hideStatusField?: boolean
 }) {
   const makingCharge = formatCharge(
     product.defaultMakingCharge,
@@ -67,16 +72,18 @@ export function ProductDetailContent({
         <Field label="Product Code" value={product.productCode} />
         <Field label="Category" value={product.category?.name} />
         <Field label="Item Type" value={product.categoryType?.name} />
-        <Field
-          label="Status"
-          value={
-            canEdit ? (
-              <ProductStatusToggle productId={product.id} isActive={product.isActive} />
-            ) : (
-              <ActiveBadge isActive={product.isActive} />
-            )
-          }
-        />
+        {!hideStatusField && (
+          <Field
+            label="Status"
+            value={
+              canEdit ? (
+                <ProductStatusToggle productId={product.id} isActive={product.isActive} />
+              ) : (
+                <ActiveBadge isActive={product.isActive} />
+              )
+            }
+          />
+        )}
       </Section>
 
       {hasMetalDetails ? (

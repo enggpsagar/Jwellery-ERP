@@ -6,6 +6,8 @@ import { Package } from "lucide-react"
 import { getProductById } from "@/lib/actions/inventory/product-actions"
 import { ProductRowActions } from "@/components/inventory/products/product-row-actions"
 import { ProductDetailContent } from "@/components/inventory/products/product-detail-content"
+import { ProductStatusToggle } from "@/components/inventory/products/product-status-toggle"
+import { ActiveBadge } from "@/components/shared/active-badge"
 import { Skeleton } from "@/components/ui/skeleton"
 
 type Product = NonNullable<Awaited<ReturnType<typeof getProductById>>>
@@ -73,14 +75,21 @@ export function ProductDetailPanel({ productId, canEdit = false }: ProductDetail
     <div className="space-y-4 rounded-xl border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{product.name}</h2>
-        <ProductRowActions
-          productId={product.id}
-          productName={product.name}
-          canEdit={canEdit}
-        />
+        <div className="flex items-center gap-2">
+          {canEdit ? (
+            <ProductStatusToggle productId={product.id} isActive={product.isActive} />
+          ) : (
+            <ActiveBadge isActive={product.isActive} />
+          )}
+          <ProductRowActions
+            productId={product.id}
+            productName={product.name}
+            canEdit={canEdit}
+          />
+        </div>
       </div>
 
-      <ProductDetailContent product={product} canEdit={canEdit} />
+      <ProductDetailContent product={product} canEdit={canEdit} hideStatusField />
     </div>
   )
 }

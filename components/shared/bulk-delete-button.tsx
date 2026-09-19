@@ -107,7 +107,7 @@ export function BulkDeleteButton({
         onClick={() => setOpen(true)}
       >
         <Trash2 className="h-4 w-4" />
-        Delete Selected ({count})
+        Delete ({count})
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>

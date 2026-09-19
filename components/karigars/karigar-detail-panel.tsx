@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Hammer } from "lucide-react"
 
 import { getKarigarDetailBundle, type KarigarDetailBundle } from "@/lib/actions/karigar-actions"
@@ -27,25 +27,28 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
   const [bundle, setBundle] = useState<KarigarDetailBundle | null>(null)
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (!karigarId) {
-      setBundle(null)
-      return
-    }
-
+  const fetchBundle = useCallback((id: string) => {
     let cancelled = false
     setLoading(true)
-    getKarigarDetailBundle(karigarId)
+    getKarigarDetailBundle(id)
       .then((result) => {
         if (!cancelled) setBundle(result)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
-
     return () => {
       cancelled = true
     }
+  }, [])
+
+  useEffect(() => {
+    if (!karigarId) {
+      setBundle(null)
+      return
+    }
+    return fetchBundle(karigarId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [karigarId])
 
   if (!karigarId) {
@@ -122,7 +125,11 @@ export function KarigarDetailPanel({ karigarId }: KarigarDetailPanelProps) {
             count={materialCounts.receivedCount}
           />
           <RecordKarigarPaymentDialog karigarId={karigar.id} />
-          <ArtisanActiveToggle karigarId={karigar.id} isActive={karigar.isActive} />
+          <ArtisanActiveToggle
+            karigarId={karigar.id}
+            isActive={karigar.isActive}
+            onSuccess={() => fetchBundle(karigar.id)}
+          />
       </div>
 
       <KarigarDetailContent bundle={bundle} hideStatusCard />

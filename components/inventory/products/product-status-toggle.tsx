@@ -12,9 +12,15 @@ import { useToast } from "@/components/providers/toast-provider"
 export function ProductStatusToggle({
   productId,
   isActive,
+  onSuccess,
 }: {
   productId: string
   isActive: boolean
+  /** Called after a successful toggle, in addition to router.refresh() —
+   * the caller's own `product` state (ProductDetailPanel) is fetched
+   * client-side via an effect keyed only on productId, so it never
+   * re-fetches on its own just because the router refreshed. */
+  onSuccess?: () => void
 }) {
   const router = useRouter()
   const toast = useToast()
@@ -30,6 +36,7 @@ export function ProductStatusToggle({
       if (result.success) {
         toast.success(result.message)
         router.refresh()
+        onSuccess?.()
       } else {
         toast.error(result.message)
       }

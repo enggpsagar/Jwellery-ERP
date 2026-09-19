@@ -49,7 +49,7 @@ export function BulkArchiveProductsButton({
       disabled={isPending}
     >
       <Archive className="h-4 w-4" />
-      {isPending ? "Archiving..." : `Archive Selected (${selectedIds.length})`}
+      {isPending ? "Archiving..." : `Archive (${selectedIds.length})`}
     </Button>
   )
 }

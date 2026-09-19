@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Package, PackagePlus } from "lucide-react"
 
@@ -18,41 +18,53 @@ type ProductDetailPanelProps = {
   productId: string | null
   /** PRODUCT_UPDATE — hides Edit/Delete in the panel header for view-only users. */
   canEdit?: boolean
+  /** Bumped by the parent after a list-level bulk action (Archive/Delete
+   * Selected) that may have changed the currently-viewed product without
+   * changing which id is selected — this panel fetches its own data
+   * client-side keyed on productId, so a plain router.refresh() from
+   * elsewhere never reaches it on its own. Any changing value forces the
+   * re-fetch below. */
+  refreshToken?: number
 }
 
 /**
  * The right-hand pane of the Products master-detail layout — fetches and
  * shows exactly what the standalone /inventory/products/[id] page shows
  * (same ProductDetailContent), just inline next to the list instead of a
- * full navigation. Re-fetches whenever the selected id changes; a delete
- * from ProductRowActions here calls router.refresh() same as the standalone
- * page, which re-renders the list — the selection itself is cleared by the
- * parent's own effect watching the products prop.
+ * full navigation. Re-fetches whenever the selected id changes, refreshToken
+ * bumps (see its own doc comment), or this panel's own Status toggle
+ * succeeds (see the onSuccess passed to ProductStatusToggle below) — a
+ * delete from ProductRowActions here calls router.refresh() same as the
+ * standalone page, which re-renders the list — the selection itself is
+ * cleared by the parent's own effect watching the products prop.
  */
-export function ProductDetailPanel({ productId, canEdit = false }: ProductDetailPanelProps) {
+export function ProductDetailPanel({ productId, canEdit = false, refreshToken }: ProductDetailPanelProps) {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (!productId) {
-      setProduct(null)
-      return
-    }
-
+  const fetchProduct = useCallback((id: string) => {
     let cancelled = false
     setLoading(true)
-    getProductById(productId)
+    getProductById(id)
       .then((result) => {
         if (!cancelled) setProduct(result)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
-
     return () => {
       cancelled = true
     }
-  }, [productId])
+  }, [])
+
+  useEffect(() => {
+    if (!productId) {
+      setProduct(null)
+      return
+    }
+    return fetchProduct(productId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId, refreshToken])
 
   if (!productId) {
     return (
@@ -85,7 +97,11 @@ export function ProductDetailPanel({ productId, canEdit = false }: ProductDetail
             </Link>
           </Button>
           {canEdit ? (
-            <ProductStatusToggle productId={product.id} isActive={product.isActive} />
+            <ProductStatusToggle
+              productId={product.id}
+              isActive={product.isActive}
+              onSuccess={() => fetchProduct(product.id)}
+            />
           ) : (
             <ActiveBadge isActive={product.isActive} />
           )}

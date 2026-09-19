@@ -17,10 +17,16 @@ export function ArtisanActiveToggle({
   karigarId,
   isActive,
   className,
+  onSuccess,
 }: {
   karigarId: string
   isActive: boolean
   className?: string
+  /** Called after a successful toggle, in addition to router.refresh() —
+   * KarigarDetailPanel fetches its own bundle client-side via an effect
+   * keyed only on karigarId, so it never re-fetches on its own just
+   * because the router refreshed. */
+  onSuccess?: () => void
 }) {
   const router = useRouter()
   const toast = useToast()
@@ -34,6 +40,7 @@ export function ArtisanActiveToggle({
       if (result.success) {
         toast.success(result.message)
         router.refresh()
+        onSuccess?.()
       } else {
         toast.error(result.message)
       }

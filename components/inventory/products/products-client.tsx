@@ -50,6 +50,12 @@ export function ProductsClient({
   metals = [],
 }: ProductsClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
+  // Forces ProductDetailPanel to re-fetch even when the selected product id
+  // hasn't changed — a bulk Archive/Delete from this list's own toolbar can
+  // change the currently-viewed product's status without ever touching
+  // activeProductId, and the panel fetches its own data client-side keyed
+  // only on that id (see ProductDetailPanel's own doc comment).
+  const [detailRefreshToken, setDetailRefreshToken] = React.useState(0)
   // Which row's full detail shows in the right-hand panel — defaults to
   // the first row on this page/search result so the panel is never empty
   // on load, matching the Customers master-detail layout this mirrors.
@@ -128,7 +134,10 @@ export function ProductsClient({
               <>
                 <BulkArchiveProductsButton
                   selectedIds={selectedIds}
-                  onDone={() => setSelectedIds([])}
+                  onDone={() => {
+                    setSelectedIds([])
+                    setDetailRefreshToken((token) => token + 1)
+                  }}
                 />
                 <BulkDeleteButton
                   selectedIds={selectedIds}
@@ -136,7 +145,10 @@ export function ProductsClient({
                   itemLabelPlural="products"
                   getDisplayName={(id) => products.find((product) => product.id === id)?.name ?? id}
                   onDelete={bulkDeleteProducts}
-                  onDone={() => setSelectedIds([])}
+                  onDone={() => {
+                    setSelectedIds([])
+                    setDetailRefreshToken((token) => token + 1)
+                  }}
                 />
               </>
             }
@@ -152,7 +164,7 @@ export function ProductsClient({
           />
         </div>
 
-        <ProductDetailPanel productId={activeProductId} canEdit={canEdit} />
+        <ProductDetailPanel productId={activeProductId} canEdit={canEdit} refreshToken={detailRefreshToken} />
       </div>
     </main>
   )

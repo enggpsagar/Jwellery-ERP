@@ -1321,11 +1321,16 @@ export async function createInvoice(
         // unit can ever match; the other gets count: 0. A stale JS-side
         // `quantity` read beforehand (the previous version of this code)
         // can never provide that guarantee.
+        // saleAmount is deliberately left untouched here — it's the Stock
+        // form's own editable pricing estimate (Purchase/Sale Amount
+        // auto-calc), not a realized-proceeds ledger, and overwriting it
+        // with just this sale's line total corrupted it for a multi-
+        // quantity row's still-unsold remainder. The invoice's own line
+        // items are the authoritative record of what actually sold for.
         const { count } = await tx.inventoryStock.updateMany({
           where: { id: item.inventoryStockId, storeId, quantity: { gte: soldQty } },
           data: {
             quantity: { decrement: soldQty },
-            saleAmount: lineTotal(item),
           },
         });
 
@@ -1937,11 +1942,16 @@ export async function updateInvoice(
 
         const soldQty = Math.max(1, item.quantity || 1);
 
+        // saleAmount is deliberately left untouched here — it's the Stock
+        // form's own editable pricing estimate (Purchase/Sale Amount
+        // auto-calc), not a realized-proceeds ledger, and overwriting it
+        // with just this sale's line total corrupted it for a multi-
+        // quantity row's still-unsold remainder. The invoice's own line
+        // items are the authoritative record of what actually sold for.
         const { count } = await tx.inventoryStock.updateMany({
           where: { id: item.inventoryStockId, storeId, quantity: { gte: soldQty } },
           data: {
             quantity: { decrement: soldQty },
-            saleAmount: lineTotal(item),
           },
         });
 

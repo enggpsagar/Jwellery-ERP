@@ -725,11 +725,12 @@ export async function createKachaInvoice(
         // JS-side `quantity` read beforehand can never provide that
         // guarantee, since two concurrent slips can both read the same
         // starting value before either decrements.
+        // saleAmount is deliberately left untouched — see the identical
+        // comment in invoice-actions.ts's createInvoice.
         const { count } = await tx.inventoryStock.updateMany({
           where: { id: item.inventoryStockId, storeId, quantity: { gte: soldQty } },
           data: {
             quantity: { decrement: soldQty },
-            saleAmount: lineTotal(item),
           },
         });
 

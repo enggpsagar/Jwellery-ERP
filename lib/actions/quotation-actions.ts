@@ -1066,12 +1066,13 @@ export async function convertQuotationToInvoice(
         const takeQty = Math.min(soldQty, currentStock.quantity);
         const remaining = currentStock.quantity - takeQty;
 
+        // saleAmount is deliberately left untouched — see the identical
+        // comment in invoice-actions.ts's createInvoice.
         const { count } = await tx.inventoryStock.updateMany({
           where: { id: item.inventoryStockId, storeId },
           data: {
             ...(takeQty > 0 ? { quantity: { decrement: takeQty } } : {}),
             ...(remaining <= 0 ? { status: InventoryStockStatus.SOLD } : {}),
-            saleAmount: item.lineTotal,
           },
         });
         if (count === 0) continue;

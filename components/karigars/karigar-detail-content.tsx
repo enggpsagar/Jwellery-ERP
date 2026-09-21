@@ -73,7 +73,15 @@ export function KarigarDetailContent({
           card in its row, which visibly bloated the compact metal-balance
           ribbon cards below to match Metal/Stone's taller checkbox lists.
           Each card now sizes to its own content instead. */}
-      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* auto-fit, not a fixed lg:grid-cols-5 — a karigar without an Opening
+          Gold/Cash figure (or with the Status card hidden) only ever
+          populates 2-3 of those 5 tracks, so a fixed column count reserved
+          the other 1-2 as dead space and squeezed Metal/Stone's own track
+          down to 1/5 width regardless — narrow enough that a plain word
+          like "Diamond" or "Platinum" wrapped mid-letter inside
+          ExpandableCheckboxList's break-words. auto-fit instead sizes
+          however many cards actually render to fill the row. */}
+      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
           {hasOpeningGold && (
             <Card size="sm">
               <CardHeader>

@@ -89,68 +89,70 @@ export function GstRateSettingsForm({ rates, canEdit }: GstRateSettingsFormProps
           <p className="text-sm text-muted-foreground">No GST rates configured yet.</p>
         ) : null}
 
-        {rates.map((rate) =>
-          editingId === rate.id ? (
-            <GstRateFormRow key={rate.id} rate={rate} onDone={() => setEditingId(null)} />
-          ) : (
-            <div
-              key={rate.id}
-              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-            >
-              <div className={rate.isActive ? "" : "text-muted-foreground line-through"}>
-                <div className="flex items-center gap-2">
-                  {rate.name}
-                  <span className="text-sm text-muted-foreground">
-                    ({rate.ratePercent}%)
-                  </span>
-                  {rate.isDefault && (
-                    <Badge variant="outline" className="gap-1 font-normal">
-                      <Star className="h-3 w-3 fill-current" />
-                      Default
-                    </Badge>
-                  )}
+        <div className="max-h-72 space-y-2 overflow-y-auto">
+          {rates.map((rate) =>
+            editingId === rate.id ? (
+              <GstRateFormRow key={rate.id} rate={rate} onDone={() => setEditingId(null)} />
+            ) : (
+              <div
+                key={rate.id}
+                className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+              >
+                <div className={rate.isActive ? "" : "text-muted-foreground line-through"}>
+                  <div className="flex items-center gap-2">
+                    {rate.name}
+                    <span className="text-sm text-muted-foreground">
+                      ({rate.ratePercent}%)
+                    </span>
+                    {rate.isDefault && (
+                      <Badge variant="outline" className="gap-1 font-normal">
+                        <Star className="h-3 w-3 fill-current" />
+                        Default
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {canEdit ? (
-                <div className="flex items-center gap-3">
-                  {!rate.isDefault && rate.isActive && (
+                {canEdit ? (
+                  <div className="flex items-center gap-3">
+                    {!rate.isDefault && rate.isActive && (
+                      <button
+                        type="button"
+                        onClick={() => handleSetDefault(rate.id)}
+                        disabled={settingDefaultId === rate.id}
+                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+                        title="Set as default rate"
+                      >
+                        {settingDefaultId === rate.id ? (
+                          <Loader className="h-3 w-3" />
+                        ) : (
+                          <Star className="h-3 w-3" />
+                        )}
+                        Set as Default
+                      </button>
+                    )}
+                    <Switch
+                      checked={rate.isActive}
+                      disabled={togglingId === rate.id}
+                      onCheckedChange={(checked) => handleToggle(rate.id, checked)}
+                    />
                     <button
                       type="button"
-                      onClick={() => handleSetDefault(rate.id)}
-                      disabled={settingDefaultId === rate.id}
-                      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground transition hover:bg-muted disabled:opacity-50"
-                      title="Set as default rate"
+                      onClick={() => setEditingId(rate.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                      aria-label={`Edit ${rate.name}`}
+                      title="Edit GST rate"
                     >
-                      {settingDefaultId === rate.id ? (
-                        <Loader className="h-3 w-3" />
-                      ) : (
-                        <Star className="h-3 w-3" />
-                      )}
-                      Set as Default
+                      <Pencil className="h-4 w-4" />
                     </button>
-                  )}
-                  <Switch
-                    checked={rate.isActive}
-                    disabled={togglingId === rate.id}
-                    onCheckedChange={(checked) => handleToggle(rate.id, checked)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(rate.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
-                    aria-label={`Edit ${rate.name}`}
-                    title="Edit GST rate"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <ActiveBadge isActive={rate.isActive} />
-              )}
-            </div>
-          ),
-        )}
+                  </div>
+                ) : (
+                  <ActiveBadge isActive={rate.isActive} />
+                )}
+              </div>
+            ),
+          )}
+        </div>
 
         {canEdit ? (
           showAdd ? (

@@ -123,7 +123,7 @@ export function StoresClient({
 
         {goldSummary.byStore.length > 0 && (
           <CardContent>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid max-h-72 grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
               {goldSummary.byStore.map((s) => (
                 <div key={s.storeId} className="rounded-lg border p-3">
                   <p className="truncate text-xs font-medium text-muted-foreground">

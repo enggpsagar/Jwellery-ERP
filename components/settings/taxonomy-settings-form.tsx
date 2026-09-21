@@ -165,63 +165,65 @@ function MetalsSection({
           <p className="text-sm text-muted-foreground">No metals configured yet.</p>
         ) : null}
 
-        {metals.map((metal) =>
-          editingId === metal.id ? (
-            <MetalFormRow
-              key={metal.id}
-              metal={metal}
-              onDone={() => setEditingId(null)}
-            />
-          ) : (
-            <div
-              key={metal.id}
-              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-            >
-              <div className="flex items-center gap-2">
-                <span className={metal.isActive ? "" : "text-muted-foreground line-through"}>
-                  {metal.name}
-                </span>
-                {metal.hasPurity ? (
-                  <Badge variant="secondary">Has Purity</Badge>
-                ) : null}
-                <Badge variant="outline">
-                  {metal.primaryUnit === "CARAT" ? "Carat" : "Gram"}
-                </Badge>
-              </div>
-
-              {canEdit ? (
-                <div className="flex items-center gap-3">
-                  <Switch
-                    checked={metal.isActive}
-                    disabled={togglingId === metal.id}
-                    onCheckedChange={(checked) => handleToggle(metal.id, checked)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(metal.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                    aria-label={`Edit ${metal.name}`}
-                    title="Edit metal"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(metal.id, metal.name)}
-                    disabled={deletingId === metal.id}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                    aria-label={`Delete ${metal.name}`}
-                    title="Delete metal (only if unused)"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+        <div className="max-h-72 space-y-2 overflow-y-auto">
+          {metals.map((metal) =>
+            editingId === metal.id ? (
+              <MetalFormRow
+                key={metal.id}
+                metal={metal}
+                onDone={() => setEditingId(null)}
+              />
+            ) : (
+              <div
+                key={metal.id}
+                className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <span className={metal.isActive ? "" : "text-muted-foreground line-through"}>
+                    {metal.name}
+                  </span>
+                  {metal.hasPurity ? (
+                    <Badge variant="secondary">Has Purity</Badge>
+                  ) : null}
+                  <Badge variant="outline">
+                    {metal.primaryUnit === "CARAT" ? "Carat" : "Gram"}
+                  </Badge>
                 </div>
-              ) : (
-                <ActiveBadge isActive={metal.isActive} />
-              )}
-            </div>
-          ),
-        )}
+
+                {canEdit ? (
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={metal.isActive}
+                      disabled={togglingId === metal.id}
+                      onCheckedChange={(checked) => handleToggle(metal.id, checked)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(metal.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                      aria-label={`Edit ${metal.name}`}
+                      title="Edit metal"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(metal.id, metal.name)}
+                      disabled={deletingId === metal.id}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                      aria-label={`Delete ${metal.name}`}
+                      title="Delete metal (only if unused)"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <ActiveBadge isActive={metal.isActive} />
+                )}
+              </div>
+            ),
+          )}
+        </div>
 
         {canEdit ? (
           showAdd ? (
@@ -419,60 +421,62 @@ function StonesSection({
           <p className="text-sm text-muted-foreground">No stones configured yet.</p>
         ) : null}
 
-        {stones.map((stone) =>
-          editingId === stone.id ? (
-            <StoneFormRow
-              key={stone.id}
-              stone={stone}
-              onDone={() => setEditingId(null)}
-            />
-          ) : (
-            <div
-              key={stone.id}
-              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-            >
-              <div className="flex items-center gap-2">
-                <span className={stone.isActive ? "" : "text-muted-foreground line-through"}>
-                  {stone.name}
-                </span>
-                <Badge variant="outline">
-                  {stone.primaryUnit === "CARAT" ? "Carat" : "Gram"}
-                </Badge>
-              </div>
-
-              {canEdit ? (
-                <div className="flex items-center gap-3">
-                  <Switch
-                    checked={stone.isActive}
-                    disabled={togglingId === stone.id}
-                    onCheckedChange={(checked) => handleToggle(stone.id, checked)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(stone.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                    aria-label={`Edit ${stone.name}`}
-                    title="Edit stone"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(stone.id, stone.name)}
-                    disabled={deletingId === stone.id}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                    aria-label={`Delete ${stone.name}`}
-                    title="Delete stone (only if unused)"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+        <div className="max-h-72 space-y-2 overflow-y-auto">
+          {stones.map((stone) =>
+            editingId === stone.id ? (
+              <StoneFormRow
+                key={stone.id}
+                stone={stone}
+                onDone={() => setEditingId(null)}
+              />
+            ) : (
+              <div
+                key={stone.id}
+                className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <span className={stone.isActive ? "" : "text-muted-foreground line-through"}>
+                    {stone.name}
+                  </span>
+                  <Badge variant="outline">
+                    {stone.primaryUnit === "CARAT" ? "Carat" : "Gram"}
+                  </Badge>
                 </div>
-              ) : (
-                <ActiveBadge isActive={stone.isActive} />
-              )}
-            </div>
-          ),
-        )}
+
+                {canEdit ? (
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={stone.isActive}
+                      disabled={togglingId === stone.id}
+                      onCheckedChange={(checked) => handleToggle(stone.id, checked)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(stone.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                      aria-label={`Edit ${stone.name}`}
+                      title="Edit stone"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(stone.id, stone.name)}
+                      disabled={deletingId === stone.id}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                      aria-label={`Delete ${stone.name}`}
+                      title="Delete stone (only if unused)"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <ActiveBadge isActive={stone.isActive} />
+                )}
+              </div>
+            ),
+          )}
+        </div>
 
         {canEdit ? (
           showAdd ? (
@@ -718,57 +722,59 @@ function StoneTypesSection({
               </p>
             ) : null}
 
-            {stoneTypes.map((option) =>
-              editingId === option.id ? (
-                <StoneTypeFormRow
-                  key={option.id}
-                  option={option}
-                  storeMetalId={selectedStoneId}
-                  onDone={() => setEditingId(null)}
-                  onSaved={() => reloadStoneTypes(selectedStoneId)}
-                />
-              ) : (
-                <div
-                  key={option.id}
-                  className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-                >
-                  <span className={option.isActive ? "" : "text-muted-foreground line-through"}>
-                    {option.name}
-                  </span>
+            <div className="max-h-72 space-y-2 overflow-y-auto">
+              {stoneTypes.map((option) =>
+                editingId === option.id ? (
+                  <StoneTypeFormRow
+                    key={option.id}
+                    option={option}
+                    storeMetalId={selectedStoneId}
+                    onDone={() => setEditingId(null)}
+                    onSaved={() => reloadStoneTypes(selectedStoneId)}
+                  />
+                ) : (
+                  <div
+                    key={option.id}
+                    className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+                  >
+                    <span className={option.isActive ? "" : "text-muted-foreground line-through"}>
+                      {option.name}
+                    </span>
 
-                  {canEdit ? (
-                    <div className="flex items-center gap-3">
-                      <Switch
-                        checked={option.isActive}
-                        disabled={togglingId === option.id}
-                        onCheckedChange={(checked) => handleToggle(option.id, checked)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(option.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                        aria-label={`Edit ${option.name}`}
-                        title="Edit Stone Type"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(option.id, option.name)}
-                        disabled={deletingId === option.id}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                        aria-label={`Delete ${option.name}`}
-                        title="Delete Stone Type (only if unused)"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <ActiveBadge isActive={option.isActive} />
-                  )}
-                </div>
-              ),
-            )}
+                    {canEdit ? (
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          checked={option.isActive}
+                          disabled={togglingId === option.id}
+                          onCheckedChange={(checked) => handleToggle(option.id, checked)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(option.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                          aria-label={`Edit ${option.name}`}
+                          title="Edit Stone Type"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(option.id, option.name)}
+                          disabled={deletingId === option.id}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                          aria-label={`Delete ${option.name}`}
+                          title="Delete Stone Type (only if unused)"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <ActiveBadge isActive={option.isActive} />
+                    )}
+                  </div>
+                ),
+              )}
+            </div>
 
             {canEdit ? (
               showAdd ? (
@@ -1040,62 +1046,64 @@ function PuritiesSection({
               </p>
             ) : null}
 
-            {purities.map((option) =>
-              editingId === option.id ? (
-                <PurityFormRow
-                  key={option.id}
-                  option={option}
-                  storeMetalId={selectedMetalId}
-                  onDone={() => setEditingId(null)}
-                  onSaved={() => reloadPurities(selectedMetalId)}
-                />
-              ) : (
-                <div
-                  key={option.id}
-                  className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-                >
-                  <div className={option.isActive ? "" : "text-muted-foreground line-through"}>
-                    <span className="font-medium">{option.label}</span>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      SKU "{option.skuCode}" &middot; {option.finenessPercent}% fine
-                      {option.sellingPrice != null ? ` · ₹${option.sellingPrice}` : ""}
-                      {option.isHallmarkable ? " · Hallmarkable" : ""}
-                    </span>
-                  </div>
-
-                  {canEdit ? (
-                    <div className="flex items-center gap-3">
-                      <Switch
-                        checked={option.isActive}
-                        disabled={togglingId === option.id}
-                        onCheckedChange={(checked) => handleToggle(option.id, checked)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(option.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                        aria-label={`Edit ${option.label}`}
-                        title="Edit Purity"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(option.id, option.label)}
-                        disabled={deletingId === option.id}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                        aria-label={`Delete ${option.label}`}
-                        title="Delete Purity (only if unused)"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+            <div className="max-h-72 space-y-2 overflow-y-auto">
+              {purities.map((option) =>
+                editingId === option.id ? (
+                  <PurityFormRow
+                    key={option.id}
+                    option={option}
+                    storeMetalId={selectedMetalId}
+                    onDone={() => setEditingId(null)}
+                    onSaved={() => reloadPurities(selectedMetalId)}
+                  />
+                ) : (
+                  <div
+                    key={option.id}
+                    className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+                  >
+                    <div className={option.isActive ? "" : "text-muted-foreground line-through"}>
+                      <span className="font-medium">{option.label}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        SKU "{option.skuCode}" &middot; {option.finenessPercent}% fine
+                        {option.sellingPrice != null ? ` · ₹${option.sellingPrice}` : ""}
+                        {option.isHallmarkable ? " · Hallmarkable" : ""}
+                      </span>
                     </div>
-                  ) : (
-                    <ActiveBadge isActive={option.isActive} />
-                  )}
-                </div>
-              ),
-            )}
+
+                    {canEdit ? (
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          checked={option.isActive}
+                          disabled={togglingId === option.id}
+                          onCheckedChange={(checked) => handleToggle(option.id, checked)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(option.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                          aria-label={`Edit ${option.label}`}
+                          title="Edit Purity"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(option.id, option.label)}
+                          disabled={deletingId === option.id}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                          aria-label={`Delete ${option.label}`}
+                          title="Delete Purity (only if unused)"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <ActiveBadge isActive={option.isActive} />
+                    )}
+                  </div>
+                ),
+              )}
+            </div>
 
             {canEdit ? (
               showAdd ? (
@@ -1307,56 +1315,58 @@ function CategoriesSection({
           <p className="text-sm text-muted-foreground">No categories configured yet.</p>
         ) : null}
 
-        {categories.map((category) =>
-          editingId === category.id ? (
-            <CategoryFormRow
-              key={category.id}
-              category={category}
-              onDone={() => setEditingId(null)}
-            />
-          ) : (
-            <div key={category.id} className="space-y-2 rounded-md border px-3 py-2">
-              <div className="flex items-center justify-between gap-3">
-                <span className={category.isActive ? "" : "text-muted-foreground line-through"}>
-                  {category.name}
-                </span>
+        <div className="max-h-72 space-y-2 overflow-y-auto">
+          {categories.map((category) =>
+            editingId === category.id ? (
+              <CategoryFormRow
+                key={category.id}
+                category={category}
+                onDone={() => setEditingId(null)}
+              />
+            ) : (
+              <div key={category.id} className="space-y-2 rounded-md border px-3 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className={category.isActive ? "" : "text-muted-foreground line-through"}>
+                    {category.name}
+                  </span>
 
-                {canEdit ? (
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      checked={category.isActive}
-                      disabled={togglingId === category.id}
-                      onCheckedChange={(checked) => handleToggle(category.id, checked)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(category.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                      aria-label={`Edit ${category.name}`}
-                      title="Edit category"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(category.id, category.name)}
-                      disabled={deletingId === category.id}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                      aria-label={`Delete ${category.name}`}
-                      title="Delete category (only if unused)"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <ActiveBadge isActive={category.isActive} />
-                )}
+                  {canEdit ? (
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={category.isActive}
+                        disabled={togglingId === category.id}
+                        onCheckedChange={(checked) => handleToggle(category.id, checked)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(category.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                        aria-label={`Edit ${category.name}`}
+                        title="Edit category"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(category.id, category.name)}
+                        disabled={deletingId === category.id}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                        aria-label={`Delete ${category.name}`}
+                        title="Delete category (only if unused)"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <ActiveBadge isActive={category.isActive} />
+                  )}
+                </div>
+
+                <CategoryMetalTags category={category} metals={metals} canEdit={canEdit} />
               </div>
-
-              <CategoryMetalTags category={category} metals={metals} canEdit={canEdit} />
-            </div>
-          ),
-        )}
+            ),
+          )}
+        </div>
 
         {canEdit ? (
           showAdd ? (
@@ -1651,57 +1661,59 @@ function TypesSection({
               </p>
             ) : null}
 
-            {types.map((type) =>
-              editingId === type.id ? (
-                <TypeFormRow
-                  key={type.id}
-                  type={type}
-                  categoryId={selectedCategoryId}
-                  onDone={() => setEditingId(null)}
-                  onSaved={() => reloadTypes(selectedCategoryId)}
-                />
-              ) : (
-                <div
-                  key={type.id}
-                  className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-                >
-                  <span className={type.isActive ? "" : "text-muted-foreground line-through"}>
-                    {type.name}
-                  </span>
+            <div className="max-h-72 space-y-2 overflow-y-auto">
+              {types.map((type) =>
+                editingId === type.id ? (
+                  <TypeFormRow
+                    key={type.id}
+                    type={type}
+                    categoryId={selectedCategoryId}
+                    onDone={() => setEditingId(null)}
+                    onSaved={() => reloadTypes(selectedCategoryId)}
+                  />
+                ) : (
+                  <div
+                    key={type.id}
+                    className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+                  >
+                    <span className={type.isActive ? "" : "text-muted-foreground line-through"}>
+                      {type.name}
+                    </span>
 
-                  {canEdit ? (
-                    <div className="flex items-center gap-3">
-                      <Switch
-                        checked={type.isActive}
-                        disabled={togglingId === type.id}
-                        onCheckedChange={(checked) => handleToggle(type.id, checked)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(type.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                        aria-label={`Edit ${type.name}`}
-                        title="Edit type"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(type.id, type.name)}
-                        disabled={deletingId === type.id}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                        aria-label={`Delete ${type.name}`}
-                        title="Delete type (only if unused)"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <ActiveBadge isActive={type.isActive} />
-                  )}
-                </div>
-              ),
-            )}
+                    {canEdit ? (
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          checked={type.isActive}
+                          disabled={togglingId === type.id}
+                          onCheckedChange={(checked) => handleToggle(type.id, checked)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(type.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                          aria-label={`Edit ${type.name}`}
+                          title="Edit type"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(type.id, type.name)}
+                          disabled={deletingId === type.id}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                          aria-label={`Delete ${type.name}`}
+                          title="Delete type (only if unused)"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <ActiveBadge isActive={type.isActive} />
+                    )}
+                  </div>
+                ),
+              )}
+            </div>
 
             {canEdit ? (
               showAdd ? (

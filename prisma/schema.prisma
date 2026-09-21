@@ -410,7 +410,8 @@ model StoreCategory {
   // metal), matching today's behavior for all of the app's existing
   // categories. Populated only once a Store Admin deliberately restricts a
   // category to specific metals.
-  metalTags StoreCategoryMetal[]
+  metalTags        StoreCategoryMetal[]
+  draftOrderItems  DraftOrderItem[]
 
   @@unique([storeId, name])
 }
@@ -457,6 +458,7 @@ model StoreCategoryType {
   updatedAt  DateTime      @updatedAt
   category   StoreCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   products   Product[]
+  draftOrderItems DraftOrderItem[]
 
   @@unique([categoryId, name])
 }
@@ -1740,6 +1742,14 @@ model DraftOrderItem {
   id                   String      @id @default(cuid())
   draftOrderId         String
   itemName             String
+  // Category/Type — same two-level picker as Product.categoryId/
+  // categoryTypeId (e.g. Category "Ornament" -> Type "Bangle"), added so a
+  // phone/counter order can capture what kind of piece the party wants
+  // before it exists as a real Product. Nullable: an order can be taken
+  // with just an item name and no category picked yet, same as every other
+  // optional field on this model.
+  categoryId           String?
+  categoryTypeId       String?
   metalTypeId          String?
   purity               PurityType?
   purityLabel          String?
@@ -1761,10 +1771,14 @@ model DraftOrderItem {
   updatedAt            DateTime    @updatedAt
 
   draftOrder         DraftOrder          @relation(fields: [draftOrderId], references: [id], onDelete: Cascade)
+  category           StoreCategory?      @relation(fields: [categoryId], references: [id])
+  categoryType       StoreCategoryType?  @relation(fields: [categoryTypeId], references: [id])
   metalType          StoreMetal?         @relation(fields: [metalTypeId], references: [id])
   karigarReceiptItem KarigarReceiptItem? @relation(fields: [karigarReceiptItemId], references: [id])
 
   @@index([draftOrderId])
+  @@index([categoryId])
+  @@index([categoryTypeId])
 }
 
 model Quotation {

@@ -104,7 +104,8 @@ export function UserStoreAccess({ userId, rows }: UserStoreAccessProps) {
         </p>
       </CardHeader>
 
-      <CardContent className="divide-y p-0">
+      <CardContent className="p-0">
+        <div className="max-h-72 divide-y overflow-y-auto">
         {state.map((row) => {
           const busy = busyStoreId === row.storeId
 
@@ -200,6 +201,7 @@ export function UserStoreAccess({ userId, rows }: UserStoreAccessProps) {
             </div>
           )
         })}
+        </div>
       </CardContent>
     </Card>
   )

@@ -74,41 +74,43 @@ export function PlansClient({ plans }: { plans: PlanRow[] }) {
             <p className="text-sm text-muted-foreground">No plans configured yet.</p>
           ) : null}
 
-          {plans.map((plan) =>
-            editingId === plan.id ? (
-              <PlanFormRow key={plan.id} plan={plan} onDone={() => setEditingId(null)} />
-            ) : (
-              <div
-                key={plan.id}
-                className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-              >
-                <div className="flex items-center gap-3">
-                  <span className={plan.isActive ? "font-medium" : "font-medium text-muted-foreground line-through"}>
-                    {plan.name}
-                  </span>
-                  <Badge variant="secondary">{plan.durationDays} days</Badge>
-                  <Badge variant="outline">{formatPrice(plan.price)}</Badge>
-                </div>
+          <div className="max-h-72 space-y-2 overflow-y-auto">
+            {plans.map((plan) =>
+              editingId === plan.id ? (
+                <PlanFormRow key={plan.id} plan={plan} onDone={() => setEditingId(null)} />
+              ) : (
+                <div
+                  key={plan.id}
+                  className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={plan.isActive ? "font-medium" : "font-medium text-muted-foreground line-through"}>
+                      {plan.name}
+                    </span>
+                    <Badge variant="secondary">{plan.durationDays} days</Badge>
+                    <Badge variant="outline">{formatPrice(plan.price)}</Badge>
+                  </div>
 
-                <div className="flex items-center gap-3">
-                  <Switch
-                    checked={plan.isActive}
-                    disabled={togglingId === plan.id}
-                    onCheckedChange={(checked) => handleToggle(plan.id, checked)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(plan.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
-                    aria-label={`Edit ${plan.name}`}
-                    title="Edit plan"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={plan.isActive}
+                      disabled={togglingId === plan.id}
+                      onCheckedChange={(checked) => handleToggle(plan.id, checked)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(plan.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                      aria-label={`Edit ${plan.name}`}
+                      title="Edit plan"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ),
-          )}
+              ),
+            )}
+          </div>
 
           {showAdd ? (
             <PlanFormRow onDone={() => setShowAdd(false)} />

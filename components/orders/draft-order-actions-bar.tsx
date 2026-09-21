@@ -1,9 +1,13 @@
 "use client"
 
+import Link from "next/link"
+import { PackageCheck } from "lucide-react"
+
 import type { DraftOrderDetail } from "@/lib/actions/draft-order-actions"
 import { EditDraftOrderDialog } from "@/components/orders/edit-draft-order-dialog"
 import { CancelDraftOrderButton } from "@/components/orders/cancel-draft-order-button"
 import { SendToKarigarDialog } from "@/components/orders/send-to-karigar-dialog"
+import { Button } from "@/components/ui/button"
 import type { KarigarOption } from "@/components/karigars/karigar-select"
 import type { LocationOption } from "@/components/shared/location-select"
 
@@ -17,14 +21,16 @@ type DraftOrderActionsBarProps = {
 }
 
 /**
- * Every action available on a draft order — Edit, Cancel, Send to Artisan.
- * Shared between the standalone /orders/[id] page and the Draft Orders
- * list's inline detail panel so the two can never drift apart, same
- * convention as InvoiceActionsBar/QuotationActionsBar.
+ * Every action available on a draft order — Edit, Cancel, Send to Artisan
+ * while still DRAFT; Receive Items once it's been SENT_TO_KARIGAR. Shared
+ * between the standalone /orders/[id] page and the Draft Orders list's
+ * inline detail panel so the two can never drift apart, same convention as
+ * InvoiceActionsBar/QuotationActionsBar.
  *
- * All three only ever show while still DRAFT — once sent to an artisan or
- * received, the order is a record of what actually happened, not
- * something to edit/cancel/re-send.
+ * Edit/Cancel/Send to Artisan only ever show while still DRAFT — once sent
+ * to an artisan, the order itself is a record of what actually happened,
+ * not something to edit/cancel/re-send. RECEIVED/CANCELLED show nothing
+ * further; there's nothing left to do.
  */
 export function DraftOrderActionsBar({
   order,
@@ -33,6 +39,25 @@ export function DraftOrderActionsBar({
   defaultLocationId,
   sendToArtisanEnabled = true,
 }: DraftOrderActionsBarProps) {
+  if (order.status === "SENT_TO_KARIGAR" && order.karigarJob) {
+    // The item-level Receive Items page (receiveItemsFromKarigar,
+    // inventory-stock-actions.ts) is the only place this order's items
+    // actually get matched to what came back and turned into real Product/
+    // InventoryStock rows — sendDraftOrderToKarigar links this order to
+    // that job (karigarJobId) precisely so this page can find its way
+    // there. Previously nothing in the UI linked to it at all once an
+    // order left DRAFT, so a sent order had no discoverable path to ever
+    // being received.
+    return (
+      <Button asChild>
+        <Link href={`/karigars/${order.karigarJob.karigarId}/receive-items/${order.karigarJob.id}`}>
+          <PackageCheck className="h-4 w-4" />
+          Receive Items
+        </Link>
+      </Button>
+    )
+  }
+
   if (order.status !== "DRAFT") return null
 
   return (

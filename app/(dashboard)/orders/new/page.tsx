@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { Suspense } from "react"
 
 import { getQuotationFormCustomers } from "@/lib/actions/quotation-actions"
-import { getStoreMetals } from "@/lib/actions/taxonomy-actions"
+import { getStoreMetals, getStoreCategories } from "@/lib/actions/taxonomy-actions"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 
 import { DraftOrderForm } from "@/components/orders/draft-order-form"
@@ -13,9 +13,10 @@ export const metadata: Metadata = {
 }
 
 export default async function NewDraftOrderPage() {
-  const [customers, metals, locations, defaultLocationId] = await Promise.all([
+  const [customers, metals, categories, locations, defaultLocationId] = await Promise.all([
     getQuotationFormCustomers(),
     getStoreMetals(),
+    getStoreCategories(),
     getStoreLocations(),
     getDefaultLocationId(),
   ])
@@ -38,6 +39,7 @@ export default async function NewDraftOrderPage() {
           <DraftOrderForm
             customers={customers}
             metals={metals}
+            categories={categories}
             locations={locations}
             defaultLocationId={defaultLocationId}
           />

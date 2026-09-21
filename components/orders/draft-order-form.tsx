@@ -17,9 +17,12 @@ import { classifyPurityFamily } from "@/lib/business-units"
 import {
   getStoreMetalPurities,
   getStoreMetalOrigins,
+  getStoreCategoryTypes,
   type StoreMetalRow,
   type StoreMetalPurityRow,
   type StoreMetalOriginRow,
+  type StoreCategoryRow,
+  type StoreCategoryTypeRow,
 } from "@/lib/actions/taxonomy-actions"
 import type { PurityType } from "@prisma/client"
 import { useToast } from "@/components/providers/toast-provider"
@@ -66,6 +69,8 @@ function emptyItem(key: string = crypto.randomUUID()): ItemRow {
   return {
     key,
     itemName: "",
+    categoryId: null,
+    categoryTypeId: null,
     metalTypeId: "",
     purity: null,
     purityLabel: null,
@@ -88,6 +93,7 @@ function formatEstimatedAmount(weight: number | null | undefined, rate: number |
 type DraftOrderFormProps = {
   customers: CustomerOption[]
   metals: StoreMetalRow[]
+  categories: StoreCategoryRow[]
   locations?: LocationOption[]
   defaultLocationId?: string | null
 }
@@ -113,6 +119,7 @@ type DraftOrderDraft = {
 export function DraftOrderForm({
   customers,
   metals,
+  categories,
   locations = [],
   defaultLocationId = null,
 }: DraftOrderFormProps) {
@@ -154,6 +161,20 @@ export function DraftOrderForm({
       .catch((err) => console.error("Failed to load Stone Types:", err))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stoneTypesCache])
+
+  // Category Types (Settings > Taxonomy > Categories, per-Category) for
+  // whichever Category is picked as an item's own Category — same
+  // cache-per-id + on-demand-fetch pattern as metalPuritiesCache/
+  // stoneTypesCache above.
+  const [categoryTypesCache, setCategoryTypesCache] = useState<Record<string, StoreCategoryTypeRow[]>>({})
+
+  const ensureCategoryTypes = useCallback((categoryId: string) => {
+    if (!categoryId || categoryTypesCache[categoryId]) return
+    getStoreCategoryTypes(categoryId)
+      .then((data) => setCategoryTypesCache((prev) => ({ ...prev, [categoryId]: data })))
+      .catch((err) => console.error("Failed to load Category Types:", err))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryTypesCache])
   const [locationId, setLocationId] = useState(defaultLocationId ?? "")
   const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
   const showLocationField = useShowLocationField(locations.length)
@@ -416,6 +437,66 @@ export function DraftOrderForm({
                       required
                     />
                   </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Category</Label>
+                    <Select
+                      value={item.categoryId ?? "__none__"}
+                      onValueChange={(value) => {
+                        const categoryId = value === "__none__" ? null : value
+                        // Same reset-on-switch behavior as Kind/Metal below:
+                        // a Type picked under the previous Category no
+                        // longer applies once the Category itself changes.
+                        if (categoryId) ensureCategoryTypes(categoryId)
+                        updateItem(item.key, { categoryId, categoryTypeId: null })
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {categories
+                          .filter((category) => category.isActive)
+                          .map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Same "hide until there's something to show" rule as
+                      product-form.tsx's own Type field: most Categories
+                      have no Types configured, so this only renders once
+                      the selected Category's Types have actually loaded and
+                      it turns out there's at least one. */}
+                  {item.categoryId && (categoryTypesCache[item.categoryId]?.length ?? 0) > 0 && (
+                    <div className="space-y-1.5">
+                      <Label>Type</Label>
+                      <Select
+                        value={item.categoryTypeId ?? "__none__"}
+                        onValueChange={(value) =>
+                          updateItem(item.key, { categoryTypeId: value === "__none__" ? null : value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {(categoryTypesCache[item.categoryId] ?? [])
+                            .filter((type) => type.isActive)
+                            .map((type) => (
+                              <SelectItem key={type.id} value={type.id}>
+                                {type.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   <div className="space-y-1.5">
                     <Label>Kind</Label>

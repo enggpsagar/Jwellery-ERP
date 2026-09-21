@@ -32,6 +32,12 @@ import { parseDateRangeBoundary } from "@/lib/date-range";
 
 export type DraftOrderItemInput = {
   itemName: string;
+  // Category/Type — same two-level Category -> Type picker as
+  // product-form.tsx's own categoryId/categoryTypeId (e.g. "Ornament" ->
+  // "Bangle"). Optional, same as metalTypeId below: a phone/counter order
+  // can be captured before the party has settled on a category.
+  categoryId?: string | null;
+  categoryTypeId?: string | null;
   metalTypeId?: string | null;
   purity?: PurityType | null;
   purityLabel?: string | null;
@@ -547,6 +553,8 @@ export async function createDraftOrder(
           items: {
             create: items.map((item) => ({
               itemName: item.itemName.trim(),
+              categoryId: item.categoryId || undefined,
+              categoryTypeId: item.categoryTypeId || undefined,
               metalTypeId: item.metalTypeId || undefined,
               purity: item.purity || undefined,
               purityLabel: item.purityLabel || undefined,

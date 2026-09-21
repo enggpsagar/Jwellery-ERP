@@ -884,5 +884,15 @@ export async function getUnfulfilledDraftOrderItemsForJob(jobId: string) {
       itemName: item.itemName,
       quantity: item.quantity,
       estimatedWeight: item.estimatedWeight ? Number(item.estimatedWeight) : null,
+      // Everything else the order already captured about this piece —
+      // matching a returned item to one of these now prefills the whole
+      // row (receive-items-form.tsx's applyDraftOrderItemToRow) instead of
+      // just recording the link and leaving every field for staff to
+      // retype by hand.
+      metalTypeId: item.metalTypeId,
+      purity: item.purity,
+      purityLabel: item.purityLabel,
+      estimatedRate: item.estimatedRate ? Number(item.estimatedRate) : null,
+      designNotes: item.designNotes,
     }));
 }

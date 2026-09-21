@@ -87,12 +87,19 @@ type ReceiptItem = {
 /** An unfulfilled item on the Draft Order this job is fulfilling (empty when
  * the job has no linked order) — lets the staff say "this returned piece is
  * the Ring the customer ordered," which stamps that order's item as received
- * once submitted (see receiveItemsFromKarigar's draftOrderItemId handling). */
+ * once submitted (see receiveItemsFromKarigar's draftOrderItemId handling),
+ * and — via applyDraftOrderItemToRow below — prefills the whole row from
+ * what the order already captured, rather than making staff retype it. */
 export type DraftOrderItemOption = {
   id: string
   itemName: string
   quantity: number
   estimatedWeight: number | null
+  metalTypeId: string | null
+  purity: string | null
+  purityLabel: string | null
+  estimatedRate: number | null
+  designNotes: string | null
 }
 
 function deriveNetWeight(
@@ -153,6 +160,55 @@ function emptyReceiptItem(
     netTouched: false,
     draftOrderItemId: "",
   }
+}
+
+/**
+ * Everything a matched Draft Order item is willing to prefill onto a row —
+ * name, quantity, an estimated weight (into Gross Weight; staff still
+ * verifies/adjusts it against the real scale once weighed, same as any
+ * other field here, and Net stays live via the normal Gross/Less/Stone/Dmo
+ * auto-calc since nothing's subtracted from the estimate yet), purity, and
+ * the quoted rate — shared by receiptItemFromDraftOrderItem (this row's own
+ * initial state, when the job's linked order has exactly this item still
+ * unmatched) and applyDraftOrderItemToRow (staff manually picking a match
+ * later), so the two can never drift apart.
+ */
+function draftOrderItemFields(
+  orderItem: DraftOrderItemOption,
+  jobMetalTypeId: string | null | undefined,
+  fallbackMetalTypeId: string,
+) {
+  const grossWeight = orderItem.estimatedWeight ?? 0
+  return {
+    draftOrderItemId: orderItem.id,
+    itemName: orderItem.itemName,
+    quantity: orderItem.quantity || 1,
+    metalTypeId: jobMetalTypeId ?? orderItem.metalTypeId ?? fallbackMetalTypeId,
+    purity: orderItem.purity ?? "",
+    purityLabel: orderItem.purityLabel ?? "",
+    grossWeight,
+    netWeight: deriveNetWeight(grossWeight, 0, 0, 0) ?? 0,
+    netTouched: false,
+    saleRate: orderItem.estimatedRate ?? 0,
+    remarks: orderItem.designNotes ?? "",
+  }
+}
+
+/**
+ * The initial row for a Draft Order item this job hasn't matched yet — so a
+ * job with a linked order opens already filled in rather than starting
+ * blank and making staff match-then-retype everything. Keyed by the order
+ * item's own id (stable, deterministic) rather than a fresh
+ * crypto.randomUUID() — safe to compute during the initial render.
+ */
+function receiptItemFromDraftOrderItem(
+  orderItem: DraftOrderItemOption,
+  defaultMetal: StoreMetalRow | undefined,
+  defaultLocationId: string | null | undefined,
+  jobMetalTypeId: string | null | undefined,
+): ReceiptItem {
+  const base = emptyReceiptItem(defaultMetal, defaultLocationId, orderItem.id)
+  return { ...base, ...draftOrderItemFields(orderItem, jobMetalTypeId, base.metalTypeId) }
 }
 
 /**
@@ -233,9 +289,20 @@ export function ReceiveItemsForm({
     [metals],
   )
 
-  const [items, setItems] = useState<ReceiptItem[]>([
-    emptyReceiptItem(defaultMetal, defaultLocationId, "initial"),
-  ])
+  // One prefilled row per still-unmatched Draft Order item when this job
+  // has a linked order — so a sent order's own items land here already
+  // filled in, not as a single blank row staff has to match-then-retype
+  // (see draftOrderItemFields' own doc comment). Falls back to the
+  // original single blank row for a plain material-only job with no
+  // linked order. Lazy initializer: draftOrderItems/defaultMetal/etc. are
+  // all props, so this only needs to run once.
+  const [items, setItems] = useState<ReceiptItem[]>(() =>
+    draftOrderItems.length > 0
+      ? draftOrderItems.map((orderItem) =>
+          receiptItemFromDraftOrderItem(orderItem, defaultMetal, defaultLocationId, jobMetalTypeId),
+        )
+      : [emptyReceiptItem(defaultMetal, defaultLocationId, "initial")],
+  )
   const [labourCharge, setLabourCharge] = useState(0)
 
   // ProductSelect only seeds its own selection from `defaultValue` once, so
@@ -259,6 +326,14 @@ export function ReceiveItemsForm({
 
   useEffect(() => {
     if (defaultMetal?.id) ensureMetalPurities(defaultMetal.id)
+    // Pre-seeded Draft Order rows (see the items initializer above) can
+    // each carry their own metalTypeId when the job has none locked in —
+    // load every one of those too, not just defaultMetal's, so their own
+    // Purity dropdowns aren't stuck empty until something else happens to
+    // trigger the fetch.
+    for (const item of items) {
+      if (item.metalTypeId) ensureMetalPurities(item.metalTypeId)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultMetal?.id])
   const [editingQuantityKeys, setEditingQuantityKeys] = useState<Set<string>>(new Set())
@@ -446,6 +521,19 @@ export function ReceiveItemsForm({
     // change, so this dialog doesn't couple to that field's shape and lets
     // the user pick Metal Type per returned item directly instead.
     updateItem(key, { productId, itemName: product.name })
+  }
+
+  /**
+   * Matching a returned item to what the Draft Order actually ordered
+   * prefills the whole row from it (draftOrderItemFields) instead of just
+   * recording the link and leaving every field blank for staff to retype
+   * by hand, which was the entire point of matching it in the first place.
+   */
+  const applyDraftOrderItemToRow = (key: string, orderItem: DraftOrderItemOption) => {
+    const currentMetalTypeId = items.find((item) => item.key === key)?.metalTypeId ?? defaultMetal?.id ?? ""
+    const fields = draftOrderItemFields(orderItem, jobMetalTypeId, currentMetalTypeId)
+    if (fields.metalTypeId) ensureMetalPurities(fields.metalTypeId)
+    updateItem(key, fields)
   }
 
   const removeItem = (key: string) => {
@@ -649,7 +737,10 @@ export function ReceiveItemsForm({
                       <Label className="text-xs">Matches Draft Order Item</Label>
                       <Select
                         value={item.draftOrderItemId}
-                        onValueChange={(value) => updateItem(item.key, { draftOrderItemId: value })}
+                        onValueChange={(value) => {
+                          const orderItem = draftOrderItems.find((o) => o.id === value)
+                          if (orderItem) applyDraftOrderItemToRow(item.key, orderItem)
+                        }}
                       >
                         <SelectTrigger className="h-11 w-full">
                           <SelectValue placeholder="Optional — none" />
@@ -713,6 +804,22 @@ export function ReceiveItemsForm({
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Purity</Label>
                       <Select
+                        // Remounts once this metal's real purities have
+                        // loaded, rather than letting the same mounted
+                        // Select transition its `value` from "__none__" to
+                        // a real id with no user interaction in between.
+                        // Radix's hidden native-select mirror (rendered
+                        // alongside the visible dropdown for browser
+                        // autofill) resyncs on that kind of value-prop-only
+                        // change and can fire a stray onValueChange of its
+                        // own before its option list has caught up,
+                        // reporting back empty and wiping the prefilled
+                        // purity right back out. A fresh instance just
+                        // renders with the correct value from its very
+                        // first paint, so there's no live transition for
+                        // that resync to react to. Same remount-via-key
+                        // idiom as ProductSelect's own productSelectKeys.
+                        key={metalPuritiesCache[item.metalTypeId] ? "loaded" : "loading"}
                         value={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
                         onValueChange={(value) => selectPurity(item, value === "__none__" ? "" : value)}
                       >

@@ -100,36 +100,13 @@ export type PaymentEntryInput = {
   attachmentUrl?: string | null;
 };
 
-function parsePayments(raw: string): PaymentEntryInput[] | null {
-  let payments: PaymentEntryInput[];
-  try {
-    payments = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-
-  if (!Array.isArray(payments) || payments.length < 1 || payments.length > 2) {
-    return null;
-  }
-
-  for (const payment of payments) {
-    if (!Object.values(PaymentMethod).includes(payment.method as PaymentMethod)) {
-      return null;
-    }
-    if (!(Number(payment.amount) > 0)) {
-      return null;
-    }
-  }
-
-  return payments;
-}
-
 /**
- * Same shape/validation as parsePayments, but allows zero rows — used at
- * document-CREATION time (createInvoice) where a fully-on-credit invoice
- * (nothing paid yet) is a normal, valid case. parsePayments itself stays
- * strict (1-2 rows required) because recordInvoicePayment's dialog only
- * ever appears once there's a known positive balance to collect against.
+ * 0-2 payment-method rows, each with a real positive amount — zero rows is
+ * valid (a fully-on-credit createInvoice, or a recordInvoicePayment covered
+ * entirely by applied store credit; see each caller's own creditApplied
+ * handling), a row with a zero/blank amount is not (the caller is expected
+ * to drop those before building paymentsJson, same as invoice-form.tsx's
+ * and record-payment-dialog.tsx's own `.filter((row) => row.amount > 0)`).
  */
 function parseOptionalPayments(raw: string): PaymentEntryInput[] | null {
   let payments: PaymentEntryInput[];
@@ -1501,20 +1478,40 @@ export async function recordInvoicePayment(
     const paymentsRaw = String(formData.get("paymentsJson") || "[]");
     const notes = String(formData.get("notes") || "").trim() || null;
 
-    const payments = parsePayments(paymentsRaw);
+    // Optional, not required (parseOptionalPayments, not parsePayments) —
+    // applying store credit (creditApplied below) can cover the entire
+    // balance on its own now, leaving zero real payment-method rows, which
+    // used to be impossible before that existed.
+    const payments = parseOptionalPayments(paymentsRaw);
     if (!payments) {
       return { success: false, message: "Add 1-2 valid payment methods with an amount" };
-    }
-
-    const amount = payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
-    if (amount <= 0) {
-      return { success: false, message: "Enter a valid payment amount" };
     }
 
     const storeId = await requireStoreScope();
 
     const invoice = await prisma.invoice.findFirst({ where: { id: invoiceId, storeId } });
     if (!invoice) return { success: false, message: "Invoice not found" };
+
+    // The customer's own existing store credit applied here instead of new
+    // cash — same shape/validation as createInvoice's own creditApplied
+    // handling (invoice-form.tsx's "Apply Credit"), re-fetched fresh rather
+    // than trusted from the client for the same reason.
+    const creditApplied = toNumber(formData.get("creditApplied"));
+    if (creditApplied > 0) {
+      const availableCredit = await getCustomerAvailableCredit(invoice.customerId);
+      if (creditApplied > availableCredit) {
+        return {
+          success: false,
+          message: `This customer's available credit has changed (₹${availableCredit.toFixed(2)} left) — refresh and try again.`,
+        };
+      }
+    }
+
+    const amount =
+      payments.reduce((sum, payment) => sum + Number(payment.amount), 0) + creditApplied;
+    if (amount <= 0) {
+      return { success: false, message: "Enter a valid payment amount" };
+    }
 
     // Reject rather than silently clamp — without this, an amount typed
     // larger than what's actually owed pushed paidAmount past totalAmount
@@ -1558,6 +1555,22 @@ export async function recordInvoicePayment(
           },
         }),
       ),
+      ...(creditApplied > 0
+        ? [
+            prisma.ledgerEntry.create({
+              data: {
+                storeId,
+                type: LedgerEntryType.CREDIT,
+                sourceType: LedgerSourceType.CREDIT_APPLIED,
+                customerId: invoice.customerId,
+                invoiceId,
+                amount: creditApplied,
+                description: notes ?? `Store credit applied to ${invoice.invoiceNumber}`,
+                locationId: invoice.locationId ?? undefined,
+              },
+            }),
+          ]
+        : []),
     ]);
 
     revalidatePath("/billing");

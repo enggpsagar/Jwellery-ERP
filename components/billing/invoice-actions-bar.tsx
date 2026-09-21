@@ -151,7 +151,11 @@ export function InvoiceActionsBar({
       )}
       {!isCancelled && (
         <>
-          <RecordPaymentDialog invoiceId={invoice.id} balanceAmount={invoice.balanceAmount} />
+          <RecordPaymentDialog
+            invoiceId={invoice.id}
+            balanceAmount={invoice.balanceAmount}
+            customerId={invoice.customer?.id}
+          />
           <EditInvoiceDialog
             compact
             invoiceId={invoice.id}

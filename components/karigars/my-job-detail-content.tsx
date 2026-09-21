@@ -95,6 +95,37 @@ export function MyJobDetailContent({ job }: { job: MyJobDetail }) {
           </CardContent>
         </Card>
       ) : null}
+
+      {job.ledgerEntries.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Ledger</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {job.ledgerEntries.map((entry) => (
+              <div key={entry.id} className="rounded-lg border p-3 text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-muted-foreground">{formatShortDate(entry.dateISO)}</span>
+                  <div className="text-right font-medium">
+                    {entry.metalWeightFine ? (
+                      <div>
+                        {entry.type === "DEBIT" ? "+" : "-"}
+                        {entry.metalWeightFine.toFixed(3)} g{entry.metalName ? ` ${entry.metalName}` : ""}
+                      </div>
+                    ) : null}
+                    {entry.amount ? (
+                      <div>
+                        {entry.type === "DEBIT" ? "+" : "-"}₹ {entry.amount.toLocaleString("en-IN")}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="mt-1">{entry.description}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   )
 }

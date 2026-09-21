@@ -80,6 +80,16 @@ export type MyJobReceiptItem = {
   fineWeight: number;
 };
 
+export type MyJobLedgerRow = {
+  id: string;
+  dateISO: string;
+  type: "CREDIT" | "DEBIT";
+  description: string;
+  metalWeightFine: number | null;
+  metalName: string | null;
+  amount: number;
+};
+
 export type MyJobDetail = {
   id: string;
   jobNumber: string | null;
@@ -99,6 +109,7 @@ export type MyJobDetail = {
   finishedPieceLabel: string | null;
   draftOrder: { orderNumber: string; items: MyJobDetailItem[] } | null;
   receiptItems: MyJobReceiptItem[];
+  ledgerEntries: MyJobLedgerRow[];
 };
 
 export async function getMyJobById(id: string): Promise<MyJobDetail | null> {
@@ -142,6 +153,21 @@ export async function getMyJobById(id: string): Promise<MyJobDetail | null> {
 
   if (!job) return null;
 
+  // LedgerEntry has no karigarJobId FK — every job-bound Issue/Receive/
+  // Labour Charge entry embeds "Job <jobNumber>" in its own description
+  // instead (see issueMaterialToKarigar/sendDraftOrderToKarigar/
+  // receiveItemsFromKarigar), so that's the only way to find a job's own
+  // slice of this karigar's ledger. recordMaterialReceiptFromKarigar
+  // (against-outstanding-balance receipts with no job) deliberately never
+  // includes a job number, so it's correctly excluded here.
+  const ledgerEntries = job.jobNumber
+    ? await prisma.ledgerEntry.findMany({
+        where: { karigarId, description: { contains: job.jobNumber } },
+        orderBy: [{ entryDate: "asc" }, { createdAt: "asc" }],
+        include: { metalType: { select: { name: true } } },
+      })
+    : [];
+
   return {
     id: job.id,
     jobNumber: job.jobNumber,
@@ -182,6 +208,15 @@ export async function getMyJobById(id: string): Promise<MyJobDetail | null> {
       grossWeight: item.grossWeight ? Number(item.grossWeight) : null,
       netWeight: item.netWeight ? Number(item.netWeight) : null,
       fineWeight: Number(item.fineWeight),
+    })),
+    ledgerEntries: ledgerEntries.map((entry) => ({
+      id: entry.id,
+      dateISO: entry.entryDate.toISOString(),
+      type: entry.type as "CREDIT" | "DEBIT",
+      description: entry.description ?? "",
+      metalWeightFine: entry.metalWeightFine ? Number(entry.metalWeightFine) : null,
+      metalName: entry.metalType?.name ?? null,
+      amount: Number(entry.amount ?? 0),
     })),
   };
 }

@@ -48,6 +48,12 @@ type ItemRow = DraftOrderItemInput & {
   // clobbers a rate the user typed in by hand — same "touched" idiom as
   // invoice-form.tsx's hmChargeTouched/stoneChargeTouched.
   rateTouched: boolean
+  // UI-only — same two-step "pick Kind, then pick the type-appropriate
+  // material" selection behavior as product-form.tsx's productKind, so the
+  // "Metal / Stone" dropdown below only ever lists options matching this.
+  // Never submitted (see itemsJson below): the server only needs the final
+  // metalTypeId/purity/stoneTypeName, same as before this existed.
+  kind: "METAL" | "STONE"
 }
 
 // `key` defaults to a fresh UUID for every "Add Item" click (client-only,
@@ -69,6 +75,7 @@ function emptyItem(key: string = crypto.randomUUID()): ItemRow {
     estimatedRate: null,
     designNotes: "",
     rateTouched: false,
+    kind: "METAL",
   }
 }
 
@@ -270,7 +277,7 @@ export function DraftOrderForm({
   }
 
   const itemsJson = JSON.stringify(
-    items.map(({ key: _key, rateTouched: _rateTouched, ...rest }) => rest),
+    items.map(({ key: _key, rateTouched: _rateTouched, kind: _kind, ...rest }) => rest),
   )
 
   // Rough order-level total from each line's estimatedWeight × estimatedRate —
@@ -311,48 +318,69 @@ export function DraftOrderForm({
       <input type="hidden" name="itemsJson" value={itemsJson} />
       <input type="hidden" name="paymentsJson" value={paymentsJson} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Party &amp; Order Details</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5 md:col-span-2">
-            <Label>
-              Party <RequiredMark />
-            </Label>
-            <CustomerSelect
-              key={customerSelectKey}
-              customers={customers}
-              defaultValue={customerId}
-              onChange={(id) => setCustomerId(id)}
-              onBeforeAddNew={() => saveDraft()}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Expected Date</Label>
-            <Input name="expectedDate" type="date" />
-          </div>
-          <div className="space-y-1.5">
-            {showLocationField && <Label>Location</Label>}
-            <LocationSelect
-              key={locationSelectKey}
-              locations={locations}
-              name="locationId"
-              defaultValue={locationId}
-              onChange={setLocationId}
-            />
-          </div>
-          <div className="space-y-1.5 md:col-span-2">
-            <Label>Notes</Label>
-            <Textarea name="notes" rows={2} placeholder="Any general notes about this order" />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Requested Items (the variable, primary work of building the order)
+          gets the wider main column; Party/Order Details and Advance
+          Payment — both short, mostly-fixed-height — share a narrower
+          sidebar column instead of each claiming a full-width row below
+          it. Single column below lg. */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:order-2 lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Party &amp; Order Details</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+                <Label>
+                  Party <RequiredMark />
+                </Label>
+                <CustomerSelect
+                  key={customerSelectKey}
+                  customers={customers}
+                  defaultValue={customerId}
+                  onChange={(id) => setCustomerId(id)}
+                  onBeforeAddNew={() => saveDraft()}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Expected Date</Label>
+                <Input name="expectedDate" type="date" />
+              </div>
+              <div className="space-y-1.5">
+                {showLocationField && <Label>Location</Label>}
+                <LocationSelect
+                  key={locationSelectKey}
+                  locations={locations}
+                  name="locationId"
+                  defaultValue={locationId}
+                  onChange={setLocationId}
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+                <Label>Notes</Label>
+                <Textarea name="notes" rows={2} placeholder="Any general notes about this order" />
+              </div>
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Requested Items</CardTitle>
-        </CardHeader>
+          <Card>
+            <CardHeader>
+              <CardTitle>Advance Payment</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PaidNowFields
+                rows={paymentRows}
+                onRowsChange={setPaymentRows}
+                maxAmount={estimatedOrderTotal > 0 ? estimatedOrderTotal : undefined}
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="lg:order-1 lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Requested Items</CardTitle>
+          </CardHeader>
         <CardContent className="space-y-4">
           {items.map((item, index) => {
             const selectedMetal = metals.find((m) => m.id === item.metalTypeId)
@@ -390,7 +418,39 @@ export function DraftOrderForm({
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label>Metal / Stone</Label>
+                    <Label>Kind</Label>
+                    <Select
+                      value={item.kind}
+                      onValueChange={(value) => {
+                        const kind = value as "METAL" | "STONE"
+                        // Same reset-on-switch behavior as product-form.tsx's
+                        // own Kind select: the previous material/purity/stone
+                        // type/rate no longer apply once the item's basic
+                        // kind changes, and a stuck rateTouched would
+                        // silently block the new material's own auto-fill.
+                        updateItem(item.key, {
+                          kind,
+                          metalTypeId: "",
+                          purity: null,
+                          purityLabel: null,
+                          stoneTypeName: null,
+                          estimatedRate: null,
+                          rateTouched: false,
+                        })
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select kind" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="METAL">Metal</SelectItem>
+                        <SelectItem value="STONE">Stone</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>{item.kind === "STONE" ? "Stone" : "Metal"}</Label>
                     <Select
                       value={item.metalTypeId ?? ""}
                       onValueChange={(value) => {
@@ -419,11 +479,11 @@ export function DraftOrderForm({
                       }}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select metal or stone" />
+                        <SelectValue placeholder={item.kind === "STONE" ? "Select stone" : "Select metal"} />
                       </SelectTrigger>
                       <SelectContent>
                         {metals
-                          .filter((m) => m.isActive)
+                          .filter((m) => m.isActive && (item.kind === "STONE" ? m.isGemstone : !m.isGemstone))
                           .map((m) => (
                             <SelectItem key={m.id} value={m.id}>
                               {m.name}
@@ -584,20 +644,8 @@ export function DraftOrderForm({
             </div>
           )}
         </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Advance Payment</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <PaidNowFields
-            rows={paymentRows}
-            onRowsChange={setPaymentRows}
-            maxAmount={estimatedOrderTotal > 0 ? estimatedOrderTotal : undefined}
-          />
-        </CardContent>
-      </Card>
+        </Card>
+      </div>
 
       {!state.success && state.message && (
         <div className="text-sm text-red-600">{state.message}</div>

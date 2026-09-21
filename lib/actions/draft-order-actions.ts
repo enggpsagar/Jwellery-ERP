@@ -69,7 +69,7 @@ export type DraftOrderRow = {
   status: string;
   customer: { id: string; name: string; phone: string | null } | null;
   itemCount: number;
-  karigarJob: { id: string; jobNumber: string | null; karigarId: string } | null;
+  karigarJob: { id: string; jobNumber: string | null; karigarId: string; karigarName: string } | null;
   /** Rough weight×rate total at order time — see DraftOrder.estimatedTotal's schema comment. */
   estimatedTotal: number;
   /** Advance collected at order-creation time — see DraftOrder.paidAmount's schema comment. */
@@ -85,7 +85,7 @@ function mapDraftOrder(order: {
   expectedDate: Date | null;
   status: string;
   customer: { id: string; name: string; phone: string | null } | null;
-  karigarJob: { id: string; jobNumber: string | null; karigarId: string } | null;
+  karigarJob: { id: string; jobNumber: string | null; karigarId: string; karigar: { name: string } | null } | null;
   estimatedTotal: unknown;
   paidAmount: unknown;
   items?: unknown[];
@@ -102,7 +102,14 @@ function mapDraftOrder(order: {
     status: order.status,
     customer: order.customer,
     itemCount: order._count?.items ?? order.items?.length ?? 0,
-    karigarJob: order.karigarJob,
+    karigarJob: order.karigarJob
+      ? {
+          id: order.karigarJob.id,
+          jobNumber: order.karigarJob.jobNumber,
+          karigarId: order.karigarJob.karigarId,
+          karigarName: order.karigarJob.karigar?.name ?? "",
+        }
+      : null,
     estimatedTotal,
     paidAmount,
     balanceAmount: Math.max(0, estimatedTotal - paidAmount),
@@ -170,7 +177,7 @@ function getDraftOrdersOrderBy(sortBy: DraftOrderSortBy = "orderDate", sortOrder
 
 const DRAFT_ORDER_INCLUDE = {
   customer: { select: { id: true, name: true, phone: true } },
-  karigarJob: { select: { id: true, jobNumber: true, karigarId: true } },
+  karigarJob: { select: { id: true, jobNumber: true, karigarId: true, karigar: { select: { name: true } } } },
   _count: { select: { items: true } },
 } as const;
 
@@ -370,7 +377,7 @@ export async function getDraftOrderById(id: string): Promise<DraftOrderDetail | 
     where: { id, storeId },
     include: {
       customer: { select: { id: true, name: true, phone: true } },
-      karigarJob: { select: { id: true, jobNumber: true, karigarId: true } },
+      karigarJob: { select: { id: true, jobNumber: true, karigarId: true, karigar: { select: { name: true } } } },
       items: {
         include: {
           metalType: { select: { name: true } },

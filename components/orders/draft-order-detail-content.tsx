@@ -55,15 +55,18 @@ export function DraftOrderDetailContent({ order }: DraftOrderDetailContentProps)
           </div>
           {order.karigarJob ? (
             <div>
-              <div className="text-muted-foreground">Artisan Job</div>
+              <div className="text-muted-foreground">Artisan</div>
               <div className="mt-1 font-medium">
                 <Link
                   href={`/karigars/${order.karigarJob.karigarId}`}
                   className="text-primary hover:underline"
                 >
-                  {order.karigarJob.jobNumber ?? "View Job"}
+                  {order.karigarJob.karigarName || order.karigarJob.jobNumber || "View Job"}
                 </Link>
               </div>
+              {order.karigarJob.jobNumber ? (
+                <div className="mt-0.5 text-xs text-muted-foreground">{order.karigarJob.jobNumber}</div>
+              ) : null}
             </div>
           ) : null}
           {order.estimatedTotal > 0 || order.paidAmount > 0 ? (

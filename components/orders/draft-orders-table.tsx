@@ -121,7 +121,7 @@ export function DraftOrdersTable({
                 <th className="px-4 py-3 text-left font-medium">Party</th>
                 <th className="px-4 py-3 text-left font-medium">Items</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
-                <th className="hidden px-4 py-3 text-left font-medium sm:table-cell">Artisan Job</th>
+                <th className="hidden px-4 py-3 text-left font-medium sm:table-cell">Artisan</th>
                 {hasAnyRowAction ? (
                   <th className="px-4 py-3 text-right font-medium">Actions</th>
                 ) : null}
@@ -174,8 +174,14 @@ export function DraftOrdersTable({
                     <td className="px-4 py-3">
                       <DraftOrderStatusBadge status={order.status} />
                     </td>
-                    <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
-                      {order.karigarJob?.jobNumber ?? "—"}
+                    <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell" onClick={(e) => e.stopPropagation()}>
+                      {order.karigarJob ? (
+                        <Link href={`/karigars/${order.karigarJob.karigarId}`} className="text-primary hover:underline">
+                          {order.karigarJob.karigarName || order.karigarJob.jobNumber || "View"}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     {hasAnyRowAction ? (
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>

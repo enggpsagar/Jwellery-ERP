@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 
@@ -87,8 +88,12 @@ export default async function MyJobsPage() {
               </TableRow>
             ) : (
               jobs.map((job) => (
-                <TableRow key={job.id}>
-                  <TableCell>{job.jobNumber ?? "-"}</TableCell>
+                <TableRow key={job.id} className="cursor-pointer hover:bg-muted/40">
+                  <TableCell>
+                    <Link href={`/my-jobs/${job.id}`} className="text-primary hover:underline">
+                      {job.jobNumber ?? "View"}
+                    </Link>
+                  </TableCell>
                   <TableCell>
                     {job.inventoryStock
                       ? `${job.inventoryStock.product.name} (${job.inventoryStock.stockCode})`

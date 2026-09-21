@@ -97,51 +97,53 @@ export function StyleSettingsForm({ styles, canEdit }: StyleSettingsFormProps) {
           <p className="text-sm text-muted-foreground">No styles configured yet.</p>
         ) : null}
 
-        {styles.map((style) =>
-          editingId === style.id ? (
-            <StyleFormRow key={style.id} style={style} onDone={() => setEditingId(null)} />
-          ) : (
-            <div
-              key={style.id}
-              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-            >
-              <span className={style.isActive ? "" : "text-muted-foreground line-through"}>
-                {style.name}
-              </span>
+        <div className="max-h-72 space-y-2 overflow-y-auto">
+          {styles.map((style) =>
+            editingId === style.id ? (
+              <StyleFormRow key={style.id} style={style} onDone={() => setEditingId(null)} />
+            ) : (
+              <div
+                key={style.id}
+                className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+              >
+                <span className={style.isActive ? "" : "text-muted-foreground line-through"}>
+                  {style.name}
+                </span>
 
-              {canEdit ? (
-                <div className="flex items-center gap-3">
-                  <Switch
-                    checked={style.isActive}
-                    disabled={togglingId === style.id}
-                    onCheckedChange={(checked) => handleToggle(style.id, checked)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(style.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                    aria-label={`Edit ${style.name}`}
-                    title="Edit style"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(style.id, style.name)}
-                    disabled={deletingId === style.id}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                    aria-label={`Delete ${style.name}`}
-                    title="Delete style (only if unused)"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <ActiveBadge isActive={style.isActive} />
-              )}
-            </div>
-          ),
-        )}
+                {canEdit ? (
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={style.isActive}
+                      disabled={togglingId === style.id}
+                      onCheckedChange={(checked) => handleToggle(style.id, checked)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(style.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                      aria-label={`Edit ${style.name}`}
+                      title="Edit style"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(style.id, style.name)}
+                      disabled={deletingId === style.id}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                      aria-label={`Delete ${style.name}`}
+                      title="Delete style (only if unused)"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <ActiveBadge isActive={style.isActive} />
+                )}
+              </div>
+            ),
+          )}
+        </div>
 
         {canEdit ? (
           showAdd ? (

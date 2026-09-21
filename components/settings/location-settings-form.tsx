@@ -96,75 +96,77 @@ export function LocationSettingsForm({ locations, states, canEdit }: LocationSet
           <p className="text-sm text-muted-foreground">No locations configured yet.</p>
         ) : null}
 
-        {locations.map((location) =>
-          editingId === location.id ? (
-            <LocationFormRow
-              key={location.id}
-              location={location}
-              states={states}
-              onDone={() => setEditingId(null)}
-            />
-          ) : (
-            <div
-              key={location.id}
-              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-            >
-              <div className={location.isActive ? "" : "text-muted-foreground line-through"}>
-                <div className="flex items-center gap-2">
-                  {location.name}
-                  {location.isDefault && (
-                    <Badge variant="outline" className="gap-1 font-normal">
-                      <Star className="h-3 w-3 fill-current" />
-                      Default
-                    </Badge>
+        <div className="max-h-72 space-y-2 overflow-y-auto">
+          {locations.map((location) =>
+            editingId === location.id ? (
+              <LocationFormRow
+                key={location.id}
+                location={location}
+                states={states}
+                onDone={() => setEditingId(null)}
+              />
+            ) : (
+              <div
+                key={location.id}
+                className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+              >
+                <div className={location.isActive ? "" : "text-muted-foreground line-through"}>
+                  <div className="flex items-center gap-2">
+                    {location.name}
+                    {location.isDefault && (
+                      <Badge variant="outline" className="gap-1 font-normal">
+                        <Star className="h-3 w-3 fill-current" />
+                        Default
+                      </Badge>
+                    )}
+                  </div>
+                  {(location.city || location.state) && (
+                    <div className="text-xs text-muted-foreground">
+                      {[location.city, location.state].filter(Boolean).join(", ")}
+                    </div>
                   )}
                 </div>
-                {(location.city || location.state) && (
-                  <div className="text-xs text-muted-foreground">
-                    {[location.city, location.state].filter(Boolean).join(", ")}
-                  </div>
-                )}
-              </div>
 
-              {canEdit ? (
-                <div className="flex items-center gap-3">
-                  {!location.isDefault && location.isActive && (
+                {canEdit ? (
+                  <div className="flex items-center gap-3">
+                    {!location.isDefault && location.isActive && (
+                      <button
+                        type="button"
+                        onClick={() => handleSetDefault(location.id)}
+                        disabled={settingDefaultId === location.id}
+                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+                        title="Set as default location"
+                      >
+                        {settingDefaultId === location.id ? (
+                          <Loader className="h-3 w-3" />
+                        ) : (
+                          <Star className="h-3 w-3" />
+                        )}
+                        Set as Default
+                      </button>
+                    )}
+                    <Switch
+                      checked={location.isActive}
+                      disabled={togglingId === location.id}
+                      onCheckedChange={(checked) => handleToggle(location.id, checked)}
+                    />
                     <button
                       type="button"
-                      onClick={() => handleSetDefault(location.id)}
-                      disabled={settingDefaultId === location.id}
-                      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground transition hover:bg-muted disabled:opacity-50"
-                      title="Set as default location"
+                      onClick={() => setEditingId(location.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                      aria-label={`Edit ${location.name}`}
+                      title="Edit location"
                     >
-                      {settingDefaultId === location.id ? (
-                        <Loader className="h-3 w-3" />
-                      ) : (
-                        <Star className="h-3 w-3" />
-                      )}
-                      Set as Default
+                      <Pencil className="h-4 w-4" />
                     </button>
-                  )}
-                  <Switch
-                    checked={location.isActive}
-                    disabled={togglingId === location.id}
-                    onCheckedChange={(checked) => handleToggle(location.id, checked)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(location.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
-                    aria-label={`Edit ${location.name}`}
-                    title="Edit location"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <ActiveBadge isActive={location.isActive} />
-              )}
-            </div>
-          ),
-        )}
+                  </div>
+                ) : (
+                  <ActiveBadge isActive={location.isActive} />
+                )}
+              </div>
+            ),
+          )}
+        </div>
 
         {canEdit ? (
           showAdd ? (

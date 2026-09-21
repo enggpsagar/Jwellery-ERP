@@ -377,6 +377,41 @@ export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCusto
 }
 
 /**
+ * How much of a single customer's own store credit (a negative ledger-
+ * derived currentBalance — see PaymentCustomerOption's own comment for the
+ * full formula, same as mapCustomer's) is available to draw down against a
+ * new document right now. Zero for a customer with no credit (a positive or
+ * zero balance), never negative. Scoped to one customer via findFirst
+ * rather than reusing getPaymentFormCustomersWithBalance's findMany, since
+ * a caller here only ever needs this for whichever single customer is
+ * currently selected — see invoice-form.tsx's "Apply Credit" flow and
+ * createInvoice's own re-validation of it in invoice-actions.ts, both of
+ * which call this exact function so the formula can never drift between
+ * what's shown and what's enforced.
+ */
+export async function getCustomerAvailableCredit(customerId: string): Promise<number> {
+  const storeId = await requireStoreScope()
+
+  const customer = await prisma.customer.findFirst({
+    where: { id: customerId, storeId },
+    select: {
+      openingBalance: true,
+      ledgerEntries: { select: { amount: true, type: true } },
+    },
+  })
+  if (!customer) return 0
+
+  const currentBalance =
+    Number(customer.openingBalance ?? 0) +
+    customer.ledgerEntries.reduce(
+      (sum, e) => sum + (e.type === "DEBIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
+      0,
+    )
+
+  return Math.max(0, -currentBalance)
+}
+
+/**
  * Record a standalone "Payment In" against a customer — not tied to any
  * specific invoice/Kacha slip (an on-account receipt). Same CREDIT/
  * PAYMENT_IN shape recordInvoicePayment writes, just without an invoiceId.

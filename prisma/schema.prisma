@@ -2721,6 +2721,13 @@ enum LedgerSourceType {
   // lib/actions/payments-actions.ts.
   PAYMENT_IN
   PAYMENT_OUT
+  // A customer's own existing store credit (from a Credit Note, or an
+  // overpayment) drawn down against a new Invoice at creation time — same
+  // CREDIT-type shape as a PAYMENT_IN row, but no new cash actually moved,
+  // so it's tagged distinctly. See createInvoice's creditApplied handling
+  // in lib/actions/invoice-actions.ts and getCustomerAvailableCredit in
+  // lib/actions/payments-actions.ts.
+  CREDIT_APPLIED
 }
 
 enum InvoiceStatus {

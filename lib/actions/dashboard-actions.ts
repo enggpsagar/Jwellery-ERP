@@ -976,6 +976,8 @@ export async function getRecentActivity(
       action = "Payment made";
     } else if (entry.sourceType === "SALE_RETURN") {
       action = "Processed a return";
+    } else if (entry.sourceType === "CREDIT_APPLIED") {
+      action = "Applied store credit";
     } else if (entry.sourceType === "ADJUSTMENT") {
       action = "Balance adjusted";
     } else if (entry.sourceType === "KARIGAR_ISSUE") {

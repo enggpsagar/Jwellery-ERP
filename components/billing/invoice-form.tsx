@@ -7,6 +7,7 @@ import { Trash2, ChevronDown, ChevronRight, Search, Plus, MoveHorizontal } from 
 import type { GstScheme, PurityType } from "@prisma/client"
 
 import { createInvoice, updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
+import { getCustomerAvailableCredit } from "@/lib/actions/payments-actions"
 import { useToast } from "@/components/providers/toast-provider"
 import { ScanToAddPanel } from "@/components/billing/scan-to-add-panel"
 import { todayForDateInput } from "@/lib/date-input"
@@ -373,6 +374,33 @@ export function InvoiceForm({
   const [addPurityForKey, setAddPurityForKey] = useState<string | null>(null)
 
   const [customerId, setCustomerId] = useState(initialCustomerId ?? "")
+  // How much of the selected customer's own existing store credit (a prior
+  // Credit Note, an overpayment) they have available right now, and how
+  // much of it is being drawn down against this invoice — create-flow
+  // only, mirrors a payment-method row's effect on paidAmount but sourced
+  // from their balance instead of new cash. Re-fetched fresh on every
+  // customer change so it can't go stale across a long-open tab; reset to
+  // 0 alongside it so switching customers never silently carries over an
+  // amount that belonged to the previous one.
+  const [customerCredit, setCustomerCredit] = useState(0)
+  const [creditApplied, setCreditApplied] = useState(0)
+  useEffect(() => {
+    if (editInvoiceId || !customerId) {
+      setCustomerCredit(0)
+      setCreditApplied(0)
+      return
+    }
+    setCreditApplied(0)
+    let cancelled = false
+    getCustomerAvailableCredit(customerId)
+      .then((credit) => {
+        if (!cancelled) setCustomerCredit(credit)
+      })
+      .catch((err) => console.error("Failed to load customer credit:", err))
+    return () => {
+      cancelled = true
+    }
+  }, [customerId, editInvoiceId])
   const [locationId, setLocationId] = useState(initialLocationId ?? "")
   // CustomerSelect/LocationSelect both seed their own selection from
   // `defaultValue` into internal state, so changing that prop alone will
@@ -456,7 +484,7 @@ export function InvoiceForm({
   const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
   const paidAmount = editInvoiceId
     ? legacyPaidAmount
-    : paymentRows.reduce((sum, row) => sum + (row.amount || 0), 0)
+    : paymentRows.reduce((sum, row) => sum + (row.amount || 0), 0) + creditApplied
 
   // Delivery Location — where the goods are actually being shipped, which
   // decides CGST+SGST vs IGST (see computeGst() below), independent of
@@ -2104,12 +2132,67 @@ export function InvoiceForm({
             />
           </div>
         ) : (
-          <div className="rounded-lg border border-[color-mix(in_oklab,var(--chart-3)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-3)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-3)_12%,transparent)]">
+          <div className="rounded-lg border border-[color-mix(in_oklab,var(--chart-3)_35%,transparent)] bg-[color-mix(in_oklab,var(--chart-3)_6%,transparent)] p-4 transition-colors focus-within:bg-[color-mix(in_oklab,var(--chart-3)_12%,transparent)] space-y-3">
+            {/* Store credit — a prior Credit Note or overpayment already
+                sitting on this customer's own ledger balance, drawn down
+                against this invoice instead of collecting new cash. Only
+                shown once one is actually selected and genuinely has
+                something available (see customerCredit's own effect). */}
+            {customerCredit > 0 && (
+              <div className="rounded-md border border-emerald-600/30 bg-emerald-600/10 p-2.5 text-sm">
+                {creditApplied > 0 ? (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-emerald-800">Credit Applied</span>
+                      <button
+                        type="button"
+                        onClick={() => setCreditApplied(0)}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      max={Math.min(customerCredit, totalAmount)}
+                      value={creditApplied}
+                      onChange={(e) =>
+                        setCreditApplied(
+                          Math.min(Math.max(0, Number(e.target.value) || 0), customerCredit, totalAmount),
+                        )
+                      }
+                      className="h-9"
+                    />
+                    <p className="text-xs text-emerald-700">
+                      Up to ₹{customerCredit.toFixed(2)} available.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-emerald-800">
+                      This customer has <span className="font-semibold">₹{customerCredit.toFixed(2)}</span> credit available.
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0 border-emerald-600/40 text-emerald-800 hover:bg-emerald-600/10"
+                      onClick={() => setCreditApplied(Math.min(customerCredit, totalAmount))}
+                    >
+                      Apply Credit
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
             <PaidNowFields
               rows={paymentRows}
               onRowsChange={setPaymentRows}
-              maxAmount={totalAmount > 0 ? totalAmount : undefined}
+              maxAmount={totalAmount > 0 ? Math.max(0, totalAmount - creditApplied) : undefined}
             />
+            <input type="hidden" name="creditApplied" value={creditApplied} />
           </div>
         )}
 
@@ -2183,6 +2266,12 @@ export function InvoiceForm({
           <span>Total</span>
           <span>₹{totalAmount.toFixed(2)}</span>
         </div>
+        {creditApplied > 0 && (
+          <div className="flex justify-between text-emerald-700">
+            <span>Credit Applied</span>
+            <span>-₹{creditApplied.toFixed(2)}</span>
+          </div>
+        )}
         <div className="flex justify-between text-red-600 font-medium">
           <span>Balance Due</span>
           <span>₹{balanceAmount.toFixed(2)}</span>

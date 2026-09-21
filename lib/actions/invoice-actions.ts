@@ -32,6 +32,7 @@ import { sendMail } from "@/lib/mailer";
 import { invoiceEmail } from "@/lib/email-templates";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { resolveGstRateSnapshot, type GstRateSnapshot } from "@/lib/actions/gst-rate-actions";
+import { getCustomerAvailableCredit } from "@/lib/actions/payments-actions";
 import { getReturnEligibility } from "@/lib/return-window";
 import { amountInWords } from "@/lib/number-to-words";
 import { resolveStoreName } from "@/lib/invite-email";
@@ -1028,10 +1029,29 @@ export async function createInvoice(
         message: "Add 1-2 valid payment methods with an amount, or leave Paid Now blank for a fully-on-credit sale.",
       };
     }
+    // Store credit the customer already had (a Credit Note, an
+    // overpayment) applied toward this invoice instead of new cash —
+    // invoice-form.tsx's "Apply Credit" flow. Never trust the client's own
+    // number: re-fetch the customer's real current available credit fresh
+    // right here and reject if it's grown stale (spent by a concurrent
+    // invoice, or simply wrong) rather than silently clamping it, since
+    // that would quietly under-charge or over-charge relative to what
+    // staff actually saw on screen.
+    const creditApplied = toNumber(formData.get("creditApplied"));
+    if (creditApplied > 0) {
+      const availableCredit = await getCustomerAvailableCredit(customerId);
+      if (creditApplied > availableCredit) {
+        return {
+          success: false,
+          message: `This customer's available credit has changed (₹${availableCredit.toFixed(2)} left) — refresh and try again.`,
+        };
+      }
+    }
+
     const paidAmount =
-      paymentsRaw !== null
+      (paymentsRaw !== null
         ? payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
-        : toNumber(formData.get("paidAmount"));
+        : toNumber(formData.get("paidAmount"))) + creditApplied;
     const invoiceDateRaw = String(formData.get("invoiceDate") || "");
     const dueDateRaw = String(formData.get("dueDate") || "");
     const notes = String(formData.get("notes") || "").trim() || null;
@@ -1416,6 +1436,26 @@ export async function createInvoice(
             attachmentUrl: payment.attachmentUrl ?? undefined,
             locationId: resolvedLocationId ?? undefined,
             description: index === 0 ? `Payment received for ${invoiceNumber}` : undefined,
+          },
+        });
+      }
+
+      // The customer's own existing store credit, drawn down against this
+      // invoice — same CREDIT shape as a payment-method row above, just
+      // sourced from their existing balance rather than new cash, and
+      // tagged distinctly so it never counts as real cash on the Payment In
+      // report (getPaymentsIn filters strictly on PAYMENT_IN).
+      if (creditApplied > 0) {
+        await tx.ledgerEntry.create({
+          data: {
+            storeId,
+            type: LedgerEntryType.CREDIT,
+            sourceType: LedgerSourceType.CREDIT_APPLIED,
+            customerId,
+            invoiceId: created.id,
+            amount: creditApplied,
+            description: `Store credit applied to ${invoiceNumber}`,
+            locationId: resolvedLocationId ?? undefined,
           },
         });
       }

@@ -24,6 +24,8 @@ export function formatLedgerSource(
       return "Payment In"
     case LedgerSourceType.PAYMENT_OUT:
       return "Payment Out"
+    case LedgerSourceType.CREDIT_APPLIED:
+      return "Credit Applied"
     default:
       return String(sourceType)
         .replaceAll("_", " ")

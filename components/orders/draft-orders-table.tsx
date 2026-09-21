@@ -51,6 +51,12 @@ export function DraftOrdersTable({
 
   const allIds = orders.map((order) => order.id)
   const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.includes(id))
+  // The Actions column only ever holds a Delete button (DRAFT/CANCELLED
+  // orders). Once every order on the page has moved past that (e.g. all
+  // Sent to Artisan), the column would render as an empty header with
+  // nothing under it in any row — hide it entirely in that case instead
+  // of showing a column that never has content.
+  const hasAnyRowAction = orders.some((order) => isDeletable(order.status))
 
   function toggleAll(checked: boolean) {
     if (checked) {
@@ -116,7 +122,9 @@ export function DraftOrdersTable({
                 <th className="px-4 py-3 text-left font-medium">Items</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="hidden px-4 py-3 text-left font-medium sm:table-cell">Artisan Job</th>
-                <th className="px-4 py-3 text-right font-medium">Actions</th>
+                {hasAnyRowAction ? (
+                  <th className="px-4 py-3 text-right font-medium">Actions</th>
+                ) : null}
               </tr>
             </thead>
 
@@ -169,20 +177,22 @@ export function DraftOrdersTable({
                     <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
                       {order.karigarJob?.jobNumber ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      {isDeletable(order.status) ? (
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          onClick={() => setConfirmOrder(order)}
-                          aria-label={`Delete ${order.orderNumber}`}
-                          title="Delete draft order"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      ) : null}
-                    </td>
+                    {hasAnyRowAction ? (
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        {isDeletable(order.status) ? (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            onClick={() => setConfirmOrder(order)}
+                            aria-label={`Delete ${order.orderNumber}`}
+                            title="Delete draft order"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        ) : null}
+                      </td>
+                    ) : null}
                   </tr>
                   )
                 })

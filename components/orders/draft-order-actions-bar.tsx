@@ -49,7 +49,10 @@ export function DraftOrderActionsBar({
     // order left DRAFT, so a sent order had no discoverable path to ever
     // being received.
     return (
-      <Button asChild>
+      <Button
+        asChild
+        className="gap-1.5 bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
+      >
         <Link href={`/karigars/${order.karigarJob.karigarId}/receive-items/${order.karigarJob.id}`}>
           <PackageCheck className="h-4 w-4" />
           Receive Items

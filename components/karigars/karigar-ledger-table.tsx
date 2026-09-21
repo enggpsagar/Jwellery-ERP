@@ -302,7 +302,15 @@ function MaterialSideTable({
   const filteredTotal = filteredSorted.reduce((sum, row) => sum + (row.metalWeightFine ?? 0), 0)
 
   return (
-    <div className="flex-1 space-y-2">
+    // min-w-0: without it, a flex-1 child refuses to shrink below its
+    // table's natural content width (flex items default to min-width:
+    // auto), so at lg (where the two side-by-side panels below switch from
+    // stacked to a row) this panel got forced wider than its share and its
+    // table clipped at the container edge instead of scrolling internally
+    // via the Table component's own overflow-x-auto wrapper — same fix as
+    // expandable-checkbox-list.tsx and ui/sidebar.tsx use for the same
+    // flexbox behavior.
+    <div className="min-w-0 flex-1 space-y-2">
       <div className="flex items-baseline justify-between">
         <h4 className="text-sm font-semibold">{title}</h4>
         <span className="text-sm font-medium tabular-nums">{filteredTotal.toFixed(3)}g</span>

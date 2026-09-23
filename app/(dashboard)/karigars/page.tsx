@@ -3,6 +3,7 @@
 import type { Metadata } from "next"
 
 import { getKarigars } from "@/lib/actions/karigar-actions"
+import { getKarigarLedgerSummary } from "@/lib/actions/ledger-actions"
 import { KarigarsClient } from "@/components/karigars/karigars-client"
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
@@ -41,16 +42,29 @@ export default async function KarigarsPage({ searchParams }: KarigarsPageProps) 
   const dateFrom = params.dateFrom || undefined
   const dateTo = params.dateTo || undefined
 
-  const { karigars, pagination } = await getKarigars({
-    page,
-    pageSize,
-    search,
-    sortBy,
-    sortOrder,
-    metalTypeId,
-    dateFrom,
-    dateTo,
-  })
+  const [{ karigars, pagination }, ledgerSummary] = await Promise.all([
+    getKarigars({
+      page,
+      pageSize,
+      search,
+      sortBy,
+      sortOrder,
+      metalTypeId,
+      dateFrom,
+      dateTo,
+    }),
+    // Store-wide (unpaginated, every artisan) — feeds both the board's
+    // dashboard stat cards and each visible row's own Outstanding column,
+    // same balance figures the standalone Artisan Ledger page shows.
+    getKarigarLedgerSummary(),
+  ])
 
-  return <KarigarsClient karigars={karigars} pagination={pagination} metals={metals} />
+  return (
+    <KarigarsClient
+      karigars={karigars}
+      pagination={pagination}
+      metals={metals}
+      ledgerSummary={ledgerSummary}
+    />
+  )
 }

@@ -7,6 +7,7 @@ import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { KarigarsPagination } from "@/components/karigars/karigars-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import type { Karigar } from "@/lib/actions/karigar-actions"
+import type { KarigarLedgerSummaryRow } from "@/lib/actions/ledger-actions"
 import { cn } from "@/lib/utils"
 
 type PaginationInfo = {
@@ -21,6 +22,12 @@ type PaginationInfo = {
 type KarigarTableProps = {
   karigars: Karigar[]
   pagination: PaginationInfo
+  /** Store-wide outstanding gold/cash per artisan (id -> row), from
+   *  getKarigarLedgerSummary — what "Outstanding" below actually reads,
+   *  distinct from the static one-time openingGold/openingCash still shown
+   *  in the hover card. Optional: the Disabled Artisans list doesn't fetch
+   *  this summary, so every row there just reads as "Settled". */
+  balanceById?: Map<string, KarigarLedgerSummaryRow>
   selectedKarigarIds: string[]
   onSelectionChange: (ids: string[]) => void
   /** Which row's detail is showing in the panel alongside this table — distinct from selectedKarigarIds, which is the bulk-action checkbox selection. */
@@ -31,6 +38,7 @@ type KarigarTableProps = {
 export function KarigarTable({
   karigars,
   pagination,
+  balanceById = new Map(),
   selectedKarigarIds,
   onSelectionChange,
   activeKarigarId,
@@ -88,13 +96,16 @@ export function KarigarTable({
                   scrolling out of view. Mobile and Opening Gold stay
                   visible. */}
               <th className="hidden px-4 py-3 text-left font-medium sm:table-cell">City</th>
-              <th className="px-4 py-3 text-left font-medium">Opening Gold</th>
+              <th className="px-4 py-3 text-left font-medium">Outstanding</th>
             </tr>
           </thead>
 
           <tbody>
             {karigars.map((karigar) => {
               const isActive = activeKarigarId === karigar.id
+              const balance = balanceById.get(karigar.id)
+              const hasGold = balance != null && Math.abs(balance.outstandingGold) >= 0.0005
+              const hasCash = balance != null && Math.abs(balance.outstandingCash) >= 0.005
               return (
               <tr
                 key={karigar.id}
@@ -142,7 +153,20 @@ export function KarigarTable({
                 </td>
                 <td className="px-4 py-3">{karigar.mobile || "-"}</td>
                 <td className="hidden px-4 py-3 sm:table-cell">{karigar.city || "-"}</td>
-                <td className="px-4 py-3">{karigar.openingGold.toFixed(3)} g</td>
+                <td className="px-4 py-3">
+                  {hasGold || hasCash ? (
+                    <div className="flex flex-col gap-0.5">
+                      {hasGold && <span>{balance!.outstandingGold.toFixed(3)} g</span>}
+                      {hasCash && (
+                        <span className="text-red-600">
+                          ₹{balance!.outstandingCash.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">Settled</span>
+                  )}
+                </td>
               </tr>
               )
             })}

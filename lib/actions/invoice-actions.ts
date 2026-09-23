@@ -433,17 +433,27 @@ function mapInvoice(invoice: any) {
           slipNumber: invoice.convertedFromKacha.slipNumber,
         }
       : null,
-    // Fetched via `include` but unused until the print view — the "Payment
-    // Details" block reads a payment's method/reference/bank the same way
-    // recordInvoicePayment's dual-method split writes them.
-    ledgerEntries: ((invoice.ledgerEntries ?? []) as any[]).map((entry) => ({
-      id: entry.id,
-      entryDate: entry.entryDate.toISOString(),
-      amount: Number(entry.amount),
-      paymentMethod: entry.paymentMethod as PaymentMethod | null,
-      paymentReference: entry.paymentReference as string | null,
-      bankName: entry.bankName as string | null,
-    })),
+    // The per-payment breakdown behind the Paid/Balance totals — every real
+    // cash payment (PAYMENT_IN) plus any store credit drawn down against
+    // this invoice (CREDIT_APPLIED), since both actually reduce the
+    // balance; createInvoice/recordInvoicePayment's own DEBIT/SALE
+    // balance-due accrual row is excluded, same reasoning as
+    // Purchase.payments filtering out its CREDIT/PURCHASE row.
+    payments: ((invoice.ledgerEntries ?? []) as any[])
+      .filter(
+        (entry) =>
+          entry.sourceType === LedgerSourceType.PAYMENT_IN ||
+          entry.sourceType === LedgerSourceType.CREDIT_APPLIED,
+      )
+      .map((entry) => ({
+        id: entry.id,
+        entryDate: entry.entryDate.toISOString(),
+        amount: Number(entry.amount),
+        paymentMethod: entry.paymentMethod as PaymentMethod | null,
+        paymentReference: entry.paymentReference as string | null,
+        bankName: entry.bankName as string | null,
+        isCreditApplied: entry.sourceType === LedgerSourceType.CREDIT_APPLIED,
+      })),
   };
 }
 

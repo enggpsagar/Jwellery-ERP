@@ -18,6 +18,15 @@ const TRANSPORT_MODE_LABELS: Record<string, string> = {
   SHIP: "Ship",
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: "Cash",
+  UPI: "UPI",
+  NET_BANKING: "Net Banking",
+  CHEQUE: "Cheque",
+  CARD: "Card",
+  OTHER: "Other",
+}
+
 type InvoiceDetailContentProps = {
   invoice: Invoice
   creditNotes: CreditNoteView[]
@@ -254,6 +263,55 @@ export function InvoiceDetailContent({
           <span>₹{invoice.balanceAmount.toFixed(2)}</span>
         </div>
       </div>
+
+      {invoice.payments.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border bg-card">
+          <div className="border-b px-4 py-3">
+            <p className="font-medium">Payment History</p>
+          </div>
+          <table className="min-w-full text-sm">
+            <thead className="bg-muted/40">
+              <tr className="border-b">
+                <th className="px-4 py-3 text-left font-medium">Date</th>
+                <th className="px-4 py-3 text-left font-medium">Method</th>
+                <th className="px-4 py-3 text-left font-medium">Reference</th>
+                <th className="px-4 py-3 text-right font-medium">Amount Received</th>
+                <th className="px-4 py-3 text-right font-medium">Balance After</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                // invoice.payments is entryDate-desc (latest first). The
+                // balance right after the latest payment is today's
+                // balanceAmount; each older row's balance-after is that plus
+                // everything paid more recently.
+                let paidSinceThisRow = 0
+                return invoice.payments.map((payment: (typeof invoice.payments)[number]) => {
+                  const balanceAfter = invoice.balanceAmount + paidSinceThisRow
+                  paidSinceThisRow += payment.amount
+                  return (
+                    <tr key={payment.id} className="border-b last:border-0">
+                      <td className="px-4 py-3">{formatShortDate(payment.entryDate)}</td>
+                      <td className="px-4 py-3">
+                        {payment.isCreditApplied
+                          ? "Store Credit"
+                          : payment.paymentMethod
+                            ? PAYMENT_METHOD_LABELS[payment.paymentMethod] ?? payment.paymentMethod
+                            : "-"}
+                      </td>
+                      <td className="px-4 py-3">{payment.paymentReference ?? "-"}</td>
+                      <td className="px-4 py-3 text-right font-medium text-blue-600">
+                        ₹{payment.amount.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right">₹{balanceAfter.toFixed(2)}</td>
+                    </tr>
+                  )
+                })
+              })()}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {eInvoiceEnabled && (invoice.irnNumber || invoice.ackNumber) && (
         <div className="rounded-xl border bg-card p-5">

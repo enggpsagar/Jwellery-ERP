@@ -4,6 +4,15 @@ import type { Purchase } from "@/lib/actions/purchase-actions"
 import { formatShortDate } from "@/lib/utils"
 import { PurchaseStatusBadge } from "@/components/purchases/purchase-status-badge"
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: "Cash",
+  UPI: "UPI",
+  NET_BANKING: "Net Banking",
+  CHEQUE: "Cheque",
+  CARD: "Card",
+  OTHER: "Other",
+}
+
 /**
  * The body of a purchase's detail view — status/vendor summary, line
  * items, totals, notes. Shared between the standalone /purchases/[id]
@@ -130,6 +139,54 @@ export function PurchaseDetailContent({
           <span>₹{purchase.balanceAmount.toFixed(2)}</span>
         </div>
       </div>
+
+      {purchase.payments.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border bg-card">
+          <div className="border-b px-4 py-3">
+            <p className="font-medium">Payment History</p>
+          </div>
+          <table className="min-w-full text-sm">
+            <thead className="bg-muted/40">
+              <tr className="border-b">
+                <th className="px-4 py-3 text-left font-medium">Date</th>
+                <th className="px-4 py-3 text-left font-medium">Method</th>
+                <th className="px-4 py-3 text-left font-medium">Reference</th>
+                <th className="px-4 py-3 text-right font-medium">Amount Paid</th>
+                <th className="px-4 py-3 text-right font-medium">Balance After</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                // purchase.payments is entryDate-desc (latest first). The
+                // balance right after the latest payment is today's
+                // balanceAmount; each older row's balance-after is that plus
+                // everything paid more recently — walk forward accumulating
+                // the more-recent amounts already seen.
+                let paidSinceThisRow = 0
+                return purchase.payments.map((payment: (typeof purchase.payments)[number]) => {
+                  const balanceAfter = purchase.balanceAmount + paidSinceThisRow
+                  paidSinceThisRow += payment.amount
+                  return (
+                    <tr key={payment.id} className="border-b last:border-0">
+                      <td className="px-4 py-3">{formatShortDate(payment.entryDate)}</td>
+                      <td className="px-4 py-3">
+                        {payment.paymentMethod
+                          ? PAYMENT_METHOD_LABELS[payment.paymentMethod] ?? payment.paymentMethod
+                          : "-"}
+                      </td>
+                      <td className="px-4 py-3">{payment.paymentReference ?? "-"}</td>
+                      <td className="px-4 py-3 text-right font-medium text-blue-600">
+                        ₹{payment.amount.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right">₹{balanceAfter.toFixed(2)}</td>
+                    </tr>
+                  )
+                })
+              })()}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {purchase.notes && (
         <div className="rounded-xl border bg-card p-6">

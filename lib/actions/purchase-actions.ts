@@ -488,6 +488,26 @@ function mapPurchase(purchase: any) {
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
     })),
+    // Every DEBIT/PAYMENT_OUT ledger entry recorded against this purchase
+    // (by recordPurchasePayment or createPurchase's up-front payment rows) —
+    // the per-payment breakdown behind the Paid/Balance totals above, so the
+    // detail view can show payment date + amount per row, not just the
+    // running total. purchase.ledgerEntries also includes the single
+    // CREDIT/PURCHASE "balance due" bookkeeping row createPurchase logs at
+    // creation time (see its own comment) — that's the shop's liability to
+    // the vendor, not a payment, so it's filtered out here rather than
+    // rendered as one.
+    payments: (purchase.ledgerEntries ?? [])
+      .filter((entry: any) => entry.type === LedgerEntryType.DEBIT)
+      .map((entry: any) => ({
+        id: entry.id,
+        entryDate: entry.entryDate.toISOString(),
+        amount: Number(entry.amount),
+        paymentMethod: entry.paymentMethod as PaymentMethod | null,
+        paymentReference: entry.paymentReference ?? null,
+        bankName: entry.bankName ?? null,
+        description: entry.description ?? null,
+      })),
   };
 }
 

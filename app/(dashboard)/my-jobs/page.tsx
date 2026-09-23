@@ -3,26 +3,12 @@ import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 
 import { getCurrentUser } from "@/lib/auth/auth";
-import { prisma } from "@/lib/prisma";
-import { formatShortDate } from "@/lib/utils";
-
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { getMyJobs } from "@/lib/actions/my-jobs-actions";
+import { MyJobsClient } from "@/components/karigars/my-jobs-client";
 
 export const metadata: Metadata = {
   title: "My Jobs",
 };
-
-function formatDate(date: Date | null) {
-  return formatShortDate(date);
-}
 
 export default async function MyJobsPage() {
   const user = await getCurrentUser();
@@ -43,15 +29,7 @@ export default async function MyJobsPage() {
     );
   }
 
-  const jobs = await prisma.karigarJob.findMany({
-    where: { karigarId: user.karigarId },
-    orderBy: { issueDate: "desc" },
-    include: {
-      inventoryStock: {
-        select: { stockCode: true, product: { select: { name: true } } },
-      },
-    },
-  });
+  const jobs = await getMyJobs();
 
   return (
     <div className="space-y-6">
@@ -63,55 +41,7 @@ export default async function MyJobsPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Job No.</TableHead>
-              <TableHead>Item</TableHead>
-              <TableHead>Issued</TableHead>
-              <TableHead>Expected</TableHead>
-              <TableHead>Issue Weight</TableHead>
-              <TableHead>Received Weight</TableHead>
-              <TableHead>Labour Charge</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-
-          <TableBody>
-            {jobs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                  No jobs assigned to you yet.
-                </TableCell>
-              </TableRow>
-            ) : (
-              jobs.map((job) => (
-                <TableRow key={job.id}>
-                  <TableCell>{job.jobNumber ?? "-"}</TableCell>
-                  <TableCell>
-                    {job.inventoryStock
-                      ? `${job.inventoryStock.product.name} (${job.inventoryStock.stockCode})`
-                      : "-"}
-                  </TableCell>
-                  <TableCell>{formatDate(job.issueDate)}</TableCell>
-                  <TableCell>{formatDate(job.expectedDate)}</TableCell>
-                  <TableCell>
-                    {job.issueWeight ? `${Number(job.issueWeight)} g` : "-"}
-                  </TableCell>
-                  <TableCell>
-                    {job.receiveWeight ? `${Number(job.receiveWeight)} g` : "-"}
-                  </TableCell>
-                  <TableCell>₹ {Number(job.labourCharge).toLocaleString("en-IN")}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{job.status}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <MyJobsClient jobs={jobs} />
     </div>
   );
 }

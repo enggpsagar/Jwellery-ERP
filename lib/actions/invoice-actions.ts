@@ -287,15 +287,22 @@ async function generateInvoiceNumber(storeId: string) {
   const startingNo = settings?.invoiceStartingNo ?? 1;
   const now = new Date();
   const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-  const prefixPart = `${prefix}-${datePart}-`;
+  // The trailing sequence number counts every invoice this store has ever
+  // raised (matched on the bare prefix, e.g. "GJ-"), not just today's — it
+  // used to be scoped to today's own datePart, which reset it to
+  // startingNo again at the start of every calendar day (GJ-20260922-0101
+  // followed the next morning by GJ-20260923-0001), even though it reads
+  // as one running invoice count. The date segment still always reflects
+  // today, so the number changes shape day to day, but the number itself
+  // now only ever goes up.
   const count = await prisma.invoice.count({
     where: {
       storeId,
-      invoiceNumber: { startsWith: prefixPart },
+      invoiceNumber: { startsWith: `${prefix}-` },
     },
   });
 
-  return `${prefixPart}${String(count + startingNo).padStart(4, "0")}`;
+  return `${prefix}-${datePart}-${String(count + startingNo).padStart(4, "0")}`;
 }
 
 /**

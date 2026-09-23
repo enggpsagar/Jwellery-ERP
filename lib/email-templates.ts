@@ -70,12 +70,21 @@ function itemsTable(
   </table>`;
 }
 
+/**
+ * A table row, not a flex div — display:flex/justify-content get stripped
+ * by Gmail's sanitizer (and render poorly in Outlook regardless, per
+ * otpEmail's own doc comment above), which left the label and value with
+ * no space between them at all instead of pushed to opposite ends.
+ */
 function summaryRow(label: string, value: string, bold = false) {
+  const boldStyle = bold
+    ? "font-weight: bold; border-top: 1px solid #e5e7eb; padding-top: 8px;"
+    : "";
   return `
-  <div style="display: flex; justify-content: space-between; padding: 4px 0; ${bold ? "font-weight: bold; border-top: 1px solid #e5e7eb; margin-top: 6px; padding-top: 8px;" : ""}">
-    <span>${label}</span>
-    <span>${value}</span>
-  </div>`;
+  <tr>
+    <td style="padding: 4px 0; text-align: left; ${boldStyle}">${label}</td>
+    <td style="padding: 4px 0; text-align: right; ${boldStyle}">${value}</td>
+  </tr>`;
 }
 
 export function disabledAccountEmail(params: {
@@ -753,11 +762,13 @@ export function invoiceEmail(params: {
         : ""
     }
 
-    <div style="display: flex; justify-content: space-between; font-size: 12px; margin: 12px 0;">
-      <span>Invoice No: <strong>${params.invoiceNumber}</strong></span>
-      <span>Date: ${formatDate(params.invoiceDate)}</span>
-      <span>Status: ${params.status}</span>
-    </div>
+    <table style="width: 100%; font-size: 12px; margin: 12px 0;">
+      <tr>
+        <td style="text-align: left;">Invoice No: <strong>${params.invoiceNumber}</strong></td>
+        <td style="text-align: center;">Date: ${formatDate(params.invoiceDate)}</td>
+        <td style="text-align: right;">Status: ${params.status}</td>
+      </tr>
+    </table>
 
     <table style="width: 100%; margin-bottom: 12px;">
       <tr>
@@ -774,7 +785,7 @@ export function invoiceEmail(params: {
 
     ${invoiceLineItemsTable(params.items, isInterState)}
 
-    <div style="font-size: 13px; max-width: 260px; margin-left: auto;">
+    <table style="width: 100%; max-width: 260px; margin-left: auto; font-size: 13px; border-collapse: collapse;">
       ${summaryRow("Subtotal", formatCurrency(params.subtotal))}
       ${params.makingCharges > 0 ? summaryRow("Making Charges", formatCurrency(params.makingCharges)) : ""}
       ${params.stoneCharges > 0 ? summaryRow("Stone Charges", formatCurrency(params.stoneCharges)) : ""}
@@ -791,7 +802,7 @@ export function invoiceEmail(params: {
       ${summaryRow("Total", formatCurrency(params.totalAmount), true)}
       ${summaryRow("Paid", formatCurrency(params.paidAmount))}
       ${summaryRow("Balance Due", formatCurrency(params.balanceAmount), true)}
-    </div>
+    </table>
 
     <p style="font-size: 11px; color: #6b7280; margin-top: 16px;">Value in words: ${params.amountInWords}</p>
 
@@ -825,7 +836,7 @@ export function kachaSlipEmail(params: {
     <p>Hi ${params.customerName || "Party"},</p>
     <p>Here is your Estimate <strong>${params.slipNumber}</strong> dated ${formatDate(params.invoiceDate)}.</p>
     ${itemsTable(params.items)}
-    <div style="font-size: 13px; max-width: 260px; margin-left: auto;">
+    <table style="width: 100%; max-width: 260px; margin-left: auto; font-size: 13px; border-collapse: collapse;">
       ${summaryRow("Subtotal", formatCurrency(params.subtotal))}
       ${params.makingCharges > 0 ? summaryRow("Making Charges", formatCurrency(params.makingCharges)) : ""}
       ${params.stoneCharges > 0 ? summaryRow("Stone Charges", formatCurrency(params.stoneCharges)) : ""}
@@ -833,7 +844,7 @@ export function kachaSlipEmail(params: {
       ${summaryRow("Total", formatCurrency(params.totalAmount), true)}
       ${summaryRow("Paid", formatCurrency(params.paidAmount))}
       ${summaryRow("Balance Due", formatCurrency(params.balanceAmount), true)}
-    </div>
+    </table>
     <p style="font-size: 12px; color: #6b7280;">This is a provisional Estimate, not a tax invoice.</p>
   `;
 
@@ -876,12 +887,12 @@ export function ledgerStatementEmail(params: {
   const body = `
     <p>Hi ${params.customerName},</p>
     <p>Here is your account statement with <strong>${params.storeName}</strong>.</p>
-    <div style="font-size: 13px; max-width: 300px;">
+    <table style="width: 100%; max-width: 300px; font-size: 13px; border-collapse: collapse;">
       ${summaryRow("Opening Balance", formatCurrency(params.openingBalance))}
       ${summaryRow("Total Sales (Debit)", formatCurrency(params.ledgerDebitTotal))}
       ${summaryRow("Total Received (Credit)", formatCurrency(params.ledgerCreditTotal))}
       ${summaryRow("Current Balance", formatCurrency(params.currentBalance), true)}
-    </div>
+    </table>
     <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px;">
       <thead>
         <tr style="background: #f9fafb;">

@@ -148,9 +148,9 @@ export type LineItem = {
    * meant to skip it?), so the picker's own escape hatch has to be an
    * explicit choice, not just "leave it blank." A skipped line still needs
    * a real Product row under the hood (InventoryStock/PurchaseItem's
-   * productId is a hard FK) — resolved server-side to one lazily-created
-   * placeholder per store, see resolveManualEntryProductId in
-   * purchase-actions.ts. */
+   * productId is a hard FK) — server-side, a brand new real Product is
+   * minted for it from this line's own name/metal/purity/weights, see
+   * createProductFromManualEntry in purchase-actions.ts. */
   productLinkDecided: boolean
 }
 

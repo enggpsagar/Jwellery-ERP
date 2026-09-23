@@ -32,6 +32,7 @@ import {
 } from "@/lib/location-scope";
 import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import { formatShortDate } from "@/lib/utils";
+import { buildSkuPrefix } from "@/lib/inventory/product-sku";
 import type {
   DataTableExportParams,
   DataTableExportResult,
@@ -241,41 +242,99 @@ async function resolvePerLineGstRateSnapshots(
   return map;
 }
 
-/** Unique per store — lets resolveManualEntryProductId find-or-create
- *  without ever racing itself into a duplicate (Product's own
- *  @@unique([storeId, productCode]) backs this up regardless). */
-const MANUAL_ENTRY_PRODUCT_CODE = "MANUAL-ENTRY";
-
 /**
  * A Purchase line item can be entered without picking a catalog Product
  * (the form's "Enter Manually (No Product)" choice) — but
  * InventoryStock.productId and PurchaseItem.productId are both required,
- * non-nullable foreign keys, and a large enough set of other places already
- * assume a real Product hangs off every stock row (the Invoice/Quotation
- * "pick a stock item to sell" queries, the item-ledger report, My Jobs) that
- * making the FK nullable everywhere it's read would be a much bigger, more
- * error-prone change than this. Instead, every manually-entered line reuses
- * one lazily-created, inactive (so it never appears in the Product picker
- * itself) placeholder Product per store — created the first time a store
- * actually uses "Enter Manually", found by its fixed productCode on every
- * purchase after that.
+ * non-nullable foreign keys, so a real Product row is still needed under the
+ * hood. This used to resolve every such line, across every purchase a store
+ * ever made, to one shared inactive placeholder Product — which meant every
+ * manually-entered item showed up everywhere (Stock, item-ledger report,
+ * the Product picker's own "recently used" list) labeled "Manual Entry (no
+ * product)" instead of its own typed name, and any view grouped or joined
+ * by Product silently merged every manual line from every purchase into
+ * that one row. Fixed to mint a real, active, per-line Product instead —
+ * named and seeded from the line's own itemName/metal/purity/weights/
+ * charges, using the same SKU-prefix + sequential-code scheme
+ * createProduct() uses (lib/actions/inventory/product-actions.ts), just
+ * without a category/type/style (this form never collects those) — so it
+ * reads as its own catalog entry immediately, and is pickable again on a
+ * future purchase/invoice instead of forcing "Enter Manually" every time.
  */
-async function resolveManualEntryProductId(storeId: string): Promise<string> {
-  const existing = await prisma.product.findFirst({
-    where: { storeId, productCode: MANUAL_ENTRY_PRODUCT_CODE },
-    select: { id: true },
-  });
-  if (existing) return existing.id;
+async function createProductFromManualEntry(
+  storeId: string,
+  item: PurchaseLineItemInput,
+): Promise<string> {
+  const [businessSettings, metalRow] = await Promise.all([
+    prisma.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true } }),
+    item.metalTypeId
+      ? prisma.storeMetal.findFirst({ where: { id: item.metalTypeId, storeId }, select: { name: true } })
+      : Promise.resolve(null),
+  ]);
 
-  const created = await prisma.product.create({
-    data: {
-      storeId,
-      productCode: MANUAL_ENTRY_PRODUCT_CODE,
-      name: "Manual Entry (no product)",
-      isActive: false,
-    },
-    select: { id: true },
+  const skuPrefix = buildSkuPrefix({
+    metalName: metalRow?.name ?? "X",
+    purity: item.purity ?? null,
+    purityCode: null,
+    targetStyleName: null,
+    categoryTypeName: null,
+    categoryName: null,
+    format: businessSettings?.skuFormat,
   });
+
+  // Same max-based, collision-retry sequencing as createProduct's own SKU
+  // generator — scoped to this exact prefix so a manual Gold-22K entry and
+  // a catalog-created Gold-22K product share one numbering line, not two.
+  const existingCodes = await prisma.product.findMany({
+    where: { storeId, productCode: { startsWith: `${skuPrefix}-` } },
+    select: { productCode: true },
+  });
+  const highestSeq = existingCodes.reduce((max, row) => {
+    const match = new RegExp(`^${skuPrefix}-(\\d+)$`).exec(row.productCode);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+
+  const hasStoneComponent = Boolean(
+    item.stoneMetalTypeName || item.stoneTypeNames || toNumber(item.stoneCharge) > 0,
+  );
+
+  let created: { id: string } | null = null;
+  for (let attempt = 0; attempt < 5 && !created; attempt += 1) {
+    const productCode = `${skuPrefix}-${String(highestSeq + 1 + attempt).padStart(3, "0")}`;
+    try {
+      created = await prisma.product.create({
+        select: { id: true },
+        data: {
+          storeId,
+          productCode,
+          name: item.itemName?.trim() || "Manually Added Item",
+          metalTypeId: item.metalTypeId ?? undefined,
+          defaultPurity: item.purity ?? undefined,
+          defaultMakingCharge: item.makingCharge,
+          defaultMakingChargeType: toChargeType(item.makingChargeType),
+          defaultStoneCharge: item.stoneCharge,
+          defaultStoneRate: item.stoneRate ?? undefined,
+          defaultGrossWeight: item.grossWeight ?? undefined,
+          defaultNetWeight: item.netWeight ?? undefined,
+          defaultStoneWeight: item.stoneWeight ?? undefined,
+          defaultCaratWeight: item.caratWeight ?? undefined,
+          hasStoneComponent,
+          defaultStoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
+          defaultStoneTypeNames: item.stoneTypeNames ?? undefined,
+          hsnCode: item.hsnCode ?? undefined,
+          isActive: true,
+        },
+      });
+    } catch (error) {
+      const isDuplicateCode =
+        error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+      if (!isDuplicateCode) throw error;
+    }
+  }
+
+  if (!created) {
+    throw new Error("Could not generate a unique product code for a manually-entered item");
+  }
   return created.id;
 }
 
@@ -286,7 +345,7 @@ async function resolveManualEntryProductId(storeId: string): Promise<string> {
  * (item name, metal/purity, weights, embedded stone, HSN) with that
  * Product's own saved values before they ever reach the DB, for every line
  * that explicitly picked one — `explicitProductIds` must be captured BEFORE
- * resolveManualEntryProductId's placeholder substitution, so a genuinely
+ * createProductFromManualEntry's per-line substitution, so a genuinely
  * manual line (no product picked at all) is never touched. Mirrors
  * purchase-form.tsx's own applyProductToItem field-for-field.
  */
@@ -824,7 +883,7 @@ export async function createPurchase(
 
     const storeId = await requireStoreScope();
 
-    // Captured before resolveManualEntryProductId's placeholder substitution
+    // Captured before createProductFromManualEntry's per-line substitution
     // below — see lockLinkedProductFields' own doc comment for why a
     // genuinely manual line must never be included here.
     const explicitProductIds = new Set(
@@ -834,13 +893,15 @@ export async function createPurchase(
     // A line with no product picked (the form's own "Enter Manually (No
     // Product)" choice) still needs a real Product row under the hood —
     // InventoryStock/PurchaseItem.productId is a hard, non-nullable FK — see
-    // resolveManualEntryProductId's own doc comment for the fuller
-    // reasoning. Resolved to one lazily-created placeholder per store.
-    if (items.some((item) => !item.productId)) {
-      const manualEntryProductId = await resolveManualEntryProductId(storeId);
-      items = items.map((item) =>
-        item.productId ? item : { ...item, productId: manualEntryProductId },
-      );
+    // createProductFromManualEntry's own doc comment for the fuller
+    // reasoning. One new real Product per manual line, awaited sequentially
+    // (not Promise.all) so two manual lines sharing a metal+purity prefix
+    // in the same purchase don't race for the same next SKU sequence
+    // number.
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].productId) continue;
+      const newProductId = await createProductFromManualEntry(storeId, items[i]);
+      items[i] = { ...items[i], productId: newProductId };
     }
 
     const productIds = [...new Set(items.map((item) => item.productId))];
@@ -1414,18 +1475,20 @@ export async function updatePurchase(
       makingChargeType: toChargeType(item.makingChargeType),
     }));
 
-    // Captured before resolveManualEntryProductId's placeholder substitution
+    // Captured before createProductFromManualEntry's per-line substitution
     // below — see lockLinkedProductFields' own doc comment for why a
     // genuinely manual line must never be included here.
     const explicitProductIds = new Set(
       items.filter((item) => item.productId).map((item) => item.productId),
     );
 
-    if (items.some((item) => !item.productId)) {
-      const manualEntryProductId = await resolveManualEntryProductId(storeId);
-      items = items.map((item) =>
-        item.productId ? item : { ...item, productId: manualEntryProductId },
-      );
+    // One new real Product per manual line — see createProductFromManualEntry's
+    // own doc comment. Sequential, not Promise.all — same reasoning as
+    // createPurchase's identical loop above (avoids a same-prefix SKU race).
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].productId) continue;
+      const newProductId = await createProductFromManualEntry(storeId, items[i]);
+      items[i] = { ...items[i], productId: newProductId };
     }
 
     const productIds = [...new Set(items.map((item) => item.productId))];

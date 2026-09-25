@@ -820,6 +820,9 @@ export function ProductForm({
     0,
   );
   const estimatedTotal = metalValueSum + stoneChargeSum;
+  const selectedGstRate = gstRates.find((rate) => rate.id === gstRateId);
+  const estimatedGstAmount = selectedGstRate ? estimatedTotal * (selectedGstRate.ratePercent / 100) : 0;
+  const estimatedTotalWithGst = estimatedTotal + estimatedGstAmount;
 
   const submittedHasStoneComponent = productKind === "METAL" && hasStoneComponent;
   const submittedStoneWeight =
@@ -1767,10 +1770,26 @@ export function ProductForm({
                 <span className="font-medium">{inr(stoneChargeSum)}</span>
               </div>
             )}
-            <div className="flex justify-between border-t pt-2 text-base font-semibold">
-              <span>Estimated Total</span>
-              <span>{inr(estimatedTotal)}</span>
+            <div className={`flex justify-between ${selectedGstRate ? "border-t pt-2" : "border-t pt-2 text-base font-semibold"}`}>
+              <span className={selectedGstRate ? "text-muted-foreground" : ""}>
+                {selectedGstRate ? "Subtotal" : "Estimated Total"}
+              </span>
+              <span className={selectedGstRate ? "font-medium" : ""}>{inr(estimatedTotal)}</span>
             </div>
+            {selectedGstRate && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    GST ({selectedGstRate.name}, {selectedGstRate.ratePercent}%)
+                  </span>
+                  <span className="font-medium">{inr(estimatedGstAmount)}</span>
+                </div>
+                <div className="flex justify-between border-t pt-2 text-base font-semibold">
+                  <span>Estimated Total (incl. GST)</span>
+                  <span>{inr(estimatedTotalWithGst)}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

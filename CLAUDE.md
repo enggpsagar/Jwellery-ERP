@@ -182,6 +182,23 @@ Nearly every `console.error(...)` across `lib/actions/**` and `app/api/**` was c
 
 `app/layout.tsx` also renders a separate Better Stack **browser (RUM) monitoring** tag, gated on `BETTERSTACK_RUM_TOKEN` — a different product and a different, intentionally-public client-side token from `BETTER_STACK_SOURCE_TOKEN`. Don't conflate the two when touching either.
 
+### Added 2026-09-25: Product-level default GST Rate
+
+`Product.gstRateId` (migration `20260925060000_add_product_gst_rate`) lets
+Add/Edit Product (`components/inventory/products/product-form.tsx`, next to
+HSN Code) pick one of the store's configured `GstRate` rows (Settings > GST
+Rates, via the existing `getGstRates()`) as this product's own default. Unlike
+Invoice/Purchase/Quotation's `gstRateId`/`gstRateName`/`gstRatePercent` trio —
+a deliberate historical snapshot of the rate actually charged on that
+document, immune to a later rename — this is a plain live FK (same pattern as
+`categoryId`/`metalTypeId`/`targetStyleId`), because a product's own
+classification should keep tracking a renamed/edited `GstRate` row rather than
+freezing one. Nullable, so existing products default to unset. **Not yet
+wired further**: nothing currently reads this to prefill a Stock/Invoice/
+Purchase line's own `gstRateId` the way `hsnCode` already gets copied onto a
+Stock entry — that prefill wiring is a real, separate follow-up if wanted, not
+done in this pass.
+
 ### Known dead/pre-existing issues (not regressions — don't "fix" without reason)
 
 - `auth.config.ts` (repo root) and `app/api/auth/route.ts` are orphaned NextAuth v5-style leftovers, not wired to anything (`app/api/auth/[...nextauth]/route.ts` is the real handler). Both have their own pre-existing type errors.

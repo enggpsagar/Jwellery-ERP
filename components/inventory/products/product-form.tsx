@@ -63,6 +63,13 @@ export type StoreCategoryTypeOption = {
   name: string;
 };
 
+export type GstRateOption = {
+  id: string;
+  name: string;
+  ratePercent: number;
+  isActive: boolean;
+};
+
 type Product = {
   id?: string;
   productCode: string;
@@ -88,6 +95,7 @@ type Product = {
   defaultStoneTypeNames: string | null;
   designCode: string | null;
   hsnCode: string | null;
+  gstRateId: string | null;
   description: string | null;
   notes: string | null;
   isActive: boolean;
@@ -125,6 +133,10 @@ type ProductFormProps = {
   categories: StoreCategoryOption[];
   styles: StoreStyleOption[];
   origins: StoreMetalOriginRow[];
+  /** Settings > GST Rates — offered as this product's default GST rate,
+   * same "live FK, not a snapshot" reasoning as Product.gstRateId's own
+   * schema doc comment. */
+  gstRates?: GstRateOption[];
   /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
    * Conversion Rules) — see the same prop on InvoiceForm. */
   caratConversionRates: Record<PurityType, number>;
@@ -228,6 +240,7 @@ export function ProductForm({
   locations = [],
   defaultLocationId,
   styleFieldEnabled = true,
+  gstRates = [],
 }: ProductFormProps) {
   const showLocationField = useShowLocationField(locations.length);
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? "");
@@ -591,6 +604,8 @@ export function ProductForm({
   const [isActive, setIsActive] = useState(
     product?.isActive === false ? "false" : "true",
   );
+
+  const [gstRateId, setGstRateId] = useState(product?.gstRateId ?? "");
 
   // Create-only: offer to open the stock entry in the same step, so a new
   // product doesn't need a second trip to Inventory to become stockable.
@@ -1552,7 +1567,7 @@ export function ProductForm({
       <div className="rounded-xl border p-6">
         <h3 className="mb-6 text-lg font-semibold">Product Details</h3>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-4">
           <div>
             <Label htmlFor="designCode">Design Code</Label>
 
@@ -1577,6 +1592,35 @@ export function ProductForm({
             />
 
             <ErrorText error={state.errors.hsnCode} />
+          </div>
+
+          <div>
+            <Label htmlFor="gstRateId">GST Rate</Label>
+
+            <Select
+              value={gstRateId || "NONE"}
+              onValueChange={(value) => setGstRateId(value === "NONE" ? "" : value)}
+            >
+              <SelectTrigger className="h-11 w-full" id="gstRateId">
+                <SelectValue placeholder="Select GST rate" />
+              </SelectTrigger>
+
+              <SelectContent>
+                <SelectItem value="NONE">Not set</SelectItem>
+
+                {gstRates
+                  .filter((rate) => rate.isActive || rate.id === product?.gstRateId)
+                  .map((rate) => (
+                    <SelectItem key={rate.id} value={rate.id}>
+                      {rate.name} ({rate.ratePercent}%)
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+
+            <input type="hidden" name="gstRateId" value={gstRateId} />
+
+            <ErrorText error={state.errors.gstRateId} />
           </div>
 
           <div>

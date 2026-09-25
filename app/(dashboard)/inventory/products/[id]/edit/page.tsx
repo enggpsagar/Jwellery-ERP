@@ -16,6 +16,7 @@ import {
 } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
+import { getGstRates } from "@/lib/actions/gst-rate-actions"
 import { EditProductForm } from "@/components/inventory/products/edit-product-form"
 
 type ProductEditPageProps = {
@@ -51,7 +52,7 @@ export default async function ProductEditPage({
     redirect(`/inventory/products/${id}`)
   }
 
-  const [product, metals, categories, styles, caratConversionRates, origins, businessSettings] = await Promise.all([
+  const [product, metals, categories, styles, caratConversionRates, origins, businessSettings, gstRates] = await Promise.all([
     getProduct(id),
     getStoreMetals(),
     getStoreCategories(),
@@ -59,6 +60,7 @@ export default async function ProductEditPage({
     getCaratConversionRateMap(),
     getAllStoreMetalOrigins(),
     getBusinessSettings(),
+    getGstRates(),
   ])
 
   if (!product) {
@@ -94,6 +96,7 @@ export default async function ProductEditPage({
         styles={styles}
         caratConversionRates={caratConversionRates}
         origins={origins}
+        gstRates={gstRates}
         styleFieldEnabled={businessSettings.styleFieldEnabled}
       />
     </main>

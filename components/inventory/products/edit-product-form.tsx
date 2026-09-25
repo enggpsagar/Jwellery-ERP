@@ -14,6 +14,7 @@ import { useToast } from "@/components/providers/toast-provider";
 import type { StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions";
 import {
   ProductForm,
+  type GstRateOption,
   type StoreCategoryOption,
   type StoreMetalOption,
   type StoreStyleOption,
@@ -45,6 +46,7 @@ type EditProductFormProps = {
     defaultStoneTypeNames: string | null;
     designCode: string | null;
     hsnCode: string | null;
+    gstRateId: string | null;
     description: string | null;
     notes: string | null;
     isActive: boolean;
@@ -56,6 +58,7 @@ type EditProductFormProps = {
   styles: StoreStyleOption[];
   caratConversionRates: Record<PurityType, number>;
   origins: StoreMetalOriginRow[];
+  gstRates?: GstRateOption[];
   /** Settings > Metals, Stones & Categories > "Require Style on products" — see the same prop on ProductForm. */
   styleFieldEnabled?: boolean;
 };
@@ -67,6 +70,7 @@ export function EditProductForm({
   styles,
   caratConversionRates,
   origins,
+  gstRates,
   styleFieldEnabled,
 }: EditProductFormProps) {
   const router = useRouter();
@@ -126,6 +130,7 @@ export function EditProductForm({
         styles={styles}
         caratConversionRates={caratConversionRates}
         origins={origins}
+        gstRates={gstRates}
         styleFieldEnabled={styleFieldEnabled}
       />
     </form>

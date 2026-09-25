@@ -697,6 +697,15 @@ model Product {
   defaultStoneTypeNames     String?
   designCode                String?
   hsnCode                   String?
+  // Which configured GstRate (Settings > GST Rates) this product is sold
+  // under by default — a live FK, not a snapshot trio like Invoice/
+  // Purchase/Quotation's own gstRateId/gstRateName/gstRatePercent: unlike
+  // those, this isn't a historical record of a rate actually charged, it's
+  // this product's own current classification, so it should keep tracking
+  // a later rename to the same GstRate row rather than freezing one.
+  // Nullable so existing products (created before this field shipped)
+  // aren't retroactively forced to pick one.
+  gstRateId                 String?
   description               String?
   notes                     String?
   isActive                  Boolean              @default(true)
@@ -722,6 +731,7 @@ model Product {
   stoneOriginOption         StoreMetalOrigin?    @relation(fields: [stoneOriginOptionId], references: [id])
   storeMetalPurity          StoreMetalPurity?    @relation(fields: [storeMetalPurityId], references: [id])
   targetStyle               StoreStyle?          @relation(fields: [targetStyleId], references: [id])
+  gstRate                   GstRate?             @relation(fields: [gstRateId], references: [id])
 
   @@unique([storeId, productCode])
   @@index([categoryId])
@@ -730,6 +740,7 @@ model Product {
   @@index([stoneOriginOptionId])
   @@index([storeMetalPurityId])
   @@index([targetStyleId])
+  @@index([gstRateId])
   @@index([name])
   @@index([productCode])
   @@index([designCode])
@@ -1645,6 +1656,7 @@ model GstRate {
   purchases     Purchase[]
   purchaseItems PurchaseItem[]
   quotations    Quotation[]
+  products      Product[]
 
   @@unique([storeId, name])
   @@index([storeId])

@@ -10,6 +10,7 @@ import {
 } from "@/lib/actions/taxonomy-actions";
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
+import { getGstRates } from "@/lib/actions/gst-rate-actions";
 import {
   getDefaultLocationId,
   getStoreLocations,
@@ -30,7 +31,7 @@ export default async function NewProductPage({
   const params = (await searchParams) ?? {};
   const returnTo = safeReturnTo(params.returnTo);
 
-  const [metals, categories, styles, caratConversionRates, origins, locations, defaultLocationId, businessSettings] =
+  const [metals, categories, styles, caratConversionRates, origins, locations, defaultLocationId, businessSettings, gstRates] =
     await Promise.all([
       getStoreMetals(),
       getStoreCategories(),
@@ -40,6 +41,7 @@ export default async function NewProductPage({
       getStoreLocations(),
       getDefaultLocationId(),
       getBusinessSettings(),
+      getGstRates(),
     ]);
 
   return (
@@ -62,6 +64,7 @@ export default async function NewProductPage({
           defaultLocationId={defaultLocationId ?? undefined}
           returnTo={returnTo}
           styleFieldEnabled={businessSettings.styleFieldEnabled}
+          gstRates={gstRates}
         />
       </ResetFormWrapper>
     </main>

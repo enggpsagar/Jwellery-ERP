@@ -212,6 +212,7 @@ function serializeProduct(product: {
   defaultStoneTypeNames: string | null;
   designCode: string | null;
   hsnCode: string | null;
+  gstRateId: string | null;
   description: string | null;
   notes: string | null;
   isActive: boolean;
@@ -270,6 +271,7 @@ function serializeProduct(product: {
     defaultStoneTypeNames: product.defaultStoneTypeNames,
     designCode: product.designCode,
     hsnCode: product.hsnCode,
+    gstRateId: product.gstRateId,
     description: product.description,
     notes: product.notes,
     isActive: product.isActive,
@@ -821,6 +823,7 @@ export async function createProduct(
 
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
+    const gstRateId = parseNullableString(formData.get("gstRateId"));
     const description = parseNullableString(formData.get("description"));
     const notes = parseNullableString(formData.get("notes"));
     const isActive = parseBoolean(formData.get("isActive"));
@@ -833,6 +836,16 @@ export async function createProduct(
 
     if (businessSettings?.styleFieldEnabled !== false && !targetStyleId) {
       errors.targetStyleId = ["Style is required"];
+    }
+
+    if (gstRateId) {
+      const gstRateRow = await prisma.gstRate.findFirst({
+        where: { id: gstRateId, storeId },
+        select: { id: true },
+      });
+      if (!gstRateRow) {
+        errors.gstRateId = ["Selected GST rate is invalid"];
+      }
     }
 
     if (defaultGrossWeight === null) {
@@ -967,6 +980,7 @@ export async function createProduct(
             defaultStoneTypeNames,
             designCode,
             hsnCode,
+            gstRateId,
             description,
             notes,
             isActive,
@@ -1223,6 +1237,7 @@ export async function updateProduct(
 
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
+    const gstRateId = parseNullableString(formData.get("gstRateId"));
     const description = parseNullableString(formData.get("description"));
     const notes = parseNullableString(formData.get("notes"));
     const isActive = parseBoolean(formData.get("isActive"));
@@ -1254,6 +1269,16 @@ export async function updateProduct(
         targetStyleId,
       ),
     );
+
+    if (gstRateId) {
+      const gstRateRow = await prisma.gstRate.findFirst({
+        where: { id: gstRateId, storeId },
+        select: { id: true },
+      });
+      if (!gstRateRow) {
+        errors.gstRateId = ["Selected GST rate is invalid"];
+      }
+    }
 
     // See createProduct's identical comment — these arrays are purely
     // additive alongside the legacy metalTypeId/defaultGrossWeight etc.
@@ -1320,6 +1345,7 @@ export async function updateProduct(
         defaultStoneTypeNames,
         designCode,
         hsnCode,
+        gstRateId,
         description,
         notes,
         isActive,

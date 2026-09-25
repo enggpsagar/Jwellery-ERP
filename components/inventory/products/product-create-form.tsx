@@ -12,6 +12,7 @@ import type { LocationOption } from "@/components/shared/location-select";
 import { initialProductFormState } from "@/lib/inventory/product-types";
 import {
   ProductForm,
+  type GstRateOption,
   type StoreCategoryOption,
   type StoreMetalOption,
   type StoreStyleOption,
@@ -24,6 +25,7 @@ type ProductCreateFormProps = {
   caratConversionRates: Record<PurityType, number>;
   origins: StoreMetalOriginRow[];
   locations: LocationOption[];
+  gstRates?: GstRateOption[];
   /** The store's configured default location, pre-selected in the Stock
    * entry Location picker — see the same prop on ProductForm. */
   defaultLocationId?: string;
@@ -44,6 +46,7 @@ export function ProductCreateForm({
   defaultLocationId,
   returnTo,
   styleFieldEnabled,
+  gstRates,
 }: ProductCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -109,6 +112,7 @@ export function ProductCreateForm({
         locations={locations}
         defaultLocationId={defaultLocationId}
         styleFieldEnabled={styleFieldEnabled}
+        gstRates={gstRates}
       />
     </form>
   );

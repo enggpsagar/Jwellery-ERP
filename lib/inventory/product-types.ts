@@ -23,7 +23,6 @@ export type ProductFormState = {
     stoneComponentsJson?: string[]
     designCode?: string[]
     hsnCode?: string[]
-    gstRateId?: string[]
     description?: string[]
     notes?: string[]
     isActive?: string[]

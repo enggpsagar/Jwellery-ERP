@@ -46,7 +46,6 @@ type EditProductFormProps = {
     defaultStoneTypeNames: string | null;
     designCode: string | null;
     hsnCode: string | null;
-    gstRateId: string | null;
     description: string | null;
     notes: string | null;
     isActive: boolean;

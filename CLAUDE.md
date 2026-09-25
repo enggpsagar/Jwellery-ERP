@@ -182,22 +182,30 @@ Nearly every `console.error(...)` across `lib/actions/**` and `app/api/**` was c
 
 `app/layout.tsx` also renders a separate Better Stack **browser (RUM) monitoring** tag, gated on `BETTERSTACK_RUM_TOKEN` — a different product and a different, intentionally-public client-side token from `BETTER_STACK_SOURCE_TOKEN`. Don't conflate the two when touching either.
 
-### Added 2026-09-25: Product-level default GST Rate
+### Added 2026-09-25: GST Rate on Product — per Metal/Stone component, not once per product
 
-`Product.gstRateId` (migration `20260925060000_add_product_gst_rate`) lets
-Add/Edit Product (`components/inventory/products/product-form.tsx`, next to
-HSN Code) pick one of the store's configured `GstRate` rows (Settings > GST
-Rates, via the existing `getGstRates()`) as this product's own default. Unlike
-Invoice/Purchase/Quotation's `gstRateId`/`gstRateName`/`gstRatePercent` trio —
-a deliberate historical snapshot of the rate actually charged on that
-document, immune to a later rename — this is a plain live FK (same pattern as
-`categoryId`/`metalTypeId`/`targetStyleId`), because a product's own
-classification should keep tracking a renamed/edited `GstRate` row rather than
-freezing one. Nullable, so existing products default to unset. **Not yet
-wired further**: nothing currently reads this to prefill a Stock/Invoice/
-Purchase line's own `gstRateId` the way `hsnCode` already gets copied onto a
-Stock entry — that prefill wiring is a real, separate follow-up if wanted, not
-done in this pass.
+First landed as a single `Product.gstRateId` (migration
+`20260925060000_add_product_gst_rate`), then corrected same-day: a jewellery
+product's Metal and embedded Stone commonly carry *different* GST rates (the
+same reason `InvoiceItem.gstRateId` is picked per line rather than once per
+document — see `GstRate`'s own schema doc comment), so one rate for the whole
+product can't express that. Migration
+`20260925070000_move_gst_rate_to_product_components` drops the Product-level
+column and adds `gstRateId` to `ProductMetalComponent` and
+`ProductStoneComponent` instead — each Metal row and each Stone row on
+Add/Edit Product (`components/inventory/products/product-form.tsx`) now has
+its own GST Rate picker (Settings > GST Rates), defaulting new rows to the
+store's own default rate (`resolveDefaultGstRateId`, same fallback order as
+`invoice-form.tsx`'s). Same as before, this is a plain live FK (not a
+snapshot trio) — it should keep tracking a later rename of the same
+`GstRate` row rather than freezing one, since it's the component's ongoing
+classification, not a record of a rate actually charged. The Estimated Value
+box computes GST per row against its own rate, grouped by rate so e.g. two
+Gold rows taxed the same show as one combined line, then a GST-inclusive
+grand total. **Not yet wired further**: nothing currently reads this to
+prefill a Stock/Invoice/Purchase line's own `gstRateId` the way `hsnCode`
+already gets copied onto a Stock entry — that prefill wiring is a real,
+separate follow-up if wanted, not done in this pass.
 
 ### Known dead/pre-existing issues (not regressions — don't "fix" without reason)
 

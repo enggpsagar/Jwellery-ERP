@@ -68,7 +68,20 @@ export type GstRateOption = {
   name: string;
   ratePercent: number;
   isActive: boolean;
+  isDefault: boolean;
 };
+
+// New Metal/Stone rows preselect the store's own default GST Rate (same
+// fallback order as invoice-form.tsx's resolveDefaultGstRateId), rather than
+// starting blank — a store owner still overrides per row when a component's
+// real rate differs.
+function resolveDefaultGstRateId(gstRates: GstRateOption[]): string {
+  return (
+    gstRates.find((rate) => rate.isDefault && rate.isActive)?.id ??
+    gstRates.find((rate) => rate.isActive)?.id ??
+    ""
+  );
+}
 
 type Product = {
   id?: string;
@@ -95,7 +108,6 @@ type Product = {
   defaultStoneTypeNames: string | null;
   designCode: string | null;
   hsnCode: string | null;
-  gstRateId: string | null;
   description: string | null;
   notes: string | null;
   isActive: boolean;
@@ -111,6 +123,7 @@ type Product = {
     storeMetalPurityLabel: string | null;
     grossWeight: string | null;
     netWeight: string | null;
+    gstRateId: string | null;
   }[];
   stoneComponents?: {
     id: string;
@@ -121,6 +134,7 @@ type Product = {
     stoneRate: string | null;
     stoneCharge: string | null;
     stoneChargeType: "FIXED" | "PERCENTAGE";
+    gstRateId: string | null;
   }[];
 };
 
@@ -133,9 +147,11 @@ type ProductFormProps = {
   categories: StoreCategoryOption[];
   styles: StoreStyleOption[];
   origins: StoreMetalOriginRow[];
-  /** Settings > GST Rates — offered as this product's default GST rate,
-   * same "live FK, not a snapshot" reasoning as Product.gstRateId's own
-   * schema doc comment. */
+  /** Settings > GST Rates — offered per Metal/Stone component row (see
+   * MetalComponentRow/StoneComponentRow's own gstRateId), not once for the
+   * whole product, since a two-tone piece's metal and an embedded stone can
+   * legitimately be taxed at different rates (same reasoning as
+   * InvoiceItem.gstRateId being picked per line). */
   gstRates?: GstRateOption[];
   /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
    * Conversion Rules) — see the same prop on InvoiceForm. */
@@ -186,10 +202,14 @@ type MetalComponentRow = {
   // at the bottom of this form, so a store owner can sanity-check the
   // total before saving.
   metalRate: string;
+  // This row's own GST Rate (Settings > GST Rates) — per-row, not once for
+  // the whole product, since a two-tone piece's Gold and Silver rows can
+  // legitimately carry different rates.
+  gstRateId: string;
 };
 
-function emptyMetalComponent(key: string = crypto.randomUUID()): MetalComponentRow {
-  return { key, metalTypeId: "", storeMetalPurityId: "", grossWeight: "", metalRate: "" };
+function emptyMetalComponent(key: string = crypto.randomUUID(), gstRateId: string = ""): MetalComponentRow {
+  return { key, metalTypeId: "", storeMetalPurityId: "", grossWeight: "", metalRate: "", gstRateId };
 }
 
 // One row of the "Stone" repeater — replaces the old single "Includes a
@@ -206,9 +226,12 @@ type StoneComponentRow = {
   stoneWeight: string; // grams
   stoneWeightTouched: boolean;
   stoneWeightUnit: "GRAM" | "CARAT";
+  // This row's own GST Rate — see MetalComponentRow.gstRateId's own doc
+  // comment for why it's per-row rather than once for the whole product.
+  gstRateId: string;
 };
 
-function emptyStoneComponent(key: string = crypto.randomUUID()): StoneComponentRow {
+function emptyStoneComponent(key: string = crypto.randomUUID(), gstRateId: string = ""): StoneComponentRow {
   return {
     key,
     stoneMetalTypeName: "",
@@ -220,6 +243,7 @@ function emptyStoneComponent(key: string = crypto.randomUUID()): StoneComponentR
     stoneWeight: "",
     stoneWeightTouched: false,
     stoneWeightUnit: "GRAM",
+    gstRateId,
   };
 }
 
@@ -294,6 +318,7 @@ export function ProductForm({
         storeMetalPurityId: component.storeMetalPurityId ?? "",
         grossWeight: component.grossWeight ?? "",
         metalRate: "",
+        gstRateId: component.gstRateId ?? "",
       }));
     }
     if (product && !initialMetals.find((item) => item.id === product.metalTypeId)?.isGemstone) {
@@ -304,10 +329,11 @@ export function ProductForm({
           storeMetalPurityId: product.storeMetalPurityId ?? "",
           grossWeight: product.defaultGrossWeight ?? "",
           metalRate: "",
+          gstRateId: "",
         },
       ];
     }
-    return [emptyMetalComponent()];
+    return [emptyMetalComponent(undefined, resolveDefaultGstRateId(gstRates))];
   });
 
   // Which metal-component row's own "Add Metal Type" / "Add Purity"
@@ -421,6 +447,7 @@ export function ProductForm({
         stoneWeight: component.stoneWeight ?? "",
         stoneWeightTouched: Boolean(component.stoneWeight),
         stoneWeightUnit: "GRAM" as const,
+        gstRateId: component.gstRateId ?? "",
       }));
     }
     if (product?.hasStoneComponent) {
@@ -438,6 +465,7 @@ export function ProductForm({
           stoneWeight: product.defaultStoneWeight ?? "",
           stoneWeightTouched: Boolean(product.defaultStoneWeight),
           stoneWeightUnit: "GRAM" as const,
+          gstRateId: "",
         },
       ];
     }
@@ -465,6 +493,7 @@ export function ProductForm({
           stoneWeight: product?.defaultNetWeight ?? "",
           stoneWeightTouched: Boolean(product?.defaultNetWeight),
           stoneWeightUnit: "GRAM" as const,
+          gstRateId: "",
         },
       ];
     }
@@ -604,8 +633,6 @@ export function ProductForm({
   const [isActive, setIsActive] = useState(
     product?.isActive === false ? "false" : "true",
   );
-
-  const [gstRateId, setGstRateId] = useState(product?.gstRateId ?? "");
 
   // Create-only: offer to open the stock entry in the same step, so a new
   // product doesn't need a second trip to Inventory to become stockable.
@@ -820,8 +847,30 @@ export function ProductForm({
     0,
   );
   const estimatedTotal = metalValueSum + stoneChargeSum;
-  const selectedGstRate = gstRates.find((rate) => rate.id === gstRateId);
-  const estimatedGstAmount = selectedGstRate ? estimatedTotal * (selectedGstRate.ratePercent / 100) : 0;
+
+  // GST computed per row against its OWN gstRateId (a metal row and a
+  // stone row can legitimately carry different rates), then grouped by
+  // rate so e.g. two Gold rows both taxed at the same rate show as one
+  // combined line rather than one per row.
+  const gstGroups = useMemo(() => {
+    const groups = new Map<string, { rate: GstRateOption; taxable: number }>();
+    const addTaxable = (rowGstRateId: string, taxable: number) => {
+      if (!rowGstRateId || taxable <= 0) return;
+      const rate = gstRates.find((item) => item.id === rowGstRateId);
+      if (!rate) return;
+      const existing = groups.get(rate.id);
+      groups.set(rate.id, { rate, taxable: (existing?.taxable ?? 0) + taxable });
+    };
+    if (productKind === "METAL") {
+      metalComponents.forEach((row) => addTaxable(row.gstRateId, (Number(row.grossWeight) || 0) * (Number(row.metalRate) || 0)));
+    }
+    stoneComponents.forEach((row) => addTaxable(row.gstRateId, Number(row.stoneCharge) || 0));
+    return [...groups.values()]
+      .map(({ rate, taxable }) => ({ rate, taxable, amount: taxable * (rate.ratePercent / 100) }))
+      .sort((a, b) => a.rate.ratePercent - b.rate.ratePercent);
+  }, [metalComponents, stoneComponents, gstRates, productKind]);
+
+  const estimatedGstAmount = gstGroups.reduce((sum, group) => sum + group.amount, 0);
   const estimatedTotalWithGst = estimatedTotal + estimatedGstAmount;
 
   const submittedHasStoneComponent = productKind === "METAL" && hasStoneComponent;
@@ -857,6 +906,7 @@ export function ProductForm({
             // product's own defaultNetWeight (submittedNetWeight) instead;
             // each component row just mirrors its own Gross Weight here.
             netWeight: row.grossWeight || null,
+            gstRateId: row.gstRateId || null,
           }))
       : metalTypeId
         ? [{ metalTypeId, storeMetalPurityId: null, grossWeight: submittedWeight(grossWeight) || null, netWeight: submittedWeight(netWeight) || null }]
@@ -877,6 +927,7 @@ export function ProductForm({
         stoneRate: row.stoneRate || null,
         stoneCharge: row.stoneCharge || null,
         stoneChargeType: "FIXED",
+        gstRateId: row.gstRateId || null,
       })),
   );
 
@@ -918,11 +969,11 @@ export function ProductForm({
                 // now-mismatched selection silently in place.
                 setMetalTypeId("");
                 setStoneOriginOptionId("");
-                setMetalComponents([emptyMetalComponent()]);
+                setMetalComponents([emptyMetalComponent(undefined, resolveDefaultGstRateId(gstRates))]);
                 // A Stone-kind product IS its stone(s) — starts with one row
                 // instead of empty, unlike the Metal-kind repeater below
                 // where an embedded stone stays genuinely optional.
-                setStoneComponents(kind === "STONE" ? [emptyStoneComponent()] : []);
+                setStoneComponents(kind === "STONE" ? [emptyStoneComponent(undefined, resolveDefaultGstRateId(gstRates))] : []);
                 // Category/Type are hidden entirely for Stone (see below) —
                 // clear them on every switch so a category picked while on
                 // Metal doesn't silently keep submitting behind the
@@ -1156,7 +1207,7 @@ export function ProductForm({
               type="button"
               variant="secondary"
               size="sm"
-              onClick={() => setMetalComponents((prev) => [...prev, emptyMetalComponent()])}
+              onClick={() => setMetalComponents((prev) => [...prev, emptyMetalComponent(undefined, resolveDefaultGstRateId(gstRates))])}
             >
               <Plus className="h-4 w-4 mr-1" /> Add Metal
             </Button>
@@ -1170,7 +1221,7 @@ export function ProductForm({
 
               return (
                 <div key={row.key} className="rounded-lg border p-4">
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
                     <div className="md:col-span-2 space-y-1">
                       <Label className="text-xs">
                         Metal Type <RequiredMark />
@@ -1269,6 +1320,30 @@ export function ProductForm({
                       <p className="text-xs text-muted-foreground">
                         Estimate only — feeds the total below, not saved
                       </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs">GST Rate</Label>
+                      <Select
+                        value={row.gstRateId || "NONE"}
+                        onValueChange={(value) =>
+                          updateMetalComponent(row.key, { gstRateId: value === "NONE" ? "" : value })
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Not set" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NONE">Not set</SelectItem>
+                          {gstRates
+                            .filter((rate) => rate.isActive || rate.id === row.gstRateId)
+                            .map((rate) => (
+                              <SelectItem key={rate.id} value={rate.id}>
+                                {rate.name} ({rate.ratePercent}%)
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -1392,7 +1467,7 @@ export function ProductForm({
               type="button"
               variant="secondary"
               size="sm"
-              onClick={() => setStoneComponents((prev) => [...prev, emptyStoneComponent()])}
+              onClick={() => setStoneComponents((prev) => [...prev, emptyStoneComponent(undefined, resolveDefaultGstRateId(gstRates))])}
             >
               <Plus className="h-4 w-4 mr-1" /> Add Stone
             </Button>
@@ -1461,6 +1536,30 @@ export function ProductForm({
                     onStoneWeightUnitChange={(unit) => updateStoneComponent(row.key, { stoneWeightUnit: unit })}
                     netStoneWeightTouched={row.stoneWeightTouched}
                   />
+
+                  <div className="mt-3 max-w-xs space-y-1">
+                    <Label className="text-xs">GST Rate</Label>
+                    <Select
+                      value={row.gstRateId || "NONE"}
+                      onValueChange={(value) =>
+                        updateStoneComponent(row.key, { gstRateId: value === "NONE" ? "" : value })
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Not set" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">Not set</SelectItem>
+                        {gstRates
+                          .filter((rate) => rate.isActive || rate.id === row.gstRateId)
+                          .map((rate) => (
+                            <SelectItem key={rate.id} value={rate.id}>
+                              {rate.name} ({rate.ratePercent}%)
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   {/* A Stone-kind product must always keep at least one
                       row — that's the whole product, not an optional
@@ -1570,7 +1669,7 @@ export function ProductForm({
       <div className="rounded-xl border p-6">
         <h3 className="mb-6 text-lg font-semibold">Product Details</h3>
 
-        <div className="grid gap-6 lg:grid-cols-4">
+        <div className="grid gap-6 lg:grid-cols-3">
           <div>
             <Label htmlFor="designCode">Design Code</Label>
 
@@ -1595,35 +1694,6 @@ export function ProductForm({
             />
 
             <ErrorText error={state.errors.hsnCode} />
-          </div>
-
-          <div>
-            <Label htmlFor="gstRateId">GST Rate</Label>
-
-            <Select
-              value={gstRateId || "NONE"}
-              onValueChange={(value) => setGstRateId(value === "NONE" ? "" : value)}
-            >
-              <SelectTrigger className="h-11 w-full" id="gstRateId">
-                <SelectValue placeholder="Select GST rate" />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="NONE">Not set</SelectItem>
-
-                {gstRates
-                  .filter((rate) => rate.isActive || rate.id === product?.gstRateId)
-                  .map((rate) => (
-                    <SelectItem key={rate.id} value={rate.id}>
-                      {rate.name} ({rate.ratePercent}%)
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-
-            <input type="hidden" name="gstRateId" value={gstRateId} />
-
-            <ErrorText error={state.errors.gstRateId} />
           </div>
 
           <div>
@@ -1770,25 +1840,25 @@ export function ProductForm({
                 <span className="font-medium">{inr(stoneChargeSum)}</span>
               </div>
             )}
-            <div className={`flex justify-between ${selectedGstRate ? "border-t pt-2" : "border-t pt-2 text-base font-semibold"}`}>
-              <span className={selectedGstRate ? "text-muted-foreground" : ""}>
-                {selectedGstRate ? "Subtotal" : "Estimated Total"}
+            <div className={`flex justify-between ${gstGroups.length > 0 ? "border-t pt-2" : "border-t pt-2 text-base font-semibold"}`}>
+              <span className={gstGroups.length > 0 ? "text-muted-foreground" : ""}>
+                {gstGroups.length > 0 ? "Subtotal" : "Estimated Total"}
               </span>
-              <span className={selectedGstRate ? "font-medium" : ""}>{inr(estimatedTotal)}</span>
+              <span className={gstGroups.length > 0 ? "font-medium" : ""}>{inr(estimatedTotal)}</span>
             </div>
-            {selectedGstRate && (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    GST ({selectedGstRate.name}, {selectedGstRate.ratePercent}%)
-                  </span>
-                  <span className="font-medium">{inr(estimatedGstAmount)}</span>
-                </div>
-                <div className="flex justify-between border-t pt-2 text-base font-semibold">
-                  <span>Estimated Total (incl. GST)</span>
-                  <span>{inr(estimatedTotalWithGst)}</span>
-                </div>
-              </>
+            {gstGroups.map((group) => (
+              <div key={group.rate.id} className="flex justify-between">
+                <span className="text-muted-foreground">
+                  GST ({group.rate.name}, {group.rate.ratePercent}%)
+                </span>
+                <span className="font-medium">{inr(group.amount)}</span>
+              </div>
+            ))}
+            {gstGroups.length > 0 && (
+              <div className="flex justify-between border-t pt-2 text-base font-semibold">
+                <span>Estimated Total (incl. GST)</span>
+                <span>{inr(estimatedTotalWithGst)}</span>
+              </div>
             )}
           </div>
         </div>

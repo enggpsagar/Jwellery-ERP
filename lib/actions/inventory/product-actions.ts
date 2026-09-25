@@ -74,6 +74,7 @@ type MetalComponentInput = {
   storeMetalPurityId?: string | null;
   grossWeight?: number | string | null;
   netWeight?: number | string | null;
+  gstRateId?: string | null;
 };
 
 type StoneComponentInput = {
@@ -84,6 +85,7 @@ type StoneComponentInput = {
   stoneRate?: number | string | null;
   stoneCharge?: number | string | null;
   stoneChargeType?: string;
+  gstRateId?: string | null;
 };
 
 /**
@@ -114,6 +116,7 @@ async function parseAndValidateMetalComponents(
       const storeMetalPurityId = component.storeMetalPurityId
         ? String(component.storeMetalPurityId).trim()
         : null;
+      const gstRateId = component.gstRateId ? String(component.gstRateId).trim() : null;
 
       if (!metalTypeId) return null;
 
@@ -131,7 +134,15 @@ async function parseAndValidateMetalComponents(
         if (!purityRow) return null;
       }
 
-      return { metalTypeId, storeMetalPurityId };
+      if (gstRateId) {
+        const gstRateRow = await prisma.gstRate.findFirst({
+          where: { id: gstRateId, storeId },
+          select: { id: true },
+        });
+        if (!gstRateRow) return null;
+      }
+
+      return { metalTypeId, storeMetalPurityId, gstRateId };
     }),
   );
 
@@ -142,7 +153,10 @@ async function parseAndValidateMetalComponents(
   return { components: components as MetalComponentInput[], error: null };
 }
 
-function parseStoneComponents(formData: FormData): { components: StoneComponentInput[]; error: string | null } {
+async function parseStoneComponents(
+  storeId: string,
+  formData: FormData,
+): Promise<{ components: StoneComponentInput[]; error: string | null }> {
   let components: StoneComponentInput[] = [];
   try {
     components = JSON.parse(String(formData.get("stoneComponentsJson") || "[]"));
@@ -169,6 +183,19 @@ function parseStoneComponents(formData: FormData): { components: StoneComponentI
       components: [],
       error: `Select at least one Stone Type for ${missingType.stoneMetalTypeName}.`,
     };
+  }
+
+  const gstRateIds = [...new Set(named.map((c) => c.gstRateId).filter((id): id is string => !!id))];
+  if (gstRateIds.length > 0) {
+    const validRows = await prisma.gstRate.findMany({
+      where: { id: { in: gstRateIds }, storeId },
+      select: { id: true },
+    });
+    const validIds = new Set(validRows.map((row) => row.id));
+    const invalid = named.find((c) => c.gstRateId && !validIds.has(c.gstRateId));
+    if (invalid) {
+      return { components: [], error: "One or more stone GST rates are invalid." };
+    }
   }
 
   return { components: named, error: null };
@@ -212,7 +239,6 @@ function serializeProduct(product: {
   defaultStoneTypeNames: string | null;
   designCode: string | null;
   hsnCode: string | null;
-  gstRateId: string | null;
   description: string | null;
   notes: string | null;
   isActive: boolean;
@@ -229,6 +255,7 @@ function serializeProduct(product: {
     storeMetalPurity: { id: string; label: string } | null;
     grossWeight: { toString(): string } | null;
     netWeight: { toString(): string } | null;
+    gstRateId: string | null;
   }[];
   stoneComponents?: {
     id: string;
@@ -239,6 +266,7 @@ function serializeProduct(product: {
     stoneRate: { toString(): string } | null;
     stoneCharge: { toString(): string } | null;
     stoneChargeType: ChargeType;
+    gstRateId: string | null;
   }[];
 }) {
   return {
@@ -271,7 +299,6 @@ function serializeProduct(product: {
     defaultStoneTypeNames: product.defaultStoneTypeNames,
     designCode: product.designCode,
     hsnCode: product.hsnCode,
-    gstRateId: product.gstRateId,
     description: product.description,
     notes: product.notes,
     isActive: product.isActive,
@@ -285,6 +312,7 @@ function serializeProduct(product: {
       storeMetalPurityLabel: component.storeMetalPurity?.label ?? null,
       grossWeight: component.grossWeight?.toString() ?? null,
       netWeight: component.netWeight?.toString() ?? null,
+      gstRateId: component.gstRateId,
     })),
     stoneComponents: (product.stoneComponents ?? []).map((component) => ({
       id: component.id,
@@ -295,6 +323,7 @@ function serializeProduct(product: {
       stoneRate: component.stoneRate?.toString() ?? null,
       stoneCharge: component.stoneCharge?.toString() ?? null,
       stoneChargeType: component.stoneChargeType,
+      gstRateId: component.gstRateId,
     })),
   };
 }
@@ -823,7 +852,6 @@ export async function createProduct(
 
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
-    const gstRateId = parseNullableString(formData.get("gstRateId"));
     const description = parseNullableString(formData.get("description"));
     const notes = parseNullableString(formData.get("notes"));
     const isActive = parseBoolean(formData.get("isActive"));
@@ -836,16 +864,6 @@ export async function createProduct(
 
     if (businessSettings?.styleFieldEnabled !== false && !targetStyleId) {
       errors.targetStyleId = ["Style is required"];
-    }
-
-    if (gstRateId) {
-      const gstRateRow = await prisma.gstRate.findFirst({
-        where: { id: gstRateId, storeId },
-        select: { id: true },
-      });
-      if (!gstRateRow) {
-        errors.gstRateId = ["Selected GST rate is invalid"];
-      }
     }
 
     if (defaultGrossWeight === null) {
@@ -878,7 +896,7 @@ export async function createProduct(
       await parseAndValidateMetalComponents(storeId, formData);
     if (metalComponentsError) errors.metalComponentsJson = [metalComponentsError];
     const { components: stoneComponents, error: stoneComponentsError } =
-      parseStoneComponents(formData);
+      await parseStoneComponents(storeId, formData);
     if (stoneComponentsError) errors.stoneComponentsJson = [stoneComponentsError];
 
     if (Object.keys(errors).length > 0) {
@@ -980,7 +998,6 @@ export async function createProduct(
             defaultStoneTypeNames,
             designCode,
             hsnCode,
-            gstRateId,
             description,
             notes,
             isActive,
@@ -1009,6 +1026,7 @@ export async function createProduct(
           storeMetalPurityId: component.storeMetalPurityId || null,
           grossWeight: toNumberOrNull(component.grossWeight),
           netWeight: toNumberOrNull(component.netWeight),
+          gstRateId: component.gstRateId || null,
           sortOrder: index,
         })),
       });
@@ -1025,6 +1043,7 @@ export async function createProduct(
           stoneRate: toNumberOrNull(component.stoneRate),
           stoneCharge: toNumberOrNull(component.stoneCharge),
           stoneChargeType: toChargeTypeInput(component.stoneChargeType),
+          gstRateId: component.gstRateId || null,
           sortOrder: index,
         })),
       });
@@ -1237,7 +1256,6 @@ export async function updateProduct(
 
     const designCode = parseNullableString(formData.get("designCode"));
     const hsnCode = parseNullableString(formData.get("hsnCode"));
-    const gstRateId = parseNullableString(formData.get("gstRateId"));
     const description = parseNullableString(formData.get("description"));
     const notes = parseNullableString(formData.get("notes"));
     const isActive = parseBoolean(formData.get("isActive"));
@@ -1270,16 +1288,6 @@ export async function updateProduct(
       ),
     );
 
-    if (gstRateId) {
-      const gstRateRow = await prisma.gstRate.findFirst({
-        where: { id: gstRateId, storeId },
-        select: { id: true },
-      });
-      if (!gstRateRow) {
-        errors.gstRateId = ["Selected GST rate is invalid"];
-      }
-    }
-
     // See createProduct's identical comment — these arrays are purely
     // additive alongside the legacy metalTypeId/defaultGrossWeight etc.
     // fields above, which already carry the first component's own values.
@@ -1287,7 +1295,7 @@ export async function updateProduct(
       await parseAndValidateMetalComponents(storeId, formData);
     if (metalComponentsError) errors.metalComponentsJson = [metalComponentsError];
     const { components: stoneComponents, error: stoneComponentsError } =
-      parseStoneComponents(formData);
+      await parseStoneComponents(storeId, formData);
     if (stoneComponentsError) errors.stoneComponentsJson = [stoneComponentsError];
 
     if (Object.keys(errors).length > 0) {
@@ -1345,7 +1353,6 @@ export async function updateProduct(
         defaultStoneTypeNames,
         designCode,
         hsnCode,
-        gstRateId,
         description,
         notes,
         isActive,
@@ -1363,6 +1370,7 @@ export async function updateProduct(
           storeMetalPurityId: component.storeMetalPurityId || null,
           grossWeight: toNumberOrNull(component.grossWeight),
           netWeight: toNumberOrNull(component.netWeight),
+          gstRateId: component.gstRateId || null,
           sortOrder: index,
         })),
       })
@@ -1380,6 +1388,7 @@ export async function updateProduct(
           stoneRate: toNumberOrNull(component.stoneRate),
           stoneCharge: toNumberOrNull(component.stoneCharge),
           stoneChargeType: toChargeTypeInput(component.stoneChargeType),
+          gstRateId: component.gstRateId || null,
           sortOrder: index,
         })),
       })

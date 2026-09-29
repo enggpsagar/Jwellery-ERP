@@ -17,6 +17,9 @@ import { useToast } from "@/components/providers/toast-provider"
 import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/loader"
 import { Mail } from "lucide-react"
+import type { getStockReport } from "@/lib/actions/report-actions"
+
+type StockReport = Awaited<ReturnType<typeof getStockReport>>
 
 type SalesReport = {
   invoiceCount: number
@@ -162,6 +165,7 @@ type ItemLedger = {
 type ReportsTabsProps = {
   sales: SalesReport
   valuation: InventoryValuation
+  stockReport: StockReport
   karigarOutstanding: KarigarOutstanding
   customerDues: CustomerDues
   goldFlow: GoldFlow
@@ -193,6 +197,7 @@ const TABS = [
   { key: "byUser", label: "Sales by User" },
   { key: "vendorPurchase", label: "Vendor Purchase" },
   { key: "inventory", label: "Inventory Valuation" },
+  { key: "stock", label: "Stock" },
   { key: "karigar", label: "Artisan Outstanding" },
   { key: "dues", label: "Party Dues" },
   { key: "goldFlow", label: "Gold Flow" },
@@ -236,6 +241,7 @@ function StatCard({
 export function ReportsTabs({
   sales,
   valuation,
+  stockReport,
   karigarOutstanding,
   customerDues,
   goldFlow,
@@ -344,6 +350,34 @@ export function ReportsTabs({
       }
     },
     pageSize: 50,
+  })
+
+  // Available / Out of Stock / All — narrows the rows before search/sort.
+  const [stockAvailability, setStockAvailability] = useState<"ALL" | "AVAILABLE" | "OUT_OF_STOCK">("ALL")
+  const stockRows = useMemo(
+    () =>
+      stockAvailability === "ALL"
+        ? stockReport.rows
+        : stockReport.rows.filter((row) => row.availability === stockAvailability),
+    [stockReport.rows, stockAvailability],
+  )
+  const stockTable = useReportTable(stockRows, {
+    searchText: (row) =>
+      `${row.stockCode} ${row.tagNumber ?? ""} ${row.productName} ${row.productCode} ${row.category} ${row.metal} ${row.purity} ${row.location}`,
+    getSortValue: (row, key) => {
+      switch (key) {
+        case "item": return `${row.productName} ${row.stockCode}`
+        case "metal": return `${row.metal} ${row.purity}`
+        case "category": return row.category
+        case "availability": return row.availability
+        case "qty": return row.quantity
+        case "netWeight": return row.totalNetWeight
+        case "value": return row.estimatedValue
+        default: return null
+      }
+    },
+    defaultSortKey: "item",
+    defaultSortDir: "asc",
   })
 
   const karigarTable = useReportTable(karigarOutstanding.byKarigar, {
@@ -894,6 +928,129 @@ export function ReportsTabs({
               totalCount={inventoryTable.totalCount}
               pageSize={inventoryTable.pageSize}
               onPageChange={inventoryTable.setPage}
+            />
+          </div>
+        </div>
+      )}
+
+      {activeTab === "stock" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard title="Available Items" value={stockReport.availableCount} />
+            <StatCard title="Out of Stock Items" value={stockReport.outOfStockCount} tone="outstanding" />
+            <StatCard
+              title="Available Qty / Net Weight"
+              value={`${stockReport.availableQuantity} pcs · ${stockReport.availableNetWeight.toFixed(3)} g`}
+            />
+            <StatCard title="Available Value (est.)" value={reportInr(stockReport.availableValue) ?? "₹0"} />
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex shrink-0 rounded-lg border bg-card p-1 text-sm">
+              {([
+                ["ALL", `All (${stockReport.rows.length})`],
+                ["AVAILABLE", `Available (${stockReport.availableCount})`],
+                ["OUT_OF_STOCK", `Out of Stock (${stockReport.outOfStockCount})`],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setStockAvailability(value)}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 font-medium whitespace-nowrap",
+                    stockAvailability === value
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="min-w-0 flex-1">
+              <ReportSearchBar
+                value={stockTable.search}
+                onChange={stockTable.setSearch}
+                placeholder="Search stock code, product, category, metal, location..."
+                resultSummary={`${stockTable.totalCount} of ${stockTable.rawCount}`}
+              />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border bg-card">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/40">
+                <tr className="border-b">
+                  <SortableTh label="Item" sortKey="item" activeSortKey={stockTable.sortKey} sortDir={stockTable.sortDir} onSort={stockTable.toggleSort} />
+                  <SortableTh label="Metal / Purity" sortKey="metal" activeSortKey={stockTable.sortKey} sortDir={stockTable.sortDir} onSort={stockTable.toggleSort} />
+                  <SortableTh label="Category · Type" sortKey="category" activeSortKey={stockTable.sortKey} sortDir={stockTable.sortDir} onSort={stockTable.toggleSort} />
+                  <SortableTh label="Availability" sortKey="availability" activeSortKey={stockTable.sortKey} sortDir={stockTable.sortDir} onSort={stockTable.toggleSort} />
+                  <SortableTh label="Qty on Hand" sortKey="qty" activeSortKey={stockTable.sortKey} sortDir={stockTable.sortDir} onSort={stockTable.toggleSort} />
+                  <SortableTh label="Net Weight (g)" sortKey="netWeight" activeSortKey={stockTable.sortKey} sortDir={stockTable.sortDir} onSort={stockTable.toggleSort} />
+                  <SortableTh label="Est. Value" sortKey="value" activeSortKey={stockTable.sortKey} sortDir={stockTable.sortDir} onSort={stockTable.toggleSort} />
+                </tr>
+              </thead>
+              <tbody>
+                {stockTable.pageRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
+                      No stock items match this search.
+                    </td>
+                  </tr>
+                ) : (
+                  stockTable.pageRows.map((row) => (
+                    <tr key={row.stockId} className="border-b last:border-0">
+                      <td className="px-4 py-3">
+                        <RecordHoverCard
+                          label={row.stockCode}
+                          href={`/inventory/stock/${row.stockId}`}
+                          title={row.productName}
+                          subtitle={row.stockCode}
+                          sections={[
+                            {
+                              fields: [
+                                { label: "Product code", value: row.productCode },
+                                { label: "Tag", value: row.tagNumber },
+                                { label: "Status", value: row.status.replace(/_/g, " ") },
+                                { label: "Location", value: row.location || null },
+                                { label: "Net weight / pc", value: `${row.netWeight.toFixed(3)} g` },
+                              ],
+                            },
+                          ]}
+                        />
+                        <div className="text-xs text-muted-foreground">{row.productName}</div>
+                      </td>
+                      <td className="px-4 py-3">{[row.metal, row.purity].filter(Boolean).join(" · ") || "-"}</td>
+                      <td className="px-4 py-3">{row.category || "-"}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium",
+                            row.availability === "AVAILABLE"
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                              : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+                          )}
+                        >
+                          {row.availability === "AVAILABLE" ? "Available" : "Out of Stock"}
+                        </span>
+                        {row.status !== "IN_STOCK" && row.status !== "SOLD" && (
+                          <div className="mt-1 text-xs text-muted-foreground">{row.status.replace(/_/g, " ")}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 tabular-nums">{row.quantity}</td>
+                      <td className="px-4 py-3 tabular-nums">{row.totalNetWeight.toFixed(3)}</td>
+                      <td className="px-4 py-3 tabular-nums">{row.availability === "AVAILABLE" ? reportInr(row.estimatedValue) : "-"}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+            <ReportPagination
+              page={stockTable.page}
+              totalPages={stockTable.totalPages}
+              totalCount={stockTable.totalCount}
+              pageSize={stockTable.pageSize}
+              onPageChange={stockTable.setPage}
             />
           </div>
         </div>

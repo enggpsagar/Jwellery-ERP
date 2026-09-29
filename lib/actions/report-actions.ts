@@ -204,6 +204,86 @@ export async function getInventoryValuationReport() {
 }
 
 /**
+ * Stock report — every active stock row, split into Available (quantity
+ * > 0) and Out of Stock (quantity 0), the same availability rule as the
+ * Stock page's In Stock / Out of Stock filter (getStockWhere). A point-in-
+ * time snapshot, so no date range. Net weight is per piece on the row;
+ * totalNetWeight is × quantity — what's actually on hand.
+ */
+export async function getStockReport() {
+  const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
+
+  const stocks = await prisma.inventoryStock.findMany({
+    where: { storeId, isActive: true, ...locationWhere(scope) },
+    orderBy: { stockCode: "asc" },
+    select: {
+      id: true,
+      stockCode: true,
+      tagNumber: true,
+      quantity: true,
+      status: true,
+      purity: true,
+      purityLabel: true,
+      netWeight: true,
+      saleRate: true,
+      purchaseAmount: true,
+      purchaseDate: true,
+      metalType: { select: { name: true } },
+      location: { select: { name: true } },
+      product: {
+        select: {
+          name: true,
+          productCode: true,
+          category: { select: { name: true } },
+          categoryType: { select: { name: true } },
+        },
+      },
+    },
+  });
+
+  const rows = stocks.map((stock) => {
+    const netWeight = stock.netWeight ? Number(stock.netWeight) : 0;
+    const available = stock.quantity > 0;
+    return {
+      stockId: stock.id,
+      stockCode: stock.stockCode,
+      tagNumber: stock.tagNumber,
+      productName: stock.product.name,
+      productCode: stock.product.productCode,
+      category: [stock.product.category?.name, stock.product.categoryType?.name].filter(Boolean).join(" · "),
+      metal: stock.metalType?.name ?? "",
+      purity: stock.purityLabel ?? stock.purity?.replace(/_/g, " ") ?? "",
+      quantity: stock.quantity,
+      netWeight,
+      totalNetWeight: netWeight * stock.quantity,
+      // Same estimate as the Inventory Valuation report: sale rate × qty,
+      // else the recorded purchase amount — only for what's on hand.
+      estimatedValue: available
+        ? stock.saleRate
+          ? Number(stock.saleRate) * stock.quantity
+          : Number(stock.purchaseAmount ?? 0)
+        : 0,
+      availability: available ? ("AVAILABLE" as const) : ("OUT_OF_STOCK" as const),
+      status: stock.status,
+      location: stock.location?.name ?? "",
+      purchaseDate: stock.purchaseDate ? stock.purchaseDate.toISOString() : null,
+    };
+  });
+
+  const availableRows = rows.filter((row) => row.availability === "AVAILABLE");
+
+  return {
+    rows,
+    availableCount: availableRows.length,
+    outOfStockCount: rows.length - availableRows.length,
+    availableQuantity: availableRows.reduce((sum, row) => sum + row.quantity, 0),
+    availableNetWeight: availableRows.reduce((sum, row) => sum + row.totalNetWeight, 0),
+    availableValue: availableRows.reduce((sum, row) => sum + row.estimatedValue, 0),
+  };
+}
+
+/**
  * Open karigar jobs — stock currently out with a karigar and not yet
  * received back, with total gold/silver weight outstanding per karigar.
  */

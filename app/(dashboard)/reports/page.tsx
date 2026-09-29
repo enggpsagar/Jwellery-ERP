@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import {
   getSalesReport,
   getInventoryValuationReport,
+  getStockReport,
   getKarigarOutstandingReport,
   getCustomerDuesReport,
   getGoldFlowReport,
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
   title: "Reports",
 }
 
-/** All 9 reports run in parallel on every load (see the Promise.all below) —
+/** All 10 reports run in parallel on every load (see the Promise.all below) —
  *  Item Ledger and Gold Flow especially can exceed the platform's default
  *  budget as data grows. Also covers "Email this report"/"Email all
  *  reports" (lib/actions/report-email-actions.ts), which Next.js runs
@@ -38,6 +39,7 @@ export default async function ReportsPage({ searchParams }: Props) {
   const [
     sales,
     valuation,
+    stockReport,
     karigarOutstanding,
     customerDues,
     goldFlow,
@@ -49,6 +51,7 @@ export default async function ReportsPage({ searchParams }: Props) {
   ] = await Promise.all([
       getSalesReport(range),
       getInventoryValuationReport(),
+      getStockReport(),
       getKarigarOutstandingReport(),
       getCustomerDuesReport(),
       getGoldFlowReport(range),
@@ -71,6 +74,7 @@ export default async function ReportsPage({ searchParams }: Props) {
       <ReportsTabs
         sales={sales}
         valuation={valuation}
+        stockReport={stockReport}
         karigarOutstanding={karigarOutstanding}
         customerDues={customerDues}
         goldFlow={goldFlow}

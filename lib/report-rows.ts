@@ -5,6 +5,7 @@ import {
   getSalesByUserReport,
   getVendorPurchaseReport,
   getInventoryValuationReport,
+  getStockReport,
   getKarigarOutstandingReport,
   getCustomerDuesReport,
   getGoldFlowReport,
@@ -26,6 +27,7 @@ export type ReportType =
   | "byUser"
   | "vendorPurchase"
   | "inventory"
+  | "stock"
   | "karigar"
   | "dues"
   | "goldFlow"
@@ -37,6 +39,7 @@ export const ALL_REPORT_TYPES: ReportType[] = [
   "byUser",
   "vendorPurchase",
   "inventory",
+  "stock",
   "karigar",
   "dues",
   "goldFlow",
@@ -49,6 +52,7 @@ export const REPORT_LABELS: Record<ReportType, string> = {
   byUser: "Sales by User",
   vendorPurchase: "Vendor Purchase",
   inventory: "Inventory Valuation",
+  stock: "Stock",
   karigar: "Artisan Outstanding",
   dues: "Party Dues",
   goldFlow: "Gold Flow",
@@ -102,6 +106,26 @@ export async function getReportRows(type: ReportType, range: DateRange) {
         Count: row.count,
         "Net Weight (g)": row.netWeight,
         "Estimated Value (₹)": row.estimatedValue,
+      }))
+    }
+    case "stock": {
+      const report = await getStockReport()
+      return report.rows.map((row) => ({
+        "Stock Code": row.stockCode,
+        "Tag #": row.tagNumber ?? "",
+        Product: row.productName,
+        "Product Code": row.productCode,
+        "Category · Type": row.category,
+        Metal: row.metal,
+        Purity: row.purity,
+        Availability: row.availability === "AVAILABLE" ? "Available" : "Out of Stock",
+        Status: row.status,
+        "Qty on Hand": row.quantity,
+        "Net Weight / pc (g)": row.netWeight,
+        "Total Net Weight (g)": row.totalNetWeight,
+        "Estimated Value (₹)": row.estimatedValue,
+        Location: row.location,
+        "Purchase Date": row.purchaseDate ? formatShortDate(row.purchaseDate) : "",
       }))
     }
     case "karigar": {

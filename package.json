@@ -12,7 +12,8 @@
     "db:seed:demo": "tsx prisma/seed-demo.ts",
     "db:seed:kacha": "tsx prisma/seed-kacha-demo.ts",
     "db:seed:business-units-demo": "tsx prisma/seed-business-units-demo.ts",
-    "db:seed:full-demo": "tsx prisma/seed-full-demo.ts"
+    "db:seed:full-demo": "tsx prisma/seed-full-demo.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -59,6 +60,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "^24",
     "@types/nodemailer": "^8.0.1",

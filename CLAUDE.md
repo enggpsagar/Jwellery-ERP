@@ -232,6 +232,10 @@ the decrement's `where` (updateInvoice exempts rows this invoice itself
 already holds, since it restores them first). **Not changed**: Kacha
 slips and Quotation conversion still allow unlinked manual lines.
 
+### Regression tests (added 2026-09-29)
+
+Playwright suite in `e2e/`, run by `.github/workflows/regression.yml` on every push to `main` and every PR: throwaway Postgres in the runner → migrate → `pnpm seed` + `pnpm db:seed:full-demo` → `tsc` → `pnpm build` → `pnpm test:e2e`. Sign-in mints a NextAuth JWT in `e2e/global-setup.ts` (no test login route in the app), which also refuses any non-localhost `DATABASE_URL`. See `e2e/README.md`. **Add a spec for every new feature.** The demo seed must keep creating `UserStoreMembership` rows for its users — `requirePermissionInStore` (createInvoice etc.) reads only that table, so without them the demo Admin can open every page but not save an invoice. Tests run in parallel with Vercel's own deploy on a direct push to `main`; they only *block* a bad change if work goes through a PR (or Vercel's deployment checks are turned on).
+
 ### Known dead/pre-existing issues (not regressions — don't "fix" without reason)
 
 - `auth.config.ts` (repo root) and `app/api/auth/route.ts` are orphaned NextAuth v5-style leftovers, not wired to anything (`app/api/auth/[...nextauth]/route.ts` is the real handler). Both have their own pre-existing type errors.

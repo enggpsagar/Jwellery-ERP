@@ -256,6 +256,27 @@ async function seedTaxonomy(storeId: string) {
 // 3. Users
 // ---------------------------------------------------------------------------
 
+/**
+ * Every real user gets a UserStoreMembership (lib/user.ts, and the
+ * add_user_store_membership backfill); permission checks against a named
+ * store (requirePermissionInStore — e.g. createInvoice) only read that
+ * table. Without these rows the demo users could open every page but not
+ * create an invoice.
+ */
+async function seedMemberships(storeId: string) {
+  const users = await prisma.user.findMany({
+    where: { storeId },
+    select: { id: true, role: true, permissions: true, isActive: true },
+  });
+  for (const user of users) {
+    await prisma.userStoreMembership.upsert({
+      where: { userId_storeId: { userId: user.id, storeId } },
+      update: { role: user.role, permissions: user.permissions ?? [], isActive: user.isActive },
+      create: { userId: user.id, storeId, role: user.role, permissions: user.permissions ?? [], isActive: user.isActive },
+    });
+  }
+}
+
 async function seedUsers(storeId: string) {
   await prisma.user.upsert({
     where: { email: "admin@aurumdemo.test" },
@@ -347,7 +368,7 @@ async function seedVendors(storeId: string) {
 
   const vendors = [];
   for (const row of rows) {
-    vendors.push(await prisma.vendor.create({ data: { storeId, ...row } }));
+    vendors.push(await prisma.customer.create({ data: { storeId, isSupplier: true, ...row } }));
   }
   return vendors;
 }
@@ -1492,6 +1513,7 @@ async function main() {
   ]);
 
   await seedUsers(store.id);
+  await seedMemberships(store.id);
   const customers = await seedCustomers(store.id);
   const vendors = await seedVendors(store.id);
   const karigars = await seedKarigars(store.id, taxonomy.metals, mainShowroom.id);

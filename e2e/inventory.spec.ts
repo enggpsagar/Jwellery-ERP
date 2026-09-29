@@ -10,8 +10,8 @@ for (const listPath of ["/inventory/products", "/inventory/stock"]) {
 
     await expect(page.locator("tfoot").getByRole("row", { name: /^Total/ })).toBeVisible()
 
-    const typeFilter = page.getByRole("combobox", { name: "Category Type" })
-    await expect(typeFilter).toBeDisabled()
+    // Type is hidden (not just disabled) until a Category with Types is picked.
+    await expect(page.getByRole("combobox", { name: "Category Type" })).toHaveCount(0)
 
     await page.getByRole("combobox", { name: "Category", exact: true }).click()
     const firstCategory = page.getByRole("option").nth(1)

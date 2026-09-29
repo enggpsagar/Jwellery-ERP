@@ -56,9 +56,9 @@ test("an invoice line can't be billed for more pieces than are in stock", async 
 
   await page.getByRole("combobox").filter({ hasText: "Search stock item" }).first().click()
   // Pick the first stock item that's actually offered (enabled).
-  const option = page.getByRole("option", { name: /available\)/ }).and(page.locator(":not([data-disabled])")).first()
+  const option = page.getByRole("option", { name: /\d+ Qty\)/ }).and(page.locator(":not([data-disabled])")).first()
   const label = (await option.textContent()) ?? ""
-  const available = Number(/\((\d+) available\)/.exec(label)?.[1] ?? "0")
+  const available = Number(/\((\d+) Qty\)/.exec(label)?.[1] ?? "0")
   test.skip(available === 0, "no sellable stock in the demo store")
   await option.click()
 

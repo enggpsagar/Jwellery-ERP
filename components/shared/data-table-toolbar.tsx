@@ -76,7 +76,7 @@ type DataTableToolbarProps = {
   categoryOptions?: (Option & { metalTagIds?: string[] })[]
   /** Category Type filter (URL param "categoryType"), each tagged with its
    * parent category — only the selected Category's own Types are offered,
-   * and the select stays disabled until a Category is picked (the same
+   * and the select is hidden until a Category with Types is picked (the same
    * Category→Type cascade as the Product form). */
   categoryTypeOptions?: (Option & { categoryId: string })[]
   /** Metal ("type") ids that are stones. When one is selected, Category/
@@ -424,17 +424,16 @@ export function DataTableToolbar({
           </Select>
         ) : null}
 
-        {categoryTypeOptions && !isStoneSelected ? (
+        {/* Only shown once a Category with its own Types is picked — a
+            permanently-disabled "All Types" placeholder on page load just
+            took up a slot and pushed the date filter onto a second row. */}
+        {categoryTypeOptions && !isStoneSelected && currentCategory !== "ALL" && typesForCategory.length > 0 ? (
           <Select
             value={currentCategoryType}
             onValueChange={(value) => updateParam("categoryType", value)}
-            disabled={isPending || currentCategory === "ALL" || typesForCategory.length === 0}
+            disabled={isPending}
           >
-            <SelectTrigger
-              className="h-9 w-[150px]"
-              aria-label="Category Type"
-              title={currentCategory === "ALL" ? "Pick a Category first" : undefined}
-            >
+            <SelectTrigger className="h-9 w-[150px]" aria-label="Category Type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

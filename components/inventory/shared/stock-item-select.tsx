@@ -31,6 +31,21 @@ type StockItemBase = {
    * just on the Inventory screens. Optional since a couple of callers'
    * stock queries don't carry it (yet) — the default label just omits it. */
   productCode?: string | null
+  /** Grams — shown in the label so two pieces of the same Product (same
+   * Product Code and name) can still be told apart. */
+  netWeight?: number | null
+}
+
+/**
+ * "C-G22-001 — Gold chain · 12.200 g (1 Qty)". The Product Code leads, not
+ * the internal stock code (STK-…); the stock code stays searchable, and is
+ * the fallback only when the stock has no linked Product Code.
+ */
+function defaultStockLabel(stock: StockItemBase, availableQty?: number) {
+  const code = stock.productCode || stock.stockCode
+  const weight = stock.netWeight != null ? ` · ${stock.netWeight.toFixed(3)} g` : ""
+  const qty = availableQty != null ? ` (${availableQty} Qty)` : ""
+  return `${code} — ${stock.productName}${weight}${qty}`
 }
 
 type StockItemSelectProps<T extends StockItemBase> = {
@@ -45,6 +60,8 @@ type StockItemSelectProps<T extends StockItemBase> = {
    */
   onCreateNew: () => void
   isDisabled?: (stock: T) => boolean
+  /** Units of this stock still free to add on this line — shown as "(N Qty)". */
+  availableQty?: (stock: T) => number
   renderLabel?: (stock: T) => React.ReactNode
   placeholder?: string
   className?: string
@@ -62,6 +79,7 @@ export function StockItemSelect<T extends StockItemBase>({
   onValueChange,
   onCreateNew,
   isDisabled,
+  availableQty,
   renderLabel,
   placeholder = "Not linked to stock",
   className,
@@ -105,7 +123,7 @@ export function StockItemSelect<T extends StockItemBase>({
       <SelectContent>
         <div className="p-2">
           <Input
-            placeholder="Search by stock code or product..."
+            placeholder="Search by product code, name or stock code..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             onKeyDown={(event) => event.stopPropagation()}
@@ -128,7 +146,7 @@ export function StockItemSelect<T extends StockItemBase>({
             <SelectItem key={stock.id} value={stock.id} disabled={isDisabled?.(stock) ?? false}>
               {renderLabel
                 ? renderLabel(stock)
-                : `${stock.stockCode}${stock.productCode ? ` (${stock.productCode})` : ""} — ${stock.productName}`}
+                : defaultStockLabel(stock, availableQty?.(stock))}
             </SelectItem>
           ))
         )}

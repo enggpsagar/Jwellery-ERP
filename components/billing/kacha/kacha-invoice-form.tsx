@@ -807,9 +807,7 @@ export function KachaInvoiceForm({
                     // rate in place, so this resets the whole row instead.
                     onCreateNew={() => updateItem(item.key, { ...emptyLineItem(), key: item.key })}
                     isDisabled={(stock) => availableForStock(stock.id, item.key) <= 0}
-                    renderLabel={(stock) =>
-                      `${stock.stockCode}${stock.productCode ? ` (${stock.productCode})` : ""} — ${stock.productName} (${availableForStock(stock.id, item.key)} available)`
-                    }
+                    availableQty={(stock) => availableForStock(stock.id, item.key)}
                   />
                 </div>
 

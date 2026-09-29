@@ -1607,9 +1607,7 @@ export function InvoiceForm({
                         })
                       }}
                       isDisabled={(stock) => availableForStock(stock.id, item.key) <= 0}
-                      renderLabel={(stock) =>
-                        `${stock.stockCode}${stock.productCode ? ` (${stock.productCode})` : ""} — ${stock.productName} (${availableForStock(stock.id, item.key)} available)`
-                      }
+                      availableQty={(stock) => availableForStock(stock.id, item.key)}
                       placeholder="Search stock item..."
                       className="w-full"
                     />

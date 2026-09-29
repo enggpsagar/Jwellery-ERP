@@ -28,6 +28,7 @@ type InventoryStockPageProps = {
     dateTo?: string
     category?: string
     categoryType?: string
+    stoneType?: string
   }>
 }
 
@@ -69,6 +70,13 @@ export default async function InventoryStockPage({
     categoryFilter.categoryTypes.some((t) => t.value === params.categoryType && t.categoryId === categoryId)
       ? params.categoryType
       : undefined
+  // A stone (Diamond ...) filters by its own Stone Type instead of Category
+  // — only a Stone Type that belongs to the selected stone counts.
+  const stoneOriginOptionId =
+    metalTypeId &&
+    categoryFilter.stoneTypes.some((t) => t.value === params.stoneType && t.metalId === metalTypeId)
+      ? params.stoneType
+      : undefined
 
   const { stockItems, pagination, totals } = await getInventoryStock({
     page,
@@ -82,6 +90,7 @@ export default async function InventoryStockPage({
     dateTo,
     categoryId,
     categoryTypeId,
+    stoneOriginOptionId,
   })
 
   return (

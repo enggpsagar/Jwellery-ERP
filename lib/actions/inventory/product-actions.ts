@@ -370,6 +370,8 @@ export type GetProductsParams = {
   /** StoreCategory / StoreCategoryType ids (Settings > Taxonomy). */
   categoryId?: string;
   categoryTypeId?: string;
+  /** StoreMetalOrigin id (Natural / Lab-Grown ...). */
+  stoneOriginOptionId?: string;
 };
 
 type ExportProductsParams = {
@@ -383,6 +385,7 @@ type ExportProductsParams = {
   dateTo?: string;
   category?: string;
   categoryType?: string;
+  stoneType?: string;
   format?: "csv" | "xlsx" | "pdf";
 };
 
@@ -395,6 +398,7 @@ function getProductWhere(
   dateTo?: string,
   categoryId?: string,
   categoryTypeId?: string,
+  stoneOriginOptionId?: string,
 ) {
   const query = String(search || "").trim();
   const from = parseDateRangeBoundary(dateFrom, false);
@@ -404,6 +408,7 @@ function getProductWhere(
     storeId,
     ...(categoryId ? { categoryId } : {}),
     ...(categoryTypeId ? { categoryTypeId } : {}),
+    ...(stoneOriginOptionId ? { stoneOriginOptionId } : {}),
     ...(metalTypeId === UNASSIGNED_METAL_TYPE
       ? { metalTypeId: null }
       : metalTypeId
@@ -525,7 +530,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   const sortOrder: ProductSortOrder = params.sortOrder || "desc";
 
   const storeId = await requireStoreScope();
-  const where = getProductWhere(storeId, search, params.metalTypeId, params.status, params.dateFrom, params.dateTo, params.categoryId, params.categoryTypeId);
+  const where = getProductWhere(storeId, search, params.metalTypeId, params.status, params.dateFrom, params.dateTo, params.categoryId, params.categoryTypeId, params.stoneOriginOptionId);
   const orderBy = getProductOrderBy(sortBy, sortOrder);
 
   const [totalCount, rows, weightSum, stockQtySum] = await Promise.all([
@@ -608,7 +613,7 @@ async function getAllProductsForExport(params: ExportProductsParams = {}) {
         id: { in: params.selectedIds },
         storeId,
       }
-    : getProductWhere(storeId, params.search, params.type, params.status, params.dateFrom, params.dateTo, params.category, params.categoryType);
+    : getProductWhere(storeId, params.search, params.type, params.status, params.dateFrom, params.dateTo, params.category, params.categoryType, params.stoneType);
 
   const rows = await prisma.product.findMany({
     where,

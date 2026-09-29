@@ -28,6 +28,7 @@ type InventoryProductsPageProps = {
     dateTo?: string
     category?: string
     categoryType?: string
+    stoneType?: string
   }>
 }
 
@@ -81,6 +82,13 @@ export default async function InventoryProductsPage({
     categoryFilter.categoryTypes.some((t) => t.value === params.categoryType && t.categoryId === categoryId)
       ? params.categoryType
       : undefined;
+  // A stone (Diamond ...) filters by its own Stone Type instead of Category
+  // — only a Stone Type that belongs to the selected stone counts.
+  const stoneOriginOptionId =
+    metalTypeId &&
+    categoryFilter.stoneTypes.some((t) => t.value === params.stoneType && t.metalId === metalTypeId)
+      ? params.stoneType
+      : undefined;
 
   const { products, pagination, totals } = await getProducts({
     page,
@@ -94,6 +102,7 @@ export default async function InventoryProductsPage({
     dateTo,
     categoryId,
     categoryTypeId,
+    stoneOriginOptionId,
   });
 
   return (

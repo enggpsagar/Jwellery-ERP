@@ -70,6 +70,8 @@ export function StockToolbar({ selectedIds, metals, categoryFilter, bulkActions 
       typeLabel="Metal"
       categoryOptions={categoryFilter?.categories}
       categoryTypeOptions={categoryFilter?.categoryTypes}
+      gemstoneMetalIds={categoryFilter?.gemstoneMetalIds}
+      stoneTypeOptions={categoryFilter?.stoneTypes}
       bulkActions={
         <>
           {bulkActions}

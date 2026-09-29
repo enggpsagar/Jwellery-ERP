@@ -143,6 +143,8 @@ export function ProductsClient({
             typeLabel="Metal"
             categoryOptions={categoryFilter?.categories}
             categoryTypeOptions={categoryFilter?.categoryTypes}
+            gemstoneMetalIds={categoryFilter?.gemstoneMetalIds}
+            stoneTypeOptions={categoryFilter?.stoneTypes}
             bulkActions={
               <>
                 <BulkArchiveProductsButton

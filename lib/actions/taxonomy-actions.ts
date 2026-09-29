@@ -800,6 +800,13 @@ export type CategoryFilterOptions = {
    *  Taxonomy); empty = universal, same rule as getStoreCategoriesForMetal. */
   categories: { value: string; label: string; metalTagIds: string[] }[];
   categoryTypes: { value: string; label: string; categoryId: string }[];
+  /** Metals that are stones (isGemstone) — for these the filter swaps
+   *  Category/Type for Stone Type, same as Add Product hides Category for
+   *  a Stone product. */
+  gemstoneMetalIds: string[];
+  /** Each stone's own Stone Type options (StoreMetalOrigin, e.g. Natural /
+   *  Lab-Grown) — what Product.stoneOriginOptionId points at. */
+  stoneTypes: { value: string; label: string; metalId: string }[];
 };
 
 /**
@@ -811,7 +818,7 @@ export type CategoryFilterOptions = {
 export async function getCategoryFilterOptions(): Promise<CategoryFilterOptions> {
   const storeId = await requireStoreScope();
 
-  const [categories, types] = await Promise.all([
+  const [categories, types, gemstones, origins] = await Promise.all([
     prisma.storeCategory.findMany({
       where: { storeId, isActive: true },
       orderBy: { name: "asc" },
@@ -822,6 +829,15 @@ export async function getCategoryFilterOptions(): Promise<CategoryFilterOptions>
       orderBy: { name: "asc" },
       select: { id: true, name: true, categoryId: true },
     }),
+    prisma.storeMetal.findMany({
+      where: { storeId, isActive: true, isGemstone: true },
+      select: { id: true },
+    }),
+    prisma.storeMetalOrigin.findMany({
+      where: { storeId, isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, storeMetalId: true },
+    }),
   ]);
 
   return {
@@ -831,6 +847,12 @@ export async function getCategoryFilterOptions(): Promise<CategoryFilterOptions>
       metalTagIds: category.metalTags.map((tag) => tag.storeMetalId),
     })),
     categoryTypes: types.map((type) => ({ value: type.id, label: type.name, categoryId: type.categoryId })),
+    gemstoneMetalIds: gemstones.map((metal) => metal.id),
+    stoneTypes: origins.map((origin) => ({
+      value: origin.id,
+      label: origin.name,
+      metalId: origin.storeMetalId,
+    })),
   };
 }
 

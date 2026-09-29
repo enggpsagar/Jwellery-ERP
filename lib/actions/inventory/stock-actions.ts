@@ -118,6 +118,9 @@ export type GetInventoryStockParams = {
    * Product's own Category and Type (stock rows carry neither directly). */
   categoryId?: string
   categoryTypeId?: string
+  /** StoreMetalOrigin id (Natural / Lab-Grown ...) — the linked Product's
+   * stoneOriginOptionId. */
+  stoneOriginOptionId?: string
 }
 
 type ExportInventoryStockParams = {
@@ -131,6 +134,7 @@ type ExportInventoryStockParams = {
   dateTo?: string
   category?: string
   categoryType?: string
+  stoneType?: string
   format?: "csv" | "xlsx" | "pdf"
 }
 
@@ -173,6 +177,7 @@ function getStockWhere(
   availability?: string,
   categoryId?: string,
   categoryTypeId?: string,
+  stoneOriginOptionId?: string,
 ) {
   const query = String(search || "").trim()
   const from = parseDateRangeBoundary(dateFrom, false)
@@ -187,11 +192,12 @@ function getStockWhere(
         ? { metalTypeId }
         : {}),
     // Category/Type live on the Product, not the stock row.
-    ...(categoryId || categoryTypeId
+    ...(categoryId || categoryTypeId || stoneOriginOptionId
       ? {
           product: {
             ...(categoryId ? { categoryId } : {}),
             ...(categoryTypeId ? { categoryTypeId } : {}),
+            ...(stoneOriginOptionId ? { stoneOriginOptionId } : {}),
           },
         }
       : {}),
@@ -272,7 +278,7 @@ export async function getInventoryStock(params: GetInventoryStockParams = {}) {
 
   const storeId = await requireStoreScope()
   const scope = await getLocationScope()
-  const where = getStockWhere(storeId, search, scope, params.metalTypeId, params.dateFrom, params.dateTo, params.status, params.categoryId, params.categoryTypeId)
+  const where = getStockWhere(storeId, search, scope, params.metalTypeId, params.dateFrom, params.dateTo, params.status, params.categoryId, params.categoryTypeId, params.stoneOriginOptionId)
   const orderBy = getStockOrderBy(sortBy, sortOrder)
 
   const [totalCount, rows, sums] = await Promise.all([
@@ -344,7 +350,7 @@ async function getAllInventoryStockForExport(
         storeId,
         ...locationWhere(scope),
       }
-    : getStockWhere(storeId, params.search, scope, params.type, params.dateFrom, params.dateTo, params.status, params.category, params.categoryType)
+    : getStockWhere(storeId, params.search, scope, params.type, params.dateFrom, params.dateTo, params.status, params.category, params.categoryType, params.stoneType)
 
   const rows = await prisma.inventoryStock.findMany({
     where,

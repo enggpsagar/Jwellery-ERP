@@ -36,6 +36,7 @@ export type DataTableExportParams = {
   dateTo?: string
   category?: string
   categoryType?: string
+  stoneType?: string
   format?: DataTableExportFormat
 }
 
@@ -78,6 +79,12 @@ type DataTableToolbarProps = {
    * and the select stays disabled until a Category is picked (the same
    * Category→Type cascade as the Product form). */
   categoryTypeOptions?: (Option & { categoryId: string })[]
+  /** Metal ("type") ids that are stones. When one is selected, Category/
+   * Type are replaced by a Stone Type filter (URL param "stoneType") —
+   * the same swap Add Product makes for a Stone product. */
+  gemstoneMetalIds?: string[]
+  /** Each stone's own Stone Type options (e.g. Natural / Lab-Grown). */
+  stoneTypeOptions?: (Option & { metalId: string })[]
   /** Hides the "Sort by …" and Ascending/Descending dropdowns — for a table
    * (Products, Stock) that sorts only via its own per-column
    * SortableTableHead clicks and doesn't want a second, redundant sort
@@ -126,6 +133,8 @@ export function DataTableToolbar({
   typeLabel = "Type",
   categoryOptions,
   categoryTypeOptions,
+  gemstoneMetalIds,
+  stoneTypeOptions,
   hideSort = false,
   dateField,
   hidePageSize = false,
@@ -146,6 +155,12 @@ export function DataTableToolbar({
   const currentType = searchParams.get("type") ?? "ALL"
   const currentCategory = searchParams.get("category") ?? "ALL"
   const currentCategoryType = searchParams.get("categoryType") ?? "ALL"
+  const currentStoneType = searchParams.get("stoneType") ?? "ALL"
+  const isStoneSelected = !!gemstoneMetalIds?.includes(currentType)
+  const stoneTypesForMetal = React.useMemo(
+    () => (stoneTypeOptions ?? []).filter((option) => option.metalId === currentType),
+    [stoneTypeOptions, currentType],
+  )
   const isCategoryForMetal = React.useCallback(
     (option: Option & { metalTagIds?: string[] }, metal: string) =>
       metal === "ALL" || !option.metalTagIds?.length || option.metalTagIds.includes(metal),
@@ -215,10 +230,15 @@ export function DataTableToolbar({
         params.delete("type")
       }
       const selectedCategory = (categoryOptions ?? []).find((option) => option.value === currentCategory)
-      if (selectedCategory && !isCategoryForMetal(selectedCategory, value || "ALL")) {
+      if (
+        gemstoneMetalIds?.includes(value) ||
+        (selectedCategory && !isCategoryForMetal(selectedCategory, value || "ALL"))
+      ) {
         params.delete("category")
         params.delete("categoryType")
       }
+      // Stone Types belong to one stone — never carried across a change.
+      params.delete("stoneType")
       params.set("page", "1")
       router.replace(`${pathname}?${params.toString()}`)
     })
@@ -291,6 +311,7 @@ export function DataTableToolbar({
               type: currentType !== "ALL" ? currentType : undefined,
               category: currentCategory !== "ALL" ? currentCategory : undefined,
               categoryType: currentCategoryType !== "ALL" ? currentCategoryType : undefined,
+              stoneType: currentStoneType !== "ALL" ? currentStoneType : undefined,
               dateFrom: currentDateFrom || undefined,
               dateTo: currentDateTo || undefined,
               format,
@@ -367,7 +388,27 @@ export function DataTableToolbar({
           </Select>
         ) : null}
 
-        {categoryOptions ? (
+        {isStoneSelected && stoneTypeOptions ? (
+          <Select
+            value={currentStoneType}
+            onValueChange={(value) => updateParam("stoneType", value)}
+            disabled={isPending || stoneTypesForMetal.length === 0}
+          >
+            <SelectTrigger className="h-9 w-[150px]" aria-label="Stone Type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Stone Types</SelectItem>
+              {stoneTypesForMetal.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+
+        {categoryOptions && !isStoneSelected ? (
           <Select value={currentCategory} onValueChange={updateCategory} disabled={isPending}>
             <SelectTrigger className="h-9 w-[150px]" aria-label="Category">
               <SelectValue />
@@ -383,7 +424,7 @@ export function DataTableToolbar({
           </Select>
         ) : null}
 
-        {categoryTypeOptions ? (
+        {categoryTypeOptions && !isStoneSelected ? (
           <Select
             value={currentCategoryType}
             onValueChange={(value) => updateParam("categoryType", value)}

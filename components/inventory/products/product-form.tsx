@@ -18,6 +18,7 @@ import { resolveGramsPerCarat, toPrimaryUnit, matchLegacyPurityType } from "@/li
 import { LocationSelect, useShowLocationField, type LocationOption } from "@/components/shared/location-select";
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields";
 import { AddCategoryDialog } from "@/components/inventory/shared/add-category-dialog";
+import { ProductImagesField } from "@/components/inventory/products/product-images-field";
 import { AddCategoryTypeDialog } from "@/components/inventory/shared/add-category-type-dialog";
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog";
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog";
@@ -85,6 +86,8 @@ function resolveDefaultGstRateId(gstRates: GstRateOption[]): string {
 
 type Product = {
   id?: string;
+  /** Product photos, first = cover — see ProductImagesField. */
+  imageUrls?: string[];
   productCode: string;
   name: string;
   categoryId: string | null;
@@ -1717,6 +1720,8 @@ export function ProductForm({
           </div>
         </div>
       </div>
+
+      <ProductImagesField initialUrls={product?.imageUrls ?? []} />
 
       {/* ============================
           ADDITIONAL INFORMATION

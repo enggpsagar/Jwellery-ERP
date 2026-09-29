@@ -241,6 +241,7 @@ function serializeProduct(product: {
   hsnCode: string | null;
   description: string | null;
   notes: string | null;
+  imageUrls?: string[];
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -301,6 +302,7 @@ function serializeProduct(product: {
     hsnCode: product.hsnCode,
     description: product.description,
     notes: product.notes,
+    imageUrls: product.imageUrls ?? [],
     isActive: product.isActive,
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),
@@ -798,6 +800,40 @@ async function validateTaxonomySelection(
   return errors;
 }
 
+const MAX_PRODUCT_IMAGES = 8;
+
+/**
+ * The Add/Edit Product form's "Product Images" list (JSON array of URLs,
+ * first = cover). Only URLs on Vercel Blob's public storage host — i.e.
+ * ones /api/products/photo actually returned — are kept, so a tampered
+ * POST can't make a product render an arbitrary third-party image. Invalid
+ * entries are dropped, duplicates removed, and the list capped.
+ */
+function parseProductImageUrls(value: FormDataEntryValue | null): string[] {
+  if (value === null) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(String(value));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  const urls: string[] = [];
+  for (const entry of parsed) {
+    if (typeof entry !== "string") continue;
+    try {
+      const url = new URL(entry);
+      if (url.protocol !== "https:" || !url.hostname.endsWith(".public.blob.vercel-storage.com")) continue;
+    } catch {
+      continue;
+    }
+    if (!urls.includes(entry)) urls.push(entry);
+    if (urls.length === MAX_PRODUCT_IMAGES) break;
+  }
+  return urls;
+}
+
 export async function createProduct(
   prevState: ProductFormState,
   formData: FormData,
@@ -878,6 +914,7 @@ export async function createProduct(
     const hsnCode = parseNullableString(formData.get("hsnCode"));
     const description = parseNullableString(formData.get("description"));
     const notes = parseNullableString(formData.get("notes"));
+    const imageUrls = parseProductImageUrls(formData.get("imageUrlsJson"));
     const isActive = parseBoolean(formData.get("isActive"));
 
     const errors: Record<string, string[]> = {};
@@ -1024,6 +1061,7 @@ export async function createProduct(
             hsnCode,
             description,
             notes,
+            imageUrls,
             isActive,
           },
         });
@@ -1282,6 +1320,7 @@ export async function updateProduct(
     const hsnCode = parseNullableString(formData.get("hsnCode"));
     const description = parseNullableString(formData.get("description"));
     const notes = parseNullableString(formData.get("notes"));
+    const imageUrls = parseProductImageUrls(formData.get("imageUrlsJson"));
     const isActive = parseBoolean(formData.get("isActive"));
 
     const errors: Record<string, string[]> = {};
@@ -1379,6 +1418,7 @@ export async function updateProduct(
         hsnCode,
         description,
         notes,
+        imageUrls,
         isActive,
       },
     })

@@ -74,8 +74,33 @@ export function ProductDetailContent({
     Boolean(product.stoneOriginOption?.name)
   const hasAdditionalInfo = Boolean(product.description) || Boolean(product.notes)
 
+  const imageUrls = product.imageUrls ?? []
+
   return (
     <div className="space-y-6">
+      {imageUrls.length > 0 && (
+        <div className="rounded-xl border bg-card p-6">
+          <h3 className="mb-4 text-lg font-semibold">Images</h3>
+          {/* Fixed square tiles, object-cover — any photo shape keeps the
+              grid intact in the narrow side panel and on the full page. */}
+          <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label="Product images">
+            {imageUrls.map((url, index) => (
+              <li key={url} className="relative aspect-square min-w-0 overflow-hidden rounded-lg border bg-muted">
+                <a href={url} target="_blank" rel="noopener noreferrer" title="Open full size">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`${product.name} image ${index + 1}`} className="h-full w-full object-cover" />
+                </a>
+                {index === 0 && (
+                  <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                    Cover
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <Section title="Basic Information">
         <Field label="Product Code" value={product.productCode} />
         <Field label="Category" value={product.category?.name} />

@@ -699,6 +699,10 @@ model Product {
   hsnCode                   String?
   description               String?
   notes                     String?
+  // Optional product photos (Vercel Blob URLs, uploaded via
+  // /api/products/photo from Add/Edit Product). Order is display order; the
+  // first is the cover. Capped at MAX_PRODUCT_IMAGES in product-actions.ts.
+  imageUrls                 String[]             @default([])
   isActive                  Boolean              @default(true)
   createdAt                 DateTime             @default(now())
   updatedAt                 DateTime             @updatedAt

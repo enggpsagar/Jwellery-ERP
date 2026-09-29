@@ -155,6 +155,40 @@ export function InvoicePrintThermal({ invoice, settings }: InvoicePrintThermalPr
         <p>{amountInWords(invoice.totalAmount)}</p>
       </div>
 
+      {/* QR + details, split in two: the QR on the left, and on the right the
+          invoice's key facts plus its E-Invoice acknowledgement (IRN / Ack)
+          when one has been recorded — thermal only; the A4 templates don't
+          carry this QR. The QR is getInvoiceById's own qrDataUrl (scans to
+          this invoice). pixelated keeps its modules crisp when the small
+          generated PNG is scaled up to 24mm on a thermal printer. */}
+      <div className="flex items-start gap-2 border-t border-dashed border-slate-500 pt-1.5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={invoice.qrDataUrl}
+          alt={`QR code for invoice ${invoice.invoiceNumber}`}
+          className="h-[24mm] w-[24mm] shrink-0"
+          style={{ imageRendering: "pixelated" }}
+        />
+        <div className="min-w-0 flex-1 space-y-0.5 text-[10px]">
+          <p className="font-bold">Invoice {invoice.invoiceNumber}</p>
+          <p>Date: {formatShortDate(invoice.invoiceDate)}</p>
+          <p>Amount: ₹{fmt(invoice.totalAmount)}</p>
+          <p>
+            {invoice.balanceAmount > 0
+              ? `Balance due: ₹${fmt(invoice.balanceAmount)}`
+              : "Paid in full"}
+          </p>
+          {settings.eInvoiceEnabled && (invoice.irnNumber || invoice.ackNumber) && (
+            <div className="space-y-0.5 border-t border-dotted border-slate-400 pt-0.5">
+              {invoice.irnNumber && <p className="break-all">IRN: {invoice.irnNumber}</p>}
+              {invoice.ackNumber && <p>Ack No: {invoice.ackNumber}</p>}
+              {invoice.ackDate && <p>Ack Date: {formatShortDate(invoice.ackDate)}</p>}
+            </div>
+          )}
+          <p className="text-[9px] text-slate-600">Scan to view this invoice</p>
+        </div>
+      </div>
+
       <p className="border-t border-dashed border-slate-500 pt-1 text-center">
         Thank you for your business!
       </p>

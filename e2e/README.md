@@ -20,6 +20,7 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `inventory.spec.ts` | Category → Type filters, Stone Type swap for a stone, footer totals (Products and Stock) |
 | `artisan.spec.ts` | Open Jobs → Receive Items; Receive Material's net weight calculation |
 | `dashboard.spec.ts` | Best Sellers card: every period and tab renders, ranked list shows |
+| `thermal-print.spec.ts` | Thermal receipt: QR on the left, invoice + IRN/Ack details on the right; A4 prints carry no QR |
 | `reports.spec.ts` | Every report tab renders; Stock report's Available / Out of Stock split; CSV export |
 
 **When you build a feature, add a test for it here** — that's what keeps

@@ -103,26 +103,53 @@ export function ReceiveMaterialDialog({
   const primaryUnit = selectedMetal?.primaryUnit ?? "GRAM"
   const [weightUnit, setWeightUnit] = useState<"GRAM" | "CARAT">(primaryUnit)
   // Always grams internally, regardless of weightUnit — see
-  // IssueMaterialDialog's identical convention.
-  const [receiveWeightGrams, setReceiveWeightGrams] = useState("")
+  // IssueMaterialDialog's identical convention. Gross and Less share the
+  // one unit toggle; Net is derived from them, never typed.
+  const [grossWeightGrams, setGrossWeightGrams] = useState("")
+  const [lessWeightGrams, setLessWeightGrams] = useState("")
+  const [wastagePercent, setWastagePercent] = useState("")
+  const [makingCharge, setMakingCharge] = useState("")
+  const [makingChargeMode, setMakingChargeMode] = useState<"FIXED" | "PER_GRAM">("FIXED")
 
   useEffect(() => {
     setWeightUnit(primaryUnit)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metalTypeId])
 
-  function displayReceiveWeight() {
-    if (receiveWeightGrams.trim() === "" || !Number.isFinite(Number(receiveWeightGrams))) return ""
-    return String(toPrimaryUnit(Number(receiveWeightGrams), "GRAM", weightUnit, GRAMS_PER_CARAT))
+  function toDisplayUnit(grams: string) {
+    if (grams.trim() === "" || !Number.isFinite(Number(grams))) return ""
+    return String(toPrimaryUnit(Number(grams), "GRAM", weightUnit, GRAMS_PER_CARAT))
   }
 
-  function handleReceiveWeightChange(typed: string) {
-    if (typed.trim() === "" || !Number.isFinite(Number(typed))) {
-      setReceiveWeightGrams("")
-      return
-    }
-    setReceiveWeightGrams(String(toPrimaryUnit(Number(typed), weightUnit, "GRAM", GRAMS_PER_CARAT)))
+  function fromTypedUnit(typed: string) {
+    if (typed.trim() === "" || !Number.isFinite(Number(typed))) return ""
+    return String(toPrimaryUnit(Number(typed), weightUnit, "GRAM", GRAMS_PER_CARAT))
   }
+
+  /** Grams → the metal's persisted Primary Unit, for the hidden inputs. */
+  function toPersistedUnit(grams: string) {
+    if (grams.trim() === "" || !Number.isFinite(Number(grams))) return ""
+    return String(toPrimaryUnit(Number(grams), "GRAM", primaryUnit, GRAMS_PER_CARAT))
+  }
+
+  // Live preview only — recordMaterialReceiptFromKarigar recomputes every
+  // one of these from the submitted gross/less/wastage/making figures.
+  const grossGrams = Number(grossWeightGrams) || 0
+  const lessGrams = Number(lessWeightGrams) || 0
+  const netGrams = Math.max(0, grossGrams - lessGrams)
+  const lessTooHigh = lessGrams > 0 && lessGrams >= grossGrams
+  const selectedPurity = metalPurities.find((option) => option.id === receiveStoreMetalPurityId)
+  const baseGrams =
+    isPreciousMetal && selectedPurity ? (netGrams * selectedPurity.finenessPercent) / 100 : netGrams
+  const wastageGrams = (baseGrams * (Number(wastagePercent) || 0)) / 100
+  const creditedGrams = baseGrams + wastageGrams
+  const makingChargeTotal =
+    makingChargeMode === "PER_GRAM"
+      ? (Number(makingCharge) || 0) * toPrimaryUnit(netGrams, "GRAM", primaryUnit, GRAMS_PER_CARAT)
+      : Number(makingCharge) || 0
+  const unitLabel = weightUnit === "CARAT" ? "ct" : "g"
+  const showWeight = (grams: number) =>
+    `${toPrimaryUnit(grams, "GRAM", weightUnit, GRAMS_PER_CARAT).toFixed(3)}${unitLabel}`
 
   // Real per-Metal Purity options (Settings > Taxonomy > Purities),
   // replacing the old hardcoded PURITY_OPTIONS list — fetched for whichever
@@ -144,6 +171,14 @@ export function ReceiveMaterialDialog({
     }
   }, [metalTypeId])
 
+  function resetWeighing() {
+    setGrossWeightGrams("")
+    setLessWeightGrams("")
+    setWastagePercent("")
+    setMakingCharge("")
+    setMakingChargeMode("FIXED")
+  }
+
   const receiveMaterialWithId = recordMaterialReceiptFromKarigar.bind(null, karigarId)
   const [state, formAction, pending] = useActionState(receiveMaterialWithId, initialState)
 
@@ -151,7 +186,7 @@ export function ReceiveMaterialDialog({
     if (state.success) {
       toast.success(state.message || "Material received")
       setOpen(false)
-      setReceiveWeightGrams("")
+      resetWeighing()
       router.refresh()
     } else if (!state.success && state.message) {
       toast.error(state.message)
@@ -163,7 +198,7 @@ export function ReceiveMaterialDialog({
     if (open) {
       setMetalTypeId(defaultMetalId)
       setLocationId(defaultLocationId ?? "")
-      setReceiveWeightGrams("")
+      resetWeighing()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -174,7 +209,7 @@ export function ReceiveMaterialDialog({
         Receive Material{typeof count === "number" ? ` (${count})` : ""}
       </Button>
 
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Receive Material from Artisan</DialogTitle>
         </DialogHeader>
@@ -198,7 +233,8 @@ export function ReceiveMaterialDialog({
         <>
         <p className="text-sm text-muted-foreground">
           Use this to record material handed back against an outstanding balance
-          — no open job needed. It only adjusts the karigar's metal ledger; it
+          — no open job needed. It adjusts the karigar's metal ledger (net weight
+          plus wastage) and adds any making charge to their cash balance; it
           won't create new inventory stock.
         </p>
 
@@ -213,15 +249,11 @@ export function ReceiveMaterialDialog({
           {isPreciousMetal && (
             <input type="hidden" name="receiveStoreMetalPurityId" value={receiveStoreMetalPurityId} />
           )}
-          <input
-            type="hidden"
-            name="receiveWeight"
-            value={
-              receiveWeightGrams.trim() === ""
-                ? ""
-                : String(toPrimaryUnit(Number(receiveWeightGrams), "GRAM", primaryUnit, GRAMS_PER_CARAT))
-            }
-          />
+          <input type="hidden" name="grossWeight" value={toPersistedUnit(grossWeightGrams)} />
+          <input type="hidden" name="lessWeight" value={toPersistedUnit(lessWeightGrams)} />
+          <input type="hidden" name="wastagePercent" value={wastagePercent} />
+          <input type="hidden" name="makingCharge" value={makingCharge} />
+          <input type="hidden" name="makingChargeMode" value={makingChargeMode} />
 
           {!state.success && state.message && (
             <div className="text-sm text-red-600">{state.message}</div>
@@ -263,29 +295,119 @@ export function ReceiveMaterialDialog({
             )}
           </div>
 
-          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
-            <Label>Received Weight <RequiredMark /></Label>
-            <div className="flex gap-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+              <Label>Gross Weight <RequiredMark /></Label>
+              <div className="flex gap-1">
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  required
+                  className="flex-1"
+                  value={toDisplayUnit(grossWeightGrams)}
+                  onChange={(event) => setGrossWeightGrams(fromTypedUnit(event.target.value))}
+                />
+                <Select value={weightUnit} onValueChange={(unit) => setWeightUnit(unit as "GRAM" | "CARAT")}>
+                  <SelectTrigger className="w-16">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="GRAM">g</SelectItem>
+                    <SelectItem value="CARAT">ct</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+              <Label>Less Weight ({unitLabel})</Label>
               <Input
                 type="number"
                 step="any"
                 min="0"
-                required
-                className="flex-1"
-                value={displayReceiveWeight()}
-                onChange={(event) => handleReceiveWeightChange(event.target.value)}
+                placeholder="Stone / impurity"
+                value={toDisplayUnit(lessWeightGrams)}
+                onChange={(event) => setLessWeightGrams(fromTypedUnit(event.target.value))}
               />
-              <Select value={weightUnit} onValueChange={(unit) => setWeightUnit(unit as "GRAM" | "CARAT")}>
-                <SelectTrigger className="w-16">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GRAM">g</SelectItem>
-                  <SelectItem value="CARAT">ct</SelectItem>
-                </SelectContent>
-              </Select>
+              {lessTooHigh && (
+                <p className="text-xs text-destructive">Must be below the gross weight</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Net Weight ({unitLabel})</Label>
+              <Input readOnly tabIndex={-1} className="bg-muted" value={grossGrams > 0 ? showWeight(netGrams) : ""} />
+            </div>
+
+            <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+              <Label>Wastage %</Label>
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                max="100"
+                value={wastagePercent}
+                onChange={(event) => setWastagePercent(event.target.value)}
+              />
             </div>
           </div>
+
+          <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
+            <div className="flex items-center justify-between">
+              <Label>Making Charge (₹{makingChargeMode === "PER_GRAM" ? `/${primaryUnit === "CARAT" ? "ct" : "g"}` : ""})</Label>
+              <div className="flex rounded-md border p-0.5 text-xs">
+                {(["FIXED", "PER_GRAM"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setMakingChargeMode(mode)}
+                    className={`rounded px-2 py-0.5 ${makingChargeMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+                  >
+                    {mode === "FIXED" ? "₹ Total" : `Per ${primaryUnit === "CARAT" ? "ct" : "g"}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Input
+              type="number"
+              step="any"
+              min="0"
+              value={makingCharge}
+              onChange={(event) => setMakingCharge(event.target.value)}
+            />
+          </div>
+
+          {grossGrams > 0 && (
+            <div className="space-y-1 rounded-lg border bg-muted/30 p-3 text-sm">
+              <div className="flex justify-between">
+                <span>Net Weight</span>
+                <span>{showWeight(netGrams)}</span>
+              </div>
+              {isPreciousMetal && selectedPurity && (
+                <div className="flex justify-between">
+                  <span>Fine Weight ({selectedPurity.finenessPercent}%)</span>
+                  <span>{showWeight(baseGrams)}</span>
+                </div>
+              )}
+              {wastageGrams > 0 && (
+                <div className="flex justify-between">
+                  <span>Wastage ({wastagePercent}%)</span>
+                  <span>+{showWeight(wastageGrams)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-semibold">
+                <span>{isPreciousMetal && selectedPurity ? "Fine credited to artisan" : "Credited to artisan"}</span>
+                <span>{showWeight(creditedGrams)}</span>
+              </div>
+              {makingChargeTotal > 0 && (
+                <div className="flex justify-between">
+                  <span>Making Charge (owed to artisan)</span>
+                  <span>₹{makingChargeTotal.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
             {showLocationField && <Label>Store Location</Label>}
@@ -326,7 +448,7 @@ export function ReceiveMaterialDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={pending || !metalTypeId}>
+            <Button type="submit" disabled={pending || !metalTypeId || lessTooHigh}>
               {pending ? "Recording..." : "Receive Material"}
             </Button>
           </DialogFooter>

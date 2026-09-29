@@ -488,8 +488,16 @@ export async function issueMaterialToKarigar(
  * when they were first added), where there's nothing currently "issued and
  * outstanding" to reconcile the receipt against. Just a single CREDIT
  * ledger entry adjusting their outstanding metal balance directly, same
- * shape as recordKarigarPayment does for cash. Deliberately does not touch
- * InventoryStock — unlike receiveItemsFromKarigar (which turns a job's
+ * shape as recordKarigarPayment does for cash.
+ *
+ * Weighed the same way receiveItemsFromKarigar weighs a job's pieces: Net
+ * Weight = Gross − Less (stone/impurity), converted to fine weight for a
+ * purity metal, plus Wastage % on top — that wastage-inclusive figure is
+ * what gets credited, same trade convention and same reasoning as the job
+ * path. A Making Charge (₹, flat or per gram of net weight) is owed to the
+ * karigar as its own DEBIT cash entry, mirroring the job path's Labour
+ * Charge, so the metal and cash balances stay single-purpose. Deliberately
+ * does not touch InventoryStock — unlike receiveItemsFromKarigar (which turns a job's
  * finished pieces into new sellable stock), there's no job/item here to
  * attach a stock row to, just raw metal being settled against what's owed.
  */
@@ -512,7 +520,14 @@ export async function recordMaterialReceiptFromKarigar(
     const metalTypeId = String(formData.get("metalTypeId") || "").trim();
     const receivePurityRaw = String(formData.get("receivePurity") || "");
     const receiveStoreMetalPurityId = String(formData.get("receiveStoreMetalPurityId") || "").trim();
-    const receiveWeight = toDecimalOrNull(formData.get("receiveWeight"));
+    // grossWeight/lessWeight are what the dialog sends now; a bare
+    // receiveWeight (older callers) is treated as gross with no less weight.
+    const grossWeight =
+      toDecimalOrNull(formData.get("grossWeight")) ?? toDecimalOrNull(formData.get("receiveWeight"));
+    const lessWeight = toDecimalOrNull(formData.get("lessWeight")) ?? 0;
+    const wastagePercent = toDecimalOrNull(formData.get("wastagePercent")) ?? 0;
+    const makingChargeRate = toDecimalOrNull(formData.get("makingCharge")) ?? 0;
+    const makingChargePerGram = String(formData.get("makingChargeMode") || "") === "PER_GRAM";
     const notes = String(formData.get("notes") || "").trim() || null;
     const locationId = String(formData.get("locationId") || "").trim() || null;
 
@@ -553,9 +568,24 @@ export async function recordMaterialReceiptFromKarigar(
 
     const isPreciousMetal = storeMetal.hasPurity;
 
-    if (!receiveWeight || receiveWeight <= 0) {
-      return { success: false, message: "Enter a valid received weight" };
+    if (!grossWeight || grossWeight <= 0) {
+      return { success: false, message: "Enter a valid gross weight" };
     }
+    if (lessWeight < 0 || lessWeight >= grossWeight) {
+      return { success: false, message: "Less weight must be below the gross weight" };
+    }
+    if (wastagePercent < 0 || wastagePercent > 100) {
+      return { success: false, message: "Wastage must be between 0% and 100%" };
+    }
+    if (makingChargeRate < 0) {
+      return { success: false, message: "Making charge can't be negative" };
+    }
+
+    // Recomputed here rather than trusted from the dialog's live preview.
+    const receiveWeight = Number((grossWeight - lessWeight).toFixed(5));
+    const makingCharge = Number(
+      (makingChargePerGram ? makingChargeRate * receiveWeight : makingChargeRate).toFixed(2),
+    );
 
     let receivePurity: PurityType | null = null;
     let receivePurityLabel: string | null = null;
@@ -584,23 +614,57 @@ export async function recordMaterialReceiptFromKarigar(
       }
     }
 
-    await prisma.ledgerEntry.create({
-      data: {
-        storeId,
-        type: LedgerEntryType.CREDIT,
-        sourceType: LedgerSourceType.KARIGAR_RECEIPT,
-        karigarId,
-        metalTypeId: storeMetal.id,
-        metalWeight: isPreciousMetal ? undefined : receiveWeight,
-        metalWeightFine: isPreciousMetal ? (receiveFineWeight ?? undefined) : undefined,
-        amount: 0,
-        description: isPreciousMetal
-          ? `${receiveWeight}g ${receivePurityLabel ?? receivePurity} received against outstanding balance (${(receiveFineWeight ?? 0).toFixed(3)}g fine)${notes ? ` — ${notes}` : ""}`
-          : `${receiveWeight}g ${notes ? notes : storeMetal.name} received against outstanding balance`,
-        createdByUserId: currentUser?.id,
-        locationId: locationId ?? undefined,
-      },
-    });
+    // Wastage on top of the metal's own weight (fine weight for a purity
+    // metal) — the credited figure, same as receiveItemsFromKarigar's
+    // accountedFineWeight.
+    const baseWeight = isPreciousMetal ? (receiveFineWeight ?? 0) : receiveWeight;
+    const wastageWeight = (baseWeight * wastagePercent) / 100;
+    const creditedWeight = baseWeight + wastageWeight;
+
+    const weighing =
+      lessWeight > 0
+        ? `${grossWeight}g gross − ${lessWeight}g less = ${receiveWeight}g net`
+        : `${receiveWeight}g`;
+    const wastageNote =
+      wastagePercent > 0 ? `, incl. ${wastageWeight.toFixed(3)}g wastage @ ${wastagePercent}%` : "";
+
+    await prisma.$transaction([
+      prisma.ledgerEntry.create({
+        data: {
+          storeId,
+          type: LedgerEntryType.CREDIT,
+          sourceType: LedgerSourceType.KARIGAR_RECEIPT,
+          karigarId,
+          metalTypeId: storeMetal.id,
+          metalWeight: isPreciousMetal ? undefined : creditedWeight,
+          metalWeightFine: isPreciousMetal ? creditedWeight : undefined,
+          amount: 0,
+          description: isPreciousMetal
+            ? `${weighing} ${receivePurityLabel ?? receivePurity} received against outstanding balance (${creditedWeight.toFixed(3)}g fine${wastageNote})${notes ? ` — ${notes}` : ""}`
+            : `${weighing} ${notes ? notes : storeMetal.name} received against outstanding balance${wastagePercent > 0 ? ` (${creditedWeight.toFixed(3)}g${wastageNote})` : ""}`,
+          createdByUserId: currentUser?.id,
+          locationId: locationId ?? undefined,
+        },
+      }),
+      ...(makingCharge > 0
+        ? [
+            prisma.ledgerEntry.create({
+              data: {
+                storeId,
+                type: LedgerEntryType.DEBIT,
+                sourceType: LedgerSourceType.KARIGAR_RECEIPT,
+                karigarId,
+                amount: makingCharge,
+                description: makingChargePerGram
+                  ? `Making charge — ₹${makingChargeRate}/g × ${receiveWeight}g ${storeMetal.name} received`
+                  : `Making charge — ${receiveWeight}g ${storeMetal.name} received`,
+                createdByUserId: currentUser?.id,
+                locationId: locationId ?? undefined,
+              },
+            }),
+          ]
+        : []),
+    ]);
 
     revalidatePath("/karigars");
     revalidatePath(`/karigars/${karigarId}`);

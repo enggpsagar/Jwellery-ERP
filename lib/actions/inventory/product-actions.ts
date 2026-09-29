@@ -528,7 +528,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   const where = getProductWhere(storeId, search, params.metalTypeId, params.status, params.dateFrom, params.dateTo, params.categoryId, params.categoryTypeId);
   const orderBy = getProductOrderBy(sortBy, sortOrder);
 
-  const [totalCount, rows] = await Promise.all([
+  const [totalCount, rows, weightSum, stockQtySum] = await Promise.all([
     prisma.product.count({ where }),
     prisma.product.findMany({
       where,
@@ -536,6 +536,12 @@ export async function getProducts(params: GetProductsParams = {}) {
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: PRODUCT_RELATIONS,
+    }),
+    // Footer totals across every matching product, not just this page.
+    prisma.product.aggregate({ where, _sum: { defaultNetWeight: true } }),
+    prisma.inventoryStock.aggregate({
+      where: { storeId, product: where },
+      _sum: { quantity: true },
     }),
   ]);
 
@@ -564,6 +570,10 @@ export async function getProducts(params: GetProductsParams = {}) {
 
   return {
     products,
+    totals: {
+      netWeight: Number(weightSum._sum.defaultNetWeight ?? 0),
+      stockQty: stockQtySum._sum.quantity ?? 0,
+    },
     pagination: {
       page,
       pageSize,

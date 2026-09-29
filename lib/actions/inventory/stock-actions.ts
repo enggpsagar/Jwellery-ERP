@@ -275,7 +275,7 @@ export async function getInventoryStock(params: GetInventoryStockParams = {}) {
   const where = getStockWhere(storeId, search, scope, params.metalTypeId, params.dateFrom, params.dateTo, params.status, params.categoryId, params.categoryTypeId)
   const orderBy = getStockOrderBy(sortBy, sortOrder)
 
-  const [totalCount, rows] = await Promise.all([
+  const [totalCount, rows, sums] = await Promise.all([
     prisma.inventoryStock.count({ where }),
     prisma.inventoryStock.findMany({
       where,
@@ -284,6 +284,12 @@ export async function getInventoryStock(params: GetInventoryStockParams = {}) {
       take: pageSize,
       include: STOCK_INCLUDE,
     }),
+    // Footer totals across every matching row, not just this page — plain
+    // column sums, so they match what the Gross/Net/Qty columns show.
+    prisma.inventoryStock.aggregate({
+      where,
+      _sum: { grossWeight: true, netWeight: true, quantity: true },
+    }),
   ])
 
   const stockItems = rows.map(mapStockRow)
@@ -291,6 +297,11 @@ export async function getInventoryStock(params: GetInventoryStockParams = {}) {
 
   return {
     stockItems,
+    totals: {
+      grossWeight: Number(sums._sum.grossWeight ?? 0),
+      netWeight: Number(sums._sum.netWeight ?? 0),
+      quantity: sums._sum.quantity ?? 0,
+    },
     pagination: {
       page,
       pageSize,

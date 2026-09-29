@@ -76,7 +76,7 @@ export default async function InventoryProductsPage({
       ? params.categoryType
       : undefined;
 
-  const { products, pagination } = await getProducts({
+  const { products, pagination, totals } = await getProducts({
     page,
     pageSize,
     search,
@@ -94,6 +94,7 @@ export default async function InventoryProductsPage({
     <ProductsClient
       products={products}
       pagination={pagination}
+      totals={totals}
       canCreate={canCreate}
       canEdit={canEdit}
       metals={metals}

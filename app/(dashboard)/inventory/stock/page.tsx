@@ -64,7 +64,7 @@ export default async function InventoryStockPage({
       ? params.categoryType
       : undefined
 
-  const { stockItems, pagination } = await getInventoryStock({
+  const { stockItems, pagination, totals } = await getInventoryStock({
     page,
     pageSize,
     search,
@@ -82,6 +82,7 @@ export default async function InventoryStockPage({
     <StockClient
       stockItems={stockItems}
       pagination={pagination}
+      totals={totals}
       metals={metals}
       categoryFilter={categoryFilter}
       showLocation={locations.length > 1}

@@ -32,6 +32,7 @@ type Pagination = {
 type ProductsClientProps = {
   products: ProductRow[]
   pagination: Pagination
+  totals?: React.ComponentProps<typeof ProductsTable>["totals"]
   /** PRODUCT_CREATE — resolved on the server; the route enforces it too. */
   canCreate?: boolean
   /** PRODUCT_UPDATE — hides per-row edit for view-only users. */
@@ -47,6 +48,7 @@ type ProductsClientProps = {
 export function ProductsClient({
   products,
   pagination,
+  totals,
   canCreate = false,
   canEdit = false,
   metals = [],
@@ -138,6 +140,7 @@ export function ProductsClient({
                 .map((metal) => ({ value: metal.id, label: metal.name })),
               { value: UNASSIGNED_METAL_TYPE, label: "Unassigned" },
             ]}
+            typeLabel="Metal"
             categoryOptions={categoryFilter?.categories}
             categoryTypeOptions={categoryFilter?.categoryTypes}
             bulkActions={
@@ -167,6 +170,7 @@ export function ProductsClient({
           <ProductsTable
             products={products}
             pagination={pagination}
+            totals={totals}
             selectedIds={selectedIds}
             onSelectionChange={setSelectedIds}
             activeProductId={activeProductId}

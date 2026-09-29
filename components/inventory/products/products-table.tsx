@@ -40,11 +40,15 @@ type ProductsTableProps = {
   /** Which row's detail is showing in the panel alongside this table — distinct from selectedIds, which is the bulk-action checkbox selection. */
   activeProductId?: string | null
   onActivate?: (id: string) => void
+  /** Sums across every product matching the current filters (all pages),
+   *  from getProducts — shown as the table's footer row. */
+  totals?: { netWeight: number; stockQty: number }
 }
 
 export function ProductsTable({
   products,
   pagination,
+  totals,
   selectedIds,
   onSelectionChange,
   activeProductId,
@@ -227,6 +231,24 @@ export function ProductsTable({
               )
             })}
           </tbody>
+          {totals && pagination.totalCount > 0 && (
+            <tfoot className="border-t bg-muted/40 font-semibold">
+              <tr>
+                <td className="px-4 py-3" />
+                <td className="px-4 py-3">
+                  Total
+                  <div className="text-xs font-normal text-muted-foreground">
+                    {pagination.totalCount} product{pagination.totalCount === 1 ? "" : "s"}
+                    {pagination.totalPages > 1 ? ", all pages" : ""}
+                  </div>
+                </td>
+                <td className="px-4 py-3 tabular-nums">{totals.stockQty}</td>
+                <td className="px-4 py-3" />
+                <td className="px-4 py-3 tabular-nums">{totals.netWeight.toFixed(3)} g</td>
+                <td className="px-4 py-3" />
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 

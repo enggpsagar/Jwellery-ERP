@@ -28,6 +28,7 @@ type Pagination = {
 type StockClientProps = {
   stockItems: React.ComponentProps<typeof StockTable>["stockItems"]
   pagination: Pagination
+  totals?: React.ComponentProps<typeof StockTable>["totals"]
   metals: StoreMetalRow[]
   /** Category → Type filter options (getCategoryFilterOptions). */
   categoryFilter?: CategoryFilterOptions
@@ -37,7 +38,7 @@ type StockClientProps = {
   showLocation: boolean
 }
 
-export function StockClient({ stockItems, pagination, metals, categoryFilter, showLocation }: StockClientProps) {
+export function StockClient({ stockItems, pagination, totals, metals, categoryFilter, showLocation }: StockClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   // Which row's full detail shows in the right-hand panel — defaults to
   // the first row on this page/search result so the panel is never empty
@@ -138,6 +139,7 @@ export function StockClient({ stockItems, pagination, metals, categoryFilter, sh
           <StockTable
             stockItems={stockItems}
             pagination={pagination}
+            totals={totals}
             selectedIds={selectedIds}
             onSelectionChange={setSelectedIds}
             activeStockId={activeStockId}

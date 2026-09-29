@@ -33,6 +33,9 @@ type StockTableProps = {
   onActivate?: (id: string) => void
   /** False for a single-location (or zero-location) store — see StockClientProps. Defaults true so a caller that hasn't been updated still shows it, matching today's behavior. */
   showLocation?: boolean
+  /** Sums across every stock row matching the current filters (all pages),
+   *  from getInventoryStock — shown as the table's footer row. */
+  totals?: { grossWeight: number; netWeight: number; quantity: number }
 }
 
 function formatNumber(value: number | string | null | undefined, digits = 3) {
@@ -53,6 +56,7 @@ export function StockTable({
   activeStockId,
   onActivate,
   showLocation = true,
+  totals,
 }: StockTableProps) {
   const allIds = React.useMemo(
     () => stockItems.map((item) => item.id),
@@ -225,6 +229,27 @@ export function StockTable({
               )
             })}
           </tbody>
+          {totals && pagination.totalCount > 0 && (
+            <tfoot className="border-t bg-muted/40 font-semibold">
+              <tr>
+                <td className="px-4 py-3" />
+                <td className="px-4 py-3">
+                  Total
+                  <div className="text-xs font-normal text-muted-foreground">
+                    {pagination.totalCount} item{pagination.totalCount === 1 ? "" : "s"}
+                    {pagination.totalPages > 1 ? ", all pages" : ""}
+                  </div>
+                </td>
+                <td className="hidden px-4 py-3 md:table-cell" />
+                <td className="px-4 py-3" />
+                <td className="hidden px-4 py-3 text-right tabular-nums sm:table-cell">
+                  {formatWeightCell(totals.grossWeight)}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums">{formatWeightCell(totals.netWeight)}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{totals.quantity}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 

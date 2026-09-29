@@ -67,6 +67,7 @@ export function StockToolbar({ selectedIds, metals, categoryFilter, bulkActions 
           .map((metal) => ({ value: metal.id, label: metal.name })),
         { value: UNASSIGNED_METAL_TYPE, label: "Unassigned" },
       ]}
+      typeLabel="Metal"
       categoryOptions={categoryFilter?.categories}
       categoryTypeOptions={categoryFilter?.categoryTypes}
       bulkActions={

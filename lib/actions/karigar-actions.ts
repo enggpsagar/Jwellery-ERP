@@ -286,8 +286,14 @@ export type KarigarOpenJob = {
   expectedDate: string | null;
   issueWeight: number;
   issuePurity: string | null;
+  /** The real per-Metal Purity label (e.g. "22K") when set — preferred
+   *  over the legacy issuePurity enum for display. */
+  issuePurityLabel: string | null;
+  metalName: string | null;
   issueFineWeight: number;
   receiveWeight: number;
+  /** Linked Draft Order's number, when the job came from Send to Artisan. */
+  draftOrderNumber: string | null;
 };
 
 export type KarigarDetailBundle = {
@@ -321,9 +327,20 @@ export async function getKarigarDetailBundle(id: string): Promise<KarigarDetailB
     prisma.karigarJob.findMany({
       where: { storeId, karigarId: id, status: "issued", ...locationWhere(scope) },
       orderBy: { issueDate: "desc" },
+      include: { metalType: { select: { name: true } } },
     }),
     getKarigarMaterialCounts(id),
   ]);
+
+  const linkedDraftOrders = openJobsRaw.length
+    ? await prisma.draftOrder.findMany({
+        where: { storeId, karigarJobId: { in: openJobsRaw.map((job) => job.id) } },
+        select: { karigarJobId: true, orderNumber: true },
+      })
+    : [];
+  const draftOrderNumberByJob = new Map(
+    linkedDraftOrders.map((order) => [order.karigarJobId as string, order.orderNumber]),
+  );
 
   const openJobs: KarigarOpenJob[] = openJobsRaw.map((job) => ({
     id: job.id,
@@ -332,8 +349,11 @@ export async function getKarigarDetailBundle(id: string): Promise<KarigarDetailB
     expectedDate: formatKarigarDate(job.expectedDate),
     issueWeight: job.issueWeight ? Number(job.issueWeight) : 0,
     issuePurity: job.issuePurity,
+    issuePurityLabel: job.issuePurityLabel,
+    metalName: job.metalType?.name ?? null,
     issueFineWeight: job.issueFineWeight ? Number(job.issueFineWeight) : 0,
     receiveWeight: job.receiveWeight ? Number(job.receiveWeight) : 0,
+    draftOrderNumber: draftOrderNumberByJob.get(job.id) ?? null,
   }));
 
   return { karigar, ledger, metals, locations, defaultLocationId, openJobs, materialCounts };

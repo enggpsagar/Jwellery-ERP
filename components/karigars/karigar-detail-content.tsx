@@ -1,4 +1,8 @@
+import Link from "next/link"
+import { PackageCheck } from "lucide-react"
+
 import type { KarigarDetailBundle } from "@/lib/actions/karigar-actions"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { KarigarLedgerTabs } from "@/components/karigars/karigar-ledger-tabs"
 import { KarigarStatusCard } from "@/components/karigars/karigar-status-card"
@@ -30,9 +34,11 @@ function metalRibbonColor(metalLabel: string): string {
 /**
  * The body of a karigar's detail view — balance cards and ledger. Shared
  * between the standalone /karigars/[id] page and the inline detail pane on
- * the Karigars list itself, so the two can never drift apart. No separate
- * "Open Jobs" section — Issue/Receive Material's own counts and the ledger
- * below already cover that.
+ * the Karigars list itself, so the two can never drift apart. The Open
+ * Jobs card is the way into Receive Items for a job issued straight from
+ * Issue Material — without it only a Draft Order's own button linked there,
+ * so a directly issued job could never have its finished pieces received
+ * as Products/Stock.
  */
 export function KarigarDetailContent({
   bundle,
@@ -46,7 +52,7 @@ export function KarigarDetailContent({
    * has no Edit button of its own to sit that toggle next to. */
   hideStatusCard?: boolean
 }) {
-  const { karigar, ledger, metals } = bundle
+  const { karigar, ledger, metals, openJobs } = bundle
 
   // Only what's actually set/nonzero — an unused Opening Gold/Cash field or
   // a karigar with no specialization recorded is clutter, not information.
@@ -207,6 +213,50 @@ export function KarigarDetailContent({
             ₹ {ledger.finalCashBalance.toLocaleString("en-IN")}
           </span>
         </p>
+      )}
+
+      {openJobs.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Open Jobs ({openJobs.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {openJobs.map((job) => {
+              const remaining = Math.max(0, job.issueWeight - job.receiveWeight)
+              const purity = job.issuePurityLabel ?? job.issuePurity?.replace(/_/g, " ")
+              return (
+                <div
+                  key={job.id}
+                  className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0 space-y-0.5 text-sm">
+                    <p className="font-medium">
+                      {job.jobNumber ?? "Job"}
+                      {job.draftOrderNumber && (
+                        <span className="font-normal text-muted-foreground"> · Draft Order {job.draftOrderNumber}</span>
+                      )}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {[job.metalName, purity].filter(Boolean).join(" ")} · Issued {job.issueWeight.toFixed(3)}g on{" "}
+                      {job.issueDate}
+                      {job.expectedDate ? ` · Due ${job.expectedDate}` : ""}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Received {job.receiveWeight.toFixed(3)}g ·{" "}
+                      <span className="font-medium text-foreground">{remaining.toFixed(3)}g remaining</span>
+                    </p>
+                  </div>
+                  <Button asChild size="sm" className="shrink-0 gap-1.5">
+                    <Link href={`/karigars/${karigar.id}/receive-items/${job.id}`}>
+                      <PackageCheck className="h-4 w-4" />
+                      Receive Items
+                    </Link>
+                  </Button>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
       )}
 
       <Card>

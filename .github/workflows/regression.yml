@@ -70,12 +70,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # pnpm skips Prisma's install script here (pnpm-workspace.yaml
+      # allowBuilds), so the client must be generated before anything
+      # that imports its types.
+      - name: Generate Prisma client
+        run: npx prisma generate
+
       - name: Type check
         run: npx tsc --noEmit -p .
 
       - name: Set up database (migrate + seed demo store)
         run: |
-          npx prisma generate
           npx prisma migrate deploy
           pnpm seed
           pnpm db:seed:full-demo

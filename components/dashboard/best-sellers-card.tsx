@@ -4,12 +4,13 @@ import { useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { DateRangePicker, type DateRangeValue } from "@/components/ui/date-range-picker"
 import {
   getBestSellers,
   type BestSellers,
   type RevenueByMetalPeriod,
 } from "@/lib/actions/dashboard-actions"
-import { cn } from "@/lib/utils"
+import { cn, formatShortDate } from "@/lib/utils"
 
 // Same period set/labels as category-chart.tsx (a "use server" file can
 // only export async functions, so each client card keeps its own copy).
@@ -30,6 +31,14 @@ const PERIOD_DESCRIPTIONS: Record<RevenueByMetalPeriod, string> = {
 }
 
 const PERIOD_OPTIONS = Object.keys(PERIOD_LABELS) as RevenueByMetalPeriod[]
+
+const NO_RANGE: DateRangeValue = { from: "", to: "" }
+
+function rangeDescription({ from, to }: DateRangeValue) {
+  if (from && to) return `Top sellers ${formatShortDate(from)} – ${formatShortDate(to)}`
+  if (from) return `Top sellers since ${formatShortDate(from)}`
+  return `Top sellers up to ${formatShortDate(to)}`
+}
 
 const TABS = [
   { key: "items", label: "Items" },
@@ -65,13 +74,33 @@ export function BestSellersCard({
   const [period, setPeriod] = useState(initialPeriod)
   const [data, setData] = useState(initialData)
   const [tab, setTab] = useState<TabKey>("items")
+  // A custom range replaces the period (see getBestSellers); picking a
+  // period button again clears it.
+  const [range, setRange] = useState<DateRangeValue>(NO_RANGE)
+  // The range the list actually shows — lags `range` while only a start
+  // date has been clicked, so the description never runs ahead of the data.
+  const [appliedRange, setAppliedRange] = useState<DateRangeValue>(NO_RANGE)
   const [isPending, startTransition] = useTransition()
+  const hasRange = Boolean(appliedRange.from || appliedRange.to)
 
   function handlePeriodChange(next: RevenueByMetalPeriod) {
-    if (next === period) return
+    if (next === period && !hasRange) return
     setPeriod(next)
+    setRange(NO_RANGE)
+    setAppliedRange(NO_RANGE)
     startTransition(async () => {
       setData(await getBestSellers(next))
+    })
+  }
+
+  function handleRangeChange(next: DateRangeValue) {
+    setRange(next)
+    // The picker reports the first click (start date only) before the end
+    // is chosen — reload once the range is complete.
+    if (next.from && !next.to) return
+    setAppliedRange(next)
+    startTransition(async () => {
+      setData(await getBestSellers(period, next.from || next.to ? next : undefined))
     })
   }
 
@@ -83,23 +112,33 @@ export function BestSellersCard({
       <CardHeader className="flex flex-col gap-3 border-b [.border-b]:pb-5">
         <div>
           <CardTitle>Best Sellers</CardTitle>
-          <CardDescription>{PERIOD_DESCRIPTIONS[period]}, by revenue</CardDescription>
+          <CardDescription>
+            {hasRange ? rangeDescription(appliedRange) : PERIOD_DESCRIPTIONS[period]}, by revenue
+          </CardDescription>
         </div>
 
-        <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
-          {PERIOD_OPTIONS.map((option) => (
-            <Button
-              key={option}
-              type="button"
-              size="sm"
-              variant={period === option ? "default" : "ghost"}
-              disabled={isPending}
-              onClick={() => handlePeriodChange(option)}
-              className="h-7 px-2.5 text-xs"
-            >
-              {PERIOD_LABELS[option]}
-            </Button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
+            {PERIOD_OPTIONS.map((option) => (
+              <Button
+                key={option}
+                type="button"
+                size="sm"
+                variant={period === option && !hasRange ? "default" : "ghost"}
+                disabled={isPending}
+                onClick={() => handlePeriodChange(option)}
+                className="h-7 px-2.5 text-xs"
+              >
+                {PERIOD_LABELS[option]}
+              </Button>
+            ))}
+          </div>
+          <DateRangePicker
+            value={range}
+            onChange={handleRangeChange}
+            placeholder="Date range"
+            className="w-[220px]"
+          />
         </div>
 
         <div className="flex gap-1 overflow-x-auto border-b" role="tablist" aria-label="Best sellers by">

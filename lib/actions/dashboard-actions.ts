@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
 import { formatShortDateTime } from "@/lib/utils";
+import { parseDateRangeBoundary } from "@/lib/date-range";
 
 /**
  * What counts as metal still on hand.
@@ -861,17 +862,28 @@ function addTo(map: Map<string, BestSellerRow>, label: string, quantity: number,
  * line total, a stone set in a metal piece counts only its stone charge, so
  * a gold ring with a diamond isn't counted twice at full price. Stone Type
  * (Natural / Lab-Grown) is part of the stone label when it's recorded.
+ *
+ * A custom date range ("YYYY-MM-DD" from/to, either end optional — the
+ * shared DateRangePicker's own format) replaces the period when given.
  */
-export async function getBestSellers(period: RevenueByMetalPeriod = "monthly"): Promise<BestSellers> {
+export async function getBestSellers(
+  period: RevenueByMetalPeriod = "monthly",
+  range?: { from?: string; to?: string },
+): Promise<BestSellers> {
   const storeId = await getStoreIdForRead();
   const scope = await getLocationScope();
-  const rangeStart = revenueByMetalPeriodStart(period, new Date());
+  const from = parseDateRangeBoundary(range?.from, false);
+  const to = parseDateRangeBoundary(range?.to, true);
+  const invoiceDate =
+    from || to
+      ? { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) }
+      : { gte: revenueByMetalPeriodStart(period, new Date()) };
 
   const lines = await prisma.invoiceItem.findMany({
     where: {
       invoice: {
         storeId,
-        invoiceDate: { gte: rangeStart },
+        invoiceDate,
         status: { not: InvoiceStatus.CANCELLED },
         ...locationWhere(scope),
       },

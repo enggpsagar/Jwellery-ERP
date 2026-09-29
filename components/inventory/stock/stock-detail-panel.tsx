@@ -8,6 +8,7 @@ import { getInventoryStockById } from "@/lib/actions/inventory/stock-actions"
 import { StockRowActions } from "@/components/inventory/stock/stock-row-actions"
 import { StockDetailContent } from "@/components/inventory/stock/stock-detail-content"
 import { StockQrCard } from "@/components/inventory/stock/stock-qr-card"
+import { tagPurity } from "@/components/inventory/stock/stock-qr-label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatShortDate } from "@/lib/utils"
 
@@ -113,7 +114,7 @@ export function StockDetailPanel({ stockId, showLocation = true }: StockDetailPa
             productName={stock.product?.name ?? "-"}
             tagNumber={stock.tagNumber || null}
             metalName={stock.metalType?.name ?? null}
-            purity={stock.purity || null}
+            purity={tagPurity(stock.purityLabel, stock.purity)}
             netWeight={
               stock.netWeight ? `${Number(stock.netWeight).toFixed(3)}g` : null
             }

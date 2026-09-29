@@ -12,6 +12,7 @@ import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { formatShortDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { StockQrCard } from "@/components/inventory/stock/stock-qr-card"
+import { tagPurity } from "@/components/inventory/stock/stock-qr-label"
 import { StockDetailContent } from "@/components/inventory/stock/stock-detail-content"
 
 type InventoryStockDetailsPageProps = {
@@ -106,7 +107,7 @@ export default async function InventoryStockDetailsPage({
             productName={stock.product?.name ?? "-"}
             tagNumber={stock.tagNumber || null}
             metalName={stock.metalType?.name ?? null}
-            purity={stock.purity || null}
+            purity={tagPurity(stock.purityLabel, stock.purity)}
             netWeight={
               stock.netWeight ? `${Number(stock.netWeight).toFixed(3)}g` : null
             }

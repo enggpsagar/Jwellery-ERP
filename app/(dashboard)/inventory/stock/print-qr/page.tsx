@@ -8,6 +8,12 @@ import { requireStoreScope } from "@/lib/store-context"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { PrintAllQrButton } from "@/components/inventory/stock/print-all-qr-button"
 import { formatShortDate } from "@/lib/utils"
+import {
+  StockQrLabel,
+  StockQrLabelPrintStyles,
+  tagPurity,
+} from "@/components/inventory/stock/stock-qr-label"
+import { StockQrPrintRoot } from "@/components/inventory/stock/stock-qr-print-root"
 
 export const metadata: Metadata = {
   title: "Print QR Codes",
@@ -67,7 +73,7 @@ export default async function StockPrintQrPage({
       productName: stock.product?.name ?? "-",
       tagNumber: stock.tagNumber || null,
       metalName: stock.metalType?.name ?? null,
-      purity: stock.purity || null,
+      purity: tagPurity(stock.purityLabel, stock.purity),
       netWeight: formatWeight(stock.netWeight),
       grossWeight: formatWeight(stock.grossWeight),
       manufactureDate: formatDate(stock.manufactureDate),
@@ -79,28 +85,14 @@ export default async function StockPrintQrPage({
 
   return (
     <main className="space-y-6 p-6">
-      {/*
-        Scoped print stylesheet, same self-contained approach as
-        stock-qr-card.tsx — only the QR grid prints, nothing else on this
-        page (header, back link, buttons).
-      */}
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #stock-qr-print-grid,
-          #stock-qr-print-grid * {
-            visibility: visible;
-          }
-          #stock-qr-print-grid {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-          }
-        }
-      `}</style>
+      {/* Only the tags print — each on its own 80×30mm thermal label,
+          outside the dashboard layout. See StockQrLabelPrintStyles. */}
+      <StockQrLabelPrintStyles />
+      <StockQrPrintRoot id="stock-qr-print-labels">
+        {items.map((item) => (
+          <StockQrLabel key={item.id} label={item} />
+        ))}
+      </StockQrPrintRoot>
 
       <PageBackHeader
         title="Print Stock QR Codes"
@@ -118,78 +110,9 @@ export default async function StockPrintQrPage({
           least one item to print.
         </div>
       ) : (
-        <div
-          id="stock-qr-print-grid"
-          className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
-        >
+        <div id="stock-qr-print-grid" className="flex flex-wrap gap-4">
           {items.map((item) => (
-            // StockQrCard bundles its own scoped print styles, id, and a
-            // per-item Print button, none of which compose with this grid
-            // (which prints as a single #stock-qr-print-grid block and
-            // would otherwise get duplicate #stock-qr-print ids, one per
-            // cell) — so the same label content is replicated inline here
-            // instead of reusing that component.
-            <div
-              key={item.id}
-              className="flex flex-col items-center gap-2 rounded-xl border bg-white p-4 text-center"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.qrDataUrl}
-                alt={`QR code for stock ${item.stockCode}`}
-                className="h-32 w-32"
-                width={128}
-                height={128}
-              />
-              <div>
-                <p className="font-semibold">
-                  LR# {item.tagNumber ?? item.stockCode}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {item.productName}
-                </p>
-                {/* Read off the physical tag by eye — monospace at full
-                    contrast so it survives a small label and is never
-                    confused with the stock code above it. */}
-                {item.productCode && (
-                  <p className="mt-1 font-mono text-sm font-semibold tracking-wide">
-                    {item.productCode}
-                  </p>
-                )}
-              </div>
-
-              <div className="w-full max-w-[220px] space-y-0.5 text-left text-xs text-muted-foreground">
-                {item.metalName && (
-                  <p>
-                    <span className="font-medium text-foreground">Metal:</span>{" "}
-                    {item.metalName}
-                  </p>
-                )}
-                {item.purity && (
-                  <p>
-                    <span className="font-medium text-foreground">Purity:</span>{" "}
-                    {item.purity}
-                  </p>
-                )}
-                {item.netWeight && (
-                  <p>
-                    <span className="font-medium text-foreground">
-                      Net Weight:
-                    </span>{" "}
-                    {item.netWeight}
-                  </p>
-                )}
-                {item.grossWeight && (
-                  <p>
-                    <span className="font-medium text-foreground">
-                      Gross Weight:
-                    </span>{" "}
-                    {item.grossWeight}
-                  </p>
-                )}
-                {item.manufactureDate && <p>MFG: {item.manufactureDate}</p>}
-              </div>
-            </div>
+            <StockQrLabel key={item.id} label={item} />
           ))}
         </div>
       )}

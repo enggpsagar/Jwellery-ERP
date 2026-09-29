@@ -26,6 +26,7 @@ const DEFAULT_LAYOUT: Layout = [
   { i: "categoryChart", x: 8, y: 11, w: 4, h: 16, minW: 3, minH: 8 },
   { i: "transactions", x: 0, y: 27, w: 8, h: 14, minW: 4, minH: 8 },
   { i: "activityFeed", x: 8, y: 27, w: 4, h: 14, minW: 3, minH: 8 },
+  { i: "bestSellers", x: 0, y: 41, w: 12, h: 19, minW: 4, minH: 12 },
 ]
 
 function loadLayout(): Layout {
@@ -77,6 +78,7 @@ export type DashboardWidgetId =
   | "categoryChart"
   | "transactions"
   | "activityFeed"
+  | "bestSellers"
 
 export function DashboardGrid({
   widgets,

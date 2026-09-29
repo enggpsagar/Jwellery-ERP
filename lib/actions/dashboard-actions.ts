@@ -820,6 +820,128 @@ export async function getRevenueByCategory(
   };
 }
 
+export type BestSellerRow = {
+  label: string;
+  /** Pieces sold (InvoiceItem.quantity). */
+  quantity: number;
+  /** Revenue attributed to this row — the line total for items/categories/
+   *  types/metals; for an embedded stone, just its stone charge. */
+  revenue: number;
+};
+
+export type BestSellers = {
+  items: BestSellerRow[];
+  categories: BestSellerRow[];
+  types: BestSellerRow[];
+  metals: BestSellerRow[];
+  stones: BestSellerRow[];
+};
+
+const BEST_SELLER_LIMIT = 8;
+
+function topRows(map: Map<string, BestSellerRow>): BestSellerRow[] {
+  return Array.from(map.values())
+    .sort((a, b) => b.revenue - a.revenue || b.quantity - a.quantity)
+    .slice(0, BEST_SELLER_LIMIT);
+}
+
+function addTo(map: Map<string, BestSellerRow>, label: string, quantity: number, revenue: number) {
+  const row = map.get(label) ?? { label, quantity: 0, revenue: 0 };
+  row.quantity += quantity;
+  row.revenue += revenue;
+  map.set(label, row);
+}
+
+/**
+ * Best sellers for the selected period, from the same invoice lines as
+ * getRevenueByCategory (non-cancelled invoices, location-scoped): top items
+ * (by Product, falling back to the line's own name for an unlinked legacy
+ * line), Categories and Types (the sold stock's Product taxonomy), Metals
+ * (non-stone metal lines) and Stones — a loose stone line counts its whole
+ * line total, a stone set in a metal piece counts only its stone charge, so
+ * a gold ring with a diamond isn't counted twice at full price. Stone Type
+ * (Natural / Lab-Grown) is part of the stone label when it's recorded.
+ */
+export async function getBestSellers(period: RevenueByMetalPeriod = "monthly"): Promise<BestSellers> {
+  const storeId = await getStoreIdForRead();
+  const scope = await getLocationScope();
+  const rangeStart = revenueByMetalPeriodStart(period, new Date());
+
+  const lines = await prisma.invoiceItem.findMany({
+    where: {
+      invoice: {
+        storeId,
+        invoiceDate: { gte: rangeStart },
+        status: { not: InvoiceStatus.CANCELLED },
+        ...locationWhere(scope),
+      },
+    },
+    select: {
+      itemName: true,
+      quantity: true,
+      lineTotal: true,
+      stoneCharge: true,
+      stoneMetalTypeName: true,
+      stoneTypeNames: true,
+      metalType: { select: { name: true, isGemstone: true } },
+      inventoryStock: {
+        select: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              productCode: true,
+              category: { select: { name: true } },
+              categoryType: { select: { name: true } },
+              stoneOriginOption: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const items = new Map<string, BestSellerRow>();
+  const categories = new Map<string, BestSellerRow>();
+  const types = new Map<string, BestSellerRow>();
+  const metals = new Map<string, BestSellerRow>();
+  const stones = new Map<string, BestSellerRow>();
+
+  for (const line of lines) {
+    const quantity = Math.max(1, line.quantity || 1);
+    const revenue = Number(line.lineTotal);
+    const product = line.inventoryStock?.product;
+
+    addTo(items, product ? `${product.name} (${product.productCode})` : line.itemName || "Unnamed item", quantity, revenue);
+
+    if (product?.category) addTo(categories, product.category.name, quantity, revenue);
+    if (product?.category && product.categoryType) {
+      addTo(types, `${product.categoryType.name} · ${product.category.name}`, quantity, revenue);
+    }
+
+    if (line.metalType?.isGemstone) {
+      const stoneType = product?.stoneOriginOption?.name ?? line.stoneTypeNames;
+      addTo(stones, stoneType ? `${line.metalType.name} · ${stoneType}` : line.metalType.name, quantity, revenue);
+    } else {
+      addTo(metals, line.metalType?.name ?? "Unspecified", quantity, revenue);
+      if (line.stoneMetalTypeName) {
+        const label = line.stoneTypeNames
+          ? `${line.stoneMetalTypeName} · ${line.stoneTypeNames}`
+          : line.stoneMetalTypeName;
+        addTo(stones, label, quantity, Number(line.stoneCharge ?? 0));
+      }
+    }
+  }
+
+  return {
+    items: topRows(items),
+    categories: topRows(categories),
+    types: topRows(types),
+    metals: topRows(metals),
+    stones: topRows(stones),
+  };
+}
+
 export type DashboardTransaction = {
   id: string;
   invoiceId: string;

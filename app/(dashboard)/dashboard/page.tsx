@@ -7,6 +7,7 @@ import { CategoryChart } from "@/components/dashboard/category-chart";
 import { TransactionsTable } from "@/components/dashboard/transactions-table";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { DashboardGrid } from "@/components/dashboard/dashboard-grid";
+import { BestSellersCard } from "@/components/dashboard/best-sellers-card";
 import {
   getDashboardStats,
   getSalesTrend,
@@ -14,6 +15,7 @@ import {
   getRevenueByCategory,
   getRecentTransactions,
   getRecentActivity,
+  getBestSellers,
 } from "@/lib/actions/dashboard-actions";
 
 export const metadata: Metadata = {
@@ -24,9 +26,10 @@ export const metadata: Metadata = {
 const DEFAULT_SALES_TREND_PERIOD = "monthly";
 const DEFAULT_REVENUE_PERIOD = "monthly";
 const DEFAULT_TRANSACTIONS_PERIOD = "monthly";
+const DEFAULT_BEST_SELLERS_PERIOD = "monthly";
 
 export default async function DashboardPage() {
-  const [stats, salesTrend, salesBreakdown, revenueByCategory, transactions, activity] =
+  const [stats, salesTrend, salesBreakdown, revenueByCategory, transactions, activity, bestSellers] =
     await Promise.all([
       getDashboardStats(),
       getSalesTrend(DEFAULT_SALES_TREND_PERIOD),
@@ -34,6 +37,7 @@ export default async function DashboardPage() {
       getRevenueByCategory(DEFAULT_REVENUE_PERIOD),
       getRecentTransactions(DEFAULT_TRANSACTIONS_PERIOD),
       getRecentActivity(),
+      getBestSellers(DEFAULT_BEST_SELLERS_PERIOD),
     ]);
 
   const currentDate = new Date();
@@ -74,6 +78,9 @@ export default async function DashboardPage() {
             />
           ),
           activityFeed: <ActivityFeed activity={activity} />,
+          bestSellers: (
+            <BestSellersCard initialData={bestSellers} initialPeriod={DEFAULT_BEST_SELLERS_PERIOD} />
+          ),
         }}
       />
     </main>

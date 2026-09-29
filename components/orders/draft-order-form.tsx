@@ -439,12 +439,44 @@ export function DraftOrderForm({
                   </div>
 
                   <div className="space-y-1.5">
+                    <Label>Kind</Label>
+                    <Select
+                      value={item.kind}
+                      onValueChange={(value) => {
+                        const kind = value as "METAL" | "STONE"
+                        // Same reset-on-switch behavior as product-form.tsx's
+                        // own Kind select: the previous material/purity/stone
+                        // type/rate no longer apply once the item's basic
+                        // kind changes, and a stuck rateTouched would
+                        // silently block the new material's own auto-fill.
+                        updateItem(item.key, {
+                          kind,
+                          metalTypeId: "",
+                          purity: null,
+                          purityLabel: null,
+                          stoneTypeName: null,
+                          estimatedRate: null,
+                          rateTouched: false,
+                        })
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select kind" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="METAL">Metal</SelectItem>
+                        <SelectItem value="STONE">Stone</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
                     <Label>Category</Label>
                     <Select
                       value={item.categoryId ?? "__none__"}
                       onValueChange={(value) => {
                         const categoryId = value === "__none__" ? null : value
-                        // Same reset-on-switch behavior as Kind/Metal below:
+                        // Same reset-on-switch behavior as Kind/Metal:
                         // a Type picked under the previous Category no
                         // longer applies once the Category itself changes.
                         if (categoryId) ensureCategoryTypes(categoryId)
@@ -497,38 +529,6 @@ export function DraftOrderForm({
                       </Select>
                     </div>
                   )}
-
-                  <div className="space-y-1.5">
-                    <Label>Kind</Label>
-                    <Select
-                      value={item.kind}
-                      onValueChange={(value) => {
-                        const kind = value as "METAL" | "STONE"
-                        // Same reset-on-switch behavior as product-form.tsx's
-                        // own Kind select: the previous material/purity/stone
-                        // type/rate no longer apply once the item's basic
-                        // kind changes, and a stuck rateTouched would
-                        // silently block the new material's own auto-fill.
-                        updateItem(item.key, {
-                          kind,
-                          metalTypeId: "",
-                          purity: null,
-                          purityLabel: null,
-                          stoneTypeName: null,
-                          estimatedRate: null,
-                          rateTouched: false,
-                        })
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select kind" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="METAL">Metal</SelectItem>
-                        <SelectItem value="STONE">Stone</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
 
                   <div className="space-y-1.5">
                     <Label>{item.kind === "STONE" ? "Stone" : "Metal"}</Label>

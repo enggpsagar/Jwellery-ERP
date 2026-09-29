@@ -6,7 +6,7 @@ import {
 } from "@/lib/actions/inventory/product-actions";
 import { hasPermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
-import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
+import { getCategoryFilterOptions, getStoreMetals } from "@/lib/actions/taxonomy-actions";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 
 import { ProductsClient } from "@/components/inventory/products/products-client";
@@ -26,6 +26,8 @@ type InventoryProductsPageProps = {
     status?: string
     dateFrom?: string
     dateTo?: string
+    category?: string
+    categoryType?: string
   }>
 }
 
@@ -45,10 +47,11 @@ export default async function InventoryProductsPage({
   // Resolved here rather than in the client component: session permissions
   // are on the JWT, and a client-side check would be advisory only. The
   // create/edit routes enforce the same permissions themselves.
-  const [canCreate, canEdit, metals] = await Promise.all([
+  const [canCreate, canEdit, metals, categoryFilter] = await Promise.all([
     hasPermission(PERMISSIONS.PRODUCT_CREATE),
     hasPermission(PERMISSIONS.PRODUCT_UPDATE),
     getStoreMetals(),
+    getCategoryFilterOptions(),
   ]);
 
   const validMetalTypeIds = new Set([...metals.map((m) => m.id), UNASSIGNED_METAL_TYPE]);
@@ -62,6 +65,16 @@ export default async function InventoryProductsPage({
   const status = params.status === "INACTIVE" ? "INACTIVE" : "ACTIVE";
   const dateFrom = params.dateFrom || undefined;
   const dateTo = params.dateTo || undefined;
+  // Same validation as the Stock page — own active ids only, and a Type
+  // only when it belongs to the selected Category.
+  const categoryId = categoryFilter.categories.some((c) => c.value === params.category)
+    ? params.category
+    : undefined;
+  const categoryTypeId =
+    categoryId &&
+    categoryFilter.categoryTypes.some((t) => t.value === params.categoryType && t.categoryId === categoryId)
+      ? params.categoryType
+      : undefined;
 
   const { products, pagination } = await getProducts({
     page,
@@ -73,6 +86,8 @@ export default async function InventoryProductsPage({
     status,
     dateFrom,
     dateTo,
+    categoryId,
+    categoryTypeId,
   });
 
   return (
@@ -82,6 +97,7 @@ export default async function InventoryProductsPage({
       canCreate={canCreate}
       canEdit={canEdit}
       metals={metals}
+      categoryFilter={categoryFilter}
     />
   );
 }

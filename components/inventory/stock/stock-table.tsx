@@ -196,6 +196,15 @@ export function StockTable({
                         },
                       ]}
                     />
+                    {/* The linked Product's Category · Type, matching the
+                        toolbar's Category → Type filter. */}
+                    {(item.product?.category || item.product?.categoryType) && (
+                      <div className="text-xs font-normal text-muted-foreground">
+                        {[item.product?.category?.name, item.product?.categoryType?.name]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    )}
                   </td>
 
                   <td className="hidden px-4 py-3 text-right tabular-nums sm:table-cell">

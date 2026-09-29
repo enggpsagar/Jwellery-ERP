@@ -367,6 +367,9 @@ export type GetProductsParams = {
   status?: string;
   dateFrom?: string;
   dateTo?: string;
+  /** StoreCategory / StoreCategoryType ids (Settings > Taxonomy). */
+  categoryId?: string;
+  categoryTypeId?: string;
 };
 
 type ExportProductsParams = {
@@ -378,6 +381,8 @@ type ExportProductsParams = {
   status?: string;
   dateFrom?: string;
   dateTo?: string;
+  category?: string;
+  categoryType?: string;
   format?: "csv" | "xlsx" | "pdf";
 };
 
@@ -388,6 +393,8 @@ function getProductWhere(
   status?: string,
   dateFrom?: string,
   dateTo?: string,
+  categoryId?: string,
+  categoryTypeId?: string,
 ) {
   const query = String(search || "").trim();
   const from = parseDateRangeBoundary(dateFrom, false);
@@ -395,6 +402,8 @@ function getProductWhere(
 
   return {
     storeId,
+    ...(categoryId ? { categoryId } : {}),
+    ...(categoryTypeId ? { categoryTypeId } : {}),
     ...(metalTypeId === UNASSIGNED_METAL_TYPE
       ? { metalTypeId: null }
       : metalTypeId
@@ -516,7 +525,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   const sortOrder: ProductSortOrder = params.sortOrder || "desc";
 
   const storeId = await requireStoreScope();
-  const where = getProductWhere(storeId, search, params.metalTypeId, params.status, params.dateFrom, params.dateTo);
+  const where = getProductWhere(storeId, search, params.metalTypeId, params.status, params.dateFrom, params.dateTo, params.categoryId, params.categoryTypeId);
   const orderBy = getProductOrderBy(sortBy, sortOrder);
 
   const [totalCount, rows] = await Promise.all([
@@ -589,7 +598,7 @@ async function getAllProductsForExport(params: ExportProductsParams = {}) {
         id: { in: params.selectedIds },
         storeId,
       }
-    : getProductWhere(storeId, params.search, params.type, params.status, params.dateFrom, params.dateTo);
+    : getProductWhere(storeId, params.search, params.type, params.status, params.dateFrom, params.dateTo, params.category, params.categoryType);
 
   const rows = await prisma.product.findMany({
     where,

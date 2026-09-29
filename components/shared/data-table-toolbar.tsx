@@ -34,6 +34,8 @@ export type DataTableExportParams = {
   type?: string
   dateFrom?: string
   dateTo?: string
+  category?: string
+  categoryType?: string
   format?: DataTableExportFormat
 }
 
@@ -65,6 +67,14 @@ type DataTableToolbarProps = {
    * different concept from this metal-family classification. */
   typeOptions?: Option[]
   typeLabel?: string
+  /** Category filter (URL param "category") — the store's own StoreCategory
+   * rows (Settings > Taxonomy). */
+  categoryOptions?: Option[]
+  /** Category Type filter (URL param "categoryType"), each tagged with its
+   * parent category — only the selected Category's own Types are offered,
+   * and the select stays disabled until a Category is picked (the same
+   * Category→Type cascade as the Product form). */
+  categoryTypeOptions?: (Option & { categoryId: string })[]
   /** Hides the "Sort by …" and Ascending/Descending dropdowns — for a table
    * (Products, Stock) that sorts only via its own per-column
    * SortableTableHead clicks and doesn't want a second, redundant sort
@@ -111,6 +121,8 @@ export function DataTableToolbar({
   statusAllLabel = "All Statuses",
   typeOptions,
   typeLabel = "Type",
+  categoryOptions,
+  categoryTypeOptions,
   hideSort = false,
   dateField,
   hidePageSize = false,
@@ -129,6 +141,12 @@ export function DataTableToolbar({
   const currentSortOrder = (searchParams.get("sortOrder") ?? defaultSortOrder) as "asc" | "desc"
   const currentStatus = searchParams.get("status") ?? "ALL"
   const currentType = searchParams.get("type") ?? "ALL"
+  const currentCategory = searchParams.get("category") ?? "ALL"
+  const currentCategoryType = searchParams.get("categoryType") ?? "ALL"
+  const typesForCategory = React.useMemo(
+    () => (categoryTypeOptions ?? []).filter((option) => option.categoryId === currentCategory),
+    [categoryTypeOptions, currentCategory],
+  )
   const currentDateFrom = searchParams.get("dateFrom") ?? ""
   const currentDateTo = searchParams.get("dateTo") ?? ""
   const currentPageSize = searchParams.get("pageSize") ?? "10"
@@ -169,6 +187,22 @@ export function DataTableToolbar({
         params.delete(key)
       }
 
+      params.set("page", "1")
+      router.replace(`${pathname}?${params.toString()}`)
+    })
+  }
+
+  // A Type picked under the previous Category no longer applies once the
+  // Category changes, so both params move in one navigation.
+  const updateCategory = (value: string) => {
+    startTransition(() => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (value && value !== "ALL") {
+        params.set("category", value)
+      } else {
+        params.delete("category")
+      }
+      params.delete("categoryType")
       params.set("page", "1")
       router.replace(`${pathname}?${params.toString()}`)
     })
@@ -223,6 +257,8 @@ export function DataTableToolbar({
               sortOrder: currentSortOrder,
               status: currentStatus !== "ALL" ? currentStatus : undefined,
               type: currentType !== "ALL" ? currentType : undefined,
+              category: currentCategory !== "ALL" ? currentCategory : undefined,
+              categoryType: currentCategoryType !== "ALL" ? currentCategoryType : undefined,
               dateFrom: currentDateFrom || undefined,
               dateTo: currentDateTo || undefined,
               format,
@@ -291,6 +327,46 @@ export function DataTableToolbar({
             <SelectContent>
               <SelectItem value="ALL">All {typeLabel}s</SelectItem>
               {typeOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+
+        {categoryOptions ? (
+          <Select value={currentCategory} onValueChange={updateCategory} disabled={isPending}>
+            <SelectTrigger className="h-9 w-[150px]" aria-label="Category">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Categories</SelectItem>
+              {categoryOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+
+        {categoryTypeOptions ? (
+          <Select
+            value={currentCategoryType}
+            onValueChange={(value) => updateParam("categoryType", value)}
+            disabled={isPending || currentCategory === "ALL" || typesForCategory.length === 0}
+          >
+            <SelectTrigger
+              className="h-9 w-[150px]"
+              aria-label="Category Type"
+              title={currentCategory === "ALL" ? "Pick a Category first" : undefined}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Types</SelectItem>
+              {typesForCategory.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>

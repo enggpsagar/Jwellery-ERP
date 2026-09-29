@@ -200,7 +200,17 @@ export function ProductsTable({
                     )}
                   </td>
 
-                  <td className="px-4 py-3 text-foreground">{product.name}</td>
+                  <td className="px-4 py-3 text-foreground">
+                    {product.name}
+                    {/* Category · Type, matching the toolbar's Category → Type filter. */}
+                    {(product.category !== "-" || product.ornamentType) && (
+                      <div className="text-xs text-muted-foreground">
+                        {[product.category !== "-" ? product.category : null, product.ornamentType]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    )}
+                  </td>
 
                   <td className="px-4 py-3 text-foreground">
                     {product.defaultNetWeight != null ? (

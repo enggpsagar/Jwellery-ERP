@@ -14,7 +14,7 @@ import { WebcamQrScanner } from "@/components/shared/webcam-qr-scanner"
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
 import { StockImportDialog } from "@/components/inventory/stock/stock-import-dialog"
 import { bulkDeleteInventoryStock } from "@/lib/actions/inventory/stock-actions"
-import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import type { CategoryFilterOptions, StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 
 type Pagination = {
   page: number
@@ -29,13 +29,15 @@ type StockClientProps = {
   stockItems: React.ComponentProps<typeof StockTable>["stockItems"]
   pagination: Pagination
   metals: StoreMetalRow[]
+  /** Category → Type filter options (getCategoryFilterOptions). */
+  categoryFilter?: CategoryFilterOptions
   /** False for a single-location (or zero-location) store — there's
    * nothing to distinguish, so the Location field/column has no reason to
    * show anywhere in this table or its detail panel. */
   showLocation: boolean
 }
 
-export function StockClient({ stockItems, pagination, metals, showLocation }: StockClientProps) {
+export function StockClient({ stockItems, pagination, metals, categoryFilter, showLocation }: StockClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   // Which row's full detail shows in the right-hand panel — defaults to
   // the first row on this page/search result so the panel is never empty
@@ -118,6 +120,7 @@ export function StockClient({ stockItems, pagination, metals, showLocation }: St
           <StockToolbar
             selectedIds={selectedIds}
             metals={metals}
+            categoryFilter={categoryFilter}
             bulkActions={
               <BulkDeleteButton
                 selectedIds={selectedIds}

@@ -795,6 +795,39 @@ export async function getStoreCategories(): Promise<StoreCategoryRow[]> {
   }));
 }
 
+export type CategoryFilterOptions = {
+  categories: { value: string; label: string }[];
+  categoryTypes: { value: string; label: string; categoryId: string }[];
+};
+
+/**
+ * Every active Category and Category Type in one call, for the Products/
+ * Stock toolbars' Category → Type filter (DataTableToolbar's
+ * categoryOptions/categoryTypeOptions). Types are loaded up front, not per
+ * pick like getStoreCategoryTypes, since the toolbar filters them locally.
+ */
+export async function getCategoryFilterOptions(): Promise<CategoryFilterOptions> {
+  const storeId = await requireStoreScope();
+
+  const [categories, types] = await Promise.all([
+    prisma.storeCategory.findMany({
+      where: { storeId, isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.storeCategoryType.findMany({
+      where: { storeId, isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, categoryId: true },
+    }),
+  ]);
+
+  return {
+    categories: categories.map((category) => ({ value: category.id, label: category.name })),
+    categoryTypes: types.map((type) => ({ value: type.id, label: type.name, categoryId: type.categoryId })),
+  };
+}
+
 /**
  * Which Categories are usable for a given Metal — every category with no
  * tags at all (universal) plus any tagged specifically to this metal. Used

@@ -15,7 +15,7 @@ import {
   exportProductsToExcel,
   bulkDeleteProducts,
 } from "@/lib/actions/inventory/product-actions"
-import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import type { CategoryFilterOptions, StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 
 type ProductRow = React.ComponentProps<typeof ProductsTable>["products"][number]
@@ -40,6 +40,8 @@ type ProductsClientProps = {
    * Type filter's options come directly from this list, so a metal added
    * there shows up here with no code change. */
   metals?: StoreMetalRow[]
+  /** Category → Type filter options (getCategoryFilterOptions). */
+  categoryFilter?: CategoryFilterOptions
 }
 
 export function ProductsClient({
@@ -48,6 +50,7 @@ export function ProductsClient({
   canCreate = false,
   canEdit = false,
   metals = [],
+  categoryFilter,
 }: ProductsClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   // Forces ProductDetailPanel to re-fetch even when the selected product id
@@ -135,6 +138,8 @@ export function ProductsClient({
                 .map((metal) => ({ value: metal.id, label: metal.name })),
               { value: UNASSIGNED_METAL_TYPE, label: "Unassigned" },
             ]}
+            categoryOptions={categoryFilter?.categories}
+            categoryTypeOptions={categoryFilter?.categoryTypes}
             bulkActions={
               <>
                 <BulkArchiveProductsButton

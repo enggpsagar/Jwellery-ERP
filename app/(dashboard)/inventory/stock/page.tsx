@@ -4,7 +4,7 @@ import {
   getInventoryStock,
   type StockSortBy,
 } from "@/lib/actions/inventory/stock-actions";
-import { getStoreMetals } from "@/lib/actions/taxonomy-actions";
+import { getCategoryFilterOptions, getStoreMetals } from "@/lib/actions/taxonomy-actions";
 import { getStoreLocations } from "@/lib/actions/store-location-actions";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 
@@ -26,6 +26,8 @@ type InventoryStockPageProps = {
     status?: string
     dateFrom?: string
     dateTo?: string
+    category?: string
+    categoryType?: string
   }>
 }
 
@@ -42,11 +44,25 @@ export default async function InventoryStockPage({
   const sortBy = params.sortBy || "createdAt"
   const sortOrder = params.sortOrder || "desc"
 
-  const [metals, locations] = await Promise.all([getStoreMetals(), getStoreLocations()])
+  const [metals, locations, categoryFilter] = await Promise.all([
+    getStoreMetals(),
+    getStoreLocations(),
+    getCategoryFilterOptions(),
+  ])
   const validMetalTypeIds = new Set([...metals.map((m) => m.id), UNASSIGNED_METAL_TYPE])
   const metalTypeId = params.type && validMetalTypeIds.has(params.type) ? params.type : undefined
   const dateFrom = params.dateFrom || undefined
   const dateTo = params.dateTo || undefined
+  // Only this store's own active Category/Type ids reach the query — and a
+  // Type only counts when it belongs to the selected Category.
+  const categoryId = categoryFilter.categories.some((c) => c.value === params.category)
+    ? params.category
+    : undefined
+  const categoryTypeId =
+    categoryId &&
+    categoryFilter.categoryTypes.some((t) => t.value === params.categoryType && t.categoryId === categoryId)
+      ? params.categoryType
+      : undefined
 
   const { stockItems, pagination } = await getInventoryStock({
     page,
@@ -58,6 +74,8 @@ export default async function InventoryStockPage({
     status: params.status,
     dateFrom,
     dateTo,
+    categoryId,
+    categoryTypeId,
   })
 
   return (
@@ -65,6 +83,7 @@ export default async function InventoryStockPage({
       stockItems={stockItems}
       pagination={pagination}
       metals={metals}
+      categoryFilter={categoryFilter}
       showLocation={locations.length > 1}
     />
   );

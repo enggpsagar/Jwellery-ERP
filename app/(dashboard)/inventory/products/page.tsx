@@ -67,7 +67,13 @@ export default async function InventoryProductsPage({
   const dateTo = params.dateTo || undefined;
   // Same validation as the Stock page — own active ids only, and a Type
   // only when it belongs to the selected Category.
-  const categoryId = categoryFilter.categories.some((c) => c.value === params.category)
+  // ...and, like the toolbar, only a Category offered for the chosen Metal
+  // (untagged = every metal).
+  const categoryId = categoryFilter.categories.some(
+    (c) =>
+      c.value === params.category &&
+      (!metalTypeId || c.metalTagIds.length === 0 || c.metalTagIds.includes(metalTypeId)),
+  )
     ? params.category
     : undefined;
   const categoryTypeId =

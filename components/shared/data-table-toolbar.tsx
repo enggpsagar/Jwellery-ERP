@@ -68,8 +68,11 @@ type DataTableToolbarProps = {
   typeOptions?: Option[]
   typeLabel?: string
   /** Category filter (URL param "category") — the store's own StoreCategory
-   * rows (Settings > Taxonomy). */
-  categoryOptions?: Option[]
+   * rows (Settings > Taxonomy). With metalTagIds, the list follows the
+   * "type" (Metal) filter the same way Add Product's Category picker
+   * follows its Metal: untagged categories apply to every metal, tagged
+   * ones only to their own metals. */
+  categoryOptions?: (Option & { metalTagIds?: string[] })[]
   /** Category Type filter (URL param "categoryType"), each tagged with its
    * parent category — only the selected Category's own Types are offered,
    * and the select stays disabled until a Category is picked (the same
@@ -143,6 +146,15 @@ export function DataTableToolbar({
   const currentType = searchParams.get("type") ?? "ALL"
   const currentCategory = searchParams.get("category") ?? "ALL"
   const currentCategoryType = searchParams.get("categoryType") ?? "ALL"
+  const isCategoryForMetal = React.useCallback(
+    (option: Option & { metalTagIds?: string[] }, metal: string) =>
+      metal === "ALL" || !option.metalTagIds?.length || option.metalTagIds.includes(metal),
+    [],
+  )
+  const categoriesForMetal = React.useMemo(
+    () => (categoryOptions ?? []).filter((option) => isCategoryForMetal(option, currentType)),
+    [categoryOptions, currentType, isCategoryForMetal],
+  )
   const typesForCategory = React.useMemo(
     () => (categoryTypeOptions ?? []).filter((option) => option.categoryId === currentCategory),
     [categoryTypeOptions, currentCategory],
@@ -187,6 +199,26 @@ export function DataTableToolbar({
         params.delete(key)
       }
 
+      params.set("page", "1")
+      router.replace(`${pathname}?${params.toString()}`)
+    })
+  }
+
+  // Changing the Metal drops a selected Category (and its Type) that isn't
+  // offered for the new Metal, in the same navigation.
+  const updateMetal = (value: string) => {
+    startTransition(() => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (value && value !== "ALL") {
+        params.set("type", value)
+      } else {
+        params.delete("type")
+      }
+      const selectedCategory = (categoryOptions ?? []).find((option) => option.value === currentCategory)
+      if (selectedCategory && !isCategoryForMetal(selectedCategory, value || "ALL")) {
+        params.delete("category")
+        params.delete("categoryType")
+      }
       params.set("page", "1")
       router.replace(`${pathname}?${params.toString()}`)
     })
@@ -320,7 +352,7 @@ export function DataTableToolbar({
         ) : null}
 
         {typeOptions ? (
-          <Select value={currentType} onValueChange={(value) => updateParam("type", value)} disabled={isPending}>
+          <Select value={currentType} onValueChange={updateMetal} disabled={isPending}>
             <SelectTrigger className="h-9 w-[150px]">
               <SelectValue />
             </SelectTrigger>
@@ -342,7 +374,7 @@ export function DataTableToolbar({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All Categories</SelectItem>
-              {categoryOptions.map((option) => (
+              {categoriesForMetal.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>

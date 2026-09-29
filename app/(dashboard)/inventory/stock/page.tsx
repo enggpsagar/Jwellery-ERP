@@ -55,7 +55,13 @@ export default async function InventoryStockPage({
   const dateTo = params.dateTo || undefined
   // Only this store's own active Category/Type ids reach the query — and a
   // Type only counts when it belongs to the selected Category.
-  const categoryId = categoryFilter.categories.some((c) => c.value === params.category)
+  // ...and, like the toolbar, only a Category offered for the chosen Metal
+  // (untagged = every metal).
+  const categoryId = categoryFilter.categories.some(
+    (c) =>
+      c.value === params.category &&
+      (!metalTypeId || c.metalTagIds.length === 0 || c.metalTagIds.includes(metalTypeId)),
+  )
     ? params.category
     : undefined
   const categoryTypeId =

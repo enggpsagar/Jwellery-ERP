@@ -796,7 +796,9 @@ export async function getStoreCategories(): Promise<StoreCategoryRow[]> {
 }
 
 export type CategoryFilterOptions = {
-  categories: { value: string; label: string }[];
+  /** metalTagIds: the metals this category is tagged to (Settings >
+   *  Taxonomy); empty = universal, same rule as getStoreCategoriesForMetal. */
+  categories: { value: string; label: string; metalTagIds: string[] }[];
   categoryTypes: { value: string; label: string; categoryId: string }[];
 };
 
@@ -813,7 +815,7 @@ export async function getCategoryFilterOptions(): Promise<CategoryFilterOptions>
     prisma.storeCategory.findMany({
       where: { storeId, isActive: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, metalTags: { select: { storeMetalId: true } } },
     }),
     prisma.storeCategoryType.findMany({
       where: { storeId, isActive: true },
@@ -823,7 +825,11 @@ export async function getCategoryFilterOptions(): Promise<CategoryFilterOptions>
   ]);
 
   return {
-    categories: categories.map((category) => ({ value: category.id, label: category.name })),
+    categories: categories.map((category) => ({
+      value: category.id,
+      label: category.name,
+      metalTagIds: category.metalTags.map((tag) => tag.storeMetalId),
+    })),
     categoryTypes: types.map((type) => ({ value: type.id, label: type.name, categoryId: type.categoryId })),
   };
 }

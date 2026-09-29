@@ -1619,6 +1619,14 @@ export function InvoiceForm({
                       Select a stock item, or choose &quot;Create New Line Item&quot;
                     </p>
                   )}
+                  {/* createInvoice/updateInvoice mint a real Product + Stock
+                      row for this line on save, then sell it from there —
+                      see createStockForManualSaleLine. */}
+                  {item.stockLinkDecided && !item.inventoryStockId && (
+                    <p className="text-[10px] leading-tight text-muted-foreground">
+                      A new product and stock entry will be added on save
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">

@@ -38,6 +38,10 @@ import { amountInWords } from "@/lib/number-to-words";
 import { resolveStoreName } from "@/lib/invite-email";
 import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import { OversellError } from "@/lib/inventory/oversell-error";
+import {
+  createStockForManualSaleLine,
+  withManualStockCodeRetry,
+} from "@/lib/inventory/manual-line-stock";
 import { formatShortDate } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import { parseDateRangeBoundary } from "@/lib/date-range";
@@ -220,8 +224,8 @@ function lineTotal(item: InvoiceLineItemInput) {
  * is no placeholder-product substitution step to worry about racing against,
  * so `explicitStockIds` can be captured straight off `items` with no
  * ordering trap. A stock id that doesn't resolve (wrong store, deleted,
- * tampered) is left unmatched here — `validStockIds` downstream then drops
- * it to a manual line rather than this function guessing at a fallback.
+ * tampered) is left unmatched here — createInvoice/updateInvoice then
+ * reject the save rather than this function guessing at a fallback.
  * Mirrors invoice-form.tsx's own applyStockToItem field-for-field.
  */
 async function lockLinkedStockFields(
@@ -993,9 +997,9 @@ export async function createInvoice(
       String(formData.get("storeId") || "") || null,
     );
 
-    // Captured directly off the parsed items — no placeholder-substitution
-    // step exists for Invoice (see lockLinkedStockFields' own doc comment),
-    // so this can be done in one line with no ordering trap.
+    // Captured directly off the parsed items, before any manual line gets
+    // its own stock minted (that happens inside the transaction below, and
+    // those lines carry the typed values, so there's nothing to lock).
     const explicitStockIds = new Set(
       items.filter((item) => item.inventoryStockId).map((item) => item.inventoryStockId as string),
     );
@@ -1198,10 +1202,31 @@ export async function createInvoice(
     const validStock = requestedStockIds.length
       ? await prisma.inventoryStock.findMany({
           where: { id: { in: requestedStockIds }, storeId },
-          select: { id: true, stockCode: true, quantity: true },
+          select: { id: true, stockCode: true, quantity: true, status: true },
         })
       : [];
     const validStockIds = new Set(validStock.map((s) => s.id));
+
+    // A linked stock id that doesn't resolve used to quietly turn its line
+    // into an unlinked manual line — i.e. a sale with no stock behind it.
+    // Every sold line must now be backed by real stock, so it's an error.
+    if (requestedStockIds.some((stockId) => !validStockIds.has(stockId))) {
+      return {
+        success: false,
+        message: "A linked stock item could not be found — refresh and pick it again.",
+      };
+    }
+
+    // Only pieces actually on hand can be sold — not ones reserved, out with
+    // an artisan, damaged, or archived (same rule the scan-to-sell flow
+    // applies in quick-sale-actions.ts).
+    const unavailableStock = validStock.find((stock) => stock.status !== InventoryStockStatus.IN_STOCK);
+    if (unavailableStock) {
+      return {
+        success: false,
+        message: `Stock ${unavailableStock.stockCode} is not available to sell (${String(unavailableStock.status).replace(/_/g, " ").toLowerCase()}).`,
+      };
+    }
 
     // A stock row can hold many pieces (qty 100 of a stud, say). Selling
     // some of them must not be allowed to exceed what is on hand, and two
@@ -1239,7 +1264,30 @@ export async function createInvoice(
     // inventory transaction) inside this one callback, which reliably blows
     // past 5s and throws P2028 ("Transaction not found") on a real (non-local)
     // DB connection. Same fix as createPurchase's identical transaction.
-    const invoice = await prisma.$transaction(async (tx) => {
+    //
+    // Retried whole on a product/stock code collision — see
+    // withManualStockCodeRetry.
+    const invoice = await withManualStockCodeRetry(() => prisma.$transaction(async (tx) => {
+      // Product → Add Stock for every "Create New Line Item" line, so it is
+      // sold below through the same guarded decrement as a picked stock
+      // line — see createStockForManualSaleLine. Built fresh per attempt
+      // (never mutating `items`) so a retried transaction mints new rows.
+      const soldItems: InvoiceLineItemInput[] = [];
+      for (const item of items) {
+        if (item.inventoryStockId) {
+          soldItems.push(item);
+          continue;
+        }
+        const newStockId = await createStockForManualSaleLine(tx, {
+          storeId,
+          line: item,
+          actor,
+          locationId: resolvedLocationId,
+          referenceType: "Invoice",
+        });
+        soldItems.push({ ...item, inventoryStockId: newStockId });
+      }
+
       const created = await tx.invoice.create({
         data: {
           storeId,
@@ -1270,7 +1318,7 @@ export async function createInvoice(
           createdByName: actor.name ?? actor.email ?? null,
           replacesId: replacesId ?? undefined,
           items: {
-            create: items.map((item) => ({
+            create: soldItems.map((item) => ({
               itemName: item.itemName,
               metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
@@ -1308,17 +1356,14 @@ export async function createInvoice(
                 : undefined,
               hsnCode: item.hsnCode ?? undefined,
               lineTotal: lineTotal(item),
-              inventoryStockId:
-                item.inventoryStockId && validStockIds.has(item.inventoryStockId)
-                  ? item.inventoryStockId
-                  : undefined,
+              inventoryStockId: item.inventoryStockId ?? undefined,
             })),
           },
         },
       });
 
-      for (const item of items) {
-        if (!item.inventoryStockId || !validStockIds.has(item.inventoryStockId)) continue;
+      for (const item of soldItems) {
+        if (!item.inventoryStockId) continue;
 
         // Decrement rather than flipping the whole row to SOLD: a row of
         // 100 pieces that sells 2 still has 98 on hand. Marking it SOLD
@@ -1342,7 +1387,12 @@ export async function createInvoice(
         // quantity row's still-unsold remainder. The invoice's own line
         // items are the authoritative record of what actually sold for.
         const { count } = await tx.inventoryStock.updateMany({
-          where: { id: item.inventoryStockId, storeId, quantity: { gte: soldQty } },
+          where: {
+            id: item.inventoryStockId,
+            storeId,
+            status: InventoryStockStatus.IN_STOCK,
+            quantity: { gte: soldQty },
+          },
           data: {
             quantity: { decrement: soldQty },
           },
@@ -1455,7 +1505,7 @@ export async function createInvoice(
       }
 
       return created;
-    }, { timeout: 15000 });
+    }, { timeout: 15000 }));
 
     revalidatePath("/billing");
 
@@ -1675,8 +1725,9 @@ export async function updateInvoice(
   formData: FormData,
 ): Promise<InvoiceFormState> {
   try {
+    let actor;
     try {
-      await requirePermission(PERMISSIONS.BILLING_UPDATE);
+      actor = await requirePermission(PERMISSIONS.BILLING_UPDATE);
     } catch {
       return { success: false, message: "You do not have permission to edit invoices." };
     }
@@ -1880,10 +1931,34 @@ export async function updateInvoice(
     const validStock = requestedStockIds.length
       ? await prisma.inventoryStock.findMany({
           where: { id: { in: requestedStockIds }, storeId },
-          select: { id: true, stockCode: true, quantity: true },
+          select: { id: true, stockCode: true, quantity: true, status: true },
         })
       : [];
     const validStockIds = new Set(validStock.map((s) => s.id));
+
+    // Same "every sold line is backed by real stock" rule as createInvoice.
+    if (requestedStockIds.some((stockId) => !validStockIds.has(stockId))) {
+      return {
+        success: false,
+        message: "A linked stock item could not be found — refresh and pick it again.",
+      };
+    }
+
+    // A row this invoice itself sold out reads SOLD right now but gets
+    // restored to IN_STOCK first inside the transaction below, so only rows
+    // new to this invoice are held to the on-hand rule here.
+    const heldByThisInvoice = new Set(
+      invoice.items.map((item) => item.inventoryStockId).filter((sid): sid is string => !!sid),
+    );
+    const unavailableStock = validStock.find(
+      (stock) => !heldByThisInvoice.has(stock.id) && stock.status !== InventoryStockStatus.IN_STOCK,
+    );
+    if (unavailableStock) {
+      return {
+        success: false,
+        message: `Stock ${unavailableStock.stockCode} is not available to sell (${String(unavailableStock.status).replace(/_/g, " ").toLowerCase()}).`,
+      };
+    }
 
     // Resolved once, up front, for every DISTINCT rate any line actually
     // uses — see resolvePerLineGstRateSnapshots' own doc comment. Must
@@ -1894,7 +1969,25 @@ export async function updateInvoice(
     // Same P2028 risk as createInvoice's transaction — two per-item loops
     // (restore old lines' stock, then apply the new lines') easily exceed
     // the default 5s interactive-transaction timeout on a multi-line edit.
-    await prisma.$transaction(async (tx) => {
+    await withManualStockCodeRetry(() => prisma.$transaction(async (tx) => {
+      // 0. Product → Add Stock for any newly added "Create New Line Item"
+      // line — same as createInvoice (see createStockForManualSaleLine).
+      const soldItems: InvoiceLineItemInput[] = [];
+      for (const item of items) {
+        if (item.inventoryStockId) {
+          soldItems.push(item);
+          continue;
+        }
+        const newStockId = await createStockForManualSaleLine(tx, {
+          storeId,
+          line: item,
+          actor,
+          locationId: resolvedLocationId,
+          referenceType: "Invoice",
+        });
+        soldItems.push({ ...item, inventoryStockId: newStockId });
+      }
+
       // 1. Restore every old line's stock first — same as cancelInvoice.
       for (const item of invoice.items) {
         if (!item.inventoryStockId) continue;
@@ -1958,7 +2051,7 @@ export async function updateInvoice(
           deliveryStateCode,
           items: {
             deleteMany: {},
-            create: items.map((item) => ({
+            create: soldItems.map((item) => ({
               itemName: item.itemName,
               metalTypeId: item.metalTypeId ?? undefined,
               purity: item.purity ?? undefined,
@@ -1996,10 +2089,7 @@ export async function updateInvoice(
                 : null,
               hsnCode: item.hsnCode ?? undefined,
               lineTotal: lineTotal(item),
-              inventoryStockId:
-                item.inventoryStockId && validStockIds.has(item.inventoryStockId)
-                  ? item.inventoryStockId
-                  : undefined,
+              inventoryStockId: item.inventoryStockId ?? undefined,
             })),
           },
         },
@@ -2007,8 +2097,8 @@ export async function updateInvoice(
 
       // 3. Apply the new lines' stock — thrown OversellError here rolls
       // back the restoration above too, leaving the invoice untouched.
-      for (const item of items) {
-        if (!item.inventoryStockId || !validStockIds.has(item.inventoryStockId)) continue;
+      for (const item of soldItems) {
+        if (!item.inventoryStockId) continue;
 
         const soldQty = Math.max(1, item.quantity || 1);
 
@@ -2019,7 +2109,12 @@ export async function updateInvoice(
         // quantity row's still-unsold remainder. The invoice's own line
         // items are the authoritative record of what actually sold for.
         const { count } = await tx.inventoryStock.updateMany({
-          where: { id: item.inventoryStockId, storeId, quantity: { gte: soldQty } },
+          where: {
+            id: item.inventoryStockId,
+            storeId,
+            status: InventoryStockStatus.IN_STOCK,
+            quantity: { gte: soldQty },
+          },
           data: {
             quantity: { decrement: soldQty },
           },
@@ -2072,7 +2167,7 @@ export async function updateInvoice(
           },
         });
       }
-    }, { timeout: 15000 });
+    }, { timeout: 15000 }));
 
     revalidatePath("/billing");
     revalidatePath(`/billing/${id}`);

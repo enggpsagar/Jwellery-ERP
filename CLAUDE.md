@@ -207,6 +207,29 @@ prefill a Stock/Invoice/Purchase line's own `gstRateId` the way `hsnCode`
 already gets copied onto a Stock entry — that prefill wiring is a real,
 separate follow-up if wanted, not done in this pass.
 
+### Added 2026-09-29: every Invoice line is sold from real stock (Product → Add Stock → Sell)
+
+An Invoice line entered via "Create New Line Item" used to be saved with no
+`inventoryStockId` — no Product, no stock, no availability check, nothing
+deducted. Now `createInvoice`/`updateInvoice` call
+`createStockForManualSaleLine` (`lib/inventory/manual-line-stock.ts`)
+inside the invoice's own transaction for each such line: it mints a real
+Product (same SKU prefix/sequence as Purchase's `createProductFromManualEntry`),
+an `IN_STOCK` `InventoryStock` row holding the line's quantity, and an
+`ADJUSTMENT` stock-in transaction, then the line is sold through the normal
+guarded decrement (→ qty 0, `SOLD`). Cancel/delete restores it like any
+other sold stock. The whole transaction is retried on a product/stock code
+collision (`withManualStockCodeRetry`) since a failed insert aborts a
+Postgres transaction. No metal `LedgerEntry` is written for the stock-in
+(it would inflate the metal balance with no matching sale-side credit).
+
+Same pass tightened sell-side validation: a linked stock id that doesn't
+resolve is now an error (it used to silently become an unlinked manual
+line), and only `IN_STOCK` rows can be sold — both in the pre-check and in
+the decrement's `where` (updateInvoice exempts rows this invoice itself
+already holds, since it restores them first). **Not changed**: Kacha
+slips and Quotation conversion still allow unlinked manual lines.
+
 ### Known dead/pre-existing issues (not regressions — don't "fix" without reason)
 
 - `auth.config.ts` (repo root) and `app/api/auth/route.ts` are orphaned NextAuth v5-style leftovers, not wired to anything (`app/api/auth/[...nextauth]/route.ts` is the real handler). Both have their own pre-existing type errors.

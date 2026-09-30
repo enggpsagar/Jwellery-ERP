@@ -615,7 +615,19 @@ async function getAllProductsForExport(params: ExportProductsParams = {}) {
         id: { in: params.selectedIds },
         storeId,
       }
-    : getProductWhere(storeId, params.search, params.type, params.status, params.dateFrom, params.dateTo, params.category, params.categoryType, params.stoneType);
+    : getProductWhere(
+        storeId,
+        params.search,
+        params.type,
+        // Same Active-only default as the Products page itself, so the
+        // export matches what's on screen (no status = Active, not every status).
+        params.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+        params.dateFrom,
+        params.dateTo,
+        params.category,
+        params.categoryType,
+        params.stoneType,
+      );
 
   const rows = await prisma.product.findMany({
     where,
@@ -1038,7 +1050,10 @@ export async function createProduct(
             storeId,
             productCode,
             name,
-            categoryId,
+            // Blank is legitimate for a stone product (see
+            // validateTaxonomySelection) and must be stored as null — an
+            // empty string fails Product_categoryId_fkey.
+            categoryId: categoryId || null,
             categoryTypeId,
             metalTypeId,
             targetStyleId,
@@ -1395,7 +1410,8 @@ export async function updateProduct(
       where: { id, storeId },
       data: {
         name,
-        categoryId,
+        // Blank → null, see createProduct.
+        categoryId: categoryId || null,
         categoryTypeId,
         metalTypeId,
         targetStyleId,

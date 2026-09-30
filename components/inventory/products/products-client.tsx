@@ -125,14 +125,12 @@ export function ProductsClient({
             selectedIds={selectedIds}
             entityLabel="products"
             exportAction={exportProductsToExcel}
-            statusOptions={[
-              { value: "ACTIVE", label: "Active" },
-              { value: "INACTIVE", label: "Inactive" },
-            ]}
             // Archived products have their own dedicated page, so this list
             // defaults to Active-only rather than a combined "All Statuses"
-            // view — the dropdown's resting label matches that (see
-            // page.tsx's own status resolution).
+            // view (see page.tsx's own status resolution). The catch-all slot
+            // *is* the Active view here, so it's labelled "Active" and there's
+            // no separate ACTIVE option — that listed "Active" twice.
+            statusOptions={[{ value: "INACTIVE", label: "Inactive" }]}
             statusAllLabel="Active"
             typeOptions={[
               ...metals

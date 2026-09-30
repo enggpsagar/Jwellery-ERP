@@ -16,7 +16,8 @@ concurrency:
 
 jobs:
   e2e:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moves to Ubuntu 26 from 2026-10-19.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     services:
@@ -56,13 +57,13 @@ jobs:
       SUPER_ADMIN_PHONES: ""
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: pnpm/action-setup@v4
         with:
           version: 11
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -96,7 +97,7 @@ jobs:
 
       - name: Upload test report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-report
           path: |

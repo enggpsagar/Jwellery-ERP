@@ -62,7 +62,7 @@ jobs:
       # Exact version, not "11": pnpm 11.28.3 (released 2026-09-30) fails
       # install with ERR_PNPM_BAD_PACKAGE_JSON on tsx's bundled fsevents, so
       # a floating major broke CI with no code change. Bump deliberately.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 11.28.2
 

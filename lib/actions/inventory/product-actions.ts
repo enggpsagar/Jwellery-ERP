@@ -686,11 +686,39 @@ export async function exportProductsToExcel(
         : "-",
     }));
 
+    // The PDF gets its own shorter column set — all 25 export columns on one
+    // landscape page left each only a few characters wide, so names, codes
+    // and dates broke mid-word. Every column is still in CSV/Excel.
+    const pdfRows = () =>
+      products.map((product, index) => ({
+        "Sr.": index + 1,
+        "Product Code": product.productCode,
+        Name: product.name,
+        Category: product.category || "-",
+        Type: product.ornamentType || "-",
+        Metal: product.metalType || "-",
+        Purity: product.defaultPurity || "-",
+        HSN: product.hsnCode || "-",
+        "Gross Wt (g)": product.defaultGrossWeight ?? "-",
+        "Net Wt (g)": product.defaultNetWeight ?? "-",
+        "Stone Wt (g)": product.defaultStoneWeight ?? "-",
+        "Making Charge":
+          product.defaultMakingCharge != null
+            ? product.defaultMakingChargeType === "PERCENTAGE"
+              ? `${product.defaultMakingCharge}%`
+              : `Rs. ${product.defaultMakingCharge}`
+            : "-",
+        Status: product.isActive ? "Active" : "Inactive",
+        Created: product.createdAt
+          ? new Date(product.createdAt).toLocaleDateString("en-IN")
+          : "-",
+      }));
+
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "products")
         : params.format === "pdf"
-          ? buildPdfExportBase64(rows, "Products", "products")
+          ? buildPdfExportBase64(pdfRows(), "Products", "products")
           : buildExcelExport(rows, "Products", "products");
 
     return {

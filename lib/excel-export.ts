@@ -101,11 +101,14 @@ export function buildPdfExportBase64(
 
   const headers = rows.length ? Object.keys(rows[0]) : [];
 
-  const cellText = (value: unknown) => (value === null || value === undefined ? "" : String(value));
+  // jsPDF's built-in Helvetica has no "₹" glyph (it printed as "¹"), so
+  // it's spelled "Rs." in PDF output only.
+  const pdfSafe = (text: string) => text.replace(/₹\s?/g, "Rs. ");
+  const cellText = (value: unknown) => (value === null || value === undefined ? "" : pdfSafe(String(value)));
 
   autoTable(doc, {
     startY: 26,
-    head: headers.length ? [headers] : undefined,
+    head: headers.length ? [headers.map(pdfSafe)] : undefined,
     body: rows.map((row) => headers.map((key) => cellText(row[key]))),
     styles: { fontSize: 7, cellPadding: 1.5 },
     headStyles: { fillColor: [212, 175, 55], textColor: 255 },

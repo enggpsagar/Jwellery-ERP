@@ -8,6 +8,7 @@ import {
   startScanSession,
   stopScanSession,
 } from "@/lib/actions/scan-session-actions"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/loader"
 import { WebcamQrScanner } from "@/components/shared/webcam-qr-scanner"
@@ -31,7 +32,11 @@ const POLL_MS = 2000
 export function ScanToAddPanel({
   onScanned,
   onAddManualItem,
+  className,
 }: {
+  /** Extra classes for the outer card — e.g. h-full when it sits beside
+   * the Customer Exchange card on New Invoice. */
+  className?: string
   /** Called once per scan, in the order the tags were scanned. */
   onScanned: (stockId: string) => void
   /** Adds a blank, hand-typed line — offered alongside the two scan routes
@@ -143,7 +148,7 @@ export function ScanToAddPanel({
 
   if (!sessionId) {
     return (
-      <div className="rounded-lg border border-dashed border-yellow-400 bg-yellow-50 p-4">
+      <div className={cn("rounded-lg border border-dashed border-yellow-400 bg-yellow-50 p-4", className)}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium">Add items by scanning</p>
@@ -212,7 +217,12 @@ export function ScanToAddPanel({
   }
 
   return (
-    <div className="rounded-lg border border-[color-mix(in_oklab,var(--chart-3)_45%,transparent)] bg-[color-mix(in_oklab,var(--chart-3)_7%,transparent)] p-4">
+    <div
+      className={cn(
+        "rounded-lg border border-[color-mix(in_oklab,var(--chart-3)_45%,transparent)] bg-[color-mix(in_oklab,var(--chart-3)_7%,transparent)] p-4",
+        className,
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className="relative mt-1 flex size-2.5">

@@ -1652,10 +1652,38 @@ export function InvoiceForm({
         {/* Above the lines, because it is how the lines get created — "Add
             Item" now lives here too, alongside the two scan routes, instead
             of its own separate button in the header above. */}
-        <ScanToAddPanel
-          onScanned={addScannedStock}
-          onAddManualItem={() => setItems((prev) => [...prev, emptyLineItem(gstRateId)])}
-        />
+        {/* One row, two cards: how sale lines get added, and — on a new
+            invoice — the Customer Exchange (what the customer sells you).
+            The exchange's item cards open full width under the lines. */}
+        <div className={editInvoiceId ? undefined : "grid grid-cols-1 gap-3 lg:grid-cols-2"}>
+          <ScanToAddPanel
+            className="h-full"
+            onScanned={addScannedStock}
+            onAddManualItem={() => setItems((prev) => [...prev, emptyLineItem(gstRateId)])}
+          />
+          {!editInvoiceId && (
+            <OldGoldExchangeSection
+              part="header"
+              lines={oldGoldLines}
+              onLinesChange={setOldGoldLines}
+              metals={metals}
+              origins={origins}
+              onMetalsChange={setMetals}
+              onOriginsChange={setOrigins}
+              puritiesByMetal={metalPuritiesCache}
+              ensurePurities={ensureMetalPurities}
+              enumFineness={enumFineness}
+              fineRates={fineRates}
+              excess={oldGoldSplit.excess}
+              excessMode={oldGoldExcessMode}
+              onExcessModeChange={setOldGoldExcessMode}
+              payoutMethod={oldGoldPayoutMethod}
+              onPayoutMethodChange={setOldGoldPayoutMethod}
+              payoutReference={oldGoldPayoutReference}
+              onPayoutReferenceChange={setOldGoldPayoutReference}
+            />
+          )}
+        </div>
 
         {/* This row is a fixed-width "spreadsheet" (see compactRowGridCols's
             own comment) that only fits without scrolling at lg:+ — below
@@ -2447,6 +2475,7 @@ export function InvoiceForm({
           invoice only — an existing exchange is never re-edited here. */}
       {!editInvoiceId && (
         <OldGoldExchangeSection
+          part="lines"
           lines={oldGoldLines}
           onLinesChange={setOldGoldLines}
           metals={metals}

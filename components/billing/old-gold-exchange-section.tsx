@@ -122,6 +122,11 @@ export function serializeOldGoldLine(line: OldGoldLineDraft) {
 }
 
 type Props = {
+  /** "header": the compact card beside "Add items" at the top of Line
+   * Items (title + Add button + running total). "lines": the item cards
+   * and settlement, full width under the line items — nothing until an
+   * item has been added. */
+  part: "header" | "lines"
   lines: OldGoldLineDraft[]
   onLinesChange: (lines: OldGoldLineDraft[]) => void
   metals: StoreMetalRow[]
@@ -151,6 +156,7 @@ type Props = {
  * recomputes them (lib/old-gold/exchange.ts).
  */
 export function OldGoldExchangeSection({
+  part,
   lines,
   onLinesChange,
   metals,
@@ -214,27 +220,57 @@ export function OldGoldExchangeSection({
   const totalFine = amounts.reduce((sum, row) => sum + row.fine, 0)
   const totalValue = round2(amounts.reduce((sum, row) => sum + row.total, 0))
 
+  if (part === "header") {
+    return (
+      <div className="flex h-full flex-col justify-between gap-3 rounded-lg border border-dashed border-amber-500/60 bg-amber-500/5 p-4">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
+            <Coins className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Customer Exchange</p>
+            <p className="text-xs text-muted-foreground">
+              Customer selling you old gold, silver or diamonds? It's bought into stock at its pure 24K / 999 weight
+              and adjusted against this bill.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Button
+            type="button"
+            onClick={() => onLinesChange([...lines, emptyOldGoldLine()])}
+            className="bg-amber-500 text-white shadow-sm hover:bg-amber-600"
+          >
+            <Plus className="mr-1.5 size-4" />
+            Add item bought
+          </Button>
+          {lines.length > 0 ? (
+            <p className="text-xs text-muted-foreground" data-testid="old-gold-header-summary">
+              {lines.length} item{lines.length === 1 ? "" : "s"}
+              {totalFine > 0 ? ` · ${totalFine.toFixed(3)} g pure` : ""} ·{" "}
+              <span className="font-semibold text-foreground">{rupees(totalValue)}</span>
+            </p>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
+  if (lines.length === 0) return null
+
   return (
     <section
       className="space-y-4 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4"
       data-testid="old-gold-section"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
-            <Coins className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="font-semibold">Customer Exchange — buy old gold, silver or diamonds</p>
-            <p className="text-xs text-muted-foreground">
-              Whatever the customer sells to you here is bought as a purchase, added to stock (metal at its pure 24K /
-              999 weight), and its value adjusted against this bill.
-            </p>
-          </div>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-semibold">
+          <Coins className="h-4 w-4 text-amber-600" />
+          Bought from the customer
+        </p>
         <Button type="button" variant="outline" size="sm" onClick={() => onLinesChange([...lines, emptyOldGoldLine()])}>
           <Plus className="mr-1 h-4 w-4" />
-          Add item bought
+          Add another
         </Button>
       </div>
 

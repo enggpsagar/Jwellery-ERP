@@ -57,7 +57,7 @@ async function fillSaleLine(page: Page, itemName: string, ratePerGram: string) {
 /** One old-gold line: 22K, given net weight, deduction and 24K rate. */
 async function addOldGold(page: Page, netWeight: string, deduction: string, rate: string) {
   const section = page.getByTestId("old-gold-section")
-  await section.getByRole("button", { name: "Add item bought" }).click()
+  await page.getByRole("button", { name: "Add item bought" }).click()
   await section.getByPlaceholder("e.g. Old chain").fill("Old chain")
   await section.getByTestId("old-gold-metal").click()
   await page.getByRole("option", { name: "Gold", exact: true }).click()
@@ -168,7 +168,7 @@ test("an old gold piece with a diamond: stone comes off the gross weight and its
 
   await fillSaleLine(page, itemName, "6000")
   const section = page.getByTestId("old-gold-section")
-  await section.getByRole("button", { name: "Add item bought" }).click()
+  await page.getByRole("button", { name: "Add item bought" }).click()
   await section.getByTestId("old-gold-metal").click()
   await page.getByRole("option", { name: "Gold", exact: true }).click()
   await section.getByTestId("old-gold-purity").click()
@@ -214,7 +214,7 @@ test("a loose diamond bought from the customer is priced per carat", async ({ pa
 
   await fillSaleLine(page, itemName, "6000")
   const section = page.getByTestId("old-gold-section")
-  await section.getByRole("button", { name: "Add item bought" }).click()
+  await page.getByRole("button", { name: "Add item bought" }).click()
   await section.getByTestId("old-gold-metal").click()
   await page.getByRole("option", { name: "Diamond", exact: true }).click()
   await expect(section.getByTestId("old-gold-purity")).toHaveCount(0)

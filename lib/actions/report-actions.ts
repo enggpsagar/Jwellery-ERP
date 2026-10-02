@@ -6,7 +6,7 @@ import { InventoryStockStatus, InventoryTransactionType, InvoiceStatus, UserRole
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
-import { getFinenessMap, toFineWeight } from "@/lib/purity";
+import { fineOrNet } from "@/lib/fine-weight-read";
 import { ROLE_LABELS } from "@/lib/roles";
 import { financialYearStartOf } from "@/lib/date-range";
 
@@ -101,6 +101,7 @@ export async function getSalesReport(range: DateRange = {}) {
         select: {
           metalType: { select: { id: true, name: true } },
           netWeight: true,
+          fineWeight: true,
           lineTotal: true,
         },
       },
@@ -111,13 +112,14 @@ export async function getSalesReport(range: DateRange = {}) {
   const totalMakingCharges = invoices.reduce((sum, inv) => sum + Number(inv.makingCharges), 0);
   const totalOutstanding = invoices.reduce((sum, inv) => sum + Number(inv.balanceAmount), 0);
 
+  // `weight` is fine (pure 24K/999) weight — 100 g of 22K counts as 91.6 g.
   const byMetal = new Map<string, { name: string; weight: number; amount: number }>();
   for (const invoice of invoices) {
     for (const item of invoice.items) {
       const key = item.metalType?.id ?? "unassigned";
       const name = item.metalType?.name ?? "Unassigned";
       const entry = byMetal.get(key) ?? { name, weight: 0, amount: 0 };
-      entry.weight += item.netWeight ? Number(item.netWeight) : 0;
+      entry.weight += fineOrNet(item);
       entry.amount += Number(item.lineTotal);
       byMetal.set(key, entry);
     }
@@ -170,7 +172,9 @@ export async function getInventoryValuationReport() {
     // figure with no × quantity, undercounting every stock row that isn't
     // exactly 1 piece. estimatedValue two lines below already multiplies
     // correctly; this was the one figure on this report that didn't.
-    entry.netWeight += stock.netWeight ? Number(stock.netWeight) * stock.quantity : 0;
+    // Totals fine (pure-metal) weight, not physical — the key stays
+    // `netWeight` for the existing consumers.
+    entry.netWeight += fineOrNet(stock) * stock.quantity;
     entry.estimatedValue += stock.saleRate
       ? Number(stock.saleRate) * stock.quantity
       : Number(stock.purchaseAmount ?? 0);
@@ -208,7 +212,9 @@ export async function getInventoryValuationReport() {
  * > 0) and Out of Stock (quantity 0), the same availability rule as the
  * Stock page's In Stock / Out of Stock filter (getStockWhere). A point-in-
  * time snapshot, so no date range. Net weight is per piece on the row;
- * totalNetWeight is × quantity — what's actually on hand.
+ * totalNetWeight is × quantity — what's actually on hand. fineWeight /
+ * totalFineWeight are the pure-metal (24K/999) equivalents on the same
+ * basis; the headline availableFineWeight totals those, never raw weight.
  */
 export async function getStockReport() {
   const storeId = await requireStoreScope();
@@ -226,6 +232,7 @@ export async function getStockReport() {
       purity: true,
       purityLabel: true,
       netWeight: true,
+      fineWeight: true,
       saleRate: true,
       purchaseAmount: true,
       purchaseDate: true,
@@ -244,6 +251,7 @@ export async function getStockReport() {
 
   const rows = stocks.map((stock) => {
     const netWeight = stock.netWeight ? Number(stock.netWeight) : 0;
+    const fineWeight = fineOrNet(stock);
     const available = stock.quantity > 0;
     return {
       stockId: stock.id,
@@ -257,6 +265,8 @@ export async function getStockReport() {
       quantity: stock.quantity,
       netWeight,
       totalNetWeight: netWeight * stock.quantity,
+      fineWeight,
+      totalFineWeight: fineWeight * stock.quantity,
       // Same estimate as the Inventory Valuation report: sale rate × qty,
       // else the recorded purchase amount — only for what's on hand.
       estimatedValue: available
@@ -279,6 +289,7 @@ export async function getStockReport() {
     outOfStockCount: rows.length - availableRows.length,
     availableQuantity: availableRows.reduce((sum, row) => sum + row.quantity, 0),
     availableNetWeight: availableRows.reduce((sum, row) => sum + row.totalNetWeight, 0),
+    availableFineWeight: availableRows.reduce((sum, row) => sum + row.totalFineWeight, 0),
     availableValue: availableRows.reduce((sum, row) => sum + row.estimatedValue, 0),
   };
 }
@@ -286,6 +297,8 @@ export async function getStockReport() {
 /**
  * Open karigar jobs — stock currently out with a karigar and not yet
  * received back, with total gold/silver weight outstanding per karigar.
+ * weightOut is fine (pure-metal) weight — issueFineWeight, falling back to
+ * the raw issueWeight for a job with no fine figure (non-purity metal).
  */
 export async function getKarigarOutstandingReport() {
   const storeId = await requireStoreScope();
@@ -309,7 +322,7 @@ export async function getKarigarOutstandingReport() {
       weightOut: 0,
     };
     entry.jobs += 1;
-    entry.weightOut += job.issueWeight ? Number(job.issueWeight) : 0;
+    entry.weightOut += Number(job.issueFineWeight ?? job.issueWeight ?? 0);
     byKarigar.set(key, entry);
   }
 
@@ -323,6 +336,10 @@ export async function getKarigarOutstandingReport() {
       issueDate: job.issueDate.toISOString(),
       expectedDate: job.expectedDate?.toISOString() ?? null,
       issueWeight: job.issueWeight ? Number(job.issueWeight) : null,
+      issueFineWeight:
+        (job.issueFineWeight ?? job.issueWeight) !== null
+          ? Number(job.issueFineWeight ?? job.issueWeight)
+          : null,
       metalType: job.metalType?.name ?? null,
     })),
   };
@@ -392,19 +409,17 @@ export async function getCustomerDuesReport() {
 export async function getGoldFlowReport(range: DateRange = {}) {
   const storeId = await requireStoreScope();
   const scope = await getLocationScope();
-  const fineness = await getFinenessMap(storeId);
 
+  // Every line/stock row stores its own fineWeight (lib/fine-weight.ts), so
+  // nothing is recomputed from the purity enum here.
   const purchaseItems = await prisma.purchaseItem.findMany({
     where: {
       purchase: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "purchaseDate") },
     },
-    include: { purchase: { select: { purchaseDate: true } } },
+    select: { netWeight: true, fineWeight: true, inventoryStockId: true },
   });
 
-  const purchasedFine = purchaseItems.reduce(
-    (sum, item) => sum + toFineWeight(Number(item.netWeight ?? 0), item.purity, fineness),
-    0,
-  );
+  const purchasedFine = purchaseItems.reduce((sum, item) => sum + fineOrNet(item), 0);
 
   const itemsCreatedFromPurchaseCount = purchaseItems.filter(
     (item) => item.inventoryStockId !== null,
@@ -446,7 +461,7 @@ export async function getGoldFlowReport(range: DateRange = {}) {
       where: {
         invoice: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "invoiceDate") },
       },
-      include: { inventoryStock: { select: { purity: true } } },
+      select: { netWeight: true, fineWeight: true, inventoryStockId: true },
     }),
     prisma.kachaInvoiceItem.findMany({
       where: {
@@ -456,31 +471,13 @@ export async function getGoldFlowReport(range: DateRange = {}) {
           ...toDateRangeWhere(range, "invoiceDate"),
         },
       },
-      include: { inventoryStock: { select: { purity: true } } },
+      select: { netWeight: true, fineWeight: true, inventoryStockId: true },
     }),
   ]);
 
   const soldFine =
-    invoiceItems.reduce(
-      (sum, item) =>
-        sum +
-        toFineWeight(
-          Number(item.netWeight ?? 0),
-          item.purity ?? item.inventoryStock?.purity ?? null,
-          fineness,
-        ),
-      0,
-    ) +
-    kachaInvoiceItems.reduce(
-      (sum, item) =>
-        sum +
-        toFineWeight(
-          Number(item.netWeight ?? 0),
-          item.purity ?? item.inventoryStock?.purity ?? null,
-          fineness,
-        ),
-      0,
-    );
+    invoiceItems.reduce((sum, item) => sum + fineOrNet(item), 0) +
+    kachaInvoiceItems.reduce((sum, item) => sum + fineOrNet(item), 0);
 
   const itemsSoldCount =
     invoiceItems.filter((item) => item.inventoryStockId !== null).length +
@@ -492,7 +489,7 @@ export async function getGoldFlowReport(range: DateRange = {}) {
       status: { in: [InventoryStockStatus.IN_STOCK, InventoryStockStatus.RESERVED] },
       ...locationWhere(scope),
     },
-    select: { netWeight: true, purity: true, quantity: true },
+    select: { netWeight: true, fineWeight: true, quantity: true },
   });
   // netWeight is per-unit — didn't select or multiply by quantity at all,
   // undercounting any stock row with more than 1 piece and inflating
@@ -502,8 +499,7 @@ export async function getGoldFlowReport(range: DateRange = {}) {
   // dashboard-actions.ts does multiply by quantity, so this was the one
   // that actually disagreed).
   const remainingStockFine = remainingStock.reduce(
-    (sum, stock) =>
-      sum + toFineWeight(Number(stock.netWeight ?? 0), stock.purity, fineness) * stock.quantity,
+    (sum, stock) => sum + fineOrNet(stock) * stock.quantity,
     0,
   );
 
@@ -574,9 +570,10 @@ function emptyMetalWiseRow(metalId: string, metalName: string): MetalWiseRow {
 }
 
 /**
- * Per-metal status — purchased/sold/in-stock/with-karigar, in raw weight
- * (not fine-weight; unlike getGoldFlowReport this must also work for
- * non-purity metals like Diamond). Rows come from whatever `StoreMetal`
+ * Per-metal status — purchased/sold/in-stock/with-karigar, in fine
+ * (pure-metal) weight: each row's stored fineWeight, which for a non-purity
+ * metal like Diamond is just its net weight, so this still works for every
+ * metal. Rows come from whatever `StoreMetal`
  * rows the store actually has, so adding a new metal in Settings makes it
  * appear here automatically on the next load — nothing here is hardcoded
  * to Gold/Silver. Purchased/sold are date-ranged; in-stock/with-karigar
@@ -597,13 +594,13 @@ export async function getMetalWiseReport(range: DateRange = {}) {
         where: {
           purchase: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "purchaseDate") },
         },
-        select: { metalTypeId: true, netWeight: true, lineTotal: true },
+        select: { metalTypeId: true, netWeight: true, fineWeight: true, lineTotal: true },
       }),
       prisma.invoiceItem.findMany({
         where: {
           invoice: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "invoiceDate") },
         },
-        select: { metalTypeId: true, netWeight: true, lineTotal: true },
+        select: { metalTypeId: true, netWeight: true, fineWeight: true, lineTotal: true },
       }),
       prisma.kachaInvoiceItem.findMany({
         where: {
@@ -613,7 +610,7 @@ export async function getMetalWiseReport(range: DateRange = {}) {
             ...toDateRangeWhere(range, "invoiceDate"),
           },
         },
-        select: { metalTypeId: true, netWeight: true, lineTotal: true },
+        select: { metalTypeId: true, netWeight: true, fineWeight: true, lineTotal: true },
       }),
       prisma.inventoryStock.findMany({
         where: {
@@ -624,6 +621,7 @@ export async function getMetalWiseReport(range: DateRange = {}) {
         select: {
           metalTypeId: true,
           netWeight: true,
+          fineWeight: true,
           saleRate: true,
           quantity: true,
           purchaseAmount: true,
@@ -631,7 +629,7 @@ export async function getMetalWiseReport(range: DateRange = {}) {
       }),
       prisma.karigarJob.findMany({
         where: { storeId, receivedDate: null, ...locationWhere(scope) },
-        select: { metalTypeId: true, issueWeight: true },
+        select: { metalTypeId: true, issueWeight: true, issueFineWeight: true },
       }),
     ]);
 
@@ -652,14 +650,14 @@ export async function getMetalWiseReport(range: DateRange = {}) {
   for (const item of purchaseItems) {
     const row = getRow(item.metalTypeId);
     row.purchasedCount += 1;
-    row.purchasedWeight += Number(item.netWeight ?? 0);
+    row.purchasedWeight += fineOrNet(item);
     row.purchasedAmount += Number(item.lineTotal ?? 0);
   }
 
   for (const item of [...invoiceItems, ...kachaInvoiceItems]) {
     const row = getRow(item.metalTypeId);
     row.soldCount += 1;
-    row.soldWeight += Number(item.netWeight ?? 0);
+    row.soldWeight += fineOrNet(item);
     row.soldAmount += Number(item.lineTotal ?? 0);
   }
 
@@ -670,7 +668,7 @@ export async function getMetalWiseReport(range: DateRange = {}) {
     // multiplies by quantity; this didn't, undercounting any stock row
     // with more than 1 piece (and skewing reconciliationGap below to look
     // like unexplained shrinkage that was actually just this bug).
-    row.inStockWeight += Number(stock.netWeight ?? 0) * stock.quantity;
+    row.inStockWeight += fineOrNet(stock) * stock.quantity;
     row.inStockValue += stock.saleRate
       ? Number(stock.saleRate) * stock.quantity
       : Number(stock.purchaseAmount ?? 0);
@@ -678,7 +676,7 @@ export async function getMetalWiseReport(range: DateRange = {}) {
 
   for (const job of openKarigarJobs) {
     const row = getRow(job.metalTypeId);
-    row.withKarigarWeight += Number(job.issueWeight ?? 0);
+    row.withKarigarWeight += Number(job.issueFineWeight ?? job.issueWeight ?? 0);
   }
 
   for (const row of byMetal.values()) {
@@ -805,6 +803,7 @@ export type VendorPurchaseRow = {
   vendorName: string;
   purchaseCount: number;
   totalQuantity: number;
+  /** Fine (pure 24K/999) weight. */
   totalWeight: number;
   totalAmount: number;
   paidAmount: number;
@@ -844,7 +843,7 @@ export async function getVendorPurchaseReport(range: DateRange = {}) {
       totalAmount: true,
       paidAmount: true,
       balanceAmount: true,
-      items: { select: { quantity: true, netWeight: true } },
+      items: { select: { quantity: true, netWeight: true, fineWeight: true } },
     },
   });
 
@@ -873,7 +872,8 @@ export async function getVendorPurchaseReport(range: DateRange = {}) {
 
     for (const item of purchase.items) {
       row.totalQuantity += item.quantity;
-      row.totalWeight += item.netWeight ? Number(item.netWeight) : 0;
+      // Fine (pure-metal) weight, not physical.
+      row.totalWeight += fineOrNet(item);
     }
 
     if (!row.firstPurchase || purchase.purchaseDate < row.firstPurchase) {
@@ -908,6 +908,8 @@ export type ItemLedgerRow = {
   status: string;
   quantityRemaining: number;
   netWeight: number;
+  /** Pure-metal (24K/999) equivalent of netWeight, same per-piece basis. */
+  fineWeight: number;
   purchaseDate: string | null;
   purchaseQuantity: number | null;
   vendorName: string | null;
@@ -1141,6 +1143,7 @@ export async function getItemLedgerReport(): Promise<ItemLedgerReport> {
       status: stock.status,
       quantityRemaining: stock.quantity,
       netWeight: stock.netWeight ? Number(stock.netWeight) : 0,
+      fineWeight: fineOrNet(stock),
       purchaseDate: stock.purchaseDate ? stock.purchaseDate.toISOString() : null,
       purchaseQuantity,
       vendorName: stock.vendorName,

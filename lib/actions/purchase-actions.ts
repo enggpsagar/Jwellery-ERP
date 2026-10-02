@@ -16,6 +16,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { getFineWeightResolver } from "@/lib/fine-weight";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
@@ -882,6 +883,7 @@ export async function createPurchase(
     }));
 
     const storeId = await requireStoreScope();
+    const fineOf = await getFineWeightResolver(storeId);
 
     // Captured before createProductFromManualEntry's per-line substitution
     // below — see lockLinkedProductFields' own doc comment for why a
@@ -1068,6 +1070,7 @@ export async function createPurchase(
             finish: InventoryFinish.PAKKA,
             grossWeight: toDecimal(item.grossWeight),
             netWeight: toDecimal(item.netWeight),
+            fineWeight: fineOf(item) ?? undefined,
             dmoWeight: toDecimal(item.dmoWeight),
             stoneWeight: toDecimal(item.stoneWeight),
             // Previously dropped here even though it's saved onto the
@@ -1132,6 +1135,7 @@ export async function createPurchase(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
+              fineWeight: fineOf(item) ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
@@ -1368,6 +1372,7 @@ export async function updatePurchase(
     }
 
     const storeId = await requireStoreScope();
+    const fineOf = await getFineWeightResolver(storeId);
     const purchase = await prisma.purchase.findFirst({
       where: { id, storeId },
       include: {
@@ -1591,6 +1596,7 @@ export async function updatePurchase(
             finish: InventoryFinish.PAKKA,
             grossWeight: toDecimal(item.grossWeight),
             netWeight: toDecimal(item.netWeight),
+            fineWeight: fineOf(item) ?? undefined,
             dmoWeight: toDecimal(item.dmoWeight),
             stoneWeight: toDecimal(item.stoneWeight),
             caratWeight: toDecimal(item.caratWeight),
@@ -1646,6 +1652,7 @@ export async function updatePurchase(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
+              fineWeight: fineOf(item) ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,

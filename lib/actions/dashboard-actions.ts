@@ -8,6 +8,7 @@ import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
 import { formatShortDateTime } from "@/lib/utils";
 import { parseDateRangeBoundary } from "@/lib/date-range";
+import { fineOrNet } from "@/lib/fine-weight-read";
 
 /**
  * What counts as metal still on hand.
@@ -156,7 +157,9 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
         // netWeight: 6, quantity: 4, so the row's actual contribution to
         // on-hand stock is netWeight * quantity, not netWeight alone.
         // aggregate()'s _sum can't express that (it sums one raw column),
-        // so this fetches the two columns and reduces client-side instead.
+        // so this fetches the columns and reduces client-side instead. The
+        // KPI totals fine (pure 24K/999) weight — fineWeight is on the same
+        // per-piece basis, so it's × quantity the same way.
         prisma.inventoryStock.findMany({
           where: {
             storeId,
@@ -165,7 +168,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
             status: { in: ON_HAND_STOCK_STATUSES },
             ...locationWhere(scope),
           },
-          select: { netWeight: true, quantity: true },
+          select: { netWeight: true, fineWeight: true, quantity: true },
         })
       )
     ),
@@ -198,7 +201,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
       metalId: metal.id,
       metalName: metal.name,
       grams: metalStockAggs[index].reduce(
-        (sum, row) => sum + Number(row.netWeight ?? 0) * row.quantity,
+        (sum, row) => sum + fineOrNet(row) * row.quantity,
         0
       ),
     }))
@@ -227,7 +230,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
       value: `${metal.grams.toLocaleString("en-IN", { maximumFractionDigits: 1 })} g`,
       change: "",
       trend: "up" as const,
-      sub: `${metal.metalName.toLowerCase()} on hand, excluding sold`,
+      sub: `fine (24K) ${metal.metalName.toLowerCase()} on hand, excluding sold`,
       icon: "metal" as const,
       metalName: metal.metalName,
     })),
@@ -1003,6 +1006,7 @@ export async function getRecentTransactions(
         select: {
           metalType: { select: { name: true } },
           netWeight: true,
+          fineWeight: true,
         },
       },
     },
@@ -1019,10 +1023,8 @@ export async function getRecentTransactions(
           ? "Mixed"
           : (metals.values().next().value as string);
 
-    const totalWeight = inv.items.reduce(
-      (sum, item) => sum + (item.netWeight ? Number(item.netWeight) : 0),
-      0
-    );
+    // Fine (pure 24K/999) weight, not physical.
+    const totalWeight = inv.items.reduce((sum, item) => sum + fineOrNet(item), 0);
 
     return {
       id: inv.invoiceNumber,
@@ -1030,7 +1032,7 @@ export async function getRecentTransactions(
       customer: inv.customer.name,
       type: "Sale" as const,
       metal,
-      weight: totalWeight > 0 ? `${totalWeight.toFixed(1)} g` : "—",
+      weight: totalWeight > 0 ? `${totalWeight.toFixed(1)} g fine` : "—",
       amount: `₹${Number(inv.totalAmount).toLocaleString("en-IN")}`,
       status: STATUS_MAP[inv.status] ?? "Pending",
       date: formatShortDateTime(inv.invoiceDate),
@@ -1120,9 +1122,11 @@ export async function getRecentActivity(
       action = "Received goods from artisan";
     }
 
+    // A purity metal only ever writes metalWeightFine, so read that first.
+    const entryWeight = entry.metalWeightFine ?? entry.metalWeight;
     const amountOrWeight =
-      entry.metalWeight && entry.metalType
-        ? `${entry.metalType.name} · ${Number(entry.metalWeight).toFixed(1)} g`
+      entryWeight && entry.metalType
+        ? `${entry.metalType.name} · ${Number(entryWeight).toFixed(1)} g${entry.metalWeightFine ? " fine" : ""}`
         : `₹${Number(entry.amount).toLocaleString("en-IN")}`;
     // "by <staff name>" answers who actually recorded this — createdBy is
     // nullable (entries written before that column existed have none), so

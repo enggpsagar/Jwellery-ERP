@@ -15,6 +15,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { getFineWeightResolver } from "@/lib/fine-weight";
 import { computeRoundOff } from "@/lib/round-off";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
@@ -540,6 +541,7 @@ export async function createKachaInvoice(
     // computed from `items`, not only from its later use (customer lookup,
     // location resolution, etc).
     const storeId = await requireStoreScope();
+    const fineOf = await getFineWeightResolver(storeId);
 
     // Captured directly off the freshly-parsed items — a Kacha line's
     // inventoryStockId is nullable and a manual line legitimately has none,
@@ -700,6 +702,7 @@ export async function createKachaInvoice(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
+              fineWeight: fineOf(item) ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
@@ -1042,6 +1045,7 @@ export async function convertKachaToPakka(
               quantity: item.quantity,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
+              fineWeight: item.fineWeight ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
@@ -1319,6 +1323,7 @@ export async function importKachaInvoicesFromExcel(
 
   try {
     const storeId = await requireStoreScope();
+    const fineOf = await getFineWeightResolver(storeId);
     const file = formData.get("file");
 
     if (!(file instanceof File) || file.size === 0) {
@@ -1538,6 +1543,7 @@ export async function importKachaInvoicesFromExcel(
               quantity: item.quantity,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
+              fineWeight: fineOf(item) ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,
               makingChargeType: toChargeType(item.makingChargeType),

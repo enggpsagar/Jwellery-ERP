@@ -274,6 +274,46 @@ hidden `customerId`, so one per line would hijack the document's own party.
 No metal `LedgerEntry` is written against the party — it's attribution,
 not a payable.
 
+### Added 2026-10-02: every metal weight is also stored as pure (24K / 999) fine weight
+
+User decision: keep the physical weight (what's printed, tagged and priced)
+**and** store its pure-metal equivalent, and make **every balance, total
+and report sum the fine figure** — 100 g of 22K counts as 91.6 g, buying or
+selling, vendor, artisan or customer.
+
+- `fineWeight Decimal?` on `InventoryStock`, `PurchaseItem`, `InvoiceItem`,
+  `KachaInvoiceItem`, `QuotationItem` — same unit and per-piece/per-line
+  basis as that row's `netWeight`. Karigar tables and `LedgerEntry`
+  already had their own fine columns (`issueFineWeight`/`receiveFineWeight`,
+  `KarigarReceiptItem.fineWeight`, `metalWeightFine`).
+- **Rule** (`lib/fine-weight.ts`, `getFineWeightResolver(storeId)` — call
+  it before a transaction): `hasPurity` metal → netWeight × fineness / 100,
+  fineness = the metal's own `StoreMetalPurity` row (metal + `purityLabel`)
+  → else the store's `PurityFineness` for the legacy enum → else 100; any
+  other metal → netWeight itself. The same rule is the backfill SQL in
+  migration `20261002140000_add_fine_weight`; `pnpm db:backfill:fine-weights`
+  re-runs it (CI does, after the demo seeds, which bypass the write paths).
+  Keep the TS and SQL identical.
+- **Every write path sets it**: purchases (lines + their stock), invoices
+  (create/update/single-line edit, minted manual-line stock), Kacha (create,
+  Excel import), quotations, Kacha→Pakka and Quotation→Invoice (copied),
+  manual Add/Edit Stock (its ADJUSTMENT ledger entry now uses the same
+  rule, not the enum-only `toFineWeight`), karigar receipts, product-seeded
+  stock. **A new write path must set it too.**
+- **Every total reads it** via `fineOrNet(row)` (`lib/fine-weight-read.ts`,
+  client-safe, `fineWeight ?? netWeight`): sales/valuation/stock/metal-wise/
+  vendor/gold-flow/item-ledger reports, the Metal-wise daily ledger, the
+  dashboard stock KPI and recent transactions; karigar outstanding/metal-wise
+  "with artisan" use `issueFineWeight ?? issueWeight`; ledger rows show
+  `metalWeightFine ?? metalWeight`. Per-row displays keep the physical
+  weight with a Fine (24K) column beside it; labels say "Fine Wt 24K".
+- Settings → purity with a blank fineness now defaults from its label
+  (22K → 91.6, 925 → 92.5, nK → n/24, 3-digit → ‰) instead of 100%, so a
+  new purity can't silently count as pure. Existing purities saved at 100%
+  before this still need checking in Settings.
+- Not covered: `DraftOrderItem.estimatedWeight` (an estimate, no stock),
+  `InventoryTransaction` weights (nothing totals them).
+
 ### Regression tests (added 2026-09-29)
 
 Playwright suite in `e2e/`, run by `.github/workflows/regression.yml` on every push to `main` and every PR: throwaway Postgres in the runner → migrate → `pnpm seed` + `pnpm db:seed:full-demo` → `tsc` → `pnpm build` → `pnpm test:e2e`. Sign-in mints a NextAuth JWT in `e2e/global-setup.ts` (no test login route in the app), which also refuses any non-localhost `DATABASE_URL`. See `e2e/README.md`. **Add a spec for every new feature.** The demo seed must keep creating `UserStoreMembership` rows for its users — `requirePermissionInStore` (createInvoice etc.) reads only that table, so without them the demo Admin can open every page but not save an invoice. Tests run in parallel with Vercel's own deploy on a direct push to `main`; they only *block* a bad change if work goes through a PR (or Vercel's deployment checks are turned on).

@@ -54,6 +54,7 @@ type KarigarOutstanding = {
     issueDate: string
     expectedDate: string | null
     issueWeight: number | null
+    issueFineWeight: number | null
     metalType: string | null
   }[]
 }
@@ -146,6 +147,7 @@ type ItemLedgerRow = {
   status: string
   quantityRemaining: number
   netWeight: number
+  fineWeight: number
   purchaseDate: string | null
   purchaseQuantity: number | null
   vendorName: string | null
@@ -372,6 +374,7 @@ export function ReportsTabs({
         case "availability": return row.availability
         case "qty": return row.quantity
         case "netWeight": return row.totalNetWeight
+        case "fineWeight": return row.totalFineWeight
         case "value": return row.estimatedValue
         default: return null
       }
@@ -435,6 +438,8 @@ export function ReportsTabs({
         case "purchaseDate": return row.purchaseDate ? new Date(row.purchaseDate).getTime() : null
         case "sold": return row.lastSaleDate ? new Date(row.lastSaleDate).getTime() : null
         case "qty": return row.quantityRemaining
+        case "netWeight": return row.netWeight
+        case "fineWeight": return row.fineWeight
         default: return null
       }
     },
@@ -762,7 +767,7 @@ export function ReportsTabs({
                     <SortableTh label="Vendor" sortKey="vendor" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} />
                     <SortableTh label="Purchases" sortKey="purchases" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} align="right" />
                     <SortableTh label="Qty" sortKey="qty" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} align="right" />
-                    <SortableTh label="Weight" sortKey="weight" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} align="right" />
+                    <SortableTh label="Fine Wt (24K)" sortKey="weight" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} align="right" />
                     <SortableTh label="Amount" sortKey="amount" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} align="right" />
                     <SortableTh label="Paid" sortKey="paid" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} align="right" />
                     <SortableTh label="Balance" sortKey="balance" activeSortKey={vendorPurchaseTable.sortKey} sortDir={vendorPurchaseTable.sortDir} onSort={vendorPurchaseTable.toggleSort} align="right" />
@@ -872,7 +877,7 @@ export function ReportsTabs({
                 <tr className="border-b">
                   <SortableTh label="Status" sortKey="status" activeSortKey={inventoryTable.sortKey} sortDir={inventoryTable.sortDir} onSort={inventoryTable.toggleSort} />
                   <SortableTh label="Count" sortKey="count" activeSortKey={inventoryTable.sortKey} sortDir={inventoryTable.sortDir} onSort={inventoryTable.toggleSort} />
-                  <SortableTh label="Net Weight (g)" sortKey="netWeight" activeSortKey={inventoryTable.sortKey} sortDir={inventoryTable.sortDir} onSort={inventoryTable.toggleSort} />
+                  <SortableTh label="Fine Wt 24K (g)" sortKey="netWeight" activeSortKey={inventoryTable.sortKey} sortDir={inventoryTable.sortDir} onSort={inventoryTable.toggleSort} />
                   <SortableTh label="Estimated Value" sortKey="estimatedValue" activeSortKey={inventoryTable.sortKey} sortDir={inventoryTable.sortDir} onSort={inventoryTable.toggleSort} />
                 </tr>
               </thead>
@@ -895,7 +900,7 @@ export function ReportsTabs({
                             {
                               fields: [
                                 { label: "Items", value: row.count },
-                                { label: "Net weight", value: `${row.netWeight.toFixed(3)} g` },
+                                { label: "Fine wt (24K)", value: `${row.netWeight.toFixed(3)} g` },
                                 {
                                   label: "Estimated value",
                                   value: reportInr(row.estimatedValue),
@@ -939,8 +944,8 @@ export function ReportsTabs({
             <StatCard title="Available Items" value={stockReport.availableCount} />
             <StatCard title="Out of Stock Items" value={stockReport.outOfStockCount} tone="outstanding" />
             <StatCard
-              title="Available Qty / Net Weight"
-              value={`${stockReport.availableQuantity} pcs · ${stockReport.availableNetWeight.toFixed(3)} g`}
+              title="Available Qty / Fine Wt (24K)"
+              value={`${stockReport.availableQuantity} pcs · ${stockReport.availableFineWeight.toFixed(3)} g`}
             />
             <StatCard title="Available Value (est.)" value={reportInr(stockReport.availableValue) ?? "₹0"} />
           </div>
@@ -987,13 +992,14 @@ export function ReportsTabs({
                   <SortableTh label="Availability" sortKey="availability" activeSortKey={stockTable.sortKey} sortDir={stockTable.sortDir} onSort={stockTable.toggleSort} />
                   <SortableTh label="Qty on Hand" sortKey="qty" activeSortKey={stockTable.sortKey} sortDir={stockTable.sortDir} onSort={stockTable.toggleSort} />
                   <SortableTh label="Net Weight (g)" sortKey="netWeight" activeSortKey={stockTable.sortKey} sortDir={stockTable.sortDir} onSort={stockTable.toggleSort} />
+                  <SortableTh label="Fine (24K) (g)" sortKey="fineWeight" activeSortKey={stockTable.sortKey} sortDir={stockTable.sortDir} onSort={stockTable.toggleSort} />
                   <SortableTh label="Est. Value" sortKey="value" activeSortKey={stockTable.sortKey} sortDir={stockTable.sortDir} onSort={stockTable.toggleSort} />
                 </tr>
               </thead>
               <tbody>
                 {stockTable.pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-4 py-6 text-center text-muted-foreground">
                       No stock items match this search.
                     </td>
                   </tr>
@@ -1014,6 +1020,7 @@ export function ReportsTabs({
                                 { label: "Status", value: row.status.replace(/_/g, " ") },
                                 { label: "Location", value: row.location || null },
                                 { label: "Net weight / pc", value: `${row.netWeight.toFixed(3)} g` },
+                                { label: "Fine wt (24K) / pc", value: `${row.fineWeight.toFixed(3)} g` },
                               ],
                             },
                           ]}
@@ -1039,6 +1046,7 @@ export function ReportsTabs({
                       </td>
                       <td className="px-4 py-3 tabular-nums">{row.quantity}</td>
                       <td className="px-4 py-3 tabular-nums">{row.totalNetWeight.toFixed(3)}</td>
+                      <td className="px-4 py-3 tabular-nums">{row.totalFineWeight.toFixed(3)}</td>
                       <td className="px-4 py-3 tabular-nums">{row.availability === "AVAILABLE" ? reportInr(row.estimatedValue) : "-"}</td>
                     </tr>
                   ))
@@ -1073,7 +1081,7 @@ export function ReportsTabs({
                 <tr className="border-b">
                   <SortableTh label="Artisan" sortKey="name" activeSortKey={karigarTable.sortKey} sortDir={karigarTable.sortDir} onSort={karigarTable.toggleSort} />
                   <SortableTh label="Open Jobs" sortKey="jobs" activeSortKey={karigarTable.sortKey} sortDir={karigarTable.sortDir} onSort={karigarTable.toggleSort} />
-                  <SortableTh label="Weight Out (g)" sortKey="weightOut" activeSortKey={karigarTable.sortKey} sortDir={karigarTable.sortDir} onSort={karigarTable.toggleSort} />
+                  <SortableTh label="Fine Wt Out 24K (g)" sortKey="weightOut" activeSortKey={karigarTable.sortKey} sortDir={karigarTable.sortDir} onSort={karigarTable.toggleSort} />
                 </tr>
               </thead>
               <tbody>
@@ -1096,7 +1104,7 @@ export function ReportsTabs({
                               fields: [
                                 { label: "Open jobs", value: row.jobs },
                                 {
-                                  label: "Weight out",
+                                  label: "Fine wt out (24K)",
                                   value: `${row.weightOut.toFixed(3)} g`,
                                 },
                                 {
@@ -1279,6 +1287,8 @@ export function ReportsTabs({
           <p className="text-sm text-muted-foreground">
             One row per metal your store has configured in Settings → Metals &amp; Categories —
             add a new metal there and it appears here automatically, no code change needed.
+            All weights below are fine weight (pure 24K / 999 equivalent, g) — 100 g of 22K counts
+            as 91.6 g; a metal without a purity (e.g. a gemstone) counts at its own weight.
           </p>
 
           <ReportSearchBar
@@ -1316,7 +1326,7 @@ export function ReportsTabs({
                         <RecordHoverCard
                           label={row.metalName}
                           title={row.metalName}
-                          subtitle="Metal position"
+                          subtitle="Metal position (fine 24K, g)"
                           sections={[
                             {
                               fields: [
@@ -1415,6 +1425,8 @@ export function ReportsTabs({
                 <tr className="border-b">
                   <SortableTh label="Item" sortKey="item" activeSortKey={itemLedgerTable.sortKey} sortDir={itemLedgerTable.sortDir} onSort={itemLedgerTable.toggleSort} />
                   <SortableTh label="Status" sortKey="status" activeSortKey={itemLedgerTable.sortKey} sortDir={itemLedgerTable.sortDir} onSort={itemLedgerTable.toggleSort} />
+                  <SortableTh label="Net Weight (g)" sortKey="netWeight" activeSortKey={itemLedgerTable.sortKey} sortDir={itemLedgerTable.sortDir} onSort={itemLedgerTable.toggleSort} />
+                  <SortableTh label="Fine (24K) (g)" sortKey="fineWeight" activeSortKey={itemLedgerTable.sortKey} sortDir={itemLedgerTable.sortDir} onSort={itemLedgerTable.toggleSort} />
                   <SortableTh label="Purchased" sortKey="purchaseDate" activeSortKey={itemLedgerTable.sortKey} sortDir={itemLedgerTable.sortDir} onSort={itemLedgerTable.toggleSort} />
                   <SortableTh label="Sold" sortKey="sold" activeSortKey={itemLedgerTable.sortKey} sortDir={itemLedgerTable.sortDir} onSort={itemLedgerTable.toggleSort} />
                   <th className="px-4 py-3 text-left font-medium">History</th>
@@ -1423,7 +1435,7 @@ export function ReportsTabs({
               <tbody>
                 {itemLedgerTable.pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+                    <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
                       No inventory items match this search.
                     </td>
                   </tr>
@@ -1442,6 +1454,7 @@ export function ReportsTabs({
                                 { label: "Status", value: row.status },
                                 { label: "Qty on hand", value: row.quantityRemaining },
                                 { label: "Net weight", value: `${row.netWeight.toFixed(3)} g` },
+                                { label: "Fine wt (24K)", value: `${row.fineWeight.toFixed(3)} g` },
                               ],
                             },
                           ]}
@@ -1456,6 +1469,8 @@ export function ReportsTabs({
                           Qty on hand: {row.quantityRemaining}
                         </div>
                       </td>
+                      <td className="px-4 py-3 tabular-nums">{row.netWeight.toFixed(3)}</td>
+                      <td className="px-4 py-3 tabular-nums">{row.fineWeight.toFixed(3)}</td>
                       <td className="px-4 py-3">
                         <div>{reportDate(row.purchaseDate)}</div>
                         <div className="text-xs text-muted-foreground">

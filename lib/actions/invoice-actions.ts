@@ -16,6 +16,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { getFineWeightResolver } from "@/lib/fine-weight";
 import { computeRoundOff } from "@/lib/round-off";
 import { requirePermission, requirePermissionInStore } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
@@ -1025,6 +1026,7 @@ export async function createInvoice(
     // locked, trustworthy value rather than whatever the client submitted
     // for a field the UI no longer lets it edit.
     items = await lockLinkedStockFields(storeId, items, explicitStockIds);
+    const fineOf = await getFineWeightResolver(storeId);
 
     // A new line item becomes a real Product on save — it needs everything
     // Add Product would ask for, or it lands outside every category report.
@@ -1304,6 +1306,7 @@ export async function createInvoice(
           actor,
           locationId: resolvedLocationId,
           referenceType: "Invoice",
+          fineWeight: fineOf(item),
         });
         soldItems.push({ ...item, inventoryStockId: newStockId });
       }
@@ -1346,6 +1349,7 @@ export async function createInvoice(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
+              fineWeight: fineOf(item) ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,
@@ -1753,6 +1757,7 @@ export async function updateInvoice(
     }
 
     const storeId = await requireStoreScope();
+    const fineOf = await getFineWeightResolver(storeId);
     const invoice = await prisma.invoice.findFirst({
       where: { id, storeId },
       include: { items: true },
@@ -2008,6 +2013,7 @@ export async function updateInvoice(
           actor,
           locationId: resolvedLocationId,
           referenceType: "Invoice",
+          fineWeight: fineOf(item),
         });
         soldItems.push({ ...item, inventoryStockId: newStockId });
       }
@@ -2083,6 +2089,7 @@ export async function updateInvoice(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
+              fineWeight: fineOf(item) ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,
@@ -2241,6 +2248,7 @@ export async function updateInvoiceLineItem(
     }
 
     const storeId = await requireStoreScope();
+    const fineOf = await getFineWeightResolver(storeId);
     const invoice = await prisma.invoice.findFirst({
       where: { id: invoiceId, storeId },
       include: { items: true },
@@ -2326,6 +2334,7 @@ export async function updateInvoiceLineItem(
         data: {
           rate,
           netWeight: isDiamond ? undefined : weight,
+          fineWeight: isDiamond ? undefined : fineOf({ ...item, netWeight: weight }) ?? undefined,
           caratWeight: isDiamond ? weight : undefined,
           sgstAmount: newSgst,
           cgstAmount: newCgst,

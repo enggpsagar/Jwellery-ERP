@@ -9,6 +9,29 @@ import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
 import { buildMultiSheetExcelExport, parseExcelWorkbook } from "@/lib/excel-export";
+import { DEFAULT_FINENESS, matchLegacyPurityType } from "@/lib/purity";
+import { classifyMetalName } from "@/lib/business-units";
+
+/**
+ * Fineness % implied by a purity label when none is typed: the standard
+ * figure for a known one (22K → 91.6, 925 → 92.5), else karat/24 for a
+ * gold "nK" label, else a 3-digit millesimal (e.g. 958 → 95.8), else 100.
+ */
+function defaultFinenessForLabel(metalName: string, label: string): number {
+  const family = classifyMetalName(metalName);
+  const legacy = matchLegacyPurityType(family, label);
+  if (legacy) return DEFAULT_FINENESS[legacy];
+
+  const karat = /^(\d{1,2}(?:\.\d+)?)\s*k(?:t|arat)?$/i.exec(label.trim());
+  if (karat && Number(karat[1]) > 0 && Number(karat[1]) <= 24) {
+    return Math.round((Number(karat[1]) / 24) * 1000) / 10;
+  }
+
+  const millesimal = /^(\d{3})$/.exec(label.trim());
+  if (millesimal && Number(millesimal[1]) <= 1000) return Number(millesimal[1]) / 10;
+
+  return 100;
+}
 
 export type StoreMetalRow = {
   id: string;
@@ -614,7 +637,10 @@ export async function upsertStoreMetalPurity(
     const finenessPercentRaw = String(formData.get("finenessPercent") || "").trim();
     const sellingPriceRaw = String(formData.get("sellingPrice") || "").trim();
     const isHallmarkable = formData.get("isHallmarkable") === "true";
-    const finenessPercent = finenessPercentRaw ? Number(finenessPercentRaw) : 100;
+    // Blank isn't "100%": it's filled from the label once the metal is
+    // known (defaultFinenessForLabel below), so a "22K" added without a
+    // figure doesn't count as pure gold in every fine-weight total.
+    let finenessPercent = finenessPercentRaw ? Number(finenessPercentRaw) : 100;
     const sellingPrice = sellingPriceRaw ? Number(sellingPriceRaw) : null;
 
     const errors: Record<string, string[]> = {};
@@ -635,7 +661,7 @@ export async function upsertStoreMetalPurity(
 
     const metal = await prisma.storeMetal.findFirst({
       where: { id: storeMetalId, storeId },
-      select: { id: true },
+      select: { id: true, name: true },
     });
 
     if (!metal) {
@@ -645,6 +671,8 @@ export async function upsertStoreMetalPurity(
         errors: { storeMetalId: ["Metal not found"] },
       };
     }
+
+    if (!finenessPercentRaw) finenessPercent = defaultFinenessForLabel(metal.name, label);
 
     const existing = await prisma.storeMetalPurity.findFirst({
       where: { storeMetalId, label, NOT: id ? { id } : undefined },

@@ -22,7 +22,7 @@ async function buildEntriesRows() {
     Type: entry.type === "DEBIT" ? "Debit" : "Credit",
     Source: entry.sourceLabel,
     Metal: entry.metalType ?? "",
-    "Metal Weight (g)": entry.metalWeight ?? "",
+    "Fine Wt 24K (g)": entry.metalWeight ?? "",
     "Carat Weight (ct)": entry.caratWeight ?? "",
     "Amount (₹)": entry.amount,
     Invoice: entry.invoiceNumber ?? "",
@@ -37,7 +37,7 @@ async function buildMetalWiseRows() {
     row.units.map((unit) => ({
       Date: row.date,
       Metal: unit.label,
-      Unit: unit.isGemstone ? "ct" : "g",
+      Unit: unit.isGemstone ? "ct" : "g fine (24K)",
       Purchased: unit.purchasedValue,
       "Purchased Amount (₹)": unit.purchasedAmount,
       Sold: unit.soldValue,

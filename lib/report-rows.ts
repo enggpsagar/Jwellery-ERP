@@ -91,7 +91,7 @@ export async function getReportRows(type: ReportType, range: DateRange) {
         Vendor: row.vendorName,
         Purchases: row.purchaseCount,
         Qty: row.totalQuantity,
-        "Weight (g)": row.totalWeight,
+        "Fine Wt 24K (g)": row.totalWeight,
         "Amount (₹)": row.totalAmount,
         "Paid (₹)": row.paidAmount,
         "Balance (₹)": row.balanceAmount,
@@ -104,7 +104,7 @@ export async function getReportRows(type: ReportType, range: DateRange) {
       return report.byStatus.map((row) => ({
         Status: row.status,
         Count: row.count,
-        "Net Weight (g)": row.netWeight,
+        "Fine Wt 24K (g)": row.netWeight,
         "Estimated Value (₹)": row.estimatedValue,
       }))
     }
@@ -123,6 +123,8 @@ export async function getReportRows(type: ReportType, range: DateRange) {
         "Qty on Hand": row.quantity,
         "Net Weight / pc (g)": row.netWeight,
         "Total Net Weight (g)": row.totalNetWeight,
+        "Fine Wt 24K / pc (g)": row.fineWeight,
+        "Total Fine Wt 24K (g)": row.totalFineWeight,
         "Estimated Value (₹)": row.estimatedValue,
         Location: row.location,
         "Purchase Date": row.purchaseDate ? formatShortDate(row.purchaseDate) : "",
@@ -137,6 +139,7 @@ export async function getReportRows(type: ReportType, range: DateRange) {
         "Expected Date": job.expectedDate ? formatShortDate(job.expectedDate) : "",
         Metal: job.metalType ?? "",
         "Issue Weight (g)": job.issueWeight ?? "",
+        "Issue Fine Wt 24K (g)": job.issueFineWeight ?? "",
       }))
     }
     case "dues": {
@@ -162,7 +165,7 @@ export async function getReportRows(type: ReportType, range: DateRange) {
           "Items Sold": report.itemsSoldCount,
           "Items Created": report.itemsCreatedCount,
           "Items Remaining": report.itemsRemainingCount,
-          "Reconciliation Gap (g)": report.reconciliationGap,
+          "Reconciliation Gap (fine g)": report.reconciliationGap,
         },
       ]
     }
@@ -170,14 +173,14 @@ export async function getReportRows(type: ReportType, range: DateRange) {
       const report = await getMetalWiseReport(range)
       return report.metals.map((row) => ({
         Metal: row.metalName,
-        "Purchased Weight (g)": row.purchasedWeight,
+        "Purchased Fine Wt 24K (g)": row.purchasedWeight,
         "Purchased Amount (₹)": row.purchasedAmount,
-        "Sold Weight (g)": row.soldWeight,
+        "Sold Fine Wt 24K (g)": row.soldWeight,
         "Sold Amount (₹)": row.soldAmount,
-        "In Stock Weight (g)": row.inStockWeight,
+        "In Stock Fine Wt 24K (g)": row.inStockWeight,
         "In Stock Value (₹)": row.inStockValue,
-        "With Artisan Weight (g)": row.withKarigarWeight,
-        "Reconciliation Gap (g)": row.reconciliationGap,
+        "With Artisan Fine Wt 24K (g)": row.withKarigarWeight,
+        "Reconciliation Gap (fine g)": row.reconciliationGap,
       }))
     }
     case "itemLedger": {
@@ -188,6 +191,7 @@ export async function getReportRows(type: ReportType, range: DateRange) {
         Status: row.status,
         "Qty On Hand": row.quantityRemaining,
         "Net Weight (g)": row.netWeight,
+        "Fine Wt 24K (g)": row.fineWeight,
         "Purchase Date": row.purchaseDate ? formatShortDate(row.purchaseDate) : "",
         "Purchase Qty": row.purchaseQuantity ?? "",
         Vendor: row.vendorName ?? "",

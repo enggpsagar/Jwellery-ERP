@@ -13,6 +13,7 @@
     "db:seed:kacha": "tsx prisma/seed-kacha-demo.ts",
     "db:seed:business-units-demo": "tsx prisma/seed-business-units-demo.ts",
     "db:seed:full-demo": "tsx prisma/seed-full-demo.ts",
+    "db:backfill:fine-weights": "tsx scripts/backfill-fine-weights.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ChargeType, PurityType, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { getFineWeightResolver, resolveFineWeight } from "@/lib/fine-weight";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scope";
@@ -1233,6 +1234,12 @@ export async function createProduct(
               // against the scale without touching the design.
               grossWeight: defaultGrossWeight,
               netWeight: defaultNetWeight,
+              fineWeight: await resolveFineWeight(storeId, {
+                metalTypeId: metalTypeId || null,
+                purityLabel: storeMetalPurityRow?.label ?? null,
+                purity: resolvedDefaultPurity,
+                netWeight: defaultNetWeight,
+              }),
               stoneWeight: defaultStoneWeight,
               caratWeight: defaultCaratWeight,
               stoneRate: defaultStoneRate,
@@ -2197,6 +2204,7 @@ export async function importProductsFromExcel(
       }, 0);
       const year = new Date().getFullYear();
 
+      const fineOf = await getFineWeightResolver(storeId);
       const stockToCreate: Prisma.InventoryStockCreateManyInput[] = rowsWantingStock.map((row) => {
         highestStockSeq += 1;
         return {
@@ -2212,6 +2220,7 @@ export async function importProductsFromExcel(
           stoneCharge: row.defaultStoneCharge,
           grossWeight: row.defaultGrossWeight,
           netWeight: row.defaultNetWeight,
+          fineWeight: fineOf({ metalTypeId: row.metalTypeId, purity: row.defaultPurity, netWeight: row.defaultNetWeight == null ? null : Number(row.defaultNetWeight) }),
           stoneWeight: row.defaultStoneWeight,
           caratWeight: row.defaultCaratWeight,
           stoneRate: row.defaultStoneRate,

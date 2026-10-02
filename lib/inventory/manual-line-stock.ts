@@ -249,9 +249,12 @@ export async function createStockForManualSaleLine(
     actor: Actor;
     locationId?: string | null;
     referenceType: string;
+    /** Pure-metal weight of the line (getFineWeightResolver), resolved by
+     *  the caller before its transaction. */
+    fineWeight?: number | null;
   },
 ): Promise<string> {
-  const { storeId, line, actor, locationId, referenceType } = params;
+  const { storeId, line, actor, locationId, referenceType, fineWeight } = params;
 
   // Every id below is re-resolved against this store (a stale or foreign
   // id is dropped, never attached) — validateManualSaleLines has already
@@ -388,6 +391,7 @@ export async function createStockForManualSaleLine(
       status: InventoryStockStatus.IN_STOCK,
       grossWeight: toDecimal(line.grossWeight),
       netWeight: toDecimal(line.netWeight),
+      fineWeight: toDecimal(fineWeight),
       caratWeight: toDecimal(line.caratWeight),
       stoneWeight: toDecimal(line.stoneWeight),
       dmoWeight: toDecimal(line.dmoWeight),

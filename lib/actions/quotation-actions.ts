@@ -14,6 +14,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { getFineWeightResolver } from "@/lib/fine-weight";
 import { computeRoundOff } from "@/lib/round-off";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
@@ -597,6 +598,7 @@ export async function createQuotation(
     // Weight (see lineQuantity) and a tampered POST could otherwise still
     // submit its own weight for a "locked" field.
     const storeId = await requireStoreScope();
+    const fineOf = await getFineWeightResolver(storeId);
 
     // Captured directly off the freshly-parsed items, before anything else
     // touches them — Quotation's inventoryStockId is nullable (a manual
@@ -738,6 +740,7 @@ export async function createQuotation(
             quantity: item.quantity || 1,
             grossWeight: item.grossWeight ?? undefined,
             netWeight: item.netWeight ?? undefined,
+            fineWeight: fineOf(item) ?? undefined,
             stoneWeight: item.stoneWeight ?? undefined,
             caratWeight: item.caratWeight ?? undefined,
             rate: item.rate ?? undefined,
@@ -1039,6 +1042,7 @@ export async function convertQuotationToInvoice(
               quantity: item.quantity,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
+              fineWeight: item.fineWeight ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,

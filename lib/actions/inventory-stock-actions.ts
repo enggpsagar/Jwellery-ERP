@@ -889,6 +889,7 @@ export async function receiveItemsFromKarigar(
             grossWeight: item.grossWeight ?? undefined,
             lessWeight: item.lessWeight ?? undefined,
             netWeight: item.netWeight ?? undefined,
+            fineWeight,
             stoneWeight: item.stoneWeight ?? undefined,
             dmoWeight: item.dmoWeight ?? undefined,
             wastagePercent: item.wastagePercent ?? undefined,

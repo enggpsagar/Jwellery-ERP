@@ -10,6 +10,7 @@ import { formatLedgerSource } from "@/lib/ledger-format"
 import { MONEY_UNIT } from "@/lib/business-units"
 import { getActiveBusinessUnits, type BusinessUnitOption } from "@/lib/business-units.server"
 import { formatShortDate } from "@/lib/utils"
+import { fineOrNet } from "@/lib/fine-weight-read"
 
 export type LedgerEntryRow = {
   id: string
@@ -30,6 +31,8 @@ export type LedgerEntryRow = {
   type: "CREDIT" | "DEBIT"
   amount: number
   metalType: string | null
+  /** Fine (pure 24K/999) weight: metalWeightFine for a purity metal (which
+   * only ever writes that column), else the raw metalWeight. */
   metalWeight: number | null
   /** Carat quantity for a gemstone entry — a gemstone is carat-based, not
    * weight-based, so it never shares metalWeight with a plain metal. */
@@ -109,7 +112,10 @@ export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
       type: entry.type as "CREDIT" | "DEBIT",
       amount: Number(entry.amount ?? 0),
       metalType: entry.metalType?.name ?? null,
-      metalWeight: entry.metalWeight ? Number(entry.metalWeight) : null,
+      metalWeight:
+        (entry.metalWeightFine ?? entry.metalWeight) !== null
+          ? Number(entry.metalWeightFine ?? entry.metalWeight)
+          : null,
       caratWeight: entry.caratWeight ? Number(entry.caratWeight) : null,
       paymentMethod: entry.paymentMethod ?? null,
       description: entry.description ?? "",
@@ -688,6 +694,7 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
       },
       select: {
         netWeight: true,
+        fineWeight: true,
         caratWeight: true,
         lineTotal: true,
         metalTypeId: true,
@@ -701,6 +708,7 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
       },
       select: {
         netWeight: true,
+        fineWeight: true,
         caratWeight: true,
         lineTotal: true,
         metalTypeId: true,
@@ -714,6 +722,7 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
       },
       select: {
         netWeight: true,
+        fineWeight: true,
         caratWeight: true,
         lineTotal: true,
         metalTypeId: true,
@@ -744,9 +753,13 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
   }
 
   // A gemstone unit is carat-based, not weight-based — its "quantity" is
-  // caratWeight, never the line's rupee amount.
-  function valueFor(unit: BusinessUnitOption, netWeight: unknown, caratWeight: unknown) {
-    return unit.isGemstone ? Number(caratWeight ?? 0) : Number(netWeight ?? 0)
+  // caratWeight, never the line's rupee amount. Any other unit totals fine
+  // (pure 24K/999) weight, never the physical net weight.
+  function valueFor(
+    unit: BusinessUnitOption,
+    item: { netWeight: unknown; fineWeight: unknown; caratWeight: unknown },
+  ) {
+    return unit.isGemstone ? Number(item.caratWeight ?? 0) : fineOrNet(item)
   }
 
   for (const item of purchaseItems) {
@@ -757,7 +770,7 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
     const dateISO = item.purchase.purchaseDate.toISOString().slice(0, 10)
     const amount = Number(item.lineTotal ?? 0)
     const entry = unitTotals(dayTotals(dateISO), unit.value)
-    entry.purchasedValue += valueFor(unit, item.netWeight, item.caratWeight)
+    entry.purchasedValue += valueFor(unit, item)
     entry.purchasedAmount += amount
   }
 
@@ -770,7 +783,7 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
     const dateISO = invoiceDate.toISOString().slice(0, 10)
     const amount = Number(item.lineTotal ?? 0)
     const entry = unitTotals(dayTotals(dateISO), unit.value)
-    entry.soldValue += valueFor(unit, item.netWeight, item.caratWeight)
+    entry.soldValue += valueFor(unit, item)
     entry.soldAmount += amount
   }
 

@@ -64,12 +64,14 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 }
 
 /** Gold/silver entries are settled by weight and Diamond by carats, not
- * rupees — show the weight/carat quantity instead of ₹ for those rows. */
+ * rupees — show the weight/carat quantity instead of ₹ for those rows.
+ * metalWeight is already the fine (pure 24K/999) figure — see
+ * getLedgerEntries. */
 function formatEntryValue(entry: LedgerEntryRow) {
   const family = classifyMetalName(entry.metalType)
 
   if ((family === "GOLD" || family === "SILVER") && entry.metalWeight != null) {
-    return `${Math.abs(entry.metalWeight).toLocaleString("en-IN", { maximumFractionDigits: 3 })} g`
+    return `${Math.abs(entry.metalWeight).toLocaleString("en-IN", { maximumFractionDigits: 3 })} g fine`
   }
 
   if (family === "DIAMOND" && entry.caratWeight != null) {

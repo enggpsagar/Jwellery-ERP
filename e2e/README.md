@@ -18,6 +18,7 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `smoke.spec.ts` | Every main screen opens: no 5xx, no "Something went wrong", no browser error, no bounce to login |
 | `billing.spec.ts` | A "Create New Line Item" invoice line creates its Product (with Metal + Category) + Stock and sells it to 0, recording its (required) Purchased From party on the stock row; a new line missing Category is blocked; quantity can't exceed stock |
 | `source-party.spec.ts` | A hand-typed Kacha / Quotation line can't be saved without its Purchased From party; the party is stored on the line and shown on the detail page |
+| `fine-weight.spec.ts` | 22K stock is backfilled at 91.6% fine; a 22K invoice line saves 9.16 g fine for 10 g on the line and its stock |
 | `inventory.spec.ts` | Category → Type filters, Stone Type swap for a stone, footer totals (Products and Stock) |
 | `artisan.spec.ts` | Open Jobs → Receive Items; Receive Material's net weight calculation |
 | `dashboard.spec.ts` | Best Sellers card: every period and tab renders, ranked list shows |
@@ -37,7 +38,7 @@ Never against the `.env` database. Use a local Postgres:
 createdb rl_e2e   # or: psql -c "create database rl_e2e"
 export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rl_e2e
 export NEXTAUTH_SECRET=local-e2e NEXTAUTH_URL=http://localhost:3100 SMTP_HOST=
-npx prisma migrate deploy && pnpm seed && pnpm db:seed:full-demo
+npx prisma migrate deploy && pnpm seed && pnpm db:seed:full-demo && pnpm db:backfill:fine-weights
 pnpm build
 npx playwright install chromium   # first time only
 pnpm test:e2e

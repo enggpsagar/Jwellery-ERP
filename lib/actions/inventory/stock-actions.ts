@@ -32,7 +32,7 @@ import {
   parseExcelUpload,
 } from "@/lib/excel-export"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
-import { getFinenessMap, toFineWeight } from "@/lib/purity"
+import { resolveFineWeight } from "@/lib/fine-weight"
 import { formatShortDate, formatShortDateTime } from "@/lib/utils"
 import { logger } from "@/lib/logger";
 import { parseDateRangeBoundary } from "@/lib/date-range";
@@ -770,11 +770,11 @@ export async function createInventoryStock(
       select: { hasPurity: true },
     })
 
-    let metalWeightFine: number | undefined
-    if (storeMetal?.hasPurity && purity && netWeight) {
-      const fineness = await getFinenessMap(storeId)
-      metalWeightFine = toFineWeight(netWeight, purity, fineness)
-    }
+    // Pure-metal weight, stored on the row and posted to the ledger — same
+    // rule as every other metal line (lib/fine-weight.ts), which also reads
+    // the metal's own purity row instead of only the legacy enum.
+    const fineWeight = await resolveFineWeight(storeId, { metalTypeId, purityLabel, purity, netWeight })
+    const metalWeightFine = storeMetal?.hasPurity && fineWeight ? fineWeight : undefined
 
     await prisma.$transaction([
       prisma.inventoryStock.create({
@@ -792,6 +792,7 @@ export async function createInventoryStock(
           grossWeight: toDecimal(grossWeight),
           lessWeight: toDecimal(lessWeight),
           netWeight: toDecimal(netWeight),
+          fineWeight: toDecimal(fineWeight),
           stoneWeight: toDecimal(stoneWeight),
           caratWeight: toDecimal(caratWeight),
           dmoWeight: toDecimal(dmoWeight),
@@ -1147,6 +1148,7 @@ export async function updateInventoryStock(
         grossWeight: toDecimal(grossWeight),
         lessWeight: toDecimal(lessWeight),
         netWeight: toDecimal(netWeight),
+        fineWeight: toDecimal(await resolveFineWeight(storeId, { metalTypeId, purityLabel, purity, netWeight })),
         stoneWeight: toDecimal(stoneWeight),
         caratWeight: toDecimal(caratWeight),
         dmoWeight: toDecimal(dmoWeight),

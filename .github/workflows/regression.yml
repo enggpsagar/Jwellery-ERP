@@ -88,6 +88,7 @@ jobs:
           npx prisma migrate deploy
           pnpm seed
           pnpm db:seed:full-demo
+          pnpm db:backfill:fine-weights
 
       - name: Build
         run: pnpm build

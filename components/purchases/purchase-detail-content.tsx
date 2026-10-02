@@ -1,8 +1,11 @@
 import Link from "next/link"
 
-import type { Purchase } from "@/lib/actions/purchase-actions"
+import type { Purchase, PurchaseItemComponent } from "@/lib/actions/purchase-actions"
 import { formatShortDate } from "@/lib/utils"
 import { PurchaseStatusBadge } from "@/components/purchases/purchase-status-badge"
+
+const rupees = (value: number) =>
+  `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CASH: "Cash",
@@ -78,11 +81,48 @@ export function PurchaseDetailContent({
             </tr>
           </thead>
           <tbody>
-            {purchase.items.map((item: (typeof purchase.items)[number]) => (
+            {purchase.items.map((item: (typeof purchase.items)[number]) => {
+              // One piece of several metals/stones — its rows carry the
+              // real purities, weights and rates; the line's own Purity/
+              // Rate are only a summary (first metal / none).
+              const multiPart = item.components.length > 0
+              return (
               <tr key={item.id} className="border-b last:border-0">
                 <td className="px-4 py-3">
                   {item.itemName}
-                  {item.stoneMetalTypeName ? (
+                  {multiPart ? (
+                    <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground" data-testid="purchase-item-components">
+                      {item.components.map((component: PurchaseItemComponent, index: number) => (
+                        <li key={index}>
+                          {component.kind === "METAL" ? (
+                            <>
+                              <span className="font-medium text-foreground">
+                                {[component.metalName ?? "Metal", component.purityLabel ?? component.purity].filter(Boolean).join(" ")}
+                              </span>
+                              {" · "}
+                              {(component.netWeight ?? 0).toFixed(3)} g net
+                              {component.fineWeight != null && component.fineWeight !== component.netWeight
+                                ? ` · ${component.fineWeight.toFixed(3)} g pure`
+                                : ""}
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-medium text-foreground">
+                                {component.stoneMetalTypeName ?? "Stone"}
+                                {component.stoneTypeNames ? ` (${component.stoneTypeNames})` : ""}
+                              </span>
+                              {" · "}
+                              {(component.caratWeight ?? 0).toFixed(2)} ct
+                            </>
+                          )}
+                          {" · "}
+                          {rupees(component.amount)}
+                          {item.quantity > 1 ? " / piece" : ""}
+                          {component.gstRatePercent != null ? ` · GST ${component.gstRatePercent}%` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : item.stoneMetalTypeName ? (
                     <span className="block text-xs text-muted-foreground">
                       Stone: {item.stoneMetalTypeName}
                       {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
@@ -90,16 +130,19 @@ export function PurchaseDetailContent({
                   ) : null}
                 </td>
                 <td className="px-4 py-3">{item.quantity}</td>
-                <td className="px-4 py-3">{item.purity ?? "-"}</td>
+                <td className="px-4 py-3">{multiPart ? "Mixed" : item.purity ?? "-"}</td>
                 <td className="px-4 py-3">
-                  {item.purity === "DIAMOND"
+                  {multiPart
+                    ? item.netWeight != null ? `${item.netWeight.toFixed(3)} g` : "-"
+                    : item.purity === "DIAMOND"
                     ? item.caratWeight != null ? `${item.caratWeight.toFixed(3)} ct` : "-"
                     : item.netWeight != null ? `${item.netWeight.toFixed(3)} g` : "-"}
                 </td>
-                <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
+                <td className="px-4 py-3">{multiPart ? "Mixed" : item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
                 <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>

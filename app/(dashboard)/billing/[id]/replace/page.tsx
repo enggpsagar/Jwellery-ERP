@@ -26,6 +26,7 @@ import { getGstRates } from "@/lib/actions/gst-rate-actions"
 import { resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
 
 import { InvoiceForm, type LineItem } from "@/components/billing/invoice-form"
+import { fromStoredComponents } from "@/lib/piece-components"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 type Props = {
@@ -150,6 +151,9 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     categoryTypeId: "",
     targetStyleId: "",
     sourcePartyId: "",
+    // A piece of several metals/stones comes back with its own rows.
+    multiPart: (item.components?.length ?? 0) > 0,
+    components: fromStoredComponents(item.components ?? []),
   }
   })
 

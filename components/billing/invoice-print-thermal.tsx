@@ -3,6 +3,7 @@ import { formatShortDate } from "@/lib/utils"
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst"
 import type { Invoice } from "@/lib/actions/invoice-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
+import { PieceBreakdown } from "@/components/billing/piece-breakdown"
 
 type InvoicePrintThermalProps = {
   invoice: Invoice
@@ -86,6 +87,7 @@ export function InvoicePrintThermal({ invoice, settings }: InvoicePrintThermalPr
           return (
             <div key={item.id}>
               <p className="font-medium">{item.itemName}</p>
+              <PieceBreakdown components={item.components} className="mt-0.5 space-y-0 text-[10px] font-normal leading-snug text-gray-600" />
               <div className="flex justify-between">
                 <span>
                   {unit === "Pcs" ? qty : qty.toFixed(3)} {unit} x ₹{fmt(Number(item.rate ?? 0))}

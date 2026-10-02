@@ -42,6 +42,22 @@ import {
 import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
+import { PieceComponentsEditor } from "@/components/shared/piece-components-editor"
+import {
+  fromStoredComponents,
+  newMetalRow,
+  newStoneRow,
+  pieceGst,
+  pieceTotals,
+  toComponentPayload,
+  type PieceComponentDraft,
+  type PieceValueOptions,
+  type StoredPieceComponent,
+} from "@/lib/piece-components"
+
+// A purchase values each metal row on its net weight × rate (not pure
+// weight — that's a Customer Exchange) — lib/piece-components.ts.
+const PIECE_VALUE: PieceValueOptions = { valuation: "net" }
 
 type VendorOption = {
   id: string
@@ -78,6 +94,10 @@ type ProductOption = {
   defaultStoneTypeNames: string | null
   hsnCode: string | null
   isActive: boolean
+  /** Set only for a Product made of several metals or stones — picking it
+   * opens the line multi-part with these rows (physical facts locked, rates
+   * typed here). See getPurchaseFormProducts. */
+  pieceComponents?: StoredPieceComponent[] | null
 }
 
 export type LineItem = {
@@ -152,6 +172,14 @@ export type LineItem = {
    * minted for it from this line's own name/metal/purity/weights, see
    * createProductFromManualEntry in purchase-actions.ts. */
   productLinkDecided: boolean
+  /** "Made of more than one metal or stone?" — one piece of e.g. Gold 22K
+   * + Silver 925 + a Diamond, each row in `components` with its own
+   * purity, weight, rate and GST rate (lib/piece-components.ts). While on,
+   * the single Metal/Purity/weights/rate/stone fields above are ignored
+   * (the server overwrites them with the piece's summary) and this line's
+   * own gstRateId taxes only its making charge. */
+  multiPart: boolean
+  components: PieceComponentDraft[]
 }
 
 // `key` defaults to a fresh UUID for every "Add Item" click (client-only,
@@ -198,7 +226,56 @@ function emptyLineItem(defaultGstRateId?: string, key: string = crypto.randomUUI
     netTouched: false,
     gstRateId: defaultGstRateId ?? "",
     productLinkDecided: false,
+    multiPart: false,
+    components: [],
   }
+}
+
+/** A multi-part Product's rows as editable drafts — physical facts from
+ * the Product; a stone's value follows carats × rate once it has a rate. */
+function draftsFromProduct(rows: StoredPieceComponent[]): PieceComponentDraft[] {
+  return fromStoredComponents(rows).map((row) =>
+    row.kind === "STONE" ? { ...row, amountTouched: !(row.rate > 0) } : row,
+  )
+}
+
+/** First rows when "Made of more than one metal or stone?" is turned on —
+ * one metal and one stone, seeded from whatever the single line already
+ * had so nothing typed so far is lost. Weights are grams, same as
+ * LineItem's own. */
+function startingComponents(item: LineItem): PieceComponentDraft[] {
+  const isMetalLine = item.itemKind === "METAL"
+  const stoneGrams = item.hasStoneComponent || !isMetalLine ? item.stoneWeightInput : 0
+  const metal = {
+    ...newMetalRow(isMetalLine ? item.rate : 0, item.gstRateId),
+    ...(isMetalLine
+      ? {
+          metalTypeId: item.metalTypeId,
+          purityLabel: item.purityLabel,
+          purity: item.purity,
+          grossWeight: Math.max(0, Number((item.grossWeight - stoneGrams).toFixed(5))),
+          netWeight: item.netWeight,
+          netTouched: item.netWeight > 0,
+        }
+      : {}),
+  }
+  const hasStone = !isMetalLine || (item.hasStoneComponent && Boolean(item.stoneMetalTypeName))
+  const stone = {
+    ...newStoneRow(item.gstRateId),
+    ...(hasStone
+      ? {
+          stoneMetalTypeName: item.stoneMetalTypeName,
+          stoneTypeNames: item.stoneTypeNames,
+          caratWeight: item.caratWeight,
+          stoneWeight: item.stoneWeightInput,
+          stoneWeightTouched: item.stoneWeightInput > 0,
+          rate: item.stoneRate,
+          amount: item.stoneCharge,
+          amountTouched: item.stoneChargeTouched,
+        }
+      : {}),
+  }
+  return [metal, stone]
 }
 
 function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: number) {
@@ -231,6 +308,9 @@ type PurchaseFormProps = {
   /** Legacy last-resort fallback (BusinessSettings.defaultGstRate) — see
    * the same prop on InvoiceForm. */
   defaultGstRate?: number
+  /** Store's per-enum fineness (Settings > Purity) — only shown as each
+   * multi-part metal row's pure weight; never priced on here. */
+  enumFineness?: Record<string, number>
   /** The store's own state, compared against the selected vendor's state to
    * tell an inter-state purchase (IGST) from an intra-state one (SGST+CGST). */
   storeState?: string | null
@@ -291,6 +371,7 @@ export function PurchaseForm({
   caratConversionRates,
   gstRates,
   defaultGstRate = 0,
+  enumFineness = {},
   storeState,
   initialLocationId,
   editPurchaseId,
@@ -453,8 +534,12 @@ export function PurchaseForm({
       setDiscount(draft.discount ?? 0)
       setPaymentRows(draft.paymentRows ?? [])
 
+      // A draft parked before multi-part lines existed has no
+      // multiPart/components on its items — default them off.
       let nextItems =
-        draft.items && draft.items.length ? draft.items : [emptyLineItem(gstRateId)]
+        draft.items && draft.items.length
+          ? draft.items.map((item) => ({ ...item, multiPart: item.multiPart ?? false, components: item.components ?? [] }))
+          : [emptyLineItem(gstRateId)]
 
       // The page refetched on the way back in, so a product created a moment
       // ago is already in `products` — it only needs applying to the line
@@ -570,9 +655,19 @@ export function PurchaseForm({
 
     if (!isGemstoneProduct && product.metalType?.id) ensureMetalPurities(product.metalType.id)
 
+    // A Product made of several metals/stones opens multi-part, its rows
+    // locked to the Product (lockLinkedProductFields rebuilds them the same
+    // way server-side) — only rates and GST stay to type.
+    const pieceComponents = product.pieceComponents?.length ? product.pieceComponents : null
+    for (const row of pieceComponents ?? []) {
+      if (row.kind === "METAL" && row.metalTypeId) ensureMetalPurities(row.metalTypeId)
+    }
+
     updateItem(key, {
       productId,
       productLinkDecided: true,
+      multiPart: Boolean(pieceComponents),
+      components: pieceComponents ? draftsFromProduct(pieceComponents) : [],
       itemName: product.name,
       itemKind: isGemstoneProduct ? "STONE" : "METAL",
       metalTypeId: isGemstoneProduct ? "" : product.metalType?.id ?? "",
@@ -666,7 +761,16 @@ export function PurchaseForm({
   }, [metalPuritiesCache])
 
   useEffect(() => {
-    const uniqueMetalTypeIds = Array.from(new Set(items.map((item) => item.metalTypeId).filter(Boolean)))
+    const uniqueMetalTypeIds = Array.from(
+      new Set(
+        items
+          .flatMap((item) => [
+            item.metalTypeId,
+            ...item.components.map((row) => (row.kind === "METAL" ? row.metalTypeId : "")),
+          ])
+          .filter(Boolean),
+      ),
+    )
     for (const id of uniqueMetalTypeIds) ensureMetalPurities(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -809,8 +913,19 @@ export function PurchaseForm({
   // own GST is computed against. The document's Discount is applied once,
   // at the very end (see totalAmount below), same as Invoice — it does not
   // reduce any individual line's own taxable base.
+  // A multi-part line's metal and stone values are its rows' (per piece)
+  // times Qty — mirrors lineMetalValue/lineStoneValue in purchase-actions.ts.
+  const lineMetalValue = (item: LineItem) =>
+    item.multiPart
+      ? pieceTotals(item.components, PIECE_VALUE).metalValue * (item.quantity || 1)
+      : item.rate * lineQuantity(item)
+  const lineStoneValue = (item: LineItem) =>
+    item.multiPart
+      ? pieceTotals(item.components, PIECE_VALUE).stoneValue * (item.quantity || 1)
+      : item.stoneCharge
+
   const lineTaxableValue = (item: LineItem) =>
-    item.rate * lineQuantity(item) + item.makingCharge + item.stoneCharge
+    lineMetalValue(item) + item.makingCharge + lineStoneValue(item)
 
   // This line's own GST %, resolved from its own gstRateId against the full
   // `gstRates` prop — falls back to the document-level default (`gstRate`
@@ -828,14 +943,35 @@ export function PurchaseForm({
   // one vendor's state vs. the store's own, both constant for the whole
   // document.
   const lineGst = (item: LineItem) => {
-    const breakdown = computePurchaseGst(
-      lineTaxableValue(item),
-      lineGstRatePercent(item),
-      selectedVendor?.gstType ?? "UNREGISTERED",
-      storeState,
-      selectedVendor?.state,
-    )
     const round = (value: number) => Math.round(value * 100) / 100
+    const split = (taxable: number, ratePercent: number) =>
+      computePurchaseGst(
+        taxable,
+        ratePercent,
+        selectedVendor?.gstType ?? "UNREGISTERED",
+        storeState,
+        selectedVendor?.state,
+      )
+    // Multi-part: each metal/stone row at its own GST rate (a blank row
+    // falls back to the line's rate), plus the making charge at the line's
+    // own rate.
+    if (item.multiPart) {
+      const rows = pieceGst(
+        item.components,
+        PIECE_VALUE,
+        item.quantity || 1,
+        (id) => gstRates.find((r) => r.id === id)?.ratePercent ?? lineGstRatePercent(item),
+        split,
+      )
+      const making = split(item.makingCharge, lineGstRatePercent(item))
+      return {
+        sgst: round(rows.sgst + round(making.sgst)),
+        cgst: round(rows.cgst + round(making.cgst)),
+        igst: round(rows.igst + round(making.igst)),
+        isInterState: making.isInterState,
+      }
+    }
+    const breakdown = split(lineTaxableValue(item), lineGstRatePercent(item))
     return {
       sgst: round(breakdown.sgst),
       cgst: round(breakdown.cgst),
@@ -850,7 +986,7 @@ export function PurchaseForm({
   }
 
   const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.rate * lineQuantity(item), 0),
+    () => items.reduce((sum, item) => sum + lineMetalValue(item), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
@@ -859,7 +995,8 @@ export function PurchaseForm({
     [items],
   )
   const stoneChargesTotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.stoneCharge, 0),
+    () => items.reduce((sum, item) => sum + lineStoneValue(item), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
   // Recomputed from each line's own sgst/cgst/igst rather than a single
@@ -892,6 +1029,11 @@ export function PurchaseForm({
       const unit = primaryUnitFor(item)
       const toUnit = (grams: number) => toPrimaryUnit(grams, "GRAM", unit, gramsPerCarat)
       const { sgst, cgst, igst } = lineGst(item)
+      const filledRows = item.components.filter((row) =>
+        row.kind === "METAL"
+          ? Boolean(row.metalTypeId) || row.netWeight > 0
+          : Boolean(row.stoneMetalTypeName) || row.caratWeight > 0 || row.amount > 0,
+      )
       return {
         productId: item.productId,
         itemName: item.itemName || "Item",
@@ -919,6 +1061,21 @@ export function PurchaseForm({
         cgstAmount: cgst,
         igstAmount: igst,
         gstRateId: item.gstRateId || null,
+        multiPart: item.multiPart,
+        // A row left on the default GST picks up the line's own rate, so
+        // what's stored is what was taxed (see lineGst). A row never filled
+        // in at all (e.g. the starter stone row on a metals-only piece) is
+        // dropped rather than failing the save — it's worth ₹0 either way
+        // (all rows still go when none is filled, so the server's "add the
+        // metals and stones" error fires instead of a silent single line).
+        components: item.multiPart
+          ? toComponentPayload(
+              (filledRows.length ? filledRows : item.components).map((row) =>
+                row.gstRateId ? row : { ...row, gstRateId: item.gstRateId },
+              ),
+              PIECE_VALUE,
+            )
+          : null,
       }
     }),
   )
@@ -1106,6 +1263,7 @@ export function PurchaseForm({
               // Mirrors Invoice's own isLinked, keyed on productId instead
               // of inventoryStockId since Purchase reads from Product.
               const isLinked = Boolean(item.productId)
+              const piece = item.multiPart ? pieceTotals(item.components, PIECE_VALUE) : null
 
               return (
               <div key={item.key} className="rounded-lg border">
@@ -1178,6 +1336,18 @@ export function PurchaseForm({
                     />
                   </div>
 
+                  {piece ? (
+                    // Multi-part: all metals' net weight together, read-only
+                    // here — each metal's own weight is typed in Details.
+                    <div className="space-y-1">
+                      <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-sm text-muted-foreground">
+                        {piece.metalNet.toFixed(3)} g
+                      </div>
+                      {piece.stoneCarats > 0 && (
+                        <p className="text-[10px] leading-tight text-muted-foreground">+ {piece.stoneCarats.toFixed(2)} ct stones</p>
+                      )}
+                    </div>
+                  ) : (
                   <div className="space-y-1">
                     <div className="flex gap-1">
                       <Input
@@ -1215,7 +1385,16 @@ export function PurchaseForm({
                       <p className="text-[10px] leading-tight text-muted-foreground">Gross − stone</p>
                     )}
                   </div>
+                  )}
 
+                  {piece ? (
+                    <div
+                      className="flex h-8 items-center rounded-md border bg-muted px-2 text-sm text-muted-foreground"
+                      title="Each metal and stone has its own rate — see Details"
+                    >
+                      Mixed
+                    </div>
+                  ) : (
                   <div className="space-y-1">
                     <Input
                       type="number"
@@ -1226,6 +1405,7 @@ export function PurchaseForm({
                       }
                     />
                   </div>
+                  )}
 
                   <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-xs text-muted-foreground">
                     ₹{gstTotal.toFixed(2)}
@@ -1274,6 +1454,66 @@ export function PurchaseForm({
                       </div>
                     </div>
 
+                    {/* One piece of several metals/stones (lib/piece-components.ts).
+                        Locked on a linked line — whether the Product is
+                        multi-part is a fact of its catalog entry. */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <IncludesStoneToggle
+                        label="Made of more than one metal or stone?"
+                        checked={item.multiPart}
+                        disabled={isLinked}
+                        onChange={(checked) => {
+                          const components = checked ? startingComponents(item) : []
+                          for (const row of components) {
+                            if (row.kind === "METAL" && row.metalTypeId) ensureMetalPurities(row.metalTypeId)
+                          }
+                          updateItem(item.key, { multiPart: checked, components })
+                        }}
+                      />
+                      {item.multiPart && (
+                        <span className="text-xs text-muted-foreground">
+                          Each metal and stone has its own purity, weight, rate and GST rate.
+                        </span>
+                      )}
+                    </div>
+
+                    {item.multiPart && piece && (
+                      <>
+                        <div className="rounded-md border-2 border-dashed border-amber-400 bg-amber-50/40 p-3">
+                          <PieceComponentsEditor
+                            rows={item.components}
+                            onRowsChange={(rows) => updateItem(item.key, { components: rows })}
+                            metals={metals}
+                            origins={origins}
+                            puritiesByMetal={metalPuritiesCache}
+                            ensurePurities={ensureMetalPurities}
+                            enumFineness={enumFineness}
+                            valuation="net"
+                            gstRates={selectedVendor && isVendorGstApplicable(selectedVendor.gstType) ? gstRates : undefined}
+                            defaultGstRateId={item.gstRateId}
+                            rateForMetal={(metal) => metal.sellingPrice ?? 0}
+                            lockPhysical={isLinked}
+                            testIdPrefix="purchase-piece"
+                          />
+                        </div>
+                        {/* % mode is a share of the piece's metal value
+                            (one piece, same basis as rate × net weight on a
+                            single-metal line). */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <MakingChargeInput
+                            rate={piece.metalValue}
+                            netWeight={1}
+                            value={item.makingCharge}
+                            onChange={(v) => updateItem(item.key, { makingCharge: v })}
+                            chargeType={item.makingChargeType}
+                            onChargeTypeChange={(t) => updateItem(item.key, { makingChargeType: t })}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {!item.multiPart && (
+                    <>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {/* First field in this section, per the explicit ask —
                           replaces "which Purity did you pick" as the signal
@@ -1638,6 +1878,8 @@ export function PurchaseForm({
                         />
                       </div>
                     )}
+                    </>
+                    )}
 
                     {/* Per-line GST Rate — this line's own selection, no
                         document-level picker anymore (see LineItem.gstRateId's
@@ -1646,7 +1888,7 @@ export function PurchaseForm({
                         deactivated. */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                        <Label className="text-xs">GST Rate</Label>
+                        <Label className="text-xs">{item.multiPart ? "GST Rate (making charge)" : "GST Rate"}</Label>
                         <Select
                           value={item.gstRateId || undefined}
                           disabled={!selectedVendor || !isVendorGstApplicable(selectedVendor.gstType)}
@@ -1675,7 +1917,9 @@ export function PurchaseForm({
                           shown is THIS line's own resolved rate. */}
                       {gst.isInterState ? (
                         <div className="space-y-1">
-                          <Label className="text-xs">IGST ({lineGstRatePercent(item).toFixed(2)}%)</Label>
+                          <Label className="text-xs">
+                            {item.multiPart ? "IGST (per row)" : `IGST (${lineGstRatePercent(item).toFixed(2)}%)`}
+                          </Label>
                           <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
                             ₹{gst.igst.toFixed(2)}
                           </div>
@@ -1683,14 +1927,18 @@ export function PurchaseForm({
                       ) : (
                         <>
                           <div className="space-y-1">
-                            <Label className="text-xs">SGST ({(lineGstRatePercent(item) / 2).toFixed(2)}%)</Label>
+                            <Label className="text-xs">
+                              {item.multiPart ? "SGST (per row)" : `SGST (${(lineGstRatePercent(item) / 2).toFixed(2)}%)`}
+                            </Label>
                             <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
                               ₹{gst.sgst.toFixed(2)}
                             </div>
                           </div>
 
                           <div className="space-y-1">
-                            <Label className="text-xs">CGST ({(lineGstRatePercent(item) / 2).toFixed(2)}%)</Label>
+                            <Label className="text-xs">
+                              {item.multiPart ? "CGST (per row)" : `CGST (${(lineGstRatePercent(item) / 2).toFixed(2)}%)`}
+                            </Label>
                             <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
                               ₹{gst.cgst.toFixed(2)}
                             </div>

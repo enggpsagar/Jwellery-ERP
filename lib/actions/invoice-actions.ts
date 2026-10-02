@@ -13,11 +13,19 @@ import {
   PaymentMethod,
   PurityType,
   ChargeType,
+  Prisma,
   TransportMode,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { getFineWeightResolver } from "@/lib/fine-weight";
+import {
+  getPieceResolver,
+  pieceComponentCreates,
+  serializeStoredComponents,
+  type ResolvedPiece,
+} from "@/lib/piece-components.server";
+import type { PieceComponentPayload, StoredPieceComponent } from "@/lib/piece-components";
 import { recordOldGoldExchange, resolveOldGoldLines, type OldGoldLineInput } from "@/lib/old-gold/exchange";
 import { round2, splitOldGoldValue } from "@/lib/old-gold/value";
 import { computeRoundOff } from "@/lib/round-off";
@@ -101,6 +109,11 @@ export type InvoiceLineItemInput = {
   // "Purchased From" party for that line's minted stock — see
   // ManualSaleLine.vendorId.
   vendorId?: string | null;
+  // A piece made of several metals/stones — its rows (lib/piece-components.ts).
+  multiPart?: boolean | null;
+  components?: PieceComponentPayload[] | null;
+  // Server-only: the resolved rows (resolvePieceLines), never from the client.
+  piece?: ResolvedPiece;
 };
 
 export type InvoiceFormState = {
@@ -212,8 +225,109 @@ function lineQuantity(item: {
   return perPiece * (toNumber(item.quantity, 1) || 1);
 }
 
+/** Metal value of a line — row by row for a multi-part piece. */
+function lineMetalValue(item: InvoiceLineItemInput) {
+  return item.piece
+    ? item.piece.metalValue * (toNumber(item.quantity, 1) || 1)
+    : toNumber(item.rate) * lineQuantity(item);
+}
+
+/**
+ * Multi-part lines ("Made of more than one metal or stone?"): validates and
+ * values each piece's rows (lib/piece-components.server.ts) and folds the
+ * result into the line's own summary fields — first metal, combined net
+ * weight, stones' value as the line's stoneCharge (× quantity, the line-
+ * level convention) and no single rate. A stock piece's metals and stones
+ * come from its own stored rows; only rates and GST come from the client.
+ */
+async function resolvePieceLines(
+  storeId: string,
+  items: InvoiceLineItemInput[],
+): Promise<{ error: string } | InvoiceLineItemInput[]> {
+  const isPiece = (item: InvoiceLineItemInput) => Boolean(item.multiPart && item.components?.length);
+  if (!items.some(isPiece)) return items.map((item) => ({ ...item, piece: undefined }));
+
+  const resolvePiece = await getPieceResolver(storeId, { valuation: "net" });
+  const linkedIds = items.filter((item) => isPiece(item) && item.inventoryStockId).map((item) => item.inventoryStockId as string);
+  const stored = linkedIds.length
+    ? await prisma.pieceComponent.findMany({
+        where: { inventoryStockId: { in: linkedIds }, inventoryStock: { storeId } },
+        orderBy: { sortOrder: "asc" },
+      })
+    : [];
+  const storedByStock = new Map<string, typeof stored>();
+  for (const row of stored) {
+    const list = storedByStock.get(row.inventoryStockId as string) ?? [];
+    list.push(row);
+    storedByStock.set(row.inventoryStockId as string, list);
+  }
+  const num = (value: Prisma.Decimal | null) => (value == null ? null : Number(value));
+
+  const out: InvoiceLineItemInput[] = [];
+  for (const item of items) {
+    if (!isPiece(item)) {
+      out.push({ ...item, multiPart: false, components: null, piece: undefined });
+      continue;
+    }
+    let rows = item.components as PieceComponentPayload[];
+    if (item.inventoryStockId) {
+      const own = storedByStock.get(item.inventoryStockId) ?? [];
+      if (!own.length) {
+        out.push({ ...item, multiPart: false, components: null, piece: undefined });
+        continue;
+      }
+      rows = own.map((row, index) => {
+        const sent = rows[index];
+        return {
+          kind: row.kind,
+          metalTypeId: row.metalTypeId,
+          purityLabel: row.purityLabel,
+          purity: row.purity,
+          grossWeight: num(row.grossWeight),
+          netWeight: num(row.netWeight),
+          stoneMetalTypeName: row.stoneMetalTypeName,
+          stoneTypeNames: row.stoneTypeNames,
+          caratWeight: num(row.caratWeight),
+          stoneWeight: num(row.stoneWeight),
+          rate: sent?.rate ?? null,
+          amount: row.kind === "STONE" ? sent?.amount ?? null : null,
+          gstRateId: sent?.gstRateId ?? row.gstRateId,
+        };
+      });
+    }
+    const label = `"${item.itemName || "a line item"}"`;
+    if (!rows.some((row) => row.kind === "METAL")) {
+      return { error: `${label} needs at least one metal — sell loose stones as their own line.` };
+    }
+    const piece = resolvePiece(rows, label);
+    if ("error" in piece) return piece;
+    if (!(piece.metalValue + piece.stoneValue > 0)) {
+      return { error: `Enter the rates for the metals and stones of ${label}.` };
+    }
+    const quantity = toNumber(item.quantity, 1) || 1;
+    const summary = piece.summary;
+    out.push({
+      ...item,
+      piece,
+      metalTypeId: summary.metalTypeId,
+      purity: summary.purity,
+      purityLabel: summary.purityLabel,
+      grossWeight: summary.grossWeight,
+      netWeight: summary.netWeight,
+      caratWeight: summary.caratWeight,
+      stoneWeight: summary.stoneWeight,
+      stoneCharge: Math.round(piece.stoneValue * quantity * 100) / 100,
+      stoneRate: null,
+      stoneMetalTypeName: summary.stoneMetalTypeName,
+      stoneTypeNames: summary.stoneTypeNames,
+      rate: null,
+    });
+  }
+  return out;
+}
+
 function lineTotal(item: InvoiceLineItemInput) {
-  const metalValue = toNumber(item.rate) * lineQuantity(item);
+  const metalValue = lineMetalValue(item);
   return (
     metalValue +
     toNumber(item.makingCharge) +
@@ -359,6 +473,8 @@ export type InvoiceItemView = {
   hsnCode: string | null;
   lineTotal: number;
   inventoryStockId: string | null;
+  /** A piece of several metals/stones — its rows (lib/piece-components.ts). */
+  components: StoredPieceComponent[];
 };
 
 function mapInvoice(invoice: any) {
@@ -452,6 +568,7 @@ function mapInvoice(invoice: any) {
       hsnCode: item.hsnCode ?? null,
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
+      components: item.components ? serializeStoredComponents(item.components) : [],
     })),
     convertedFromKacha: invoice.convertedFromKacha
       ? {
@@ -682,7 +799,11 @@ export async function getInvoiceById(id: string) {
       },
       createdBy: { select: { name: true, email: true } },
       cancelledBy: { select: { name: true, email: true } },
-      items: true,
+      items: {
+        include: {
+          components: { orderBy: { sortOrder: "asc" }, include: { metalType: { select: { name: true } } } },
+        },
+      },
       ledgerEntries: { orderBy: { entryDate: "desc" } },
       convertedFromKacha: { select: { id: true, slipNumber: true } },
       replaces: { select: { id: true, invoiceNumber: true } },
@@ -839,6 +960,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
         },
       },
       metalType: { select: { id: true, name: true } },
+      components: true,
     },
   });
 
@@ -880,6 +1002,8 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
     makingChargeType: stock.makingChargeType,
     quantity: stock.quantity,
     ...toStockOptionProductDetails(stock.product),
+    // A piece made of several metals/stones — see lib/piece-components.ts.
+    components: serializeStoredComponents(stock.components),
   }));
 
   if (!includeInvoiceId) return mapped;
@@ -921,6 +1045,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
           },
         },
         metalType: { select: { id: true, name: true } },
+        components: true,
       },
     });
     if (!stock) continue;
@@ -953,6 +1078,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       makingChargeType: stock.makingChargeType,
       quantity: stock.quantity + claimed,
       ...toStockOptionProductDetails(stock.product),
+      components: serializeStoredComponents(stock.components),
     });
   }
 
@@ -995,7 +1121,9 @@ export async function createInvoice(
     // form is only a convenience; this is the real guarantee. Checked
     // before any other parsing so a $0 line never reaches stock/ledger
     // writes below.
-    const invalidRateItem = items.find((item) => !(toNumber(item.rate) > 0));
+    const invalidRateItem = items.find(
+      (item) => !(item.multiPart && item.components?.length) && !(toNumber(item.rate) > 0),
+    );
     if (invalidRateItem) {
       return {
         success: false,
@@ -1029,6 +1157,9 @@ export async function createInvoice(
     // locked, trustworthy value rather than whatever the client submitted
     // for a field the UI no longer lets it edit.
     items = await lockLinkedStockFields(storeId, items, explicitStockIds);
+    const pieceLines = await resolvePieceLines(storeId, items);
+    if ("error" in pieceLines) return { success: false, message: pieceLines.error };
+    items = pieceLines;
     const fineOf = await getFineWeightResolver(storeId);
 
     // A new line item becomes a real Product on save — it needs everything
@@ -1107,7 +1238,7 @@ export async function createInvoice(
     const deliveryStateCode = String(formData.get("deliveryStateCode") || "").trim() || null;
 
     const subtotal = items.reduce(
-      (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
+      (sum, item) => sum + lineMetalValue(item),
       0,
     );
     // Hallmarking charge folds into the invoice's Making Charges total — the
@@ -1346,7 +1477,8 @@ export async function createInvoice(
           actor,
           locationId: resolvedLocationId,
           referenceType: "Invoice",
-          fineWeight: fineOf(item),
+          fineWeight: item.piece ? item.piece.summary.fineWeight : fineOf(item),
+          piece: item.piece,
         });
         soldItems.push({ ...item, inventoryStockId: newStockId });
       }
@@ -1389,7 +1521,8 @@ export async function createInvoice(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
-              fineWeight: fineOf(item) ?? undefined,
+              fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
+              components: item.piece ? { create: pieceComponentCreates(item.piece.components) } : undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,
@@ -1920,7 +2053,9 @@ export async function updateInvoice(
 
     // Same guarantee as createInvoice — a line with no rate at all is not a
     // valid sale, whether the invoice is being created or edited.
-    const invalidRateItem = items.find((item) => !(toNumber(item.rate) > 0));
+    const invalidRateItem = items.find(
+      (item) => !(item.multiPart && item.components?.length) && !(toNumber(item.rate) > 0),
+    );
     if (invalidRateItem) {
       return {
         success: false,
@@ -1937,6 +2072,9 @@ export async function updateInvoice(
       items.filter((item) => item.inventoryStockId).map((item) => item.inventoryStockId as string),
     );
     items = await lockLinkedStockFields(storeId, items, explicitStockIds);
+    const pieceLines = await resolvePieceLines(storeId, items);
+    if ("error" in pieceLines) return { success: false, message: pieceLines.error };
+    items = pieceLines;
 
     // Same complete-product requirement as createInvoice.
     const manualLineError = await validateManualSaleLines(storeId, items);
@@ -1970,7 +2108,7 @@ export async function updateInvoice(
     const gstRateSnapshot = await resolveGstRateSnapshot(storeId, gstRateId);
 
     const subtotal = items.reduce(
-      (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
+      (sum, item) => sum + lineMetalValue(item),
       0,
     );
     const makingCharges = items.reduce(
@@ -2075,7 +2213,8 @@ export async function updateInvoice(
           actor,
           locationId: resolvedLocationId,
           referenceType: "Invoice",
-          fineWeight: fineOf(item),
+          fineWeight: item.piece ? item.piece.summary.fineWeight : fineOf(item),
+          piece: item.piece,
         });
         soldItems.push({ ...item, inventoryStockId: newStockId });
       }
@@ -2151,7 +2290,8 @@ export async function updateInvoice(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
-              fineWeight: fineOf(item) ?? undefined,
+              fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
+              components: item.piece ? { create: pieceComponentCreates(item.piece.components) } : undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
               makingCharge: item.makingCharge,
@@ -2313,7 +2453,7 @@ export async function updateInvoiceLineItem(
     const fineOf = await getFineWeightResolver(storeId);
     const invoice = await prisma.invoice.findFirst({
       where: { id: invoiceId, storeId },
-      include: { items: true },
+      include: { items: { include: { components: { select: { id: true } } } } },
     });
     if (!invoice) return { success: false, message: "Invoice not found" };
 
@@ -2326,6 +2466,10 @@ export async function updateInvoiceLineItem(
 
     const item = invoice.items.find((existing) => existing.id === itemId);
     if (!item) return { success: false, message: "Line item not found on this invoice" };
+    // One rate × one weight can't describe a piece of several metals/stones.
+    if (item.components.length) {
+      return { success: false, message: "This piece has several metals or stones — change it from Edit Invoice instead." };
+    }
 
     const rate = toNumber(formData.get("rate"));
     const weight = toNumber(formData.get("weight"));

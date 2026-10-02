@@ -8,7 +8,8 @@ import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
 import { formatShortDateTime } from "@/lib/utils";
 import { parseDateRangeBoundary } from "@/lib/date-range";
-import { fineOrNet } from "@/lib/fine-weight-read";
+import { fineOrNet, pieceMetalsSelect } from "@/lib/fine-weight-read";
+import { metalBreakdown } from "@/lib/piece-components";
 
 /**
  * What counts as metal still on hand.
@@ -163,12 +164,13 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
         prisma.inventoryStock.findMany({
           where: {
             storeId,
-            metalTypeId: metal.id,
+            // A piece of several metals counts under each of its metals.
+            OR: [{ metalTypeId: metal.id }, { components: { some: { metalTypeId: metal.id } } }],
             isActive: true,
             status: { in: ON_HAND_STOCK_STATUSES },
             ...locationWhere(scope),
           },
-          select: { netWeight: true, fineWeight: true, quantity: true },
+          select: { metalTypeId: true, netWeight: true, fineWeight: true, quantity: true, components: pieceMetalsSelect },
         })
       )
     ),
@@ -200,8 +202,14 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     .map((metal, index) => ({
       metalId: metal.id,
       metalName: metal.name,
+      // Only this metal's own share of a multi-metal piece (metalBreakdown).
       grams: metalStockAggs[index].reduce(
-        (sum, row) => sum + fineOrNet(row) * row.quantity,
+        (sum, row) =>
+          sum +
+          metalBreakdown(row)
+            .filter((part) => part.metalTypeId === metal.id)
+            .reduce((acc, part) => acc + part.fineWeight, 0) *
+            row.quantity,
         0
       ),
     }))
@@ -1007,6 +1015,7 @@ export async function getRecentTransactions(
           metalType: { select: { name: true } },
           netWeight: true,
           fineWeight: true,
+          components: pieceMetalsSelect,
         },
       },
     },

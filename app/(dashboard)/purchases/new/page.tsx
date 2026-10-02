@@ -10,6 +10,8 @@ import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-loc
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
+import { getFinenessMap } from "@/lib/purity"
+import { requireStoreScope } from "@/lib/store-context"
 
 import { PurchaseForm } from "@/components/purchases/purchase-form"
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
@@ -25,7 +27,7 @@ type Props = {
 export default async function NewPurchasePage({ searchParams }: Props) {
   const params = (await searchParams) ?? {}
 
-  const [vendors, products, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, gstRates] =
+  const [vendors, products, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, gstRates, enumFineness] =
     await Promise.all([
       getPurchaseFormParties(),
       getPurchaseFormProducts(),
@@ -36,6 +38,7 @@ export default async function NewPurchasePage({ searchParams }: Props) {
       getAllStoreMetalOrigins(),
       getCaratConversionRateMap(),
       getGstRates(),
+      requireStoreScope().then(getFinenessMap),
     ])
 
   return (
@@ -62,6 +65,7 @@ export default async function NewPurchasePage({ searchParams }: Props) {
             caratConversionRates={caratConversionRates}
             gstRates={gstRates}
             defaultGstRate={businessSettings.defaultGstRate}
+            enumFineness={enumFineness}
             storeState={businessSettings.state}
             initialLocationId={defaultLocationId}
             initialVendorId={params.vendorId}

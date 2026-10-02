@@ -5,6 +5,8 @@
 // value = fine (24K / 999) weight × the fine rate × (1 − deduction% / 100),
 // fine weight = net weight × the purity's fineness % (lib/fine-weight.ts).
 
+import type { PieceComponentDraft } from "@/lib/piece-components"
+
 export type OldGoldLineDraft = {
   key: string
   description: string
@@ -35,6 +37,10 @@ export type OldGoldLineDraft = {
   /** Stone value — stoneRate × caratWeight until typed directly. */
   stoneCharge: number
   stoneChargeTouched: boolean
+  /** A piece of several metals/stones (lib/piece-components.ts): metals
+   * valued on pure weight × pure rate (less deduction), stones added. */
+  multiPart: boolean
+  components: PieceComponentDraft[]
 }
 
 export const OLD_GOLD_EXCESS_MODES = ["STORE_CREDIT", "PAID_OUT"] as const

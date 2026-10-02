@@ -31,7 +31,9 @@ test("existing 22K stock is backfilled at 91.6% fine", async () => {
   const goldId = await goldMetalId(storeId)
 
   const rows = await db().inventoryStock.findMany({
-    where: { storeId, metalTypeId: goldId, purity: "GOLD_22K", netWeight: { not: null } },
+    // A piece of several metals keeps only its first metal's pure weight on
+    // the row (the rest is per component) — see PieceComponent.
+    where: { storeId, metalTypeId: goldId, purity: "GOLD_22K", netWeight: { not: null }, components: { none: {} } },
     select: { netWeight: true, fineWeight: true },
     take: 20,
   })

@@ -6,7 +6,8 @@ import { InventoryStockStatus, InventoryTransactionType, InvoiceStatus, UserRole
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
-import { fineOrNet } from "@/lib/fine-weight-read";
+import { fineOrNet, pieceMetalsSelect } from "@/lib/fine-weight-read";
+import { metalBreakdown } from "@/lib/piece-components";
 import { ROLE_LABELS } from "@/lib/roles";
 import { financialYearStartOf } from "@/lib/date-range";
 
@@ -103,6 +104,10 @@ export async function getSalesReport(range: DateRange = {}) {
           netWeight: true,
           fineWeight: true,
           lineTotal: true,
+          components: {
+            where: { kind: "METAL" },
+            select: { kind: true, metalTypeId: true, netWeight: true, fineWeight: true, metalType: { select: { id: true, name: true } } },
+          },
         },
       },
     },
@@ -119,9 +124,20 @@ export async function getSalesReport(range: DateRange = {}) {
       const key = item.metalType?.id ?? "unassigned";
       const name = item.metalType?.name ?? "Unassigned";
       const entry = byMetal.get(key) ?? { name, weight: 0, amount: 0 };
-      entry.weight += fineOrNet(item);
       entry.amount += Number(item.lineTotal);
       byMetal.set(key, entry);
+      // A piece of several metals: each metal's pure weight under its own
+      // metal (the line's amount stays with its first metal).
+      if (item.components.length) {
+        for (const part of item.components) {
+          const partKey = part.metalTypeId ?? "unassigned";
+          const partEntry = byMetal.get(partKey) ?? { name: part.metalType?.name ?? "Unassigned", weight: 0, amount: 0 };
+          partEntry.weight += fineOrNet(part);
+          byMetal.set(partKey, partEntry);
+        }
+      } else {
+        entry.weight += fineOrNet(item);
+      }
     }
   }
 
@@ -152,7 +168,7 @@ export async function getInventoryValuationReport() {
   const scope = await getLocationScope();
   const stockItems = await prisma.inventoryStock.findMany({
     where: { storeId, isActive: true, ...locationWhere(scope) },
-    include: { product: { select: { name: true, category: true } } },
+    include: { product: { select: { name: true, category: true } }, components: pieceMetalsSelect },
   });
 
   const byStatus = new Map<
@@ -233,6 +249,7 @@ export async function getStockReport() {
       purityLabel: true,
       netWeight: true,
       fineWeight: true,
+      components: pieceMetalsSelect,
       saleRate: true,
       purchaseAmount: true,
       purchaseDate: true,
@@ -416,7 +433,7 @@ export async function getGoldFlowReport(range: DateRange = {}) {
     where: {
       purchase: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "purchaseDate") },
     },
-    select: { netWeight: true, fineWeight: true, inventoryStockId: true },
+    select: { netWeight: true, fineWeight: true, inventoryStockId: true, components: pieceMetalsSelect },
   });
 
   const purchasedFine = purchaseItems.reduce((sum, item) => sum + fineOrNet(item), 0);
@@ -461,7 +478,7 @@ export async function getGoldFlowReport(range: DateRange = {}) {
       where: {
         invoice: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "invoiceDate") },
       },
-      select: { netWeight: true, fineWeight: true, inventoryStockId: true },
+      select: { netWeight: true, fineWeight: true, inventoryStockId: true, components: pieceMetalsSelect },
     }),
     prisma.kachaInvoiceItem.findMany({
       where: {
@@ -489,7 +506,7 @@ export async function getGoldFlowReport(range: DateRange = {}) {
       status: { in: [InventoryStockStatus.IN_STOCK, InventoryStockStatus.RESERVED] },
       ...locationWhere(scope),
     },
-    select: { netWeight: true, fineWeight: true, quantity: true },
+    select: { netWeight: true, fineWeight: true, quantity: true, components: pieceMetalsSelect },
   });
   // netWeight is per-unit — didn't select or multiply by quantity at all,
   // undercounting any stock row with more than 1 piece and inflating
@@ -594,13 +611,13 @@ export async function getMetalWiseReport(range: DateRange = {}) {
         where: {
           purchase: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "purchaseDate") },
         },
-        select: { metalTypeId: true, netWeight: true, fineWeight: true, lineTotal: true },
+        select: { metalTypeId: true, netWeight: true, fineWeight: true, lineTotal: true, components: pieceMetalsSelect },
       }),
       prisma.invoiceItem.findMany({
         where: {
           invoice: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "invoiceDate") },
         },
-        select: { metalTypeId: true, netWeight: true, fineWeight: true, lineTotal: true },
+        select: { metalTypeId: true, netWeight: true, fineWeight: true, lineTotal: true, components: pieceMetalsSelect },
       }),
       prisma.kachaInvoiceItem.findMany({
         where: {
@@ -625,6 +642,7 @@ export async function getMetalWiseReport(range: DateRange = {}) {
           saleRate: true,
           quantity: true,
           purchaseAmount: true,
+          components: pieceMetalsSelect,
         },
       }),
       prisma.karigarJob.findMany({
@@ -647,18 +665,21 @@ export async function getMetalWiseReport(range: DateRange = {}) {
     return row;
   }
 
+  // Weights go metal by metal (a piece of several metals credits each
+  // metal its own pure weight — metalBreakdown); count/amount stay with the
+  // line's first metal.
   for (const item of purchaseItems) {
     const row = getRow(item.metalTypeId);
     row.purchasedCount += 1;
-    row.purchasedWeight += fineOrNet(item);
     row.purchasedAmount += Number(item.lineTotal ?? 0);
+    for (const part of metalBreakdown(item)) getRow(part.metalTypeId).purchasedWeight += part.fineWeight;
   }
 
   for (const item of [...invoiceItems, ...kachaInvoiceItems]) {
     const row = getRow(item.metalTypeId);
     row.soldCount += 1;
-    row.soldWeight += fineOrNet(item);
     row.soldAmount += Number(item.lineTotal ?? 0);
+    for (const part of metalBreakdown(item)) getRow(part.metalTypeId).soldWeight += part.fineWeight;
   }
 
   for (const stock of stockRows) {
@@ -668,7 +689,7 @@ export async function getMetalWiseReport(range: DateRange = {}) {
     // multiplies by quantity; this didn't, undercounting any stock row
     // with more than 1 piece (and skewing reconciliationGap below to look
     // like unexplained shrinkage that was actually just this bug).
-    row.inStockWeight += fineOrNet(stock) * stock.quantity;
+    for (const part of metalBreakdown(stock)) getRow(part.metalTypeId).inStockWeight += part.fineWeight * stock.quantity;
     row.inStockValue += stock.saleRate
       ? Number(stock.saleRate) * stock.quantity
       : Number(stock.purchaseAmount ?? 0);
@@ -843,7 +864,7 @@ export async function getVendorPurchaseReport(range: DateRange = {}) {
       totalAmount: true,
       paidAmount: true,
       balanceAmount: true,
-      items: { select: { quantity: true, netWeight: true, fineWeight: true } },
+      items: { select: { quantity: true, netWeight: true, fineWeight: true, components: pieceMetalsSelect } },
     },
   });
 
@@ -1004,6 +1025,7 @@ export async function getItemLedgerReport(): Promise<ItemLedgerReport> {
     orderBy: { createdAt: "desc" },
     include: {
       product: { select: { name: true } },
+      components: pieceMetalsSelect,
       purchaseItems: {
         select: {
           quantity: true,

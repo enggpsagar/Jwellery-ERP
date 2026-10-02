@@ -13,7 +13,9 @@ import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
-import { resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
+import { requireStoreScope } from "@/lib/store-context"
+import { getFinenessMap, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
+import { fromStoredComponents } from "@/lib/piece-components"
 
 import { PurchaseForm, type LineItem } from "@/components/purchases/purchase-form"
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
@@ -50,7 +52,7 @@ export default async function EditPurchasePage({ params }: Props) {
     redirect(`/purchases/${id}`)
   }
 
-  const [vendors, products, locations, businessSettings, metals, origins, caratConversionRates, gstRates] =
+  const [vendors, products, locations, businessSettings, metals, origins, caratConversionRates, gstRates, enumFineness] =
     await Promise.all([
       getPurchaseFormParties(),
       getPurchaseFormProducts(),
@@ -60,6 +62,7 @@ export default async function EditPurchasePage({ params }: Props) {
       getAllStoreMetalOrigins(),
       getCaratConversionRateMap(),
       getGstRates(),
+      requireStoreScope().then(getFinenessMap),
     ])
 
   // Saved weights are persisted in each line's own metal's configured
@@ -116,6 +119,10 @@ export default async function EditPurchasePage({ params }: Props) {
       netTouched: true,
       gstRateId: item.gstRateId ?? "",
       productLinkDecided: true,
+      // A multi-part piece (Gold + Silver + Diamond…) reloads its own
+      // metal/stone rows, each in grams/carats as stored.
+      multiPart: item.components.length > 0,
+      components: fromStoredComponents(item.components),
     }
   })
 
@@ -140,6 +147,7 @@ export default async function EditPurchasePage({ params }: Props) {
             caratConversionRates={caratConversionRates}
             gstRates={gstRates}
             defaultGstRate={businessSettings.defaultGstRate}
+            enumFineness={enumFineness}
             storeState={businessSettings.state}
             initialLocationId={purchase.locationId}
             editPurchaseId={purchase.id}

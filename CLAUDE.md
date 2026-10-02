@@ -357,6 +357,46 @@ records it in the sale's own transaction via `recordOldGoldExchange`
 - Not built: exchange on edit (never re-edited), Kacha/Quotation, and the
   printed invoice templates (screen only).
 
+### Added 2026-10-03: pieces made of several metals and stones
+
+One ornament can be e.g. Gold 22K + Silver 925 + a Diamond. A line asks
+**"Made of more than one metal or stone?"** (`components/shared/multi-part-question.tsx`)
+on a New Invoice line (top of New product details), a Purchase line and a
+Customer Exchange item; on → `PieceComponentsEditor`
+(`components/shared/piece-components-editor.tsx`): one row per metal
+(purity, gross/net, rate per gram, GST) and per stone (stone, type, carats,
+weight, rate per carat, value, GST).
+- **Data**: `PieceComponent` (migration `20261003100000_piece_components`)
+  under `InvoiceItem` / `PurchaseItem` / `InventoryStock` (cascade). The
+  **parent row is a summary**: first metal's metalTypeId/purity, netWeight
+  = all metals, stoneCharge = all stones (× qty on a sale/purchase line,
+  per piece on stock), `rate` null, and **fineWeight = only the first
+  metal's own pure weight** so a reader grouping by the parent's metal never
+  counts silver as gold.
+- **Maths** (`lib/piece-components.ts` client preview; `getPieceResolver`
+  in `lib/piece-components.server.ts` recomputes, validates against the
+  store, snapshots GST): sale/purchase value metals on net × rate
+  ("net"), Customer Exchange on pure weight × pure rate ("fine", less the
+  item's deduction, no GST). GST per row at its own rate; making/HM at the
+  line's rate. Line GST amounts are still taken from the form (same trust
+  model as single lines).
+- **Stock**: the rows go onto the stock row; selling a multi-part stock
+  piece brings its rows (physical facts locked server-side from the stock's
+  own rows; rates/GST from the form). A manual multi-part line mints its
+  Product with one ProductMetalComponent per metal + ProductStoneComponent
+  per stone. Purchase: picking a product with >1 metal or >1 stone comes in
+  multi-part (fixes the old bug where such a product's stock stored the
+  SUMMED weight under its first metal).
+- **Reports**: anything grouped by metal uses `metalBreakdown(row)` (sales by
+  metal, metal-wise report, metal daily ledger, dashboard metal cards —
+  those widen their filter to `components: { some: { metalTypeId } }`);
+  all-metals totals use `fineOrNet` with `pieceMetalsSelect` selected.
+- **Display**: `PieceBreakdown` under the item on the invoice detail table
+  and all five print templates; purchase detail lists the rows. The inline
+  rate/weight edit is refused for a multi-part line (use Edit Invoice).
+- Not built: Kacha/Quotation multi-part lines; per-row GST isn't split in
+  GSTR/HSN reporting (the line keeps its own rate snapshot).
+
 ### Regression tests (added 2026-09-29)
 
 Playwright suite in `e2e/`, run by `.github/workflows/regression.yml` on every push to `main` and every PR: throwaway Postgres in the runner → migrate → `pnpm seed` + `pnpm db:seed:full-demo` → `tsc` → `pnpm build` → `pnpm test:e2e`. Sign-in mints a NextAuth JWT in `e2e/global-setup.ts` (no test login route in the app), which also refuses any non-localhost `DATABASE_URL`. See `e2e/README.md`. **Add a spec for every new feature.** The demo seed must keep creating `UserStoreMembership` rows for its users — `requirePermissionInStore` (createInvoice etc.) reads only that table, so without them the demo Admin can open every page but not save an invoice. Tests run in parallel with Vercel's own deploy on a direct push to `main`; they only *block* a bad change if work goes through a PR (or Vercel's deployment checks are turned on).

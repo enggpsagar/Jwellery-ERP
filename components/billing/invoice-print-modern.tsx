@@ -6,6 +6,7 @@ import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst"
 import type { Invoice } from "@/lib/actions/invoice-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { APP_NAME } from "@/lib/constants/app"
+import { PieceBreakdown } from "@/components/billing/piece-breakdown"
 
 type InvoicePrintModernProps = {
   invoice: Invoice
@@ -267,7 +268,10 @@ export function InvoicePrintModern({ invoice, settings }: InvoicePrintModernProp
                       className="[&>td]:px-2.5 [&>td]:py-2.5 align-top odd:bg-white even:bg-indigo-50/40"
                     >
                       <td>{index + 1}</td>
-                      <td className="font-medium">{item.itemName}</td>
+                      <td className="font-medium">
+                    {item.itemName}
+                    <PieceBreakdown components={item.components} className="mt-0.5 space-y-0 text-[10px] font-normal leading-snug text-gray-600" />
+                  </td>
                       <td>{item.hsnCode ?? "-"}</td>
                       <td className="text-right whitespace-nowrap">
                         {unit === "Pcs" ? qty : qty.toFixed(3)}

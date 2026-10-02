@@ -24,6 +24,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { buildSkuPrefix } from "@/lib/inventory/product-sku";
 import { markSourcePartiesAsSuppliers, missingSourcePartyError } from "@/lib/inventory/line-source-party";
+import { pieceComponentCreates, type ResolvedPiece } from "@/lib/piece-components.server";
 
 export type ManualSaleLine = {
   itemName: string;
@@ -256,9 +257,12 @@ export async function createStockForManualSaleLine(
     /** Pure-metal weight of the line (getFineWeightResolver), resolved by
      *  the caller before its transaction. */
     fineWeight?: number | null;
+    /** A piece made of several metals/stones — its resolved rows become the
+     *  stock row's PieceComponents and the Product's metal/stone components. */
+    piece?: ResolvedPiece;
   },
 ): Promise<string> {
-  const { storeId, line, actor, locationId, referenceType, fineWeight } = params;
+  const { storeId, line, actor, locationId, referenceType, fineWeight, piece } = params;
 
   // Every id below is re-resolved against this store (a stale or foreign
   // id is dropped, never attached) — validateManualSaleLines has already
@@ -353,7 +357,45 @@ export async function createStockForManualSaleLine(
   // Add Product always writes the metal/stone breakdown rows too (the
   // scalar fields above are only a summary of component[0]) — readers of
   // the product's detail view and per-component GST expect them.
-  if (metalTypeId) {
+  if (piece) {
+    // One component per metal and per stone, like a multi-metal Add Product.
+    const purityRows = await tx.storeMetalPurity.findMany({
+      where: { storeId, storeMetalId: { in: piece.components.flatMap((row) => (row.metalTypeId ? [row.metalTypeId] : [])) } },
+      select: { id: true, storeMetalId: true, label: true },
+    });
+    const purityIdOf = (metalId: string | null, label: string | null) =>
+      purityRows.find((row) => row.storeMetalId === metalId && row.label === label)?.id ?? null;
+    const metals = piece.components.filter((row) => row.kind === "METAL");
+    const stones = piece.components.filter((row) => row.kind === "STONE");
+    if (metals.length) {
+      await tx.productMetalComponent.createMany({
+        data: metals.map((row, index) => ({
+          productId: product.id,
+          metalTypeId: row.metalTypeId as string,
+          storeMetalPurityId: purityIdOf(row.metalTypeId, row.purityLabel),
+          grossWeight: toDecimal(row.grossWeight) ?? null,
+          netWeight: toDecimal(row.netWeight) ?? null,
+          gstRateId: row.gstRateId,
+          sortOrder: index,
+        })),
+      });
+    }
+    if (stones.length) {
+      await tx.productStoneComponent.createMany({
+        data: stones.map((row, index) => ({
+          productId: product.id,
+          stoneMetalTypeName: row.stoneMetalTypeName as string,
+          stoneTypeNames: row.stoneTypeNames,
+          caratWeight: toDecimal(row.caratWeight) ?? null,
+          stoneWeight: toDecimal(row.stoneWeight) ?? null,
+          stoneRate: toDecimal(row.rate) ?? null,
+          stoneCharge: toDecimal(row.amount) ?? null,
+          gstRateId: row.gstRateId,
+          sortOrder: index,
+        })),
+      });
+    }
+  } else if (metalTypeId) {
     await tx.productMetalComponent.create({
       data: {
         productId: product.id,
@@ -366,7 +408,7 @@ export async function createStockForManualSaleLine(
       },
     });
   }
-  if (hasStoneComponent && line.stoneMetalTypeName) {
+  if (!piece && hasStoneComponent && line.stoneMetalTypeName) {
     await tx.productStoneComponent.create({
       data: {
         productId: product.id,
@@ -416,6 +458,7 @@ export async function createStockForManualSaleLine(
       createdById: actor.id ?? undefined,
       createdByName: actor.name ?? actor.email ?? undefined,
       createdByRole: actor.role ?? undefined,
+      components: piece ? { create: pieceComponentCreates(piece.components) } : undefined,
     },
   });
 

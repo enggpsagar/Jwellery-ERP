@@ -35,6 +35,8 @@ import { prisma } from "@/lib/prisma";
 import { getFineWeightResolver } from "@/lib/fine-weight";
 import { GRAMS_PER_CARAT } from "@/lib/purity";
 import { oldGoldLineValue, round2 } from "@/lib/old-gold/value";
+import { getPieceResolver, pieceComponentCreates, type ResolvedPiece } from "@/lib/piece-components.server";
+import type { PieceComponentPayload } from "@/lib/piece-components";
 
 export type OldGoldLineInput = {
   description?: string | null;
@@ -55,6 +57,10 @@ export type OldGoldLineInput = {
   stoneWeight?: number | null;
   stoneRate?: number | null;
   stoneCharge?: number | null;
+  // A piece of several metals/stones (lib/piece-components.ts) — metals at
+  // pure weight × pure rate (less deduction), stones added.
+  multiPart?: boolean | null;
+  components?: PieceComponentPayload[] | null;
 };
 
 export type ResolvedOldGoldLine = {
@@ -63,6 +69,8 @@ export type ResolvedOldGoldLine = {
   metalName: string;
   /** A loose diamond/gemstone — priced per carat, no purity. */
   isGemstone: boolean;
+  /** Several metals/stones — its resolved rows. */
+  piece?: ResolvedPiece;
   stone: {
     metalTypeName: string;
     typeNames: string | null;
@@ -116,16 +124,62 @@ export async function resolveOldGoldLines(
     ).map((stone) => stone.name),
   );
 
+  const resolvePiece = lines.some((line) => line.multiPart && line.components?.length)
+    ? await getPieceResolver(storeId, { valuation: "fine" })
+    : null;
+
   const resolved: ResolvedOldGoldLine[] = [];
   for (const [index, line] of lines.entries()) {
     const label = `item bought ${index + 1}`;
-    const metal = line.metalTypeId ? metalById.get(line.metalTypeId) : undefined;
-    if (!metal) return { error: `Select the metal or stone for ${label}.` };
 
     const deduction = toNumber(line.deductionPercent);
     if (deduction < 0 || deduction >= 100) {
       return { error: `Deduction for ${label} must be between 0 and 100%.` };
     }
+
+    // Several metals and stones in one piece.
+    if (line.multiPart && line.components?.length && resolvePiece) {
+      if (!line.components.some((row) => row.kind === "METAL")) {
+        return { error: `${label} needs at least one metal — buy loose stones as their own item.` };
+      }
+      const piece = resolvePiece(line.components, label);
+      if ("error" in piece) return piece;
+      const summary = piece.summary;
+      const firstMetal = piece.components.find((row) => row.kind === "METAL");
+      const metalValue = round2(piece.metalValue * (1 - deduction / 100));
+      const value = round2(metalValue + piece.stoneValue);
+      if (!(value > 0)) return { error: `Enter the rates for the metals and stones of ${label}.` };
+      resolved.push({
+        description: line.description?.trim() || `Old ${firstMetal?.metalName ?? "piece"}`,
+        metalTypeId: summary.metalTypeId as string,
+        metalName: firstMetal?.metalName ?? "Metal",
+        isGemstone: false,
+        piece,
+        stone: piece.stoneValue > 0 || summary.stoneMetalTypeName
+          ? {
+              metalTypeName: summary.stoneMetalTypeName ?? "",
+              typeNames: summary.stoneTypeNames,
+              caratWeight: summary.caratWeight,
+              weightGrams: summary.stoneWeight,
+              rate: null,
+              charge: piece.stoneValue,
+            }
+          : null,
+        purityLabel: summary.purityLabel,
+        purity: summary.purity,
+        grossWeight: summary.grossWeight,
+        netWeight: summary.netWeight ?? 0,
+        fineWeight: summary.fineWeight ?? 0,
+        caratWeight: summary.caratWeight,
+        deductionPercent: deduction,
+        rate: firstMetal?.rate ?? 0,
+        value,
+      });
+      continue;
+    }
+
+    const metal = line.metalTypeId ? metalById.get(line.metalTypeId) : undefined;
+    if (!metal) return { error: `Select the metal or stone for ${label}.` };
 
     // A loose diamond / gemstone: carats × rate per carat, no purity.
     if (metal.isGemstone) {
@@ -318,6 +372,7 @@ export async function recordOldGoldExchange(
         grossWeight: line.grossWeight ?? undefined,
         netWeight: line.netWeight,
         fineWeight: line.fineWeight,
+        components: line.piece ? { create: pieceComponentCreates(line.piece.components) } : undefined,
         caratWeight: line.caratWeight ?? undefined,
         stoneWeight: line.stone?.weightGrams ?? undefined,
         stoneRate: line.stone?.rate ?? undefined,
@@ -357,6 +412,7 @@ export async function recordOldGoldExchange(
       grossWeight: line.grossWeight ?? undefined,
       netWeight: line.netWeight,
       fineWeight: line.fineWeight,
+      components: line.piece ? { create: pieceComponentCreates(line.piece.components) } : undefined,
       caratWeight: line.caratWeight ?? undefined,
       stoneWeight: line.stone?.weightGrams ?? undefined,
       stoneRate: line.stone?.rate ?? undefined,

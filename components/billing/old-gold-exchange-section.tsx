@@ -14,7 +14,17 @@ import {
 } from "@/components/ui/select"
 import { RequiredMark } from "@/components/shared/required-mark"
 import { StonePresenceQuestion } from "@/components/shared/stone-presence-question"
+import { MultiPartQuestion } from "@/components/shared/multi-part-question"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
+import { PieceComponentsEditor, metalRowFineness } from "@/components/shared/piece-components-editor"
+import {
+  metalRowFine,
+  newMetalRow,
+  newStoneRow,
+  pieceTotals,
+  toComponentPayload,
+  type PieceMetalDraft,
+} from "@/lib/piece-components"
 import { DEFAULT_FINENESS, GRAMS_PER_CARAT, PURITY_SELECT_OPTIONS, matchLegacyPurityType } from "@/lib/purity"
 import { classifyPurityFamily } from "@/lib/business-units"
 import {
@@ -61,6 +71,8 @@ export function emptyOldGoldLine(rate = 0): OldGoldLineDraft {
     stoneRate: 0,
     stoneCharge: 0,
     stoneChargeTouched: false,
+    multiPart: false,
+    components: [],
   }
 }
 
@@ -85,7 +97,17 @@ export function oldGoldLineAmounts(
   enumFineness: Record<string, number>,
   /** A loose diamond/gemstone: priced by carats × rate per carat, no purity. */
   isGemstone = false,
+  /** Several metals/stones: every row's metal purities, for pure weights. */
+  puritiesByMetal: Record<string, StoreMetalPurityRow[]> = {},
 ) {
+  if (line.multiPart) {
+    const finenessOf = (row: PieceMetalDraft) => metalRowFineness(row, puritiesByMetal[row.metalTypeId], enumFineness)
+    const totals = pieceTotals(line.components, { valuation: "fine", finenessOf })
+    const fine = line.components.reduce((sum, row) => (row.kind === "METAL" ? sum + metalRowFine(row, finenessOf) : sum), 0)
+    const deduction = Math.min(Math.max(line.deductionPercent || 0, 0), 100)
+    const metalValue = round2(totals.metalValue * (1 - deduction / 100))
+    return { fineness: 100, fine, metalValue, stoneValue: totals.stoneValue, total: oldGoldLineTotal(metalValue, totals.stoneValue) }
+  }
   if (isGemstone) {
     const value = round2(
       Math.max(line.caratWeight || 0, 0) * Math.max(line.rate || 0, 0) * (1 - Math.min(Math.max(line.deductionPercent || 0, 0), 100) / 100),
@@ -118,6 +140,8 @@ export function serializeOldGoldLine(line: OldGoldLineDraft) {
     stoneWeight: line.hasStone ? line.stoneWeightGrams || null : null,
     stoneRate: line.hasStone ? line.stoneRate || null : null,
     stoneCharge: line.hasStone ? line.stoneCharge || 0 : 0,
+    multiPart: line.multiPart && line.components.length > 0,
+    components: line.multiPart ? toComponentPayload(line.components, { valuation: "fine" }) : [],
   }
 }
 
@@ -211,6 +235,7 @@ export function OldGoldExchangeSection({
       puritiesByMetal[line.metalTypeId],
       enumFineness,
       Boolean(metalById.get(line.metalTypeId)?.isGemstone),
+      puritiesByMetal,
     ),
   )
   const totalNet = lines.reduce(
@@ -301,6 +326,84 @@ export function OldGoldExchangeSection({
               </Button>
             </div>
 
+            {!isGem && (
+              <MultiPartQuestion
+                checked={line.multiPart}
+                onChange={(on) =>
+                  update(line.key, {
+                    multiPart: on,
+                    hasStone: false,
+                    components: on
+                      ? [
+                          {
+                            ...newMetalRow(line.rate || fineRates.gold || 0),
+                            metalTypeId: line.metalTypeId,
+                            purityLabel: line.purityLabel,
+                            purity: line.purity,
+                            grossWeight: line.grossWeight,
+                            netWeight: line.netWeight,
+                          },
+                          newMetalRow(fineRates.silver ?? 0),
+                          newStoneRow(),
+                        ]
+                      : [],
+                  })
+                }
+                hint="e.g. gold + silver + a diamond in one piece — each metal at its pure weight × pure rate, stones added"
+              />
+            )}
+
+            {line.multiPart ? (
+              <>
+                <div className="rounded-md border border-amber-300 bg-amber-50/60 p-2.5">
+                  <PieceComponentsEditor
+                    rows={line.components}
+                    onRowsChange={(rows) => {
+                      const firstMetal = rows.find((row) => row.kind === "METAL")
+                      const totals = pieceTotals(rows, { valuation: "fine" })
+                      update(line.key, {
+                        components: rows,
+                        metalTypeId: firstMetal?.kind === "METAL" ? firstMetal.metalTypeId : "",
+                        purityLabel: firstMetal?.kind === "METAL" ? firstMetal.purityLabel : "",
+                        purity: firstMetal?.kind === "METAL" ? firstMetal.purity : "",
+                        netWeight: totals.metalNet,
+                        netTouched: true,
+                      })
+                    }}
+                    metals={metals}
+                    origins={origins}
+                    puritiesByMetal={puritiesByMetal}
+                    ensurePurities={ensurePurities}
+                    enumFineness={enumFineness}
+                    valuation="fine"
+                    rateForMetal={(m) => rateFor(m.id)}
+                    testIdPrefix="exchange-piece"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <div className="col-span-2 space-y-1">
+                    <Label className="text-xs">Description</Label>
+                    <Input
+                      placeholder="e.g. Old bangle"
+                      value={line.description}
+                      onChange={(e) => update(line.key, { description: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Deduction % (metals)</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      min={0}
+                      max={99}
+                      value={line.deductionPercent || ""}
+                      onChange={(e) => update(line.key, { deductionPercent: Number(e.target.value) || 0 })}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+            <>
             {!isGem && (
             <StonePresenceQuestion
               checked={line.hasStone}
@@ -533,11 +636,15 @@ export function OldGoldExchangeSection({
               </div>
             </div>
 
+            </>
+            )}
+
             <dl className="grid grid-cols-2 gap-2 rounded-md bg-amber-500/10 p-2.5 text-sm md:grid-cols-4">
               <div>
                 <dt className="text-xs text-muted-foreground">{isGem ? "Weight" : "Pure (24K / 999) weight"}</dt>
                 <dd className="font-medium" data-testid="old-gold-fine">
                   {isGem ? `${(line.caratWeight || 0).toFixed(3)} ct` : `${fine.toFixed(3)} g`}
+                  {line.multiPart ? <span className="ml-1 text-xs font-normal text-muted-foreground">all metals</span> : null}
                   {line.netWeight > 0 && fineness !== 100 ? (
                     <span className="ml-1 text-xs font-normal text-muted-foreground">@ {fineness}%</span>
                   ) : null}
@@ -549,7 +656,7 @@ export function OldGoldExchangeSection({
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Stone in it</dt>
-                <dd className="font-medium">{line.hasStone ? rupees(stoneValue) : "—"}</dd>
+                <dd className="font-medium">{line.hasStone || line.multiPart ? rupees(stoneValue) : "—"}</dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Item total</dt>

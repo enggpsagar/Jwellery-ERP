@@ -65,6 +65,18 @@ import { StoneComponentFields } from "@/components/inventory/shared/stone-compon
 import { StockItemSelect } from "@/components/inventory/shared/stock-item-select"
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 import { StonePresenceQuestion } from "@/components/shared/stone-presence-question"
+import { PieceComponentsEditor } from "@/components/shared/piece-components-editor"
+import { MultiPartQuestion } from "@/components/shared/multi-part-question"
+import {
+  fromStoredComponents,
+  newMetalRow,
+  newStoneRow,
+  pieceGst,
+  pieceTotals,
+  toComponentPayload,
+  type PieceComponentDraft,
+  type StoredPieceComponent,
+} from "@/lib/piece-components"
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog"
 import { AddCategoryDialog } from "@/components/inventory/shared/add-category-dialog"
@@ -106,6 +118,8 @@ type StockOption = {
   makingCharge: number | null
   makingChargeType: "FIXED" | "PERCENTAGE"
   quantity: number
+  /** A piece made of several metals/stones — its rows (lib/piece-components.ts). */
+  components?: StoredPieceComponent[]
 } & StockOptionProductDetails
 
 /**
@@ -221,6 +235,12 @@ export type LineItem = {
    * arrival is traceable later, the same way a Purchase's stock is.
    * Required on a new line; ignored for a stock-linked line. */
   sourcePartyId: string
+  /** A piece made of several metals and stones (Gold + Silver + Diamond…):
+   * its value, weights and GST come from `components`, one row per metal /
+   * stone, each with its own rate and GST rate (lib/piece-components.ts).
+   * The line's own metal/purity/weights are kept in sync from them. */
+  multiPart: boolean
+  components: PieceComponentDraft[]
 }
 
 function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: number) {
@@ -274,6 +294,8 @@ function emptyLineItem(defaultGstRateId?: string, key: string = crypto.randomUUI
     categoryTypeId: "",
     targetStyleId: "",
     sourcePartyId: "",
+    multiPart: false,
+    components: [],
   }
 }
 
@@ -744,7 +766,26 @@ export function InvoiceForm({
       // the document's default. See stockCatalogFields.
       ...stockCatalogFields(stock, gstRateId),
       stockLinkDecided: true,
+      // A multi-metal / multi-stone piece brings its rows; their physical
+      // facts are locked, rates start from today's selling prices.
+      ...(stock.components?.length
+        ? {
+            multiPart: true,
+            components: fromStoredComponents(stock.components).map((row) =>
+              row.kind === "METAL"
+                ? { ...row, rate: metalById.get(row.metalTypeId)?.sellingPrice ?? row.rate }
+                : {
+                    ...row,
+                    rate: metalByName.get(row.stoneMetalTypeName.toLowerCase())?.sellingPrice ?? row.rate,
+                    amountTouched: false,
+                  },
+            ),
+          }
+        : { multiPart: false, components: [] }),
     })
+    for (const component of stock.components ?? []) {
+      if (component.metalTypeId) ensureMetalPurities(component.metalTypeId)
+    }
     // Real data just landed on this line via the stock picker — start it
     // expanded rather than making the user hunt for the chevron to see what
     // got filled in. See expandedKeys' own doc comment above.
@@ -1234,14 +1275,22 @@ export function InvoiceForm({
   const lineQuantity = (item: LineItem) =>
     (item.purity === "DIAMOND" ? item.caratWeight : item.netWeight) * (item.quantity || 1)
 
+  // A multi-part piece is valued row by row (lib/piece-components.ts);
+  // amounts are per piece, so quantity multiplies them.
+  const pieceOf = (item: LineItem) => pieceTotals(item.components, { valuation: "net" })
+  const lineMetalValue = (item: LineItem) =>
+    item.multiPart ? pieceOf(item).metalValue * (item.quantity || 1) : item.rate * lineQuantity(item)
+  const lineStoneValue = (item: LineItem) =>
+    item.multiPart ? pieceOf(item).stoneValue * (item.quantity || 1) : item.stoneCharge
+
   // Taxable value per line: metal + making + HM + stone, less any per-line
   // scheme discount — the same base the reference format's SGST/CGST/IGST
   // columns are computed against.
   const taxableValue = (item: LineItem) =>
-    item.rate * lineQuantity(item) +
+    lineMetalValue(item) +
     item.makingCharge +
     item.hmCharge +
-    item.stoneCharge -
+    lineStoneValue(item) -
     item.schemeDiscount
 
   // This line's own GST %, resolved from its own gstRateId against the
@@ -1259,8 +1308,23 @@ export function InvoiceForm({
   // of rate, IGST-only on an inter-state sale, SGST+CGST split otherwise —
   // see computeGst()'s own doc comment in lib/gst.ts.
   const lineGst = (item: LineItem) => {
-    const breakdown = computeGst(taxableValue(item), lineGstRatePercent(item), gstScheme, storeState, deliveryState)
     const round = (value: number) => Math.round(value * 100) / 100
+    if (item.multiPart) {
+      // Each metal/stone at its own GST rate; making/HM (less any scheme
+      // discount) at the line's own rate.
+      const split = (taxable: number, percent: number) =>
+        computeGst(taxable, gstScheme === "COMPOSITION" ? 0 : percent, gstScheme, storeState, deliveryState)
+      const rateOf = (id: string) => gstRates.find((r) => r.id === id)?.ratePercent ?? lineGstRatePercent(item)
+      const parts = pieceGst(item.components, { valuation: "net" }, item.quantity || 1, rateOf, split)
+      const making = split(item.makingCharge + item.hmCharge - item.schemeDiscount, lineGstRatePercent(item))
+      return {
+        sgst: round(parts.sgst + making.sgst),
+        cgst: round(parts.cgst + making.cgst),
+        igst: round(parts.igst + making.igst),
+        isInterState: making.isInterState,
+      }
+    }
+    const breakdown = computeGst(taxableValue(item), lineGstRatePercent(item), gstScheme, storeState, deliveryState)
     return {
       sgst: round(breakdown.sgst),
       cgst: round(breakdown.cgst),
@@ -1275,7 +1339,7 @@ export function InvoiceForm({
   }
 
   const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.rate * lineQuantity(item), 0),
+    () => items.reduce((sum, item) => sum + lineMetalValue(item), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
@@ -1284,7 +1348,7 @@ export function InvoiceForm({
     [items],
   )
   const stoneChargesTotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.stoneCharge, 0),
+    () => items.reduce((sum, item) => sum + lineStoneValue(item), 0),
     [items],
   )
   const schemeDiscountTotal = useMemo(
@@ -1345,6 +1409,7 @@ export function InvoiceForm({
         metalPuritiesCache[line.metalTypeId],
         enumFineness,
         Boolean(metalById.get(line.metalTypeId)?.isGemstone),
+        metalPuritiesCache,
       ).total,
     0,
   )
@@ -1396,6 +1461,8 @@ export function InvoiceForm({
         categoryTypeId: item.inventoryStockId ? null : item.categoryTypeId || null,
         targetStyleId: item.inventoryStockId ? null : item.targetStyleId || null,
         vendorId: item.inventoryStockId ? null : item.sourcePartyId || null,
+        multiPart: item.multiPart && item.components.length > 0,
+        components: item.multiPart ? toComponentPayload(item.components, { valuation: "net" }) : [],
       }
     }),
   )
@@ -1403,7 +1470,9 @@ export function InvoiceForm({
   // Selling price is mandatory on every line — an invoice with a $0 rate is
   // not a real sale. Checked against every item (not just "filled" ones),
   // matching the server's own guard in createInvoice.
-  const hasInvalidRate = items.some((item) => !(item.rate > 0))
+  const hasInvalidRate = items.some((item) =>
+    item.multiPart ? !(pieceOf(item).total > 0) : !(item.rate > 0),
+  )
 
   // Every line must go through the Link Stock Item picker — either linked
   // to real stock, or explicitly sent down "Create New Line Item" — so a
@@ -1751,6 +1820,49 @@ export function InvoiceForm({
                   ? {}
                   : { stoneWeightInput: 0, netStoneWeightTouched: false, stoneCharge: 0, stoneChargeTouched: false }),
               })
+            // Multi-part piece: rows drive the line's own metal/purity/weights
+            // (first metal; combined net), so category filtering and the
+            // "Still needed" checks keep working unchanged.
+            const setComponents = (rows: PieceComponentDraft[]) => {
+              const firstMetal = rows.find((row) => row.kind === "METAL")
+              const totals = pieceTotals(rows, { valuation: "net" })
+              updateItem(item.key, {
+                components: rows,
+                metalTypeId: firstMetal?.kind === "METAL" ? firstMetal.metalTypeId : "",
+                purity: firstMetal?.kind === "METAL" ? firstMetal.purity : "",
+                purityLabel: firstMetal?.kind === "METAL" ? firstMetal.purityLabel : "",
+                netWeight: totals.metalNet,
+                grossWeight: totals.metalGross + totals.stoneGrams || totals.metalNet,
+                netTouched: true,
+              })
+            }
+            const setMultiPart = (on: boolean) => {
+              if (!on) {
+                updateItem(item.key, { multiPart: false, components: [] })
+                return
+              }
+              const metalRow = { ...newMetalRow(item.rate, item.gstRateId), metalTypeId: item.metalTypeId, purity: item.purity, purityLabel: item.purityLabel, grossWeight: item.grossWeight, netWeight: item.netWeight }
+              const rows: PieceComponentDraft[] = [metalRow, newMetalRow(0, item.gstRateId), newStoneRow(item.gstRateId)]
+              updateItem(item.key, { multiPart: true, hasStoneComponent: false, stoneCharge: 0, stoneWeightInput: 0 })
+              setComponents(rows)
+            }
+            const piecesEditor = (
+              <PieceComponentsEditor
+                rows={item.components}
+                onRowsChange={setComponents}
+                metals={metals}
+                origins={origins}
+                puritiesByMetal={metalPuritiesCache}
+                ensurePurities={ensureMetalPurities}
+                enumFineness={enumFineness}
+                valuation="net"
+                gstRates={gstScheme === "COMPOSITION" ? undefined : gstRates}
+                defaultGstRateId={item.gstRateId}
+                rateForMetal={(metal) => metal.sellingPrice ?? 0}
+                lockPhysical={isLinked}
+                testIdPrefix="sale-piece"
+              />
+            )
             const stoneFields = (
               <div className="rounded-md border-2 border-dashed border-emerald-400 bg-emerald-50 p-3">
                 <StoneComponentFields
@@ -1988,6 +2100,14 @@ export function InvoiceForm({
                   )}
                 </div>
 
+                {item.multiPart ? (
+                  <div className="space-y-1">
+                    <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-sm" data-testid="sale-line-net">
+                      {pieceOf(item).metalNet.toFixed(3)} g
+                    </div>
+                    <p className="text-[10px] leading-tight text-muted-foreground">All metals</p>
+                  </div>
+                ) : (
                 <div className="space-y-1">
                   <div className="flex gap-1">
                     <Input
@@ -2025,7 +2145,16 @@ export function InvoiceForm({
                     <p className="text-[10px] leading-tight text-muted-foreground">Gross − stone</p>
                   )}
                 </div>
+                )}
 
+                {item.multiPart ? (
+                  <div className="space-y-1">
+                    <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-xs text-muted-foreground">Per metal</div>
+                    {!(pieceOf(item).total > 0) && (
+                      <p className="text-[10px] leading-tight text-destructive">Add rates to the metals/stones</p>
+                    )}
+                  </div>
+                ) : (
                 <div className="space-y-1">
                   <Input
                     type="number"
@@ -2039,6 +2168,7 @@ export function InvoiceForm({
                     <p className="text-[10px] leading-tight text-destructive">Selling price is required</p>
                   )}
                 </div>
+                )}
 
                 <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-xs text-muted-foreground">
                   ₹{gstTotal.toFixed(2)}
@@ -2070,8 +2200,11 @@ export function InvoiceForm({
                   {linkedStock && (
                     <div className="space-y-2 rounded-lg border border-dashed p-3">
                       <p className="text-xs font-medium">Product details</p>
+                      {item.multiPart && (
+                        <div className="rounded-md border border-amber-300 bg-amber-50/60 p-2.5">{piecesEditor}</div>
+                      )}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {metalPurityFields}
+                        {!item.multiPart && metalPurityFields}
                         <LinkedProductDetails
                           categoryName={linkedStock.categoryName}
                           categoryTypeName={linkedStock.categoryTypeName}
@@ -2096,10 +2229,17 @@ export function InvoiceForm({
                     const categoryRequired = !metalById.get(item.metalTypeId)?.isGemstone
                     return (
                       <div className="space-y-3 rounded-lg border border-dashed p-3">
-                        {!isCaratLine(item) && (
-                          <StonePresenceQuestion checked={item.hasStoneComponent} onChange={setHasStone} />
+                        <MultiPartQuestion checked={item.multiPart} onChange={setMultiPart} />
+                        {item.multiPart ? (
+                          <div className="rounded-md border border-amber-300 bg-amber-50/60 p-2.5">{piecesEditor}</div>
+                        ) : (
+                          <>
+                            {!isCaratLine(item) && (
+                              <StonePresenceQuestion checked={item.hasStoneComponent} onChange={setHasStone} />
+                            )}
+                            {!isCaratLine(item) && item.hasStoneComponent && stoneFields}
+                          </>
                         )}
-                        {!isCaratLine(item) && item.hasStoneComponent && stoneFields}
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
                           <p className="text-xs font-medium">New product details</p>
                           {missing.length > 0 && (
@@ -2107,7 +2247,7 @@ export function InvoiceForm({
                           )}
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          {metalPurityFields}
+                          {!item.multiPart && metalPurityFields}
                           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                             <Label className="text-xs">
                               Category {categoryRequired && <RequiredMark />}
@@ -2229,6 +2369,7 @@ export function InvoiceForm({
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {!showNewProductDetails && !linkedStock && metalPurityFields}
 
+                    {!item.multiPart && (
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Gross Weight {!isLinked && <RequiredMark />}</Label>
                       <div className="flex gap-1">
@@ -2274,6 +2415,7 @@ export function InvoiceForm({
                         </Select>
                       </div>
                     </div>
+                    )}
 
                     {isCaratLine(item) && (
                       <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">

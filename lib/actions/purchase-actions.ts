@@ -34,6 +34,15 @@ import {
 import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import { formatShortDate } from "@/lib/utils";
 import { buildSkuPrefix } from "@/lib/inventory/product-sku";
+import { classifyPurityFamily } from "@/lib/business-units";
+import { matchLegacyPurityType } from "@/lib/purity";
+import { round2, type PieceComponentPayload, type StoredPieceComponent } from "@/lib/piece-components";
+import {
+  getPieceResolver,
+  pieceComponentCreates,
+  serializeStoredComponents,
+  type ResolvedPiece,
+} from "@/lib/piece-components.server";
 import type {
   DataTableExportParams,
   DataTableExportResult,
@@ -83,7 +92,20 @@ export type PurchaseLineItemInput = {
   // own doc comment in schema.prisma. Optional for the same reason as
   // InvoiceLineItemInput.gstRateId.
   gstRateId?: string | null;
+  // One piece made of several metals/stones (Gold 22K + Silver 925 +
+  // Diamond…) — lib/piece-components.ts. When set, `components` carries
+  // each row with its own purity, weight, rate and GST rate, and the flat
+  // metal/weight/stone fields above are overwritten server-side with the
+  // resolved summary (see resolveMultiPartLines). The line's own gstRateId
+  // then only taxes its making charge; each row is taxed at its own rate.
+  multiPart?: boolean;
+  components?: PieceComponentPayload[] | null;
 };
+
+/** A line after resolveMultiPartLines — `piece` is set only for a
+ * multi-part line, and every money formula below prices it from the
+ * piece's own metal/stone values instead of rate × netWeight. */
+type PreparedLineItem = PurchaseLineItemInput & { piece?: ResolvedPiece };
 
 /** Never trust client input for the making-charge mode — anything other
  * than a valid ChargeType falls back to FIXED. */
@@ -193,19 +215,33 @@ function lineQuantity(item: {
   return perPiece * (toNumber(item.quantity, 1) || 1);
 }
 
+// Metal value of the whole line: rate × priced quantity, or — for a
+// multi-part piece — Σ metal rows (per piece) × quantity.
+function lineMetalValue(item: PreparedLineItem) {
+  if (item.piece) return round2(item.piece.metalValue * (toNumber(item.quantity, 1) || 1));
+  return toNumber(item.rate) * lineQuantity(item);
+}
+
+// Stone value of the whole line: the line's own stoneCharge, or — for a
+// multi-part piece — Σ stone rows (per piece) × quantity. resolveMultiPartLines
+// also writes that same figure onto item.stoneCharge, so the two agree.
+function lineStoneValue(item: PreparedLineItem) {
+  if (item.piece) return round2(item.piece.stoneValue * (toNumber(item.quantity, 1) || 1));
+  return toNumber(item.stoneCharge);
+}
+
 // Pre-tax — this is also what feeds InventoryStock.purchaseAmount (the
 // stock's own cost basis), which GST paid to the vendor never becomes part
 // of, unlike an as-billed total. See lineTotalWithTax below for the other
 // one, used only for PurchaseItem.lineTotal.
-function lineTotal(item: PurchaseLineItemInput) {
-  const metalValue = toNumber(item.rate) * lineQuantity(item);
-  return metalValue + toNumber(item.makingCharge) + toNumber(item.stoneCharge);
+function lineTotal(item: PreparedLineItem) {
+  return lineMetalValue(item) + toNumber(item.makingCharge) + lineStoneValue(item);
 }
 
 // Same base as lineTotal, plus this line's own GST — mirrors
 // InvoiceItem.lineTotal's convention (the as-billed total), used only for
 // PurchaseItem.lineTotal, never for stock cost basis.
-function lineTotalWithTax(item: PurchaseLineItemInput) {
+function lineTotalWithTax(item: PreparedLineItem) {
   return (
     lineTotal(item) +
     toNumber(item.sgstAmount) +
@@ -264,8 +300,31 @@ async function resolvePerLineGstRateSnapshots(
  */
 async function createProductFromManualEntry(
   storeId: string,
-  item: PurchaseLineItemInput,
+  item: PreparedLineItem,
 ): Promise<string> {
+  // A multi-part line also gets the Product's own per-metal/per-stone rows
+  // (ProductMetalComponent/ProductStoneComponent, as Add Product writes
+  // them), and its scalar defaults mirror only the FIRST metal/stone —
+  // never a sum — per ProductMetalComponent's own doc comment. A
+  // single-metal line skips all of this, exactly as before.
+  const piece = item.piece;
+  const pieceMetals = piece ? piece.components.filter((row) => row.kind === "METAL") : [];
+  const pieceStones = piece ? piece.components.filter((row) => row.kind === "STONE") : [];
+  const purityRows = pieceMetals.length
+    ? await prisma.storeMetalPurity.findMany({
+        where: {
+          storeId,
+          storeMetalId: { in: pieceMetals.map((row) => row.metalTypeId).filter((id): id is string => Boolean(id)) },
+          label: { in: pieceMetals.map((row) => row.purityLabel).filter((label): label is string => Boolean(label)) },
+        },
+        select: { id: true, storeMetalId: true, label: true },
+      })
+    : [];
+  const purityIdFor = (metalTypeId: string | null, label: string | null) =>
+    purityRows.find((row) => row.storeMetalId === metalTypeId && row.label === label)?.id ?? null;
+  const firstMetal = pieceMetals[0];
+  const firstStone = pieceStones[0];
+
   const [businessSettings, metalRow] = await Promise.all([
     prisma.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true } }),
     item.metalTypeId
@@ -295,9 +354,45 @@ async function createProductFromManualEntry(
     return match ? Math.max(max, Number(match[1])) : max;
   }, 0);
 
-  const hasStoneComponent = Boolean(
-    item.stoneMetalTypeName || item.stoneTypeNames || toNumber(item.stoneCharge) > 0,
-  );
+  const hasStoneComponent = piece
+    ? pieceStones.length > 0
+    : Boolean(item.stoneMetalTypeName || item.stoneTypeNames || toNumber(item.stoneCharge) > 0);
+
+  const pieceDefaults = piece
+    ? {
+        storeMetalPurityId: firstMetal ? purityIdFor(firstMetal.metalTypeId, firstMetal.purityLabel) ?? undefined : undefined,
+        defaultStoneCharge: firstStone?.amount ?? 0,
+        defaultStoneRate: firstStone?.rate ?? undefined,
+        defaultGrossWeight: firstMetal?.grossWeight ?? firstMetal?.netWeight ?? undefined,
+        defaultNetWeight: firstMetal?.netWeight ?? undefined,
+        defaultStoneWeight: firstStone?.stoneWeight ?? undefined,
+        defaultCaratWeight: firstStone?.caratWeight ?? undefined,
+        defaultStoneMetalTypeName: firstStone?.stoneMetalTypeName ?? undefined,
+        defaultStoneTypeNames: firstStone?.stoneTypeNames ?? undefined,
+        metalComponents: {
+          create: pieceMetals.map((row, index) => ({
+            metalTypeId: row.metalTypeId as string,
+            storeMetalPurityId: purityIdFor(row.metalTypeId, row.purityLabel),
+            grossWeight: row.grossWeight,
+            netWeight: row.netWeight,
+            gstRateId: row.gstRateId,
+            sortOrder: index,
+          })),
+        },
+        stoneComponents: {
+          create: pieceStones.map((row, index) => ({
+            stoneMetalTypeName: row.stoneMetalTypeName as string,
+            stoneTypeNames: row.stoneTypeNames,
+            caratWeight: row.caratWeight,
+            stoneWeight: row.stoneWeight,
+            stoneRate: row.rate,
+            stoneCharge: row.amount,
+            gstRateId: row.gstRateId,
+            sortOrder: index,
+          })),
+        },
+      }
+    : {};
 
   let created: { id: string } | null = null;
   for (let attempt = 0; attempt < 5 && !created; attempt += 1) {
@@ -324,6 +419,7 @@ async function createProductFromManualEntry(
           defaultStoneTypeNames: item.stoneTypeNames ?? undefined,
           hsnCode: item.hsnCode ?? undefined,
           isActive: true,
+          ...pieceDefaults,
         },
       });
     } catch (error) {
@@ -337,6 +433,97 @@ async function createProductFromManualEntry(
     throw new Error("Could not generate a unique product code for a manually-entered item");
   }
   return created.id;
+}
+
+/** A Product's per-metal/per-stone rows (Add Product's own components). */
+const productPieceSelect = {
+  metalComponents: {
+    orderBy: { sortOrder: "asc" },
+    select: {
+      metalTypeId: true,
+      grossWeight: true,
+      netWeight: true,
+      gstRateId: true,
+      metalType: { select: { name: true, isGemstone: true } },
+      storeMetalPurity: { select: { label: true } },
+    },
+  },
+  stoneComponents: {
+    orderBy: { sortOrder: "asc" },
+    select: {
+      stoneMetalTypeName: true,
+      stoneTypeNames: true,
+      caratWeight: true,
+      stoneWeight: true,
+      stoneRate: true,
+      stoneCharge: true,
+      gstRateId: true,
+    },
+  },
+} satisfies Prisma.ProductSelect;
+
+type ProductPieceRows = Prisma.ProductGetPayload<{ select: typeof productPieceSelect }>;
+
+/**
+ * Whether a picked Product is a piece the single-metal line can't express:
+ * more than one metal, or more than one stone. A product with one metal and
+ * one embedded stone is already exactly what the single line models (metal
+ * + "Includes a Stone"), so it keeps that path unchanged — its metal row's
+ * gross weight includes the stone, which a multi-part metal row's doesn't.
+ */
+function isMultiComponentProduct(product: ProductPieceRows) {
+  return product.metalComponents.length > 1 || product.stoneComponents.length > 1;
+}
+
+/** A Product's components in the shape the purchase form edits (metals
+ * first, then stones, each in sortOrder) — physical facts only, metal
+ * rates 0. `fallback` fills the first metal's purity from the Product's
+ * own scalar purity when its component row has none. */
+function productPieceComponents(
+  product: ProductPieceRows,
+  fallback: { purityLabel: string | null; purity: PurityType | null },
+): StoredPieceComponent[] {
+  const n = (value: Prisma.Decimal | null) => (value == null ? null : Number(value));
+  const metals: StoredPieceComponent[] = product.metalComponents.map((row, index) => {
+    const purityLabel = row.storeMetalPurity?.label ?? (index === 0 ? fallback.purityLabel : null);
+    return {
+      kind: "METAL",
+      metalTypeId: row.metalTypeId,
+      purityLabel,
+      purity: matchLegacyPurityType(classifyPurityFamily(row.metalType), purityLabel) ?? (index === 0 ? fallback.purity : null),
+      grossWeight: n(row.grossWeight),
+      netWeight: n(row.netWeight),
+      fineWeight: null,
+      stoneMetalTypeName: null,
+      stoneTypeNames: null,
+      caratWeight: null,
+      stoneWeight: null,
+      rate: null,
+      amount: 0,
+      gstRateId: row.gstRateId,
+    };
+  });
+  const stones: StoredPieceComponent[] = product.stoneComponents.map((row) => {
+    const caratWeight = n(row.caratWeight);
+    const rate = n(row.stoneRate);
+    return {
+      kind: "STONE",
+      metalTypeId: null,
+      purityLabel: null,
+      purity: null,
+      grossWeight: null,
+      netWeight: null,
+      fineWeight: null,
+      stoneMetalTypeName: row.stoneMetalTypeName,
+      stoneTypeNames: row.stoneTypeNames,
+      caratWeight,
+      stoneWeight: n(row.stoneWeight),
+      rate,
+      amount: rate != null && caratWeight != null ? round2(rate * caratWeight) : n(row.stoneCharge) ?? 0,
+      gstRateId: row.gstRateId,
+    };
+  });
+  return [...metals, ...stones];
 }
 
 /**
@@ -374,6 +561,7 @@ async function lockLinkedProductFields(
       defaultStoneMetalTypeName: true,
       defaultStoneTypeNames: true,
       hsnCode: true,
+      ...productPieceSelect,
     },
   });
   const productById = new Map(products.map((product) => [product.id, product]));
@@ -382,10 +570,66 @@ async function lockLinkedProductFields(
     const product = productById.get(item.productId);
     if (!product) return item;
 
+    // A piece made of several metals/stones comes in as a multi-part line
+    // built from the Product's own components — before this, its stock row
+    // kept only the first metal's weight and silently dropped the rest.
+    // Physical facts come from the Product; only each row's rate (and GST
+    // rate, and a stone's typed value) comes from the client, matched by
+    // position within its kind. A line the form already shows as
+    // multi-part (an edit of one) stays multi-part as long as the Product
+    // has components to rebuild it from.
+    const componentCount = product.metalComponents.length + product.stoneComponents.length;
+    if (isMultiComponentProduct(product) || (item.multiPart && componentCount > 0)) {
+      const stored = productPieceComponents(product, {
+        purityLabel: product.storeMetalPurity?.label ?? null,
+        purity: product.defaultPurity,
+      });
+      const clientMetals = (item.components ?? []).filter((row) => row.kind === "METAL");
+      const clientStones = (item.components ?? []).filter((row) => row.kind === "STONE");
+      let metalIndex = 0;
+      let stoneIndex = 0;
+      const components: PieceComponentPayload[] = stored.map((row) => {
+        if (row.kind === "METAL") {
+          const client = clientMetals[metalIndex++];
+          return {
+            kind: "METAL",
+            metalTypeId: row.metalTypeId,
+            purityLabel: row.purityLabel,
+            purity: row.purity,
+            grossWeight: row.grossWeight,
+            netWeight: row.netWeight,
+            rate: toNumber(client?.rate),
+            gstRateId: client?.gstRateId || row.gstRateId,
+          };
+        }
+        const client = clientStones[stoneIndex++];
+        const rate = client ? toNumber(client.rate) : toNumber(row.rate);
+        return {
+          kind: "STONE",
+          stoneMetalTypeName: row.stoneMetalTypeName,
+          stoneTypeNames: row.stoneTypeNames,
+          caratWeight: row.caratWeight,
+          stoneWeight: row.stoneWeight,
+          rate,
+          amount: client?.amount != null ? toNumber(client.amount) : round2(toNumber(row.caratWeight) * rate),
+          gstRateId: client?.gstRateId || row.gstRateId,
+        };
+      });
+      return {
+        ...item,
+        itemName: product.name,
+        hsnCode: product.hsnCode ?? null,
+        multiPart: true,
+        components,
+      };
+    }
+
     const isGemstoneProduct = product.metalType?.isGemstone ?? false;
 
     return {
       ...item,
+      multiPart: false,
+      components: null,
       itemName: product.name,
       metalTypeId: isGemstoneProduct ? null : product.metalTypeId,
       purity: isGemstoneProduct ? null : product.defaultPurity,
@@ -410,6 +654,55 @@ async function lockLinkedProductFields(
       hsnCode: product.hsnCode ?? null,
     };
   });
+}
+
+/**
+ * Resolves every multi-part line's metal/stone rows against the store
+ * (lib/piece-components.server.ts — validates metals/stones/GST rates,
+ * recomputes each row's value and pure weight) and overwrites the line's
+ * flat fields with the piece's summary, so every existing reader of the
+ * PurchaseItem/InventoryStock scalar columns keeps working: first metal +
+ * its purity, all metals' net weight together, all stones' value, no single
+ * rate (a mixed piece has none). Run after lockLinkedProductFields (which
+ * can turn a linked line multi-part) and before anything prices `items`.
+ */
+async function resolveMultiPartLines(
+  storeId: string,
+  items: PurchaseLineItemInput[],
+): Promise<{ error: string } | { items: PreparedLineItem[] }> {
+  if (!items.some((item) => item.multiPart)) return { items };
+  const resolve = await getPieceResolver(storeId, { valuation: "net" });
+  const prepared: PreparedLineItem[] = [];
+  for (const [index, item] of items.entries()) {
+    if (!item.multiPart) {
+      prepared.push(item);
+      continue;
+    }
+    // An empty list is the resolver's own "add the metals and stones" error.
+    const piece = resolve(item.components ?? [], `line ${index + 1}${item.itemName ? ` (${item.itemName})` : ""}`);
+    if ("error" in piece) return { error: piece.error };
+    const quantity = toNumber(item.quantity, 1) || 1;
+    prepared.push({
+      ...item,
+      metalTypeId: piece.summary.metalTypeId,
+      purity: piece.summary.purity,
+      purityLabel: piece.summary.purityLabel,
+      grossWeight: piece.summary.grossWeight,
+      netWeight: piece.summary.netWeight,
+      caratWeight: piece.summary.caratWeight,
+      stoneWeight: piece.summary.stoneWeight,
+      stoneMetalTypeName: piece.summary.stoneMetalTypeName,
+      stoneTypeNames: piece.summary.stoneTypeNames,
+      // The line's whole stone value (every stone × quantity), so the
+      // purchase's own Stone Charges total reconciles with its lines.
+      stoneCharge: round2(piece.stoneValue * quantity),
+      stoneRate: null,
+      rate: null,
+      dmoWeight: null,
+      piece,
+    });
+  }
+  return { items: prepared };
 }
 
 async function generatePurchaseNumber(storeId: string) {
@@ -547,6 +840,15 @@ function mapPurchase(purchase: any) {
       gstRatePercent: item.gstRatePercent != null ? Number(item.gstRatePercent) : null,
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
+      // A multi-part piece's metal/stone rows (empty for a single-metal
+      // line) — only getPurchaseById loads them.
+      components: [...(item.components ?? [])]
+        .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
+        .map((component: any): PurchaseItemComponent => ({
+          ...serializeStoredComponents([component])[0],
+          metalName: (component.metalType?.name as string | undefined) ?? null,
+          gstRatePercent: component.gstRatePercent != null ? Number(component.gstRatePercent) : null,
+        })),
     })),
     // Every DEBIT/PAYMENT_OUT ledger entry recorded against this purchase
     // (by recordPurchasePayment or createPurchase's up-front payment rows) —
@@ -572,6 +874,12 @@ function mapPurchase(purchase: any) {
 }
 
 export type Purchase = ReturnType<typeof mapPurchase>;
+
+/** One metal/stone row of a multi-part purchase line (detail/edit views). */
+export type PurchaseItemComponent = StoredPieceComponent & {
+  metalName: string | null;
+  gstRatePercent: number | null;
+};
 
 export type PurchaseSortBy = "purchaseDate" | "purchaseNumber" | "totalAmount";
 
@@ -747,7 +1055,7 @@ export async function getPurchaseById(id: string) {
     where: { id, storeId },
     include: {
       vendor: { select: { id: true, name: true, phone: true } },
-      items: true,
+      items: { include: { components: { include: { metalType: { select: { name: true } } } } } },
       ledgerEntries: { orderBy: { entryDate: "desc" } },
     },
   });
@@ -806,11 +1114,21 @@ export async function getPurchaseFormProducts() {
       defaultStoneTypeNames: true,
       hsnCode: true,
       isActive: true,
+      ...productPieceSelect,
     },
   });
 
-  return products.map((product) => ({
+  return products.map(({ metalComponents, stoneComponents, ...product }) => ({
     ...product,
+    // Set only for a piece of several metals/stones (isMultiComponentProduct)
+    // — the form then opens the line multi-part with these rows locked, and
+    // lockLinkedProductFields rebuilds them server-side the same way.
+    pieceComponents: isMultiComponentProduct({ metalComponents, stoneComponents })
+      ? productPieceComponents(
+          { metalComponents, stoneComponents },
+          { purityLabel: product.storeMetalPurity?.label ?? null, purity: product.defaultPurity },
+        )
+      : null,
     category: product.category?.name ?? null,
     ornamentType: product.categoryType?.name ?? null,
     metalType: product.metalType ?? null,
@@ -864,7 +1182,7 @@ export async function createPurchase(
       return { success: false, message: "Please select a vendor" };
     }
 
-    let items: PurchaseLineItemInput[] = [];
+    let items: PreparedLineItem[] = [];
     try {
       items = JSON.parse(itemsRaw);
     } catch {
@@ -880,6 +1198,8 @@ export async function createPurchase(
     items = items.map((item) => ({
       ...item,
       makingChargeType: toChargeType(item.makingChargeType),
+      // Server-side only (resolveMultiPartLines) — never from the client.
+      piece: undefined,
     }));
 
     const storeId = await requireStoreScope();
@@ -891,6 +1211,18 @@ export async function createPurchase(
     const explicitProductIds = new Set(
       items.filter((item) => item.productId).map((item) => item.productId),
     );
+
+    // Linked lines are locked to their Product first (it only ever touches
+    // lines that picked one, so running it before the manual-line minting
+    // below changes nothing for those) — a multi-metal Product turns its
+    // line multi-part here, and resolveMultiPartLines then has to see that
+    // before any line is minted or priced.
+    items = await lockLinkedProductFields(storeId, items, explicitProductIds);
+    const resolvedLines = await resolveMultiPartLines(storeId, items);
+    if ("error" in resolvedLines) {
+      return { success: false, message: resolvedLines.error };
+    }
+    items = resolvedLines.items;
 
     // A line with no product picked (the form's own "Enter Manually (No
     // Product)" choice) still needs a real Product row under the hood —
@@ -915,12 +1247,12 @@ export async function createPurchase(
       return { success: false, message: "One or more selected products are invalid" };
     }
 
-    // Must happen before every total below is computed from `items` — a
+    // lockLinkedProductFields already ran above (before minting) — it must
+    // happen before every total below is computed from `items`: a
     // Purchase's own subtotal/GST is priced off Net/Carat Weight (see
-    // lineQuantity), which this can change, so pricing has to see the
+    // lineQuantity), which it can change, so pricing has to see the
     // locked, trustworthy value rather than whatever the client submitted
     // for a field the UI no longer lets it edit.
-    items = await lockLinkedProductFields(storeId, items, explicitProductIds);
 
     const discount = toNumber(formData.get("discount"));
     // Recomputed from each line's own sgst/cgst/igst rather than trusted
@@ -961,12 +1293,9 @@ export async function createPurchase(
     const notes = String(formData.get("notes") || "").trim() || null;
     const vendorInvoiceNumber = String(formData.get("vendorInvoiceNumber") || "").trim() || null;
 
-    const subtotal = items.reduce(
-      (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
-      0,
-    );
+    const subtotal = items.reduce((sum, item) => sum + lineMetalValue(item), 0);
     const makingCharges = items.reduce((sum, item) => sum + toNumber(item.makingCharge), 0);
-    const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
+    const stoneCharges = items.reduce((sum, item) => sum + lineStoneValue(item), 0);
     const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
     // Indian billing convention: the saved total is rounded to the nearest
     // whole rupee, with the (small, signed) adjustment kept alongside it as
@@ -1070,7 +1399,7 @@ export async function createPurchase(
             finish: InventoryFinish.PAKKA,
             grossWeight: toDecimal(item.grossWeight),
             netWeight: toDecimal(item.netWeight),
-            fineWeight: fineOf(item) ?? undefined,
+            fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
             dmoWeight: toDecimal(item.dmoWeight),
             stoneWeight: toDecimal(item.stoneWeight),
             // Previously dropped here even though it's saved onto the
@@ -1081,10 +1410,14 @@ export async function createPurchase(
             purchaseAmount: toDecimal(lineTotal(item)),
             makingCharge: toDecimal(item.makingCharge),
             makingChargeType: toChargeType(item.makingChargeType),
-            stoneCharge: toDecimal(item.stoneCharge),
+            // A multi-part stock row keeps its per-piece stone value (the
+            // PieceComponent parent-summary convention); the purchase line
+            // below keeps the whole line's.
+            stoneCharge: toDecimal(item.piece ? item.piece.summary.stoneCharge : item.stoneCharge),
             stoneRate: toDecimal(item.stoneRate),
             stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
             stoneTypeNames: item.stoneTypeNames ?? undefined,
+            ...(item.piece ? { components: { create: pieceComponentCreates(item.piece.components) } } : {}),
             vendorId,
             vendorName: vendor.name,
             purchaseDate,
@@ -1135,7 +1468,7 @@ export async function createPurchase(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
-              fineWeight: fineOf(item) ?? undefined,
+              fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
@@ -1165,6 +1498,7 @@ export async function createPurchase(
                 ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRatePercent ?? undefined
                 : undefined,
               lineTotal: lineTotalWithTax(item),
+              ...(item.piece ? { components: { create: pieceComponentCreates(item.piece.components) } } : {}),
               inventoryStockId: stockIds[i],
             })),
           },
@@ -1472,7 +1806,7 @@ export async function updatePurchase(
     }
 
     const itemsRaw = String(formData.get("itemsJson") || "[]");
-    let items: PurchaseLineItemInput[] = [];
+    let items: PreparedLineItem[] = [];
     try {
       items = JSON.parse(itemsRaw);
     } catch {
@@ -1484,6 +1818,8 @@ export async function updatePurchase(
     items = items.map((item) => ({
       ...item,
       makingChargeType: toChargeType(item.makingChargeType),
+      // Server-side only (resolveMultiPartLines) — never from the client.
+      piece: undefined,
     }));
 
     // Captured before createProductFromManualEntry's per-line substitution
@@ -1492,6 +1828,15 @@ export async function updatePurchase(
     const explicitProductIds = new Set(
       items.filter((item) => item.productId).map((item) => item.productId),
     );
+
+    // Locked + multi-part lines resolved before minting — see createPurchase's
+    // identical step.
+    items = await lockLinkedProductFields(storeId, items, explicitProductIds);
+    const resolvedLines = await resolveMultiPartLines(storeId, items);
+    if ("error" in resolvedLines) {
+      return { success: false, message: resolvedLines.error };
+    }
+    items = resolvedLines.items;
 
     // One new real Product per manual line — see createProductFromManualEntry's
     // own doc comment. Sequential, not Promise.all — same reasoning as
@@ -1511,10 +1856,6 @@ export async function updatePurchase(
       return { success: false, message: "One or more selected products are invalid" };
     }
 
-    // Must happen before every total below is computed from `items` — see
-    // createPurchase's identical comment.
-    items = await lockLinkedProductFields(storeId, items, explicitProductIds);
-
     const discount = toNumber(formData.get("discount"));
     const sgstAmount = items.reduce((sum, item) => sum + toNumber(item.sgstAmount), 0);
     const cgstAmount = items.reduce((sum, item) => sum + toNumber(item.cgstAmount), 0);
@@ -1522,12 +1863,9 @@ export async function updatePurchase(
     const taxAmount = sgstAmount + cgstAmount + igstAmount;
     const gstRateId = String(formData.get("gstRateId") || "").trim() || null;
 
-    const subtotal = items.reduce(
-      (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
-      0,
-    );
+    const subtotal = items.reduce((sum, item) => sum + lineMetalValue(item), 0);
     const makingCharges = items.reduce((sum, item) => sum + toNumber(item.makingCharge), 0);
-    const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
+    const stoneCharges = items.reduce((sum, item) => sum + lineStoneValue(item), 0);
     const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
     const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
 
@@ -1602,7 +1940,7 @@ export async function updatePurchase(
             finish: InventoryFinish.PAKKA,
             grossWeight: toDecimal(item.grossWeight),
             netWeight: toDecimal(item.netWeight),
-            fineWeight: fineOf(item) ?? undefined,
+            fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
             dmoWeight: toDecimal(item.dmoWeight),
             stoneWeight: toDecimal(item.stoneWeight),
             caratWeight: toDecimal(item.caratWeight),
@@ -1610,10 +1948,14 @@ export async function updatePurchase(
             purchaseAmount: toDecimal(lineTotal(item)),
             makingCharge: toDecimal(item.makingCharge),
             makingChargeType: toChargeType(item.makingChargeType),
-            stoneCharge: toDecimal(item.stoneCharge),
+            // A multi-part stock row keeps its per-piece stone value (the
+            // PieceComponent parent-summary convention); the purchase line
+            // below keeps the whole line's.
+            stoneCharge: toDecimal(item.piece ? item.piece.summary.stoneCharge : item.stoneCharge),
             stoneRate: toDecimal(item.stoneRate),
             stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
             stoneTypeNames: item.stoneTypeNames ?? undefined,
+            ...(item.piece ? { components: { create: pieceComponentCreates(item.piece.components) } } : {}),
             vendorId: purchase.vendorId,
             vendorName: vendor.name,
             purchaseDate,
@@ -1658,7 +2000,7 @@ export async function updatePurchase(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
-              fineWeight: fineOf(item) ?? undefined,
+              fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
@@ -1683,6 +2025,7 @@ export async function updatePurchase(
                 ? perLineGstRateSnapshots.get(item.gstRateId)?.gstRatePercent ?? undefined
                 : undefined,
               lineTotal: lineTotalWithTax(item),
+              ...(item.piece ? { components: { create: pieceComponentCreates(item.piece.components) } } : {}),
               inventoryStockId: newStockIds[i],
             })),
           },

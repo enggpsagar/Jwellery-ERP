@@ -8,8 +8,12 @@ import { updateInvoiceLineItem, type InvoiceFormState } from "@/lib/actions/invo
 import { useToast } from "@/components/providers/toast-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import type { StoredPieceComponent } from "@/lib/piece-components"
 
 export type InvoiceItemRow = {
+  /** A piece of several metals/stones — see PieceBreakdown. */
+  components?: StoredPieceComponent[]
   id: string
   itemName: string
   quantity: number
@@ -86,7 +90,9 @@ function InvoiceItemRowView({
       <tr className="border-b last:border-0">
         <td className="px-4 py-3">
           {item.itemName}
-          {item.stoneMetalTypeName ? (
+          {item.components?.length ? (
+            <PieceBreakdown components={item.components} />
+          ) : item.stoneMetalTypeName ? (
             <span className="block text-xs text-muted-foreground">
               Stone: {item.stoneMetalTypeName}
               {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
@@ -120,6 +126,9 @@ function InvoiceItemRowView({
         <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
         {canEdit && (
           <td className="px-4 py-3 text-right">
+            {/* A piece of several metals has no single rate/weight — it's
+                changed from Edit Invoice instead. */}
+            {item.components?.length ? null : (
             <Button
               type="button"
               variant="ghost"
@@ -130,6 +139,7 @@ function InvoiceItemRowView({
             >
               <Pencil className="h-4 w-4" />
             </Button>
+            )}
           </td>
         )}
       </tr>

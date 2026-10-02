@@ -10,7 +10,8 @@ import { formatLedgerSource } from "@/lib/ledger-format"
 import { MONEY_UNIT } from "@/lib/business-units"
 import { getActiveBusinessUnits, type BusinessUnitOption } from "@/lib/business-units.server"
 import { formatShortDate } from "@/lib/utils"
-import { fineOrNet } from "@/lib/fine-weight-read"
+import { fineOrNet, pieceMetalsSelect } from "@/lib/fine-weight-read"
+import { metalBreakdown } from "@/lib/piece-components"
 
 export type LedgerEntryRow = {
   id: string
@@ -690,7 +691,8 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
     prisma.purchaseItem.findMany({
       where: {
         purchase: { storeId, ...locationWhere(scope) },
-        metalTypeId: { in: activeMetalIds },
+        // A piece of several metals counts under each of its metals.
+        OR: [{ metalTypeId: { in: activeMetalIds } }, { components: { some: { metalTypeId: { in: activeMetalIds } } } }],
       },
       select: {
         netWeight: true,
@@ -698,13 +700,14 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
         caratWeight: true,
         lineTotal: true,
         metalTypeId: true,
+        components: pieceMetalsSelect,
         purchase: { select: { purchaseDate: true } },
       },
     }),
     prisma.invoiceItem.findMany({
       where: {
         invoice: { storeId, status: { not: InvoiceStatus.CANCELLED }, ...locationWhere(scope) },
-        metalTypeId: { in: activeMetalIds },
+        OR: [{ metalTypeId: { in: activeMetalIds } }, { components: { some: { metalTypeId: { in: activeMetalIds } } } }],
       },
       select: {
         netWeight: true,
@@ -712,6 +715,7 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
         caratWeight: true,
         lineTotal: true,
         metalTypeId: true,
+        components: pieceMetalsSelect,
         invoice: { select: { invoiceDate: true } },
       },
     }),
@@ -762,28 +766,46 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
     return unit.isGemstone ? Number(item.caratWeight ?? 0) : fineOrNet(item)
   }
 
+  // A piece of several metals credits each metal its own pure weight; its
+  // amount stays with its first metal.
+  function addMetalParts(
+    totals: DayTotals,
+    item: Parameters<typeof metalBreakdown>[0],
+    add: (entry: ReturnType<typeof unitTotals>, fine: number) => void,
+  ) {
+    for (const part of metalBreakdown(item).slice(1)) {
+      const unit = part.metalTypeId ? unitById.get(part.metalTypeId) : undefined
+      if (unit && !unit.isGemstone) add(unitTotals(totals, unit.value), part.fineWeight)
+    }
+  }
+
   for (const item of purchaseItems) {
+    const dateISO = item.purchase.purchaseDate.toISOString().slice(0, 10)
+    const totals = dayTotals(dateISO)
+    addMetalParts(totals, item, (entry, fine) => (entry.purchasedValue += fine))
     if (!item.metalTypeId) continue
     const unit = unitById.get(item.metalTypeId)
     if (!unit) continue
 
-    const dateISO = item.purchase.purchaseDate.toISOString().slice(0, 10)
     const amount = Number(item.lineTotal ?? 0)
-    const entry = unitTotals(dayTotals(dateISO), unit.value)
-    entry.purchasedValue += valueFor(unit, item)
+    const entry = unitTotals(totals, unit.value)
+    entry.purchasedValue += item.components?.length ? metalBreakdown(item)[0].fineWeight : valueFor(unit, item)
     entry.purchasedAmount += amount
   }
 
   for (const item of [...invoiceItems, ...kachaInvoiceItems]) {
+    const invoiceDate = "invoice" in item ? item.invoice.invoiceDate : item.kachaInvoice.invoiceDate
+    const dateISO = invoiceDate.toISOString().slice(0, 10)
+    const totals = dayTotals(dateISO)
+    const components = "components" in item ? item.components : []
+    addMetalParts(totals, { ...item, components }, (entry, fine) => (entry.soldValue += fine))
     if (!item.metalTypeId) continue
     const unit = unitById.get(item.metalTypeId)
     if (!unit) continue
 
-    const invoiceDate = "invoice" in item ? item.invoice.invoiceDate : item.kachaInvoice.invoiceDate
-    const dateISO = invoiceDate.toISOString().slice(0, 10)
     const amount = Number(item.lineTotal ?? 0)
-    const entry = unitTotals(dayTotals(dateISO), unit.value)
-    entry.soldValue += valueFor(unit, item)
+    const entry = unitTotals(totals, unit.value)
+    entry.soldValue += components.length ? metalBreakdown({ ...item, components })[0].fineWeight : valueFor(unit, item)
     entry.soldAmount += amount
   }
 

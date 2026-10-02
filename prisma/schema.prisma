@@ -1025,6 +1025,8 @@ model Invoice {
   items                  InvoiceItem[]
   ledgerEntries          LedgerEntry[]
   convertedFromKacha     KachaInvoice?  @relation("KachaConvertedToPakka")
+  // Old gold the customer traded in against this sale, if any.
+  oldGoldExchange        Purchase?      @relation("OldGoldExchange")
   convertedFromQuotation Quotation?     @relation("QuotationConvertedToInvoice")
   locationId             String?
   location               StoreLocation? @relation(fields: [locationId], references: [id])
@@ -1538,6 +1540,19 @@ model Purchase {
   locationId          String?
   location            StoreLocation? @relation(fields: [locationId], references: [id])
   createdBy           User?          @relation("PurchaseCreatedBy", fields: [createdById], references: [id])
+  // Old Gold Exchange — old gold bought from a customer at the counter
+  // while selling them new jewellery (lib/old-gold/exchange.ts). vendorId
+  // is that customer; numbered OG-YYYY-NNNN; locked against edit/delete on
+  // the Purchases screen since its value is already settled on the
+  // customer's ledger (OLD_GOLD_EXCHANGE entry).
+  isOldGoldExchange    Boolean            @default(false)
+  exchangeInvoiceId    String?            @unique
+  exchangeInvoice      Invoice?           @relation("OldGoldExchange", fields: [exchangeInvoiceId], references: [id], onDelete: SetNull)
+  // How much of the old gold's value went against that invoice, and what
+  // was left over (kept as store credit or paid out — oldGoldExcessMode).
+  oldGoldAppliedAmount Decimal            @default(0) @db.Decimal(12, 2)
+  oldGoldExcessAmount  Decimal            @default(0) @db.Decimal(12, 2)
+  oldGoldExcessMode    OldGoldExcessMode?
 
   @@unique([storeId, purchaseNumber])
   @@index([vendorId])
@@ -1595,6 +1610,10 @@ model PurchaseItem {
   gstRateName        String?
   gstRatePercent     Decimal?        @db.Decimal(5, 2)
   lineTotal          Decimal         @default(0) @db.Decimal(12, 2)
+  // Old Gold Exchange only: melting/testing deduction taken off the line's
+  // value (fineWeight × rate × (1 − deductionPercent/100)); rate is then
+  // the 24K/fine rate, not a per-carat one.
+  deductionPercent   Decimal?        @db.Decimal(5, 2)
   inventoryStockId   String?
   createdAt          DateTime        @default(now())
   purchase           Purchase        @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
@@ -2820,6 +2839,21 @@ enum LedgerSourceType {
   // in lib/actions/invoice-actions.ts and getCustomerAvailableCredit in
   // lib/actions/payments-actions.ts.
   CREDIT_APPLIED
+  // Old gold the customer handed in against a sale (Old Gold Exchange):
+  // a CREDIT on the customer for its value, linked to the exchange's own
+  // Purchase (purchaseId), never the invoice — so cancelling the invoice
+  // leaves the customer holding that value as store credit, since the
+  // gold itself stays in stock. See lib/old-gold/exchange.ts.
+  OLD_GOLD_EXCHANGE
+}
+
+// What happened to an Old Gold Exchange's value beyond the bill it was
+// traded against — the customer chooses per exchange.
+enum OldGoldExcessMode {
+  // Stays on the customer's ledger as store credit (Apply Credit later).
+  STORE_CREDIT
+  // Paid out to the customer there and then (a PAYMENT_OUT entry).
+  PAID_OUT
 }
 
 enum InvoiceStatus {

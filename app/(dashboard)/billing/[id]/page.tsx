@@ -5,11 +5,13 @@ import { notFound } from "next/navigation"
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
 import { getCreditNotesForInvoice, getReturnableInvoiceItems } from "@/lib/actions/credit-note-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
+import { getInvoiceOldGoldExchange } from "@/lib/actions/old-gold-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { toTitleCase } from "@/lib/utils"
 import { InvoiceActionsBar, InvoiceQuickActions } from "@/components/billing/invoice-actions-bar"
 import { InvoiceDetailContent } from "@/components/billing/invoice-detail-content"
+import { InvoiceOldGoldCard } from "@/components/billing/invoice-old-gold-card"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
 type Props = {
@@ -48,9 +50,10 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
 
   if (!invoice) notFound()
 
-  const [creditNotes, returnableItems] = await Promise.all([
+  const [creditNotes, returnableItems, oldGoldExchange] = await Promise.all([
     getCreditNotesForInvoice(invoice.id),
     getReturnableInvoiceItems(invoice.id),
+    getInvoiceOldGoldExchange(invoice.id),
   ])
   const hasReturnableItems = (returnableItems ?? []).length > 0
 
@@ -84,6 +87,10 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         eInvoiceEnabled={settings.eInvoiceEnabled}
         showDueDate={settings.showDueDate}
       />
+
+      {oldGoldExchange ? (
+        <InvoiceOldGoldCard exchange={oldGoldExchange} invoiceTotal={Number(invoice.totalAmount)} />
+      ) : null}
     </main>
   )
 }

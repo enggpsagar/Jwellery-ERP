@@ -9,6 +9,9 @@ import {
 } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getSupplierOptions } from "@/lib/actions/customer-actions"
+import { getLatestMetalRates } from "@/lib/actions/metal-rate-actions"
+import { getFinenessMap } from "@/lib/purity"
+import { requireStoreScope } from "@/lib/store-context"
 import { getStates } from "@/lib/actions/location-actions"
 import { filterDeliveryStates } from "@/lib/delivery-location"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
@@ -54,11 +57,13 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     redirect(`/billing/${id}`)
   }
 
-  const [customers, stockItems, suppliers, businessSettings, locations, metals, origins, categories, styles, caratConversionRates, defaultLocationId, gstRates, states] =
+  const [customers, stockItems, suppliers, enumFineness, metalRates, businessSettings, locations, metals, origins, categories, styles, caratConversionRates, defaultLocationId, gstRates, states] =
     await Promise.all([
       getInvoiceFormCustomers(),
       getInvoiceFormStockItems(),
       getSupplierOptions(),
+      requireStoreScope().then(getFinenessMap),
+      getLatestMetalRates(),
       getBusinessSettings(),
       getStoreLocations(),
       getStoreMetals(),
@@ -162,6 +167,11 @@ export default async function ReplaceInvoicePage({ params }: Props) {
         stockItems={stockItems}
         suppliers={suppliers}
         supplierModuleEnabled={businessSettings.supplierModuleEnabled}
+        enumFineness={enumFineness}
+        fineRates={{
+          gold: metalRates.latest ? Number(metalRates.latest.gold24k) : null,
+          silver: metalRates.latest ? Number(metalRates.latest.silver) : null,
+        }}
         locations={locations}
         metals={metals}
         origins={origins}

@@ -24,6 +24,7 @@ import {
   Wallet,
   Phone,
   Truck,
+  Coins,
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
@@ -90,6 +91,13 @@ const mainNav: NavItem[] = [
       // invoice's return flow, there is no standalone "new" page for one.
       { title: "Credit Notes", href: "/billing/credit-notes", countKey: "creditNotes" },
     ],
+  },
+  {
+    // Old Gold Exchanges — lives under /billing so the Billing module's
+    // permissions (middleware + sidebar filter) gate it with no new module.
+    title: "Old Gold",
+    href: "/billing/old-gold",
+    icon: Coins,
   },
   {
     title: "Purchases",
@@ -193,7 +201,11 @@ function getNavForRole(role?: string, permissions: string[] = [], supplierModule
     // Empty permissions means "not customized" — falls back to full access,
     // matching getEffectivePermissions() in lib/roles.ts.
     if (role === "STAFF" && permissions.length > 0) {
-      const module = MODULE_DEFINITIONS.find((definition) => definition.href === item.href);
+      // Prefix match, same as middleware.ts — an item nested under a
+      // module's path (Old Gold under /billing) follows that module.
+      const module = MODULE_DEFINITIONS.find(
+        (definition) => item.href === definition.href || item.href.startsWith(`${definition.href}/`),
+      );
       if (module) {
         return module.permissions.every((permission) => permissions.includes(permission));
       }

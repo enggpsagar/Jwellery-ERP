@@ -26,6 +26,8 @@ export function formatLedgerSource(
       return "Payment Out"
     case LedgerSourceType.CREDIT_APPLIED:
       return "Credit Applied"
+    case LedgerSourceType.OLD_GOLD_EXCHANGE:
+      return "Old Gold Exchange"
     default:
       return String(sourceType)
         .replaceAll("_", " ")

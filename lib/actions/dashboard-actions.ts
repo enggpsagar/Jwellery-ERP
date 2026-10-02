@@ -1114,6 +1114,8 @@ export async function getRecentActivity(
       action = "Processed a return";
     } else if (entry.sourceType === "CREDIT_APPLIED") {
       action = "Applied store credit";
+    } else if (entry.sourceType === "OLD_GOLD_EXCHANGE") {
+      action = "Took old gold in exchange";
     } else if (entry.sourceType === "ADJUSTMENT") {
       action = "Balance adjusted";
     } else if (entry.sourceType === "KARIGAR_ISSUE") {

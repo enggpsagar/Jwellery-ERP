@@ -195,20 +195,24 @@ export async function getPaymentsOut(): Promise<PaymentOutRow[]> {
     orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
     include: {
       vendor: { select: { id: true, name: true } },
+      customer: { select: { id: true, name: true } },
       karigar: { select: { id: true, name: true } },
       purchase: { select: { id: true, purchaseNumber: true } },
     },
   })
 
+  // A customer-only PAYMENT_OUT is an Old Gold Exchange balance paid out at
+  // the counter (lib/old-gold/exchange.ts) — posted on the customer's own
+  // ledger, where the exchange's credit sits. Same Party table as a vendor.
   return entries
-    .filter((entry) => entry.vendorId || entry.karigarId)
+    .filter((entry) => entry.vendorId || entry.karigarId || entry.customerId)
     .map((entry) => ({
       id: entry.id,
       dateISO: entry.entryDate.toISOString(),
       date: formatDate(entry.entryDate),
-      partyType: entry.vendorId ? ("VENDOR" as const) : ("KARIGAR" as const),
-      partyId: (entry.vendorId ?? entry.karigarId)!,
-      partyName: entry.vendor?.name ?? entry.karigar?.name ?? "-",
+      partyType: entry.vendorId || !entry.karigarId ? ("VENDOR" as const) : ("KARIGAR" as const),
+      partyId: (entry.vendorId ?? entry.karigarId ?? entry.customerId)!,
+      partyName: entry.vendor?.name ?? entry.karigar?.name ?? entry.customer?.name ?? "-",
       amount: Number(entry.amount),
       paymentMethod: entry.paymentMethod,
       paymentReference: entry.paymentReference,

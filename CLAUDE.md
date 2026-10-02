@@ -314,6 +314,36 @@ selling, vendor, artisan or customer.
 - Not covered: `DraftOrderItem.estimatedWeight` (an estimate, no stock),
   `InventoryTransaction` weights (nothing totals them).
 
+### Added 2026-10-02: Old Gold Exchange (customer trades old gold against a sale)
+
+On **New Invoice** an "Old Gold Exchange" block (`components/billing/old-gold-exchange-section.tsx`)
+takes the customer's old gold: metal (hasPurity only), purity, gross/net
+weight, deduction %, 24K rate (prefilled from the latest Metal Rate). Value
+= fine (24K) weight × fine rate × (1 − deduction%) — `lib/old-gold/value.ts`
+(client preview) and `resolveOldGoldLines` (server, the real figure).
+`createInvoice` records it in the sale's own transaction via
+`recordOldGoldExchange` (`lib/old-gold/exchange.ts`):
+- **Customer → Business**: a real `Purchase` (`isOldGoldExchange`, number
+  `OG-YYYY-NNNN`, vendor = the customer, `exchangeInvoiceId` → the
+  invoice); each line is an IN_STOCK KACHA stock row with its `fineWeight`
+  under a reusable "Old Gold — <metal> <purity>" product. Locked against
+  edit/delete on the Purchases screen.
+- **Money**: one CREDIT `OLD_GOLD_EXCHANGE` on the customer for the full
+  value, keyed by `purchaseId`, **not** `invoiceId` — cancelling/deleting
+  the invoice leaves that value as store credit (the gold stays in stock).
+  Old gold is applied first (after store credit), then cash covers the
+  rest (`splitOldGoldValue`); the applied part is in `Invoice.paidAmount`.
+  Excess beyond the bill: `STORE_CREDIT` (nothing else posted — the
+  customer's balance simply goes negative = available credit) or
+  `PAID_OUT` (a customer-only DEBIT `PAYMENT_OUT`, which `getPaymentsOut`
+  now lists too). Stored on `Purchase.oldGoldAppliedAmount/ExcessAmount/ExcessMode`.
+- **Menu**: sidebar "Old Gold" → `/billing/old-gold` (lives under /billing
+  so Billing's permissions gate it; the sidebar's module filter now
+  prefix-matches like middleware). The invoice detail page shows an Old
+  Gold card with the net payable.
+- Not built: old gold on edit (an existing exchange is never re-edited),
+  Kacha/Quotation, and the printed invoice templates (screen only).
+
 ### Regression tests (added 2026-09-29)
 
 Playwright suite in `e2e/`, run by `.github/workflows/regression.yml` on every push to `main` and every PR: throwaway Postgres in the runner → migrate → `pnpm seed` + `pnpm db:seed:full-demo` → `tsc` → `pnpm build` → `pnpm test:e2e`. Sign-in mints a NextAuth JWT in `e2e/global-setup.ts` (no test login route in the app), which also refuses any non-localhost `DATABASE_URL`. See `e2e/README.md`. **Add a spec for every new feature.** The demo seed must keep creating `UserStoreMembership` rows for its users — `requirePermissionInStore` (createInvoice etc.) reads only that table, so without them the demo Admin can open every page but not save an invoice. Tests run in parallel with Vercel's own deploy on a direct push to `main`; they only *block* a bad change if work goes through a PR (or Vercel's deployment checks are turned on).

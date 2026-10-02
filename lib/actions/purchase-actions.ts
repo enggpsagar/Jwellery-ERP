@@ -1380,6 +1380,12 @@ export async function updatePurchase(
       },
     });
     if (!purchase) return { success: false, message: "Purchase not found" };
+    if (purchase.isOldGoldExchange) {
+      return {
+        success: false,
+        message: "An Old Gold Exchange is settled on the customer's ledger and can't be edited here — cancel its invoice instead; the value stays as the customer's store credit.",
+      };
+    }
 
     const purchaseDateRaw = String(formData.get("purchaseDate") || "");
     const vendorInvoiceNumber = String(formData.get("vendorInvoiceNumber") || "").trim() || null;
@@ -1763,6 +1769,12 @@ export async function deletePurchase(id: string): Promise<PurchaseFormState> {
     });
 
     if (!purchase) return { success: false, message: "Purchase not found" };
+    if (purchase.isOldGoldExchange) {
+      return {
+        success: false,
+        message: "An Old Gold Exchange is settled on the customer's ledger and can't be deleted here — cancel its invoice instead; the value stays as the customer's store credit.",
+      };
+    }
 
     const stockIds = purchase.items
       .map((item) => item.inventoryStockId)

@@ -32,6 +32,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { SourcePartySelect, type SourcePartyOption } from "@/components/billing/source-party-select"
+import { OldGoldExchangeSection, oldGoldLineFineness } from "@/components/billing/old-gold-exchange-section"
+import {
+  oldGoldFineWeight,
+  oldGoldLineValue,
+  splitOldGoldValue,
+  type OldGoldExcessModeValue,
+  type OldGoldLineDraft,
+} from "@/lib/old-gold/value"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { RequiredMark } from "@/components/shared/required-mark"
@@ -385,6 +393,10 @@ type InvoiceFormProps = {
    * for a fresh invoice. Uncontrolled (defaultValue), so typing over it
    * doesn't fight the form. */
   defaultNotes?: string
+  /** Old Gold Exchange: the store's per-purity fineness table (legacy enum
+   * fallback when a metal has no purity rows) and today's fine rates. */
+  enumFineness?: Record<string, number>
+  fineRates?: { gold: number | null; silver: number | null }
 }
 
 export function InvoiceForm({
@@ -417,6 +429,8 @@ export function InvoiceForm({
   replacesInvoiceNumber,
   editInvoiceId,
   defaultNotes,
+  enumFineness = {},
+  fineRates = { gold: null, silver: null },
 }: InvoiceFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -547,9 +561,15 @@ export function InvoiceForm({
   // can't go stale relative to what's actually been entered.
   const [legacyPaidAmount, setLegacyPaidAmount] = useState(0)
   const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
-  const paidAmount = editInvoiceId
+  const paidBeforeOldGold = editInvoiceId
     ? legacyPaidAmount
     : paymentRows.reduce((sum, row) => sum + (row.amount || 0), 0) + creditApplied
+
+  // Old Gold Exchange (create flow only) — see OldGoldExchangeSection.
+  const [oldGoldLines, setOldGoldLines] = useState<OldGoldLineDraft[]>([])
+  const [oldGoldExcessMode, setOldGoldExcessMode] = useState<OldGoldExcessModeValue>("STORE_CREDIT")
+  const [oldGoldPayoutMethod, setOldGoldPayoutMethod] = useState("")
+  const [oldGoldPayoutReference, setOldGoldPayoutReference] = useState("")
 
   // Delivery Location — where the goods are actually being shipped, which
   // decides CGST+SGST vs IGST (see computeGst() below), independent of
@@ -1311,7 +1331,18 @@ export function InvoiceForm({
   // line — same computeRoundOff the server uses, so what's previewed here is
   // exactly what createInvoice/updateInvoice will persist.
   const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal, roundOffOverride)
+
+  // Old gold is applied against the bill first (after store credit), so
+  // cash only covers what's left — the same order createInvoice uses.
+  const oldGoldValue = oldGoldLines.reduce((sum, line) => {
+    const fineness = oldGoldLineFineness(line, metalPuritiesCache[line.metalTypeId], enumFineness)
+    return sum + oldGoldLineValue(oldGoldFineWeight(line.netWeight, fineness), line.rate, line.deductionPercent)
+  }, 0)
+  const oldGoldSplit = splitOldGoldValue(editInvoiceId ? 0 : oldGoldValue, totalAmount - creditApplied)
+  const paidAmount = paidBeforeOldGold + oldGoldSplit.applied
   const balanceAmount = Math.max(0, totalAmount - paidAmount)
+  const oldGoldPayoutMissing =
+    oldGoldSplit.excess > 0 && oldGoldExcessMode === "PAID_OUT" && !oldGoldPayoutMethod
 
   const itemsJson = JSON.stringify(
     items.map((item) => {
@@ -2394,6 +2425,50 @@ export function InvoiceForm({
         </div>
       </div>
 
+      {/* Customer → Business: old gold handed in against this sale. A new
+          invoice only — an existing exchange is never re-edited here. */}
+      {!editInvoiceId && (
+        <OldGoldExchangeSection
+          lines={oldGoldLines}
+          onLinesChange={setOldGoldLines}
+          metals={metals}
+          puritiesByMetal={metalPuritiesCache}
+          ensurePurities={ensureMetalPurities}
+          enumFineness={enumFineness}
+          fineRates={fineRates}
+          excess={oldGoldSplit.excess}
+          excessMode={oldGoldExcessMode}
+          onExcessModeChange={setOldGoldExcessMode}
+          payoutMethod={oldGoldPayoutMethod}
+          onPayoutMethodChange={setOldGoldPayoutMethod}
+          payoutReference={oldGoldPayoutReference}
+          onPayoutReferenceChange={setOldGoldPayoutReference}
+        />
+      )}
+      {!editInvoiceId && (
+        <>
+          <input
+            type="hidden"
+            name="oldGoldJson"
+            value={JSON.stringify(
+              oldGoldLines.map((line) => ({
+                description: line.description || null,
+                metalTypeId: line.metalTypeId || null,
+                purityLabel: line.purityLabel || null,
+                purity: line.purity || null,
+                grossWeight: line.grossWeight || null,
+                netWeight: line.netWeight || null,
+                deductionPercent: line.deductionPercent || 0,
+                rate: line.rate || null,
+              })),
+            )}
+          />
+          <input type="hidden" name="oldGoldExcessMode" value={oldGoldExcessMode} />
+          <input type="hidden" name="oldGoldPayoutMethod" value={oldGoldPayoutMethod} />
+          <input type="hidden" name="oldGoldPayoutReference" value={oldGoldPayoutReference} />
+        </>
+      )}
+
       {/* Side by side rather than stacked — narrow, single-purpose fields
           with no reason to each claim a full row of vertical space. Each
           gets its own bordered, tinted box (one of this app's chart hues,
@@ -2478,7 +2553,7 @@ export function InvoiceForm({
             <PaidNowFields
               rows={paymentRows}
               onRowsChange={setPaymentRows}
-              maxAmount={totalAmount > 0 ? Math.max(0, totalAmount - creditApplied) : undefined}
+              maxAmount={totalAmount > 0 ? Math.max(0, totalAmount - creditApplied - oldGoldSplit.applied) : undefined}
             />
             <input type="hidden" name="creditApplied" value={creditApplied} />
           </div>
@@ -2560,6 +2635,26 @@ export function InvoiceForm({
             <span>-₹{creditApplied.toFixed(2)}</span>
           </div>
         )}
+        {oldGoldValue > 0 && (
+          <>
+            <div className="flex justify-between text-amber-700" data-testid="old-gold-applied">
+              <span>Less: Old Gold (value ₹{oldGoldValue.toFixed(2)})</span>
+              <span>-₹{oldGoldSplit.applied.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-semibold" data-testid="net-payable">
+              <span>Net Payable by Customer</span>
+              <span>₹{Math.max(0, totalAmount - creditApplied - oldGoldSplit.applied).toFixed(2)}</span>
+            </div>
+            {oldGoldSplit.excess > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span>
+                  {oldGoldExcessMode === "PAID_OUT" ? "Old gold balance paid to customer" : "Old gold balance kept as store credit"}
+                </span>
+                <span>₹{oldGoldSplit.excess.toFixed(2)}</span>
+              </div>
+            )}
+          </>
+        )}
         <div className="flex justify-between text-red-600 font-medium">
           <span>Balance Due</span>
           <span>₹{balanceAmount.toFixed(2)}</span>
@@ -2567,7 +2662,10 @@ export function InvoiceForm({
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={pending || !customerId || hasInvalidStockLink || hasInvalidRate || paidOverTotal}>
+        <Button
+          type="submit"
+          disabled={pending || !customerId || hasInvalidStockLink || hasInvalidRate || paidOverTotal || oldGoldPayoutMissing}
+        >
           {editInvoiceId
             ? pending
               ? "Updating..."

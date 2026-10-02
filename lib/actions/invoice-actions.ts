@@ -9,6 +9,7 @@ import {
   InventoryTransactionType,
   LedgerEntryType,
   LedgerSourceType,
+  OldGoldExcessMode,
   PaymentMethod,
   PurityType,
   ChargeType,
@@ -17,6 +18,8 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { getFineWeightResolver } from "@/lib/fine-weight";
+import { recordOldGoldExchange, resolveOldGoldLines, type OldGoldLineInput } from "@/lib/old-gold/exchange";
+import { round2, splitOldGoldValue } from "@/lib/old-gold/value";
 import { computeRoundOff } from "@/lib/round-off";
 import { requirePermission, requirePermissionInStore } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
@@ -1068,7 +1071,29 @@ export async function createInvoice(
       }
     }
 
-    const paidAmount =
+    // Old Gold Exchange — old gold the customer hands in against this sale
+    // (lib/old-gold/exchange.ts). Every value is recomputed server-side from
+    // weight, purity, rate and deduction; the form's figures are a preview.
+    let oldGoldInput: OldGoldLineInput[] = [];
+    try {
+      const parsed = JSON.parse(String(formData.get("oldGoldJson") || "[]"));
+      oldGoldInput = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return { success: false, message: "Invalid old gold lines" };
+    }
+    const oldGold = await resolveOldGoldLines(storeId, oldGoldInput);
+    if ("error" in oldGold) return { success: false, message: oldGold.error };
+    const oldGoldExcessMode =
+      formData.get("oldGoldExcessMode") === OldGoldExcessMode.PAID_OUT
+        ? OldGoldExcessMode.PAID_OUT
+        : OldGoldExcessMode.STORE_CREDIT;
+    const oldGoldPayoutMethodRaw = String(formData.get("oldGoldPayoutMethod") || "");
+    const oldGoldPayoutMethod = (Object.values(PaymentMethod) as string[]).includes(oldGoldPayoutMethodRaw)
+      ? (oldGoldPayoutMethodRaw as PaymentMethod)
+      : null;
+    const oldGoldPayoutReference = String(formData.get("oldGoldPayoutReference") || "").trim() || null;
+
+    let paidAmount =
       (paymentsRaw !== null
         ? payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
         : toNumber(formData.get("paidAmount"))) + creditApplied;
@@ -1125,6 +1150,21 @@ export async function createInvoice(
     const roundOffOverride =
       roundOffOverrideRaw !== null && roundOffOverrideRaw !== "" ? toNumber(roundOffOverrideRaw) : null;
     const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal, roundOffOverride);
+
+    // Old gold goes against the bill first (after any store credit); cash
+    // only covers what's left, and any old-gold value beyond the bill is
+    // excess — kept as store credit or paid out, as chosen.
+    const oldGoldSplit = splitOldGoldValue(oldGold.total, totalAmount - creditApplied);
+    if (oldGoldSplit.excess > 0 && oldGoldExcessMode === OldGoldExcessMode.PAID_OUT && !oldGoldPayoutMethod) {
+      return { success: false, message: "Choose how the old gold balance is paid out to the customer." };
+    }
+    paidAmount = round2(paidAmount + oldGoldSplit.applied);
+    if (oldGoldSplit.applied > 0 && paidAmount > totalAmount + 0.01) {
+      return {
+        success: false,
+        message: `Payments exceed what's left to pay after the old gold (₹${Math.max(0, totalAmount - creditApplied - oldGoldSplit.applied).toFixed(2)}).`,
+      };
+    }
     const balanceAmount = Math.max(0, totalAmount - paidAmount);
 
     let status: InvoiceStatus = InvoiceStatus.PAID;
@@ -1156,7 +1196,7 @@ export async function createInvoice(
 
     const customer = await prisma.customer.findFirst({
       where: { id: customerId, storeId },
-      select: { id: true },
+      select: { id: true, name: true },
     });
     if (!customer) {
       return { success: false, message: "Please select a party" };
@@ -1525,6 +1565,28 @@ export async function createInvoice(
             description: `Store credit applied to ${invoiceNumber}`,
             locationId: resolvedLocationId ?? undefined,
           },
+        });
+      }
+
+      // Customer → Business half of an Old Gold Exchange: the OG purchase,
+      // its old-gold stock and the customer's ledger entries.
+      if (oldGold.lines.length) {
+        await recordOldGoldExchange(tx, {
+          storeId,
+          customerId,
+          customerName: customer.name,
+          invoiceId: created.id,
+          invoiceNumber,
+          lines: oldGold.lines,
+          total: oldGold.total,
+          applied: oldGoldSplit.applied,
+          excess: oldGoldSplit.excess,
+          excessMode: oldGoldExcessMode,
+          payout: oldGoldPayoutMethod
+            ? { method: oldGoldPayoutMethod, reference: oldGoldPayoutReference }
+            : null,
+          locationId: resolvedLocationId,
+          actor,
         });
       }
 

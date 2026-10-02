@@ -76,8 +76,8 @@ function toDecimal(value: number | null | undefined) {
 }
 
 /**
- * True for a unique-constraint violation on Product.productCode or
- * InventoryStock.stockCode — the only collision the sequential codes below
+ * True for a unique-constraint violation on Product.productCode,
+ * InventoryStock.stockCode or Purchase.purchaseNumber — the only collision the sequential codes below
  * can produce (two sales minting the same "next" code at once). Callers
  * retry their whole transaction on this; see withManualStockCodeRetry.
  */
@@ -87,7 +87,11 @@ export function isManualStockCodeConflict(error: unknown): boolean {
   }
   const target = (error.meta as { target?: unknown } | undefined)?.target;
   const fields = Array.isArray(target) ? target.map(String) : [String(target ?? "")];
-  return fields.some((field) => field.includes("productCode") || field.includes("stockCode"));
+  // purchaseNumber: an Old Gold Exchange in the same sale mints an OG-
+  // purchase number the same "next highest" way (lib/old-gold/exchange.ts).
+  return fields.some(
+    (field) => field.includes("productCode") || field.includes("stockCode") || field.includes("purchaseNumber"),
+  );
 }
 
 /**

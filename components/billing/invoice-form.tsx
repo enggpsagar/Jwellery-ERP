@@ -40,7 +40,11 @@ import type { PaymentMethodValue } from "@/components/shared/payment-method-fiel
 import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, resolveStockSellingRate, toPrimaryUnit, matchLegacyPurityType, resolveLegacyPurityLabel } from "@/lib/purity"
 import { classifyPurityFamily } from "@/lib/business-units"
 import {
+  getStoreCategoryTypes,
   getStoreMetalPurities,
+  type StoreCategoryRow,
+  type StoreCategoryTypeRow,
+  type StoreStyleRow,
   type StoreMetalRow,
   type StoreMetalOriginRow,
   type StoreMetalPurityRow,
@@ -51,6 +55,8 @@ import { StockItemSelect } from "@/components/inventory/shared/stock-item-select
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog"
+import { AddCategoryDialog } from "@/components/inventory/shared/add-category-dialog"
+import { AddCategoryTypeDialog } from "@/components/inventory/shared/add-category-type-dialog"
 
 type CustomerOption = {
   id: string
@@ -172,6 +178,14 @@ export type LineItem = {
    * initialItems (edit/replace) are grandfathered to true regardless — see
    * those pages' own comments on this field. */
   stockLinkDecided: boolean
+  /** Catalog classification for a "Create New Line Item" line — the
+   * Product minted for it on save (createStockForManualSaleLine) gets
+   * these, and createInvoice rejects a new line without Category (and
+   * Style, when the store uses it), same as Add Product does. Ignored for
+   * a stock-linked line: its product already has them. */
+  categoryId: string
+  categoryTypeId: string
+  targetStyleId: string
 }
 
 function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: number) {
@@ -221,6 +235,9 @@ function emptyLineItem(defaultGstRateId?: string, key: string = crypto.randomUUI
     netTouched: false,
     gstRateId: defaultGstRateId ?? "",
     stockLinkDecided: false,
+    categoryId: "",
+    categoryTypeId: "",
+    targetStyleId: "",
   }
 }
 
@@ -265,6 +282,13 @@ type InvoiceFormProps = {
    * whatever else has already been entered on this document. */
   metals: StoreMetalRow[]
   origins: StoreMetalOriginRow[]
+  /** Category / Style for a "Create New Line Item" line — see LineItem's
+   * categoryId. Types are fetched per category on demand. */
+  categories: StoreCategoryRow[]
+  styles: StoreStyleRow[]
+  /** BusinessSettings.styleFieldEnabled — Style is only asked for (and
+   * only required) when the store uses it, same as Add Product. */
+  styleFieldEnabled?: boolean
   /** Grams-per-carat per purity (Settings > Purity & Carat > Carat
    * Conversion Rules), resolved via resolveGramsPerCarat() wherever a
    * Carat Weight is converted to/from grams on this form. */
@@ -339,6 +363,9 @@ export function InvoiceForm({
   locations,
   metals: initialMetals,
   origins: initialOrigins,
+  categories: initialCategories,
+  styles,
+  styleFieldEnabled = true,
   caratConversionRates,
   gstRates,
   initialGstRateId,
@@ -372,6 +399,12 @@ export function InvoiceForm({
   // else already typed on this form is ever at risk.
   const [addMetalForKey, setAddMetalForKey] = useState<string | null>(null)
   const [addPurityForKey, setAddPurityForKey] = useState<string | null>(null)
+  const [categories, setCategories] = useState(initialCategories)
+  // Same rule as validateManualSaleLines: Style is only asked for when the
+  // store uses it AND has at least one to pick.
+  const showStyleField = styleFieldEnabled && styles.some((style) => style.isActive)
+  const [addCategoryForKey, setAddCategoryForKey] = useState<string | null>(null)
+  const [addTypeForKey, setAddTypeForKey] = useState<string | null>(null)
 
   const [customerId, setCustomerId] = useState(initialCustomerId ?? "")
   // How much of the selected customer's own existing store credit (a prior
@@ -870,6 +903,44 @@ export function InvoiceForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Category Types for a new line's Category picker — cached per category,
+  // same shape as metalPuritiesCache above.
+  const [categoryTypesCache, setCategoryTypesCache] = useState<Record<string, StoreCategoryTypeRow[]>>({})
+
+  const ensureCategoryTypes = useCallback((categoryId: string) => {
+    if (!categoryId || categoryTypesCache[categoryId]) return
+    getStoreCategoryTypes(categoryId)
+      .then((data) => setCategoryTypesCache((prev) => ({ ...prev, [categoryId]: data })))
+      .catch((err) => console.error("Failed to load category types:", err))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryTypesCache])
+
+  // A category tagged to specific metals (Settings > Taxonomy) only applies
+  // to those; an untagged one applies to every metal — same rule as
+  // getStoreCategoriesForMetal, which Add Product's picker uses.
+  const categoriesForMetal = (metalTypeId: string, selectedId: string) =>
+    categories.filter(
+      (category) =>
+        category.id === selectedId ||
+        (category.isActive &&
+          (category.metalTagIds.length === 0 || (metalTypeId !== "" && category.metalTagIds.includes(metalTypeId)))),
+    )
+
+  // What a "Create New Line Item" line still lacks before it can become a
+  // real Product — mirrors validateManualSaleLines on the server (which is
+  // the real guarantee), listed per line so the Details region can flag it.
+  const missingProductFields = (item: LineItem) => {
+    if (!item.stockLinkDecided || item.inventoryStockId) return []
+    const missing: string[] = []
+    if (!item.itemName.trim()) missing.push("Item name")
+    if (!item.metalTypeId) missing.push("Metal Type")
+    if (!item.categoryId && !metalById.get(item.metalTypeId)?.isGemstone) missing.push("Category")
+    if (showStyleField && !item.targetStyleId) missing.push("Style")
+    if (!(item.grossWeight > 0)) missing.push("Gross Weight")
+    if (!(item.netWeight > 0)) missing.push("Net Weight")
+    return missing
+  }
+
   // A stock item saved before per-metal Purities existed carries only the
   // legacy `purity` enum, with `purityLabel` blank — once that metal's real
   // Purity options load, this backfills the label so the Purity dropdown
@@ -932,6 +1003,7 @@ export function InvoiceForm({
       // this restore replaced `items`.
       for (const item of draft.items ?? []) {
         if (item.metalTypeId) ensureMetalPurities(item.metalTypeId)
+        if (item.categoryId) ensureCategoryTypes(item.categoryId)
       }
 
       if (formRef.current) {
@@ -1251,6 +1323,9 @@ export function InvoiceForm({
         hsnCode: item.hsnCode || null,
         inventoryStockId: item.inventoryStockId || null,
         gstRateId: item.gstRateId || null,
+        categoryId: item.inventoryStockId ? null : item.categoryId || null,
+        categoryTypeId: item.inventoryStockId ? null : item.categoryTypeId || null,
+        targetStyleId: item.inventoryStockId ? null : item.targetStyleId || null,
       }
     }),
   )
@@ -1265,6 +1340,8 @@ export function InvoiceForm({
   // line can't be added by typing straight into Item Name without ever
   // touching the picker. Same unconditional-per-item check as hasInvalidRate.
   const hasInvalidStockLink = items.some((item) => !item.stockLinkDecided)
+
+  const incompleteNewItem = items.find((item) => missingProductFields(item).length > 0)
 
   // Only meaningful for a fresh invoice — see paymentRows' own comment
   // above. Zero-amount rows (a split row the user opened but never filled
@@ -1308,6 +1385,14 @@ export function InvoiceForm({
         event.preventDefault()
         if (hasInvalidStockLink) {
           toast.error("Link every line item to a stock item, or choose \"Create New Line Item\" for a custom piece, before creating the invoice.")
+          return
+        }
+        if (incompleteNewItem) {
+          const missing = missingProductFields(incompleteNewItem)
+          toast.error(
+            `"${incompleteNewItem.itemName.trim() || "New line item"}" will be added as a new product — fill in ${missing.join(", ")} first.`,
+          )
+          setExpandedKeys((prev) => new Set(prev).add(incompleteNewItem.key))
           return
         }
         if (hasInvalidRate) {
@@ -1600,11 +1685,10 @@ export function InvoiceForm({
                           // stockLinkDecided's own doc comment.
                           stockLinkDecided: true,
                         })
-                        setExpandedKeys((prev) => {
-                          const next = new Set(prev)
-                          next.delete(item.key)
-                          return next
-                        })
+                        // Opened, not collapsed: a new item becomes a real
+                        // Product on save, and its required catalog fields
+                        // (Category, Style, Gross Weight...) live in Details.
+                        setExpandedKeys((prev) => new Set(prev).add(item.key))
                       }}
                       isDisabled={(stock) => availableForStock(stock.id, item.key) <= 0}
                       availableQty={(stock) => availableForStock(stock.id, item.key)}
@@ -1741,6 +1825,127 @@ export function InvoiceForm({
                   rendered while expanded. */}
               {isExpanded && (
                 <div className="space-y-3 border-t p-4">
+                  {/* New Product details — only for a "Create New Line
+                      Item" line, which becomes a real catalog Product on
+                      save. Same required fields as Add Product, so a piece
+                      sold this way lands in the right Category/Style in
+                      reports instead of an unclassified row. */}
+                  {!isLinked && item.stockLinkDecided && (() => {
+                    const missing = missingProductFields(item)
+                    const lineCategories = categoriesForMetal(item.metalTypeId, item.categoryId)
+                    const lineTypes = (categoryTypesCache[item.categoryId] ?? []).filter(
+                      (type) => type.isActive || type.id === item.categoryTypeId,
+                    )
+                    const categoryRequired = !metalById.get(item.metalTypeId)?.isGemstone
+                    return (
+                      <div className="space-y-2 rounded-lg border border-dashed p-3">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <p className="text-xs font-medium">New product details</p>
+                          {missing.length > 0 && (
+                            <p className="text-[11px] text-destructive">Still needed: {missing.join(", ")}</p>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                            <Label className="text-xs">
+                              Category {categoryRequired && <RequiredMark />}
+                            </Label>
+                            <div className="flex gap-1.5">
+                              <Select
+                                value={item.categoryId || undefined}
+                                onValueChange={(value) => {
+                                  ensureCategoryTypes(value)
+                                  updateItem(item.key, { categoryId: value, categoryTypeId: "" })
+                                }}
+                              >
+                                <SelectTrigger className="h-11 w-full">
+                                  <SelectValue placeholder={lineCategories.length ? "Select category" : "No categories yet"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {lineCategories.map((category) => (
+                                    <SelectItem key={category.id} value={category.id}>
+                                      {category.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="icon"
+                                className="h-11 w-9 shrink-0 px-0"
+                                title="Add Category"
+                                onClick={() => setAddCategoryForKey(item.key)}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                            <Label className="text-xs">Type</Label>
+                            <div className="flex gap-1.5">
+                              <Select
+                                value={item.categoryTypeId || "__none__"}
+                                onValueChange={(value) =>
+                                  updateItem(item.key, { categoryTypeId: value === "__none__" ? "" : value })
+                                }
+                                disabled={!item.categoryId}
+                              >
+                                <SelectTrigger className="h-11 w-full">
+                                  <SelectValue placeholder={item.categoryId ? "Select type" : "Select a category first"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__none__">None</SelectItem>
+                                  {lineTypes.map((type) => (
+                                    <SelectItem key={type.id} value={type.id}>
+                                      {type.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="icon"
+                                className="h-11 w-9 shrink-0 px-0"
+                                title="Add Type"
+                                disabled={!item.categoryId}
+                                onClick={() => setAddTypeForKey(item.key)}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {showStyleField && (
+                            <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                              <Label className="text-xs">
+                                Style <RequiredMark />
+                              </Label>
+                              <Select
+                                value={item.targetStyleId || undefined}
+                                onValueChange={(value) => updateItem(item.key, { targetStyleId: value })}
+                              >
+                                <SelectTrigger className="h-11 w-full">
+                                  <SelectValue placeholder="Select style" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {styles
+                                    .filter((style) => style.isActive || style.id === item.targetStyleId)
+                                    .map((style) => (
+                                      <SelectItem key={style.id} value={style.id}>
+                                        {style.name}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
                   {/* One consistent grid for the whole row — Link Stock
                       Item used to sit alone in its own half-width row
                       while Purity/Gross Weight/etc were each a much
@@ -1749,13 +1954,21 @@ export function InvoiceForm({
                       columns) in the same grid everything else shares. */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">Metal Type</Label>
+                      <Label className="text-xs">Metal Type {!isLinked && <RequiredMark />}</Label>
                       <div className="flex gap-1.5">
                         <Select
                           value={item.metalTypeId}
                           onValueChange={(value) => {
                             ensureMetalPurities(value)
-                            updateItem(item.key, { metalTypeId: value, purity: "", purityLabel: "" })
+                            const category = categories.find((c) => c.id === item.categoryId)
+                            const categoryStillApplies =
+                              !category || category.metalTagIds.length === 0 || category.metalTagIds.includes(value)
+                            updateItem(item.key, {
+                              metalTypeId: value,
+                              purity: "",
+                              purityLabel: "",
+                              ...(categoryStillApplies ? {} : { categoryId: "", categoryTypeId: "" }),
+                            })
                           }}
                           disabled={isLinked}
                         >
@@ -1821,7 +2034,7 @@ export function InvoiceForm({
                     </div>
 
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">Gross Weight</Label>
+                      <Label className="text-xs">Gross Weight {!isLinked && <RequiredMark />}</Label>
                       <div className="flex gap-1">
                         <Input
                           type="number"
@@ -2299,6 +2512,42 @@ export function InvoiceForm({
       {/* Rendered via Radix's own portal, so being inside <form> in the JSX
           tree doesn't nest them in the actual <form> DOM node — no submit/
           bubbling conflict with either dialog's own Cancel/Add buttons. */}
+      <AddCategoryDialog
+        open={addCategoryForKey !== null}
+        onOpenChange={(open) => {
+          if (!open) setAddCategoryForKey(null)
+        }}
+        onCreated={(category) => {
+          setCategories((prev) => [...prev, category])
+          if (addCategoryForKey) {
+            updateItem(addCategoryForKey, { categoryId: category.id, categoryTypeId: "" })
+            setCategoryTypesCache((prev) => ({ ...prev, [category.id]: [] }))
+          }
+        }}
+      />
+
+      {addTypeForKey && (() => {
+        const targetItem = items.find((item) => item.key === addTypeForKey)
+        if (!targetItem?.categoryId) return null
+        return (
+          <AddCategoryTypeDialog
+            open
+            onOpenChange={(open) => {
+              if (!open) setAddTypeForKey(null)
+            }}
+            categoryId={targetItem.categoryId}
+            categoryName={categories.find((c) => c.id === targetItem.categoryId)?.name ?? ""}
+            onCreated={(type) => {
+              setCategoryTypesCache((prev) => ({
+                ...prev,
+                [type.categoryId]: [...(prev[type.categoryId] ?? []), type],
+              }))
+              updateItem(targetItem.key, { categoryTypeId: type.id })
+            }}
+          />
+        )
+      })()}
+
       <AddMetalDialog
         open={addMetalForKey !== null}
         onOpenChange={(open) => { if (!open) setAddMetalForKey(null) }}

@@ -40,6 +40,7 @@ import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/
 import { OversellError } from "@/lib/inventory/oversell-error";
 import {
   createStockForManualSaleLine,
+  validateManualSaleLines,
   withManualStockCodeRetry,
 } from "@/lib/inventory/manual-line-stock";
 import { formatShortDate } from "@/lib/utils";
@@ -86,6 +87,12 @@ export type InvoiceLineItemInput = {
   // (legacy) gstRateId is, just per-distinct-id rather than once per
   // document — see resolvePerLineGstRateSnapshots below.
   gstRateId?: string | null;
+  // Only read for a "Create New Line Item" line (no inventoryStockId) —
+  // the Product minted for it on save gets these, same as Add Product.
+  // See validateManualSaleLines in lib/inventory/manual-line-stock.ts.
+  categoryId?: string | null;
+  categoryTypeId?: string | null;
+  targetStyleId?: string | null;
 };
 
 export type InvoiceFormState = {
@@ -1011,6 +1018,11 @@ export async function createInvoice(
     // for a field the UI no longer lets it edit.
     items = await lockLinkedStockFields(storeId, items, explicitStockIds);
 
+    // A new line item becomes a real Product on save — it needs everything
+    // Add Product would ask for, or it lands outside every category report.
+    const manualLineError = await validateManualSaleLines(storeId, items);
+    if (manualLineError) return { success: false, message: manualLineError };
+
     const manualDiscount = toNumber(formData.get("discount"));
 
     // paymentsJson (1-2 method rows, or none for a fully-on-credit sale) is
@@ -1850,6 +1862,10 @@ export async function updateInvoice(
       items.filter((item) => item.inventoryStockId).map((item) => item.inventoryStockId as string),
     );
     items = await lockLinkedStockFields(storeId, items, explicitStockIds);
+
+    // Same complete-product requirement as createInvoice.
+    const manualLineError = await validateManualSaleLines(storeId, items);
+    if (manualLineError) return { success: false, message: manualLineError };
 
     // Same Composition-scheme guard as createInvoice — a store that can't
     // charge GST at creation can't gain it back by editing line items either.

@@ -11,7 +11,12 @@ import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getStates } from "@/lib/actions/location-actions"
 import { filterDeliveryStates } from "@/lib/delivery-location"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
-import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
+import {
+  getStoreMetals,
+  getAllStoreMetalOrigins,
+  getStoreCategories,
+  getStoreStyles,
+} from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
 import { resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
@@ -48,7 +53,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     redirect(`/billing/${id}`)
   }
 
-  const [customers, stockItems, businessSettings, locations, metals, origins, caratConversionRates, defaultLocationId, gstRates, states] =
+  const [customers, stockItems, businessSettings, locations, metals, origins, categories, styles, caratConversionRates, defaultLocationId, gstRates, states] =
     await Promise.all([
       getInvoiceFormCustomers(),
       getInvoiceFormStockItems(),
@@ -56,6 +61,8 @@ export default async function ReplaceInvoicePage({ params }: Props) {
       getStoreLocations(),
       getStoreMetals(),
       getAllStoreMetalOrigins(),
+      getStoreCategories(),
+      getStoreStyles(),
       getCaratConversionRateMap(),
       getDefaultLocationId(),
       getGstRates(),
@@ -132,6 +139,9 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     // it's exempt from the "must decide" gate that only applies to a
     // freshly-added blank row. See LineItem's own doc comment.
     stockLinkDecided: true,
+    categoryId: "",
+    categoryTypeId: "",
+    targetStyleId: "",
   }
   })
 
@@ -150,6 +160,9 @@ export default async function ReplaceInvoicePage({ params }: Props) {
         locations={locations}
         metals={metals}
         origins={origins}
+        categories={categories}
+        styles={styles}
+        styleFieldEnabled={businessSettings.styleFieldEnabled}
         caratConversionRates={caratConversionRates}
         gstRates={gstRates}
         defaultGstRate={businessSettings.defaultGstRate}

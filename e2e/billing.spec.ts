@@ -1,6 +1,15 @@
 import { expect, test } from "@playwright/test"
 
+import type { Page } from "@playwright/test"
+
 import { db, demoStoreId, watchForPageCrash } from "./helpers"
+
+const grossWeightInput = (page: Page) =>
+  page
+    .locator("div.space-y-1")
+    .filter({ has: page.getByText("Gross Weight", { exact: false }) })
+    .locator('input[type="number"]')
+    .first()
 
 /**
  * Product → Add Stock → Sell (lib/inventory/manual-line-stock.ts): an
@@ -30,17 +39,34 @@ test("a new line item on an invoice creates its Product and Stock and sells it",
   await lineNumbers.nth(2).fill("5000")
   await expect(page.getByText("Selling price is required")).toHaveCount(0)
 
+  // The new Product needs what Add Product asks for — Metal, Category,
+  // Gross Weight (Style too, but the demo store has none configured, so
+  // it isn't asked). Details opens on its own for a new line.
+  await page.getByRole("combobox").filter({ hasText: "Select metal" }).click()
+  await page.getByRole("option", { name: "Gold", exact: true }).click()
+  await page.getByRole("combobox").filter({ hasText: "Select category" }).click()
+  await page.getByRole("option", { name: "Ornament", exact: true }).click()
+  await grossWeightInput(page).fill("6")
+  await expect(page.getByText(/Still needed:/)).toHaveCount(0)
+
   await page.getByRole("button", { name: "Create Invoice" }).click()
   await page.waitForURL(/\/billing\/(?!new)[^/]+$/)
 
   const storeId = await demoStoreId()
   const stock = await db().inventoryStock.findFirst({
     where: { storeId, product: { name: itemName } },
-    include: { product: true, transactions: true, invoiceItems: true },
+    include: {
+      product: { include: { category: true, metalType: true, metalComponents: true } },
+      transactions: true,
+      invoiceItems: true,
+    },
   })
 
   expect(stock, "stock row created for the manual line").not.toBeNull()
   expect(stock!.product.name).toBe(itemName)
+  expect(stock!.product.category?.name).toBe("Ornament")
+  expect(stock!.product.metalType?.name).toBe("Gold")
+  expect(stock!.product.metalComponents).toHaveLength(1)
   expect(stock!.quantity).toBe(0)
   expect(stock!.status).toBe("SOLD")
   expect(stock!.invoiceItems).toHaveLength(1)
@@ -65,4 +91,28 @@ test("an invoice line can't be billed for more pieces than are in stock", async 
   const qty = page.locator('input[type="number"]').first()
   await qty.fill(String(available + 5))
   await expect(qty).toHaveValue(String(available))
+})
+
+test("a new line item can't be saved without the fields its Product needs", async ({ page }) => {
+  const itemName = `E2E Unclassified ${Date.now()}`
+
+  await page.goto("/billing/new")
+
+  await page.getByRole("combobox").filter({ hasText: "Select a party" }).click()
+  await page.getByRole("option", { name: /Ananya Kulkarni/ }).click()
+
+  await page.getByRole("combobox").filter({ hasText: "Search stock item" }).first().click()
+  await page.getByRole("option", { name: "Create New Line Item" }).click()
+  await page.getByPlaceholder("Item name").fill(itemName)
+
+  const lineNumbers = page.locator('input[type="number"]')
+  await lineNumbers.nth(1).fill("5")
+  await lineNumbers.nth(2).fill("5000")
+
+  await expect(page.getByText(/Still needed: .*Category/)).toBeVisible()
+  await page.getByRole("button", { name: "Create Invoice" }).click()
+  await expect(page).toHaveURL(/\/billing\/new/)
+
+  const storeId = await demoStoreId()
+  expect(await db().product.count({ where: { storeId, name: itemName } })).toBe(0)
 })

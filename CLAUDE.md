@@ -232,6 +232,23 @@ the decrement's `where` (updateInvoice exempts rows this invoice itself
 already holds, since it restores them first). **Not changed**: Kacha
 slips and Quotation conversion still allow unlinked manual lines.
 
+**2026-10-02: the minted Product is now a complete catalog entry.** It
+used to get only name/metal/weights — no Category, Type, Style or
+per-Metal Purity — so it fell outside every category-grouped report.
+A "Create New Line Item" line's Details region now asks for Category /
+Type / Style (opened automatically), and `validateManualSaleLines`
+(same file) enforces Add Product's own rules before the transaction:
+item name, Metal, Category (unless the metal `isGemstone`), Style (only
+when `styleFieldEnabled` **and** the store has ≥1 active style — stores
+created after the StoreStyle backfill migration have none), gross and net
+weight. `createStockForManualSaleLine` also resolves `storeMetalPurityId`
+from the line's `purityLabel`, builds the SKU with category/type/style
+like `createProduct`, and writes the `ProductMetalComponent` (+
+`ProductStoneComponent`) rows Add Product writes. A pre-09-29 invoice
+line with no stock now needs these filled before the invoice can be
+edited. Purchase's `createProductFromManualEntry` still mints
+unclassified products — same gap, not yet fixed.
+
 ### Regression tests (added 2026-09-29)
 
 Playwright suite in `e2e/`, run by `.github/workflows/regression.yml` on every push to `main` and every PR: throwaway Postgres in the runner → migrate → `pnpm seed` + `pnpm db:seed:full-demo` → `tsc` → `pnpm build` → `pnpm test:e2e`. Sign-in mints a NextAuth JWT in `e2e/global-setup.ts` (no test login route in the app), which also refuses any non-localhost `DATABASE_URL`. See `e2e/README.md`. **Add a spec for every new feature.** The demo seed must keep creating `UserStoreMembership` rows for its users — `requirePermissionInStore` (createInvoice etc.) reads only that table, so without them the demo Admin can open every page but not save an invoice. Tests run in parallel with Vercel's own deploy on a direct push to `main`; they only *block* a bad change if work goes through a PR (or Vercel's deployment checks are turned on).

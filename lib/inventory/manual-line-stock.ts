@@ -21,6 +21,7 @@ import {
   type UserRole,
 } from "@prisma/client";
 
+import { prisma } from "@/lib/prisma";
 import { buildSkuPrefix } from "@/lib/inventory/product-sku";
 
 export type ManualSaleLine = {
@@ -42,6 +43,14 @@ export type ManualSaleLine = {
   stoneMetalTypeName?: string | null;
   stoneTypeNames?: string | null;
   hsnCode?: string | null;
+  // The catalog classification Add Product asks for — required here too
+  // (see validateManualSaleLines) so a product minted at sale time lands
+  // in the same Category/Type/Style buckets that reports and the product
+  // list group by, instead of an unclassified row nothing reconciles to.
+  categoryId?: string | null;
+  categoryTypeId?: string | null;
+  targetStyleId?: string | null;
+  gstRateId?: string | null;
 };
 
 type Actor = {
@@ -90,6 +99,86 @@ export async function withManualStockCodeRetry<T>(fn: () => Promise<T>, attempts
       if (attempt >= attempts || !isManualStockCodeConflict(error)) throw error;
     }
   }
+}
+
+/**
+ * Add Product's own required-field rules (createProduct /
+ * validateTaxonomySelection in lib/actions/inventory/product-actions.ts),
+ * applied to every line that has no stock yet and will mint a Product on
+ * save. Run before the sale's transaction; returns the first problem as a
+ * user-facing message, or null when every manual line is complete. Lines
+ * already linked to stock are skipped — their product already exists.
+ */
+export async function validateManualSaleLines(
+  storeId: string,
+  lines: (ManualSaleLine & { inventoryStockId?: string | null })[],
+): Promise<string | null> {
+  const manual = lines.filter((line) => !line.inventoryStockId);
+  if (!manual.length) return null;
+
+  const ids = (pick: (line: ManualSaleLine) => string | null | undefined) => [
+    ...new Set(manual.map(pick).filter((id): id is string => Boolean(id))),
+  ];
+
+  const [settings, activeStyleCount, metals, categories, types, styles] = await Promise.all([
+    prisma.businessSettings.findUnique({ where: { storeId }, select: { styleFieldEnabled: true } }),
+    prisma.storeStyle.count({ where: { storeId, isActive: true } }),
+    prisma.storeMetal.findMany({
+      where: { storeId, id: { in: ids((l) => l.metalTypeId) } },
+      select: { id: true, isGemstone: true },
+    }),
+    prisma.storeCategory.findMany({
+      where: { storeId, id: { in: ids((l) => l.categoryId) } },
+      select: { id: true },
+    }),
+    prisma.storeCategoryType.findMany({
+      where: { storeId, id: { in: ids((l) => l.categoryTypeId) } },
+      select: { id: true, categoryId: true },
+    }),
+    prisma.storeStyle.findMany({
+      where: { storeId, id: { in: ids((l) => l.targetStyleId) } },
+      select: { id: true },
+    }),
+  ]);
+  const metalById = new Map(metals.map((m) => [m.id, m]));
+  const categoryIds = new Set(categories.map((c) => c.id));
+  const typeById = new Map(types.map((t) => [t.id, t]));
+  const styleIds = new Set(styles.map((s) => s.id));
+  // Only required when there is something to pick: a store created after
+  // StoreStyle's backfill migration starts with no styles at all, and a
+  // sale shouldn't be blocked on a list it can't choose from.
+  const styleRequired = settings?.styleFieldEnabled !== false && activeStyleCount > 0;
+
+  for (const line of manual) {
+    const name = line.itemName?.trim();
+    const label = name ? `"${name}"` : "a new line item";
+    if (!name) return "Enter an item name for every new line item.";
+
+    const metal = line.metalTypeId ? metalById.get(line.metalTypeId) : undefined;
+    if (!metal) return `Select a metal type for ${label}.`;
+
+    // Same exemption as Add Product: a loose stone isn't an ornament.
+    if (!line.categoryId) {
+      if (!metal.isGemstone) return `Select a category for ${label}.`;
+    } else if (!categoryIds.has(line.categoryId)) {
+      return `The category picked for ${label} is invalid — pick it again.`;
+    }
+
+    if (line.categoryTypeId && typeById.get(line.categoryTypeId)?.categoryId !== line.categoryId) {
+      return `The type picked for ${label} doesn't belong to its category — pick it again.`;
+    }
+
+    if (line.targetStyleId) {
+      if (!styleIds.has(line.targetStyleId)) return `The style picked for ${label} is invalid — pick it again.`;
+    } else if (styleRequired) {
+      return `Select a style for ${label}.`;
+    }
+
+    if (!(toNumber(line.grossWeight) > 0)) return `Enter the gross weight for ${label}.`;
+    if (!(toNumber(line.netWeight) > 0)) return `Enter the net weight for ${label}.`;
+  }
+
+  return null;
 }
 
 /** Same `{prefix}-NNN` sequencing as createProduct / Purchase's
@@ -147,23 +236,51 @@ export async function createStockForManualSaleLine(
 ): Promise<string> {
   const { storeId, line, actor, locationId, referenceType } = params;
 
-  const [businessSettings, metalRow] = await Promise.all([
-    tx.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true } }),
-    line.metalTypeId
-      ? tx.storeMetal.findFirst({ where: { id: line.metalTypeId, storeId }, select: { id: true, name: true } })
-      : Promise.resolve(null),
-  ]);
-  // A metal id from another store (or a stale one) is dropped, never
-  // attached to this store's product/stock.
+  // Every id below is re-resolved against this store (a stale or foreign
+  // id is dropped, never attached) — validateManualSaleLines has already
+  // rejected a sale missing a required one, so this is only the backstop.
+  const [businessSettings, metalRow, categoryRow, categoryTypeRow, styleRow, gstRateRow] =
+    await Promise.all([
+      tx.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true } }),
+      line.metalTypeId
+        ? tx.storeMetal.findFirst({ where: { id: line.metalTypeId, storeId }, select: { id: true, name: true } })
+        : Promise.resolve(null),
+      line.categoryId
+        ? tx.storeCategory.findFirst({ where: { id: line.categoryId, storeId }, select: { id: true, name: true } })
+        : Promise.resolve(null),
+      line.categoryTypeId && line.categoryId
+        ? tx.storeCategoryType.findFirst({
+            where: { id: line.categoryTypeId, storeId, categoryId: line.categoryId },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve(null),
+      line.targetStyleId
+        ? tx.storeStyle.findFirst({ where: { id: line.targetStyleId, storeId }, select: { id: true, name: true } })
+        : Promise.resolve(null),
+      line.gstRateId
+        ? tx.gstRate.findFirst({ where: { id: line.gstRateId, storeId }, select: { id: true } })
+        : Promise.resolve(null),
+    ]);
   const metalTypeId = metalRow?.id ?? null;
+
+  // The line carries the per-Metal Purity's label (InvoiceItem.purityLabel),
+  // not its id — resolved back to the StoreMetalPurity row so the Product
+  // gets the same FK (and SKU purity code) Add Product would give it.
+  const purityRow =
+    metalTypeId && line.purityLabel
+      ? await tx.storeMetalPurity.findFirst({
+          where: { storeId, storeMetalId: metalTypeId, label: line.purityLabel },
+          select: { id: true, skuCode: true },
+        })
+      : null;
 
   const skuPrefix = buildSkuPrefix({
     metalName: metalRow?.name ?? "X",
     purity: line.purity ?? null,
-    purityCode: null,
-    targetStyleName: null,
-    categoryTypeName: null,
-    categoryName: null,
+    purityCode: purityRow?.skuCode,
+    targetStyleName: styleRow?.name ?? null,
+    categoryTypeName: categoryTypeRow?.name ?? null,
+    categoryName: categoryRow?.name ?? null,
     format: businessSettings?.skuFormat,
   });
 
@@ -171,6 +288,9 @@ export async function createStockForManualSaleLine(
     line.makingChargeType === ChargeType.PERCENTAGE ? ChargeType.PERCENTAGE : ChargeType.FIXED;
   const quantity = Math.max(1, Math.trunc(toNumber(line.quantity)) || 1);
   const itemName = line.itemName?.trim() || "Manually Added Item";
+  const hasStoneComponent = Boolean(
+    line.stoneMetalTypeName || line.stoneTypeNames || toNumber(line.stoneCharge) > 0,
+  );
 
   const product = await tx.product.create({
     select: { id: true },
@@ -178,8 +298,12 @@ export async function createStockForManualSaleLine(
       storeId,
       productCode: await nextProductCode(tx, storeId, skuPrefix),
       name: itemName,
+      categoryId: categoryRow?.id ?? undefined,
+      categoryTypeId: categoryTypeRow?.id ?? undefined,
+      targetStyleId: styleRow?.id ?? undefined,
       metalTypeId: metalTypeId ?? undefined,
       defaultPurity: line.purity ?? undefined,
+      storeMetalPurityId: purityRow?.id ?? undefined,
       defaultMakingCharge: line.makingCharge,
       defaultMakingChargeType: makingChargeType,
       defaultStoneCharge: line.stoneCharge,
@@ -188,15 +312,45 @@ export async function createStockForManualSaleLine(
       defaultNetWeight: line.netWeight ?? undefined,
       defaultStoneWeight: line.stoneWeight ?? undefined,
       defaultCaratWeight: line.caratWeight ?? undefined,
-      hasStoneComponent: Boolean(
-        line.stoneMetalTypeName || line.stoneTypeNames || toNumber(line.stoneCharge) > 0,
-      ),
+      hasStoneComponent,
       defaultStoneMetalTypeName: line.stoneMetalTypeName ?? undefined,
       defaultStoneTypeNames: line.stoneTypeNames ?? undefined,
       hsnCode: line.hsnCode ?? undefined,
       isActive: true,
     },
   });
+
+  // Add Product always writes the metal/stone breakdown rows too (the
+  // scalar fields above are only a summary of component[0]) — readers of
+  // the product's detail view and per-component GST expect them.
+  if (metalTypeId) {
+    await tx.productMetalComponent.create({
+      data: {
+        productId: product.id,
+        metalTypeId,
+        storeMetalPurityId: purityRow?.id ?? null,
+        grossWeight: toDecimal(line.grossWeight) ?? null,
+        netWeight: toDecimal(line.netWeight) ?? null,
+        gstRateId: gstRateRow?.id ?? null,
+        sortOrder: 0,
+      },
+    });
+  }
+  if (hasStoneComponent && line.stoneMetalTypeName) {
+    await tx.productStoneComponent.create({
+      data: {
+        productId: product.id,
+        stoneMetalTypeName: line.stoneMetalTypeName,
+        stoneTypeNames: line.stoneTypeNames ?? null,
+        caratWeight: toDecimal(line.caratWeight) ?? null,
+        stoneWeight: toDecimal(line.stoneWeight) ?? null,
+        stoneRate: toDecimal(line.stoneRate) ?? null,
+        stoneCharge: toDecimal(line.stoneCharge) ?? null,
+        gstRateId: gstRateRow?.id ?? null,
+        sortOrder: 0,
+      },
+    });
+  }
 
   const stock = await tx.inventoryStock.create({
     select: { id: true },

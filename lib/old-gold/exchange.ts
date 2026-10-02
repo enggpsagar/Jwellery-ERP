@@ -33,6 +33,7 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { getFineWeightResolver } from "@/lib/fine-weight";
+import { GRAMS_PER_CARAT } from "@/lib/purity";
 import { oldGoldLineValue, round2 } from "@/lib/old-gold/value";
 
 export type OldGoldLineInput = {
@@ -44,17 +45,39 @@ export type OldGoldLineInput = {
   netWeight?: number | null;
   deductionPercent?: number | null;
   rate?: number | null;
+  // A stone set in the metal ("Does this piece have a stone?"), or — for a
+  // loose diamond/gemstone line — caratWeight is the item's own weight.
+  hasStone?: boolean | null;
+  stoneMetalTypeName?: string | null;
+  stoneTypeNames?: string | null;
+  caratWeight?: number | null;
+  /** Grams. */
+  stoneWeight?: number | null;
+  stoneRate?: number | null;
+  stoneCharge?: number | null;
 };
 
 export type ResolvedOldGoldLine = {
   description: string;
   metalTypeId: string;
   metalName: string;
+  /** A loose diamond/gemstone — priced per carat, no purity. */
+  isGemstone: boolean;
+  stone: {
+    metalTypeName: string;
+    typeNames: string | null;
+    caratWeight: number | null;
+    weightGrams: number | null;
+    rate: number | null;
+    charge: number;
+  } | null;
   purityLabel: string | null;
   purity: PurityType | null;
   grossWeight: number | null;
   netWeight: number;
   fineWeight: number;
+  /** Loose stone's own carats, or the carats of the stone set in the metal. */
+  caratWeight: number | null;
   deductionPercent: number;
   rate: number;
   value: number;
@@ -82,18 +105,55 @@ export async function resolveOldGoldLines(
   const [metals, fineOf] = await Promise.all([
     prisma.storeMetal.findMany({
       where: { storeId, id: { in: metalIds } },
-      select: { id: true, name: true, hasPurity: true },
+      select: { id: true, name: true, hasPurity: true, isGemstone: true, primaryUnit: true },
     }),
     getFineWeightResolver(storeId),
   ]);
   const metalById = new Map(metals.map((metal) => [metal.id, metal]));
+  const stoneNames = new Set(
+    (
+      await prisma.storeMetal.findMany({ where: { storeId, isGemstone: true }, select: { name: true } })
+    ).map((stone) => stone.name),
+  );
 
   const resolved: ResolvedOldGoldLine[] = [];
   for (const [index, line] of lines.entries()) {
-    const label = `old gold line ${index + 1}`;
+    const label = `item bought ${index + 1}`;
     const metal = line.metalTypeId ? metalById.get(line.metalTypeId) : undefined;
-    if (!metal) return { error: `Select the metal for ${label}.` };
-    if (!metal.hasPurity) return { error: `${metal.name} has no purity, so it can't be taken as old gold (${label}).` };
+    if (!metal) return { error: `Select the metal or stone for ${label}.` };
+
+    const deduction = toNumber(line.deductionPercent);
+    if (deduction < 0 || deduction >= 100) {
+      return { error: `Deduction for ${label} must be between 0 and 100%.` };
+    }
+
+    // A loose diamond / gemstone: carats × rate per carat, no purity.
+    if (metal.isGemstone) {
+      const carats = toNumber(line.caratWeight);
+      if (!(carats > 0)) return { error: `Enter the carat weight for ${label}.` };
+      const gemRate = toNumber(line.rate);
+      if (!(gemRate > 0)) return { error: `Enter the rate per carat for ${label}.` };
+      const netWeight = metal.primaryUnit === "CARAT" ? carats : carats * GRAMS_PER_CARAT;
+      resolved.push({
+        description: line.description?.trim() || metal.name,
+        metalTypeId: metal.id,
+        metalName: metal.name,
+        isGemstone: true,
+        stone: null,
+        purityLabel: null,
+        purity: null,
+        grossWeight: null,
+        netWeight,
+        fineWeight: netWeight,
+        caratWeight: carats,
+        deductionPercent: deduction,
+        rate: gemRate,
+        value: round2(carats * gemRate * (1 - deduction / 100)),
+      });
+      continue;
+    }
+
+    if (!metal.hasPurity) return { error: `${metal.name} has no purity, so it can't be bought here (${label}).` };
 
     const purityLabel = line.purityLabel?.trim() || null;
     const purity = line.purity && PURITY_VALUES.has(line.purity) ? (line.purity as PurityType) : null;
@@ -107,17 +167,41 @@ export async function resolveOldGoldLines(
     }
 
     const rate = toNumber(line.rate);
-    if (!(rate > 0)) return { error: `Enter the 24K rate for ${label}.` };
-    const deductionPercent = toNumber(line.deductionPercent);
-    if (deductionPercent < 0 || deductionPercent >= 100) {
-      return { error: `Deduction for ${label} must be between 0 and 100%.` };
+    if (!(rate > 0)) return { error: `Enter the pure (24K / 999) rate for ${label}.` };
+    const deductionPercent = deduction;
+
+    let stone: ResolvedOldGoldLine["stone"] = null;
+    if (line.hasStone) {
+      const stoneName = line.stoneMetalTypeName?.trim() || "";
+      if (!stoneNames.has(stoneName)) return { error: `Select which stone is in ${label}.` };
+      const weightGrams = toNumber(line.stoneWeight);
+      if (weightGrams < 0) return { error: `Stone weight for ${label} can't be negative.` };
+      if (grossWeight !== null && grossWeight > 0 && netWeight + weightGrams > grossWeight + 0.0005) {
+        return { error: `Net metal weight plus stone weight is more than the gross weight for ${label}.` };
+      }
+      const carats = toNumber(line.caratWeight) || null;
+      const stoneRate = toNumber(line.stoneRate) || null;
+      const charge = line.stoneCharge != null ? toNumber(line.stoneCharge) : (carats ?? 0) * (stoneRate ?? 0);
+      if (charge < 0) return { error: `Stone value for ${label} can't be negative.` };
+      stone = {
+        metalTypeName: stoneName,
+        typeNames: line.stoneTypeNames?.trim() || null,
+        caratWeight: carats,
+        weightGrams: weightGrams || null,
+        rate: stoneRate,
+        charge: round2(charge),
+      };
     }
 
     const fineWeight = fineOf({ metalTypeId: metal.id, purityLabel, purity, netWeight }) ?? netWeight;
+    const metalValue = oldGoldLineValue(fineWeight, rate, deductionPercent);
     resolved.push({
       description: line.description?.trim() || `Old ${metal.name}`,
       metalTypeId: metal.id,
       metalName: metal.name,
+      isGemstone: false,
+      stone,
+      caratWeight: stone?.caratWeight ?? null,
       purityLabel,
       purity,
       grossWeight: grossWeight && grossWeight > 0 ? grossWeight : null,
@@ -125,25 +209,26 @@ export async function resolveOldGoldLines(
       fineWeight,
       deductionPercent,
       rate,
-      value: oldGoldLineValue(fineWeight, rate, deductionPercent),
+      value: round2(metalValue + (stone?.charge ?? 0)),
     });
   }
 
   return { lines: resolved, total: round2(resolved.reduce((sum, line) => sum + line.value, 0)) };
 }
 
-/** OG-{year}-{0001}, highest existing wins — same rule as the stock codes. */
+/** EX-{year}-{0001}, highest existing wins — same rule as the stock codes.
+ *  (The first exchanges, gold-only, were numbered OG-; those keep theirs.) */
 async function nextExchangeNumber(tx: Prisma.TransactionClient, storeId: string) {
   const year = new Date().getFullYear();
   const existing = await tx.purchase.findMany({
-    where: { storeId, purchaseNumber: { startsWith: `OG-${year}-` } },
+    where: { storeId, purchaseNumber: { startsWith: `EX-${year}-` } },
     select: { purchaseNumber: true },
   });
   const highest = existing.reduce((max, row) => {
-    const match = /^OG-\d{4}-(\d+)$/.exec(row.purchaseNumber);
+    const match = /^EX-\d{4}-(\d+)$/.exec(row.purchaseNumber);
     return match ? Math.max(max, Number(match[1])) : max;
   }, 0);
-  return `OG-${year}-${String(highest + 1).padStart(4, "0")}`;
+  return `EX-${year}-${String(highest + 1).padStart(4, "0")}`;
 }
 
 /** Same STK-{year}-{0001} numbering as getNextStockCode / manual-line stock. */
@@ -159,7 +244,8 @@ async function nextStockCode(tx: Prisma.TransactionClient, storeId: string) {
   return `STK-${new Date().getFullYear()}-${String(highest + 1).padStart(4, "0")}`;
 }
 
-/** One reusable "Old Gold — Gold 22K" catalog product per metal + purity. */
+/** One reusable "Bought from customer — Gold 22K" catalog product per
+ *  metal (or stone) + purity. */
 async function oldGoldProductId(tx: Prisma.TransactionClient, storeId: string, line: ResolvedOldGoldLine) {
   const purityKey = (line.purityLabel ?? line.purity ?? "").replace(/[^A-Za-z0-9.]/g, "").toUpperCase();
   const productCode = `OLDGOLD-${line.metalName.replace(/[^A-Za-z0-9]/g, "").toUpperCase()}-${purityKey || "NA"}`;
@@ -177,7 +263,7 @@ async function oldGoldProductId(tx: Prisma.TransactionClient, storeId: string, l
     data: {
       storeId,
       productCode,
-      name: `Old Gold — ${line.metalName} ${line.purityLabel ?? line.purity ?? ""}`.trim(),
+      name: `Bought from customer — ${line.metalName} ${line.purityLabel ?? line.purity ?? ""}`.trim(),
       metalTypeId: line.metalTypeId,
       defaultPurity: line.purity ?? undefined,
       storeMetalPurityId: purityRow?.id ?? undefined,
@@ -232,13 +318,19 @@ export async function recordOldGoldExchange(
         grossWeight: line.grossWeight ?? undefined,
         netWeight: line.netWeight,
         fineWeight: line.fineWeight,
+        caratWeight: line.caratWeight ?? undefined,
+        stoneWeight: line.stone?.weightGrams ?? undefined,
+        stoneRate: line.stone?.rate ?? undefined,
+        stoneCharge: line.stone?.charge ?? undefined,
+        stoneMetalTypeName: line.stone?.metalTypeName ?? undefined,
+        stoneTypeNames: line.stone?.typeNames ?? undefined,
         purchaseRate: line.rate,
         purchaseAmount: line.value,
         vendorId: customerId,
         vendorName: customerName,
         purchaseDate: now,
         locationId: params.locationId ?? undefined,
-        remarks: `Old gold from ${customerName} — ${purchaseNumber}, exchanged against ${invoiceNumber}`,
+        remarks: `Bought from ${customerName} — ${purchaseNumber}, exchanged against ${invoiceNumber}`,
         createdById: actor.id ?? undefined,
         createdByName: actor.name ?? actor.email ?? undefined,
         createdByRole: actor.role ?? undefined,
@@ -252,7 +344,7 @@ export async function recordOldGoldExchange(
         grossWeight: line.grossWeight ?? undefined,
         netWeight: line.netWeight,
         referenceType: "OldGoldExchange",
-        notes: `Old gold received — ${purchaseNumber}`,
+        notes: `Received from customer — ${purchaseNumber}`,
       },
     });
     items.push({
@@ -265,6 +357,12 @@ export async function recordOldGoldExchange(
       grossWeight: line.grossWeight ?? undefined,
       netWeight: line.netWeight,
       fineWeight: line.fineWeight,
+      caratWeight: line.caratWeight ?? undefined,
+      stoneWeight: line.stone?.weightGrams ?? undefined,
+      stoneRate: line.stone?.rate ?? undefined,
+      stoneCharge: line.stone?.charge ?? 0,
+      stoneMetalTypeName: line.stone?.metalTypeName ?? undefined,
+      stoneTypeNames: line.stone?.typeNames ?? undefined,
       rate: line.rate,
       deductionPercent: line.deductionPercent,
       lineTotal: line.value,
@@ -284,7 +382,7 @@ export async function recordOldGoldExchange(
       totalAmount: total,
       paidAmount: total,
       balanceAmount: 0,
-      notes: `Old gold exchanged against ${invoiceNumber}`,
+      notes: `Bought from the customer in exchange against ${invoiceNumber}`,
       locationId: params.locationId ?? undefined,
       createdById: actor.id ?? undefined,
       createdByName: actor.name ?? actor.email ?? undefined,
@@ -309,7 +407,7 @@ export async function recordOldGoldExchange(
       customerId,
       purchaseId: purchase.id,
       amount: total,
-      description: `Old gold received (${purchaseNumber}) against ${invoiceNumber}`,
+      description: `Bought from customer (${purchaseNumber}) against ${invoiceNumber}`,
       locationId: params.locationId ?? undefined,
       createdByUserId: actor.id ?? undefined,
     },
@@ -326,7 +424,7 @@ export async function recordOldGoldExchange(
         amount: excess,
         paymentMethod: params.payout.method,
         paymentReference: params.payout.reference ?? undefined,
-        description: `Old gold balance paid to ${customerName} (${purchaseNumber})`,
+        description: `Exchange balance paid to ${customerName} (${purchaseNumber})`,
         locationId: params.locationId ?? undefined,
         createdByUserId: actor.id ?? undefined,
       },

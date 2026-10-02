@@ -24,7 +24,6 @@ import {
   Wallet,
   Phone,
   Truck,
-  Coins,
 } from "lucide-react";
 
 import { ROLE_LABELS, MODULE_DEFINITIONS } from "@/lib/roles";
@@ -93,18 +92,15 @@ const mainNav: NavItem[] = [
     ],
   },
   {
-    // Old Gold Exchanges — lives under /billing so the Billing module's
-    // permissions (middleware + sidebar filter) gate it with no new module.
-    title: "Old Gold",
-    href: "/billing/old-gold",
-    icon: Coins,
-  },
-  {
     title: "Purchases",
     href: "/purchases",
     icon: PackagePlus,
-    countKey: "purchases",
-    quickAddHref: "/purchases/new",
+    items: [
+      { title: "Purchase Bills", href: "/purchases", quickAddHref: "/purchases/new", countKey: "purchases" },
+      // Gold, silver or diamonds bought from a customer against a sale
+      // (Customer Exchange on New Invoice) — lib/old-gold/exchange.ts.
+      { title: "From Customers", href: "/purchases/exchanges" },
+    ],
   },
   {
     title: "Suppliers",

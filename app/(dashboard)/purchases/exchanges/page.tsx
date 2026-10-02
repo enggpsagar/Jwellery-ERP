@@ -15,7 +15,7 @@ import {
 import { formatShortDate } from "@/lib/utils"
 
 export const metadata: Metadata = {
-  title: "Old Gold",
+  title: "Bought from Customers",
 }
 
 export const dynamic = "force-dynamic"
@@ -24,29 +24,29 @@ const grams = (value: number) => `${value.toFixed(3)} g`
 const rupees = (value: number) => `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 /**
- * Every Old Gold Exchange — old gold bought from a customer while selling
- * them new jewellery (created from the New Invoice form). Each is a real
- * OG- purchase linked to its invoice; weights are shown physical and in
- * 24K fine terms.
+ * Purchases → From Customers: every Customer Exchange — gold, silver or
+ * diamonds bought from a customer while selling them new jewellery (created
+ * from the New Invoice form). Each is a real purchase linked to its invoice;
+ * metal is shown physical and in pure (24K / 999) terms.
  */
-export default async function OldGoldPage() {
+export default async function CustomerExchangesPage() {
   const { rows, summary, truncated } = await getOldGoldExchanges()
 
   const cards = [
     { label: "Exchanges", value: String(summary.count) },
-    { label: "Old gold received (net)", value: grams(summary.totalNet) },
-    { label: "Received in 24K fine", value: grams(summary.totalFine) },
-    { label: "Still in stock (24K fine)", value: grams(summary.inStockFine) },
+    { label: "Metal received (net)", value: grams(summary.totalNet) },
+    { label: "Received pure (24K / 999)", value: grams(summary.totalFine) },
+    { label: "Still in stock (pure)", value: grams(summary.inStockFine) },
     { label: "Total value paid", value: rupees(summary.totalValue) },
   ]
 
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
-        title="Old Gold"
-        description="Old gold taken from customers against new jewellery — each exchange is a purchase linked to its invoice."
-        backHref="/billing"
-        backLabel="Back to Billing"
+        title="Bought from Customers"
+        description="Gold, silver and diamonds bought from customers against new jewellery — each is a purchase linked to its invoice."
+        backHref="/purchases"
+        backLabel="Back to Purchases"
       />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -60,11 +60,11 @@ export default async function OldGoldPage() {
 
       {rows.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No old gold exchanges yet. Add one from{" "}
+          Nothing bought from customers yet. Add it from{" "}
           <Link href="/billing/new" className="text-primary underline-offset-2 hover:underline">
             New Invoice
           </Link>{" "}
-          → Old Gold Exchange.
+          → Customer Exchange.
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border">
@@ -73,9 +73,9 @@ export default async function OldGoldPage() {
               <TableRow>
                 <TableHead>Exchange</TableHead>
                 <TableHead>Customer</TableHead>
-                <TableHead>Old gold</TableHead>
+                <TableHead>Items bought</TableHead>
                 <TableHead className="text-right">Net Wt</TableHead>
-                <TableHead className="text-right">24K Fine</TableHead>
+                <TableHead className="text-right">Pure (24K / 999)</TableHead>
                 <TableHead className="text-right">Value</TableHead>
                 <TableHead>Against invoice</TableHead>
                 <TableHead>Settled</TableHead>
@@ -101,8 +101,14 @@ export default async function OldGoldPage() {
                         <li key={line.id}>
                           {line.description} · {line.metalName} {line.purity}
                           <span className="block text-xs text-muted-foreground">
-                            {grams(line.netWeight)} → {grams(line.fineWeight)} 24K × {rupees(line.rate)}
-                            {line.deductionPercent > 0 ? ` − ${line.deductionPercent}%` : ""} = {rupees(line.value)}
+                            {line.isGemstone
+                              ? `${(line.caratWeight ?? 0).toFixed(3)} ct × ${rupees(line.rate)}/ct`
+                              : `${grams(line.netWeight)} → ${grams(line.fineWeight)} pure × ${rupees(line.rate)}`}
+                            {line.deductionPercent > 0 ? ` − ${line.deductionPercent}%` : ""}
+                            {line.stone
+                              ? ` + stone ${line.stone.name}${line.stone.caratWeight ? ` ${line.stone.caratWeight} ct` : ""} ${rupees(line.stone.value)}`
+                              : ""}{" "}
+                            = {rupees(line.value)}
                             {line.inStock ? "" : " · out of stock"}
                           </span>
                         </li>

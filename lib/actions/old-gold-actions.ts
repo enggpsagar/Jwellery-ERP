@@ -25,6 +25,11 @@ export type OldGoldExchangeRow = {
     rate: number;
     deductionPercent: number;
     value: number;
+    /** A loose diamond/gemstone — weighed in carats, no purity. */
+    isGemstone: boolean;
+    caratWeight: number | null;
+    /** A stone set in the metal piece. */
+    stone: { name: string; caratWeight: number | null; value: number } | null;
     inStock: boolean;
   }[];
   totalNet: number;
@@ -69,7 +74,7 @@ export async function getOldGoldExchanges(): Promise<{
       exchangeInvoice: { select: { id: true, invoiceNumber: true, status: true } },
       items: {
         include: {
-          metalType: { select: { name: true } },
+          metalType: { select: { name: true, isGemstone: true } },
           inventoryStock: { select: { status: true, quantity: true } },
         },
       },
@@ -82,12 +87,21 @@ export async function getOldGoldExchanges(): Promise<{
       id: item.id,
       description: item.itemName,
       metalName: item.metalType?.name ?? "-",
-      purity: item.purityLabel ?? item.purity?.replace(/^[A-Z]+_/, "") ?? "-",
+      purity: item.metalType?.isGemstone ? "" : item.purityLabel ?? item.purity?.replace(/^[A-Z]+_/, "") ?? "-",
       netWeight: Number(item.netWeight ?? 0),
       fineWeight: Number(item.fineWeight ?? item.netWeight ?? 0),
       rate: Number(item.rate ?? 0),
       deductionPercent: Number(item.deductionPercent ?? 0),
       value: Number(item.lineTotal),
+      isGemstone: Boolean(item.metalType?.isGemstone),
+      caratWeight: item.caratWeight != null ? Number(item.caratWeight) : null,
+      stone: item.stoneMetalTypeName
+        ? {
+            name: [item.stoneMetalTypeName, item.stoneTypeNames].filter(Boolean).join(" · "),
+            caratWeight: item.caratWeight != null ? Number(item.caratWeight) : null,
+            value: Number(item.stoneCharge ?? 0),
+          }
+        : null,
       inStock:
         item.inventoryStock?.status === InventoryStockStatus.IN_STOCK && (item.inventoryStock?.quantity ?? 0) > 0,
     }));
@@ -101,8 +115,8 @@ export async function getOldGoldExchanges(): Promise<{
       invoiceNumber: purchase.exchangeInvoice?.invoiceNumber ?? null,
       invoiceStatus: purchase.exchangeInvoice?.status ?? null,
       lines,
-      totalNet: lines.reduce((sum, line) => sum + line.netWeight, 0),
-      totalFine: lines.reduce((sum, line) => sum + line.fineWeight, 0),
+      totalNet: lines.reduce((sum, line) => (line.isGemstone ? sum : sum + line.netWeight), 0),
+      totalFine: lines.reduce((sum, line) => (line.isGemstone ? sum : sum + line.fineWeight), 0),
       value: Number(purchase.totalAmount),
       applied: Number(purchase.oldGoldAppliedAmount),
       excess: Number(purchase.oldGoldExcessAmount),
@@ -117,6 +131,7 @@ export async function getOldGoldExchanges(): Promise<{
       netWeight: true,
       fineWeight: true,
       lineTotal: true,
+      metalType: { select: { isGemstone: true } },
       inventoryStock: { select: { status: true, quantity: true } },
     },
   });
@@ -124,12 +139,14 @@ export async function getOldGoldExchanges(): Promise<{
     where: { storeId, isOldGoldExchange: true, ...locationWhere(scope) },
   });
 
+  // Metal weights only — a loose stone's carats aren't grams of metal.
+  const metalItems = allItems.filter((item) => !item.metalType?.isGemstone);
   const summary: OldGoldSummary = {
     count,
-    totalNet: allItems.reduce((sum, item) => sum + Number(item.netWeight ?? 0), 0),
-    totalFine: allItems.reduce((sum, item) => sum + Number(item.fineWeight ?? item.netWeight ?? 0), 0),
+    totalNet: metalItems.reduce((sum, item) => sum + Number(item.netWeight ?? 0), 0),
+    totalFine: metalItems.reduce((sum, item) => sum + Number(item.fineWeight ?? item.netWeight ?? 0), 0),
     totalValue: allItems.reduce((sum, item) => sum + Number(item.lineTotal), 0),
-    inStockFine: allItems.reduce(
+    inStockFine: metalItems.reduce(
       (sum, item) =>
         item.inventoryStock?.status === InventoryStockStatus.IN_STOCK && item.inventoryStock.quantity > 0
           ? sum + Number(item.fineWeight ?? item.netWeight ?? 0)
@@ -146,7 +163,7 @@ export async function getInvoiceOldGoldExchange(invoiceId: string) {
   const storeId = await requireStoreScope();
   const purchase = await prisma.purchase.findFirst({
     where: { storeId, exchangeInvoiceId: invoiceId, isOldGoldExchange: true },
-    include: { items: { include: { metalType: { select: { name: true } } } } },
+    include: { items: { include: { metalType: { select: { name: true, isGemstone: true } } } } },
   });
   if (!purchase) return null;
   return {
@@ -160,12 +177,21 @@ export async function getInvoiceOldGoldExchange(invoiceId: string) {
       id: item.id,
       description: item.itemName,
       metalName: item.metalType?.name ?? "-",
-      purity: item.purityLabel ?? item.purity?.replace(/^[A-Z]+_/, "") ?? "-",
+      purity: item.metalType?.isGemstone ? "" : item.purityLabel ?? item.purity?.replace(/^[A-Z]+_/, "") ?? "-",
       netWeight: Number(item.netWeight ?? 0),
       fineWeight: Number(item.fineWeight ?? item.netWeight ?? 0),
       rate: Number(item.rate ?? 0),
       deductionPercent: Number(item.deductionPercent ?? 0),
       value: Number(item.lineTotal),
+      isGemstone: Boolean(item.metalType?.isGemstone),
+      caratWeight: item.caratWeight != null ? Number(item.caratWeight) : null,
+      stone: item.stoneMetalTypeName
+        ? {
+            name: [item.stoneMetalTypeName, item.stoneTypeNames].filter(Boolean).join(" · "),
+            caratWeight: item.caratWeight != null ? Number(item.caratWeight) : null,
+            value: Number(item.stoneCharge ?? 0),
+          }
+        : null,
     })),
   };
 }

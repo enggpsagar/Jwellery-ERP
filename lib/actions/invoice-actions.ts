@@ -1079,7 +1079,7 @@ export async function createInvoice(
       const parsed = JSON.parse(String(formData.get("oldGoldJson") || "[]"));
       oldGoldInput = Array.isArray(parsed) ? parsed : [];
     } catch {
-      return { success: false, message: "Invalid old gold lines" };
+      return { success: false, message: "Invalid customer exchange lines" };
     }
     const oldGold = await resolveOldGoldLines(storeId, oldGoldInput);
     if ("error" in oldGold) return { success: false, message: oldGold.error };
@@ -1156,13 +1156,13 @@ export async function createInvoice(
     // excess — kept as store credit or paid out, as chosen.
     const oldGoldSplit = splitOldGoldValue(oldGold.total, totalAmount - creditApplied);
     if (oldGoldSplit.excess > 0 && oldGoldExcessMode === OldGoldExcessMode.PAID_OUT && !oldGoldPayoutMethod) {
-      return { success: false, message: "Choose how the old gold balance is paid out to the customer." };
+      return { success: false, message: "Choose how the exchange balance is paid out to the customer." };
     }
     paidAmount = round2(paidAmount + oldGoldSplit.applied);
     if (oldGoldSplit.applied > 0 && paidAmount > totalAmount + 0.01) {
       return {
         success: false,
-        message: `Payments exceed what's left to pay after the old gold (₹${Math.max(0, totalAmount - creditApplied - oldGoldSplit.applied).toFixed(2)}).`,
+        message: `Payments exceed what's left to pay after the customer exchange (₹${Math.max(0, totalAmount - creditApplied - oldGoldSplit.applied).toFixed(2)}).`,
       };
     }
     const balanceAmount = Math.max(0, totalAmount - paidAmount);

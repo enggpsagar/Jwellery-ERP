@@ -16,6 +16,25 @@ export type OldGoldLineDraft = {
   deductionPercent: number
   /** Rate per gram of fine (24K / 999) metal. */
   rate: number
+  /** Net Wt typed directly — stops it following Gross − stone weight. */
+  netTouched: boolean
+  /** "Does this piece have a stone?" — the stone's own weight comes off the
+   * gross weight (net = gross − stone), and its value is added on top of
+   * the metal's (and may be ₹0 when the shop doesn't pay for stones). */
+  hasStone: boolean
+  stoneMetalTypeName: string
+  stoneTypeNames: string[]
+  /** Stone weight in carats (what the rate is per). */
+  caratWeight: number
+  /** Physical stone weight, always grams internally. */
+  stoneWeightGrams: number
+  stoneWeightUnit: "GRAM" | "CARAT"
+  netStoneWeightTouched: boolean
+  /** Per carat. */
+  stoneRate: number
+  /** Stone value — stoneRate × caratWeight until typed directly. */
+  stoneCharge: number
+  stoneChargeTouched: boolean
 }
 
 export const OLD_GOLD_EXCESS_MODES = ["STORE_CREDIT", "PAID_OUT"] as const
@@ -38,6 +57,17 @@ export function oldGoldLineValue(fineWeight: number, rate: number, deductionPerc
   if (!(fineWeight > 0) || !(rate > 0)) return 0
   const deduction = Math.min(Math.max(deductionPercent || 0, 0), 100)
   return round2(fineWeight * rate * (1 - deduction / 100))
+}
+
+/** A line's full value: the metal's (24K-based) value plus its stone's. */
+export function oldGoldLineTotal(metalValue: number, stoneValue: number) {
+  return round2(metalValue + Math.max(stoneValue || 0, 0))
+}
+
+/** Metal net weight left once the stone's weight comes off the gross. */
+export function netAfterStone(grossWeight: number, stoneWeightGrams: number) {
+  if (!(grossWeight > 0)) return 0
+  return round5(Math.max(0, grossWeight - Math.max(stoneWeightGrams || 0, 0)))
 }
 
 /**

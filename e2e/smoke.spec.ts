@@ -14,7 +14,7 @@ const PAGES = [
   "/billing/kacha",
   "/billing/kacha/new",
   "/billing/credit-notes",
-  "/billing/old-gold",
+  "/purchases/exchanges",
   "/customers",
   "/suppliers",
   "/purchases",

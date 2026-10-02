@@ -314,35 +314,48 @@ selling, vendor, artisan or customer.
 - Not covered: `DraftOrderItem.estimatedWeight` (an estimate, no stock),
   `InventoryTransaction` weights (nothing totals them).
 
-### Added 2026-10-02: Old Gold Exchange (customer trades old gold against a sale)
+### Added 2026-10-02: Customer Exchange (customer sells gold / silver / diamonds against a sale)
 
-On **New Invoice** an "Old Gold Exchange" block (`components/billing/old-gold-exchange-section.tsx`)
-takes the customer's old gold: metal (hasPurity only), purity, gross/net
-weight, deduction %, 24K rate (prefilled from the latest Metal Rate). Value
-= fine (24K) weight × fine rate × (1 − deduction%) — `lib/old-gold/value.ts`
-(client preview) and `resolveOldGoldLines` (server, the real figure).
-`createInvoice` records it in the sale's own transaction via
-`recordOldGoldExchange` (`lib/old-gold/exchange.ts`):
+On **New Invoice** a "Customer Exchange" block (`components/billing/old-gold-exchange-section.tsx`;
+code names still say old-gold) takes whatever the customer sells the shop:
+- **Metal piece** (any `hasPurity` metal — gold, silver, platinum): purity,
+  gross/net weight, deduction %, pure rate (prefilled from the latest Metal
+  Rate: gold24k / silver). Metal value = fine (24K / 999) weight × rate ×
+  (1 − deduction%). Each piece first asks **"Does this piece have a
+  stone?"** (`components/shared/stone-presence-question.tsx`); on → the
+  shared `StoneComponentFields` panel; the stone's weight comes off the gross
+  (net follows gross − stone until typed) and its value (₹0 allowed) is
+  added. Stored on the line/stock's stoneWeight/caratWeight/stoneRate/
+  stoneCharge/stoneMetalTypeName.
+- **Loose diamond / gemstone** (`isGemstone` metal): carats × rate per
+  carat, no purity; netWeight in the metal's primaryUnit, fineWeight = net.
+Client preview `lib/old-gold/value.ts` + `oldGoldLineAmounts`; the server
+(`resolveOldGoldLines`) recomputes and is the real figure. `createInvoice`
+records it in the sale's own transaction via `recordOldGoldExchange`
+(`lib/old-gold/exchange.ts`):
 - **Customer → Business**: a real `Purchase` (`isOldGoldExchange`, number
-  `OG-YYYY-NNNN`, vendor = the customer, `exchangeInvoiceId` → the
-  invoice); each line is an IN_STOCK KACHA stock row with its `fineWeight`
-  under a reusable "Old Gold — <metal> <purity>" product. Locked against
-  edit/delete on the Purchases screen.
+  `EX-YYYY-NNNN` — the first gold-only ones were `OG-`; vendor = the
+  customer, `exchangeInvoiceId` → the invoice); each line is an IN_STOCK
+  KACHA stock row under a reusable "Bought from customer — <metal> <purity>"
+  product (code `OLDGOLD-…`). Locked against edit/delete on Purchases.
 - **Money**: one CREDIT `OLD_GOLD_EXCHANGE` on the customer for the full
   value, keyed by `purchaseId`, **not** `invoiceId` — cancelling/deleting
-  the invoice leaves that value as store credit (the gold stays in stock).
-  Old gold is applied first (after store credit), then cash covers the
-  rest (`splitOldGoldValue`); the applied part is in `Invoice.paidAmount`.
-  Excess beyond the bill: `STORE_CREDIT` (nothing else posted — the
-  customer's balance simply goes negative = available credit) or
-  `PAID_OUT` (a customer-only DEBIT `PAYMENT_OUT`, which `getPaymentsOut`
-  now lists too). Stored on `Purchase.oldGoldAppliedAmount/ExcessAmount/ExcessMode`.
-- **Menu**: sidebar "Old Gold" → `/billing/old-gold` (lives under /billing
-  so Billing's permissions gate it; the sidebar's module filter now
-  prefix-matches like middleware). The invoice detail page shows an Old
-  Gold card with the net payable.
-- Not built: old gold on edit (an existing exchange is never re-edited),
-  Kacha/Quotation, and the printed invoice templates (screen only).
+  the invoice leaves that value as store credit (the goods stay in stock).
+  Applied first (after store credit), then cash covers the rest
+  (`splitOldGoldValue`); the applied part is in `Invoice.paidAmount`.
+  Excess: `STORE_CREDIT` (nothing else posted — the customer's balance goes
+  negative = available credit) or `PAID_OUT` (a customer-only DEBIT
+  `PAYMENT_OUT`, which `getPaymentsOut` now lists). Stored on
+  `Purchase.oldGoldAppliedAmount/ExcessAmount/ExcessMode`.
+- **Menu**: Purchases → "From Customers" (`/purchases/exchanges`, gated by
+  the Purchases module); Purchases became a parent with "Purchase Bills".
+  The sidebar's module filter prefix-matches like middleware. The invoice
+  detail page shows a "Bought from customer" card with the net payable.
+- **Sale side**: a new sale line ("Create New Line Item") now asks the same
+  stone question first, at the top of its New product details, with the
+  stone panel under it; a linked piece shows its stone toggle locked.
+- Not built: exchange on edit (never re-edited), Kacha/Quotation, and the
+  printed invoice templates (screen only).
 
 ### Regression tests (added 2026-09-29)
 

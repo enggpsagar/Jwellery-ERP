@@ -32,10 +32,12 @@ import {
 import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { SourcePartySelect, type SourcePartyOption } from "@/components/billing/source-party-select"
-import { OldGoldExchangeSection, oldGoldLineFineness } from "@/components/billing/old-gold-exchange-section"
 import {
-  oldGoldFineWeight,
-  oldGoldLineValue,
+  OldGoldExchangeSection,
+  oldGoldLineAmounts,
+  serializeOldGoldLine,
+} from "@/components/billing/old-gold-exchange-section"
+import {
   splitOldGoldValue,
   type OldGoldExcessModeValue,
   type OldGoldLineDraft,
@@ -62,6 +64,7 @@ import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 import { StoneComponentFields } from "@/components/inventory/shared/stone-component-fields"
 import { StockItemSelect } from "@/components/inventory/shared/stock-item-select"
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
+import { StonePresenceQuestion } from "@/components/shared/stone-presence-question"
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog"
 import { AddCategoryDialog } from "@/components/inventory/shared/add-category-dialog"
@@ -1334,10 +1337,17 @@ export function InvoiceForm({
 
   // Old gold is applied against the bill first (after store credit), so
   // cash only covers what's left — the same order createInvoice uses.
-  const oldGoldValue = oldGoldLines.reduce((sum, line) => {
-    const fineness = oldGoldLineFineness(line, metalPuritiesCache[line.metalTypeId], enumFineness)
-    return sum + oldGoldLineValue(oldGoldFineWeight(line.netWeight, fineness), line.rate, line.deductionPercent)
-  }, 0)
+  const oldGoldValue = oldGoldLines.reduce(
+    (sum, line) =>
+      sum +
+      oldGoldLineAmounts(
+        line,
+        metalPuritiesCache[line.metalTypeId],
+        enumFineness,
+        Boolean(metalById.get(line.metalTypeId)?.isGemstone),
+      ).total,
+    0,
+  )
   const oldGoldSplit = splitOldGoldValue(editInvoiceId ? 0 : oldGoldValue, totalAmount - creditApplied)
   const paidAmount = paidBeforeOldGold + oldGoldSplit.applied
   const balanceAmount = Math.max(0, totalAmount - paidAmount)
@@ -1693,6 +1703,51 @@ export function InvoiceForm({
             // filled from the picked piece's Product, so both kinds of line
             // read the same way.
             const showNewProductDetails = !isLinked && item.stockLinkDecided
+            // "Does this piece have a stone?" — asked first on a new line
+            // (top of New product details); the stone's own fields follow.
+            const setHasStone = (checked: boolean) =>
+              updateItem(item.key, {
+                hasStoneComponent: checked,
+                // Net Stone Weight and Stone Charge are hidden once off —
+                // clear them so a hidden field can't keep submitting.
+                ...(checked
+                  ? {}
+                  : { stoneWeightInput: 0, netStoneWeightTouched: false, stoneCharge: 0, stoneChargeTouched: false }),
+              })
+            const stoneFields = (
+              <div className="rounded-md border-2 border-dashed border-emerald-400 bg-emerald-50 p-3">
+                <StoneComponentFields
+                  metals={metals}
+                  origins={origins}
+                  onMetalsChange={setMetals}
+                  onOriginsChange={setOrigins}
+                  stoneMetalTypeName={item.stoneMetalTypeName}
+                  onStoneChange={(name, typeNames) =>
+                    updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
+                  }
+                  selectedTypeNames={item.stoneTypeNames}
+                  onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
+                  caratWeight={item.caratWeight}
+                  onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
+                  stoneRate={item.stoneRate}
+                  onStoneRateChange={(value) => handleStoneRateChange(item, value)}
+                  stoneCharge={item.stoneCharge}
+                  onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
+                  stoneChargeTouched={item.stoneChargeTouched}
+                  stoneWeightInput={toPrimaryUnit(
+                    item.stoneWeightInput,
+                    "GRAM",
+                    item.stoneWeightUnit,
+                    resolveGramsPerCarat(item.purity, caratConversionRates),
+                  )}
+                  onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
+                  stoneWeightUnit={item.stoneWeightUnit}
+                  onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
+                  netStoneWeightTouched={item.netStoneWeightTouched}
+                  lockPhysicalFields={isLinked}
+                />
+              </div>
+            )
             const linkedStock = isLinked ? stockItems.find((s) => s.id === item.inventoryStockId) : undefined
             const metalPurityFields = (
               <>
@@ -2003,7 +2058,11 @@ export function InvoiceForm({
                     )
                     const categoryRequired = !metalById.get(item.metalTypeId)?.isGemstone
                     return (
-                      <div className="space-y-2 rounded-lg border border-dashed p-3">
+                      <div className="space-y-3 rounded-lg border border-dashed p-3">
+                        {!isCaratLine(item) && (
+                          <StonePresenceQuestion checked={item.hasStoneComponent} onChange={setHasStone} />
+                        )}
+                        {!isCaratLine(item) && item.hasStoneComponent && stoneFields}
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
                           <p className="text-xs font-medium">New product details</p>
                           {missing.length > 0 && (
@@ -2256,29 +2315,12 @@ export function InvoiceForm({
                         can for this specific piece. Still shown (locked on)
                         when the linked stock does have one, and stays a
                         normal editable toggle for a manually-entered line. */}
-                    {!isCaratLine(item) && (!isLinked || item.hasStoneComponent) && (
+                    {/* A new line asks this first, at the top of its "New
+                        product details" box (see stoneQuestion below); only
+                        a linked piece that has a stone shows it here, locked. */}
+                    {!isCaratLine(item) && isLinked && item.hasStoneComponent && (
                       <div className="flex items-end pb-2">
-                        <IncludesStoneToggle
-                          checked={item.hasStoneComponent}
-                          onChange={(checked) =>
-                            updateItem(item.key, {
-                              hasStoneComponent: checked,
-                              // Net Stone Weight and Stone Charge are now both
-                              // hidden once the toggle is off — clear them so a
-                              // hidden field can't silently keep submitting
-                              // whatever was last entered.
-                              ...(checked
-                                ? {}
-                                : {
-                                    stoneWeightInput: 0,
-                                    netStoneWeightTouched: false,
-                                    stoneCharge: 0,
-                                    stoneChargeTouched: false,
-                                  }),
-                            })
-                          }
-                          disabled={isLinked}
-                        />
+                        <IncludesStoneToggle checked onChange={() => {}} disabled />
                       </div>
                     )}
                   </div>
@@ -2303,40 +2345,7 @@ export function InvoiceForm({
 
                   {/* StoneComponentFields only, once checked — the toggle
                       itself now lives in the grid row above. */}
-                  {!isCaratLine(item) && item.hasStoneComponent && (
-                    <div className="rounded-md border-2 border-dashed border-emerald-400 bg-emerald-50 p-3">
-                      <StoneComponentFields
-                        metals={metals}
-                        origins={origins}
-                        onMetalsChange={setMetals}
-                        onOriginsChange={setOrigins}
-                        stoneMetalTypeName={item.stoneMetalTypeName}
-                        onStoneChange={(name, typeNames) =>
-                          updateItem(item.key, { stoneMetalTypeName: name, stoneTypeNames: typeNames })
-                        }
-                        selectedTypeNames={item.stoneTypeNames}
-                        onTypesChange={(names) => updateItem(item.key, { stoneTypeNames: names })}
-                        caratWeight={item.caratWeight}
-                        onCaratWeightChange={(value) => handleCaratWeightChange(item, value)}
-                        stoneRate={item.stoneRate}
-                        onStoneRateChange={(value) => handleStoneRateChange(item, value)}
-                        stoneCharge={item.stoneCharge}
-                        onStoneChargeChange={(value) => handleStoneChargeChange(item, value)}
-                        stoneChargeTouched={item.stoneChargeTouched}
-                        stoneWeightInput={toPrimaryUnit(
-                          item.stoneWeightInput,
-                          "GRAM",
-                          item.stoneWeightUnit,
-                          resolveGramsPerCarat(item.purity, caratConversionRates),
-                        )}
-                        onStoneWeightInputChange={(value) => handleStoneWeightInputChange(item, value)}
-                        stoneWeightUnit={item.stoneWeightUnit}
-                        onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
-                        netStoneWeightTouched={item.netStoneWeightTouched}
-                        lockPhysicalFields={isLinked}
-                      />
-                    </div>
-                  )}
+                  {!isCaratLine(item) && item.hasStoneComponent && !showNewProductDetails && stoneFields}
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -2432,6 +2441,9 @@ export function InvoiceForm({
           lines={oldGoldLines}
           onLinesChange={setOldGoldLines}
           metals={metals}
+          origins={origins}
+          onMetalsChange={setMetals}
+          onOriginsChange={setOrigins}
           puritiesByMetal={metalPuritiesCache}
           ensurePurities={ensureMetalPurities}
           enumFineness={enumFineness}
@@ -2450,18 +2462,7 @@ export function InvoiceForm({
           <input
             type="hidden"
             name="oldGoldJson"
-            value={JSON.stringify(
-              oldGoldLines.map((line) => ({
-                description: line.description || null,
-                metalTypeId: line.metalTypeId || null,
-                purityLabel: line.purityLabel || null,
-                purity: line.purity || null,
-                grossWeight: line.grossWeight || null,
-                netWeight: line.netWeight || null,
-                deductionPercent: line.deductionPercent || 0,
-                rate: line.rate || null,
-              })),
-            )}
+            value={JSON.stringify(oldGoldLines.map(serializeOldGoldLine))}
           />
           <input type="hidden" name="oldGoldExcessMode" value={oldGoldExcessMode} />
           <input type="hidden" name="oldGoldPayoutMethod" value={oldGoldPayoutMethod} />
@@ -2638,7 +2639,7 @@ export function InvoiceForm({
         {oldGoldValue > 0 && (
           <>
             <div className="flex justify-between text-amber-700" data-testid="old-gold-applied">
-              <span>Less: Old Gold (value ₹{oldGoldValue.toFixed(2)})</span>
+              <span>Less: Bought from customer (value ₹{oldGoldValue.toFixed(2)})</span>
               <span>-₹{oldGoldSplit.applied.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-semibold" data-testid="net-payable">
@@ -2648,7 +2649,7 @@ export function InvoiceForm({
             {oldGoldSplit.excess > 0 && (
               <div className="flex justify-between text-emerald-700">
                 <span>
-                  {oldGoldExcessMode === "PAID_OUT" ? "Old gold balance paid to customer" : "Old gold balance kept as store credit"}
+                  {oldGoldExcessMode === "PAID_OUT" ? "Balance paid to customer" : "Balance kept as store credit"}
                 </span>
                 <span>₹{oldGoldSplit.excess.toFixed(2)}</span>
               </div>

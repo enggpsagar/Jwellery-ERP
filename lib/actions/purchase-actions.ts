@@ -1383,7 +1383,7 @@ export async function updatePurchase(
     if (purchase.isOldGoldExchange) {
       return {
         success: false,
-        message: "An Old Gold Exchange is settled on the customer's ledger and can't be edited here — cancel its invoice instead; the value stays as the customer's store credit.",
+        message: "A Customer Exchange is settled on the customer's ledger and can't be edited here — cancel its invoice instead; the value stays as the customer's store credit.",
       };
     }
 
@@ -1772,7 +1772,7 @@ export async function deletePurchase(id: string): Promise<PurchaseFormState> {
     if (purchase.isOldGoldExchange) {
       return {
         success: false,
-        message: "An Old Gold Exchange is settled on the customer's ledger and can't be deleted here — cancel its invoice instead; the value stays as the customer's store credit.",
+        message: "A Customer Exchange is settled on the customer's ledger and can't be deleted here — cancel its invoice instead; the value stays as the customer's store credit.",
       };
     }
 

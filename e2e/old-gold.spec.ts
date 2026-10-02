@@ -237,3 +237,9 @@ test("a loose diamond bought from the customer is priced per carat", async ({ pa
   expect(Number(invoice!.oldGoldExchange!.totalAmount)).toBeCloseTo(40000, 2)
   expect(crashes).toEqual([])
 })
+
+test("the old /billing/old-gold link redirects to Purchases → From Customers", async ({ page }) => {
+  await page.goto("/billing/old-gold")
+  await page.waitForURL(/\/purchases\/exchanges$/)
+  await page.getByRole("heading", { name: "Bought from Customers" }).waitFor()
+})

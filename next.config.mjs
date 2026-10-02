@@ -16,6 +16,12 @@ const nextConfig = {
   // past the free-tier limit (each deployment pays this cost ~120 times
   // over, then multiplies again across every retained deployment).
   serverExternalPackages: ["@prisma/client", "@prisma/engines"],
+  // Customer Exchange moved from /billing/old-gold to Purchases → From
+  // Customers; keep old links and bookmarks (and a still-open tab's old
+  // sidebar link) working. Not permanent, so browsers don't cache it.
+  async redirects() {
+    return [{ source: "/billing/old-gold", destination: "/purchases/exchanges", permanent: false }]
+  },
 }
 
 export default nextConfig

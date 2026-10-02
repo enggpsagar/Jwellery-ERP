@@ -36,6 +36,7 @@ import type {
 } from "@/components/shared/data-table-toolbar";
 import { logger } from "@/lib/logger";
 import { parseDateRangeBoundary } from "@/lib/date-range";
+import { stockOptionProductDetailsSelect, toStockOptionProductDetails } from "@/lib/inventory/stock-option-details";
 
 export type QuotationLineItemInput = {
   itemName: string;
@@ -510,9 +511,9 @@ export async function getQuotationFormStockItems() {
           // See getInvoiceFormStockItems's identical comment
           // (invoice-actions.ts) / resolveStockSellingRate (lib/purity.ts).
           storeMetalPurityId: true,
-          storeMetalPurity: { select: { sellingPrice: true } },
           stoneOriginOptionId: true,
           stoneOriginOption: { select: { sellingPrice: true } },
+          ...stockOptionProductDetailsSelect,
         },
       },
       metalType: { select: { id: true, name: true } },
@@ -542,6 +543,7 @@ export async function getQuotationFormStockItems() {
       stock.product.stoneOriginOption?.sellingPrice != null
         ? Number(stock.product.stoneOriginOption.sellingPrice)
         : null,
+    ...toStockOptionProductDetails(stock.product),
   }));
 }
 

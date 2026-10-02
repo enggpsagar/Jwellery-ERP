@@ -57,6 +57,8 @@ import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog"
 import { AddCategoryDialog } from "@/components/inventory/shared/add-category-dialog"
 import { AddCategoryTypeDialog } from "@/components/inventory/shared/add-category-type-dialog"
+import { LinkedProductDetails } from "@/components/inventory/shared/linked-product-details"
+import type { StockOptionProductDetails } from "@/lib/inventory/stock-option-details"
 
 type CustomerOption = {
   id: string
@@ -92,6 +94,22 @@ type StockOption = {
   makingCharge: number | null
   makingChargeType: "FIXED" | "PERCENTAGE"
   quantity: number
+} & StockOptionProductDetails
+
+/**
+ * The catalog fields a picked/scanned piece carries over from its Product
+ * (see lib/inventory/stock-option-details.ts) — the stock row's own values
+ * win; the Product's fill the gaps so Purity/GST Rate/Making Charge aren't
+ * left blank on a piece whose stock row never recorded them.
+ */
+function stockCatalogFields(stock: StockOption, fallbackGstRateId: string) {
+  const hasOwnMaking = stock.makingCharge != null && stock.makingCharge > 0
+  return {
+    purityLabel: stock.purityLabel || stock.productPurityLabel || "",
+    gstRateId: stock.gstRateId || fallbackGstRateId,
+    makingCharge: hasOwnMaking ? (stock.makingCharge as number) : stock.defaultMakingCharge ?? 0,
+    makingChargeType: hasOwnMaking ? stock.makingChargeType : stock.defaultMakingChargeType,
+  }
 }
 
 export type LineItem = {
@@ -627,7 +645,6 @@ export function InvoiceForm({
       itemName: stock.productName,
       metalTypeId: stock.metalType?.id ?? "",
       purity: stock.purity ?? "",
-      purityLabel: stock.purityLabel ?? "",
       grossWeight: stock.grossWeight ?? 0,
       grossWeightUnit: linkedUnit,
       netWeight: stock.netWeight ?? 0,
@@ -670,8 +687,6 @@ export function InvoiceForm({
       // a piece's own making charge doesn't have to be re-typed on every
       // sale (previously always reset to 0/FIXED regardless of what was
       // set on the stock item).
-      makingCharge: stock.makingCharge ?? 0,
-      makingChargeType: stock.makingChargeType,
       // InventoryStock carries no hmCharge field of its own — there's
       // nothing authoritative here to protect (same reasoning as
       // netStoneWeightTouched above when a stock row has no recorded stone
@@ -687,10 +702,10 @@ export function InvoiceForm({
       // lines) rather than carrying over a quantity that made sense for
       // the previous stock item.
       quantity: available > 0 ? 1 : 0,
-      // InventoryStock carries no GST rate of its own — same reasoning as
-      // hmCharge above, so this line starts on the document's current
-      // "default for new items" selection rather than blank.
-      gstRateId,
+      // Purity, GST Rate (the Product's Metal row) and Making Charge — the
+      // stock row's own value first, then the Product's, then (GST only)
+      // the document's default. See stockCatalogFields.
+      ...stockCatalogFields(stock, gstRateId),
       stockLinkDecided: true,
     })
     // Real data just landed on this line via the stock picker — start it
@@ -779,7 +794,6 @@ export function InvoiceForm({
           itemName: stock.productName,
           metalTypeId: stock.metalType?.id ?? "",
           purity: stock.purity ?? "",
-          purityLabel: stock.purityLabel ?? "",
           grossWeight: stock.grossWeight ?? 0,
           grossWeightUnit: linkedUnit,
           netWeight: stock.netWeight ?? 0,
@@ -810,8 +824,7 @@ export function InvoiceForm({
             : [],
           // Same reasoning as applyStockToItem — carry over the stock
           // item's own recorded making charge instead of resetting to 0.
-          makingCharge: stock.makingCharge ?? 0,
-          makingChargeType: stock.makingChargeType,
+          ...stockCatalogFields(stock, gstRateId),
           // Same reasoning as applyStockToItem — InventoryStock has no
           // hmCharge of its own, so this is left untouched.
           hmCharge: isHallmarkablePurity(stock.purity) ? hallmarkChargePerPiece : 0,
@@ -1629,8 +1642,11 @@ export function InvoiceForm({
             const gstTotal = gst.isInterState ? gst.igst : gst.sgst + gst.cgst
             // A not-yet-linked line being added as a new product groups
             // Metal Type and Purity with Category/Type in the "New product
-            // details" box; otherwise they stay in the Details grid below.
+            // details" box. A linked line shows the same box read-only,
+            // filled from the picked piece's Product, so both kinds of line
+            // read the same way.
             const showNewProductDetails = !isLinked && item.stockLinkDecided
+            const linkedStock = isLinked ? stockItems.find((s) => s.id === item.inventoryStockId) : undefined
             const metalPurityFields = (
               <>
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -1912,6 +1928,21 @@ export function InvoiceForm({
                   rendered while expanded. */}
               {isExpanded && (
                 <div className="space-y-3 border-t p-4">
+                  {linkedStock && (
+                    <div className="space-y-2 rounded-lg border border-dashed p-3">
+                      <p className="text-xs font-medium">Product details</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {metalPurityFields}
+                        <LinkedProductDetails
+                          categoryName={linkedStock.categoryName}
+                          categoryTypeName={linkedStock.categoryTypeName}
+                          targetStyleName={linkedStock.targetStyleName}
+                          showStyle={showStyleField}
+                          inputClassName="h-11"
+                        />
+                      </div>
+                    </div>
+                  )}
                   {/* New Product details — only for a "Create New Line
                       Item" line, which becomes a real catalog Product on
                       save. Same required fields as Add Product, so a piece
@@ -2041,7 +2072,7 @@ export function InvoiceForm({
                       next to them. Now it's just the widest cell (2 of 6
                       columns) in the same grid everything else shares. */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {!showNewProductDetails && metalPurityFields}
+                    {!showNewProductDetails && !linkedStock && metalPurityFields}
 
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Gross Weight {!isLinked && <RequiredMark />}</Label>

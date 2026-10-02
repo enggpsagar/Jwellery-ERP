@@ -34,18 +34,23 @@ type StockItemBase = {
   /** Grams — shown in the label so two pieces of the same Product (same
    * Product Code and name) can still be told apart. */
   netWeight?: number | null
+  /** The linked Product's Category (lib/inventory/stock-option-details.ts)
+   * — shown in the label and searchable, so a piece's category is visible
+   * while picking, not only after. */
+  categoryName?: string | null
 }
 
 /**
- * "C-G22-001 — Gold chain · 12.200 g (1 Qty)". The Product Code leads, not
+ * "C-G22-001 — Gold chain · Ornament · 12.200 g (1 Qty)". The Product Code leads, not
  * the internal stock code (STK-…); the stock code stays searchable, and is
  * the fallback only when the stock has no linked Product Code.
  */
 function defaultStockLabel(stock: StockItemBase, availableQty?: number) {
   const code = stock.productCode || stock.stockCode
+  const category = stock.categoryName ? ` · ${stock.categoryName}` : ""
   const weight = stock.netWeight != null ? ` · ${stock.netWeight.toFixed(3)} g` : ""
   const qty = availableQty != null ? ` (${availableQty} Qty)` : ""
-  return `${code} — ${stock.productName}${weight}${qty}`
+  return `${code} — ${stock.productName}${category}${weight}${qty}`
 }
 
 type StockItemSelectProps<T extends StockItemBase> = {
@@ -95,7 +100,8 @@ export function StockItemSelect<T extends StockItemBase>({
       (stock) =>
         stock.stockCode.toLowerCase().includes(query) ||
         stock.productName.toLowerCase().includes(query) ||
-        (stock.productCode ?? "").toLowerCase().includes(query),
+        (stock.productCode ?? "").toLowerCase().includes(query) ||
+        (stock.categoryName ?? "").toLowerCase().includes(query),
     )
   }, [stockItems, search])
 
@@ -123,7 +129,7 @@ export function StockItemSelect<T extends StockItemBase>({
       <SelectContent>
         <div className="p-2">
           <Input
-            placeholder="Search by product code, name or stock code..."
+            placeholder="Search by product code, name, category or stock code..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             onKeyDown={(event) => event.stopPropagation()}

@@ -14,6 +14,8 @@ import { useToast } from "@/components/providers/toast-provider"
 import { cn } from "@/lib/utils"
 
 import { Input } from "@/components/ui/input"
+import { LinkedProductDetails } from "@/components/inventory/shared/linked-product-details"
+import type { StockOptionProductDetails } from "@/lib/inventory/stock-option-details"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -73,8 +75,10 @@ type StockOption = {
   // exclusive by StoreMetal.isGemstone).
   storeMetalPurityRate: number | null
   stoneOriginRate: number | null
+  makingCharge: number | null
+  makingChargeType: "FIXED" | "PERCENTAGE"
   quantity: number
-}
+} & StockOptionProductDetails
 
 type LineItem = {
   key: string
@@ -475,7 +479,9 @@ export function KachaInvoiceForm({
       itemName: stock.productName,
       metalTypeId: stock.metalType?.id ?? "",
       purity: stock.purity ?? "",
-      purityLabel: stock.purityLabel ?? "",
+      // The Product's own per-Metal Purity fills a stock row that never
+      // recorded one — see lib/inventory/stock-option-details.ts.
+      purityLabel: stock.purityLabel || stock.productPurityLabel || "",
       grossWeight: stock.grossWeight ?? 0,
       grossWeightUnit: linkedUnit,
       netWeight: stock.netWeight ?? 0,
@@ -512,6 +518,11 @@ export function KachaInvoiceForm({
       // protect; left untouched so the Purity-driven auto-fill populates it.
       hmCharge: isHallmarkablePurity(stock.purity) ? hallmarkChargePerPiece : 0,
       hmChargeTouched: false,
+      // The stock row's own Making Charge, else the Product's default —
+      // same precedence as invoice-form.tsx's stockCatalogFields.
+      ...(stock.makingCharge != null && stock.makingCharge > 0
+        ? { makingCharge: stock.makingCharge, makingChargeType: stock.makingChargeType }
+        : { makingCharge: stock.defaultMakingCharge ?? 0, makingChargeType: stock.defaultMakingChargeType }),
       // The linked stock row's own net weight is authoritative — the
       // gross/dmo calc below must not silently recompute over it.
       netTouched: true,
@@ -792,6 +803,7 @@ export function KachaInvoiceForm({
             // about that piece come from Inventory and are locked here,
             // same as Invoice already does — see isLinked there.
             const isLinked = Boolean(item.inventoryStockId)
+            const linkedStock = isLinked ? stockItems.find((s) => s.id === item.inventoryStockId) : undefined
             return (
             <div key={item.key} className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -849,6 +861,19 @@ export function KachaInvoiceForm({
                   )}
                 </div>
               </div>
+
+              {/* Category/Type/Style of the picked piece — read-only,
+                  same as Invoice's Product details. */}
+              {linkedStock && (
+                <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+                  <LinkedProductDetails
+                    categoryName={linkedStock.categoryName}
+                    categoryTypeName={linkedStock.categoryTypeName}
+                    targetStyleName={linkedStock.targetStyleName}
+                    showStyle={false}
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">

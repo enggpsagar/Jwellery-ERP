@@ -14,6 +14,8 @@ import { computeRoundOff } from "@/lib/round-off"
 import { GstSchemeBadge } from "@/components/shared/gst-scheme-badge"
 
 import { Input } from "@/components/ui/input"
+import { LinkedProductDetails } from "@/components/inventory/shared/linked-product-details"
+import type { StockOptionProductDetails } from "@/lib/inventory/stock-option-details"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -72,7 +74,7 @@ type StockOption = {
   // exclusive by StoreMetal.isGemstone).
   storeMetalPurityRate: number | null
   stoneOriginRate: number | null
-}
+} & StockOptionProductDetails
 
 type LineItem = {
   key: string
@@ -494,7 +496,9 @@ export function QuotationForm({
       itemName: stock.productName,
       metalTypeId: stock.metalType?.id ?? "",
       purity: stock.purity ?? "",
-      purityLabel: stock.purityLabel ?? "",
+      // The Product's own per-Metal Purity fills a stock row that never
+      // recorded one — see lib/inventory/stock-option-details.ts.
+      purityLabel: stock.purityLabel || stock.productPurityLabel || "",
       grossWeight: stock.grossWeight ?? 0,
       netWeight: stock.netWeight ?? 0,
       netWeightUnit: linkedUnit,
@@ -522,6 +526,8 @@ export function QuotationForm({
       // Purity-driven auto-fill populate it instead of locking in a stale 0.
       hmCharge: isHallmarkablePurity(stock.purity) ? hallmarkChargePerPiece : 0,
       hmChargeTouched: false,
+      makingCharge: stock.defaultMakingCharge ?? 0,
+      makingChargeType: stock.defaultMakingChargeType,
     })
   }
 
@@ -790,6 +796,7 @@ export function QuotationForm({
             // about that piece come from Inventory and are locked here,
             // same as Invoice already does — see isLinked there.
             const isLinked = Boolean(item.inventoryStockId)
+            const linkedStock = isLinked ? stockItems.find((s) => s.id === item.inventoryStockId) : undefined
             return (
             <div key={item.key} className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -837,6 +844,19 @@ export function QuotationForm({
                   />
                 </div>
               </div>
+
+              {/* Category/Type/Style of the picked piece — read-only,
+                  same as Invoice's Product details. */}
+              {linkedStock && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <LinkedProductDetails
+                    categoryName={linkedStock.categoryName}
+                    categoryTypeName={linkedStock.categoryTypeName}
+                    targetStyleName={linkedStock.targetStyleName}
+                    showStyle={false}
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">

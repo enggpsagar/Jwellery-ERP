@@ -46,6 +46,7 @@ import {
 import { formatShortDate } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import { parseDateRangeBoundary } from "@/lib/date-range";
+import { stockOptionProductDetailsSelect, toStockOptionProductDetails } from "@/lib/inventory/stock-option-details";
 
 export type InvoiceLineItemInput = {
   itemName: string;
@@ -823,9 +824,11 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
           // legacy global-PurityType MetalSellingRate lookup. See
           // resolveStockSellingRate (lib/purity.ts).
           storeMetalPurityId: true,
-          storeMetalPurity: { select: { sellingPrice: true } },
           stoneOriginOptionId: true,
           stoneOriginOption: { select: { sellingPrice: true } },
+          // Category/Type/Style, Purity, GST Rate, Making Charge — see
+          // lib/inventory/stock-option-details.ts.
+          ...stockOptionProductDetailsSelect,
         },
       },
       metalType: { select: { id: true, name: true } },
@@ -869,6 +872,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
     makingCharge: stock.makingCharge ? Number(stock.makingCharge) : null,
     makingChargeType: stock.makingChargeType,
     quantity: stock.quantity,
+    ...toStockOptionProductDetails(stock.product),
   }));
 
   if (!includeInvoiceId) return mapped;
@@ -904,9 +908,9 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
             hsnCode: true,
             productCode: true,
             storeMetalPurityId: true,
-            storeMetalPurity: { select: { sellingPrice: true } },
             stoneOriginOptionId: true,
             stoneOriginOption: { select: { sellingPrice: true } },
+            ...stockOptionProductDetailsSelect,
           },
         },
         metalType: { select: { id: true, name: true } },
@@ -941,6 +945,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       makingCharge: stock.makingCharge ? Number(stock.makingCharge) : null,
       makingChargeType: stock.makingChargeType,
       quantity: stock.quantity + claimed,
+      ...toStockOptionProductDetails(stock.product),
     });
   }
 

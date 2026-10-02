@@ -31,3 +31,28 @@ test("Delivery Location shows on New Invoice only when Settings has some", async
     await db().businessSettings.update({ where: { storeId }, data: { allowedDeliveryStateIds: original } })
   }
 })
+
+test("Delivery Locations are set on Settings → Locations and saved on their own", async ({ page }) => {
+  const storeId = await demoStoreId()
+  const original =
+    (await db().businessSettings.findUnique({ where: { storeId }, select: { allowedDeliveryStateIds: true } }))
+      ?.allowedDeliveryStateIds ?? []
+  const state = await db().state.findFirst({ orderBy: { name: "asc" }, select: { id: true, name: true } })
+
+  try {
+    await db().businessSettings.update({ where: { storeId }, data: { allowedDeliveryStateIds: [] } })
+    await page.goto("/settings/locations")
+    await expect(page.getByText("Delivery Locations", { exact: true })).toBeVisible()
+    await page.getByLabel(state!.name, { exact: true }).check()
+    await page.getByRole("button", { name: "Save Delivery Locations" }).click()
+    await expect(page.getByText(/Delivery Locations saved/)).toBeVisible()
+    const saved = await db().businessSettings.findUnique({ where: { storeId }, select: { allowedDeliveryStateIds: true } })
+    expect(saved?.allowedDeliveryStateIds).toEqual([state!.id])
+
+    // No longer on the main Settings page.
+    await page.goto("/settings")
+    await expect(page.getByText("Delivery Locations", { exact: true })).toHaveCount(0)
+  } finally {
+    await db().businessSettings.update({ where: { storeId }, data: { allowedDeliveryStateIds: original } })
+  }
+})

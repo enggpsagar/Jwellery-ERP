@@ -345,7 +345,6 @@ export async function updateBusinessSettings(
         ewayBillEnabled: formData.get("ewayBillEnabled") === "on",
         eInvoiceEnabled: formData.get("eInvoiceEnabled") === "on",
         showDueDate: formData.get("showDueDate") === "on",
-        allowedDeliveryStateIds: formData.getAll("allowedDeliveryStateIds").map(String),
         returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),
@@ -391,7 +390,6 @@ export async function updateBusinessSettings(
         ewayBillEnabled: formData.get("ewayBillEnabled") === "on",
         eInvoiceEnabled: formData.get("eInvoiceEnabled") === "on",
         showDueDate: formData.get("showDueDate") === "on",
-        allowedDeliveryStateIds: formData.getAll("allowedDeliveryStateIds").map(String),
         returnWindowDays: toNumber(formData.get("returnWindowDays"), 30),
         financialYearStartMonth: toNumber(
           formData.get("financialYearStartMonth"),
@@ -414,6 +412,50 @@ export async function updateBusinessSettings(
   } catch (error) {
     logger.error("updateBusinessSettings error", error);
     return { success: false, message: actionErrorMessage(error, "Failed to update settings") };
+  }
+}
+
+/**
+ * Settings → Locations → Delivery Locations: which states the invoice's
+ * Delivery Location picker offers (none = field hidden, intra-state — see
+ * filterDeliveryStates). Saved on its own, so the Business Settings form
+ * never touches it.
+ */
+export async function updateDeliveryLocations(
+  prevState: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return { success: false, message: "Only the Store Owner can update these settings." };
+  }
+
+  try {
+    const requested = [...new Set(formData.getAll("allowedDeliveryStateIds").map(String).filter(Boolean))];
+    const states = requested.length
+      ? await prisma.state.findMany({ where: { id: { in: requested } }, select: { id: true } })
+      : [];
+    const allowedDeliveryStateIds = states.map((state) => state.id);
+
+    // Creates the store's settings row if it doesn't exist yet (lazily
+    // created on first read, same as every other settings write).
+    await getBusinessSettings();
+    const storeId = await requireStoreScope();
+    await prisma.businessSettings.update({ where: { storeId }, data: { allowedDeliveryStateIds } });
+
+    revalidatePath("/settings/locations");
+    revalidatePath("/billing/new");
+
+    return {
+      success: true,
+      message: allowedDeliveryStateIds.length
+        ? `Delivery Locations saved — ${allowedDeliveryStateIds.length} state${allowedDeliveryStateIds.length === 1 ? "" : "s"}`
+        : "Delivery Locations cleared — invoices won't ask for one",
+    };
+  } catch (error) {
+    logger.error("updateDeliveryLocations error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to save Delivery Locations") };
   }
 }
 

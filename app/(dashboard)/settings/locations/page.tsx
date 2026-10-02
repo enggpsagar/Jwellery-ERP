@@ -5,8 +5,10 @@ import { redirect } from "next/navigation";
 import { getStoreLocations } from "@/lib/actions/store-location-actions";
 import { getStates } from "@/lib/actions/location-actions";
 import { getCurrentUser } from "@/lib/auth/auth";
+import { getBusinessSettings } from "@/lib/actions/settings-actions";
 
 import { LocationSettingsForm } from "@/components/settings/location-settings-form";
+import { DeliveryLocationsForm } from "@/components/settings/delivery-locations-form";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { PageBackHeader } from "@/components/shared/page-back-header";
 
@@ -23,16 +25,17 @@ export default async function LocationsSettingsPage() {
     currentUser?.role === UserRole.SUPER_ADMIN;
   if (!canEdit) redirect("/dashboard");
 
-  const [locations, states] = await Promise.all([
+  const [locations, states, settings] = await Promise.all([
     getStoreLocations(),
     getStates(),
+    getBusinessSettings(),
   ]);
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-6 p-6">
       <PageBackHeader
         title="Locations"
-        description="Define the physical locations your store keeps stock in."
+        description="Where your store keeps stock, and which states it delivers to."
         backHref="/dashboard"
         backLabel="Back to Dashboard"
       />
@@ -40,6 +43,12 @@ export default async function LocationsSettingsPage() {
       <SettingsTabs active="locations" role={currentUser?.role} />
 
       <LocationSettingsForm locations={locations} states={states} canEdit={canEdit} />
+
+      <DeliveryLocationsForm
+        states={states}
+        initialSelectedIds={settings.allowedDeliveryStateIds}
+        canEdit={canEdit}
+      />
     </main>
   );
 }

@@ -537,6 +537,9 @@ model Customer {
   purchasesAsVendor      Purchase[]       @relation("PurchaseVendor")
   inventoryStockAsVendor InventoryStock[] @relation("InventoryStockVendor")
   ledgerEntriesAsVendor  LedgerEntry[]    @relation("LedgerEntryVendor")
+  // "Purchased From" on a hand-typed Kacha / Quotation line.
+  kachaItemsAsVendor     KachaInvoiceItem[] @relation("KachaInvoiceItemVendor")
+  quotationItemsAsVendor QuotationItem[]    @relation("QuotationItemVendor")
 
   @@unique([storeId, customerCode])
   @@unique([storeId, vendorCode])
@@ -1210,9 +1213,18 @@ model KachaInvoiceItem {
   inventoryStock     InventoryStock? @relation(fields: [inventoryStockId], references: [id])
   kachaInvoice       KachaInvoice    @relation(fields: [kachaInvoiceId], references: [id], onDelete: Cascade)
   metalType          StoreMetal?     @relation(fields: [metalTypeId], references: [id])
+  // Who a hand-typed line's piece (and its metal) came in from — required
+  // on a new line with no linked stock, so the metal's arrival stays
+  // traceable even though this line never mints a stock row. Name is a
+  // snapshot, same as InventoryStock.vendorName. Points at Customer (the
+  // merged Party table, see Purchase.vendor).
+  vendorId           String?
+  vendorName         String?
+  vendor             Customer?       @relation("KachaInvoiceItemVendor", fields: [vendorId], references: [id])
 
   @@index([kachaInvoiceId])
   @@index([inventoryStockId])
+  @@index([vendorId])
 }
 
 model InvoiceItem {
@@ -1886,9 +1898,19 @@ model QuotationItem {
   quotation          Quotation       @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   inventoryStock     InventoryStock? @relation(fields: [inventoryStockId], references: [id])
   metalType          StoreMetal?     @relation(fields: [metalTypeId], references: [id])
+  // Who a hand-typed line's piece (and its metal) came in from — required
+  // on a new line with no linked stock, so the metal's arrival stays
+  // traceable even though this line never mints a stock row (not even on
+  // conversion). Name is a
+  // snapshot, same as InventoryStock.vendorName. Points at Customer (the
+  // merged Party table, see Purchase.vendor).
+  vendorId           String?
+  vendorName         String?
+  vendor             Customer?       @relation("QuotationItemVendor", fields: [vendorId], references: [id])
 
   @@index([quotationId])
   @@index([inventoryStockId])
+  @@index([vendorId])
 }
 
 model State {

@@ -23,6 +23,7 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { buildSkuPrefix } from "@/lib/inventory/product-sku";
+import { markSourcePartiesAsSuppliers, missingSourcePartyError } from "@/lib/inventory/line-source-party";
 
 export type ManualSaleLine = {
   itemName: string;
@@ -51,6 +52,11 @@ export type ManualSaleLine = {
   categoryTypeId?: string | null;
   targetStyleId?: string | null;
   gstRateId?: string | null;
+  // Who the piece came in from (a Party — a Supplier when the Supplier
+  // module is on). Required on a new line; written to the minted stock row's
+  // vendorId/vendorName, the same columns createPurchase fills, so the
+  // Item Ledger can say "Purchased from X" instead of "Unknown vendor".
+  vendorId?: string | null;
 };
 
 type Actor = {
@@ -120,7 +126,7 @@ export async function validateManualSaleLines(
     ...new Set(manual.map(pick).filter((id): id is string => Boolean(id))),
   ];
 
-  const [settings, activeStyleCount, metals, categories, types, styles] = await Promise.all([
+  const [settings, activeStyleCount, metals, categories, types, styles, vendors] = await Promise.all([
     prisma.businessSettings.findUnique({ where: { storeId }, select: { styleFieldEnabled: true } }),
     prisma.storeStyle.count({ where: { storeId, isActive: true } }),
     prisma.storeMetal.findMany({
@@ -139,11 +145,16 @@ export async function validateManualSaleLines(
       where: { storeId, id: { in: ids((l) => l.targetStyleId) } },
       select: { id: true },
     }),
+    prisma.customer.findMany({
+      where: { storeId, isArchived: false, id: { in: ids((l) => l.vendorId) } },
+      select: { id: true },
+    }),
   ]);
   const metalById = new Map(metals.map((m) => [m.id, m]));
   const categoryIds = new Set(categories.map((c) => c.id));
   const typeById = new Map(types.map((t) => [t.id, t]));
   const styleIds = new Set(styles.map((s) => s.id));
+  const vendorIds = new Set(vendors.map((v) => v.id));
   // Only required when there is something to pick: a store created after
   // StoreStyle's backfill migration starts with no styles at all, and a
   // sale shouldn't be blocked on a list it can't choose from.
@@ -172,6 +183,12 @@ export async function validateManualSaleLines(
       if (!styleIds.has(line.targetStyleId)) return `The style picked for ${label} is invalid — pick it again.`;
     } else if (styleRequired) {
       return `Select a style for ${label}.`;
+    }
+
+    const sourceError = missingSourcePartyError(line);
+    if (sourceError) return sourceError;
+    if (!vendorIds.has(line.vendorId as string)) {
+      return `The "Purchased From" party picked for ${label} is invalid — pick it again.`;
     }
 
     if (!(toNumber(line.grossWeight) > 0)) return `Enter the gross weight for ${label}.`;
@@ -239,7 +256,7 @@ export async function createStockForManualSaleLine(
   // Every id below is re-resolved against this store (a stale or foreign
   // id is dropped, never attached) — validateManualSaleLines has already
   // rejected a sale missing a required one, so this is only the backstop.
-  const [businessSettings, metalRow, categoryRow, categoryTypeRow, styleRow, gstRateRow] =
+  const [businessSettings, metalRow, categoryRow, categoryTypeRow, styleRow, gstRateRow, vendorRow] =
     await Promise.all([
       tx.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true } }),
       line.metalTypeId
@@ -259,6 +276,12 @@ export async function createStockForManualSaleLine(
         : Promise.resolve(null),
       line.gstRateId
         ? tx.gstRate.findFirst({ where: { id: line.gstRateId, storeId }, select: { id: true } })
+        : Promise.resolve(null),
+      line.vendorId
+        ? tx.customer.findFirst({
+            where: { id: line.vendorId, storeId, isArchived: false },
+            select: { id: true, name: true },
+          })
         : Promise.resolve(null),
     ]);
   const metalTypeId = metalRow?.id ?? null;
@@ -375,9 +398,13 @@ export async function createStockForManualSaleLine(
       stoneRate: line.stoneRate ?? undefined,
       stoneMetalTypeName: line.stoneMetalTypeName ?? undefined,
       stoneTypeNames: line.stoneTypeNames ?? undefined,
+      vendorId: vendorRow?.id ?? undefined,
+      vendorName: vendorRow?.name ?? undefined,
       purchaseDate: new Date(),
       locationId: locationId ?? undefined,
-      remarks: `Added while billing a new line item (${referenceType})`,
+      remarks: `Added while billing a new line item (${referenceType})${
+        vendorRow ? ` — purchased from ${vendorRow.name}` : ""
+      }`,
       createdById: actor.id ?? undefined,
       createdByName: actor.name ?? actor.email ?? undefined,
       createdByRole: actor.role ?? undefined,
@@ -392,9 +419,11 @@ export async function createStockForManualSaleLine(
       grossWeight: toDecimal(line.grossWeight),
       netWeight: toDecimal(line.netWeight),
       referenceType,
-      notes: "Stock added for a new line item at sale time",
+      notes: `Stock added for a new line item at sale time${vendorRow ? ` — from ${vendorRow.name}` : ""}`,
     },
   });
+
+  if (vendorRow) await markSourcePartiesAsSuppliers(tx, storeId, [vendorRow.id]);
 
   return stock.id;
 }

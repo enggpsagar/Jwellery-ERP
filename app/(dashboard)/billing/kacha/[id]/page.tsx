@@ -147,6 +147,9 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
               <tr key={item.id} className="border-b last:border-0">
                 <td className="px-4 py-3">
                   {item.itemName}
+                  {item.vendorName ? (
+                    <span className="block text-xs text-muted-foreground">Purchased from {item.vendorName}</span>
+                  ) : null}
                   {item.stoneMetalTypeName ? (
                     <span className="block text-xs text-muted-foreground">
                       Stone: {item.stoneMetalTypeName}

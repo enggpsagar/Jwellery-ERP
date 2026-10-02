@@ -94,6 +94,9 @@ export type InvoiceLineItemInput = {
   categoryId?: string | null;
   categoryTypeId?: string | null;
   targetStyleId?: string | null;
+  // "Purchased From" party for that line's minted stock — see
+  // ManualSaleLine.vendorId.
+  vendorId?: string | null;
 };
 
 export type InvoiceFormState = {

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
+import { SourcePartySelect, type SourcePartyOption } from "@/components/billing/source-party-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
@@ -115,6 +116,9 @@ type LineItem = {
    * hatch as stoneChargeTouched/netStoneWeightTouched. */
   hmChargeTouched: boolean
   inventoryStockId: string
+  /** "Purchased From" — who a hand-typed line's piece came in from.
+   * Required on a line with no linked stock (see resolveLineSourceParties). */
+  sourcePartyId: string
 }
 
 // `key` defaults to a fresh UUID for every "Add Item" click (client-only,
@@ -150,6 +154,7 @@ function emptyLineItem(key: string = crypto.randomUUID()): LineItem {
     hmCharge: 0,
     hmChargeTouched: false,
     inventoryStockId: "",
+    sourcePartyId: "",
   }
 }
 
@@ -212,6 +217,10 @@ type QuotationFormProps = {
   /** The store's own state, compared against the selected customer's state
    * to tell an inter-state quote (IGST) from an intra-state one (SGST+CGST). */
   storeState?: string | null
+  /** "Purchased From" options — getSupplierOptions(): Suppliers only when
+   * the Supplier module is on, every party when it's off. */
+  suppliers?: SourcePartyOption[]
+  supplierModuleEnabled?: boolean
 }
 
 export function QuotationForm({
@@ -227,7 +236,12 @@ export function QuotationForm({
   hallmarkChargePerPiece = 0,
   gstScheme,
   storeState,
+  suppliers = [],
+  supplierModuleEnabled = false,
 }: QuotationFormProps) {
+  // Every hand-typed line needs its source party — see sourcePartyId.
+  const missingSourceParty = (lines: LineItem[]) =>
+    lines.some((line) => !line.inventoryStockId && !line.sourcePartyId)
   const router = useRouter()
   const searchParams = useSearchParams()
   const toast = useToast()
@@ -709,6 +723,7 @@ export function QuotationForm({
         stoneWeight: toUnit(item.stoneWeightInput) || null,
         hmCharge: item.hmCharge,
         inventoryStockId: item.inventoryStockId || null,
+        vendorId: item.inventoryStockId ? null : item.sourcePartyId || null,
       }
     }),
   )
@@ -855,6 +870,28 @@ export function QuotationForm({
                     targetStyleName={linkedStock.targetStyleName}
                     showStyle={false}
                   />
+                </div>
+              )}
+
+              {/* Where a hand-typed piece (and its metal) came in from —
+                  required, so its arrival stays traceable. A linked
+                  piece's source is its stock row's own vendor. */}
+              {!isLinked && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="col-span-2 space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                    <Label className="text-xs">
+                      Purchased From ({supplierModuleEnabled ? "Supplier" : "Party"}) <RequiredMark />
+                    </Label>
+                    <SourcePartySelect
+                      parties={suppliers}
+                      value={item.sourcePartyId ?? ""}
+                      onChange={(value) => updateItem(item.key, { sourcePartyId: value })}
+                      termLabel={supplierModuleEnabled ? "supplier" : "party"}
+                    />
+                    {!item.sourcePartyId && (
+                      <p className="text-[11px] text-destructive">Select who this piece was purchased from</p>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1283,7 +1320,7 @@ export function QuotationForm({
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={pending || !customerId}>
+        <Button type="submit" disabled={pending || !customerId || missingSourceParty(items)}>
           {pending ? "Creating..." : "Create Quotation"}
         </Button>
       </div>

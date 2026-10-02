@@ -5,6 +5,7 @@ import {
   getQuotationFormStockItems,
 } from "@/lib/actions/quotation-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
+import { getSupplierOptions } from "@/lib/actions/customer-actions"
 import { getDefaultLocationId, getStoreLocations } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
@@ -18,10 +19,11 @@ export const metadata: Metadata = {
 }
 
 export default async function NewQuotationPage() {
-  const [customers, stockItems, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, gstRates] =
+  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, gstRates] =
     await Promise.all([
       getQuotationFormCustomers(),
       getQuotationFormStockItems(),
+      getSupplierOptions(),
       getStoreLocations(),
       getDefaultLocationId(),
       getBusinessSettings(),
@@ -45,6 +47,8 @@ export default async function NewQuotationPage() {
         <QuotationForm
           customers={customers}
           stockItems={stockItems}
+          suppliers={suppliers}
+          supplierModuleEnabled={businessSettings.supplierModuleEnabled}
           locations={locations}
           defaultLocationId={defaultLocationId}
           metals={metals}

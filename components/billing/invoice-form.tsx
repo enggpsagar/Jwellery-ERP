@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
+import { SourcePartySelect, type SourcePartyOption } from "@/components/billing/source-party-select"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { RequiredMark } from "@/components/shared/required-mark"
@@ -204,6 +205,11 @@ export type LineItem = {
   categoryId: string
   categoryTypeId: string
   targetStyleId: string
+  /** Who a "Create New Line Item" piece came in from — saved onto the
+   * stock row minted for it (InventoryStock.vendorId) so the metal's
+   * arrival is traceable later, the same way a Purchase's stock is.
+   * Required on a new line; ignored for a stock-linked line. */
+  sourcePartyId: string
 }
 
 function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: number) {
@@ -256,6 +262,7 @@ function emptyLineItem(defaultGstRateId?: string, key: string = crypto.randomUUI
     categoryId: "",
     categoryTypeId: "",
     targetStyleId: "",
+    sourcePartyId: "",
   }
 }
 
@@ -304,6 +311,11 @@ type InvoiceFormProps = {
    * categoryId. Types are fetched per category on demand. */
   categories: StoreCategoryRow[]
   styles: StoreStyleRow[]
+  /** "Purchased From" options for a "Create New Line Item" line —
+   * getSupplierOptions(): Suppliers only when the Supplier module is on
+   * (supplierModuleEnabled), every party when it's off. */
+  suppliers?: SourcePartyOption[]
+  supplierModuleEnabled?: boolean
   /** BusinessSettings.styleFieldEnabled — Style is only asked for (and
    * only required) when the store uses it, same as Add Product. */
   styleFieldEnabled?: boolean
@@ -383,6 +395,8 @@ export function InvoiceForm({
   origins: initialOrigins,
   categories: initialCategories,
   styles,
+  suppliers = [],
+  supplierModuleEnabled = false,
   styleFieldEnabled = true,
   caratConversionRates,
   gstRates,
@@ -951,6 +965,7 @@ export function InvoiceForm({
     if (showStyleField && !item.targetStyleId) missing.push("Style")
     if (!(item.grossWeight > 0)) missing.push("Gross Weight")
     if (!(item.netWeight > 0)) missing.push("Net Weight")
+    if (!item.sourcePartyId) missing.push("Purchased From")
     return missing
   }
 
@@ -1339,6 +1354,7 @@ export function InvoiceForm({
         categoryId: item.inventoryStockId ? null : item.categoryId || null,
         categoryTypeId: item.inventoryStockId ? null : item.categoryTypeId || null,
         targetStyleId: item.inventoryStockId ? null : item.targetStyleId || null,
+        vendorId: item.inventoryStockId ? null : item.sourcePartyId || null,
       }
     }),
   )
@@ -2061,6 +2077,18 @@ export function InvoiceForm({
                               </Select>
                             </div>
                           )}
+
+                          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                            <Label className="text-xs">
+                              Purchased From ({supplierModuleEnabled ? "Supplier" : "Party"}) <RequiredMark />
+                            </Label>
+                            <SourcePartySelect
+                              parties={suppliers}
+                              value={item.sourcePartyId ?? ""}
+                              onChange={(value) => updateItem(item.key, { sourcePartyId: value })}
+                              termLabel={supplierModuleEnabled ? "supplier" : "party"}
+                            />
+                          </div>
                         </div>
                       </div>
                     )

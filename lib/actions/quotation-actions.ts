@@ -35,6 +35,7 @@ import type {
   DataTableExportResult,
 } from "@/components/shared/data-table-toolbar";
 import { logger } from "@/lib/logger";
+import { markSourcePartiesAsSuppliers, resolveLineSourceParties } from "@/lib/inventory/line-source-party";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 import { stockOptionProductDetailsSelect, toStockOptionProductDetails } from "@/lib/inventory/stock-option-details";
 
@@ -59,6 +60,9 @@ export type QuotationLineItemInput = {
   // same convention as InvoiceLineItemInput.hmCharge's own doc comment.
   hmCharge?: number;
   inventoryStockId?: string | null;
+  // "Purchased From" — required on a line with no linked stock, see
+  // lib/inventory/line-source-party.ts.
+  vendorId?: string | null;
 };
 
 export type QuotationFormState = {
@@ -271,6 +275,7 @@ function mapQuotation(quotation: any) {
       hmCharge: Number(item.hmCharge ?? 0),
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
+      vendorName: item.vendorName ?? null,
     })),
   };
 }
@@ -680,6 +685,13 @@ export async function createQuotation(
         })
       : [];
     const validStockIds = new Set(validStock.map((s) => s.id));
+    const isManualLine = (item: QuotationLineItemInput) =>
+      !item.inventoryStockId || !validStockIds.has(item.inventoryStockId);
+
+    // Recorded only — unlike a sale, a proposal doesn't flag the party as a
+    // supplier (markSourcePartiesAsSuppliers); nothing has come in yet.
+    const sourceParties = await resolveLineSourceParties(storeId, items.filter(isManualLine));
+    if ("error" in sourceParties) return { success: false, message: sourceParties.error };
 
     // See resolveWritableLocationId's own doc comment — without this, a
     // location-restricted Staff user submitting no location at all saved
@@ -741,6 +753,8 @@ export async function createQuotation(
               item.inventoryStockId && validStockIds.has(item.inventoryStockId)
                 ? item.inventoryStockId
                 : undefined,
+            vendorId: isManualLine(item) ? item.vendorId ?? undefined : undefined,
+            vendorName: isManualLine(item) && item.vendorId ? sourceParties.names.get(item.vendorId) : undefined,
           })),
         },
       },
@@ -1047,6 +1061,14 @@ export async function convertQuotationToInvoice(
           },
         },
       });
+
+      // The piece is sold now, so the party a hand-typed line came in from
+      // becomes a supplier here — see markSourcePartiesAsSuppliers.
+      await markSourcePartiesAsSuppliers(
+        tx,
+        storeId,
+        quotation.items.flatMap((item) => (!item.inventoryStockId && item.vendorId ? [item.vendorId] : [])),
+      );
 
       for (const item of quotation.items) {
         if (!item.inventoryStockId) continue;

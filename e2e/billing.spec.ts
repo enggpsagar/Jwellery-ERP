@@ -47,6 +47,12 @@ test("a new line item on an invoice creates its Product and Stock and sells it",
   await page.getByRole("combobox").filter({ hasText: "Select category" }).click()
   await page.getByRole("option", { name: "Ornament", exact: true }).click()
   await grossWeightInput(page).fill("6")
+
+  // Where the piece's metal came in from — required, and saved on the
+  // minted stock row so it's traceable later.
+  await expect(page.getByText(/Still needed: Purchased From/)).toBeVisible()
+  await page.getByRole("combobox").filter({ hasText: "Not recorded" }).click()
+  await page.getByRole("option", { name: /Chandra Bullion Suppliers/ }).click()
   await expect(page.getByText(/Still needed:/)).toHaveCount(0)
 
   await page.getByRole("button", { name: "Create Invoice" }).click()
@@ -56,6 +62,7 @@ test("a new line item on an invoice creates its Product and Stock and sells it",
   const stock = await db().inventoryStock.findFirst({
     where: { storeId, product: { name: itemName } },
     include: {
+      vendor: true,
       product: { include: { category: true, metalType: true, metalComponents: true } },
       transactions: true,
       invoiceItems: true,
@@ -67,6 +74,8 @@ test("a new line item on an invoice creates its Product and Stock and sells it",
   expect(stock!.product.category?.name).toBe("Ornament")
   expect(stock!.product.metalType?.name).toBe("Gold")
   expect(stock!.product.metalComponents).toHaveLength(1)
+  expect(stock!.vendor?.name).toBe("Chandra Bullion Suppliers")
+  expect(stock!.vendorName).toBe("Chandra Bullion Suppliers")
   expect(stock!.quantity).toBe(0)
   expect(stock!.status).toBe("SOLD")
   expect(stock!.invoiceItems).toHaveLength(1)

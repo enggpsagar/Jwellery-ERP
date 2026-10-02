@@ -249,6 +249,31 @@ line with no stock now needs these filled before the invoice can be
 edited. Purchase's `createProductFromManualEntry` still mints
 unclassified products — same gap, not yet fixed.
 
+**2026-10-02: every hand-typed line records where its metal came from.**
+A **Purchased From** party is **required** on every line with no linked
+stock — Invoice's "Create New Line Item" (in "New product details", listed
+under "Still needed"), and any unlinked Kacha slip / Quotation line. The
+picker (`components/billing/source-party-select.tsx`) is fed by
+`getSupplierOptions()`: Suppliers only when Settings → Supplier Module is
+on, every party when it's off. Server rules live in
+`lib/inventory/line-source-party.ts` (`resolveLineSourceParties`,
+`markSourcePartiesAsSuppliers`). Where it lands:
+- **Invoice** — the minted stock row's `vendorId`/`vendorName` (the columns
+  `createPurchase` fills), so the Item Ledger says "Purchased from X".
+- **Kacha / Quotation** — the line's own `KachaInvoiceItem`/`QuotationItem`
+  `vendorId`/`vendorName` (migration `20261002120000_add_line_item_source_party`),
+  shown under the item name on the detail page. Those lines still never
+  mint stock, including on Kacha→Pakka or Quotation→Invoice conversion,
+  so the party stays on the Kacha/Quotation line (the converted invoice
+  links back to it).
+- The party is flagged `isSupplier` when the piece is sold (Invoice, Kacha,
+  Quotation *conversion*) — not when a quotation is merely created.
+- Kacha Excel import is exempt (no such column in the template).
+Not `CustomerSelect` on purpose: it reacts to `newCustomerId` and writes a
+hidden `customerId`, so one per line would hijack the document's own party.
+No metal `LedgerEntry` is written against the party — it's attribution,
+not a payable.
+
 ### Regression tests (added 2026-09-29)
 
 Playwright suite in `e2e/`, run by `.github/workflows/regression.yml` on every push to `main` and every PR: throwaway Postgres in the runner → migrate → `pnpm seed` + `pnpm db:seed:full-demo` → `tsc` → `pnpm build` → `pnpm test:e2e`. Sign-in mints a NextAuth JWT in `e2e/global-setup.ts` (no test login route in the app), which also refuses any non-localhost `DATABASE_URL`. See `e2e/README.md`. **Add a spec for every new feature.** The demo seed must keep creating `UserStoreMembership` rows for its users — `requirePermissionInStore` (createInvoice etc.) reads only that table, so without them the demo Admin can open every page but not save an invoice. Tests run in parallel with Vercel's own deploy on a direct push to `main`; they only *block* a bad change if work goes through a PR (or Vercel's deployment checks are turned on).

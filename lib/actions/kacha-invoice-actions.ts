@@ -36,6 +36,7 @@ import {
   getInvoiceFormStockItems,
 } from "@/lib/actions/invoice-actions";
 import { OversellError } from "@/lib/inventory/oversell-error";
+import { markSourcePartiesAsSuppliers, resolveLineSourceParties } from "@/lib/inventory/line-source-party";
 import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import { computeGst } from "@/lib/gst";
 import {
@@ -70,6 +71,9 @@ export type KachaInvoiceLineItemInput = {
   // convention as InvoiceLineItemInput.hmCharge's own doc comment.
   hmCharge?: number;
   inventoryStockId?: string | null;
+  // "Purchased From" — required on a line with no linked stock, see
+  // lib/inventory/line-source-party.ts.
+  vendorId?: string | null;
 };
 
 export type KachaInvoiceFormState = {
@@ -283,6 +287,7 @@ function mapKachaInvoice(kachaInvoice: any) {
       hmCharge: Number(item.hmCharge ?? 0),
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
+      vendorName: item.vendorName ?? null,
     })),
   };
 }
@@ -634,6 +639,11 @@ export async function createKachaInvoice(
         })
       : [];
     const validStockIds = new Set(validStock.map((s) => s.id));
+    const isManualLine = (item: KachaInvoiceLineItemInput) =>
+      !item.inventoryStockId || !validStockIds.has(item.inventoryStockId);
+
+    const sourceParties = await resolveLineSourceParties(storeId, items.filter(isManualLine));
+    if ("error" in sourceParties) return { success: false, message: sourceParties.error };
 
     // A stock row can hold many pieces. Selling some must not exceed what is
     // on hand, and two line items can point at the same row, so the check
@@ -706,10 +716,14 @@ export async function createKachaInvoice(
                 item.inventoryStockId && validStockIds.has(item.inventoryStockId)
                   ? item.inventoryStockId
                   : undefined,
+              vendorId: isManualLine(item) ? item.vendorId ?? undefined : undefined,
+              vendorName: isManualLine(item) && item.vendorId ? sourceParties.names.get(item.vendorId) : undefined,
             })),
           },
         },
       });
+
+      await markSourcePartiesAsSuppliers(tx, storeId, sourceParties.names.keys());
 
       for (const item of items) {
         if (!item.inventoryStockId || !validStockIds.has(item.inventoryStockId)) continue;

@@ -16,7 +16,8 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | Spec | Checks |
 | --- | --- |
 | `smoke.spec.ts` | Every main screen opens: no 5xx, no "Something went wrong", no browser error, no bounce to login |
-| `billing.spec.ts` | A "Create New Line Item" invoice line creates its Product (with Metal + Category) + Stock and sells it to 0; a new line missing Category is blocked; quantity can't exceed stock |
+| `billing.spec.ts` | A "Create New Line Item" invoice line creates its Product (with Metal + Category) + Stock and sells it to 0, recording its (required) Purchased From party on the stock row; a new line missing Category is blocked; quantity can't exceed stock |
+| `source-party.spec.ts` | A hand-typed Kacha / Quotation line can't be saved without its Purchased From party; the party is stored on the line and shown on the detail page |
 | `inventory.spec.ts` | Category → Type filters, Stone Type swap for a stone, footer totals (Products and Stock) |
 | `artisan.spec.ts` | Open Jobs → Receive Items; Receive Material's net weight calculation |
 | `dashboard.spec.ts` | Best Sellers card: every period and tab renders, ranked list shows |

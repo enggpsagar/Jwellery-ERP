@@ -5,6 +5,7 @@ import {
   getInvoiceFormStockItems,
 } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
+import { getSupplierOptions } from "@/lib/actions/customer-actions"
 import { getStates } from "@/lib/actions/location-actions"
 import { filterDeliveryStates } from "@/lib/delivery-location"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
@@ -31,10 +32,11 @@ type Props = {
 
 export default async function NewInvoicePage({ searchParams }: Props) {
   const params = await searchParams
-  const [customers, stockItems, businessSettings, locations, metals, origins, categories, styles, caratConversionRates, defaultLocationId, gstRates, states] =
+  const [customers, stockItems, suppliers, businessSettings, locations, metals, origins, categories, styles, caratConversionRates, defaultLocationId, gstRates, states] =
     await Promise.all([
       getInvoiceFormCustomers(),
       getInvoiceFormStockItems(),
+      getSupplierOptions(),
       getBusinessSettings(),
       getStoreLocations(),
       getStoreMetals(),
@@ -73,6 +75,8 @@ export default async function NewInvoicePage({ searchParams }: Props) {
         <InvoiceForm
           customers={customers}
           stockItems={stockItems}
+          suppliers={suppliers}
+          supplierModuleEnabled={businessSettings.supplierModuleEnabled}
           locations={locations}
           metals={metals}
           origins={origins}

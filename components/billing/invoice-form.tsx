@@ -1627,6 +1627,93 @@ export function InvoiceForm({
             // below, in the Details region; this is only a summary.
             const gst = lineGst(item)
             const gstTotal = gst.isInterState ? gst.igst : gst.sgst + gst.cgst
+            // A not-yet-linked line being added as a new product groups
+            // Metal Type and Purity with Category/Type in the "New product
+            // details" box; otherwise they stay in the Details grid below.
+            const showNewProductDetails = !isLinked && item.stockLinkDecided
+            const metalPurityFields = (
+              <>
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">Metal Type {!isLinked && <RequiredMark />}</Label>
+                      <div className="flex gap-1.5">
+                        <Select
+                          value={item.metalTypeId}
+                          onValueChange={(value) => {
+                            ensureMetalPurities(value)
+                            const category = categories.find((c) => c.id === item.categoryId)
+                            const categoryStillApplies =
+                              !category || category.metalTagIds.length === 0 || category.metalTagIds.includes(value)
+                            updateItem(item.key, {
+                              metalTypeId: value,
+                              purity: "",
+                              purityLabel: "",
+                              ...(categoryStillApplies ? {} : { categoryId: "", categoryTypeId: "" }),
+                            })
+                          }}
+                          disabled={isLinked}
+                        >
+                          <SelectTrigger className="h-11 w-full">
+                            <SelectValue placeholder="Select metal" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {metals
+                              .filter((metal) => !metal.isGemstone && (metal.isActive || metal.id === item.metalTypeId))
+                              .map((metal) => (
+                                <SelectItem key={metal.id} value={metal.id}>
+                                  {metal.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          className="h-11 w-9 shrink-0 px-0"
+                          title="Add Metal Type"
+                          disabled={isLinked}
+                          onClick={() => setAddMetalForKey(item.key)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
+                      <Label className="text-xs">Purity</Label>
+                      <div className="flex gap-1.5">
+                        <Select
+                          value={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
+                          onValueChange={(value) => selectPurity(item, value === "__none__" ? "" : value)}
+                          disabled={isLinked || !item.metalTypeId}
+                        >
+                          <SelectTrigger className="h-11 w-full">
+                            <SelectValue placeholder={item.metalTypeId ? "Select purity" : "Select a metal first"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">None</SelectItem>
+                            {(metalPuritiesCache[item.metalTypeId] ?? []).map((option) => (
+                              <SelectItem key={option.id} value={option.id}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          className="h-11 w-9 shrink-0 px-0"
+                          title="Add Purity"
+                          disabled={isLinked || !item.metalTypeId}
+                          onClick={() => setAddPurityForKey(item.key)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+              </>
+            )
 
             return (
             <div key={item.key} className="rounded-lg border">
@@ -1830,7 +1917,7 @@ export function InvoiceForm({
                       save. Same required fields as Add Product, so a piece
                       sold this way lands in the right Category/Style in
                       reports instead of an unclassified row. */}
-                  {!isLinked && item.stockLinkDecided && (() => {
+                  {showNewProductDetails && (() => {
                     const missing = missingProductFields(item)
                     const lineCategories = categoriesForMetal(item.metalTypeId, item.categoryId)
                     const lineTypes = (categoryTypesCache[item.categoryId] ?? []).filter(
@@ -1846,6 +1933,7 @@ export function InvoiceForm({
                           )}
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {metalPurityFields}
                           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                             <Label className="text-xs">
                               Category {categoryRequired && <RequiredMark />}
@@ -1953,85 +2041,7 @@ export function InvoiceForm({
                       next to them. Now it's just the widest cell (2 of 6
                       columns) in the same grid everything else shares. */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">Metal Type {!isLinked && <RequiredMark />}</Label>
-                      <div className="flex gap-1.5">
-                        <Select
-                          value={item.metalTypeId}
-                          onValueChange={(value) => {
-                            ensureMetalPurities(value)
-                            const category = categories.find((c) => c.id === item.categoryId)
-                            const categoryStillApplies =
-                              !category || category.metalTagIds.length === 0 || category.metalTagIds.includes(value)
-                            updateItem(item.key, {
-                              metalTypeId: value,
-                              purity: "",
-                              purityLabel: "",
-                              ...(categoryStillApplies ? {} : { categoryId: "", categoryTypeId: "" }),
-                            })
-                          }}
-                          disabled={isLinked}
-                        >
-                          <SelectTrigger className="h-11 w-full">
-                            <SelectValue placeholder="Select metal" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {metals
-                              .filter((metal) => !metal.isGemstone && (metal.isActive || metal.id === item.metalTypeId))
-                              .map((metal) => (
-                                <SelectItem key={metal.id} value={metal.id}>
-                                  {metal.name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="icon"
-                          className="h-11 w-9 shrink-0 px-0"
-                          title="Add Metal Type"
-                          disabled={isLinked}
-                          onClick={() => setAddMetalForKey(item.key)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">Purity</Label>
-                      <div className="flex gap-1.5">
-                        <Select
-                          value={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
-                          onValueChange={(value) => selectPurity(item, value === "__none__" ? "" : value)}
-                          disabled={isLinked || !item.metalTypeId}
-                        >
-                          <SelectTrigger className="h-11 w-full">
-                            <SelectValue placeholder={item.metalTypeId ? "Select purity" : "Select a metal first"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">None</SelectItem>
-                            {(metalPuritiesCache[item.metalTypeId] ?? []).map((option) => (
-                              <SelectItem key={option.id} value={option.id}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="icon"
-                          className="h-11 w-9 shrink-0 px-0"
-                          title="Add Purity"
-                          disabled={isLinked || !item.metalTypeId}
-                          onClick={() => setAddPurityForKey(item.key)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
+                    {!showNewProductDetails && metalPurityFields}
 
                     <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                       <Label className="text-xs">Gross Weight {!isLinked && <RequiredMark />}</Label>

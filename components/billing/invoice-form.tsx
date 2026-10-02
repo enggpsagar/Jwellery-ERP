@@ -1560,6 +1560,14 @@ export function InvoiceForm({
           />
         )}
 
+        {/* No Delivery Locations picked in Settings → no field at all; the
+            sale stays intra-state, same as leaving it blank. */}
+        {states.length === 0 ? (
+          <>
+            <input type="hidden" name="deliveryState" value="" />
+            <input type="hidden" name="deliveryStateCode" value="" />
+          </>
+        ) : (
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
           {showDeliveryPicker ? (
             <DeliveryLocationSelect
@@ -1586,6 +1594,7 @@ export function InvoiceForm({
             </>
           )}
         </div>
+        )}
       </div>
 
       <div className="space-y-3">

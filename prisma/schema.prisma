@@ -2158,7 +2158,8 @@ model BusinessSettings {
   // (components/shared/delivery-location-select.tsx) — a curated subset a
   // Store Admin picks in Settings, since most stores only ever ship within
   // a handful of states. Holds State.id values. Empty (the default) means
-  // "no curation yet" and shows every State — never an empty picker.
+  // the store doesn't deliver out of state: the invoice form hides Delivery
+  // Location entirely and bills intra-state (see filterDeliveryStates).
   allowedDeliveryStateIds String[] @default([])
 
   // Whether the Supplier module's own UI shows up at all — the "Suppliers"

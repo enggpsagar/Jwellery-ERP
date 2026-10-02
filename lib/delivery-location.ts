@@ -9,8 +9,9 @@ import type { StateOption } from "@/lib/actions/location-actions"
 /**
  * Narrows the full State list down to a store's curated
  * BusinessSettings.allowedDeliveryStateIds subset (see that field's doc
- * comment in schema.prisma) — empty means no curation yet, so every state
- * is shown, same as before this setting existed.
+ * comment in schema.prisma). Empty means the store hasn't picked any
+ * Delivery Locations, so none are offered and the invoice form hides the
+ * field entirely (the sale is treated as intra-state, same as a blank one).
  *
  * `mustIncludeName` keeps an already-saved invoice's own delivery state
  * selectable even if a Store Admin later un-checked it — the edit page
@@ -22,8 +23,6 @@ export function filterDeliveryStates(
   allowedStateIds: string[],
   mustIncludeName?: string | null,
 ): StateOption[] {
-  if (allowedStateIds.length === 0) return states
-
   const allowed = new Set(allowedStateIds)
   const filtered = states.filter((state) => allowed.has(state.id))
 

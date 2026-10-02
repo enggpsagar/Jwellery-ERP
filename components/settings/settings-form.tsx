@@ -448,9 +448,9 @@ export function SettingsForm({ settings, canEdit, states = [], unitOptions }: Se
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
             Which states show up in the Delivery Location picker when creating an
-            Invoice — most stores only ever ship within a handful of states, so
-            narrowing this makes that dropdown faster to use. Leave every box
-            unchecked to show all states (the default).
+            Invoice. Leave every box unchecked if you don't deliver out of your
+            own state — the Delivery Location field is then hidden on invoices
+            and every sale is billed as intra-state (CGST + SGST).
           </p>
 
           <div className="grid max-h-72 grid-cols-2 gap-x-4 gap-y-1.5 overflow-y-auto rounded-lg border p-3 sm:grid-cols-3">

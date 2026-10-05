@@ -5,7 +5,7 @@ import * as React from "react"
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
-import { cn, formatShortDate } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 
 type ProductRow = {
   id: string
@@ -120,7 +120,6 @@ export function ProductsTable({
               <SortableTableHead label="Title" sortKey="name" defaultSortBy="createdAt" />
               <SortableTableHead label="Net Weight" sortKey="defaultNetWeight" defaultSortBy="createdAt" />
               <th className="px-4 py-3 text-left font-medium">Fine Weight</th>
-              <SortableTableHead label="Created Date" sortKey="createdAt" defaultSortBy="createdAt" />
             </tr>
           </thead>
 
@@ -235,9 +234,6 @@ export function ProductsTable({
                     )}
                   </td>
 
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {formatShortDate(product.createdAt)}
-                  </td>
                 </tr>
               )
             })}
@@ -259,7 +255,6 @@ export function ProductsTable({
                 <td className="px-4 py-3 tabular-nums">
                   {totals.fineWeight != null ? `${totals.fineWeight.toFixed(3)} g` : ""}
                 </td>
-                <td className="px-4 py-3" />
               </tr>
             </tfoot>
           )}

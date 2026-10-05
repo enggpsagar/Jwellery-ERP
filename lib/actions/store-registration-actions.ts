@@ -9,6 +9,7 @@ import { newStoreRegisteredEmail, storeWelcomeEmail } from "@/lib/email-template
 import { buildUniqueStoreCode } from "@/lib/store-code";
 import { getSuperAdminEmails } from "@/lib/super-admin";
 import { logger } from "@/lib/logger";
+import { STARTER_CLARITIES, STARTER_STYLES } from "@/lib/inventory/starter-masters";
 
 export type RegisterStoreState = {
   success: boolean;
@@ -233,6 +234,15 @@ export async function registerStoreAction(
           name: metal.name,
           hasPurity: metal.hasPurity,
         })),
+      });
+
+      await tx.storeStyle.createMany({
+        data: STARTER_STYLES.map((name) => ({ storeId: createdStore.id, name })),
+        skipDuplicates: true,
+      });
+      await tx.storeStoneClarity.createMany({
+        data: STARTER_CLARITIES.map((name) => ({ storeId: createdStore.id, name })),
+        skipDuplicates: true,
       });
 
       for (const category of STARTER_CATEGORIES) {

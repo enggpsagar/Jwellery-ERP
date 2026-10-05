@@ -56,9 +56,10 @@ export default async function TaxonomySettingsPage() {
         misconfiguredPurities={misconfiguredPurities}
       />
 
-      <StyleSettingsForm styles={styles} canEdit={canEdit} />
-
-      <ClaritySettingsForm clarities={clarities} canEdit={canEdit} />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <StyleSettingsForm styles={styles} canEdit={canEdit} />
+        <ClaritySettingsForm clarities={clarities} canEdit={canEdit} />
+      </div>
 
       <SkuFormatForm
         skuFormat={businessSettings.skuFormat}

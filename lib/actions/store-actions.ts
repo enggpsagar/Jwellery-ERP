@@ -15,6 +15,7 @@ import { buildUniqueStoreCode } from "@/lib/store-code";
 import { sendInviteEmailSafely } from "@/lib/invite-email";
 import { logger } from "@/lib/logger";
 import { parseDateRangeBoundary } from "@/lib/date-range";
+import { STARTER_CLARITIES, STARTER_STYLES } from "@/lib/inventory/starter-masters";
 
 export type StoreFormState = {
   success: boolean;
@@ -310,6 +311,15 @@ export async function createStoreWithAdmin(
               }
             : {}),
         },
+      });
+
+      await tx.storeStyle.createMany({
+        data: STARTER_STYLES.map((name) => ({ storeId: createdStore.id, name })),
+        skipDuplicates: true,
+      });
+      await tx.storeStoneClarity.createMany({
+        data: STARTER_CLARITIES.map((name) => ({ storeId: createdStore.id, name })),
+        skipDuplicates: true,
       });
 
       await tx.user.create({

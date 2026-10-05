@@ -805,6 +805,11 @@ model ProductStoneComponent {
   stoneRate          Decimal?   @db.Decimal(12, 2)
   stoneCharge        Decimal?   @db.Decimal(12, 2)
   stoneChargeType    ChargeType @default(FIXED)
+  // Diamond grading — free text (standard grades are only suggested in the
+  // form) since a coloured stone's clarity isn't on the FL..I3 scale.
+  clarity            String?
+  // IGI (or other lab) certificate number for this stone.
+  certificateNumber  String?
   // Per-row GST rate — see ProductMetalComponent.gstRateId's own doc
   // comment for why this lives on the row rather than once per Product.
   gstRateId          String?

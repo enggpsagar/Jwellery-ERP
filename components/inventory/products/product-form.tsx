@@ -137,6 +137,8 @@ type Product = {
     stoneRate: string | null;
     stoneCharge: string | null;
     stoneChargeType: "FIXED" | "PERCENTAGE";
+    clarity: string | null;
+    certificateNumber: string | null;
     gstRateId: string | null;
   }[];
 };
@@ -229,6 +231,8 @@ type StoneComponentRow = {
   stoneWeight: string; // grams
   stoneWeightTouched: boolean;
   stoneWeightUnit: "GRAM" | "CARAT";
+  clarity: string;
+  certificateNumber: string;
   // This row's own GST Rate — see MetalComponentRow.gstRateId's own doc
   // comment for why it's per-row rather than once for the whole product.
   gstRateId: string;
@@ -246,6 +250,8 @@ function emptyStoneComponent(key: string = crypto.randomUUID(), gstRateId: strin
     stoneWeight: "",
     stoneWeightTouched: false,
     stoneWeightUnit: "GRAM",
+    clarity: "",
+    certificateNumber: "",
     gstRateId,
   };
 }
@@ -450,6 +456,8 @@ export function ProductForm({
         stoneWeight: component.stoneWeight ?? "",
         stoneWeightTouched: Boolean(component.stoneWeight),
         stoneWeightUnit: "GRAM" as const,
+        clarity: component.clarity ?? "",
+        certificateNumber: component.certificateNumber ?? "",
         gstRateId: component.gstRateId ?? "",
       }));
     }
@@ -468,6 +476,8 @@ export function ProductForm({
           stoneWeight: product.defaultStoneWeight ?? "",
           stoneWeightTouched: Boolean(product.defaultStoneWeight),
           stoneWeightUnit: "GRAM" as const,
+          clarity: "",
+          certificateNumber: "",
           gstRateId: "",
         },
       ];
@@ -496,6 +506,8 @@ export function ProductForm({
           stoneWeight: product?.defaultNetWeight ?? "",
           stoneWeightTouched: Boolean(product?.defaultNetWeight),
           stoneWeightUnit: "GRAM" as const,
+          clarity: "",
+          certificateNumber: "",
           gstRateId: "",
         },
       ];
@@ -930,6 +942,8 @@ export function ProductForm({
         stoneRate: row.stoneRate || null,
         stoneCharge: row.stoneCharge || null,
         stoneChargeType: "FIXED",
+        clarity: row.clarity.trim() || null,
+        certificateNumber: row.certificateNumber.trim() || null,
         gstRateId: row.gstRateId || null,
       })),
   );
@@ -1540,7 +1554,27 @@ export function ProductForm({
                     netStoneWeightTouched={row.stoneWeightTouched}
                   />
 
-                  <div className="mt-3 max-w-xs space-y-1">
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Clarity</Label>
+                    <Input
+                      list="stone-clarity-grades"
+                      value={row.clarity}
+                      placeholder="e.g. VVS1"
+                      onChange={(event) => updateStoneComponent(row.key, { clarity: event.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs">IGI Certificate No.</Label>
+                    <Input
+                      value={row.certificateNumber}
+                      placeholder="e.g. LG612345678"
+                      onChange={(event) => updateStoneComponent(row.key, { certificateNumber: event.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
                     <Label className="text-xs">GST Rate</Label>
                     <Select
                       value={row.gstRateId || "NONE"}
@@ -1562,6 +1596,7 @@ export function ProductForm({
                           ))}
                       </SelectContent>
                     </Select>
+                  </div>
                   </div>
 
                   {/* A Stone-kind product must always keep at least one
@@ -1585,6 +1620,12 @@ export function ProductForm({
               ))}
             </div>
           )}
+
+          <datalist id="stone-clarity-grades">
+            {["FL", "IF", "VVS1", "VVS2", "VS1", "VS2", "SI1", "SI2", "I1", "I2", "I3"].map((grade) => (
+              <option key={grade} value={grade} />
+            ))}
+          </datalist>
 
           <ErrorText error={state.errors.stoneComponentsJson} />
           <ErrorText error={state.errors.defaultCaratWeight} />

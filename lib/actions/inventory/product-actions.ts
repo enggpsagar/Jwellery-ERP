@@ -86,6 +86,8 @@ type StoneComponentInput = {
   stoneRate?: number | string | null;
   stoneCharge?: number | string | null;
   stoneChargeType?: string;
+  clarity?: string | null;
+  certificateNumber?: string | null;
   gstRateId?: string | null;
 };
 
@@ -268,6 +270,8 @@ function serializeProduct(product: {
     stoneRate: { toString(): string } | null;
     stoneCharge: { toString(): string } | null;
     stoneChargeType: ChargeType;
+    clarity: string | null;
+    certificateNumber: string | null;
     gstRateId: string | null;
   }[];
 }) {
@@ -326,6 +330,8 @@ function serializeProduct(product: {
       stoneRate: component.stoneRate?.toString() ?? null,
       stoneCharge: component.stoneCharge?.toString() ?? null,
       stoneChargeType: component.stoneChargeType,
+      clarity: component.clarity,
+      certificateNumber: component.certificateNumber,
       gstRateId: component.gstRateId,
     })),
   };
@@ -1149,6 +1155,8 @@ export async function createProduct(
           stoneRate: toNumberOrNull(component.stoneRate),
           stoneCharge: toNumberOrNull(component.stoneCharge),
           stoneChargeType: toChargeTypeInput(component.stoneChargeType),
+          clarity: component.clarity ? String(component.clarity).trim() || null : null,
+          certificateNumber: component.certificateNumber ? String(component.certificateNumber).trim() || null : null,
           gstRateId: component.gstRateId || null,
           sortOrder: index,
         })),
@@ -1503,6 +1511,8 @@ export async function updateProduct(
           stoneRate: toNumberOrNull(component.stoneRate),
           stoneCharge: toNumberOrNull(component.stoneCharge),
           stoneChargeType: toChargeTypeInput(component.stoneChargeType),
+          clarity: component.clarity ? String(component.clarity).trim() || null : null,
+          certificateNumber: component.certificateNumber ? String(component.certificateNumber).trim() || null : null,
           gstRateId: component.gstRateId || null,
           sortOrder: index,
         })),

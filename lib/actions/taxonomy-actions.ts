@@ -165,13 +165,17 @@ export async function upsertStoreMetal(
 
     const existing = await prisma.storeMetal.findFirst({
       where: { storeId, name, NOT: id ? { id } : undefined },
-      select: { id: true },
+      select: { id: true, isGemstone: true, isActive: true },
     });
 
     if (existing) {
-      const message = isGemstone
-        ? "A stone with this name already exists"
-        : "A metal with this name already exists";
+      // Metals and Stones share this one table, so the clash may be in the
+      // other section, or a row that's been turned off — say which, or the
+      // owner looks in the list they're editing and finds nothing.
+      const section = existing.isGemstone ? "Stones" : "Metals";
+      const message = `"${name}" already exists under ${section}${
+        existing.isActive ? "" : " (turned off — switch it back on instead)"
+      }`;
       return { success: false, message, errors: { name: [message] } };
     }
 

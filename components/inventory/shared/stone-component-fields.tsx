@@ -1,6 +1,6 @@
 "use client"
 
-import { useId, useMemo, useState } from "react"
+import { useEffect, useId, useMemo, useState, type ComponentProps } from "react"
 import { Plus } from "lucide-react"
 
 import type { StoreMetalRow, StoreMetalOriginRow } from "@/lib/actions/taxonomy-actions"
@@ -18,6 +18,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+
+// Every amount here is held by the callers as a number, so binding the
+// input straight to it threw away what was being typed: "0" rendered as
+// blank and "0." parsed back to 0, which made a 0.25 ct stone impossible
+// to enter. Keeps the raw text locally and only re-syncs from the prop
+// when the number it represents actually changes (e.g. an auto-fill).
+function DecimalInput({
+  value,
+  onValueChange,
+  ...props
+}: Omit<ComponentProps<typeof Input>, "value" | "onChange" | "type"> & {
+  value: number
+  onValueChange: (value: string) => void
+}) {
+  const [draft, setDraft] = useState(value === 0 ? "" : String(value))
+
+  useEffect(() => {
+    setDraft((current) => ((Number(current) || 0) === value ? current : value === 0 ? "" : String(value)))
+  }, [value])
+
+  return (
+    <Input
+      {...props}
+      type="number"
+      value={draft}
+      onChange={(event) => {
+        setDraft(event.target.value)
+        onValueChange(event.target.value)
+      }}
+    />
+  )
+}
 
 type StoneComponentFieldsProps = {
   metals: StoreMetalRow[]
@@ -263,11 +295,10 @@ export function StoneComponentFields({
 
           <div className="space-y-1">
             <Label className="text-xs">Carat Wt (ct)</Label>
-            <Input
-              type="number"
+            <DecimalInput
               step="any"
-              value={caratWeight === 0 ? "" : caratWeight}
-              onChange={(event) => onCaratWeightChange(event.target.value)}
+              value={caratWeight}
+              onValueChange={onCaratWeightChange}
               readOnly={lockPhysicalFields}
               className={lockPhysicalFields ? "bg-muted" : undefined}
             />
@@ -275,23 +306,21 @@ export function StoneComponentFields({
 
           <div className="space-y-1">
             <Label className="text-xs">Rate (₹/ct)</Label>
-            <Input
-              type="number"
+            <DecimalInput
               step="0.01"
-              value={stoneRate === 0 ? "" : stoneRate}
-              onChange={(event) => onStoneRateChange(event.target.value)}
+              value={stoneRate}
+              onValueChange={onStoneRateChange}
             />
           </div>
 
           <div className="space-y-1">
             <Label className="text-xs">Net Wt</Label>
             <div className="flex gap-1">
-              <Input
-                type="number"
+              <DecimalInput
                 step="any"
                 className={lockPhysicalFields ? "flex-1 bg-muted" : "flex-1"}
-                value={stoneWeightInput === 0 ? "" : stoneWeightInput}
-                onChange={(event) => onStoneWeightInputChange(event.target.value)}
+                value={stoneWeightInput}
+                onValueChange={onStoneWeightInputChange}
                 readOnly={lockPhysicalFields}
               />
               <Select
@@ -419,11 +448,10 @@ export function StoneComponentFields({
 
         <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label className="text-xs">Stone Carat Weight (ct)</Label>
-          <Input
-            type="number"
+          <DecimalInput
             step="any"
-            value={caratWeight === 0 ? "" : caratWeight}
-            onChange={(event) => onCaratWeightChange(event.target.value)}
+            value={caratWeight}
+            onValueChange={onCaratWeightChange}
             readOnly={lockPhysicalFields}
             className={lockPhysicalFields ? "bg-muted" : undefined}
           />
@@ -434,21 +462,19 @@ export function StoneComponentFields({
 
         <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label className="text-xs">Stone Rate (₹/ct)</Label>
-          <Input
-            type="number"
+          <DecimalInput
             step="0.01"
-            value={stoneRate === 0 ? "" : stoneRate}
-            onChange={(event) => onStoneRateChange(event.target.value)}
+            value={stoneRate}
+            onValueChange={onStoneRateChange}
           />
         </div>
 
         <div className="space-y-1 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
           <Label className="text-xs">Stone Charge</Label>
-          <Input
-            type="number"
+          <DecimalInput
             step="0.01"
-            value={stoneCharge === 0 ? "" : stoneCharge}
-            onChange={(event) => onStoneChargeChange(event.target.value)}
+            value={stoneCharge}
+            onValueChange={onStoneChargeChange}
           />
           <p className="text-xs text-muted-foreground">
             {stoneChargeTouched
@@ -460,12 +486,11 @@ export function StoneComponentFields({
         <div className="space-y-1 md:col-span-2">
           <Label className="text-xs">Net Stone Weight</Label>
           <div className="flex gap-1">
-            <Input
-              type="number"
+            <DecimalInput
               step="any"
               className={lockPhysicalFields ? "flex-1 bg-muted" : "flex-1"}
-              value={stoneWeightInput === 0 ? "" : stoneWeightInput}
-              onChange={(event) => onStoneWeightInputChange(event.target.value)}
+              value={stoneWeightInput}
+              onValueChange={onStoneWeightInputChange}
               readOnly={lockPhysicalFields}
             />
             <Select

@@ -185,20 +185,46 @@ export function ProductDetailContent({
       {hasStoneDetails ? (
         <Section title="Stone Details">
           {hasStoneComponents ? (
-            product.stoneComponents!.map((component, index) => (
-              <Field
-                key={component.id}
-                label={product.stoneComponents!.length > 1 ? `Stone ${index + 1}` : "Embedded Stone"}
-                value={
-                  <span>
-                    {component.stoneMetalTypeName}
-                    {component.stoneTypeNames ? ` (${component.stoneTypeNames})` : ""}
-                    {component.caratWeight ? ` — ${formatCarat(component.caratWeight)}` : ""}
-                    {formatCharge(component.stoneRate, "FIXED") ? ` @ ${formatCharge(component.stoneRate, "FIXED")}/ct` : ""}
-                  </span>
-                }
-              />
-            ))
+            // Every field captured on the stone row, one block per stone —
+            // a single summary line used to drop Pcs, Clarity, IGI No.,
+            // weight, charge and GST.
+            product.stoneComponents!.map((component, index) => {
+              // A ₹0 charge is the form's blank default, not a real charge.
+              const charge =
+                Number(component.stoneCharge) > 0
+                  ? formatCharge(component.stoneCharge, component.stoneChargeType)
+                  : null
+              const rate = formatCharge(component.stoneRate, "FIXED")
+              return (
+                <div
+                  key={component.id}
+                  className={`sm:col-span-2 lg:col-span-3 ${index > 0 ? "border-t pt-6" : ""}`}
+                >
+                  {product.stoneComponents!.length > 1 ? (
+                    <p className="mb-4 text-sm font-semibold">Stone {index + 1}</p>
+                  ) : null}
+                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    <Field label="Stone" value={component.stoneMetalTypeName} />
+                    <Field label="Stone Type" value={component.stoneTypeNames} />
+                    <Field label="Clarity" value={component.clarity} />
+                    <Field label="Pcs" value={component.pieces ?? null} />
+                    <Field label="Carat Weight" value={formatCarat(component.caratWeight)} />
+                    <Field label="Stone Weight" value={formatWeight(component.stoneWeight)} />
+                    <Field label="Rate (per ct)" value={rate} />
+                    <Field
+                      label="Stone Charge"
+                      value={
+                        charge
+                          ? `${charge} (${component.stoneChargeType === "PERCENTAGE" ? "Percentage" : "Fixed"})`
+                          : null
+                      }
+                    />
+                    <Field label="GST Rate" value={component.gstRateLabel} />
+                    <Field label="IGI Certificate No." value={component.certificateNumber} />
+                  </div>
+                </div>
+              )
+            })
           ) : (
             <>
               <Field label="Carat Weight" value={caratWeight} />

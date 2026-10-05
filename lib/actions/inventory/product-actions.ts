@@ -281,6 +281,7 @@ function serializeProduct(product: {
     certificateNumber: string | null;
     pieces: number | null;
     gstRateId: string | null;
+    gstRate?: { name: string; ratePercent: { toString(): string } } | null;
   }[];
 }) {
   return {
@@ -342,6 +343,13 @@ function serializeProduct(product: {
       certificateNumber: component.certificateNumber,
       pieces: component.pieces,
       gstRateId: component.gstRateId,
+      // Rate names are free text — only append the % when the name doesn't
+      // already say it ("GST 3%" shouldn't read "GST 3% (3%)").
+      gstRateLabel: component.gstRate
+        ? component.gstRate.name.includes("%")
+          ? component.gstRate.name
+          : `${component.gstRate.name} (${Number(component.gstRate.ratePercent.toString())}%)`
+        : null,
     })),
   };
 }
@@ -766,7 +774,10 @@ export async function getProductById(id: string) {
         orderBy: { sortOrder: "asc" },
         include: { metalType: { select: { id: true, name: true } }, storeMetalPurity: { select: { id: true, label: true } } },
       },
-      stoneComponents: { orderBy: { sortOrder: "asc" } },
+      stoneComponents: {
+        orderBy: { sortOrder: "asc" },
+        include: { gstRate: { select: { name: true, ratePercent: true } } },
+      },
     },
   });
 

@@ -31,7 +31,7 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `dashboard.spec.ts` | Best Sellers card: every period and tab renders, ranked list shows |
 | `thermal-print.spec.ts` | Thermal receipt: QR on the left, invoice + IRN/Ack details on the right; A4 prints carry no QR |
 | `stock-qr-print.spec.ts` | Stock QR tags: QR left / details right; print is one 80×30mm thermal label per page, at the paper edge |
-| `stock-autofill.spec.ts` | Picking an 18K + diamond piece with no selling price fills Purity, the stone and Rate / g (today's 24K × fineness); QR/Barcode tags print every metal and stone and follow Settings → QR & Barcode Tags; Stock list shows `CODE (qty)` and Fine Weight |
+| `stock-autofill.spec.ts` | Picking an 18K + diamond piece with no selling price fills Purity, the stone and Rate / g (today's 24K × fineness); QR/Barcode tags print every metal and stone and follow Settings → QR & Barcode Tags; Stock list shows Product Code over `STOCK-CODE (qty)` and Fine Weight |
 | `product-images.spec.ts` | Product Images: add / make cover / remove / save order; square tiles for any photo shape; non-Blob URLs rejected |
 | `reports.spec.ts` | Every report tab renders; Stock report's Available / Out of Stock split; CSV export |
 

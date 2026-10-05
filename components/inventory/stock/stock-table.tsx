@@ -120,11 +120,11 @@ export function StockTable({
                   className="h-4 w-4 rounded border-input"
                 />
               </th>
-              {/* Qty in stock rides on the code — "STK-2026-0003 (1)". Stock has
-                  no Active/Inactive of its own; availability is purely
+              {/* One column: Product Code on top, the stock code with its qty
+                  in stock below — "STK-2026-0003 (1)". Stock has no
+                  Active/Inactive of its own; availability is purely
                   quantity-driven, so a sold-out row's count shows red. */}
-              <SortableTableHead label="Stock Code (Qty)" sortKey="stockCode" defaultSortBy="createdAt" />
-              <th className="hidden px-4 py-3 text-left font-medium md:table-cell">Product Code</th>
+              <SortableTableHead label="Product / Stock Code (Qty)" sortKey="stockCode" defaultSortBy="createdAt" />
               <SortableTableHead label="Title" sortKey="product" defaultSortBy="createdAt" />
               {/* Gross Weight hidden below sm — same rationale as the other
                   list tables: least-essential column hidden instead of
@@ -171,14 +171,13 @@ export function StockTable({
                   </td>
 
                   <td className="px-4 py-3 text-foreground">
-                    {item.stockCode}{" "}
-                    <span className={cn("tabular-nums text-muted-foreground", item.quantity <= 0 && "font-medium text-red-600")}>
-                      ({item.quantity})
-                    </span>
-                  </td>
-
-                  <td className="hidden px-4 py-3 text-foreground md:table-cell">
-                    {item.product?.productCode ?? "-"}
+                    <div className="font-medium">{item.product?.productCode ?? "-"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {item.stockCode}{" "}
+                      <span className={cn("tabular-nums", item.quantity <= 0 && "font-medium text-red-600")}>
+                        ({item.quantity})
+                      </span>
+                    </div>
                   </td>
 
                   <td className="px-4 py-3 font-medium">
@@ -241,7 +240,6 @@ export function StockTable({
                     {pagination.totalPages > 1 ? ", all pages" : ""}
                   </div>
                 </td>
-                <td className="hidden px-4 py-3 md:table-cell" />
                 <td className="px-4 py-3" />
                 <td className="hidden px-4 py-3 text-right tabular-nums sm:table-cell">
                   {formatWeightCell(totals.grossWeight)}

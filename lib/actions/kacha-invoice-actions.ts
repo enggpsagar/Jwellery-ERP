@@ -12,10 +12,18 @@ import {
   PurityType,
   ChargeType,
   UserRole,
+  Prisma,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { getFineWeightResolver } from "@/lib/fine-weight";
+import {
+  getPieceResolver,
+  pieceComponentCreates,
+  serializeStoredComponents,
+  type ResolvedPiece,
+} from "@/lib/piece-components.server";
+import type { PieceComponentPayload } from "@/lib/piece-components";
 import { computeRoundOff } from "@/lib/round-off";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
@@ -75,6 +83,11 @@ export type KachaInvoiceLineItemInput = {
   // "Purchased From" — required on a line with no linked stock, see
   // lib/inventory/line-source-party.ts.
   vendorId?: string | null;
+  // A piece made of several metals/stones — its rows (lib/piece-components.ts).
+  multiPart?: boolean | null;
+  components?: PieceComponentPayload[] | null;
+  // Server-only: the resolved rows (resolvePieceLines), never from the client.
+  piece?: ResolvedPiece;
 };
 
 export type KachaInvoiceFormState = {
@@ -157,8 +170,118 @@ function lineQuantity(item: {
   return perPiece * (toNumber(item.quantity, 1) || 1);
 }
 
+/** Metal value of a line — row by row for a multi-part piece. */
+function lineMetalValue(item: KachaInvoiceLineItemInput) {
+  return item.piece
+    ? item.piece.metalValue * (toNumber(item.quantity, 1) || 1)
+    : toNumber(item.rate) * lineQuantity(item);
+}
+
+/**
+ * Multi-part lines ("Made of more than one metal or stone?"): validates and
+ * values each piece's rows (lib/piece-components.server.ts) and folds the
+ * result into the line's own summary fields — first metal, combined net
+ * weight, stones' value as the line's stoneCharge (× quantity, the line-
+ * level convention) and no single rate. A stock piece's metals and stones
+ * come from its own stored rows; only rates come from the client. Adapted
+ * from invoice-actions.ts's resolvePieceLines (duplicated per action file,
+ * same convention as lineQuantity). A Kacha slip carries no GST, so no row
+ * snapshots a GST rate — convertKachaToPakka taxes them at the rate picked
+ * there.
+ */
+async function resolvePieceLines(
+  storeId: string,
+  items: KachaInvoiceLineItemInput[],
+): Promise<{ error: string } | KachaInvoiceLineItemInput[]> {
+  const isPiece = (item: KachaInvoiceLineItemInput) => Boolean(item.multiPart && item.components?.length);
+  if (!items.some(isPiece)) return items.map((item) => ({ ...item, piece: undefined }));
+
+  const resolvePiece = await getPieceResolver(storeId, { valuation: "net" });
+  const linkedIds = items.filter((item) => isPiece(item) && item.inventoryStockId).map((item) => item.inventoryStockId as string);
+  const stored = linkedIds.length
+    ? await prisma.pieceComponent.findMany({
+        where: { inventoryStockId: { in: linkedIds }, inventoryStock: { storeId } },
+        orderBy: { sortOrder: "asc" },
+      })
+    : [];
+  const storedByStock = new Map<string, typeof stored>();
+  for (const row of stored) {
+    const list = storedByStock.get(row.inventoryStockId as string) ?? [];
+    list.push(row);
+    storedByStock.set(row.inventoryStockId as string, list);
+  }
+  const num = (value: Prisma.Decimal | null) => (value == null ? null : Number(value));
+
+  const out: KachaInvoiceLineItemInput[] = [];
+  for (const item of items) {
+    if (!isPiece(item)) {
+      out.push({ ...item, multiPart: false, components: null, piece: undefined });
+      continue;
+    }
+    let rows = item.components as PieceComponentPayload[];
+    if (item.inventoryStockId) {
+      const own = storedByStock.get(item.inventoryStockId) ?? [];
+      if (!own.length) {
+        out.push({ ...item, multiPart: false, components: null, piece: undefined });
+        continue;
+      }
+      rows = own.map((row, index) => {
+        const sent = rows[index];
+        return {
+          kind: row.kind,
+          metalTypeId: row.metalTypeId,
+          purityLabel: row.purityLabel,
+          purity: row.purity,
+          grossWeight: num(row.grossWeight),
+          netWeight: num(row.netWeight),
+          stoneMetalTypeName: row.stoneMetalTypeName,
+          stoneTypeNames: row.stoneTypeNames,
+          caratWeight: num(row.caratWeight),
+          stoneWeight: num(row.stoneWeight),
+          rate: sent?.rate ?? null,
+          amount: row.kind === "STONE" ? sent?.amount ?? null : null,
+          // Kept (not shown on the slip) so converting to a Pakka invoice
+          // taxes each row at the stock piece's own rate.
+          gstRateId: row.gstRateId,
+        };
+      });
+    } else {
+      rows = rows.map((row) => ({ ...row, gstRateId: null }));
+    }
+    const label = `"${item.itemName || "a line item"}"`;
+    if (!rows.some((row) => row.kind === "METAL")) {
+      return { error: `${label} needs at least one metal — sell loose stones as their own line.` };
+    }
+    const piece = resolvePiece(rows, label);
+    if ("error" in piece) return piece;
+    if (!(piece.metalValue + piece.stoneValue > 0)) {
+      return { error: `Enter the rates for the metals and stones of ${label}.` };
+    }
+    const quantity = toNumber(item.quantity, 1) || 1;
+    const summary = piece.summary;
+    out.push({
+      ...item,
+      piece,
+      metalTypeId: summary.metalTypeId,
+      purity: summary.purity,
+      purityLabel: summary.purityLabel,
+      grossWeight: summary.grossWeight,
+      netWeight: summary.netWeight,
+      caratWeight: summary.caratWeight,
+      stoneWeight: summary.stoneWeight,
+      stoneCharge: Math.round(piece.stoneValue * quantity * 100) / 100,
+      stoneRate: null,
+      stoneMetalTypeName: summary.stoneMetalTypeName,
+      stoneTypeNames: summary.stoneTypeNames,
+      rate: null,
+      dmoWeight: null,
+    });
+  }
+  return out;
+}
+
 function lineTotal(item: KachaInvoiceLineItemInput) {
-  const metalValue = toNumber(item.rate) * lineQuantity(item);
+  const metalValue = lineMetalValue(item);
   return (
     metalValue + toNumber(item.makingCharge) + toNumber(item.hmCharge) + toNumber(item.stoneCharge)
   );
@@ -289,6 +412,8 @@ function mapKachaInvoice(kachaInvoice: any) {
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
       vendorName: item.vendorName ?? null,
+      // A piece of several metals/stones — see PieceBreakdown.
+      components: item.components ? serializeStoredComponents(item.components) : [],
     })),
   };
 }
@@ -486,7 +611,11 @@ export async function getKachaInvoiceById(id: string) {
     where: { id, storeId },
     include: {
       customer: { select: { id: true, name: true, phone: true, gstin: true } },
-      items: true,
+      items: {
+        include: {
+          components: { orderBy: { sortOrder: "asc" }, include: { metalType: { select: { name: true } } } },
+        },
+      },
       convertedTo: { select: { id: true, invoiceNumber: true } },
     },
   });
@@ -557,6 +686,9 @@ export async function createKachaInvoice(
     // locked, trustworthy value rather than whatever the client submitted
     // for a field the UI no longer lets it edit.
     items = await lockLinkedStockFields(storeId, items, explicitStockIds);
+    const pieceLines = await resolvePieceLines(storeId, items);
+    if ("error" in pieceLines) return { success: false, message: pieceLines.error };
+    items = pieceLines;
 
     const discount = toNumber(formData.get("discount"));
 
@@ -582,10 +714,7 @@ export async function createKachaInvoice(
     const notes = String(formData.get("notes") || "").trim() || null;
     const locationId = String(formData.get("locationId") || "").trim() || null;
 
-    const subtotal = items.reduce(
-      (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
-      0,
-    );
+    const subtotal = items.reduce((sum, item) => sum + lineMetalValue(item), 0);
     // Hallmarking charge folds into the slip's Making Charges total — same
     // convention as invoice-actions.ts's own makingCharges.
     const makingCharges = items.reduce(
@@ -702,7 +831,8 @@ export async function createKachaInvoice(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
-              fineWeight: fineOf(item) ?? undefined,
+              fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
+              components: item.piece ? { create: pieceComponentCreates(item.piece.components) } : undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
@@ -933,7 +1063,10 @@ export async function convertKachaToPakka(
 
     const kachaInvoice = await prisma.kachaInvoice.findFirst({
       where: { id: kachaInvoiceId, storeId },
-      include: { items: true, customer: { select: { state: true } } },
+      include: {
+        items: { include: { components: { orderBy: { sortOrder: "asc" } } } },
+        customer: { select: { state: true } },
+      },
     });
 
     if (!kachaInvoice) {
@@ -979,9 +1112,34 @@ export async function convertKachaToPakka(
       Number(item.hmCharge) +
       Number(item.stoneCharge);
 
-    const itemGst = kachaInvoice.items.map((item) =>
-      computeGst(itemTaxableValue(item), gstRatePercent, gstScheme, storeState, customerState),
-    );
+    // A piece made of several metals/stones: each row at its own GST rate
+    // (falling back to the rate picked here — a Kacha row never carries
+    // one today), making/HM at the picked rate — same split as
+    // invoice-form.tsx's lineGst for a multi-part line.
+    const round = (value: number) => Math.round(value * 100) / 100;
+    const itemGst = kachaInvoice.items.map((item) => {
+      if (!item.components.length) {
+        return computeGst(itemTaxableValue(item), gstRatePercent, gstScheme, storeState, customerState);
+      }
+      const quantity = item.quantity || 1;
+      const parts = [
+        ...item.components.map((row) =>
+          computeGst(
+            Number(row.amount) * quantity,
+            row.gstRatePercent != null ? Number(row.gstRatePercent) : gstRatePercent,
+            gstScheme,
+            storeState,
+            customerState,
+          ),
+        ),
+        computeGst(Number(item.makingCharge) + Number(item.hmCharge), gstRatePercent, gstScheme, storeState, customerState),
+      ];
+      return {
+        sgst: round(parts.reduce((sum, part) => sum + round(part.sgst), 0)),
+        cgst: round(parts.reduce((sum, part) => sum + round(part.cgst), 0)),
+        igst: round(parts.reduce((sum, part) => sum + round(part.igst), 0)),
+      };
+    });
     const taxAmount = itemGst.reduce((sum, g) => sum + g.sgst + g.cgst + g.igst, 0);
 
     const subtotal = Number(kachaInvoice.subtotal);
@@ -1062,6 +1220,30 @@ export async function convertKachaToPakka(
               sgstAmount: itemGst[index].sgst,
               cgstAmount: itemGst[index].cgst,
               igstAmount: itemGst[index].igst,
+              // The slip's own metal/stone rows, copied as stored.
+              components: item.components.length
+                ? {
+                    create: item.components.map((row) => ({
+                      kind: row.kind,
+                      sortOrder: row.sortOrder,
+                      metalTypeId: row.metalTypeId,
+                      purity: row.purity,
+                      purityLabel: row.purityLabel,
+                      grossWeight: row.grossWeight,
+                      netWeight: row.netWeight,
+                      fineWeight: row.fineWeight,
+                      stoneMetalTypeName: row.stoneMetalTypeName,
+                      stoneTypeNames: row.stoneTypeNames,
+                      caratWeight: row.caratWeight,
+                      stoneWeight: row.stoneWeight,
+                      rate: row.rate,
+                      amount: row.amount,
+                      gstRateId: row.gstRateId,
+                      gstRateName: row.gstRateName,
+                      gstRatePercent: row.gstRatePercent,
+                    })),
+                  }
+                : undefined,
               gstRateId: gstRateSnapshot?.gstRateId ?? undefined,
               gstRateName: gstRateSnapshot?.gstRateName ?? undefined,
               gstRatePercent: gstRateSnapshot?.gstRatePercent ?? undefined,

@@ -7,6 +7,7 @@ import type { Invoice } from "@/lib/actions/invoice-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { APP_NAME } from "@/lib/constants/app"
 import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { gstRateGroups, hasMixedGst } from "@/lib/invoice-gst-summary"
 
 type InvoicePrintModernProps = {
   invoice: Invoice
@@ -100,17 +101,9 @@ export function InvoicePrintModern({ invoice, settings }: InvoicePrintModernProp
   const heading = documentHeading(settings.gstScheme)
   const hasBankDetails = Boolean(settings.bankName)
 
-  const rateGroups = new Map<number, { percent: number; sgst: number; cgst: number; igst: number }>()
-  for (const item of invoice.items) {
-    const { percent } = lineGst(item)
-    if (percent <= 0) continue
-    const group = rateGroups.get(percent) ?? { percent, sgst: 0, cgst: 0, igst: 0 }
-    group.sgst += item.sgstAmount
-    group.cgst += item.cgstAmount
-    group.igst += item.igstAmount
-    rateGroups.set(percent, group)
-  }
-  const sortedRateGroups = Array.from(rateGroups.values()).sort((a, b) => a.percent - b.percent)
+  // A piece of several metals/stones splits its tax across its rows' own
+  // rates — see gstRateGroups.
+  const sortedRateGroups = gstRateGroups(invoice.items)
   const isInterState = invoice.items.some((item) => item.igstAmount > 0)
 
   const subtotal = invoice.subtotal + invoice.makingCharges + invoice.stoneCharges
@@ -279,7 +272,7 @@ export function InvoicePrintModern({ invoice, settings }: InvoicePrintModernProp
                       <td>{unit}</td>
                       <td className="text-right whitespace-nowrap">₹{fmt(pricePerUnit)}</td>
                       <td className="text-right whitespace-nowrap">
-                        ₹{fmt(gstAmount)} {gstPercent > 0 && `(${gstPercent}%)`}
+                        ₹{fmt(gstAmount)} {hasMixedGst(item) ? "(mixed)" : gstPercent > 0 && `(${gstPercent}%)`}
                       </td>
                       <td className="text-right whitespace-nowrap font-medium">₹{fmt(item.lineTotal)}</td>
                     </tr>

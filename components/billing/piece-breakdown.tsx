@@ -12,15 +12,19 @@ const rupees = (value: number) =>
 export function PieceBreakdown({
   components,
   className = "mt-0.5 space-y-0.5 text-[11px] leading-snug text-muted-foreground",
+  showGst = true,
 }: {
   components?: StoredPieceComponent[] | null
   className?: string
+  /** Off on a Kacha slip, which carries no GST (its rows may still keep a
+   *  rate, for when the slip is converted to a Pakka invoice). */
+  showGst?: boolean
 }) {
   if (!components?.length) return null
   return (
     <ul className={className}>
       {components.map((row, index) => {
-        const gst = row.gstRatePercent != null ? ` · GST ${row.gstRatePercent}%` : ""
+        const gst = showGst && row.gstRatePercent != null ? ` · GST ${row.gstRatePercent}%` : ""
         if (row.kind === "METAL") {
           const pure = row.fineWeight != null && row.netWeight != null && round5(row.fineWeight) !== round5(row.netWeight)
           return (

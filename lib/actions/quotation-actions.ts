@@ -15,6 +15,13 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { getFineWeightResolver } from "@/lib/fine-weight";
+import {
+  getPieceResolver,
+  pieceComponentCreates,
+  serializeStoredComponents,
+  type ResolvedPiece,
+} from "@/lib/piece-components.server";
+import type { PieceComponentPayload } from "@/lib/piece-components";
 import { computeRoundOff } from "@/lib/round-off";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
@@ -64,6 +71,11 @@ export type QuotationLineItemInput = {
   // "Purchased From" — required on a line with no linked stock, see
   // lib/inventory/line-source-party.ts.
   vendorId?: string | null;
+  // A piece made of several metals/stones — its rows (lib/piece-components.ts).
+  multiPart?: boolean | null;
+  components?: PieceComponentPayload[] | null;
+  // Server-only: the resolved rows (resolvePieceLines), never from the client.
+  piece?: ResolvedPiece;
 };
 
 export type QuotationFormState = {
@@ -106,8 +118,111 @@ function lineQuantity(item: {
   return perPiece * (toNumber(item.quantity, 1) || 1);
 }
 
+/** Metal value of a line — row by row for a multi-part piece. */
+function lineMetalValue(item: QuotationLineItemInput) {
+  return item.piece
+    ? item.piece.metalValue * (toNumber(item.quantity, 1) || 1)
+    : toNumber(item.rate) * lineQuantity(item);
+}
+
+/**
+ * Multi-part lines ("Made of more than one metal or stone?"): validates and
+ * values each piece's rows (lib/piece-components.server.ts) and folds the
+ * result into the line's own summary fields — first metal, combined net
+ * weight, stones' value as the line's stoneCharge (× quantity, the line-
+ * level convention) and no single rate. A stock piece's metals and stones
+ * come from its own stored rows; only rates and GST come from the client.
+ * Duplicated from invoice-actions.ts's resolvePieceLines (per-file helpers,
+ * same convention as generateInvoiceNumber below).
+ */
+async function resolvePieceLines(
+  storeId: string,
+  items: QuotationLineItemInput[],
+): Promise<{ error: string } | QuotationLineItemInput[]> {
+  const isPiece = (item: QuotationLineItemInput) => Boolean(item.multiPart && item.components?.length);
+  if (!items.some(isPiece)) return items.map((item) => ({ ...item, piece: undefined }));
+
+  const resolvePiece = await getPieceResolver(storeId, { valuation: "net" });
+  const linkedIds = items.filter((item) => isPiece(item) && item.inventoryStockId).map((item) => item.inventoryStockId as string);
+  const stored = linkedIds.length
+    ? await prisma.pieceComponent.findMany({
+        where: { inventoryStockId: { in: linkedIds }, inventoryStock: { storeId } },
+        orderBy: { sortOrder: "asc" },
+      })
+    : [];
+  const storedByStock = new Map<string, typeof stored>();
+  for (const row of stored) {
+    const list = storedByStock.get(row.inventoryStockId as string) ?? [];
+    list.push(row);
+    storedByStock.set(row.inventoryStockId as string, list);
+  }
+  const num = (value: Prisma.Decimal | null) => (value == null ? null : Number(value));
+
+  const out: QuotationLineItemInput[] = [];
+  for (const item of items) {
+    if (!isPiece(item)) {
+      out.push({ ...item, multiPart: false, components: null, piece: undefined });
+      continue;
+    }
+    let rows = item.components as PieceComponentPayload[];
+    if (item.inventoryStockId) {
+      const own = storedByStock.get(item.inventoryStockId) ?? [];
+      if (!own.length) {
+        out.push({ ...item, multiPart: false, components: null, piece: undefined });
+        continue;
+      }
+      rows = own.map((row, index) => {
+        const sent = rows[index];
+        return {
+          kind: row.kind,
+          metalTypeId: row.metalTypeId,
+          purityLabel: row.purityLabel,
+          purity: row.purity,
+          grossWeight: num(row.grossWeight),
+          netWeight: num(row.netWeight),
+          stoneMetalTypeName: row.stoneMetalTypeName,
+          stoneTypeNames: row.stoneTypeNames,
+          caratWeight: num(row.caratWeight),
+          stoneWeight: num(row.stoneWeight),
+          rate: sent?.rate ?? null,
+          amount: row.kind === "STONE" ? sent?.amount ?? null : null,
+          gstRateId: sent?.gstRateId ?? row.gstRateId,
+        };
+      });
+    }
+    const label = `"${item.itemName || "a line item"}"`;
+    if (!rows.some((row) => row.kind === "METAL")) {
+      return { error: `${label} needs at least one metal — quote loose stones as their own line.` };
+    }
+    const piece = resolvePiece(rows, label);
+    if ("error" in piece) return piece;
+    if (!(piece.metalValue + piece.stoneValue > 0)) {
+      return { error: `Enter the rates for the metals and stones of ${label}.` };
+    }
+    const quantity = toNumber(item.quantity, 1) || 1;
+    const summary = piece.summary;
+    out.push({
+      ...item,
+      piece,
+      metalTypeId: summary.metalTypeId,
+      purity: summary.purity,
+      purityLabel: summary.purityLabel,
+      grossWeight: summary.grossWeight,
+      netWeight: summary.netWeight,
+      caratWeight: summary.caratWeight,
+      stoneWeight: summary.stoneWeight,
+      stoneCharge: Math.round(piece.stoneValue * quantity * 100) / 100,
+      stoneRate: null,
+      stoneMetalTypeName: summary.stoneMetalTypeName,
+      stoneTypeNames: summary.stoneTypeNames,
+      rate: null,
+    });
+  }
+  return out;
+}
+
 function lineTotal(item: QuotationLineItemInput) {
-  const metalValue = toNumber(item.rate) * lineQuantity(item);
+  const metalValue = lineMetalValue(item);
   return (
     metalValue + toNumber(item.makingCharge) + toNumber(item.hmCharge) + toNumber(item.stoneCharge)
   );
@@ -277,6 +392,9 @@ function mapQuotation(quotation: any) {
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
       vendorName: item.vendorName ?? null,
+      // A piece made of several metals/stones — see lib/piece-components.ts.
+      // Only populated when the query included them (getQuotationById).
+      components: item.components ? serializeStoredComponents(item.components) : [],
     })),
   };
 }
@@ -473,7 +591,11 @@ export async function getQuotationById(id: string) {
           pincode: true,
         },
       },
-      items: true,
+      items: {
+        include: {
+          components: { include: { metalType: { select: { name: true } } }, orderBy: { sortOrder: "asc" } },
+        },
+      },
       convertedTo: { select: { id: true, invoiceNumber: true } },
     },
   });
@@ -523,6 +645,7 @@ export async function getQuotationFormStockItems() {
         },
       },
       metalType: { select: { id: true, name: true } },
+      components: true,
     },
   });
 
@@ -550,6 +673,8 @@ export async function getQuotationFormStockItems() {
         ? Number(stock.product.stoneOriginOption.sellingPrice)
         : null,
     ...toStockOptionProductDetails(stock.product),
+    // A piece made of several metals/stones — see lib/piece-components.ts.
+    components: serializeStoredComponents(stock.components),
   }));
 }
 
@@ -609,6 +734,9 @@ export async function createQuotation(
     );
 
     items = await lockLinkedStockFields(storeId, items, explicitStockIds);
+    const pieceLines = await resolvePieceLines(storeId, items);
+    if ("error" in pieceLines) return { success: false, message: pieceLines.error };
+    items = pieceLines;
 
     const discount = toNumber(formData.get("discount"));
     const taxAmount = toNumber(formData.get("taxAmount"));
@@ -625,7 +753,7 @@ export async function createQuotation(
     const notes = String(formData.get("notes") || "").trim() || null;
 
     const subtotal = items.reduce(
-      (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
+      (sum, item) => sum + lineMetalValue(item),
       0,
     );
     // Hallmarking charge folds into the quotation's Making Charges total —
@@ -740,7 +868,8 @@ export async function createQuotation(
             quantity: item.quantity || 1,
             grossWeight: item.grossWeight ?? undefined,
             netWeight: item.netWeight ?? undefined,
-            fineWeight: fineOf(item) ?? undefined,
+            fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
+            components: item.piece ? { create: pieceComponentCreates(item.piece.components) } : undefined,
             stoneWeight: item.stoneWeight ?? undefined,
             caratWeight: item.caratWeight ?? undefined,
             rate: item.rate ?? undefined,
@@ -921,7 +1050,10 @@ export async function convertQuotationToInvoice(
 
     const quotation = await prisma.quotation.findFirst({
       where: { id: quotationId, storeId },
-      include: { items: true, customer: { select: { state: true } } },
+      include: {
+        items: { include: { components: { orderBy: { sortOrder: "asc" } } } },
+        customer: { select: { state: true } },
+      },
     });
 
     if (!quotation) {
@@ -976,9 +1108,34 @@ export async function convertQuotationToInvoice(
       Number(item.hmCharge) +
       Number(item.stoneCharge);
 
-    const itemGst = quotation.items.map((item) =>
-      computeGst(itemTaxableValue(item), gstRatePercent, gstScheme, storeState, customerState),
-    );
+    // A multi-part piece (several metals/stones, PieceComponent rows) is
+    // taxed row by row at each row's own snapshotted GST rate (falling back
+    // to the document rate), with its making/HM at the document rate — the
+    // same split invoice-form.tsx's lineGst applies. Row amounts are per
+    // piece, so quantity multiplies them.
+    const round2 = (value: number) => Math.round(value * 100) / 100;
+    const itemGst = quotation.items.map((item) => {
+      if (!item.components.length) {
+        return computeGst(itemTaxableValue(item), gstRatePercent, gstScheme, storeState, customerState);
+      }
+      const quantity = item.quantity || 1;
+      const parts = [
+        ...item.components.map((row) => ({
+          taxable: Number(row.amount) * quantity,
+          percent: row.gstRatePercent != null ? Number(row.gstRatePercent) : gstRatePercent,
+        })),
+        { taxable: Number(item.makingCharge) + Number(item.hmCharge), percent: gstRatePercent },
+      ];
+      const sum = { sgst: 0, cgst: 0, igst: 0 };
+      for (const part of parts) {
+        if (!(part.taxable > 0)) continue;
+        const gst = computeGst(part.taxable, part.percent, gstScheme, storeState, customerState);
+        sum.sgst += round2(gst.sgst);
+        sum.cgst += round2(gst.cgst);
+        sum.igst += round2(gst.igst);
+      }
+      return { sgst: round2(sum.sgst), cgst: round2(sum.cgst), igst: round2(sum.igst) };
+    });
     const taxAmount = itemGst.reduce((sum, g) => sum + g.sgst + g.cgst + g.igst, 0);
 
     const subtotal = Number(quotation.subtotal);
@@ -1055,6 +1212,30 @@ export async function convertQuotationToInvoice(
               hmCharge: item.hmCharge,
               lineTotal: item.lineTotal,
               inventoryStockId: item.inventoryStockId ?? undefined,
+              // The piece's metal/stone rows travel with it onto the invoice.
+              components: item.components.length
+                ? {
+                    create: item.components.map((row) => ({
+                      kind: row.kind,
+                      sortOrder: row.sortOrder,
+                      metalTypeId: row.metalTypeId,
+                      purity: row.purity,
+                      purityLabel: row.purityLabel,
+                      grossWeight: row.grossWeight,
+                      netWeight: row.netWeight,
+                      fineWeight: row.fineWeight,
+                      stoneMetalTypeName: row.stoneMetalTypeName,
+                      stoneTypeNames: row.stoneTypeNames,
+                      caratWeight: row.caratWeight,
+                      stoneWeight: row.stoneWeight,
+                      rate: row.rate,
+                      amount: row.amount,
+                      gstRateId: row.gstRateId,
+                      gstRateName: row.gstRateName,
+                      gstRatePercent: row.gstRatePercent,
+                    })),
+                  }
+                : undefined,
               sgstAmount: itemGst[index].sgst,
               cgstAmount: itemGst[index].cgst,
               igstAmount: itemGst[index].igst,

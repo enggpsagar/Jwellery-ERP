@@ -9,6 +9,8 @@ import { getSupplierOptions } from "@/lib/actions/customer-actions"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
+import { getFinenessMap } from "@/lib/purity"
+import { requireStoreScope } from "@/lib/store-context"
 
 import { KachaInvoiceForm } from "@/components/billing/kacha/kacha-invoice-form"
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
@@ -18,7 +20,7 @@ export const metadata: Metadata = {
 }
 
 export default async function NewKachaInvoicePage() {
-  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates] =
+  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, enumFineness] =
     await Promise.all([
       getKachaInvoiceFormCustomers(),
       getKachaInvoiceFormStockItems(),
@@ -29,6 +31,7 @@ export default async function NewKachaInvoicePage() {
       getStoreMetals(),
       getAllStoreMetalOrigins(),
       getCaratConversionRateMap(),
+      requireStoreScope().then(getFinenessMap),
     ])
 
   return (
@@ -52,6 +55,7 @@ export default async function NewKachaInvoicePage() {
           origins={origins}
           caratConversionRates={caratConversionRates}
           hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
+          enumFineness={enumFineness}
           initialLocationId={defaultLocationId}
         />
       </ResetFormWrapper>

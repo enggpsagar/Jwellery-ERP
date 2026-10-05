@@ -112,6 +112,29 @@ test("a sale line of gold + silver + diamond prices and taxes each part on its o
   expect(line!.inventoryStock?.components).toHaveLength(3)
   expect(line!.inventoryStock?.product.metalComponents).toHaveLength(2)
   expect(line!.inventoryStock?.product.stoneComponents).toHaveLength(1)
+
+  // Printed rate-wise GST summary: the diamond's tax sits in its own 1.5%
+  // group (SGST/CGST @0.75%), the metals' in the 3% group.
+  const invoiceUrl = page.url()
+  await page.goto(`${invoiceUrl}/print`)
+  await expect(page.getByText("SGST@0.75%").first()).toBeVisible()
+  await expect(page.getByText("SGST@1.50%").first()).toBeVisible()
+
+  // Quick edit: gold's rate 6,800 → 7,000; weights stay, each row re-taxed.
+  await page.goto(invoiceUrl)
+  await page.getByRole("button", { name: `Edit rate/weight for ${itemName}` }).click()
+  await page.getByLabel(/^Rate for Gold 22K/).fill("7000")
+  await page.getByRole("button", { name: "Save" }).click()
+  await expect(page.getByText("Line item updated")).toBeVisible()
+  const edited = await db().invoiceItem.findUnique({
+    where: { id: line!.id },
+    include: { components: { orderBy: { sortOrder: "asc" } }, invoice: true },
+  })
+  expect(Number(edited!.components[0].amount)).toBeCloseTo(57400, 2)
+  // 3% on 57,400 + 270 = 1,730.10; 1.5% on 24,000 = 360.
+  expect(Number(edited!.sgstAmount) + Number(edited!.cgstAmount)).toBeCloseTo(2090.1, 2)
+  expect(Number(edited!.lineTotal)).toBeCloseTo(83760.1, 2)
+  expect(Number(edited!.invoice.subtotal)).toBeCloseTo(57670, 2)
   expect(crashes).toEqual([])
 })
 
@@ -210,5 +233,91 @@ test("a purchase line can be one piece of gold + silver + diamond", async ({ pag
   expect(Number(silverPart?.fineWeight)).toBeCloseTo(1.85, 4)
   expect(Number(item!.fineWeight)).toBeCloseTo(4.58, 4)
   expect(item!.inventoryStock?.components).toHaveLength(3)
+  expect(crashes).toEqual([])
+})
+
+/** A hand-typed Kacha / Quotation line of gold + silver + diamond. */
+async function fillSlipPiece(page: Page, prefix: string, itemName: string) {
+  await pick(page, page.getByRole("combobox").filter({ hasText: "Select a party" }), /Ananya Kulkarni/)
+  await page
+    .locator("div.space-y-1")
+    .filter({ has: page.getByText("Item Name", { exact: true }) })
+    .locator("input")
+    .first()
+    .fill(itemName)
+  await pick(page, page.getByRole("combobox").filter({ hasText: "Not recorded" }), /Chandra Bullion Suppliers/)
+  await page.getByTestId("multi-part-question").click()
+  await fillMetalRow(page, prefix, 0, "Gold", /^22K/, "4", "7000")
+  await fillMetalRow(page, prefix, 1, "Silver", /^925/, "2", "100")
+  await pick(page, page.getByTestId(`${prefix}-stone`).first(), "Diamond")
+  await page.getByTestId(`${prefix}-carat`).first().fill("0.1")
+  await page.getByTestId(`${prefix}-stone-rate`).first().fill("50000")
+}
+
+test("a Kacha slip line can be gold + silver + diamond, and keeps its rows on conversion", async ({ page }) => {
+  const crashes = watchForPageCrash(page)
+  const { storeId } = await setUpPurities()
+  const itemName = `E2E Multi Kacha ${Date.now()}`
+
+  await page.goto("/billing/kacha/new")
+  await fillSlipPiece(page, "kacha-piece", itemName)
+  await page.getByRole("button", { name: "Create Estimate" }).click()
+  await page.waitForURL(/\/billing\/kacha\/(?!new)[^/]+$/)
+  await expect(page.getByText(/Silver 925 · 2\.000 g/)).toBeVisible()
+
+  const slipItem = await db().kachaInvoiceItem.findFirst({
+    where: { itemName, kachaInvoice: { storeId } },
+    include: { components: true },
+  })
+  expect(slipItem!.components.map((c) => c.kind).sort()).toEqual(["METAL", "METAL", "STONE"])
+  // 4 × 7,000 + 2 × 100 + 0.1 × 50,000 = 28,000 + 200 + 5,000.
+  expect(Number(slipItem!.lineTotal)).toBeCloseTo(33200, 2)
+  expect(Number(slipItem!.fineWeight)).toBeCloseTo(3.664, 4)
+
+  await page.goto(`${page.url()}/convert`)
+  await page.getByRole("button", { name: "Convert to Tax Invoice" }).click()
+  // Lands on the new invoice; its line has the piece's rows copied across.
+  await page.waitForURL(/\/billing\/(?!kacha)[^/]+$/)
+  await expect
+    .poll(async () => db().invoiceItem.count({ where: { itemName, invoice: { storeId } } }), { timeout: 15000 })
+    .toBe(1)
+  const invoiceItem = await db().invoiceItem.findFirst({
+    where: { itemName, invoice: { storeId } },
+    include: { components: true },
+  })
+  expect(invoiceItem!.components).toHaveLength(3)
+  expect(crashes).toEqual([])
+})
+
+test("a Quotation line can be gold + silver + diamond, and keeps its rows on conversion", async ({ page }) => {
+  const crashes = watchForPageCrash(page)
+  const { storeId } = await setUpPurities()
+  const itemName = `E2E Multi Quote ${Date.now()}`
+
+  await page.goto("/quotations/new")
+  await fillSlipPiece(page, "quotation-piece", itemName)
+  await page.getByRole("button", { name: "Create Quotation" }).click()
+  await page.waitForURL(/\/quotations\/(?!new)[^/]+$/)
+  await expect(page.getByText(/Silver 925 · 2\.000 g/)).toBeVisible()
+
+  const quoteItem = await db().quotationItem.findFirst({
+    where: { itemName, quotation: { storeId } },
+    include: { components: true },
+  })
+  expect(quoteItem!.components.map((c) => c.kind).sort()).toEqual(["METAL", "METAL", "STONE"])
+  expect(Number(quoteItem!.fineWeight)).toBeCloseTo(3.664, 4)
+
+  await page.goto(`${page.url()}/convert`)
+  await page.getByRole("button", { name: "Convert to Invoice" }).click()
+  // Lands on the new invoice; its line has the piece's rows copied across.
+  await page.waitForURL(/\/billing\/(?!kacha)[^/]+$/)
+  await expect
+    .poll(async () => db().invoiceItem.count({ where: { itemName, invoice: { storeId } } }), { timeout: 15000 })
+    .toBe(1)
+  const invoiceItem = await db().invoiceItem.findFirst({
+    where: { itemName, invoice: { storeId } },
+    include: { components: true },
+  })
+  expect(invoiceItem!.components).toHaveLength(3)
   expect(crashes).toEqual([])
 })

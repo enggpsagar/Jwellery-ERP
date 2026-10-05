@@ -90,7 +90,7 @@ export function InvoicePrintThermal({ invoice, settings }: InvoicePrintThermalPr
               <PieceBreakdown components={item.components} className="mt-0.5 space-y-0 text-[10px] font-normal leading-snug text-gray-600" />
               <div className="flex justify-between">
                 <span>
-                  {unit === "Pcs" ? qty : qty.toFixed(3)} {unit} x ₹{fmt(Number(item.rate ?? 0))}
+                  {unit === "Pcs" ? qty : qty.toFixed(3)} {unit} x {item.components?.length ? "rate per row" : <>₹{fmt(Number(item.rate ?? 0))}</>}
                 </span>
                 <span>₹{fmt(item.lineTotal)}</span>
               </div>

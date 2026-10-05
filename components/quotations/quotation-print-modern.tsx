@@ -5,6 +5,7 @@ import { COMPOSITION_DISCLAIMER } from "@/lib/gst"
 import type { Quotation } from "@/lib/actions/quotation-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { APP_NAME } from "@/lib/constants/app"
+import { PieceBreakdown } from "@/components/billing/piece-breakdown"
 
 type QuotationPrintModernProps = {
   quotation: Quotation
@@ -226,7 +227,10 @@ export function QuotationPrintModern({ quotation, settings }: QuotationPrintMode
                       className="align-top odd:bg-white even:bg-indigo-50/40 [&>td]:px-3 [&>td]:py-2.5"
                     >
                       <td>{index + 1}</td>
-                      <td className="font-medium">{item.itemName}</td>
+                      <td className="font-medium">
+                        {item.itemName}
+                        <PieceBreakdown components={item.components} className="mt-0.5 space-y-0 text-[10px] font-normal leading-snug text-gray-600" />
+                      </td>
                       <td className="text-right whitespace-nowrap">{unit === "Pcs" ? qty : qty.toFixed(3)}</td>
                       <td>{unit}</td>
                       <td className="text-right whitespace-nowrap">₹{fmt(pricePerUnit)}</td>

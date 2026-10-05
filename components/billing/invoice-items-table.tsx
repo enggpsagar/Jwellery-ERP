@@ -59,6 +59,15 @@ function InvoiceItemRowView({
 
   const [rateInput, setRateInput] = useState(item.rate ? String(item.rate) : "")
   const [weightInput, setWeightInput] = useState(quantity != null ? String(quantity) : "")
+  // A piece of several metals/stones: one rate per row (and a stone's
+  // value); weights stay as recorded — see updatePieceLineItem.
+  const pieceRows = item.components ?? []
+  const isPiece = pieceRows.length > 0
+  const pieceInputsFrom = () =>
+    Object.fromEntries(
+      pieceRows.map((row) => [row.id ?? "", { rate: row.rate != null ? String(row.rate) : "", amount: String(row.amount ?? "") }]),
+    )
+  const [pieceInputs, setPieceInputs] = useState<Record<string, { rate: string; amount: string }>>(pieceInputsFrom)
 
   const action = updateInvoiceLineItem.bind(null, invoiceId, item.id)
   const [state, formAction, pending] = useActionState(action, initialState)
@@ -66,13 +75,33 @@ function InvoiceItemRowView({
   const startEditing = () => {
     setRateInput(item.rate ? String(item.rate) : "")
     setWeightInput(quantity != null ? String(quantity) : "")
+    setPieceInputs(pieceInputsFrom())
     setEditing(true)
   }
 
   const handleSave = () => {
     const formData = new FormData()
-    formData.set("rate", rateInput)
-    formData.set("weight", weightInput)
+    if (isPiece) {
+      formData.set(
+        "componentsJson",
+        JSON.stringify(
+          pieceRows.map((row) => {
+            const input = pieceInputs[row.id ?? ""]
+            const rate = input?.rate.trim() ? Number(input.rate) : null
+            // A stone's value is sent only when it was changed by hand;
+            // otherwise the server re-derives it from carats × rate.
+            const typedAmount =
+              row.kind === "STONE" && input && input.amount.trim() && Number(input.amount) !== row.amount
+                ? Number(input.amount)
+                : null
+            return { id: row.id, rate, amount: typedAmount }
+          }),
+        ),
+      )
+    } else {
+      formData.set("rate", rateInput)
+      formData.set("weight", weightInput)
+    }
     formAction(formData)
   }
 
@@ -126,9 +155,6 @@ function InvoiceItemRowView({
         <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
         {canEdit && (
           <td className="px-4 py-3 text-right">
-            {/* A piece of several metals has no single rate/weight — it's
-                changed from Edit Invoice instead. */}
-            {item.components?.length ? null : (
             <Button
               type="button"
               variant="ghost"
@@ -139,7 +165,6 @@ function InvoiceItemRowView({
             >
               <Pencil className="h-4 w-4" />
             </Button>
-            )}
           </td>
         )}
       </tr>
@@ -150,7 +175,48 @@ function InvoiceItemRowView({
     <tr className="border-b bg-accent/30 last:border-0">
       <td className="px-4 py-3">
         {item.itemName}
-        {item.stoneMetalTypeName ? (
+        {isPiece ? (
+          <div className="mt-2 space-y-1.5" data-testid="piece-quick-edit">
+            {pieceRows.map((row) => {
+              const key = row.id ?? ""
+              const input = pieceInputs[key] ?? { rate: "", amount: "" }
+              const label =
+                row.kind === "METAL"
+                  ? `${[row.metalName, row.purityLabel].filter(Boolean).join(" ") || "Metal"} · ${(row.netWeight ?? 0).toFixed(3)} g`
+                  : `${row.stoneMetalTypeName ?? "Stone"} · ${(row.caratWeight ?? 0).toFixed(2)} ct`
+              return (
+                <div key={key} className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="min-w-36 text-muted-foreground">{label}</span>
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    placeholder={row.kind === "METAL" ? "Rate / g" : "Rate / ct"}
+                    aria-label={`Rate for ${label}`}
+                    value={input.rate}
+                    onChange={(event) => setPieceInputs((prev) => ({ ...prev, [key]: { ...input, rate: event.target.value } }))}
+                    className="h-8 w-28"
+                    disabled={pending}
+                  />
+                  {row.kind === "STONE" ? (
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0"
+                      placeholder="Value"
+                      aria-label={`Value for ${label}`}
+                      value={input.amount}
+                      onChange={(event) => setPieceInputs((prev) => ({ ...prev, [key]: { ...input, amount: event.target.value } }))}
+                      className="h-8 w-28"
+                      disabled={pending}
+                    />
+                  ) : null}
+                  {row.gstRatePercent != null ? <span className="text-muted-foreground">GST {row.gstRatePercent}%</span> : null}
+                </div>
+              )
+            })}
+          </div>
+        ) : item.stoneMetalTypeName ? (
           <span className="block text-xs text-muted-foreground">
             Stone: {item.stoneMetalTypeName}
             {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
@@ -158,6 +224,13 @@ function InvoiceItemRowView({
         ) : null}
       </td>
       <td className="px-4 py-3">{item.quantity}</td>
+      {isPiece ? (
+        <>
+          <td className="px-4 py-3 text-xs text-muted-foreground">{(item.netWeight ?? 0).toFixed(3)} g</td>
+          <td className="px-4 py-3 text-xs text-muted-foreground">Per row</td>
+        </>
+      ) : (
+      <>
       <td className="px-4 py-3">
         <Input
           type="number"
@@ -180,6 +253,8 @@ function InvoiceItemRowView({
           disabled={pending}
         />
       </td>
+      </>
+      )}
       {showMaking && (
         <td className="px-4 py-3">{item.makingCharge > 0 ? `₹${item.makingCharge.toFixed(2)}` : "-"}</td>
       )}

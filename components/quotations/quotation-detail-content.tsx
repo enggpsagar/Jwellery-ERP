@@ -4,6 +4,7 @@ import { ArrowRightCircle } from "lucide-react"
 import type { Quotation } from "@/lib/actions/quotation-actions"
 import { formatShortDate } from "@/lib/utils"
 import { QuotationStatusBadge } from "@/components/quotations/quotation-status-badge"
+import { PieceBreakdown } from "@/components/billing/piece-breakdown"
 
 type QuotationItem = Quotation["items"][number]
 
@@ -90,7 +91,9 @@ export function QuotationDetailContent({ quotation }: QuotationDetailContentProp
                   {item.vendorName ? (
                     <span className="block text-xs text-muted-foreground">Purchased from {item.vendorName}</span>
                   ) : null}
-                  {item.stoneMetalTypeName ? (
+                  {item.components?.length ? (
+                    <PieceBreakdown components={item.components} />
+                  ) : item.stoneMetalTypeName ? (
                     <span className="block text-xs text-muted-foreground">
                       Stone: {item.stoneMetalTypeName}
                       {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}

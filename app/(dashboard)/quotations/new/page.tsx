@@ -10,6 +10,8 @@ import { getDefaultLocationId, getStoreLocations } from "@/lib/actions/store-loc
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
+import { getFinenessMap } from "@/lib/purity"
+import { requireStoreScope } from "@/lib/store-context"
 
 import { QuotationForm } from "@/components/quotations/quotation-form"
 import { ResetFormWrapper } from "@/components/shared/reset-form-wrapper"
@@ -19,7 +21,7 @@ export const metadata: Metadata = {
 }
 
 export default async function NewQuotationPage() {
-  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, gstRates] =
+  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, gstRates, enumFineness] =
     await Promise.all([
       getQuotationFormCustomers(),
       getQuotationFormStockItems(),
@@ -31,6 +33,7 @@ export default async function NewQuotationPage() {
       getAllStoreMetalOrigins(),
       getCaratConversionRateMap(),
       getGstRates(),
+      requireStoreScope().then(getFinenessMap),
     ])
 
   return (
@@ -59,6 +62,7 @@ export default async function NewQuotationPage() {
           hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
           gstScheme={businessSettings.gstScheme}
           storeState={businessSettings.state}
+          enumFineness={enumFineness}
         />
       </ResetFormWrapper>
     </main>

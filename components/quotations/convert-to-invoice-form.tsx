@@ -46,6 +46,9 @@ type QuotationSummary = {
     netWeight: number | null
     rate: number | null
     lineTotal: number
+    /** A piece made of several metals/stones — its rows, each with its own
+     * snapshotted GST rate (lib/piece-components.ts). */
+    components?: { amount: number; gstRatePercent?: number | null }[]
   }[]
 }
 
@@ -87,10 +90,25 @@ export function ConvertToInvoiceForm({
       "",
   )
   const activeGstRates = useMemo(() => gstRates.filter((r) => r.isActive), [gstRates])
+  // A multi-part piece's metal/stone rows are taxed at their own GST rate
+  // (falling back to the picked one), everything else at the picked rate —
+  // the same split convertQuotationToInvoice applies. With no multi-part
+  // lines this is exactly the old flat base × rate.
+  const taxAt = (ratePercent: number) => {
+    const round = (value: number) => Math.round(value * 100) / 100
+    let pieceBase = 0
+    let pieceTax = 0
+    for (const item of quotation.items) {
+      for (const row of item.components ?? []) {
+        const taxable = row.amount * (item.quantity || 1)
+        pieceBase += taxable
+        pieceTax += round((taxable * (row.gstRatePercent ?? ratePercent)) / 100)
+      }
+    }
+    return round(((subtotalBeforeTax - pieceBase) * ratePercent) / 100) + round(pieceTax)
+  }
   const initialGstRate = gstRates.find((r) => r.id === gstRateId)
-  const initialTaxAmount = initialGstRate
-    ? Math.round(((subtotalBeforeTax * initialGstRate.ratePercent) / 100) * 100) / 100
-    : defaultTaxAmount
+  const initialTaxAmount = initialGstRate ? taxAt(initialGstRate.ratePercent) : defaultTaxAmount
 
   const [taxAmount, setTaxAmount] = useState(initialTaxAmount)
   const [paidAmount, setPaidAmount] = useState(0)
@@ -104,7 +122,7 @@ export function ConvertToInvoiceForm({
     setGstRateId(id)
     const rate = gstRates.find((r) => r.id === id)
     if (rate) {
-      setTaxAmount(Math.round(((subtotalBeforeTax * rate.ratePercent) / 100) * 100) / 100)
+      setTaxAmount(taxAt(rate.ratePercent))
     }
   }
 

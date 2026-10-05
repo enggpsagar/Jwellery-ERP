@@ -2437,8 +2437,10 @@ export function InvoiceForm({
                     )}
 
                     <MakingChargeInput
-                      rate={item.rate}
-                      netWeight={item.netWeight}
+                      // A multi-part piece has no single rate — % making is
+                      // on its metals' value (value per gram × net weight).
+                      rate={item.multiPart ? (pieceOf(item).metalNet > 0 ? pieceOf(item).metalValue / pieceOf(item).metalNet : 0) : item.rate}
+                      netWeight={item.multiPart ? pieceOf(item).metalNet : item.netWeight}
                       value={item.makingCharge}
                       onChange={(v) => updateItem(item.key, { makingCharge: v })}
                       chargeType={item.makingChargeType}

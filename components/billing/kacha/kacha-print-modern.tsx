@@ -5,6 +5,7 @@ import { amountInWords } from "@/lib/number-to-words"
 import { formatShortDate } from "@/lib/utils"
 import type { KachaInvoice } from "@/lib/actions/kacha-invoice-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
+import { PieceBreakdown } from "@/components/billing/piece-breakdown"
 
 type KachaPrintModernProps = {
   kachaInvoice: KachaInvoice
@@ -184,7 +185,10 @@ export function KachaPrintModern({ kachaInvoice, settings }: KachaPrintModernPro
                         className="align-top odd:bg-white even:bg-indigo-50/40 [&>td]:border-t [&>td]:border-slate-100 [&>td]:px-3 [&>td]:py-2.5"
                       >
                         <td>{index + 1}</td>
-                        <td className="font-medium">{item.itemName}</td>
+                        <td className="font-medium">
+                          {item.itemName}
+                          <PieceBreakdown components={item.components} showGst={false} className="mt-0.5 space-y-0 text-[10px] font-normal leading-snug text-gray-600" />
+                        </td>
                         <td className="text-right whitespace-nowrap">{unit === "Pcs" ? qty : qty.toFixed(3)}</td>
                         <td>{unit}</td>
                         <td className="text-right whitespace-nowrap">₹{fmt(Number(item.rate ?? 0))}</td>

@@ -80,6 +80,8 @@ export type StoredPieceComponent = {
   rate: number | null
   amount: number
   gstRateId: string | null
+  /** The stored row's id (quick per-row rate edit). */
+  id?: string
   /** For display, when the query included the metal / GST snapshot. */
   metalName?: string | null
   gstRatePercent?: number | null

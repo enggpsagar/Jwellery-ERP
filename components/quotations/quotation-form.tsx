@@ -46,6 +46,18 @@ import { StockItemSelect } from "@/components/inventory/shared/stock-item-select
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog"
+import { PieceComponentsEditor } from "@/components/shared/piece-components-editor"
+import { MultiPartQuestion } from "@/components/shared/multi-part-question"
+import {
+  fromStoredComponents,
+  newMetalRow,
+  newStoneRow,
+  pieceGst,
+  pieceTotals,
+  toComponentPayload,
+  type PieceComponentDraft,
+  type StoredPieceComponent,
+} from "@/lib/piece-components"
 
 type CustomerOption = {
   id: string
@@ -75,6 +87,8 @@ type StockOption = {
   // exclusive by StoreMetal.isGemstone).
   storeMetalPurityRate: number | null
   stoneOriginRate: number | null
+  /** A piece made of several metals/stones — its rows (lib/piece-components.ts). */
+  components?: StoredPieceComponent[]
 } & StockOptionProductDetails
 
 type LineItem = {
@@ -119,6 +133,13 @@ type LineItem = {
   /** "Purchased From" — who a hand-typed line's piece came in from.
    * Required on a line with no linked stock (see resolveLineSourceParties). */
   sourcePartyId: string
+  /** A piece made of several metals and stones (Gold + Silver + Diamond…):
+   * its value, weights and GST come from `components`, one row per metal /
+   * stone, each with its own rate and GST rate (lib/piece-components.ts).
+   * The line's own metal/purity/weights are kept in sync from them. Same
+   * as invoice-form.tsx's LineItem. */
+  multiPart: boolean
+  components: PieceComponentDraft[]
 }
 
 // `key` defaults to a fresh UUID for every "Add Item" click (client-only,
@@ -155,6 +176,8 @@ function emptyLineItem(key: string = crypto.randomUUID()): LineItem {
     hmChargeTouched: false,
     inventoryStockId: "",
     sourcePartyId: "",
+    multiPart: false,
+    components: [],
   }
 }
 
@@ -221,6 +244,9 @@ type QuotationFormProps = {
    * the Supplier module is on, every party when it's off. */
   suppliers?: SourcePartyOption[]
   supplierModuleEnabled?: boolean
+  /** Fineness % per legacy purity (getFinenessMap) — the multi-part editor's
+   * pure-weight display. */
+  enumFineness?: Record<string, number>
 }
 
 export function QuotationForm({
@@ -238,6 +264,7 @@ export function QuotationForm({
   storeState,
   suppliers = [],
   supplierModuleEnabled = false,
+  enumFineness = {},
 }: QuotationFormProps) {
   // Every hand-typed line needs its source party — see sourcePartyId.
   const missingSourceParty = (lines: LineItem[]) =>
@@ -526,8 +553,10 @@ export function QuotationForm({
         stock.stoneRate ??
         metalByName.get((stock.stoneMetalTypeName ?? "").toLowerCase())?.sellingPrice ??
         0,
-      hasStoneComponent: stock.stoneRate != null,
-      stoneCharge: stock.stoneRate != null && stock.caratWeight != null
+      // A multi-part piece's stones are rows of their own (components
+      // below), never the single-stone fields.
+      hasStoneComponent: !stock.components?.length && stock.stoneRate != null,
+      stoneCharge: !stock.components?.length && stock.stoneRate != null && stock.caratWeight != null
         ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
         : 0,
       stoneChargeTouched: false,
@@ -542,7 +571,27 @@ export function QuotationForm({
       hmChargeTouched: false,
       makingCharge: stock.defaultMakingCharge ?? 0,
       makingChargeType: stock.defaultMakingChargeType,
+      // A multi-metal / multi-stone piece brings its rows; their physical
+      // facts are locked, rates start from today's selling prices — same as
+      // invoice-form.tsx's applyStockToItem.
+      ...(stock.components?.length
+        ? {
+            multiPart: true,
+            components: fromStoredComponents(stock.components).map((row) =>
+              row.kind === "METAL"
+                ? { ...row, rate: metalById.get(row.metalTypeId)?.sellingPrice ?? row.rate }
+                : {
+                    ...row,
+                    rate: metalByName.get(row.stoneMetalTypeName.toLowerCase())?.sellingPrice ?? row.rate,
+                    amountTouched: false,
+                  },
+            ),
+          }
+        : { multiPart: false, components: [] }),
     })
+    for (const component of stock.components ?? []) {
+      if (component.metalTypeId) ensureMetalPurities(component.metalTypeId)
+    }
   }
 
   const removeItem = (key: string) => {
@@ -650,11 +699,19 @@ export function QuotationForm({
   const lineQuantity = (item: LineItem) =>
     (item.purity === "DIAMOND" ? item.caratWeight : item.netWeight) * (item.quantity || 1)
 
+  // A multi-part piece is valued row by row (lib/piece-components.ts);
+  // amounts are per piece, so quantity multiplies them.
+  const pieceOf = (item: LineItem) => pieceTotals(item.components, { valuation: "net" })
+  const lineMetalValue = (item: LineItem) =>
+    item.multiPart ? pieceOf(item).metalValue * (item.quantity || 1) : item.rate * lineQuantity(item)
+  const lineStoneValue = (item: LineItem) =>
+    item.multiPart ? pieceOf(item).stoneValue * (item.quantity || 1) : item.stoneCharge
+
   const lineTotal = (item: LineItem) =>
-    item.rate * lineQuantity(item) + item.makingCharge + item.hmCharge + item.stoneCharge
+    lineMetalValue(item) + item.makingCharge + item.hmCharge + lineStoneValue(item)
 
   const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.rate * lineQuantity(item), 0),
+    () => items.reduce((sum, item) => sum + lineMetalValue(item), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
@@ -665,25 +722,41 @@ export function QuotationForm({
     [items],
   )
   const stoneChargesTotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.stoneCharge, 0),
+    () => items.reduce((sum, item) => sum + lineStoneValue(item), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
 
   // Quotation records tax at the document level, not per line (see
   // Quotation's own schema comment) — one computeGst() call against the
   // whole taxable base, scheme- and inter-state-aware just like Invoice.
+  //
+  // A multi-part piece's metal/stone rows are the exception: each is taxed
+  // at its own GST rate (falling back to the document's), so they come out
+  // of the document-rate base and are added row by row — its making/HM
+  // stays in the base, same split as invoice-form.tsx's lineGst. With no
+  // multi-part line this is exactly the single computeGst() call above.
+  const hasMultiPart = items.some((item) => item.multiPart)
   const taxableValue = subtotal + makingChargesTotal + stoneChargesTotal - discount
   const gstBreakdown = useMemo(() => {
-    const breakdown = computeGst(taxableValue, gstRate, gstScheme, storeState, selectedCustomer?.state)
     const round = (value: number) => Math.round(value * 100) / 100
+    const pieceLines = items.filter((item) => item.multiPart)
+    const pieceBase = pieceLines.reduce((sum, item) => sum + lineMetalValue(item) + lineStoneValue(item), 0)
+    const breakdown = computeGst(taxableValue - pieceBase, gstRate, gstScheme, storeState, selectedCustomer?.state)
+    const split = (taxable: number, percent: number) =>
+      computeGst(taxable, gstScheme === "COMPOSITION" ? 0 : percent, gstScheme, storeState, selectedCustomer?.state)
+    const rateOf = (id: string) => gstRates.find((r) => r.id === id)?.ratePercent ?? gstRate
+    const parts = pieceLines.map((item) =>
+      pieceGst(item.components, { valuation: "net" }, item.quantity || 1, rateOf, split),
+    )
     return {
-      sgst: round(breakdown.sgst),
-      cgst: round(breakdown.cgst),
-      igst: round(breakdown.igst),
+      sgst: round(round(breakdown.sgst) + parts.reduce((sum, part) => sum + part.sgst, 0)),
+      cgst: round(round(breakdown.cgst) + parts.reduce((sum, part) => sum + part.cgst, 0)),
+      igst: round(round(breakdown.igst) + parts.reduce((sum, part) => sum + part.igst, 0)),
       isInterState: breakdown.isInterState,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taxableValue, gstRate, gstScheme, storeState, selectedCustomer?.state])
+  }, [items, taxableValue, gstRate, gstRates, gstScheme, storeState, selectedCustomer?.state])
   const taxAmount = gstBreakdown.sgst + gstBreakdown.cgst + gstBreakdown.igst
 
   const rawTotal =
@@ -724,9 +797,15 @@ export function QuotationForm({
         hmCharge: item.hmCharge,
         inventoryStockId: item.inventoryStockId || null,
         vendorId: item.inventoryStockId ? null : item.sourcePartyId || null,
+        multiPart: item.multiPart && item.components.length > 0,
+        components: item.multiPart ? toComponentPayload(item.components, { valuation: "net" }) : [],
       }
     }),
   )
+
+  // A multi-part line is only quotable once its rows carry a value — the
+  // server refuses a ₹0 piece (resolvePieceLines in quotation-actions.ts).
+  const hasUnpricedPiece = items.some((item) => item.multiPart && !(pieceOf(item).total > 0))
 
   return (
     <form
@@ -812,6 +891,56 @@ export function QuotationForm({
             // same as Invoice already does — see isLinked there.
             const isLinked = Boolean(item.inventoryStockId)
             const linkedStock = isLinked ? stockItems.find((s) => s.id === item.inventoryStockId) : undefined
+            // Multi-part piece: rows drive the line's own metal/purity/weights
+            // (first metal; combined net) — same as invoice-form.tsx.
+            const setComponents = (rows: PieceComponentDraft[]) => {
+              const firstMetal = rows.find((row) => row.kind === "METAL")
+              const totals = pieceTotals(rows, { valuation: "net" })
+              updateItem(item.key, {
+                components: rows,
+                metalTypeId: firstMetal?.kind === "METAL" ? firstMetal.metalTypeId : "",
+                purity: firstMetal?.kind === "METAL" ? firstMetal.purity : "",
+                purityLabel: firstMetal?.kind === "METAL" ? firstMetal.purityLabel : "",
+                netWeight: totals.metalNet,
+                grossWeight: totals.metalGross + totals.stoneGrams || totals.metalNet,
+              })
+            }
+            const setMultiPart = (on: boolean) => {
+              if (!on) {
+                updateItem(item.key, { multiPart: false, components: [] })
+                return
+              }
+              const metalRow = { ...newMetalRow(item.rate, gstRateId), metalTypeId: item.metalTypeId, purity: item.purity, purityLabel: item.purityLabel, grossWeight: item.grossWeight, netWeight: item.netWeight }
+              const rows: PieceComponentDraft[] = [metalRow, newMetalRow(0, gstRateId), newStoneRow(gstRateId)]
+              updateItem(item.key, {
+                multiPart: true,
+                hasStoneComponent: false,
+                stoneCharge: 0,
+                stoneChargeTouched: false,
+                stoneWeightInput: 0,
+                netStoneWeightTouched: false,
+              })
+              setComponents(rows)
+            }
+            const piecesEditor = (
+              <div className="rounded-md border border-amber-300 bg-amber-50/60 p-2.5">
+                <PieceComponentsEditor
+                  rows={item.components}
+                  onRowsChange={setComponents}
+                  metals={metals}
+                  origins={origins}
+                  puritiesByMetal={metalPuritiesCache}
+                  ensurePurities={ensureMetalPurities}
+                  enumFineness={enumFineness}
+                  valuation="net"
+                  gstRates={gstScheme === "COMPOSITION" ? undefined : gstRates}
+                  defaultGstRateId={gstRateId}
+                  rateForMetal={(metal) => metal.sellingPrice ?? 0}
+                  lockPhysical={isLinked}
+                  testIdPrefix="quotation-piece"
+                />
+              </div>
+            )
             return (
             <div key={item.key} className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -895,7 +1024,15 @@ export function QuotationForm({
                 </div>
               )}
 
+              {/* "Made of more than one metal or stone?" — a hand-typed line
+                  only; a picked stock piece made of several comes in with
+                  its rows already (physical facts locked). */}
+              {!isLinked && <MultiPartQuestion checked={item.multiPart} onChange={setMultiPart} />}
+              {item.multiPart && piecesEditor}
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {!item.multiPart && (
+                <>
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Metal Type</Label>
                   <div className="flex gap-1.5">
@@ -967,7 +1104,18 @@ export function QuotationForm({
                     </Button>
                   </div>
                 </div>
+                </>
+                )}
 
+                {item.multiPart ? (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Net Weight</Label>
+                    <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm" data-testid="quotation-line-net">
+                      {pieceOf(item).metalNet.toFixed(3)} g
+                    </div>
+                    <p className="text-xs text-muted-foreground">All metals</p>
+                  </div>
+                ) : (
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Net Weight</Label>
                   <div className="flex gap-1">
@@ -1003,6 +1151,7 @@ export function QuotationForm({
                     </Select>
                   </div>
                 </div>
+                )}
 
                 {/* For a carat-weighed line (no "Includes a Stone" toggle
                     applies there at all — see below), Net Stone Weight has
@@ -1011,7 +1160,7 @@ export function QuotationForm({
                     Stone" is checked, inside that toggle's own box below —
                     while off, it stays fully hidden (not shown here) rather
                     than relocated, per the toggle's on/off gating. */}
-                {isCaratLine(item) && (
+                {!item.multiPart && isCaratLine(item) && (
                   <div className="space-y-1">
                     <Label className="text-xs">Net Stone Weight</Label>
                     <div className="flex gap-1">
@@ -1051,7 +1200,7 @@ export function QuotationForm({
                   </div>
                 )}
 
-                {isCaratLine(item) && (
+                {!item.multiPart && isCaratLine(item) && (
                   <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Carat Weight (ct)</Label>
                     <Input
@@ -1070,6 +1219,15 @@ export function QuotationForm({
                   </div>
                 )}
 
+                {item.multiPart ? (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Rate / g</Label>
+                    <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-xs text-muted-foreground">Per metal</div>
+                    {!(pieceOf(item).total > 0) && (
+                      <p className="text-xs text-destructive">Add rates to the metals/stones</p>
+                    )}
+                  </div>
+                ) : (
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Rate / g</Label>
                   <Input
@@ -1081,10 +1239,13 @@ export function QuotationForm({
                     }
                   />
                 </div>
+                )}
 
                 <MakingChargeInput
-                  rate={item.rate}
-                  netWeight={item.netWeight}
+                  // A multi-part piece has no single rate — % making is on
+                  // its metals' value (value per gram × net weight).
+                  rate={item.multiPart ? (pieceOf(item).metalNet > 0 ? pieceOf(item).metalValue / pieceOf(item).metalNet : 0) : item.rate}
+                  netWeight={item.multiPart ? pieceOf(item).metalNet : item.netWeight}
                   value={item.makingCharge}
                   onChange={(v) => updateItem(item.key, { makingCharge: v })}
                   chargeType={item.makingChargeType}
@@ -1097,7 +1258,7 @@ export function QuotationForm({
                     "Includes a Stone" is checked, inside that toggle's own
                     box below — while off, no stone means nothing to charge
                     for, so it stays fully hidden here. */}
-                {isCaratLine(item) && (
+                {!item.multiPart && isCaratLine(item) && (
                   <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Stone Charge</Label>
                     <Input
@@ -1132,7 +1293,7 @@ export function QuotationForm({
                   Diamond/Stone — kept as its own toggled strip rather than
                   wedged into the grid above, so a plain Gold line's fields
                   don't reflow every time this gets checked/unchecked. */}
-              {!isCaratLine(item) && (!isLinked || item.hasStoneComponent) && (
+              {!item.multiPart && !isCaratLine(item) && (!isLinked || item.hasStoneComponent) && (
                 <div
                   className={cn(
                     "flex flex-col gap-3 rounded-md border border-dashed p-3 transition-colors",
@@ -1255,7 +1416,7 @@ export function QuotationForm({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {gstBreakdown.isInterState ? (
             <div className="space-y-2">
-              <Label className="text-xs">IGST ({gstRate.toFixed(2)}%)</Label>
+              <Label className="text-xs">IGST{hasMultiPart ? "" : ` (${gstRate.toFixed(2)}%)`}</Label>
               <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
                 ₹{gstBreakdown.igst.toFixed(2)}
               </div>
@@ -1263,13 +1424,13 @@ export function QuotationForm({
           ) : (
             <>
               <div className="space-y-2">
-                <Label className="text-xs">SGST ({(gstRate / 2).toFixed(2)}%)</Label>
+                <Label className="text-xs">SGST{hasMultiPart ? "" : ` (${(gstRate / 2).toFixed(2)}%)`}</Label>
                 <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
                   ₹{gstBreakdown.sgst.toFixed(2)}
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs">CGST ({(gstRate / 2).toFixed(2)}%)</Label>
+                <Label className="text-xs">CGST{hasMultiPart ? "" : ` (${(gstRate / 2).toFixed(2)}%)`}</Label>
                 <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
                   ₹{gstBreakdown.cgst.toFixed(2)}
                 </div>
@@ -1320,7 +1481,7 @@ export function QuotationForm({
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={pending || !customerId || missingSourceParty(items)}>
+        <Button type="submit" disabled={pending || !customerId || missingSourceParty(items) || hasUnpricedPiece}>
           {pending ? "Creating..." : "Create Quotation"}
         </Button>
       </div>

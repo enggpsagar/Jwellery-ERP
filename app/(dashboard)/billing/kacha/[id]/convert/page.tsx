@@ -39,8 +39,10 @@ export default async function ConvertKachaToPakkaPage({ params }: Props) {
 
   if (!kachaInvoice) notFound()
 
+  // Already converted (including the refresh right after converting here):
+  // go to the Tax Invoice it became.
   if (kachaInvoice.convertedToId) {
-    redirect(`/billing/kacha/${id}`)
+    redirect(`/billing/${kachaInvoice.convertedToId}`)
   }
 
   return (

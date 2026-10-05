@@ -755,7 +755,7 @@ model Product {
 /// financial number, not just a cosmetic default. Sale, purchase, Customer
 /// Exchange and stock rows carry their own per-metal/per-stone breakdown in
 /// PieceComponent (a multi-part line copies these rows when its product is
-/// picked); Kacha/Quotation lines still stay single-metal/single-stone.
+/// picked) — Kacha slip and Quotation lines too.
 model ProductMetalComponent {
   id                 String            @id @default(cuid())
   productId          String
@@ -1238,6 +1238,7 @@ model KachaInvoiceItem {
   vendorName         String?
   vendor             Customer?       @relation("KachaInvoiceItemVendor", fields: [vendorId], references: [id])
 
+  components         PieceComponent[]
   @@index([kachaInvoiceId])
   @@index([inventoryStockId])
   @@index([vendorId])
@@ -1961,6 +1962,7 @@ model QuotationItem {
   vendorName         String?
   vendor             Customer?       @relation("QuotationItemVendor", fields: [vendorId], references: [id])
 
+  components         PieceComponent[]
   @@index([quotationId])
   @@index([inventoryStockId])
   @@index([vendorId])
@@ -3152,8 +3154,9 @@ enum PieceComponentKind {
 }
 
 /// One metal or stone of a piece made of several (e.g. Gold 22K + Silver
-/// 925 + Diamond in one ornament), on a sale line, a purchase line (incl. a
-/// Customer Exchange item) or a stock row — lib/piece-components.ts. The
+/// 925 + Diamond in one ornament), on a sale line, a Kacha slip or
+/// Quotation line, a purchase line (incl. a Customer Exchange item) or a
+/// stock row — lib/piece-components.ts. The
 /// parent row keeps a summary: metalTypeId/purity = the first metal,
 /// netWeight = all metals' net weight together, stoneCharge = all stones,
 /// and fineWeight = only the first metal's own pure weight (so a reader that
@@ -3192,9 +3195,15 @@ model PieceComponent {
   purchaseItem       PurchaseItem?      @relation(fields: [purchaseItemId], references: [id], onDelete: Cascade)
   inventoryStockId   String?
   inventoryStock     InventoryStock?    @relation(fields: [inventoryStockId], references: [id], onDelete: Cascade)
+  kachaInvoiceItemId String?
+  kachaInvoiceItem   KachaInvoiceItem?  @relation(fields: [kachaInvoiceItemId], references: [id], onDelete: Cascade)
+  quotationItemId    String?
+  quotationItem      QuotationItem?     @relation(fields: [quotationItemId], references: [id], onDelete: Cascade)
   createdAt          DateTime           @default(now())
 
   @@index([invoiceItemId])
+  @@index([kachaInvoiceItemId])
+  @@index([quotationItemId])
   @@index([purchaseItemId])
   @@index([inventoryStockId])
   @@index([metalTypeId])

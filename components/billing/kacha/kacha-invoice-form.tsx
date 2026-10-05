@@ -48,6 +48,17 @@ import { StockItemSelect } from "@/components/inventory/shared/stock-item-select
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog"
+import { PieceComponentsEditor } from "@/components/shared/piece-components-editor"
+import { MultiPartQuestion } from "@/components/shared/multi-part-question"
+import {
+  fromStoredComponents,
+  newMetalRow,
+  newStoneRow,
+  pieceTotals,
+  toComponentPayload,
+  type PieceComponentDraft,
+  type StoredPieceComponent,
+} from "@/lib/piece-components"
 
 type CustomerOption = {
   id: string
@@ -79,6 +90,8 @@ type StockOption = {
   makingCharge: number | null
   makingChargeType: "FIXED" | "PERCENTAGE"
   quantity: number
+  /** A piece made of several metals/stones — its rows (lib/piece-components.ts). */
+  components?: StoredPieceComponent[]
 } & StockOptionProductDetails
 
 type LineItem = {
@@ -128,6 +141,14 @@ type LineItem = {
   /** Once Net Weight is edited directly, the gross/dmo auto-calc stops
    * overwriting it. */
   netTouched: boolean
+  /**
+   * "Made of more than one metal or stone?" — when on, this line is a piece
+   * of several metals/stones (e.g. Gold 22K + Silver 925 + Diamond) and its
+   * value and weights come from `components`, one row per metal / stone,
+   * each with its own rate (lib/piece-components.ts). No GST on a slip.
+   */
+  multiPart: boolean
+  components: PieceComponentDraft[]
 }
 
 // `key` defaults to a fresh UUID for every "Add Item" click (client-only,
@@ -168,6 +189,8 @@ function emptyLineItem(key: string = crypto.randomUUID()): LineItem {
     inventoryStockId: "",
     sourcePartyId: "",
     netTouched: false,
+    multiPart: false,
+    components: [],
   }
 }
 
@@ -220,6 +243,9 @@ type KachaInvoiceFormProps = {
    * the Supplier module is on, every party when it's off. */
   suppliers?: SourcePartyOption[]
   supplierModuleEnabled?: boolean
+  /** Store's per-purity fineness table — the multi-part editor's pure-weight
+   * readout (same prop as invoice-form.tsx's). */
+  enumFineness?: Record<string, number>
 }
 
 export function KachaInvoiceForm({
@@ -233,6 +259,7 @@ export function KachaInvoiceForm({
   initialLocationId,
   suppliers = [],
   supplierModuleEnabled = false,
+  enumFineness = {},
 }: KachaInvoiceFormProps) {
   // Every hand-typed line needs its source party — see sourcePartyId.
   const missingSourceParty = (lines: LineItem[]) =>
@@ -407,7 +434,10 @@ export function KachaInvoiceForm({
 
     if (draft) {
       setCustomerId(newCustomerId || draft.customerId || "")
-      const restoredItems = draft.items && draft.items.length ? draft.items : [emptyLineItem()]
+      // A draft parked before multi-part lines existed has neither field.
+      const restoredItems = draft.items && draft.items.length
+        ? draft.items.map((item) => ({ ...item, multiPart: item.multiPart ?? false, components: item.components ?? [] }))
+        : [emptyLineItem()]
       setItems(restoredItems)
       setLocationId(draft.locationId ?? "")
       setDiscount(draft.discount ?? 0)
@@ -540,7 +570,27 @@ export function KachaInvoiceForm({
       // The linked stock row's own net weight is authoritative — the
       // gross/dmo calc below must not silently recompute over it.
       netTouched: true,
+      // A multi-metal / multi-stone piece brings its rows; their physical
+      // facts are locked, rates start from today's selling prices — same
+      // as invoice-form.tsx's applyStockToItem.
+      ...(stock.components?.length
+        ? {
+            multiPart: true,
+            components: fromStoredComponents(stock.components).map((row) =>
+              row.kind === "METAL"
+                ? { ...row, rate: metalById.get(row.metalTypeId)?.sellingPrice ?? row.rate }
+                : {
+                    ...row,
+                    rate: metalByName.get(row.stoneMetalTypeName.toLowerCase())?.sellingPrice ?? row.rate,
+                    amountTouched: false,
+                  },
+            ),
+          }
+        : { multiPart: false, components: [] }),
     })
+    for (const component of stock.components ?? []) {
+      if (component.metalTypeId) ensureMetalPurities(component.metalTypeId)
+    }
   }
 
   const removeItem = (key: string) => {
@@ -666,11 +716,20 @@ export function KachaInvoiceForm({
   const lineQuantity = (item: LineItem) =>
     (item.purity === "DIAMOND" ? item.caratWeight : item.netWeight) * (item.quantity || 1)
 
+  // A multi-part piece is valued row by row (lib/piece-components.ts);
+  // amounts are per piece, so quantity multiplies them — same as
+  // invoice-form.tsx and createKachaInvoice's lineMetalValue.
+  const pieceOf = (item: LineItem) => pieceTotals(item.components, { valuation: "net" })
+  const lineMetalValue = (item: LineItem) =>
+    item.multiPart ? pieceOf(item).metalValue * (item.quantity || 1) : item.rate * lineQuantity(item)
+  const lineStoneValue = (item: LineItem) =>
+    item.multiPart ? pieceOf(item).stoneValue * (item.quantity || 1) : item.stoneCharge
+
   const lineTotal = (item: LineItem) =>
-    item.rate * lineQuantity(item) + item.makingCharge + item.hmCharge + item.stoneCharge
+    lineMetalValue(item) + item.makingCharge + item.hmCharge + lineStoneValue(item)
 
   const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.rate * lineQuantity(item), 0),
+    () => items.reduce((sum, item) => sum + lineMetalValue(item), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
@@ -681,7 +740,8 @@ export function KachaInvoiceForm({
     [items],
   )
   const stoneChargesTotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.stoneCharge, 0),
+    () => items.reduce((sum, item) => sum + lineStoneValue(item), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
   const rawTotal = subtotal + makingChargesTotal + stoneChargesTotal - discount
@@ -723,9 +783,16 @@ export function KachaInvoiceForm({
         hmCharge: item.hmCharge,
         inventoryStockId: item.inventoryStockId || null,
         vendorId: item.inventoryStockId ? null : item.sourcePartyId || null,
+        multiPart: item.multiPart && item.components.length > 0,
+        components: item.multiPart ? toComponentPayload(item.components, { valuation: "net" }) : [],
       }
     }),
   )
+
+  // A multi-part line needs a value — the server refuses one whose metals
+  // and stones are all unpriced (createKachaInvoice's resolvePieceLines).
+  // Single-metal lines keep their existing (unchecked) behaviour.
+  const hasInvalidPiece = items.some((item) => item.multiPart && !(pieceOf(item).total > 0))
 
   // Zero-amount rows (a split row opened but never filled in) are dropped
   // here — the server's parseOptionalPayments requires any row it does
@@ -819,6 +886,60 @@ export function KachaInvoiceForm({
             // same as Invoice already does — see isLinked there.
             const isLinked = Boolean(item.inventoryStockId)
             const linkedStock = isLinked ? stockItems.find((s) => s.id === item.inventoryStockId) : undefined
+            // Multi-part piece: rows drive the line's own metal/purity/weights
+            // (first metal; combined net) — same as invoice-form.tsx.
+            const setComponents = (rows: PieceComponentDraft[]) => {
+              const firstMetal = rows.find((row) => row.kind === "METAL")
+              const totals = pieceTotals(rows, { valuation: "net" })
+              updateItem(item.key, {
+                components: rows,
+                metalTypeId: firstMetal?.kind === "METAL" ? firstMetal.metalTypeId : "",
+                purity: firstMetal?.kind === "METAL" ? firstMetal.purity : "",
+                purityLabel: firstMetal?.kind === "METAL" ? firstMetal.purityLabel : "",
+                netWeight: totals.metalNet,
+                grossWeight: totals.metalGross + totals.stoneGrams || totals.metalNet,
+                netTouched: true,
+              })
+            }
+            const setMultiPart = (on: boolean) => {
+              if (!on) {
+                updateItem(item.key, { multiPart: false, components: [] })
+                return
+              }
+              const metalRow = { ...newMetalRow(item.rate), metalTypeId: item.metalTypeId, purity: item.purity, purityLabel: item.purityLabel, grossWeight: item.grossWeight, netWeight: item.netWeight }
+              const rows: PieceComponentDraft[] = [metalRow, newMetalRow(0), newStoneRow()]
+              updateItem(item.key, {
+                multiPart: true,
+                hasStoneComponent: false,
+                stoneCharge: 0,
+                stoneChargeTouched: false,
+                stoneWeightInput: 0,
+                netStoneWeightTouched: false,
+                dmoWeight: 0,
+              })
+              setComponents(rows)
+            }
+            // No gstRates — a Kacha slip carries no GST, so the editor hides
+            // its GST picker.
+            const piecesEditor = (
+              <PieceComponentsEditor
+                rows={item.components}
+                onRowsChange={setComponents}
+                metals={metals}
+                origins={origins}
+                puritiesByMetal={metalPuritiesCache}
+                ensurePurities={ensureMetalPurities}
+                enumFineness={enumFineness}
+                valuation="net"
+                rateForMetal={(metal) => metal.sellingPrice ?? 0}
+                lockPhysical={isLinked}
+                testIdPrefix="kacha-piece"
+              />
+            )
+            // Making charge in % mode is a % of the metal value — for a
+            // multi-part piece that's the rows' metal value per gram of metal.
+            const piece = item.multiPart ? pieceOf(item) : null
+            const makingBaseRate = piece ? (piece.metalNet > 0 ? piece.metalValue / piece.metalNet : 0) : item.rate
             return (
             <div key={item.key} className="rounded-lg border p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -912,7 +1033,37 @@ export function KachaInvoiceForm({
                 </div>
               )}
 
+              {/* "Made of more than one metal or stone?" — a hand-typed line
+                  asks; a linked stock piece made of several brings its rows
+                  (physical facts locked, rates editable). */}
+              {!isLinked && <MultiPartQuestion checked={item.multiPart} onChange={setMultiPart} />}
+              {item.multiPart && (
+                <div className="rounded-md border border-amber-300 bg-amber-50/60 p-2.5">{piecesEditor}</div>
+              )}
+
               <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+                {/* A multi-part piece's metal/purity/weights/rates live on its
+                    rows above — only the combined readouts show here. */}
+                {piece ? (
+                <>
+                <div className="space-y-1">
+                  <Label className="text-xs">Net Weight</Label>
+                  <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm" data-testid="kacha-line-net">
+                    {piece.metalNet.toFixed(3)} g
+                  </div>
+                  <p className="text-xs text-muted-foreground">All metals</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Rate / g</Label>
+                  <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-xs text-muted-foreground">Per metal</div>
+                  {!(piece.total > 0) && (
+                    <p className="text-xs text-destructive">Add rates to the metals/stones</p>
+                  )}
+                </div>
+                </>
+                ) : (
+                <>
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Metal Type</Label>
                   <div className="flex gap-1.5">
@@ -1189,6 +1340,8 @@ export function KachaInvoiceForm({
                     }
                   />
                 </div>
+                </>
+                )}
 
               </div>
 
@@ -1196,7 +1349,7 @@ export function KachaInvoiceForm({
                   onto a mostly-empty line of the 6-column grid above. */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <MakingChargeInput
-                  rate={item.rate}
+                  rate={makingBaseRate}
                   netWeight={item.netWeight}
                   value={item.makingCharge}
                   onChange={(v) => updateItem(item.key, { makingCharge: v })}
@@ -1210,7 +1363,7 @@ export function KachaInvoiceForm({
                     "Includes a Stone" is checked, inside that toggle's own
                     box below — while off, no stone means nothing to charge
                     for, so it stays fully hidden here. */}
-                {isCaratLine(item) && (
+                {!item.multiPart && isCaratLine(item) && (
                   <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Stone Charge</Label>
                     <Input
@@ -1245,7 +1398,7 @@ export function KachaInvoiceForm({
                   Diamond/Stone — kept as its own toggled strip rather than
                   wedged into the grid above, so a plain Gold line's fields
                   don't reflow every time this gets checked/unchecked. */}
-              {!isCaratLine(item) && (!isLinked || item.hasStoneComponent) && (
+              {!item.multiPart && !isCaratLine(item) && (!isLinked || item.hasStoneComponent) && (
                 <div
                   className={cn(
                     "flex flex-col gap-3 rounded-md border border-dashed p-3 transition-colors",
@@ -1379,7 +1532,7 @@ export function KachaInvoiceForm({
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={pending || !customerId || paidOverTotal || missingSourceParty(items)}>
+        <Button type="submit" disabled={pending || !customerId || paidOverTotal || missingSourceParty(items) || hasInvalidPiece}>
           {pending ? "Creating..." : "Create Estimate"}
         </Button>
       </div>

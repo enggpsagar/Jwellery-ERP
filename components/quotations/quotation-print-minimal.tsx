@@ -4,6 +4,7 @@ import { COMPOSITION_DISCLAIMER } from "@/lib/gst"
 import type { Quotation } from "@/lib/actions/quotation-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { APP_NAME } from "@/lib/constants/app"
+import { PieceBreakdown } from "@/components/billing/piece-breakdown"
 
 type QuotationPrintMinimalProps = {
   quotation: Quotation
@@ -216,7 +217,10 @@ export function QuotationPrintMinimal({ quotation, settings }: QuotationPrintMin
                 return (
                   <tr key={item.id} className="[&>td]:border [&>td]:border-slate-300 [&>td]:p-2 align-top">
                     <td className="tabular-nums">{index + 1}</td>
-                    <td className="font-medium">{item.itemName}</td>
+                    <td className="font-medium">
+                      {item.itemName}
+                      <PieceBreakdown components={item.components} className="mt-0.5 space-y-0 text-[10px] font-normal leading-snug text-gray-600" />
+                    </td>
                     <td className="text-right tabular-nums whitespace-nowrap">
                       {unit === "Pcs" ? qty : qty.toFixed(3)}
                     </td>

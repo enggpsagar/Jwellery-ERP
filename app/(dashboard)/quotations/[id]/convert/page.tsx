@@ -39,8 +39,10 @@ export default async function ConvertQuotationToInvoicePage({ params }: Props) {
 
   if (!quotation) notFound()
 
+  // Already converted (including the refresh right after converting here):
+  // go to the invoice it became; otherwise back to the quotation.
   if (quotation.status !== "open") {
-    redirect(`/quotations/${id}`)
+    redirect(quotation.convertedToId ? `/billing/${quotation.convertedToId}` : `/quotations/${id}`)
   }
 
   const taxableAmount =

@@ -392,10 +392,27 @@ weight, rate per carat, value, GST).
   those widen their filter to `components: { some: { metalTypeId } }`);
   all-metals totals use `fineOrNet` with `pieceMetalsSelect` selected.
 - **Display**: `PieceBreakdown` under the item on the invoice detail table
-  and all five print templates; purchase detail lists the rows. The inline
-  rate/weight edit is refused for a multi-part line (use Edit Invoice).
-- Not built: Kacha/Quotation multi-part lines; per-row GST isn't split in
-  GSTR/HSN reporting (the line keeps its own rate snapshot).
+  and every invoice / Kacha / Quotation print template (`showGst={false}` on
+  Kacha, which has no GST); purchase detail lists the rows. Thermal prints
+  say "rate per row".
+- **2026-10-05 — Kacha slips and Quotations too** (migration
+  `20261005100000_piece_components_kacha_quotation`: PieceComponent
+  `kachaInvoiceItemId` / `quotationItemId`). Same question + editor; each
+  action file has its own copy of `resolvePieceLines`. Kacha rows carry no
+  GST of their own except a linked stock piece's (kept, hidden on the slip);
+  Kacha→Pakka and Quotation→Invoice copy the rows to the InvoiceItem and tax
+  each at its own rate (fallback: the rate picked on the convert form),
+  making/HM at that rate. Converted slips/quotes' convert pages redirect to
+  the new invoice.
+- **Printed rate-wise GST summary** (`gstRateGroups`, `lib/invoice-gst-summary.ts`,
+  all four A4 invoice templates): a multi-part line's tax is split to each
+  row's own rate, making/HM (+ rounding) to the line's; its per-line GST cell
+  says "(mixed)".
+- **Quick edit** (invoice detail "Edit rate/weight"): a multi-part line edits
+  each row's rate (and a stone's value); weights fixed; `updatePieceLineItem`
+  re-taxes per row and shifts invoice totals by the line's delta.
+- % making charge on a multi-part line is on its metals' value
+  (value per gram × net), on Invoice/Kacha/Quotation.
 
 ### Regression tests (added 2026-09-29)
 

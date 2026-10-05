@@ -2453,7 +2453,7 @@ export async function updateInvoiceLineItem(
     const fineOf = await getFineWeightResolver(storeId);
     const invoice = await prisma.invoice.findFirst({
       where: { id: invoiceId, storeId },
-      include: { items: { include: { components: { select: { id: true } } } } },
+      include: { items: { include: { components: { orderBy: { sortOrder: "asc" } } } } },
     });
     if (!invoice) return { success: false, message: "Invoice not found" };
 
@@ -2466,9 +2466,10 @@ export async function updateInvoiceLineItem(
 
     const item = invoice.items.find((existing) => existing.id === itemId);
     if (!item) return { success: false, message: "Line item not found on this invoice" };
-    // One rate × one weight can't describe a piece of several metals/stones.
+    // A piece of several metals/stones: its rows' rates (and a stone's
+    // value) change instead — weights stay as recorded.
     if (item.components.length) {
-      return { success: false, message: "This piece has several metals or stones — change it from Edit Invoice instead." };
+      return updatePieceLineItem({ storeId, invoice, item, formData });
     }
 
     const rate = toNumber(formData.get("rate"));
@@ -2589,6 +2590,140 @@ export async function updateInvoiceLineItem(
     logger.error("updateInvoiceLineItem error", error);
     return { success: false, message: actionErrorMessage(error, "Failed to update line item") };
   }
+}
+
+/**
+ * Quick edit of a multi-part line (updateInvoiceLineItem): new rate per
+ * metal/stone row (and optionally a stone's value), weights unchanged. Each
+ * row is re-valued and re-taxed at its own GST rate, making/HM at the line's
+ * rate, and the invoice's totals shift by exactly this line's delta — same
+ * convention as the single-rate path above.
+ */
+async function updatePieceLineItem({
+  storeId,
+  invoice,
+  item,
+  formData,
+}: {
+  storeId: string;
+  invoice: Prisma.InvoiceGetPayload<{ include: { items: { include: { components: true } } } }>;
+  item: Prisma.InvoiceItemGetPayload<{ include: { components: true } }>;
+  formData: FormData;
+}): Promise<InvoiceFormState> {
+  let edits: { id: string; rate?: number | null; amount?: number | null }[] = [];
+  try {
+    const parsed = JSON.parse(String(formData.get("componentsJson") || "[]"));
+    edits = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return { success: false, message: "Invalid rates" };
+  }
+  const editById = new Map(edits.map((edit) => [edit.id, edit]));
+  const round = (value: number) => Math.round(value * 100) / 100;
+  const quantity = toNumber(item.quantity, 1) || 1;
+  const isInterState = toNumber(item.igstAmount) > 0;
+
+  let metalValue = 0;
+  let stoneValue = 0;
+  let sgst = 0;
+  let cgst = 0;
+  let igst = 0;
+  const addTax = (taxable: number, percent: number) => {
+    const tax = round((taxable * percent) / 100);
+    if (isInterState) igst += tax;
+    else {
+      const half = round(tax / 2);
+      sgst += half;
+      cgst += round(tax - half);
+    }
+  };
+
+  const updates: { id: string; rate: number | null; amount: number }[] = [];
+  for (const row of item.components) {
+    const edit = editById.get(row.id);
+    const rate = edit?.rate != null ? toNumber(edit.rate) : toNumber(row.rate);
+    if (rate < 0) return { success: false, message: "Rates can't be negative." };
+    let amount: number;
+    if (row.kind === "STONE") {
+      const typed = edit?.amount != null ? toNumber(edit.amount) : null;
+      amount = round(typed != null && typed >= 0 ? typed : toNumber(row.caratWeight) * rate);
+      stoneValue += amount * quantity;
+    } else {
+      amount = round(toNumber(row.netWeight) * rate);
+      metalValue += amount * quantity;
+    }
+    addTax(amount * quantity, toNumber(row.gstRatePercent));
+    updates.push({ id: row.id, rate: rate || null, amount });
+  }
+  if (!(metalValue + stoneValue > 0)) return { success: false, message: "Enter the rates for this piece's metals and stones." };
+
+  const making = toNumber(item.makingCharge) + toNumber(item.hmCharge) - toNumber(item.schemeDiscount);
+  addTax(making, toNumber(item.gstRatePercent));
+  metalValue = round(metalValue);
+  stoneValue = round(stoneValue);
+  const newSgst = round(sgst);
+  const newCgst = round(cgst);
+  const newIgst = round(igst);
+  const newLineTotal = round(metalValue + stoneValue + making + newSgst + newCgst + newIgst);
+
+  const oldMetalValue = round(
+    item.components.filter((row) => row.kind === "METAL").reduce((sum, row) => sum + toNumber(row.amount), 0) * quantity,
+  );
+  const oldStoneValue = toNumber(item.stoneCharge);
+  const oldTax = toNumber(item.sgstAmount) + toNumber(item.cgstAmount) + toNumber(item.igstAmount);
+
+  const subtotal = Number(invoice.subtotal) - oldMetalValue + metalValue;
+  const stoneCharges = Number(invoice.stoneCharges) - oldStoneValue + stoneValue;
+  const taxAmount = Number(invoice.taxAmount) - oldTax + (newSgst + newCgst + newIgst);
+  const { roundOffAmount, totalAmount } = computeRoundOff(
+    subtotal + Number(invoice.makingCharges) + stoneCharges - Number(invoice.discount) + taxAmount,
+  );
+  const paidAmount = Number(invoice.paidAmount);
+  if (totalAmount < paidAmount) {
+    return {
+      success: false,
+      message: `New total (₹${totalAmount.toFixed(2)}) can't be less than the ₹${paidAmount.toFixed(2)} already paid — record a refund or adjust payments first.`,
+    };
+  }
+  const newBalanceAmount = Math.max(0, totalAmount - paidAmount);
+  let newStatus: InvoiceStatus = InvoiceStatus.PAID;
+  if (newBalanceAmount > 0 && paidAmount > 0) newStatus = InvoiceStatus.PARTIAL;
+  else if (newBalanceAmount > 0 && paidAmount === 0) newStatus = InvoiceStatus.DRAFT;
+
+  await prisma.$transaction(async (tx) => {
+    for (const update of updates) {
+      await tx.pieceComponent.updateMany({
+        where: { id: update.id, invoiceItemId: item.id },
+        data: { rate: update.rate, amount: update.amount },
+      });
+    }
+    await tx.invoiceItem.update({
+      where: { id: item.id },
+      data: { stoneCharge: stoneValue, sgstAmount: newSgst, cgstAmount: newCgst, igstAmount: newIgst, lineTotal: newLineTotal },
+    });
+    await tx.invoice.update({
+      where: { id: invoice.id },
+      data: { subtotal, stoneCharges, taxAmount, totalAmount, roundOffAmount, balanceAmount: newBalanceAmount, status: newStatus },
+    });
+    const delta = newBalanceAmount - Number(invoice.balanceAmount);
+    if (delta !== 0) {
+      await tx.ledgerEntry.create({
+        data: {
+          storeId,
+          type: delta > 0 ? LedgerEntryType.DEBIT : LedgerEntryType.CREDIT,
+          sourceType: LedgerSourceType.SALE,
+          customerId: invoice.customerId,
+          invoiceId: invoice.id,
+          amount: Math.abs(delta),
+          description: `Invoice ${invoice.invoiceNumber} revised — balance ${delta > 0 ? "increased" : "decreased"}`,
+          locationId: invoice.locationId ?? undefined,
+        },
+      });
+    }
+  });
+
+  revalidatePath("/billing");
+  revalidatePath(`/billing/${invoice.id}`);
+  return { success: true, message: "Line item updated" };
 }
 
 /**

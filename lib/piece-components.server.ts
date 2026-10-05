@@ -213,6 +213,7 @@ export function pieceComponentCreates(components: ResolvedPieceComponent[]) {
 /** Stored rows (any parent) → the client shape (lib/piece-components StoredPieceComponent). */
 export function serializeStoredComponents(
   rows: {
+    id?: string;
     kind: PieceComponentKind;
     metalTypeId: string | null;
     purityLabel: string | null;
@@ -236,6 +237,7 @@ export function serializeStoredComponents(
   return [...rows]
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((row) => ({
+      id: row.id,
       kind: row.kind,
       metalTypeId: row.metalTypeId,
       purityLabel: row.purityLabel,

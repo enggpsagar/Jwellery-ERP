@@ -28,6 +28,8 @@ type AddClarityDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: (clarity: StoreStoneClarityRow) => void
+  /** Prefills the name — e.g. what was typed in the Clarity search. */
+  initialName?: string
 }
 
 /** Quick "Add Clarity" from a product stone row, via the same action
@@ -36,14 +38,15 @@ export function AddClarityDialog({
   open,
   onOpenChange,
   onCreated,
+  initialName = "",
 }: AddClarityDialogProps) {
   const toast = useToast()
   const [state, formAction, pending] = useActionState(upsertStoreStoneClarity, initialState)
   const [name, setName] = useState("")
 
   useEffect(() => {
-    if (!open) setName("")
-  }, [open])
+    setName(open ? initialName : "")
+  }, [open, initialName])
 
   useEffect(() => {
     if (state.success && state.id) {

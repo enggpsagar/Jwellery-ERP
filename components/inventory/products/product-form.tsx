@@ -443,6 +443,8 @@ export function ProductForm({
   const [clarities, setClarities] = useState(initialClarities);
   // Stone row whose "+ Add Clarity" dialog is open.
   const [addClarityForKey, setAddClarityForKey] = useState<string | null>(null);
+  const [claritySearch, setClaritySearch] = useState("");
+  const [addClarityName, setAddClarityName] = useState("");
 
   // The stone-component repeater (productKind "METAL" only) — replaces the
   // old single hasStoneComponent toggle + one StoneComponentFields
@@ -1567,12 +1569,37 @@ export function ProductForm({
                     <div className="flex gap-1.5">
                       <Select
                         value={row.clarity || "NONE"}
-                        onValueChange={(value) => updateStoneComponent(row.key, { clarity: value === "NONE" ? "" : value })}
+                        onOpenChange={(open) => open && setClaritySearch("")}
+                        onValueChange={(value) => {
+                          // Not in the list yet — add it, prefilled with what was typed.
+                          if (value === "__add__") {
+                            setAddClarityName(claritySearch.trim());
+                            setAddClarityForKey(row.key);
+                            return;
+                          }
+                          updateStoneComponent(row.key, { clarity: value === "NONE" ? "" : value });
+                        }}
                       >
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Not set" />
                         </SelectTrigger>
                         <SelectContent>
+                          <div className="p-2">
+                            <Input
+                              placeholder="Search or type a new clarity..."
+                              value={claritySearch}
+                              onChange={(event) => setClaritySearch(event.target.value)}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            />
+                          </div>
+                          {claritySearch.trim() &&
+                            !clarities.some((item) => item.name.toLowerCase() === claritySearch.trim().toLowerCase()) && (
+                              <SelectItem value="__add__">
+                                <span className="inline-flex items-center gap-1 font-medium text-primary">
+                                  <Plus className="h-3.5 w-3.5" /> Add &quot;{claritySearch.trim()}&quot;
+                                </span>
+                              </SelectItem>
+                            )}
                           <SelectItem value="NONE">Not set</SelectItem>
                           {/* A saved value no longer in the list (renamed or
                               turned off) still shows rather than vanishing. */}
@@ -1581,6 +1608,7 @@ export function ProductForm({
                           )}
                           {clarities
                             .filter((item) => item.isActive || item.name === row.clarity)
+                            .filter((item) => item.name.toLowerCase().includes(claritySearch.trim().toLowerCase()))
                             .map((item) => (
                               <SelectItem key={item.id} value={item.name}>
                                 {item.name}
@@ -1594,7 +1622,10 @@ export function ProductForm({
                         size="icon"
                         className="shrink-0"
                         title="Add Clarity"
-                        onClick={() => setAddClarityForKey(row.key)}
+                        onClick={() => {
+                          setAddClarityName("");
+                          setAddClarityForKey(row.key);
+                        }}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
@@ -1660,6 +1691,7 @@ export function ProductForm({
           <AddClarityDialog
             open={addClarityForKey !== null}
             onOpenChange={(open) => !open && setAddClarityForKey(null)}
+            initialName={addClarityName}
             onCreated={(clarity) => {
               setClarities((prev) => [...prev, clarity].sort((a, b) => a.name.localeCompare(b.name)));
               if (addClarityForKey) updateStoneComponent(addClarityForKey, { clarity: clarity.name });

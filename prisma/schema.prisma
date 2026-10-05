@@ -827,6 +827,8 @@ model ProductStoneComponent {
   clarity            String?
   // IGI (or other lab) certificate number for this stone.
   certificateNumber  String?
+  // Number of stones in this row (e.g. 12 diamonds totalling 0.19 ct).
+  pieces             Int?
   // Per-row GST rate — see ProductMetalComponent.gstRateId's own doc
   // comment for why this lives on the row rather than once per Product.
   gstRateId          String?

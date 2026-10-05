@@ -140,6 +140,7 @@ type Product = {
     stoneChargeType: "FIXED" | "PERCENTAGE";
     clarity: string | null;
     certificateNumber: string | null;
+    pieces: number | null;
     gstRateId: string | null;
   }[];
 };
@@ -236,6 +237,7 @@ type StoneComponentRow = {
   stoneWeightUnit: "GRAM" | "CARAT";
   clarity: string;
   certificateNumber: string;
+  pieces: string;
   // This row's own GST Rate — see MetalComponentRow.gstRateId's own doc
   // comment for why it's per-row rather than once for the whole product.
   gstRateId: string;
@@ -255,6 +257,7 @@ function emptyStoneComponent(key: string = crypto.randomUUID(), gstRateId: strin
     stoneWeightUnit: "GRAM",
     clarity: "",
     certificateNumber: "",
+    pieces: "",
     gstRateId,
   };
 }
@@ -467,6 +470,7 @@ export function ProductForm({
         stoneWeightUnit: "GRAM" as const,
         clarity: component.clarity ?? "",
         certificateNumber: component.certificateNumber ?? "",
+        pieces: component.pieces != null ? String(component.pieces) : "",
         gstRateId: component.gstRateId ?? "",
       }));
     }
@@ -487,6 +491,7 @@ export function ProductForm({
           stoneWeightUnit: "GRAM" as const,
           clarity: "",
           certificateNumber: "",
+          pieces: "",
           gstRateId: "",
         },
       ];
@@ -517,6 +522,7 @@ export function ProductForm({
           stoneWeightUnit: "GRAM" as const,
           clarity: "",
           certificateNumber: "",
+          pieces: "",
           gstRateId: "",
         },
       ];
@@ -953,6 +959,7 @@ export function ProductForm({
         stoneChargeType: "FIXED",
         clarity: row.clarity.trim() || null,
         certificateNumber: row.certificateNumber.trim() || null,
+        pieces: row.pieces.trim() || null,
         gstRateId: row.gstRateId || null,
       })),
   );
@@ -1563,7 +1570,20 @@ export function ProductForm({
                     netStoneWeightTouched={row.stoneWeightTouched}
                   />
 
-                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Pcs</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputMode="numeric"
+                      value={row.pieces}
+                      placeholder="No. of stones"
+                      onChange={(event) => updateStoneComponent(row.key, { pieces: event.target.value })}
+                    />
+                  </div>
+
                   <div className="space-y-1">
                     <Label className="text-xs">Clarity</Label>
                     <div className="flex gap-1.5">

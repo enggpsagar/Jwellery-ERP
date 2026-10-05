@@ -88,6 +88,7 @@ type StoneComponentInput = {
   stoneChargeType?: string;
   clarity?: string | null;
   certificateNumber?: string | null;
+  pieces?: number | string | null;
   gstRateId?: string | null;
 };
 
@@ -154,6 +155,12 @@ async function parseAndValidateMetalComponents(
   }
 
   return { components: components as MetalComponentInput[], error: null };
+}
+
+/** A stone row's piece count — a whole number ≥ 0, else null. */
+function toPiecesOrNull(value: unknown): number | null {
+  const n = Number(value);
+  return value != null && String(value).trim() !== "" && Number.isInteger(n) && n >= 0 ? n : null;
 }
 
 async function parseStoneComponents(
@@ -272,6 +279,7 @@ function serializeProduct(product: {
     stoneChargeType: ChargeType;
     clarity: string | null;
     certificateNumber: string | null;
+    pieces: number | null;
     gstRateId: string | null;
   }[];
 }) {
@@ -332,6 +340,7 @@ function serializeProduct(product: {
       stoneChargeType: component.stoneChargeType,
       clarity: component.clarity,
       certificateNumber: component.certificateNumber,
+      pieces: component.pieces,
       gstRateId: component.gstRateId,
     })),
   };
@@ -1157,6 +1166,7 @@ export async function createProduct(
           stoneChargeType: toChargeTypeInput(component.stoneChargeType),
           clarity: component.clarity ? String(component.clarity).trim() || null : null,
           certificateNumber: component.certificateNumber ? String(component.certificateNumber).trim() || null : null,
+          pieces: toPiecesOrNull(component.pieces),
           gstRateId: component.gstRateId || null,
           sortOrder: index,
         })),
@@ -1513,6 +1523,7 @@ export async function updateProduct(
           stoneChargeType: toChargeTypeInput(component.stoneChargeType),
           clarity: component.clarity ? String(component.clarity).trim() || null : null,
           certificateNumber: component.certificateNumber ? String(component.certificateNumber).trim() || null : null,
+          pieces: toPiecesOrNull(component.pieces),
           gstRateId: component.gstRateId || null,
           sortOrder: index,
         })),

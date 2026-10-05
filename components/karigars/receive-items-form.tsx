@@ -821,7 +821,12 @@ export function ReceiveItemsForm({
                         // idiom as ProductSelect's own productSelectKeys.
                         key={metalPuritiesCache[item.metalTypeId] ? "loaded" : "loading"}
                         value={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
-                        onValueChange={(value) => selectPurity(item, value === "__none__" ? "" : value)}
+                        onValueChange={(value) => {
+                            // Radix fires "" when the value lands before its option has
+                            // loaded (purities load async) — not a pick; "None" is "__none__".
+                            if (!value) return
+                            selectPurity(item, value === "__none__" ? "" : value)
+                          }}
                       >
                         <SelectTrigger className="h-11 w-full">
                           <SelectValue placeholder="Select purity" />

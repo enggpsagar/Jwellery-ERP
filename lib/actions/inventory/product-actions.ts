@@ -559,14 +559,21 @@ export async function getProducts(params: GetProductsParams = {}) {
   const where = getProductWhere(storeId, search, params.metalTypeId, params.status, params.dateFrom, params.dateTo, params.categoryId, params.categoryTypeId, params.stoneOriginOptionId);
   const orderBy = getProductOrderBy(sortBy, sortOrder);
 
-  const [totalCount, rows, weightSum, stockQtySum] = await Promise.all([
+  const fineWeightSelect = {
+    metalTypeId: true,
+    defaultPurity: true,
+    defaultNetWeight: true,
+    storeMetalPurity: { select: { label: true } },
+  } as const;
+
+  const [totalCount, rows, weightSum, stockQtySum, fineWeightOf, fineRows] = await Promise.all([
     prisma.product.count({ where }),
     prisma.product.findMany({
       where,
       orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: PRODUCT_RELATIONS,
+      include: { ...PRODUCT_RELATIONS, storeMetalPurity: { select: { label: true } } },
     }),
     // Footer totals across every matching product, not just this page.
     prisma.product.aggregate({ where, _sum: { defaultNetWeight: true } }),
@@ -574,7 +581,24 @@ export async function getProducts(params: GetProductsParams = {}) {
       where: { storeId, product: where },
       _sum: { quantity: true },
     }),
+    // Products store no fine weight of their own — net × the purity's
+    // fineness, same resolver stock rows are stamped with (lib/fine-weight.ts).
+    getFineWeightResolver(storeId),
+    prisma.product.findMany({ where, select: fineWeightSelect }),
   ]);
+
+  const productFineWeight = (row: {
+    metalTypeId: string | null;
+    defaultPurity: string | null;
+    defaultNetWeight: Prisma.Decimal | null;
+    storeMetalPurity: { label: string } | null;
+  }) =>
+    fineWeightOf({
+      metalTypeId: row.metalTypeId,
+      purityLabel: row.storeMetalPurity?.label,
+      purity: row.defaultPurity,
+      netWeight: row.defaultNetWeight,
+    });
 
   // How many pieces of this product design are currently in stock, summed
   // across every InventoryStock lot it has (a design can have several —
@@ -596,6 +620,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   const products = rows.map((row) => ({
     ...mapProductRow(row),
     stockQty: stockQtyByProductId.get(row.id) ?? 0,
+    fineWeight: productFineWeight(row),
   }));
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
@@ -603,6 +628,7 @@ export async function getProducts(params: GetProductsParams = {}) {
     products,
     totals: {
       netWeight: Number(weightSum._sum.defaultNetWeight ?? 0),
+      fineWeight: fineRows.reduce((sum, row) => sum + (productFineWeight(row) ?? 0), 0),
       stockQty: stockQtySum._sum.quantity ?? 0,
     },
     pagination: {

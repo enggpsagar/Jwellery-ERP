@@ -35,7 +35,7 @@ type StockTableProps = {
   showLocation?: boolean
   /** Sums across every stock row matching the current filters (all pages),
    *  from getInventoryStock — shown as the table's footer row. */
-  totals?: { grossWeight: number; netWeight: number; quantity: number }
+  totals?: { grossWeight: number; netWeight: number; fineWeight: number; quantity: number }
 }
 
 function formatNumber(value: number | string | null | undefined, digits = 3) {
@@ -120,7 +120,10 @@ export function StockTable({
                   className="h-4 w-4 rounded border-input"
                 />
               </th>
-              <SortableTableHead label="Stock Code" sortKey="stockCode" defaultSortBy="createdAt" />
+              {/* Qty in stock rides on the code — "STK-2026-0003 (1)". Stock has
+                  no Active/Inactive of its own; availability is purely
+                  quantity-driven, so a sold-out row's count shows red. */}
+              <SortableTableHead label="Stock Code (Qty)" sortKey="stockCode" defaultSortBy="createdAt" />
               <th className="hidden px-4 py-3 text-left font-medium md:table-cell">Product Code</th>
               <SortableTableHead label="Title" sortKey="product" defaultSortBy="createdAt" />
               {/* Gross Weight hidden below sm — same rationale as the other
@@ -136,11 +139,9 @@ export function StockTable({
                 defaultSortBy="createdAt"
                 align="right"
               />
-              {/* Stock has no Active/Inactive concept of its own — that
-                  belongs to Product only. Availability here is purely
-                  quantity-driven (see the toolbar's In Stock/Out of Stock
-                  filter), so this column shows the actual count instead. */}
-              <SortableTableHead label="Qty in Stock" sortKey="quantity" defaultSortBy="createdAt" align="right" />
+              {/* Pure metal content (net × purity fineness), stored on the
+                  stock row — see lib/fine-weight.ts. */}
+              <th className="px-4 py-3 text-right font-medium">Fine Weight</th>
             </tr>
           </thead>
 
@@ -169,7 +170,12 @@ export function StockTable({
                     />
                   </td>
 
-                  <td className="px-4 py-3 text-foreground">{item.stockCode}</td>
+                  <td className="px-4 py-3 text-foreground">
+                    {item.stockCode}{" "}
+                    <span className={cn("tabular-nums text-muted-foreground", item.quantity <= 0 && "font-medium text-red-600")}>
+                      ({item.quantity})
+                    </span>
+                  </td>
 
                   <td className="hidden px-4 py-3 text-foreground md:table-cell">
                     {item.product?.productCode ?? "-"}
@@ -217,13 +223,8 @@ export function StockTable({
                   <td className="px-4 py-3 text-right tabular-nums">
                     {formatWeightCell(item.netWeight)}
                   </td>
-                  <td
-                    className={cn(
-                      "px-4 py-3 text-right tabular-nums font-medium",
-                      item.quantity <= 0 && "text-red-600",
-                    )}
-                  >
-                    {item.quantity}
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {formatWeightCell(item.fineWeight)}
                   </td>
                 </tr>
               )
@@ -236,7 +237,7 @@ export function StockTable({
                 <td className="px-4 py-3">
                   Total
                   <div className="text-xs font-normal text-muted-foreground">
-                    {pagination.totalCount} item{pagination.totalCount === 1 ? "" : "s"}
+                    {pagination.totalCount} item{pagination.totalCount === 1 ? "" : "s"} · {totals.quantity} in stock
                     {pagination.totalPages > 1 ? ", all pages" : ""}
                   </div>
                 </td>
@@ -246,7 +247,7 @@ export function StockTable({
                   {formatWeightCell(totals.grossWeight)}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">{formatWeightCell(totals.netWeight)}</td>
-                <td className="px-4 py-3 text-right tabular-nums">{totals.quantity}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{formatWeightCell(totals.fineWeight)}</td>
               </tr>
             </tfoot>
           )}

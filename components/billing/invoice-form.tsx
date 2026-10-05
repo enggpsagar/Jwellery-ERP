@@ -53,7 +53,7 @@ import { LocationSelect, useShowLocationField, type LocationOption } from "@/com
 import { PaidNowFields } from "@/components/shared/paid-now-fields"
 import type { PaymentMethodValue } from "@/components/shared/payment-method-fields"
 import { isCaratWeighedMetal, isHallmarkablePurity, resolveGramsPerCarat, resolveStockSellingRate, toPrimaryUnit, matchLegacyPurityType, resolveLegacyPurityLabel } from "@/lib/purity"
-import { classifyPurityFamily } from "@/lib/business-units"
+import { classifyMetalName, classifyPurityFamily } from "@/lib/business-units"
 import {
   getStoreCategoryTypes,
   getStoreMetalPurities,
@@ -140,6 +140,18 @@ function stockCatalogFields(stock: StockOption, fallbackGstRateId: string) {
     makingCharge: hasOwnMaking ? (stock.makingCharge as number) : stock.defaultMakingCharge ?? 0,
     makingChargeType: hasOwnMaking ? stock.makingChargeType : stock.defaultMakingChargeType,
   }
+}
+
+/** A piece has a stone when its stock row or its Product says so — not
+ * only when a stone rate was recorded (most stones are priced at sale). */
+function stockHasStone(stock: StockOption) {
+  return (
+    stock.stoneRate != null ||
+    (stock.caratWeight ?? 0) > 0 ||
+    (stock.stoneWeight ?? 0) > 0 ||
+    Boolean(stock.stoneMetalTypeName) ||
+    stock.productHasStone
+  )
 }
 
 export type LineItem = {
@@ -762,14 +774,14 @@ export function InvoiceForm({
       // field isn't just silently 0 — still fully editable either way, and
       // plain manual entry when none of these are set. See
       // resolveStockSellingRate (lib/purity.ts).
-      rate: resolveStockSellingRate(stock, metalById.get(stock.metalType?.id ?? "")?.sellingPrice),
+      rate: stockSellingRate(stock),
       hsnCode: stock.hsnCode ?? "",
       caratWeight: stock.caratWeight ?? 0,
       stoneRate:
         stock.stoneRate ??
         metalByName.get((stock.stoneMetalTypeName ?? "").toLowerCase())?.sellingPrice ??
         0,
-      hasStoneComponent: stock.stoneRate != null,
+      hasStoneComponent: stockHasStone(stock),
       stoneCharge: stock.stoneRate != null && stock.caratWeight != null
         ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
         : 0,
@@ -924,14 +936,14 @@ export function InvoiceForm({
           stoneWeightInput: stock.stoneWeight ?? 0,
           stoneWeightUnit: linkedUnit,
           // See applyStockToItem's identical comment above.
-          rate: resolveStockSellingRate(stock, metalById.get(stock.metalType?.id ?? "")?.sellingPrice),
+          rate: stockSellingRate(stock),
           hsnCode: stock.hsnCode ?? "",
           caratWeight: stock.caratWeight ?? 0,
           stoneRate:
             stock.stoneRate ??
             metalByName.get((stock.stoneMetalTypeName ?? "").toLowerCase())?.sellingPrice ??
             0,
-          hasStoneComponent: stock.stoneRate != null,
+          hasStoneComponent: stockHasStone(stock),
           stoneCharge: stock.stoneRate != null && stock.caratWeight != null
             ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
             : 0,
@@ -1018,6 +1030,20 @@ export function InvoiceForm({
   // what Gross/Net/Dmo/Stone Weight are actually persisted in at submit,
   // regardless of what unit is currently toggled for display/entry.
   const metalById = useMemo(() => new Map(metals.map((m) => [m.id, m])), [metals])
+
+  // A picked piece's Rate / g: its own sale rate, else the configured
+  // per-Purity / per-Stone-Type / per-Metal Selling Price (see
+  // resolveStockSellingRate), else today's fine rate (the Metal Rates board,
+  // 24K gold / silver) scaled by the purity's fineness — so 18K at 75% of
+  // today's 24K rate instead of a blank field. Still editable.
+  const stockSellingRate = (stock: StockOption) => {
+    const metal = metalById.get(stock.metalType?.id ?? "")
+    const configured = resolveStockSellingRate(stock, metal?.sellingPrice)
+    if (configured > 0 || stock.purityFineness == null) return configured
+    const family = classifyMetalName(metal?.name ?? stock.metalType?.name)
+    const fineRate = family === "GOLD" ? fineRates.gold : family === "SILVER" ? fineRates.silver : null
+    return fineRate ? Number(((fineRate * stock.purityFineness) / 100).toFixed(2)) : configured
+  }
 
   // Real per-Metal Purity options (Settings > Taxonomy > Purities),
   // replacing the old global PURITY_SELECT_OPTIONS enum list — cached per
@@ -2039,7 +2065,12 @@ export function InvoiceForm({
                       <div className="flex gap-1.5">
                         <Select
                           value={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
-                          onValueChange={(value) => selectPurity(item, value === "__none__" ? "" : value)}
+                          onValueChange={(value) => {
+                            // Radix fires "" when the value lands before its option has
+                            // loaded (purities load async) — not a pick; "None" is "__none__".
+                            if (!value) return
+                            selectPurity(item, value === "__none__" ? "" : value)
+                          }}
                           disabled={isLinked || !item.metalTypeId}
                         >
                           <SelectTrigger className="h-11 w-full">

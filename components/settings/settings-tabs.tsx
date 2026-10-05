@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { UserRole } from "@prisma/client";
-import { Building2, Gem, Layers, MapPin, KeyRound, Percent, ShieldCheck, Mail } from "lucide-react";
+import { Building2, Gem, Layers, MapPin, KeyRound, Percent, ShieldCheck, Mail, Tag } from "lucide-react";
 
 type SettingsTab =
   | "business"
@@ -10,7 +10,8 @@ type SettingsTab =
   | "api-keys"
   | "gst-rates"
   | "collaboration"
-  | "reports";
+  | "reports"
+  | "tags";
 
 type SettingsTabsProps = {
   active: SettingsTab;
@@ -42,6 +43,7 @@ const TABS: {
   { id: "locations", href: "/settings/locations", label: "Locations", icon: MapPin, tint: "var(--chart-4)" },
   { id: "api-keys", href: "/settings/api-keys", label: "API Keys", icon: KeyRound, tint: "var(--chart-5)" },
   { id: "gst-rates", href: "/settings/gst-rates", label: "GST Rates", icon: Percent, tint: "#0891b2" },
+  { id: "tags", href: "/settings/tags", label: "QR & Barcode Tags", icon: Tag, tint: "#ca8a04" },
   { id: "reports", href: "/settings/reports", label: "Reports & Notifications", icon: Mail, tint: "#7c3aed" },
   { id: "collaboration", href: "/settings/collaboration", label: "Collaboration", icon: ShieldCheck, tint: "#be123c" },
 ];

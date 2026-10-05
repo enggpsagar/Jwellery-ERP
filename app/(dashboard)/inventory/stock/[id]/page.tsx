@@ -9,10 +9,8 @@ import QRCode from "qrcode"
 
 import { getInventoryStockById } from "@/lib/actions/inventory/stock-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
-import { formatShortDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { StockQrCard } from "@/components/inventory/stock/stock-qr-card"
-import { tagPurity } from "@/components/inventory/stock/stock-qr-label"
 import { StockDetailContent } from "@/components/inventory/stock/stock-detail-content"
 
 type InventoryStockDetailsPageProps = {
@@ -33,10 +31,6 @@ export async function generateMetadata({
   } catch {
     return { title: "Stock" }
   }
-}
-
-function formatDate(value: Date | string | null | undefined) {
-  return formatShortDate(value)
 }
 
 export default async function InventoryStockDetailsPage({
@@ -100,27 +94,7 @@ export default async function InventoryStockDetailsPage({
         stock={stock}
         showLocation={locations.length > 1}
         qrCard={
-          <StockQrCard
-            stockId={stock.id}
-            dataUrl={qrDataUrl}
-            stockCode={stock.stockCode}
-            productCode={stock.product?.productCode ?? null}
-            productName={stock.product?.name ?? "-"}
-            tagNumber={stock.tagNumber || null}
-            metalName={stock.metalType?.name ?? null}
-            purity={tagPurity(stock.purityLabel, stock.purity)}
-            netWeight={
-              stock.netWeight ? `${Number(stock.netWeight).toFixed(3)}g` : null
-            }
-            grossWeight={
-              stock.grossWeight
-                ? `${Number(stock.grossWeight).toFixed(3)}g`
-                : null
-            }
-            manufactureDate={
-              stock.manufactureDate ? formatDate(stock.manufactureDate) : null
-            }
-          />
+          <StockQrCard stockId={stock.id} dataUrl={qrDataUrl} />
         }
       />
     </main>

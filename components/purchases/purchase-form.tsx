@@ -1602,7 +1602,12 @@ export function PurchaseForm({
                         <Label className="text-xs">Purity</Label>
                         <Select
                           value={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.id ?? "__none__"}
-                          onValueChange={(value) => selectPurity(item, value === "__none__" ? "" : value)}
+                          onValueChange={(value) => {
+                            // Radix fires "" when the value lands before its option has
+                            // loaded (purities load async) — not a pick; "None" is "__none__".
+                            if (!value) return
+                            selectPurity(item, value === "__none__" ? "" : value)
+                          }}
                           disabled={isLinked || !item.metalTypeId}
                         >
                           <SelectTrigger className="w-full">

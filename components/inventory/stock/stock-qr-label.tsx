@@ -1,24 +1,15 @@
+import type { StockTagData } from "@/lib/actions/inventory/stock-tag-actions"
+import type { StockTagField } from "@/lib/stock-tag-fields"
+import { stockTagLines, tagFontSize } from "@/components/inventory/stock/stock-tag-lines"
+
 /**
  * One stock tag, laid out for an 80mm thermal printer: the QR on the left,
- * everything else on the right, one tag per row. Used by both the single-
+ * the fields Settings > Tags picks on the right, one tag per row. Used by both the single-
  * item print (StockQrCard) and the bulk Print QR Codes page, so a tag
  * printed either way comes out identical. Plain black on white — thermal
  * printers are monochrome. Printing goes through StockQrPrintRoot +
  * StockQrLabelPrintStyles.
  */
-export type StockQrLabelData = {
-  qrDataUrl: string
-  stockCode: string
-  tagNumber: string | null
-  productName: string
-  productCode: string | null
-  metalName: string | null
-  purity: string | null
-  netWeight: string | null
-  grossWeight: string | null
-  manufactureDate: string | null
-}
-
 /** "GOLD_22K" → "22K"-style label for tags; a real per-metal purity label
  *  (StockItem.purityLabel) should be passed in preference when present. */
 export function tagPurity(purityLabel: string | null | undefined, purity: string | null | undefined) {
@@ -67,31 +58,32 @@ export function StockQrLabelPrintStyles() {
   )
 }
 
-export function StockQrLabel({ label }: { label: StockQrLabelData }) {
-  const weights = [
-    label.netWeight ? `Net ${label.netWeight}` : null,
-    label.grossWeight ? `Gross ${label.grossWeight}` : null,
-  ].filter(Boolean)
+export function StockQrLabel({
+  tag,
+  qrDataUrl,
+  fields,
+}: {
+  tag: StockTagData
+  qrDataUrl: string
+  fields: readonly StockTagField[]
+}) {
+  const lines = stockTagLines(tag, fields, { codePrefix: "LR# " })
 
   return (
     <div className="stock-qr-label flex w-[76mm] items-center gap-2 rounded-lg border bg-white p-2 text-black">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={label.qrDataUrl}
-        alt={`QR code for stock ${label.stockCode}`}
+        src={qrDataUrl}
+        alt={`QR code for stock ${tag.stockCode}`}
         className="h-[24mm] w-[24mm] shrink-0"
         style={{ imageRendering: "pixelated" }}
       />
-      <div className="min-w-0 flex-1 space-y-0.5 font-mono text-[10px] leading-tight">
-        <p className="truncate text-[11px] font-bold">LR# {label.tagNumber ?? label.stockCode}</p>
-        <p className="line-clamp-2 font-sans text-[10px]">{label.productName}</p>
-        {/* Read off the tag by eye, so it's never mistaken for the LR# above. */}
-        {label.productCode && <p className="truncate font-semibold tracking-wide">{label.productCode}</p>}
-        {(label.metalName || label.purity) && (
-          <p className="truncate">{[label.metalName, label.purity].filter(Boolean).join(" · ")}</p>
-        )}
-        {weights.length > 0 && <p className="truncate">{weights.join(" · ")}</p>}
-        {label.manufactureDate && <p className="truncate">MFG {label.manufactureDate}</p>}
+      <div className="min-w-0 flex-1 font-mono leading-tight" style={{ fontSize: tagFontSize(lines.length) }}>
+        {lines.map((line) => (
+          <p key={line.key} className={`truncate ${line.bold ? "font-bold" : ""}`}>
+            {line.text}
+          </p>
+        ))}
       </div>
     </div>
   )

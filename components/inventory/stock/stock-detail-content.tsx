@@ -93,22 +93,25 @@ export function StockDetailContent({
         </DetailGrid>
       </DetailSection>
 
-      <DetailSection title="Source / Extra Details" icon={Truck} tint="var(--chart-4)">
-        <DetailGrid>
-          <DetailField label="Vendor Name" value={stock.vendorName} />
-          <DetailField label="Purchase Date" value={formatDate(stock.purchaseDate)} />
-          {showLocation && <DetailField label="Location" value={stock.location?.name} />}
-          <DetailField
-            label="Remarks"
-            span
-            value={
-              stock.remarks ? (
-                <span className="whitespace-pre-wrap">{stock.remarks}</span>
-              ) : null
-            }
-          />
-        </DetailGrid>
-      </DetailSection>
+      {/* Every field here is optional — hide the card when none is set. */}
+      {(stock.vendorName || stock.purchaseDate || (showLocation && stock.location?.name) || stock.remarks) && (
+        <DetailSection title="Source / Extra Details" icon={Truck} tint="var(--chart-4)">
+          <DetailGrid>
+            <DetailField label="Vendor Name" value={stock.vendorName} />
+            <DetailField label="Purchase Date" value={formatDate(stock.purchaseDate)} />
+            {showLocation && <DetailField label="Location" value={stock.location?.name} />}
+            <DetailField
+              label="Remarks"
+              span
+              value={
+                stock.remarks ? (
+                  <span className="whitespace-pre-wrap">{stock.remarks}</span>
+                ) : null
+              }
+            />
+          </DetailGrid>
+        </DetailSection>
+      )}
     </div>
   )
 }

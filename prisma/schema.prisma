@@ -2241,6 +2241,11 @@ model BusinessSettings {
   // (lib/business-units.server.ts), never read raw.
   businessUnits String[] @default(["MONEY"])
 
+  // Printed stock tags — which fields each layout shows, in order (keys and
+  // labels: lib/stock-tag-fields.ts, Settings > Tags).
+  qrTagFields      String[] @default(["TAG_CODE", "PRODUCT_NAME", "PRODUCT_CODE", "METALS", "GROSS_WEIGHT", "NET_WEIGHT", "STONES", "MFG_DATE"])
+  barcodeTagFields String[] @default(["STORE_NAME", "TAG_CODE", "METALS", "GROSS_WEIGHT", "NET_WEIGHT", "STONES"])
+
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 }

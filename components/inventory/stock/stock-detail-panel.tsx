@@ -8,9 +8,7 @@ import { getInventoryStockById } from "@/lib/actions/inventory/stock-actions"
 import { StockRowActions } from "@/components/inventory/stock/stock-row-actions"
 import { StockDetailContent } from "@/components/inventory/stock/stock-detail-content"
 import { StockQrCard } from "@/components/inventory/stock/stock-qr-card"
-import { tagPurity } from "@/components/inventory/stock/stock-qr-label"
 import { Skeleton } from "@/components/ui/skeleton"
-import { formatShortDate } from "@/lib/utils"
 
 type Stock = NonNullable<Awaited<ReturnType<typeof getInventoryStockById>>>
 
@@ -107,27 +105,7 @@ export function StockDetailPanel({ stockId, showLocation = true }: StockDetailPa
         stock={stock}
         showLocation={showLocation}
         qrCard={
-          <StockQrCard
-            stockId={stock.id}
-            dataUrl={qrDataUrl}
-            stockCode={stock.stockCode}
-            productCode={stock.product?.productCode ?? null}
-            productName={stock.product?.name ?? "-"}
-            tagNumber={stock.tagNumber || null}
-            metalName={stock.metalType?.name ?? null}
-            purity={tagPurity(stock.purityLabel, stock.purity)}
-            netWeight={
-              stock.netWeight ? `${Number(stock.netWeight).toFixed(3)}g` : null
-            }
-            grossWeight={
-              stock.grossWeight
-                ? `${Number(stock.grossWeight).toFixed(3)}g`
-                : null
-            }
-            manufactureDate={
-              stock.manufactureDate ? formatShortDate(stock.manufactureDate) : null
-            }
-          />
+          <StockQrCard stockId={stock.id} dataUrl={qrDataUrl} />
         }
       />
     </div>

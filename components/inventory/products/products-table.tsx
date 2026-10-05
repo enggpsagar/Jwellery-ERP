@@ -16,6 +16,8 @@ type ProductRow = {
   metalType: string
   defaultPurity: string | null
   defaultNetWeight: number | null
+  /** Net × purity fineness — computed by getProducts, not stored. */
+  fineWeight?: number | null
   defaultGrossWeight: number | null
   defaultStoneWeight: number | null
   stockQty: number
@@ -42,7 +44,7 @@ type ProductsTableProps = {
   onActivate?: (id: string) => void
   /** Sums across every product matching the current filters (all pages),
    *  from getProducts — shown as the table's footer row. */
-  totals?: { netWeight: number; stockQty: number }
+  totals?: { netWeight: number; fineWeight?: number; stockQty: number }
 }
 
 export function ProductsTable({
@@ -117,6 +119,7 @@ export function ProductsTable({
               <th className="px-4 py-3 text-left font-medium">Stock Qty</th>
               <SortableTableHead label="Title" sortKey="name" defaultSortBy="createdAt" />
               <SortableTableHead label="Net Weight" sortKey="defaultNetWeight" defaultSortBy="createdAt" />
+              <th className="px-4 py-3 text-left font-medium">Fine Weight</th>
               <SortableTableHead label="Created Date" sortKey="createdAt" defaultSortBy="createdAt" />
             </tr>
           </thead>
@@ -224,6 +227,14 @@ export function ProductsTable({
                     )}
                   </td>
 
+                  <td className="px-4 py-3 text-foreground">
+                    {product.fineWeight != null ? (
+                      `${product.fineWeight.toFixed(3)} g`
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+
                   <td className="px-4 py-3 text-muted-foreground">
                     {formatShortDate(product.createdAt)}
                   </td>
@@ -245,6 +256,9 @@ export function ProductsTable({
                 <td className="px-4 py-3 tabular-nums">{totals.stockQty}</td>
                 <td className="px-4 py-3" />
                 <td className="px-4 py-3 tabular-nums">{totals.netWeight.toFixed(3)} g</td>
+                <td className="px-4 py-3 tabular-nums">
+                  {totals.fineWeight != null ? `${totals.fineWeight.toFixed(3)} g` : ""}
+                </td>
                 <td className="px-4 py-3" />
               </tr>
             </tfoot>

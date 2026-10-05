@@ -4,8 +4,10 @@ import { useEffect, useState } from "react"
 import { Printer, QrCode } from "lucide-react"
 
 import {
-  getStockBarcodeTags,
-  type StockBarcodeTagData,
+  getStockTags,
+  getStockTagSettings,
+  type StockTagData,
+  type StockTagSettings,
 } from "@/lib/actions/inventory/stock-tag-actions"
 import { StockBarcodeLabel } from "@/components/inventory/stock/stock-barcode-label"
 
@@ -16,64 +18,29 @@ import { StockQrPrintRoot } from "@/components/inventory/stock/stock-qr-print-ro
 type StockQrCardProps = {
   stockId: string
   dataUrl: string
-  stockCode: string
-  productCode: string | null
-  productName: string
-  tagNumber: string | null
-  metalName: string | null
-  purity: string | null
-  netWeight: string | null
-  grossWeight: string | null
-  manufactureDate: string | null
 }
 
-export function StockQrCard({
-  stockId,
-  dataUrl,
-  stockCode,
-  productCode,
-  productName,
-  tagNumber,
-  metalName,
-  purity,
-  netWeight,
-  grossWeight,
-  manufactureDate,
-}: StockQrCardProps) {
+export function StockQrCard({ stockId, dataUrl }: StockQrCardProps) {
   const [layout, setLayout] = useState<"qr" | "barcode">("qr")
-  const [barcodeTag, setBarcodeTag] = useState<StockBarcodeTagData | null>(null)
+  const [tagData, setTagData] = useState<{ tag: StockTagData; settings: StockTagSettings } | null>(null)
 
-  // Fetched only once Barcode is picked, and again if the panel switches item.
+  // Both layouts print from the same tag data; refetched if the panel switches item.
   useEffect(() => {
-    setBarcodeTag(null)
-    if (layout !== "barcode") return
+    setTagData(null)
     let cancelled = false
-    getStockBarcodeTags([stockId]).then((tags) => {
-      if (!cancelled) setBarcodeTag(tags[0] ?? null)
+    Promise.all([getStockTags([stockId]), getStockTagSettings()]).then(([tags, settings]) => {
+      if (!cancelled && tags[0]) setTagData({ tag: tags[0], settings })
     })
     return () => {
       cancelled = true
     }
-  }, [layout, stockId])
+  }, [stockId])
 
-  const qrLabel = {
-    qrDataUrl: dataUrl,
-    stockCode,
-    tagNumber,
-    productName,
-    productCode,
-    metalName,
-    purity,
-    netWeight,
-    grossWeight,
-    manufactureDate,
-  }
-  const tag =
-    layout === "barcode" ? (
-      barcodeTag ? <StockBarcodeLabel tag={barcodeTag} /> : null
-    ) : (
-      <StockQrLabel label={qrLabel} />
-    )
+  const tag = !tagData ? null : layout === "barcode" ? (
+    <StockBarcodeLabel tag={tagData.tag} fields={tagData.settings.barcode} />
+  ) : (
+    <StockQrLabel tag={tagData.tag} qrDataUrl={dataUrl} fields={tagData.settings.qr} />
+  )
 
   return (
     <section className="rounded-xl border bg-card p-5">
@@ -106,7 +73,7 @@ export function StockQrCard({
           title="Print"
           aria-label="Print"
           onClick={() => window.print()}
-          disabled={layout === "barcode" && !barcodeTag}
+          disabled={!tagData}
           variant="outline"
           className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
         >

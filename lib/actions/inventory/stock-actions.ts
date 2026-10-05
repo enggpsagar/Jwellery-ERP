@@ -253,6 +253,7 @@ function mapStockRow(row: any) {
     grossWeight: row.grossWeight?.toString() ?? null,
     lessWeight: row.lessWeight?.toString() ?? null,
     netWeight: row.netWeight?.toString() ?? null,
+    fineWeight: row.fineWeight?.toString() ?? null,
     stoneWeight: row.stoneWeight?.toString() ?? null,
     caratWeight: row.caratWeight?.toString() ?? null,
     dmoWeight: row.dmoWeight?.toString() ?? null,
@@ -295,7 +296,7 @@ export async function getInventoryStock(params: GetInventoryStockParams = {}) {
     // column sums, so they match what the Gross/Net/Qty columns show.
     prisma.inventoryStock.aggregate({
       where,
-      _sum: { grossWeight: true, netWeight: true, quantity: true },
+      _sum: { grossWeight: true, netWeight: true, fineWeight: true, quantity: true },
     }),
   ])
 
@@ -307,6 +308,7 @@ export async function getInventoryStock(params: GetInventoryStockParams = {}) {
     totals: {
       grossWeight: Number(sums._sum.grossWeight ?? 0),
       netWeight: Number(sums._sum.netWeight ?? 0),
+      fineWeight: Number(sums._sum.fineWeight ?? 0),
       quantity: sums._sum.quantity ?? 0,
     },
     pagination: {

@@ -5,48 +5,103 @@ import { PieceComponentKind } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getStoreIdForRead } from "@/lib/store-context"
 import { resolveStoreName } from "@/lib/invite-email"
+import { formatShortDate } from "@/lib/utils"
 import { tagPurity } from "@/components/inventory/stock/stock-qr-label"
+import {
+  DEFAULT_BARCODE_TAG_FIELDS,
+  DEFAULT_QR_TAG_FIELDS,
+  normalizeTagFields,
+  type StockTagField,
+} from "@/lib/stock-tag-fields"
 
-/** One printed barcode tag — see StockBarcodeLabel. */
-export type StockBarcodeTagData = {
+export type StockTagMetal = {
+  name: string
+  /** "18 KT", "925" — null for a metal with no purity. */
+  purity: string | null
+  /** Net weight of this metal, "1.794g". */
+  weight: string | null
+}
+
+export type StockTagStone = {
+  name: string
+  /** Stone Types, e.g. "Natural". */
+  types: string | null
+  carat: string | null
+  pieces: number | null
+  clarity: string | null
+  certificate: string | null
+}
+
+/** Everything a printed tag can show — StockQrLabel and StockBarcodeLabel
+ * pick from it per Settings > Tags. */
+export type StockTagData = {
   id: string
   storeName: string
-  /** Encoded in the barcode and printed under it: the tag number, else the stock code. */
+  /** Encoded in the barcode and printed as the tag code: the tag number, else the stock code. */
   code: string
+  stockCode: string
+  tagNumber: string | null
+  productName: string
+  productCode: string | null
+  category: string | null
+  /** Every metal in the piece — one row for a single-metal piece, one per
+   * metal row for a multi-part piece (gold + silver). */
+  metals: StockTagMetal[]
+  /** First metal's purity, the way it's written on a tag ("18 KT"). */
   karat: string | null
   grossWeight: string | null
   netWeight: string | null
-  /** One "DIA : ct / pcs" line per diamond row. */
-  diamonds: { carat: string; pieces: number | null }[]
-  /** Every non-diamond stone, summed. */
-  otherStoneCarat: string
-  otherStonePieces: number
+  stones: StockTagStone[]
+  stoneTotalCarat: string | null
+  stoneTotalPieces: number | null
+  manufactureDate: string | null
 }
 
-type StoneLine = { name: string; carat: number; pieces: number | null }
+export type StockTagSettings = { qr: StockTagField[]; barcode: StockTagField[] }
 
-const isDiamond = (name: string) => /diamond/i.test(name)
-
-/** "18K" → "18 KT", the way it's written on a tag; anything else as-is. */
+/** "18K" / "18" → "18 KT" for a gold-style label; anything else as-is. */
 function karatLabel(purity: string | null) {
   if (!purity) return null
-  const match = /^(\d+)\s*K(T)?$/i.exec(purity.trim())
-  return match ? `${match[1]} KT` : purity
+  const match = /^(\d+)\s*(K|KT)?$/i.exec(purity.trim())
+  if (!match) return purity
+  // A bare 3-digit label is a silver/platinum fineness (925, 999), not karat.
+  return match[2] || Number(match[1]) <= 24 ? `${match[1]} KT` : match[1]
 }
 
-function weight(value: unknown) {
+function grams(value: unknown) {
   if (value === null || value === undefined || value === "") return null
-  return Number(value).toFixed(3)
+  const number = Number(value)
+  return number > 0 ? `${number.toFixed(3)}g` : null
+}
+
+function carats(value: unknown) {
+  if (value === null || value === undefined || value === "") return null
+  const number = Number(value)
+  return number > 0 ? `${number.toFixed(2)}ct` : null
+}
+
+/** Settings > Tags — which fields each layout prints. A store with no
+ * BusinessSettings row yet prints the defaults. */
+export async function getStockTagSettings(): Promise<StockTagSettings> {
+  const storeId = await getStoreIdForRead()
+  const settings = await prisma.businessSettings.findUnique({
+    where: { storeId },
+    select: { qrTagFields: true, barcodeTagFields: true },
+  })
+  return {
+    qr: normalizeTagFields(settings?.qrTagFields, DEFAULT_QR_TAG_FIELDS),
+    barcode: normalizeTagFields(settings?.barcodeTagFields, DEFAULT_BARCODE_TAG_FIELDS),
+  }
 }
 
 /**
- * Tag data for the given stock items, scoped to the current store. Stones
- * come from the piece's own stone components when it has them (else its
- * single stone fields), with the piece count taken from the Product's
- * matching stone row — stock rows don't record a count of their own. A
- * piece with no stone data of its own falls back to the Product's rows.
+ * Tag data for the given stock items, scoped to the current store.
+ * Metals: the piece's own metal rows (multi-part), else its single metal.
+ * Stones: the piece's own stone rows, else its single stone fields, else the
+ * Product's stone rows. Pieces, clarity and certificate come from the
+ * Product's matching stone row — stock rows don't record them.
  */
-export async function getStockBarcodeTags(ids: string[]): Promise<StockBarcodeTagData[]> {
+export async function getStockTags(ids: string[]): Promise<StockTagData[]> {
   if (ids.length === 0) return []
   const storeId = await getStoreIdForRead()
 
@@ -64,17 +119,40 @@ export async function getStockBarcodeTags(ids: string[]): Promise<StockBarcodeTa
         grossWeight: true,
         netWeight: true,
         stoneMetalTypeName: true,
+        stoneTypeNames: true,
         caratWeight: true,
+        manufactureDate: true,
+        metalType: { select: { name: true } },
         components: {
-          where: { kind: PieceComponentKind.STONE },
           orderBy: { sortOrder: "asc" },
-          select: { stoneMetalTypeName: true, caratWeight: true },
+          select: {
+            kind: true,
+            metalType: { select: { name: true } },
+            purity: true,
+            purityLabel: true,
+            netWeight: true,
+            grossWeight: true,
+            stoneMetalTypeName: true,
+            stoneTypeNames: true,
+            caratWeight: true,
+          },
         },
         product: {
           select: {
+            name: true,
+            productCode: true,
+            category: { select: { name: true } },
+            categoryType: { select: { name: true } },
             stoneComponents: {
               orderBy: { sortOrder: "asc" },
-              select: { stoneMetalTypeName: true, caratWeight: true, pieces: true },
+              select: {
+                stoneMetalTypeName: true,
+                stoneTypeNames: true,
+                caratWeight: true,
+                pieces: true,
+                clarity: true,
+                certificateNumber: true,
+              },
             },
           },
         },
@@ -85,54 +163,81 @@ export async function getStockBarcodeTags(ids: string[]): Promise<StockBarcodeTa
   return rows.map((stock) => {
     const productStones = stock.product?.stoneComponents ?? []
 
-    // Pcs for the nth stock row named X = the product's nth row named X.
+    // Details for the nth stock stone named X = the product's nth row named X.
     const seen = new Map<string, number>()
-    const piecesFor = (name: string) => {
+    const productStoneFor = (name: string) => {
       const nth = seen.get(name) ?? 0
       seen.set(name, nth + 1)
-      return productStones.filter((row) => row.stoneMetalTypeName === name)[nth]?.pieces ?? null
+      return productStones.filter((row) => row.stoneMetalTypeName === name)[nth]
+    }
+    const stoneLine = (name: string, types: string | null, carat: unknown): StockTagStone => {
+      const match = productStoneFor(name)
+      return {
+        name,
+        types: types || match?.stoneTypeNames || null,
+        carat: carats(carat ?? match?.caratWeight),
+        pieces: match?.pieces ?? null,
+        clarity: match?.clarity ?? null,
+        certificate: match?.certificateNumber ?? null,
+      }
     }
 
-    let stones: StoneLine[] = stock.components
-      .filter((row) => row.stoneMetalTypeName)
-      .map((row) => ({
-        name: row.stoneMetalTypeName!,
-        carat: Number(row.caratWeight ?? 0),
-        pieces: piecesFor(row.stoneMetalTypeName!),
-      }))
-
-    if (stones.length === 0 && stock.stoneMetalTypeName) {
-      stones = [
+    const metalRows = stock.components.filter((row) => row.kind === PieceComponentKind.METAL)
+    let metals: StockTagMetal[] = metalRows.map((row) => ({
+      name: row.metalType?.name ?? "Metal",
+      purity: karatLabel(tagPurity(row.purityLabel, row.purity)),
+      weight: grams(row.netWeight ?? row.grossWeight),
+    }))
+    if (metals.length === 0 && stock.metalType) {
+      metals = [
         {
-          name: stock.stoneMetalTypeName,
-          carat: Number(stock.caratWeight ?? 0),
-          pieces: piecesFor(stock.stoneMetalTypeName),
+          name: stock.metalType.name,
+          purity: karatLabel(tagPurity(stock.purityLabel, stock.purity)),
+          weight: grams(stock.netWeight),
         },
       ]
+    }
+
+    let stones: StockTagStone[] = stock.components
+      .filter((row) => row.kind === PieceComponentKind.STONE && row.stoneMetalTypeName)
+      .map((row) => stoneLine(row.stoneMetalTypeName!, row.stoneTypeNames, row.caratWeight))
+
+    if (stones.length === 0 && stock.stoneMetalTypeName) {
+      stones = [stoneLine(stock.stoneMetalTypeName, stock.stoneTypeNames, stock.caratWeight)]
     }
 
     if (stones.length === 0) {
       stones = productStones.map((row) => ({
         name: row.stoneMetalTypeName,
-        carat: Number(row.caratWeight ?? 0),
+        types: row.stoneTypeNames,
+        carat: carats(row.caratWeight),
         pieces: row.pieces,
+        clarity: row.clarity,
+        certificate: row.certificateNumber,
       }))
     }
 
-    const others = stones.filter((stone) => !isDiamond(stone.name))
+    const totalCarat = stones.reduce((sum, stone) => sum + (stone.carat ? parseFloat(stone.carat) : 0), 0)
+    const totalPieces = stones.reduce((sum, stone) => sum + (stone.pieces ?? 0), 0)
+    const category = [stock.product?.category?.name, stock.product?.categoryType?.name].filter(Boolean).join(" · ")
 
     return {
       id: stock.id,
       storeName,
       code: stock.tagNumber || stock.stockCode,
-      karat: karatLabel(tagPurity(stock.purityLabel, stock.purity)),
-      grossWeight: weight(stock.grossWeight),
-      netWeight: weight(stock.netWeight),
-      diamonds: stones
-        .filter((stone) => isDiamond(stone.name))
-        .map((stone) => ({ carat: stone.carat.toFixed(2), pieces: stone.pieces })),
-      otherStoneCarat: Number(others.reduce((sum, stone) => sum + stone.carat, 0).toFixed(2)).toString(),
-      otherStonePieces: others.reduce((sum, stone) => sum + (stone.pieces ?? 0), 0),
+      stockCode: stock.stockCode,
+      tagNumber: stock.tagNumber || null,
+      productName: stock.product?.name ?? "-",
+      productCode: stock.product?.productCode ?? null,
+      category: category || null,
+      metals,
+      karat: metals[0]?.purity ?? null,
+      grossWeight: grams(stock.grossWeight),
+      netWeight: grams(stock.netWeight),
+      stones,
+      stoneTotalCarat: totalCarat > 0 ? `${totalCarat.toFixed(2)}ct` : null,
+      stoneTotalPieces: totalPieces > 0 ? totalPieces : null,
+      manufactureDate: stock.manufactureDate ? formatShortDate(stock.manufactureDate) : null,
     }
   })
 }

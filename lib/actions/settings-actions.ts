@@ -11,6 +11,7 @@ import { MONEY_UNIT } from "@/lib/business-units";
 import { getAvailableBusinessUnitOptions } from "@/lib/business-units.server";
 import { LEGACY_PLACEHOLDER_BUSINESS_NAME } from "@/lib/constants/app";
 import { logger } from "@/lib/logger";
+import { normalizeTagFields } from "@/lib/stock-tag-fields";
 
 export type BusinessSettings = {
   storeId: string;
@@ -531,5 +532,37 @@ export async function updateSkuFormat(
   } catch (error) {
     logger.error("updateSkuFormat error", error);
     return { success: false, message: actionErrorMessage(error, "Failed to update SKU format") };
+  }
+}
+/**
+ * Settings > Tags: which fields the QR and Barcode stock tags print, in
+ * order (lib/stock-tag-fields.ts). Each layout is submitted as repeated
+ * `qrTagFields` / `barcodeTagFields` values in display order.
+ */
+export async function updateStockTagFields(
+  prevState: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return { success: false, message: "Only the Store Owner can update these settings." };
+  }
+
+  try {
+    const qrTagFields = normalizeTagFields(formData.getAll("qrTagFields").map(String), []);
+    const barcodeTagFields = normalizeTagFields(formData.getAll("barcodeTagFields").map(String), []);
+
+    await getBusinessSettings();
+    const storeId = await requireStoreScope();
+    await prisma.businessSettings.update({ where: { storeId }, data: { qrTagFields, barcodeTagFields } });
+
+    revalidatePath("/settings/tags");
+    revalidatePath("/inventory/stock");
+
+    return { success: true, message: "Tag fields saved" };
+  } catch (error) {
+    logger.error("updateStockTagFields error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to save tag fields") };
   }
 }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { UserRole } from "@prisma/client";
 import { redirect } from "next/navigation";
 
-import { getStoreMetals, getStoreCategories, getStoreStyles } from "@/lib/actions/taxonomy-actions";
+import { getStoreMetals, getStoreCategories, getStoreStyles, getMisconfiguredPurities } from "@/lib/actions/taxonomy-actions";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { getCurrentUser } from "@/lib/auth/auth";
 
@@ -25,11 +25,12 @@ export default async function TaxonomySettingsPage() {
     currentUser?.role === UserRole.SUPER_ADMIN;
   if (!canEdit) redirect("/dashboard");
 
-  const [metals, categories, styles, businessSettings] = await Promise.all([
+  const [metals, categories, styles, businessSettings, misconfiguredPurities] = await Promise.all([
     getStoreMetals(),
     getStoreCategories(),
     getStoreStyles(),
     getBusinessSettings(),
+    getMisconfiguredPurities(),
   ]);
 
   const sampleMetal = metals.find((metal) => !metal.isGemstone && metal.isActive) ?? metals[0];
@@ -50,6 +51,7 @@ export default async function TaxonomySettingsPage() {
         metals={metals}
         categories={categories}
         canEdit={canEdit}
+        misconfiguredPurities={misconfiguredPurities}
       />
 
       <StyleSettingsForm styles={styles} canEdit={canEdit} />

@@ -11,6 +11,8 @@ import {
 import { useToast } from "@/components/providers/toast-provider"
 import { todayForDateInput } from "@/lib/date-input"
 import { computeRoundOff } from "@/lib/round-off"
+import { computeGst } from "@/lib/gst"
+import type { GstScheme } from "@prisma/client"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -47,6 +49,14 @@ type KachaInvoiceSummary = {
     netWeight: number | null
     rate: number | null
     lineTotal: number
+    purity: string | null
+    caratWeight: number | null
+    makingCharge: number
+    hmCharge: number
+    stoneCharge: number
+    /** A piece made of several metals/stones — its rows, each with its own
+     * snapshotted GST rate (null → the rate picked here). */
+    components?: { amount: number; gstRatePercent?: number | null }[]
   }[]
 }
 
@@ -62,6 +72,80 @@ type ConvertToPakkaFormProps = {
    * Defaults true so an existing caller not yet passing this keeps
    * showing it. */
   showDueDate?: boolean
+  /** BusinessSettings.gstScheme / .state and the slip's customer state —
+   * the same three inputs convertKachaToPakka feeds computeGst(), so the
+   * preview's SGST+CGST vs IGST split (and Composition's zero) match. */
+  gstScheme: GstScheme
+  storeState: string | null
+  customerState: string | null
+}
+
+type RateGroup = { ratePercent: number; sgst: number; cgst: number; igst: number }
+
+/**
+ * Mirror of convertKachaToPakka's per-item tax (lib/actions/kacha-invoice-
+ * actions.ts) — keep the two in step. A single-metal item is taxed at the
+ * picked rate on rate × net (carats for DIAMOND) + making + HM + stone,
+ * unrounded; a multi-part item taxes each row's amount × quantity at the
+ * row's own rate (fallback: the picked one) and making + HM at the picked
+ * rate, each part's SGST/CGST/IGST rounded to paise. The slip-level
+ * discount is not taken off the tax base — the server doesn't either.
+ */
+function previewTax(
+  items: KachaInvoiceSummary["items"],
+  pickedRate: number,
+  scheme: GstScheme,
+  storeState: string | null,
+  customerState: string | null,
+) {
+  const round = (value: number) => Math.round(value * 100) / 100
+  const groups = new Map<number, RateGroup>()
+  let taxAmount = 0
+  const add = (ratePercent: number, part: { sgst: number; cgst: number; igst: number }) => {
+    const group = groups.get(ratePercent) ?? { ratePercent, sgst: 0, cgst: 0, igst: 0 }
+    group.sgst += part.sgst
+    group.cgst += part.cgst
+    group.igst += part.igst
+    groups.set(ratePercent, group)
+  }
+  for (const item of items) {
+    const components = item.components ?? []
+    if (!components.length) {
+      const taxable =
+        (item.rate ?? 0) * ((item.purity === "DIAMOND" ? item.caratWeight : item.netWeight) ?? 0) +
+        item.makingCharge +
+        item.hmCharge +
+        item.stoneCharge
+      const gst = computeGst(taxable, pickedRate, scheme, storeState, customerState)
+      add(pickedRate, gst)
+      taxAmount += gst.sgst + gst.cgst + gst.igst
+      continue
+    }
+    const quantity = item.quantity || 1
+    const parts = [
+      ...components.map((row) => ({
+        ratePercent: row.gstRatePercent ?? pickedRate,
+        taxable: row.amount * quantity,
+      })),
+      { ratePercent: pickedRate, taxable: item.makingCharge + item.hmCharge },
+    ]
+    let sgst = 0
+    let cgst = 0
+    let igst = 0
+    for (const part of parts) {
+      const gst = computeGst(part.taxable, part.ratePercent, scheme, storeState, customerState)
+      const rounded = { sgst: round(gst.sgst), cgst: round(gst.cgst), igst: round(gst.igst) }
+      add(part.ratePercent, rounded)
+      sgst += rounded.sgst
+      cgst += rounded.cgst
+      igst += rounded.igst
+    }
+    taxAmount += round(sgst) + round(cgst) + round(igst)
+  }
+  const rateGroups = [...groups.values()]
+    .filter((g) => g.sgst + g.cgst + g.igst !== 0)
+    .sort((a, b) => a.ratePercent - b.ratePercent)
+  return { taxAmount, rateGroups }
 }
 
 export function ConvertToPakkaForm({
@@ -69,6 +153,9 @@ export function ConvertToPakkaForm({
   gstRates,
   defaultGstRate,
   showDueDate = true,
+  gstScheme,
+  storeState,
+  customerState,
 }: ConvertToPakkaFormProps) {
   const router = useRouter()
   const toast = useToast()
@@ -92,10 +179,12 @@ export function ConvertToPakkaForm({
   const gstRate = selectedGstRate?.ratePercent ?? defaultGstRate
   const [notes, setNotes] = useState(kachaInvoice.notes ?? "")
 
-  const taxAmount = useMemo(
-    () => Math.round(((taxableAmount * gstRate) / 100) * 100) / 100,
-    [taxableAmount, gstRate],
+  const { taxAmount, rateGroups } = useMemo(
+    () => previewTax(kachaInvoice.items, gstRate, gstScheme, storeState, customerState),
+    [kachaInvoice.items, gstRate, gstScheme, storeState, customerState],
   )
+  const isComposition = gstScheme === "COMPOSITION"
+  const isInterState = rateGroups.some((g) => g.igst !== 0)
 
   const rawTotal = taxableAmount + taxAmount
   // Live preview of the same server-side round-off convertKachaToPakka
@@ -132,7 +221,7 @@ export function ConvertToPakkaForm({
       }}
       className="space-y-6"
     >
-      <input type="hidden" name="taxAmount" value={taxAmount} />
+      <input type="hidden" name="taxAmount" value={Math.round(taxAmount * 100) / 100} />
       <input type="hidden" name="gstRateId" value={gstRateId} />
 
       <div className="rounded-xl border bg-card p-6 space-y-4">
@@ -220,10 +309,44 @@ export function ConvertToPakkaForm({
           <span>Subtotal + Charges</span>
           <span>₹{taxableAmount.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between">
-          <span>GST ({gstRate}%)</span>
-          <span>₹{taxAmount.toFixed(2)}</span>
-        </div>
+        {isComposition ? (
+          <div className="flex justify-between">
+            <span>GST (Composition scheme — none charged)</span>
+            <span>₹0.00</span>
+          </div>
+        ) : rateGroups.length > 1 ? (
+          <>
+            {rateGroups.map((group) => (
+              <div key={group.ratePercent} className="flex justify-between">
+                <span>
+                  {isInterState ? "IGST" : "GST"} {group.ratePercent}%
+                  {!isInterState && (
+                    <span className="text-xs text-muted-foreground">
+                      {" "}(SGST ₹{group.sgst.toFixed(2)} + CGST ₹{group.cgst.toFixed(2)})
+                    </span>
+                  )}
+                </span>
+                <span>₹{(group.sgst + group.cgst + group.igst).toFixed(2)}</span>
+              </div>
+            ))}
+            <div className="flex justify-between font-medium">
+              <span>Total GST</span>
+              <span>₹{taxAmount.toFixed(2)}</span>
+            </div>
+          </>
+        ) : (
+          <div className="flex justify-between">
+            <span>
+              {isInterState ? "IGST" : "GST"} ({rateGroups[0]?.ratePercent ?? gstRate}%)
+              {!isInterState && rateGroups[0] && (
+                <span className="text-xs text-muted-foreground">
+                  {" "}(SGST ₹{rateGroups[0].sgst.toFixed(2)} + CGST ₹{rateGroups[0].cgst.toFixed(2)})
+                </span>
+              )}
+            </span>
+            <span>₹{taxAmount.toFixed(2)}</span>
+          </div>
+        )}
         {roundOffAmount !== 0 && (
           <div className="flex justify-between">
             <span>Round Off</span>

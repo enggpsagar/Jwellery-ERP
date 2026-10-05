@@ -112,6 +112,11 @@ test("old gold worth less than the bill is bought, stocked at 24K and adjusted",
   expect(Number(credit?.amount)).toBeCloseTo(12824, 2)
   expect(credit?.customerId).toBe(invoice!.customerId)
 
+  // The printed invoice shows what was bought and the net payable.
+  await page.goto(`/billing/${invoice!.id}/print`)
+  await expect(page.getByText(/Less: Bought from customer/).first()).toBeVisible()
+  await expect(page.getByText("Net payable").first()).toBeVisible()
+
   await page.goto("/purchases/exchanges")
   await expect(page.getByRole("link", { name: exchange!.purchaseNumber })).toBeVisible()
   expect(crashes).toEqual([])
@@ -242,4 +247,125 @@ test("the old /billing/old-gold link redirects to Purchases → From Customers",
   await page.goto("/billing/old-gold")
   await page.waitForURL(/\/purchases\/exchanges$/)
   await page.getByRole("heading", { name: "Bought from Customers" }).waitFor()
+})
+
+test("an exchange can be added to an existing invoice from Edit Invoice", async ({ page }) => {
+  const crashes = watchForPageCrash(page)
+  const storeId = await setUpGold22K()
+  const itemName = `E2E Exchange Later ${Date.now()}`
+
+  // A plain invoice first, no exchange.
+  await fillSaleLine(page, itemName, "6000")
+  await page.getByRole("button", { name: "Create Invoice" }).click()
+  await page.waitForURL(/\/billing\/(?!new)[^/]+$/)
+  const invoice = await db().invoice.findFirst({ where: { storeId, items: { some: { itemName } } } })
+  const ledgerBefore = await db().ledgerEntry.findMany({ where: { customerId: invoice!.customerId, storeId } })
+  const balanceOf = (rows: { type: string; amount: unknown }[]) =>
+    rows.reduce((sum, row) => sum + (row.type === "DEBIT" ? Number(row.amount) : -Number(row.amount)), 0)
+
+  // Edit → add 2 g of 22K at ₹7,000 pure = ₹12,824.
+  await page.goto(`/billing/${invoice!.id}/edit`)
+  await addOldGold(page, "2", "0", "7000")
+  await page.getByRole("button", { name: "Update Changes" }).click()
+  await page.waitForURL(/\/billing\/[^/]+$/)
+
+  const updated = await db().invoice.findUnique({ where: { id: invoice!.id }, include: { oldGoldExchange: true } })
+  expect(updated!.oldGoldExchange?.isOldGoldExchange).toBe(true)
+  expect(Number(updated!.oldGoldExchange?.oldGoldAppliedAmount)).toBeCloseTo(12824, 2)
+  expect(Number(updated!.paidAmount)).toBeCloseTo(12824, 2)
+  expect(Number(updated!.balanceAmount)).toBeCloseTo(Number(updated!.totalAmount) - 12824, 2)
+  // The customer's balance drops by exactly the exchange value — no double credit.
+  const ledgerAfter = await db().ledgerEntry.findMany({ where: { customerId: invoice!.customerId, storeId } })
+  expect(balanceOf(ledgerAfter)).toBeCloseTo(balanceOf(ledgerBefore) - 12824, 2)
+
+  // A second edit shows it read-only instead of offering another one.
+  await page.goto(`/billing/${invoice!.id}/edit`)
+  await expect(page.getByText("Bought from customer (exchange)")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Add item bought" })).toHaveCount(0)
+  expect(crashes).toEqual([])
+})
+
+test("an Estimate (Kacha slip) can take old gold, and keeps it when converted", async ({ page }) => {
+  const crashes = watchForPageCrash(page)
+  const storeId = await setUpGold22K()
+  const itemName = `E2E Exchange Slip ${Date.now()}`
+  const field = (label: string) =>
+    page.locator("div.space-y-1").filter({ has: page.getByText(label, { exact: true }) }).locator("input").first()
+
+  await page.goto("/billing/kacha/new")
+  await page.getByRole("combobox").filter({ hasText: "Select a party" }).click()
+  await page.getByRole("option", { name: /Ananya Kulkarni/ }).click()
+  await field("Item Name").fill(itemName)
+  await field("Net Weight").fill("5")
+  await field("Rate / g").fill("6000")
+  await page.getByRole("combobox").filter({ hasText: "Not recorded" }).click()
+  await page.getByRole("option", { name: /Chandra Bullion Suppliers/ }).click()
+  // 2 g of 22K → 1.832 g pure × ₹7,000 = ₹12,824 off the slip.
+  await addOldGold(page, "2", "0", "7000")
+  await page.getByRole("button", { name: "Create Estimate" }).click()
+  await page.waitForURL(/\/billing\/kacha\/(?!new)[^/]+$/)
+  await expect(page.getByText("Bought from customer (exchange)")).toBeVisible()
+
+  const slip = await db().kachaInvoice.findFirst({
+    where: { storeId, items: { some: { itemName } } },
+    include: { oldGoldExchange: true },
+  })
+  expect(slip!.oldGoldExchange?.isOldGoldExchange).toBe(true)
+  expect(Number(slip!.paidAmount)).toBeCloseTo(12824, 2)
+
+  await page.goto(`/billing/kacha/${slip!.id}/convert`)
+  await page.getByRole("button", { name: "Convert to Tax Invoice" }).click()
+  await page.waitForURL(/\/billing\/(?!kacha)[^/]+$/)
+  const exchange = await db().purchase.findUnique({ where: { id: slip!.oldGoldExchange!.id } })
+  expect(exchange!.exchangeKachaInvoiceId).toBe(slip!.id)
+  expect(exchange!.exchangeInvoiceId).toBeTruthy()
+  await expect(page.getByText("Bought from customer (exchange)")).toBeVisible()
+  expect(crashes).toEqual([])
+})
+
+test("a Quotation carries an exchange estimate that becomes real on conversion", async ({ page }) => {
+  const crashes = watchForPageCrash(page)
+  const storeId = await setUpGold22K()
+  const itemName = `E2E Exchange Quote ${Date.now()}`
+  const field = (label: string) =>
+    page.locator("div.space-y-1").filter({ has: page.getByText(label, { exact: true }) }).locator("input").first()
+
+  await page.goto("/quotations/new")
+  await page.getByRole("combobox").filter({ hasText: "Select a party" }).click()
+  await page.getByRole("option", { name: /Ananya Kulkarni/ }).click()
+  await field("Item Name").fill(itemName)
+  await field("Net Weight").fill("5")
+  await field("Rate / g").fill("6000")
+  await page.getByRole("combobox").filter({ hasText: "Not recorded" }).click()
+  await page.getByRole("option", { name: /Chandra Bullion Suppliers/ }).click()
+
+  await page.getByRole("button", { name: "Add exchange item" }).click()
+  const section = page.getByTestId("old-gold-section")
+  await section.getByTestId("old-gold-metal").click()
+  await page.getByRole("option", { name: "Gold", exact: true }).click()
+  await section.getByTestId("old-gold-purity").click()
+  await page.getByRole("option", { name: /^22K/ }).click()
+  await section.getByTestId("old-gold-net").fill("2")
+  await section.getByTestId("old-gold-rate").fill("7000")
+  await page.getByRole("button", { name: "Create Quotation" }).click()
+  await page.waitForURL(/\/quotations\/(?!new)[^/]+$/)
+  await expect(page.getByText(/old gold \(estimate\)/).first()).toBeVisible()
+
+  const quotation = await db().quotation.findFirst({ where: { storeId, items: { some: { itemName } } } })
+  expect(quotation!.exchangeEstimate).toBeTruthy()
+  // An estimate buys nothing.
+  expect(await db().purchase.count({ where: { storeId, isOldGoldExchange: true, vendorId: quotation!.customerId, createdAt: { gte: quotation!.createdAt } } })).toBe(0)
+
+  await page.goto(`/quotations/${quotation!.id}/convert`)
+  await expect(page.getByLabel("Customer is handing over this old gold now")).toBeChecked()
+  await page.getByRole("button", { name: "Convert to Invoice" }).click()
+  await page.waitForURL(/\/billing\/[^/]+$/)
+  const invoice = await db().invoice.findFirst({
+    where: { storeId, items: { some: { itemName } } },
+    include: { oldGoldExchange: true },
+  })
+  expect(invoice!.oldGoldExchange?.isOldGoldExchange).toBe(true)
+  expect(Number(invoice!.oldGoldExchange?.totalAmount)).toBeCloseTo(12824, 2)
+  expect(Number(invoice!.paidAmount)).toBeCloseTo(12824, 2)
+  expect(crashes).toEqual([])
 })

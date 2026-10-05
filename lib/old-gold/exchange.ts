@@ -338,7 +338,10 @@ export async function recordOldGoldExchange(
     storeId: string;
     customerId: string;
     customerName: string;
-    invoiceId: string;
+    /** The Tax Invoice it's traded against — or, for an Estimate, the
+     *  Kacha slip (kachaInvoiceId); invoiceNumber is then the slip number. */
+    invoiceId?: string | null;
+    kachaInvoiceId?: string | null;
     invoiceNumber: string;
     lines: ResolvedOldGoldLine[];
     total: number;
@@ -444,7 +447,8 @@ export async function recordOldGoldExchange(
       createdByName: actor.name ?? actor.email ?? undefined,
       createdByRole: actor.role ?? undefined,
       isOldGoldExchange: true,
-      exchangeInvoiceId: invoiceId,
+      exchangeInvoiceId: invoiceId ?? null,
+      exchangeKachaInvoiceId: params.kachaInvoiceId ?? null,
       oldGoldAppliedAmount: applied,
       oldGoldExcessAmount: excess,
       oldGoldExcessMode: excess > 0 ? params.excessMode ?? OldGoldExcessMode.STORE_CREDIT : null,

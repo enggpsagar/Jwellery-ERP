@@ -19,9 +19,10 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `billing.spec.ts` | A "Create New Line Item" invoice line creates its Product (with Metal + Category) + Stock and sells it to 0, recording its (required) Purchased From party on the stock row; a new line missing Category is blocked; quantity can't exceed stock |
 | `source-party.spec.ts` | A hand-typed Kacha / Quotation line can't be saved without its Purchased From party; the party is stored on the line and shown on the detail page |
 | `fine-weight.spec.ts` | 22K stock is backfilled at 91.6% fine; a 22K invoice line saves 9.16 g fine for 10 g on the line and its stock |
-| `old-gold.spec.ts` | Customer Exchange: below the bill → EX- purchase, pure-24K stock, customer credit, adjusted; above → excess paid out; a gold piece with a diamond (stone off the gross, value added); a loose diamond per carat |
+| `old-gold.spec.ts` | Customer Exchange: below/above the bill, stones, loose diamonds, printed exchange rows, adding one on Edit Invoice (no double credit), on an Estimate (kept through conversion), and a Quotation estimate that becomes real on conversion |
 | `delivery-location.spec.ts` | New Invoice hides Delivery Location when Settings has none picked; shows it once one is |
 | `multi-part.spec.ts` | One piece of gold + silver + diamond on a sale line (per-row value & GST, gold-only pure weight on the line, stock + product breakdown, printed 1.5% GST group, per-row quick edit), a Customer Exchange item, a purchase line, and Kacha / Quotation lines that keep their rows when converted to an invoice |
+| `purity-check.spec.ts` | A 22K purity saved at 100% is flagged in Settings and fixed to 91.6% in one click |
 | `inventory.spec.ts` | Category → Type filters, Stone Type swap for a stone, footer totals (Products and Stock) |
 | `artisan.spec.ts` | Open Jobs → Receive Items; Receive Material's net weight calculation |
 | `dashboard.spec.ts` | Best Sellers card: every period and tab renders, ranked list shows |

@@ -8,6 +8,7 @@ import {
   InventoryTransactionType,
   LedgerEntryType,
   LedgerSourceType,
+  OldGoldExcessMode,
   PaymentMethod,
   PurityType,
   ChargeType,
@@ -34,7 +35,10 @@ import {
   resolveWritableLocationId,
   type LocationScope,
 } from "@/lib/location-scope";
-import { requireAuth, requireRole } from "@/lib/auth/auth";
+import { getCurrentUser, requireAuth, requireRole } from "@/lib/auth/auth";
+import { recordOldGoldExchange, resolveOldGoldLines, type OldGoldLineInput } from "@/lib/old-gold/exchange";
+import { round2, splitOldGoldValue } from "@/lib/old-gold/value";
+import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/piece-components-text";
 import { sendMail } from "@/lib/mailer";
 import { kachaSlipEmail, dataBackupEmail } from "@/lib/email-templates";
 import { formatShortDate } from "@/lib/utils";
@@ -706,7 +710,29 @@ export async function createKachaInvoice(
         message: "Add 1-2 valid payment methods with an amount, or leave Paid Now blank for a fully-on-credit slip.",
       };
     }
-    const paidAmount =
+    // Customer Exchange — what the customer sells the shop against this slip
+    // (lib/old-gold/exchange.ts), parsed and recomputed server-side exactly
+    // as createInvoice does; the form's figures are only a preview.
+    let oldGoldInput: OldGoldLineInput[] = [];
+    try {
+      const parsed = JSON.parse(String(formData.get("oldGoldJson") || "[]"));
+      oldGoldInput = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return { success: false, message: "Invalid customer exchange lines" };
+    }
+    const oldGold = await resolveOldGoldLines(storeId, oldGoldInput);
+    if ("error" in oldGold) return { success: false, message: oldGold.error };
+    const oldGoldExcessMode =
+      formData.get("oldGoldExcessMode") === OldGoldExcessMode.PAID_OUT
+        ? OldGoldExcessMode.PAID_OUT
+        : OldGoldExcessMode.STORE_CREDIT;
+    const oldGoldPayoutMethodRaw = String(formData.get("oldGoldPayoutMethod") || "");
+    const oldGoldPayoutMethod = (Object.values(PaymentMethod) as string[]).includes(oldGoldPayoutMethodRaw)
+      ? (oldGoldPayoutMethodRaw as PaymentMethod)
+      : null;
+    const oldGoldPayoutReference = String(formData.get("oldGoldPayoutReference") || "").trim() || null;
+
+    let paidAmount =
       paymentsRaw !== null
         ? payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
         : toNumber(formData.get("paidAmount"));
@@ -727,6 +753,22 @@ export async function createKachaInvoice(
     // rupee, with the (small, signed) adjustment recorded separately rather
     // than silently absorbed — see lib/round-off.ts.
     const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
+
+    // The exchange goes against the slip first (Kacha has no store-credit
+    // apply); cash only covers what's left, and any value beyond the slip is
+    // excess — kept as store credit or paid out, as chosen. Same order as
+    // createInvoice.
+    const oldGoldSplit = splitOldGoldValue(oldGold.total, totalAmount);
+    if (oldGoldSplit.excess > 0 && oldGoldExcessMode === OldGoldExcessMode.PAID_OUT && !oldGoldPayoutMethod) {
+      return { success: false, message: "Choose how the exchange balance is paid out to the customer." };
+    }
+    paidAmount = round2(paidAmount + oldGoldSplit.applied);
+    if (oldGoldSplit.applied > 0 && paidAmount > totalAmount + 0.01) {
+      return {
+        success: false,
+        message: `Payments exceed what's left to pay after the customer exchange (₹${Math.max(0, totalAmount - oldGoldSplit.applied).toFixed(2)}).`,
+      };
+    }
     const balanceAmount = Math.max(0, totalAmount - paidAmount);
 
     let status: InvoiceStatus = InvoiceStatus.PAID;
@@ -739,11 +781,13 @@ export async function createKachaInvoice(
 
     const customer = await prisma.customer.findFirst({
       where: { id: customerId, storeId },
-      select: { id: true },
+      select: { id: true, name: true },
     });
     if (!customer) {
       return { success: false, message: "Please select a party" };
     }
+    // Only the exchange's records carry who created them.
+    const actor = oldGold.lines.length ? await getCurrentUser() : null;
 
     // See resolveWritableLocationId's own doc comment — without this, a
     // location-restricted Staff user submitting no location at all saved
@@ -955,6 +999,35 @@ export async function createKachaInvoice(
             attachmentUrl: payment.attachmentUrl ?? undefined,
             locationId: resolvedLocationId ?? undefined,
             description: index === 0 ? `Payment received for ${slipNumber}` : undefined,
+          },
+        });
+      }
+
+      // Customer → Business half of a Customer Exchange: the EX purchase,
+      // its stock and the customer's OLD_GOLD_EXCHANGE credit (keyed by the
+      // purchase, not the slip) — alongside the SALE debit / PAYMENT_IN
+      // credits above, same as on an invoice.
+      if (oldGold.lines.length) {
+        await recordOldGoldExchange(tx, {
+          storeId,
+          customerId,
+          customerName: customer.name,
+          kachaInvoiceId: created.id,
+          invoiceNumber: slipNumber,
+          lines: oldGold.lines,
+          total: oldGold.total,
+          applied: oldGoldSplit.applied,
+          excess: oldGoldSplit.excess,
+          excessMode: oldGoldExcessMode,
+          payout: oldGoldPayoutMethod
+            ? { method: oldGoldPayoutMethod, reference: oldGoldPayoutReference }
+            : null,
+          locationId: resolvedLocationId,
+          actor: {
+            id: actor?.id ?? null,
+            name: actor?.name ?? null,
+            email: actor?.email ?? null,
+            role: (actor?.role as UserRole | undefined) ?? null,
           },
         });
       }
@@ -1262,6 +1335,16 @@ export async function convertKachaToPakka(
       await tx.kachaInvoice.updateMany({
         where: { id: kachaInvoiceId, storeId },
         data: { convertedToId: created.id, balanceAmount: 0, status: InvoiceStatus.PAID },
+      });
+
+      // A Customer Exchange recorded on the slip now also belongs to the Tax
+      // Invoice, so its detail page and prints show it. Nothing is posted:
+      // the exchange's OLD_GOLD_EXCHANGE credit was written when the slip was
+      // created, and its applied value is already in the slip's paidAmount
+      // carried over above.
+      await tx.purchase.updateMany({
+        where: { storeId, exchangeKachaInvoiceId: kachaInvoiceId, isOldGoldExchange: true },
+        data: { exchangeInvoiceId: created.id },
       });
 
       return created;
@@ -1853,7 +1936,12 @@ export async function deleteAllKachaInvoices(
       include: {
         customer: { select: { name: true, phone: true, gstin: true } },
         convertedTo: { select: { invoiceNumber: true } },
-        items: { include: { metalType: { select: { name: true } } } },
+        items: {
+          include: {
+            metalType: { select: { name: true } },
+            components: { orderBy: { sortOrder: "asc" }, include: { metalType: { select: { name: true } } } },
+          },
+        },
       },
     });
 
@@ -1903,6 +1991,7 @@ export async function deleteAllKachaInvoices(
         "Making Charge Type": item.makingChargeType,
         "Stone Charge": Number(item.stoneCharge),
         "Line Total": Number(item.lineTotal),
+        [METALS_AND_STONES_COLUMN]: describePieceComponentsText(item.components),
       })),
     );
 
@@ -1981,7 +2070,11 @@ export async function emailKachaInvoiceAction(
         where: { id: kachaInvoiceId, storeId },
         include: {
           customer: { select: { name: true, email: true } },
-          items: true,
+          items: {
+            include: {
+              components: { orderBy: { sortOrder: "asc" }, include: { metalType: { select: { name: true } } } },
+            },
+          },
         },
       }),
       resolveStoreName(storeId),
@@ -2006,6 +2099,7 @@ export async function emailKachaInvoiceAction(
         makingCharge: Number(item.makingCharge),
         stoneCharge: Number(item.stoneCharge),
         lineTotal: Number(item.lineTotal),
+        components: item.components,
       })),
       subtotal: Number(kachaInvoice.subtotal),
       makingCharges: Number(kachaInvoice.makingCharges),

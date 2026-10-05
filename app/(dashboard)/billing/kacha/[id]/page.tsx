@@ -5,11 +5,13 @@ import { notFound } from "next/navigation"
 import { ArrowRightCircle, Printer } from "lucide-react"
 
 import { getKachaInvoiceById } from "@/lib/actions/kacha-invoice-actions"
+import { getKachaOldGoldExchange } from "@/lib/actions/old-gold-actions"
 import { formatShortDate } from "@/lib/utils"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordKachaPaymentDialog } from "@/components/billing/kacha/record-kacha-payment-dialog"
 import { EmailKachaInvoiceButton } from "@/components/billing/kacha/email-kacha-invoice-button"
 import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { InvoiceOldGoldCard } from "@/components/billing/invoice-old-gold-card"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
 
@@ -34,6 +36,9 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
   const kachaInvoice = await getKachaInvoice(id)
 
   if (!kachaInvoice) notFound()
+
+  // Customer Exchange traded in against this slip, if any.
+  const oldGoldExchange = await getKachaOldGoldExchange(kachaInvoice.id)
 
   // A column with nothing to show across every line item is dead weight,
   // not information — Making also carries the Hallmark charge sub-line, so
@@ -228,6 +233,10 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
           <span>₹{kachaInvoice.balanceAmount.toFixed(2)}</span>
         </div>
       </div>
+
+      {oldGoldExchange ? (
+        <InvoiceOldGoldCard totalLabel="Estimate total" exchange={oldGoldExchange} invoiceTotal={kachaInvoice.totalAmount} />
+      ) : null}
 
       {kachaInvoice.notes && (
         <div className="rounded-xl border bg-card p-6">

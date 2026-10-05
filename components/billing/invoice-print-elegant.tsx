@@ -8,8 +8,11 @@ import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { APP_NAME } from "@/lib/constants/app"
 import { PieceBreakdown } from "@/components/billing/piece-breakdown"
 import { gstRateGroups, hasMixedGst } from "@/lib/invoice-gst-summary"
+import { PrintExchangeRows, cashReceived, type PrintExchange } from "@/components/billing/print-exchange-rows"
 
 type InvoicePrintElegantProps = {
+  /** Customer Exchange traded in against this invoice, if any. */
+  exchange?: PrintExchange | null
   invoice: Invoice
   settings: BusinessSettings
 }
@@ -133,7 +136,7 @@ function SectionOrnament() {
  * flat fill) is still the theme, just carried through with more structural
  * craft than a single thin rule.
  */
-export function InvoicePrintElegant({ invoice, settings }: InvoicePrintElegantProps) {
+export function InvoicePrintElegant({ invoice, settings, exchange }: InvoicePrintElegantProps) {
   const businessAddressLines = [
     settings.address,
     [settings.city, settings.state].filter(Boolean).join(", "),
@@ -411,9 +414,10 @@ export function InvoicePrintElegant({ invoice, settings }: InvoicePrintElegantPr
                     ₹{fmt(invoice.totalAmount)}
                   </span>
                 </div>
+                <PrintExchangeRows exchange={exchange} invoiceTotal={invoice.totalAmount} rowClassName="flex justify-between border-b border-amber-200 p-1.5" />
                 <div className="flex justify-between border-b border-amber-200 p-1.5">
                   <span>Received</span>
-                  <span>₹{fmt(invoice.paidAmount)}</span>
+                  <span>₹{fmt(cashReceived(invoice.paidAmount, exchange))}</span>
                 </div>
                 <div className="flex justify-between p-1.5 font-bold text-red-600">
                   <span>Balance</span>

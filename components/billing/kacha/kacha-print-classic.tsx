@@ -6,10 +6,13 @@ import { formatShortDate } from "@/lib/utils"
 import type { KachaInvoice } from "@/lib/actions/kacha-invoice-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { PrintExchangeRows, cashReceived, type PrintExchange } from "@/components/billing/print-exchange-rows"
 
 type KachaPrintClassicProps = {
   kachaInvoice: KachaInvoice
   settings: BusinessSettings
+  /** Customer Exchange traded in against this slip, if any. */
+  exchange?: PrintExchange | null
 }
 
 function fmt(value: number) {
@@ -44,7 +47,7 @@ const STATUS_LABELS: Record<string, string> = {
  * fresh here since a Kacha Slip has no GST fields at all (no tax rows/
  * columns, no rate-wise summary) — see KachaInvoice's own doc comment.
  */
-export function KachaPrintClassic({ kachaInvoice, settings }: KachaPrintClassicProps) {
+export function KachaPrintClassic({ kachaInvoice, settings, exchange }: KachaPrintClassicProps) {
   const businessAddressLines = [
     settings.address,
     [settings.city, settings.state].filter(Boolean).join(", "),
@@ -248,9 +251,10 @@ export function KachaPrintClassic({ kachaInvoice, settings }: KachaPrintClassicP
               <span>Total</span>
               <span>₹{fmt(kachaInvoice.totalAmount)}</span>
             </div>
+            <PrintExchangeRows exchange={exchange} invoiceTotal={kachaInvoice.totalAmount} rowClassName="flex justify-between border-b border-slate-300 p-1.5" />
             <div className="flex justify-between border-b border-slate-300 p-1.5">
               <span>Received</span>
-              <span>₹{fmt(kachaInvoice.paidAmount)}</span>
+              <span>₹{fmt(cashReceived(kachaInvoice.paidAmount, exchange))}</span>
             </div>
             <div className="flex justify-between p-1.5 font-bold text-red-600">
               <span>Balance</span>

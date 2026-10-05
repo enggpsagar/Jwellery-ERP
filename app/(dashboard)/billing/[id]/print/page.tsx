@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react"
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
+import { getInvoiceOldGoldExchange } from "@/lib/actions/old-gold-actions"
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button"
 import { InvoicePrintThermal } from "@/components/billing/invoice-print-thermal"
 import { InvoicePrintClassic } from "@/components/billing/invoice-print-classic"
@@ -32,7 +33,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function InvoicePrintPage({ params }: Props) {
   const { id } = await params
 
-  const [invoice, settings] = await Promise.all([getInvoice(id), getBusinessSettings()])
+  const [invoice, settings, exchange] = await Promise.all([
+    getInvoice(id),
+    getBusinessSettings(),
+    getInvoiceOldGoldExchange(id),
+  ])
 
   if (!invoice) notFound()
 
@@ -53,7 +58,7 @@ export default async function InvoicePrintPage({ params }: Props) {
           </Link>
           <InvoicePrintButton />
         </div>
-        <InvoicePrintThermal invoice={invoice} settings={settings} />
+        <InvoicePrintThermal invoice={invoice} settings={settings} exchange={exchange} />
       </div>
     )
   }
@@ -76,13 +81,13 @@ export default async function InvoicePrintPage({ params }: Props) {
         <InvoicePrintButton />
       </div>
       {settings.invoiceTemplate === "MODERN" ? (
-        <InvoicePrintModern invoice={invoice} settings={settings} />
+        <InvoicePrintModern invoice={invoice} settings={settings} exchange={exchange} />
       ) : settings.invoiceTemplate === "MINIMAL" ? (
-        <InvoicePrintMinimal invoice={invoice} settings={settings} />
+        <InvoicePrintMinimal invoice={invoice} settings={settings} exchange={exchange} />
       ) : settings.invoiceTemplate === "ELEGANT" ? (
-        <InvoicePrintElegant invoice={invoice} settings={settings} />
+        <InvoicePrintElegant invoice={invoice} settings={settings} exchange={exchange} />
       ) : (
-        <InvoicePrintClassic invoice={invoice} settings={settings} />
+        <InvoicePrintClassic invoice={invoice} settings={settings} exchange={exchange} />
       )}
     </div>
   )

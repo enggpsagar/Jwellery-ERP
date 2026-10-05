@@ -4,8 +4,11 @@ import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst"
 import type { Invoice } from "@/lib/actions/invoice-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { PrintExchangeRows, cashReceived, type PrintExchange } from "@/components/billing/print-exchange-rows"
 
 type InvoicePrintThermalProps = {
+  /** Customer Exchange traded in against this invoice, if any. */
+  exchange?: PrintExchange | null
   invoice: Invoice
   settings: BusinessSettings
 }
@@ -38,7 +41,7 @@ function lineQuantity(item: Invoice["items"][number]) {
  * at the bottom instead, same total figures as the A4 layout, just less
  * spread out.
  */
-export function InvoicePrintThermal({ invoice, settings }: InvoicePrintThermalProps) {
+export function InvoicePrintThermal({ invoice, settings, exchange }: InvoicePrintThermalProps) {
   const heading = documentHeading(settings.gstScheme)
   const subtotal = invoice.subtotal + invoice.makingCharges + invoice.stoneCharges
   const isInterState = invoice.items.some((item) => item.igstAmount > 0)
@@ -141,9 +144,10 @@ export function InvoicePrintThermal({ invoice, settings }: InvoicePrintThermalPr
           <span>Total</span>
           <span>₹{fmt(invoice.totalAmount)}</span>
         </div>
+        <PrintExchangeRows exchange={exchange} invoiceTotal={invoice.totalAmount} rowClassName="flex justify-between" />
         <div className="flex justify-between">
           <span>Received</span>
-          <span>₹{fmt(invoice.paidAmount)}</span>
+          <span>₹{fmt(cashReceived(invoice.paidAmount, exchange))}</span>
         </div>
         {invoice.balanceAmount > 0 && (
           <div className="flex justify-between font-bold">

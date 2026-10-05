@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react"
 
 import { getKachaInvoiceById } from "@/lib/actions/kacha-invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
+import { getKachaOldGoldExchange } from "@/lib/actions/old-gold-actions"
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button"
 import { KachaPrintThermal } from "@/components/billing/kacha/kacha-print-thermal"
 import { KachaPrintClassic } from "@/components/billing/kacha/kacha-print-classic"
@@ -39,7 +40,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function KachaInvoicePrintPage({ params }: Props) {
   const { id } = await params
 
-  const [kachaInvoice, settings] = await Promise.all([getKachaInvoice(id), getBusinessSettings()])
+  const [kachaInvoice, settings, exchange] = await Promise.all([
+    getKachaInvoice(id),
+    getBusinessSettings(),
+    getKachaOldGoldExchange(id),
+  ])
 
   if (!kachaInvoice) notFound()
 
@@ -65,7 +70,7 @@ export default async function KachaInvoicePrintPage({ params }: Props) {
     return (
       <div className="mx-auto max-w-md space-y-4 p-6 print:p-0">
         {headerRow}
-        <KachaPrintThermal kachaInvoice={kachaInvoice} settings={settings} />
+        <KachaPrintThermal kachaInvoice={kachaInvoice} settings={settings} exchange={exchange} />
       </div>
     )
   }
@@ -82,7 +87,7 @@ export default async function KachaInvoicePrintPage({ params }: Props) {
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6 print:p-0">
       {headerRow}
-      <KachaTemplate kachaInvoice={kachaInvoice} settings={settings} />
+      <KachaTemplate kachaInvoice={kachaInvoice} settings={settings} exchange={exchange} />
     </div>
   )
 }

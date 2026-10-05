@@ -4,6 +4,7 @@ import { COMPOSITION_DISCLAIMER } from "@/lib/gst"
 import type { Quotation } from "@/lib/actions/quotation-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { QuotationExchangeEstimateRows } from "@/components/quotations/quotation-exchange-estimate"
 
 type QuotationPrintThermalProps = {
   quotation: Quotation
@@ -153,6 +154,12 @@ export function QuotationPrintThermal({ quotation, settings }: QuotationPrintThe
           <span>Total</span>
           <span>₹{fmt(quotation.totalAmount)}</span>
         </div>
+        <QuotationExchangeEstimateRows
+          estimate={quotation.exchangeEstimate}
+          total={quotation.totalAmount}
+          rowClassName="flex justify-between gap-2"
+          netClassName="flex justify-between gap-2 font-bold"
+        />
       </div>
 
       {quotation.convertedToId && quotation.convertedTo && (

@@ -5,10 +5,13 @@ import { formatShortDate } from "@/lib/utils"
 import type { KachaInvoice } from "@/lib/actions/kacha-invoice-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { PrintExchangeRows, cashReceived, type PrintExchange } from "@/components/billing/print-exchange-rows"
 
 type KachaPrintElegantProps = {
   kachaInvoice: KachaInvoice
   settings: BusinessSettings
+  /** Customer Exchange traded in against this slip, if any. */
+  exchange?: PrintExchange | null
 }
 
 function fmt(value: number) {
@@ -89,7 +92,7 @@ function SectionOrnament() {
  * Total row. A faint centered logo watermark sits behind the whole card
  * when `settings.logoUrl` is set.
  */
-export function KachaPrintElegant({ kachaInvoice, settings }: KachaPrintElegantProps) {
+export function KachaPrintElegant({ kachaInvoice, settings, exchange }: KachaPrintElegantProps) {
   const businessAddressLines = [
     settings.address,
     [settings.city, settings.state].filter(Boolean).join(", "),
@@ -274,9 +277,10 @@ export function KachaPrintElegant({ kachaInvoice, settings }: KachaPrintElegantP
                     ₹{fmt(kachaInvoice.totalAmount)}
                   </span>
                 </div>
+                <PrintExchangeRows exchange={exchange} invoiceTotal={kachaInvoice.totalAmount} rowClassName="flex justify-between border-b border-amber-200 p-1.5" />
                 <div className="flex justify-between border-b border-amber-200 p-1.5">
                   <span>Received</span>
-                  <span>₹{fmt(kachaInvoice.paidAmount)}</span>
+                  <span>₹{fmt(cashReceived(kachaInvoice.paidAmount, exchange))}</span>
                 </div>
                 <div className="flex justify-between p-1.5 font-bold text-red-600">
                   <span>Balance</span>

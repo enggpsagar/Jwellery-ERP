@@ -11,6 +11,7 @@ import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
 import { getFinenessMap } from "@/lib/purity"
+import { getLatestMetalRates } from "@/lib/actions/metal-rate-actions"
 import { requireStoreScope } from "@/lib/store-context"
 
 import { QuotationForm } from "@/components/quotations/quotation-form"
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
 }
 
 export default async function NewQuotationPage() {
-  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, gstRates, enumFineness] =
+  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, gstRates, enumFineness, metalRates] =
     await Promise.all([
       getQuotationFormCustomers(),
       getQuotationFormStockItems(),
@@ -34,6 +35,7 @@ export default async function NewQuotationPage() {
       getCaratConversionRateMap(),
       getGstRates(),
       requireStoreScope().then(getFinenessMap),
+      getLatestMetalRates(),
     ])
 
   return (
@@ -63,6 +65,10 @@ export default async function NewQuotationPage() {
           gstScheme={businessSettings.gstScheme}
           storeState={businessSettings.state}
           enumFineness={enumFineness}
+          fineRates={{
+            gold: metalRates.latest ? Number(metalRates.latest.gold24k) : null,
+            silver: metalRates.latest ? Number(metalRates.latest.silver) : null,
+          }}
         />
       </ResetFormWrapper>
     </main>

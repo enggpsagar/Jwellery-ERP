@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation"
 import { getKachaInvoiceById } from "@/lib/actions/kacha-invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
+import { getCustomerById } from "@/lib/actions/customer-actions"
 import { ConvertToPakkaForm } from "@/components/billing/kacha/convert-to-pakka-form"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 
@@ -45,6 +46,10 @@ export default async function ConvertKachaToPakkaPage({ params }: Props) {
     redirect(`/billing/${kachaInvoice.convertedToId}`)
   }
 
+  // getKachaInvoiceById's customer select has no state, and the tax preview
+  // needs it for the same SGST+CGST vs IGST split convertKachaToPakka uses.
+  const customer = kachaInvoice.customer ? await getCustomerById(kachaInvoice.customer.id) : null
+
   return (
     <main className="space-y-6 p-6">
       <PageBackHeader
@@ -59,6 +64,9 @@ export default async function ConvertKachaToPakkaPage({ params }: Props) {
         gstRates={gstRates}
         defaultGstRate={businessSettings.defaultGstRate}
         showDueDate={businessSettings.showDueDate}
+        gstScheme={businessSettings.gstScheme}
+        storeState={businessSettings.state || null}
+        customerState={customer?.state || null}
       />
     </main>
   )

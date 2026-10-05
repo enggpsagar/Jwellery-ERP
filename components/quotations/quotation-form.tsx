@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
-import { Plus, Trash2 } from "lucide-react"
+import { Coins, Plus, Trash2 } from "lucide-react"
 import type { GstScheme, PurityType } from "@prisma/client"
 
 import { createQuotation, type QuotationFormState } from "@/lib/actions/quotation-actions"
@@ -58,6 +58,13 @@ import {
   type PieceComponentDraft,
   type StoredPieceComponent,
 } from "@/lib/piece-components"
+import {
+  OldGoldExchangeSection,
+  emptyOldGoldLine,
+  oldGoldLineAmounts,
+  serializeOldGoldLine,
+} from "@/components/billing/old-gold-exchange-section"
+import type { OldGoldLineDraft } from "@/lib/old-gold/value"
 
 type CustomerOption = {
   id: string
@@ -202,6 +209,8 @@ type QuotationDraft = {
   quotationDate: string
   validUntil: string
   notes: string
+  /** Customer Exchange estimate lines (optional — older drafts lack it). */
+  exchangeLines?: OldGoldLineDraft[]
 }
 
 type LocationOption = {
@@ -247,6 +256,9 @@ type QuotationFormProps = {
   /** Fineness % per legacy purity (getFinenessMap) — the multi-part editor's
    * pure-weight display. */
   enumFineness?: Record<string, number>
+  /** Today's fine rates (Metal Rates: gold24k / silver) — prefill a
+   * Customer Exchange estimate line's rate, same as New Invoice. */
+  fineRates?: { gold: number | null; silver: number | null }
 }
 
 export function QuotationForm({
@@ -265,6 +277,7 @@ export function QuotationForm({
   suppliers = [],
   supplierModuleEnabled = false,
   enumFineness = {},
+  fineRates = { gold: null, silver: null },
 }: QuotationFormProps) {
   // Every hand-typed line needs its source party — see sourcePartyId.
   const missingSourceParty = (lines: LineItem[]) =>
@@ -357,6 +370,11 @@ export function QuotationForm({
   const [locationSelectKey, setLocationSelectKey] = useState(0)
   const [items, setItems] = useState<LineItem[]>([emptyLineItem("initial")])
   const [discount, setDiscount] = useState(0)
+  // Customer Exchange ESTIMATE — what the customer says they'll trade in.
+  // A quotation buys nothing: these are only stored as an estimate
+  // (Quotation.exchangeEstimate) and become a real exchange only when the
+  // quotation is converted to an invoice (convert-to-invoice-form.tsx).
+  const [exchangeLines, setExchangeLines] = useState<OldGoldLineDraft[]>([])
   // A Composition-scheme store can never charge GST — so no rate is
   // selected at all regardless of the store's configured GST Rates.
   const [gstRateId, setGstRateId] = useState<string>(() => {
@@ -415,6 +433,7 @@ export function QuotationForm({
       quotationDate: formData ? String(formData.get("quotationDate") ?? "") : "",
       validUntil: formData ? String(formData.get("validUntil") ?? "") : "",
       notes: formData ? String(formData.get("notes") ?? "") : "",
+      exchangeLines,
     }
 
     try {
@@ -461,6 +480,7 @@ export function QuotationForm({
       setItems(nextItems)
       setLocationId(draft.locationId ?? "")
       setDiscount(draft.discount ?? 0)
+      if (draft.exchangeLines?.length) setExchangeLines(draft.exchangeLines)
       if (draft.gstRateId) setGstRateId(draft.gstRateId)
 
       if (formRef.current) {
@@ -485,7 +505,10 @@ export function QuotationForm({
       // show an empty Purity dropdown until something else happens to
       // trigger a fetch. Mirrors ReceiveItemsForm's own restore effect.
       const uniqueMetalTypeIds = Array.from(
-        new Set(nextItems.map((item) => item.metalTypeId).filter(Boolean)),
+        new Set([
+          ...nextItems.map((item) => item.metalTypeId),
+          ...(draft.exchangeLines ?? []).map((line) => line.metalTypeId),
+        ].filter(Boolean)),
       )
       for (const id of uniqueMetalTypeIds) ensureMetalPurities(id)
 
@@ -766,6 +789,22 @@ export function QuotationForm({
   // just shown here so the displayed Total already matches what gets saved.
   const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal)
 
+  // The exchange estimate is shown as a deduction only — the quotation's own
+  // Total is unchanged (createQuotation never folds it in).
+  const exchangeValue = exchangeLines.reduce(
+    (sum, line) =>
+      sum +
+      oldGoldLineAmounts(
+        line,
+        metalPuritiesCache[line.metalTypeId],
+        enumFineness,
+        Boolean(metalById.get(line.metalTypeId)?.isGemstone),
+        metalPuritiesCache,
+      ).total,
+    0,
+  )
+  const exchangeApplied = Math.min(exchangeValue, Math.max(totalAmount, 0))
+
   const itemsJson = JSON.stringify(
     items.map((item) => {
       // Every weight below is tracked internally in grams (see LineItem's
@@ -831,6 +870,11 @@ export function QuotationForm({
       <input type="hidden" name="sgstAmount" value={gstBreakdown.sgst} />
       <input type="hidden" name="cgstAmount" value={gstBreakdown.cgst} />
       <input type="hidden" name="igstAmount" value={gstBreakdown.igst} />
+      <input
+        type="hidden"
+        name="exchangeEstimateJson"
+        value={JSON.stringify(exchangeLines.map(serializeOldGoldLine))}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2 md:col-span-2 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -1372,6 +1416,63 @@ export function QuotationForm({
         </div>
       </div>
 
+      {/* Customer Exchange — an ESTIMATE only. Nothing is bought, no stock
+          moves and no ledger is posted from a quotation; the shop confirms
+          it on conversion, where it becomes a real exchange on the invoice.
+          The excess / payout choice is decided there too (excess={0}). */}
+      <section className="space-y-3" data-testid="quotation-exchange-estimate">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-amber-500/60 bg-amber-500/5 p-4">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
+              <Coins className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Customer Exchange — estimate</p>
+              <p className="text-xs text-muted-foreground">
+                Old gold, silver or diamonds the customer says they&apos;ll trade in. Nothing is bought until the
+                quotation is converted to an invoice.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {exchangeLines.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {exchangeLines.length} item{exchangeLines.length === 1 ? "" : "s"} ·{" "}
+                <span className="font-semibold text-foreground">₹{exchangeValue.toFixed(2)}</span> (estimate)
+              </p>
+            )}
+            <Button
+              type="button"
+              onClick={() => setExchangeLines((prev) => [...prev, emptyOldGoldLine()])}
+              className="bg-amber-500 text-white shadow-sm hover:bg-amber-600"
+            >
+              <Plus className="mr-1.5 size-4" />
+              Add exchange item
+            </Button>
+          </div>
+        </div>
+        <OldGoldExchangeSection
+          part="lines"
+          lines={exchangeLines}
+          onLinesChange={setExchangeLines}
+          metals={metals}
+          origins={origins}
+          onMetalsChange={setMetals}
+          onOriginsChange={setOrigins}
+          puritiesByMetal={metalPuritiesCache}
+          ensurePurities={ensureMetalPurities}
+          enumFineness={enumFineness}
+          fineRates={fineRates}
+          excess={0}
+          excessMode="STORE_CREDIT"
+          onExcessModeChange={() => {}}
+          payoutMethod=""
+          onPayoutMethodChange={() => {}}
+          payoutReference=""
+          onPayoutReferenceChange={() => {}}
+        />
+      </section>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <PercentOrFlatInput
@@ -1478,6 +1579,18 @@ export function QuotationForm({
           <span>Total</span>
           <span>₹{totalAmount.toFixed(2)}</span>
         </div>
+        {exchangeValue > 0 && (
+          <>
+            <div className="flex justify-between text-amber-700" data-testid="quotation-exchange-less">
+              <span>Less: old gold (estimate{exchangeValue > exchangeApplied ? `, value ₹${exchangeValue.toFixed(2)}` : ""})</span>
+              <span>-₹{exchangeApplied.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-semibold" data-testid="quotation-net-payable">
+              <span>Net payable (estimate)</span>
+              <span>₹{Math.max(0, totalAmount - exchangeApplied).toFixed(2)}</span>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="flex justify-end">

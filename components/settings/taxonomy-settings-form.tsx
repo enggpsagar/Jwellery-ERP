@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 
 import {
@@ -18,6 +18,7 @@ import {
   upsertStoreMetalPurity,
   toggleStoreMetalPurityActive,
   deleteStoreMetalPurity,
+  fixPurityFineness,
   upsertStoreCategory,
   toggleStoreCategoryActive,
   deleteStoreCategory,
@@ -29,6 +30,7 @@ import {
   type StoreMetalRow,
   type StoreMetalOriginRow,
   type StoreMetalPurityRow,
+  type MisconfiguredPurityRow,
   type StoreCategoryRow,
   type StoreCategoryTypeRow,
   type TaxonomyFormState,
@@ -51,6 +53,7 @@ import {
 import { useToast } from "@/components/providers/toast-provider";
 import { MetalCategoryImportDialog } from "@/components/settings/metal-category-import-dialog";
 import { StoneTypeImportDialog } from "@/components/settings/stone-type-import-dialog";
+import { finenessMismatch } from "@/lib/purity-fineness-check";
 // Note: StoneTypesSection below still uses the plain Select above for the
 // *parent stone* picker (unchanged) — only the child Stone Type value
 // itself moved from a fixed Select to a free-text Input, mirroring
@@ -62,12 +65,15 @@ type TaxonomySettingsFormProps = {
   metals: StoreMetalRow[];
   categories: StoreCategoryRow[];
   canEdit: boolean;
+  /** Purities whose fineness disagrees with their label (store-wide). */
+  misconfiguredPurities?: MisconfiguredPurityRow[];
 };
 
 export function TaxonomySettingsForm({
   metals,
   categories,
   canEdit,
+  misconfiguredPurities = [],
 }: TaxonomySettingsFormProps) {
   // Stones live in the same StoreMetal table as Metals (same metalTypeId FK
   // everywhere a product/stock/invoice/purchase line references one) — this
@@ -75,12 +81,21 @@ export function TaxonomySettingsForm({
   // already fetched, not a separate query.
   const metalRows = metals.filter((metal) => !metal.isGemstone);
   const stoneRows = metals.filter((metal) => metal.isGemstone);
+  // Bumped when a purity's fineness is fixed from the banner, so the
+  // Purities list (loaded per metal, client-side) re-reads its rows.
+  const [puritiesVersion, setPuritiesVersion] = useState(0);
 
   return (
     <div className="space-y-6">
+      <MisconfiguredPuritiesBanner
+        purities={misconfiguredPurities}
+        canEdit={canEdit}
+        onFixed={() => setPuritiesVersion((version) => version + 1)}
+      />
+
       <MetalsSection metals={metalRows} canEdit={canEdit} />
 
-      <PuritiesSection metals={metalRows} canEdit={canEdit} />
+      <PuritiesSection metals={metalRows} canEdit={canEdit} version={puritiesVersion} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <StonesSection stones={stoneRows} canEdit={canEdit} />
@@ -90,6 +105,89 @@ export function TaxonomySettingsForm({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <CategoriesSection categories={categories} metals={metalRows.concat(stoneRows)} canEdit={canEdit} />
         <TypesSection categories={categories} canEdit={canEdit} />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Purities whose fineness doesn't match their label — e.g. a "22K" saved at
+// 100% counts as pure gold in every 24K total (lib/purity-fineness-check.ts).
+// ---------------------------------------------------------------------------
+
+function formatFineness(value: number) {
+  return `${Number(value.toFixed(2))}%`;
+}
+
+function useFixPurityFineness(onFixed: () => void) {
+  const router = useRouter();
+  const toast = useToast();
+  const [fixingId, setFixingId] = useState<string | null>(null);
+
+  async function fix(id: string) {
+    try {
+      setFixingId(id);
+      const result = await fixPurityFineness(id);
+      if (result.success) {
+        toast.success(result.message);
+        onFixed();
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to fix purity fineness");
+    } finally {
+      setFixingId(null);
+    }
+  }
+
+  return { fix, fixingId };
+}
+
+function MisconfiguredPuritiesBanner({
+  purities,
+  canEdit,
+  onFixed,
+}: {
+  purities: MisconfiguredPurityRow[];
+  canEdit: boolean;
+  onFixed: () => void;
+}) {
+  const { fix, fixingId } = useFixPurityFineness(onFixed);
+  if (!purities.length) return null;
+
+  return (
+    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="font-medium">
+            {purities.length === 1 ? "1 purity looks wrong" : `${purities.length} purities look wrong`} — totals in 24K
+            would be off
+          </p>
+          <ul className="space-y-1">
+            {purities.map((purity) => (
+              <li key={purity.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span>
+                  {purity.metalName} {purity.label} is saved at {formatFineness(purity.finenessPercent)} fine — should be{" "}
+                  {formatFineness(purity.expectedFinenessPercent)}?
+                </span>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={() => fix(purity.id)}
+                    disabled={fixingId === purity.id}
+                    className="font-medium underline underline-offset-2 hover:no-underline disabled:opacity-50"
+                  >
+                    {fixingId === purity.id ? "Fixing…" : "Fix"}
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );
@@ -908,9 +1006,12 @@ function StoneTypeFormRow({
 function PuritiesSection({
   metals,
   canEdit,
+  version = 0,
 }: {
   metals: StoreMetalRow[];
   canEdit: boolean;
+  /** Changes when a purity was fixed elsewhere (the banner) — reload. */
+  version?: number;
 }) {
   const toast = useToast();
 
@@ -923,6 +1024,8 @@ function PuritiesSection({
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const purityEligibleMetals = metals.filter((metal) => metal.hasPurity);
+  const selectedMetalName = metals.find((metal) => metal.id === selectedMetalId)?.name ?? "";
+  const { fix, fixingId } = useFixPurityFineness(() => reloadPurities(selectedMetalId));
 
   const reloadPurities = React.useCallback(async (storeMetalId: string) => {
     if (!storeMetalId) {
@@ -967,6 +1070,12 @@ function PuritiesSection({
       cancelled = true;
     };
   }, [selectedMetalId]);
+
+  // A fix from the banner: re-read without resetting the edit/add state.
+  useEffect(() => {
+    if (version > 0) reloadPurities(selectedMetalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version]);
 
   async function handleToggle(id: string, isActive: boolean) {
     try {
@@ -1068,6 +1177,29 @@ function PuritiesSection({
                         {option.sellingPrice != null ? ` · ₹${option.sellingPrice}` : ""}
                         {option.isHallmarkable ? " · Hallmarkable" : ""}
                       </span>
+                      {(() => {
+                        const expected = finenessMismatch(selectedMetalName, option.label, option.finenessPercent);
+                        if (expected == null) return null;
+                        return (
+                          <span
+                            className="ml-2 inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-xs text-amber-900 no-underline dark:text-amber-200"
+                            title={`"${option.label}" usually means ${formatFineness(expected)} fine — at ${formatFineness(option.finenessPercent)} every 24K total for this purity is off`}
+                          >
+                            <AlertTriangle className="h-3 w-3" />
+                            Should be {formatFineness(expected)}?
+                            {canEdit ? (
+                              <button
+                                type="button"
+                                onClick={() => fix(option.id)}
+                                disabled={fixingId === option.id}
+                                className="font-medium underline underline-offset-2 hover:no-underline disabled:opacity-50"
+                              >
+                                {fixingId === option.id ? "Fixing…" : "Fix"}
+                              </button>
+                            ) : null}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {canEdit ? (

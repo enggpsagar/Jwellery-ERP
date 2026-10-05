@@ -1473,6 +1473,7 @@ export function PurchaseForm({
                       {item.multiPart && (
                         <span className="text-xs text-muted-foreground">
                           Each metal and stone has its own purity, weight, rate and GST rate.
+                          Enter each metal&apos;s purchase rate per gram from the vendor&apos;s bill — it isn&apos;t prefilled.
                         </span>
                       )}
                     </div>
@@ -1491,7 +1492,11 @@ export function PurchaseForm({
                             valuation="net"
                             gstRates={selectedVendor && isVendorGstApplicable(selectedVendor.gstType) ? gstRates : undefined}
                             defaultGstRateId={item.gstRateId}
-                            rateForMetal={(metal) => metal.sellingPrice ?? 0}
+                            // No rateForMetal: a metal row starts with an
+                            // empty rate. The only per-metal price on hand
+                            // is StoreMetal.sellingPrice — a SELLING price,
+                            // wrong as a purchase cost — so the user types
+                            // the vendor's actual rate per gram.
                             lockPhysical={isLinked}
                             testIdPrefix="purchase-piece"
                           />

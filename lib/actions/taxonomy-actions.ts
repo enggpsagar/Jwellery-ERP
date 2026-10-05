@@ -9,29 +9,7 @@ import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
 import { buildMultiSheetExcelExport, parseExcelWorkbook } from "@/lib/excel-export";
-import { DEFAULT_FINENESS, matchLegacyPurityType } from "@/lib/purity";
-import { classifyMetalName } from "@/lib/business-units";
-
-/**
- * Fineness % implied by a purity label when none is typed: the standard
- * figure for a known one (22K → 91.6, 925 → 92.5), else karat/24 for a
- * gold "nK" label, else a 3-digit millesimal (e.g. 958 → 95.8), else 100.
- */
-function defaultFinenessForLabel(metalName: string, label: string): number {
-  const family = classifyMetalName(metalName);
-  const legacy = matchLegacyPurityType(family, label);
-  if (legacy) return DEFAULT_FINENESS[legacy];
-
-  const karat = /^(\d{1,2}(?:\.\d+)?)\s*k(?:t|arat)?$/i.exec(label.trim());
-  if (karat && Number(karat[1]) > 0 && Number(karat[1]) <= 24) {
-    return Math.round((Number(karat[1]) / 24) * 1000) / 10;
-  }
-
-  const millesimal = /^(\d{3})$/.exec(label.trim());
-  if (millesimal && Number(millesimal[1]) <= 1000) return Number(millesimal[1]) / 10;
-
-  return 100;
-}
+import { defaultFinenessForLabel, expectedFinenessForLabel, finenessMismatch } from "@/lib/purity-fineness-check";
 
 export type StoreMetalRow = {
   id: string;
@@ -799,6 +777,91 @@ export async function deleteStoreMetalPurity(id: string): Promise<TaxonomyFormSt
   } catch (error) {
     logger.error("deleteStoreMetalPurity error", error);
     return { success: false, message: actionErrorMessage(error, "Failed to delete purity") };
+  }
+}
+
+// A purity whose saved fineness disagrees with what its label implies (a
+// "22K" at 100%) — every pure-weight total would be off. Settings flags
+// them (lib/purity-fineness-check.ts) and offers a one-click fix.
+export type MisconfiguredPurityRow = {
+  id: string;
+  storeMetalId: string;
+  metalName: string;
+  label: string;
+  finenessPercent: number;
+  expectedFinenessPercent: number;
+};
+
+export async function getMisconfiguredPurities(): Promise<MisconfiguredPurityRow[]> {
+  const storeId = await getStoreIdForRead();
+
+  const purities = await prisma.storeMetalPurity.findMany({
+    where: { storeId, storeMetal: { hasPurity: true } },
+    orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+    select: {
+      id: true,
+      storeMetalId: true,
+      label: true,
+      finenessPercent: true,
+      storeMetal: { select: { name: true } },
+    },
+  });
+
+  return purities.flatMap((row) => {
+    const finenessPercent = Number(row.finenessPercent);
+    const expected = finenessMismatch(row.storeMetal.name, row.label, finenessPercent);
+    return expected == null
+      ? []
+      : [
+          {
+            id: row.id,
+            storeMetalId: row.storeMetalId,
+            metalName: row.storeMetal.name,
+            label: row.label,
+            finenessPercent,
+            expectedFinenessPercent: expected,
+          },
+        ];
+  });
+}
+
+/**
+ * Resets one purity's fineness to the standard figure its label implies,
+ * recomputed here (never trusted from the client).
+ */
+export async function fixPurityFineness(id: string): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return { success: false, message: "Only the Store Owner can update these settings." };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const row = await prisma.storeMetalPurity.findFirst({
+      where: { id, storeId },
+      select: { label: true, storeMetal: { select: { name: true } } },
+    });
+    if (!row) return { success: false, message: "Purity not found" };
+
+    const expected = expectedFinenessForLabel(row.storeMetal.name, row.label);
+    if (expected == null) {
+      return { success: false, message: `"${row.label}" has no standard fineness — set it by hand.` };
+    }
+
+    const { count } = await prisma.storeMetalPurity.updateMany({
+      where: { id, storeId },
+      data: { finenessPercent: expected },
+    });
+    if (count === 0) return { success: false, message: "Purity not found" };
+
+    revalidatePath(TAXONOMY_PATH);
+
+    return { success: true, id, message: `${row.storeMetal.name} ${row.label} set to ${expected}% fine` };
+  } catch (error) {
+    logger.error("fixPurityFineness error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to fix purity fineness") };
   }
 }
 

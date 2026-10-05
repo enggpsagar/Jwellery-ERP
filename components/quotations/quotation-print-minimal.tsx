@@ -2,6 +2,7 @@ import { amountInWords } from "@/lib/number-to-words"
 import { formatShortDate } from "@/lib/utils"
 import { COMPOSITION_DISCLAIMER } from "@/lib/gst"
 import type { Quotation } from "@/lib/actions/quotation-actions"
+import { QuotationExchangeEstimateRows } from "@/components/quotations/quotation-exchange-estimate"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { APP_NAME } from "@/lib/constants/app"
 import { PieceBreakdown } from "@/components/billing/piece-breakdown"
@@ -327,6 +328,12 @@ export function QuotationPrintMinimal({ quotation, settings }: QuotationPrintMin
                   <span>Total</span>
                   <span className="tabular-nums">₹{fmt(quotation.totalAmount)}</span>
                 </div>
+                <QuotationExchangeEstimateRows
+                  estimate={quotation.exchangeEstimate}
+                  total={quotation.totalAmount}
+                  rowClassName="flex justify-between gap-3 text-xs"
+                  netClassName="flex justify-between gap-3 text-xs font-semibold"
+                />
               </div>
             </div>
           </div>

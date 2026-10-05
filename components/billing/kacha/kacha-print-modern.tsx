@@ -6,10 +6,13 @@ import { formatShortDate } from "@/lib/utils"
 import type { KachaInvoice } from "@/lib/actions/kacha-invoice-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { PrintExchangeRows, cashReceived, type PrintExchange } from "@/components/billing/print-exchange-rows"
 
 type KachaPrintModernProps = {
   kachaInvoice: KachaInvoice
   settings: BusinessSettings
+  /** Customer Exchange traded in against this slip, if any. */
+  exchange?: PrintExchange | null
 }
 
 function fmt(value: number) {
@@ -53,7 +56,7 @@ const STATUS_PILL_CLASSES: Record<string, string> = {
  * same gradient fill. A large, very faint centered logo watermark sits
  * behind the whole card when `settings.logoUrl` is set.
  */
-export function KachaPrintModern({ kachaInvoice, settings }: KachaPrintModernProps) {
+export function KachaPrintModern({ kachaInvoice, settings, exchange }: KachaPrintModernProps) {
   const businessAddressLines = [
     settings.address,
     [settings.city, settings.state].filter(Boolean).join(", "),
@@ -250,9 +253,10 @@ export function KachaPrintModern({ kachaInvoice, settings }: KachaPrintModernPro
                   <span>Total</span>
                   <span>₹{fmt(kachaInvoice.totalAmount)}</span>
                 </div>
+                <PrintExchangeRows exchange={exchange} invoiceTotal={kachaInvoice.totalAmount} rowClassName="flex justify-between border-b border-slate-100 px-3 py-1.5" />
                 <div className="flex justify-between border-b border-slate-100 px-3 py-1.5">
                   <span>Received</span>
-                  <span>₹{fmt(kachaInvoice.paidAmount)}</span>
+                  <span>₹{fmt(cashReceived(kachaInvoice.paidAmount, exchange))}</span>
                 </div>
                 <div className="flex justify-between px-3 py-1.5 font-bold text-red-600">
                   <span>Balance</span>

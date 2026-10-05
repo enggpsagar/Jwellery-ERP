@@ -6,8 +6,12 @@ import { useRouter } from "next/navigation"
 
 import {
   convertQuotationToInvoice,
+  type QuotationExchangeEstimate,
   type QuotationFormState,
 } from "@/lib/actions/quotation-actions"
+import { computeRoundOff } from "@/lib/round-off"
+import { splitOldGoldValue, type OldGoldExcessModeValue } from "@/lib/old-gold/value"
+import { QuotationExchangeEstimateCard } from "@/components/quotations/quotation-exchange-estimate"
 import { useToast } from "@/components/providers/toast-provider"
 import { todayForDateInput } from "@/lib/date-input"
 
@@ -26,6 +30,15 @@ import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 
 const initialState: QuotationFormState = { success: false, message: "" }
 
+// Same PaymentMethod values New Invoice's exchange payout offers.
+const PAYOUT_METHODS = [
+  { value: "CASH", label: "Cash" },
+  { value: "UPI", label: "UPI" },
+  { value: "NET_BANKING", label: "Net Banking" },
+  { value: "CHEQUE", label: "Cheque" },
+  { value: "OTHER", label: "Other" },
+]
+
 type QuotationSummary = {
   id: string
   quotationNumber: string
@@ -35,6 +48,8 @@ type QuotationSummary = {
   discount: number
   totalAmount: number
   notes: string | null
+  /** Customer Exchange estimate saved on the quotation, if any. */
+  exchangeEstimate?: QuotationExchangeEstimate | null
   customer: {
     name: string
     phone: string | null
@@ -130,7 +145,26 @@ export function ConvertToInvoiceForm({
     () => subtotalBeforeTax + taxAmount,
     [subtotalBeforeTax, taxAmount],
   )
-  const balanceAmount = Math.max(0, totalAmount - paidAmount)
+
+  // Customer Exchange estimate → real exchange on this invoice, only when
+  // the shop confirms the customer is handing it over now. The server
+  // re-resolves the lines with today's data and splits against the
+  // invoice's own rounded total less the cash paid now — previewed here
+  // the same way (its value may move a little from the quoted one).
+  const estimate = quotation.exchangeEstimate ?? null
+  const [exchangeConfirm, setExchangeConfirm] = useState(true)
+  const [exchangeExcessMode, setExchangeExcessMode] = useState<OldGoldExcessModeValue>("STORE_CREDIT")
+  const [exchangePayoutMethod, setExchangePayoutMethod] = useState("")
+  const [exchangePayoutReference, setExchangePayoutReference] = useState("")
+  const exchangeActive = Boolean(estimate) && exchangeConfirm
+  const roundedTotal = computeRoundOff(totalAmount).totalAmount
+  const exchangeSplit = exchangeActive && estimate
+    ? splitOldGoldValue(estimate.total, roundedTotal - paidAmount)
+    : { applied: 0, excess: 0 }
+  const exchangePayoutMissing =
+    exchangeSplit.excess > 0 && exchangeExcessMode === "PAID_OUT" && !exchangePayoutMethod
+
+  const balanceAmount = Math.max(0, totalAmount - paidAmount - exchangeSplit.applied)
 
   const convertAction = convertQuotationToInvoice.bind(null, quotation.id)
   const [state, formAction, pending] = useActionState(convertAction, initialState)
@@ -164,6 +198,14 @@ export function ConvertToInvoiceForm({
       <input type="hidden" name="taxAmount" value={taxAmount} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
       <input type="hidden" name="gstRateId" value={gstRateId} />
+      {estimate && (
+        <>
+          {exchangeConfirm && <input type="hidden" name="exchangeConfirm" value="on" />}
+          <input type="hidden" name="exchangeExcessMode" value={exchangeExcessMode} />
+          <input type="hidden" name="exchangePayoutMethod" value={exchangePayoutMethod} />
+          <input type="hidden" name="exchangePayoutReference" value={exchangePayoutReference} />
+        </>
+      )}
 
       <div className="rounded-xl border bg-card p-6 space-y-4">
         <h2 className="text-lg font-semibold">From Quotation {quotation.quotationNumber}</h2>
@@ -253,6 +295,77 @@ export function ConvertToInvoiceForm({
         </div>
       </div>
 
+      {estimate && (
+        <div className="space-y-3" data-testid="convert-exchange">
+          <QuotationExchangeEstimateCard estimate={estimate} />
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={exchangeConfirm}
+              onChange={(e) => setExchangeConfirm(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium">Customer is handing over this old gold now</span>
+              <span className="block text-xs text-muted-foreground">
+                It&apos;s bought into stock and adjusted against this invoice, re-valued with today&apos;s rates.
+                Untick to convert without the exchange.
+              </span>
+            </span>
+          </label>
+          {exchangeActive && exchangeSplit.excess > 0 && (
+            <div className="space-y-2 rounded-md border border-emerald-600/30 bg-emerald-600/10 p-3 text-sm">
+              <p className="font-medium text-emerald-800">
+                The old gold is worth ₹{exchangeSplit.excess.toFixed(2)} more than what&apos;s left on the bill. How does the
+                customer want the difference?
+              </p>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="exchangeExcessModeChoice"
+                    checked={exchangeExcessMode === "STORE_CREDIT"}
+                    onChange={() => setExchangeExcessMode("STORE_CREDIT")}
+                  />
+                  Keep as store credit
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="exchangeExcessModeChoice"
+                    checked={exchangeExcessMode === "PAID_OUT"}
+                    onChange={() => setExchangeExcessMode("PAID_OUT")}
+                  />
+                  Pay it out now
+                </label>
+              </div>
+              {exchangeExcessMode === "PAID_OUT" && (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <Select value={exchangePayoutMethod || undefined} onValueChange={setExchangePayoutMethod}>
+                    <SelectTrigger className="h-9 w-full bg-background">
+                      <SelectValue placeholder="Paid by…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYOUT_METHODS.map((method) => (
+                        <SelectItem key={method.value} value={method.value}>
+                          {method.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    className="h-9 bg-background"
+                    placeholder="Reference (optional)"
+                    value={exchangePayoutReference}
+                    onChange={(e) => setExchangePayoutReference(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="rounded-lg border bg-muted/30 p-4 space-y-1 text-sm max-w-sm ml-auto">
         <div className="flex justify-between">
           <span>Subtotal + Charges</span>
@@ -270,6 +383,22 @@ export function ConvertToInvoiceForm({
           <span>Paid Now</span>
           <span>₹{paidAmount.toFixed(2)}</span>
         </div>
+        {exchangeActive && estimate && (
+          <>
+            <div className="flex justify-between text-amber-700">
+              <span>Less: old gold (estimate ₹{estimate.total.toFixed(2)})</span>
+              <span>-₹{exchangeSplit.applied.toFixed(2)}</span>
+            </div>
+            {exchangeSplit.excess > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span>
+                  {exchangeExcessMode === "PAID_OUT" ? "Balance paid to customer" : "Balance kept as store credit"}
+                </span>
+                <span>₹{exchangeSplit.excess.toFixed(2)}</span>
+              </div>
+            )}
+          </>
+        )}
         <div className="flex justify-between text-red-600 font-medium">
           <span>Balance Due</span>
           <span>₹{balanceAmount.toFixed(2)}</span>
@@ -277,7 +406,7 @@ export function ConvertToInvoiceForm({
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending || exchangePayoutMissing}>
           {pending ? "Converting..." : "Convert to Invoice"}
         </Button>
       </div>

@@ -33,6 +33,7 @@ import {
 } from "@/lib/excel-export"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 import { resolveFineWeight } from "@/lib/fine-weight"
+import { describePieceComponentsText, METALS_AND_STONES_COLUMN } from "@/lib/piece-components-text"
 import { formatShortDate, formatShortDateTime } from "@/lib/utils"
 import { logger } from "@/lib/logger";
 import { parseDateRangeBoundary } from "@/lib/date-range";
@@ -355,7 +356,14 @@ async function getAllInventoryStockForExport(
   const rows = await prisma.inventoryStock.findMany({
     where,
     orderBy: getStockOrderBy(sortBy, sortOrder),
-    include: STOCK_INCLUDE,
+    include: {
+      ...STOCK_INCLUDE,
+      // A piece of several metals/stones — the export's "Metals & Stones" column.
+      components: {
+        orderBy: { sortOrder: "asc" },
+        include: { metalType: { select: { name: true } } },
+      },
+    },
   })
 
   return rows.map(mapStockRow)
@@ -392,6 +400,7 @@ export async function exportInventoryStockToExcel(
       "Net Weight (g)": item.netWeight || "-",
       "Stone Weight (g)": item.stoneWeight || "-",
       "Carat Weight (ct)": item.caratWeight || "-",
+      [METALS_AND_STONES_COLUMN]: describePieceComponentsText(item.components),
       "Purchase Rate": item.purchaseRate || "-",
       "Sale Rate": item.saleRate || "-",
       "Making Charge": item.makingCharge || "-",

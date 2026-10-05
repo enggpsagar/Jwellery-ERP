@@ -28,6 +28,16 @@ import {
 import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { SourcePartySelect, type SourcePartyOption } from "@/components/billing/source-party-select"
+import {
+  OldGoldExchangeSection,
+  oldGoldLineAmounts,
+  serializeOldGoldLine,
+} from "@/components/billing/old-gold-exchange-section"
+import {
+  splitOldGoldValue,
+  type OldGoldExcessModeValue,
+  type OldGoldLineDraft,
+} from "@/lib/old-gold/value"
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
 import { PercentOrFlatInput } from "@/components/shared/percent-or-flat-input"
 import { RequiredMark } from "@/components/shared/required-mark"
@@ -246,6 +256,9 @@ type KachaInvoiceFormProps = {
   /** Store's per-purity fineness table — the multi-part editor's pure-weight
    * readout (same prop as invoice-form.tsx's). */
   enumFineness?: Record<string, number>
+  /** Today's fine rates (Metal Rates) to prefill a Customer Exchange line's
+   * rate — same prop as invoice-form.tsx's. */
+  fineRates?: { gold: number | null; silver: number | null }
 }
 
 export function KachaInvoiceForm({
@@ -260,6 +273,7 @@ export function KachaInvoiceForm({
   suppliers = [],
   supplierModuleEnabled = false,
   enumFineness = {},
+  fineRates = { gold: null, silver: null },
 }: KachaInvoiceFormProps) {
   // Every hand-typed line needs its source party — see sourcePartyId.
   const missingSourceParty = (lines: LineItem[]) =>
@@ -356,7 +370,13 @@ export function KachaInvoiceForm({
   // from these rows (never tracked separately), so it can't go stale relative
   // to what's actually been entered.
   const [paymentRows, setPaymentRows] = useState<PaymentMethodValue[]>([])
-  const paidAmount = paymentRows.reduce((sum, row) => sum + (row.amount || 0), 0)
+  const paidBeforeOldGold = paymentRows.reduce((sum, row) => sum + (row.amount || 0), 0)
+
+  // Customer Exchange — see OldGoldExchangeSection (same as New Invoice).
+  const [oldGoldLines, setOldGoldLines] = useState<OldGoldLineDraft[]>([])
+  const [oldGoldExcessMode, setOldGoldExcessMode] = useState<OldGoldExcessModeValue>("STORE_CREDIT")
+  const [oldGoldPayoutMethod, setOldGoldPayoutMethod] = useState("")
+  const [oldGoldPayoutReference, setOldGoldPayoutReference] = useState("")
 
   const [state, formAction, pending] = useActionState(
     createKachaInvoice,
@@ -749,7 +769,27 @@ export function KachaInvoiceForm({
   // applies — see lib/round-off.ts. The client never submits this value;
   // it's entirely recomputed server-side from the persisted line items.
   const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal)
+
+  // The exchange is applied against the slip first (Kacha has no store
+  // credit to apply), so cash only covers what's left — the same order
+  // createKachaInvoice uses.
+  const oldGoldValue = oldGoldLines.reduce(
+    (sum, line) =>
+      sum +
+      oldGoldLineAmounts(
+        line,
+        metalPuritiesCache[line.metalTypeId],
+        enumFineness,
+        Boolean(metalById.get(line.metalTypeId)?.isGemstone),
+        metalPuritiesCache,
+      ).total,
+    0,
+  )
+  const oldGoldSplit = splitOldGoldValue(oldGoldValue, totalAmount)
+  const paidAmount = paidBeforeOldGold + oldGoldSplit.applied
   const balanceAmount = Math.max(0, totalAmount - paidAmount)
+  const oldGoldPayoutMissing =
+    oldGoldSplit.excess > 0 && oldGoldExcessMode === "PAID_OUT" && !oldGoldPayoutMethod
 
   const itemsJson = JSON.stringify(
     items.map((item) => {
@@ -877,6 +917,32 @@ export function KachaInvoiceForm({
           >
             <Plus className="h-4 w-4 mr-1" /> Add Item
           </Button>
+        </div>
+
+        {/* Customer Exchange (what the customer sells you) — the compact
+            card here, its item cards full width under the lines. Same as
+            New Invoice. */}
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <OldGoldExchangeSection
+            part="header"
+            lines={oldGoldLines}
+            onLinesChange={setOldGoldLines}
+            metals={metals}
+            origins={origins}
+            onMetalsChange={setMetals}
+            onOriginsChange={setOrigins}
+            puritiesByMetal={metalPuritiesCache}
+            ensurePurities={ensureMetalPurities}
+            enumFineness={enumFineness}
+            fineRates={fineRates}
+            excess={oldGoldSplit.excess}
+            excessMode={oldGoldExcessMode}
+            onExcessModeChange={setOldGoldExcessMode}
+            payoutMethod={oldGoldPayoutMethod}
+            onPayoutMethodChange={setOldGoldPayoutMethod}
+            payoutReference={oldGoldPayoutReference}
+            onPayoutReferenceChange={setOldGoldPayoutReference}
+          />
         </div>
 
         <div className="space-y-3">
@@ -1477,6 +1543,36 @@ export function KachaInvoiceForm({
         </div>
       </div>
 
+      {/* Customer → Business: what the customer sells against this slip. */}
+      <OldGoldExchangeSection
+        part="lines"
+        lines={oldGoldLines}
+        onLinesChange={setOldGoldLines}
+        metals={metals}
+        origins={origins}
+        onMetalsChange={setMetals}
+        onOriginsChange={setOrigins}
+        puritiesByMetal={metalPuritiesCache}
+        ensurePurities={ensureMetalPurities}
+        enumFineness={enumFineness}
+        fineRates={fineRates}
+        excess={oldGoldSplit.excess}
+        excessMode={oldGoldExcessMode}
+        onExcessModeChange={setOldGoldExcessMode}
+        payoutMethod={oldGoldPayoutMethod}
+        onPayoutMethodChange={setOldGoldPayoutMethod}
+        payoutReference={oldGoldPayoutReference}
+        onPayoutReferenceChange={setOldGoldPayoutReference}
+      />
+      <input
+        type="hidden"
+        name="oldGoldJson"
+        value={JSON.stringify(oldGoldLines.map(serializeOldGoldLine))}
+      />
+      <input type="hidden" name="oldGoldExcessMode" value={oldGoldExcessMode} />
+      <input type="hidden" name="oldGoldPayoutMethod" value={oldGoldPayoutMethod} />
+      <input type="hidden" name="oldGoldPayoutReference" value={oldGoldPayoutReference} />
+
       <div className="max-w-sm space-y-2">
         <PercentOrFlatInput
           base={subtotal + makingChargesTotal + stoneChargesTotal}
@@ -1488,7 +1584,7 @@ export function KachaInvoiceForm({
       <PaidNowFields
         rows={paymentRows}
         onRowsChange={setPaymentRows}
-        maxAmount={totalAmount > 0 ? totalAmount : undefined}
+        maxAmount={totalAmount > 0 ? Math.max(0, totalAmount - oldGoldSplit.applied) : undefined}
       />
 
       <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -1525,6 +1621,26 @@ export function KachaInvoiceForm({
           <span>Total</span>
           <span>₹{totalAmount.toFixed(2)}</span>
         </div>
+        {oldGoldValue > 0 && (
+          <>
+            <div className="flex justify-between text-amber-700" data-testid="old-gold-applied">
+              <span>Less: Bought from customer (value ₹{oldGoldValue.toFixed(2)})</span>
+              <span>-₹{oldGoldSplit.applied.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-semibold" data-testid="net-payable">
+              <span>Net Payable by Customer</span>
+              <span>₹{Math.max(0, totalAmount - oldGoldSplit.applied).toFixed(2)}</span>
+            </div>
+            {oldGoldSplit.excess > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span>
+                  {oldGoldExcessMode === "PAID_OUT" ? "Balance paid to customer" : "Balance kept as store credit"}
+                </span>
+                <span>₹{oldGoldSplit.excess.toFixed(2)}</span>
+              </div>
+            )}
+          </>
+        )}
         <div className="flex justify-between text-red-600 font-medium">
           <span>Balance Due</span>
           <span>₹{balanceAmount.toFixed(2)}</span>
@@ -1532,7 +1648,7 @@ export function KachaInvoiceForm({
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={pending || !customerId || paidOverTotal || missingSourceParty(items) || hasInvalidPiece}>
+        <Button type="submit" disabled={pending || !customerId || paidOverTotal || missingSourceParty(items) || hasInvalidPiece || oldGoldPayoutMissing}>
           {pending ? "Creating..." : "Create Estimate"}
         </Button>
       </div>

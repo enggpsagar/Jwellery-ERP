@@ -15,6 +15,9 @@ export type OldGoldExchangeRow = {
   invoiceId: string | null;
   invoiceNumber: string | null;
   invoiceStatus: string | null;
+  /** When traded against an Estimate (Kacha slip). */
+  kachaInvoiceId: string | null;
+  slipNumber: string | null;
   lines: {
     id: string;
     description: string;
@@ -72,6 +75,7 @@ export async function getOldGoldExchanges(): Promise<{
     include: {
       vendor: { select: { id: true, name: true } },
       exchangeInvoice: { select: { id: true, invoiceNumber: true, status: true } },
+      exchangeKachaInvoice: { select: { id: true, slipNumber: true } },
       items: {
         include: {
           metalType: { select: { name: true, isGemstone: true } },
@@ -114,6 +118,8 @@ export async function getOldGoldExchanges(): Promise<{
       invoiceId: purchase.exchangeInvoice?.id ?? null,
       invoiceNumber: purchase.exchangeInvoice?.invoiceNumber ?? null,
       invoiceStatus: purchase.exchangeInvoice?.status ?? null,
+      kachaInvoiceId: purchase.exchangeKachaInvoice?.id ?? null,
+      slipNumber: purchase.exchangeKachaInvoice?.slipNumber ?? null,
       lines,
       totalNet: lines.reduce((sum, line) => (line.isGemstone ? sum : sum + line.netWeight), 0),
       totalFine: lines.reduce((sum, line) => (line.isGemstone ? sum : sum + line.fineWeight), 0),
@@ -160,9 +166,18 @@ export async function getOldGoldExchanges(): Promise<{
 
 /** The exchange traded in against one invoice, for its detail page. */
 export async function getInvoiceOldGoldExchange(invoiceId: string) {
+  return getDocumentExchange({ exchangeInvoiceId: invoiceId });
+}
+
+/** The exchange traded in against one Kacha slip (Estimate). */
+export async function getKachaOldGoldExchange(kachaInvoiceId: string) {
+  return getDocumentExchange({ exchangeKachaInvoiceId: kachaInvoiceId });
+}
+
+async function getDocumentExchange(link: { exchangeInvoiceId: string } | { exchangeKachaInvoiceId: string }) {
   const storeId = await requireStoreScope();
   const purchase = await prisma.purchase.findFirst({
-    where: { storeId, exchangeInvoiceId: invoiceId, isOldGoldExchange: true },
+    where: { storeId, ...link, isOldGoldExchange: true },
     include: { items: { include: { metalType: { select: { name: true, isGemstone: true } } } } },
   });
   if (!purchase) return null;

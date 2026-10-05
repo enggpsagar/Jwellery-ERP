@@ -6,6 +6,7 @@ import {
 } from "@/lib/actions/kacha-invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getSupplierOptions } from "@/lib/actions/customer-actions"
+import { getLatestMetalRates } from "@/lib/actions/metal-rate-actions"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
 }
 
 export default async function NewKachaInvoicePage() {
-  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, enumFineness] =
+  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, enumFineness, metalRates] =
     await Promise.all([
       getKachaInvoiceFormCustomers(),
       getKachaInvoiceFormStockItems(),
@@ -32,6 +33,7 @@ export default async function NewKachaInvoicePage() {
       getAllStoreMetalOrigins(),
       getCaratConversionRateMap(),
       requireStoreScope().then(getFinenessMap),
+      getLatestMetalRates(),
     ])
 
   return (
@@ -56,6 +58,10 @@ export default async function NewKachaInvoicePage() {
           caratConversionRates={caratConversionRates}
           hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
           enumFineness={enumFineness}
+          fineRates={{
+            gold: metalRates.latest ? Number(metalRates.latest.gold24k) : null,
+            silver: metalRates.latest ? Number(metalRates.latest.silver) : null,
+          }}
           initialLocationId={defaultLocationId}
         />
       </ResetFormWrapper>

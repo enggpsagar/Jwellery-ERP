@@ -252,6 +252,7 @@ export function PieceComponentsEditor({
                   min={0}
                   className="h-9"
                   data-testid={`${testIdPrefix}-rate`}
+                  placeholder={valuation === "fine" ? "Pure rate" : "₹ / g"}
                   value={row.rate || ""}
                   onChange={(e) => update(row.key, { rate: Number(e.target.value) || 0 })}
                 />

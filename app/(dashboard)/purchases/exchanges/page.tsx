@@ -77,7 +77,7 @@ export default async function CustomerExchangesPage() {
                 <TableHead className="text-right">Net Wt</TableHead>
                 <TableHead className="text-right">Pure (24K / 999)</TableHead>
                 <TableHead className="text-right">Value</TableHead>
-                <TableHead>Against invoice</TableHead>
+                <TableHead>Against bill</TableHead>
                 <TableHead>Settled</TableHead>
               </TableRow>
             </TableHeader>
@@ -122,6 +122,10 @@ export default async function CustomerExchangesPage() {
                     {row.invoiceId ? (
                       <Link href={`/billing/${row.invoiceId}`} className="hover:underline">
                         {row.invoiceNumber}
+                      </Link>
+                    ) : row.kachaInvoiceId ? (
+                      <Link href={`/billing/kacha/${row.kachaInvoiceId}`} className="hover:underline">
+                        {row.slipNumber} <span className="text-xs text-muted-foreground">(estimate)</span>
                       </Link>
                     ) : (
                       <span className="text-muted-foreground">Invoice deleted</span>

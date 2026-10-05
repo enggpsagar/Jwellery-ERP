@@ -2141,11 +2141,45 @@ export async function updateInvoice(
         message: `New total (₹${totalAmount.toFixed(2)}) can't be less than the ₹${paidAmount.toFixed(2)} already paid — record a refund or adjust payments first.`,
       };
     }
-    const newBalanceAmount = Math.max(0, totalAmount - paidAmount);
+
+    // Customer Exchange added while editing — only when the invoice doesn't
+    // have one yet (a recorded exchange's goods may already be melted or
+    // issued, so it is never rewritten here). Applied against what's still
+    // unpaid; any excess is store credit or paid out, as on New Invoice.
+    let editOldGoldInput: OldGoldLineInput[] = [];
+    try {
+      const parsed = JSON.parse(String(formData.get("oldGoldJson") || "[]"));
+      editOldGoldInput = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return { success: false, message: "Invalid customer exchange lines" };
+    }
+    const existingExchange = editOldGoldInput.length
+      ? await prisma.purchase.findFirst({ where: { storeId, exchangeInvoiceId: id }, select: { id: true } })
+      : null;
+    if (existingExchange) {
+      return { success: false, message: "This invoice already has a Customer Exchange — it can't be changed here." };
+    }
+    const editOldGold = await resolveOldGoldLines(storeId, editOldGoldInput);
+    if ("error" in editOldGold) return { success: false, message: editOldGold.error };
+    const editExcessMode =
+      formData.get("oldGoldExcessMode") === OldGoldExcessMode.PAID_OUT ? OldGoldExcessMode.PAID_OUT : OldGoldExcessMode.STORE_CREDIT;
+    const editPayoutRaw = String(formData.get("oldGoldPayoutMethod") || "");
+    const editPayoutMethod = (Object.values(PaymentMethod) as string[]).includes(editPayoutRaw)
+      ? (editPayoutRaw as PaymentMethod)
+      : null;
+    const editOldGoldSplit = splitOldGoldValue(editOldGold.total, totalAmount - paidAmount);
+    if (editOldGoldSplit.excess > 0 && editExcessMode === OldGoldExcessMode.PAID_OUT && !editPayoutMethod) {
+      return { success: false, message: "Choose how the exchange balance is paid out to the customer." };
+    }
+    const paidWithExchange = round2(paidAmount + editOldGoldSplit.applied);
+    // The revision's own ledger entry must leave the exchange out — its
+    // OLD_GOLD_EXCHANGE credit (recorded below) covers that part.
+    const balanceBeforeExchange = Math.max(0, totalAmount - paidAmount);
+    const newBalanceAmount = Math.max(0, totalAmount - paidWithExchange);
 
     let newStatus: InvoiceStatus = InvoiceStatus.PAID;
-    if (newBalanceAmount > 0 && paidAmount > 0) newStatus = InvoiceStatus.PARTIAL;
-    else if (newBalanceAmount > 0 && paidAmount === 0) newStatus = InvoiceStatus.DRAFT;
+    if (newBalanceAmount > 0 && paidWithExchange > 0) newStatus = InvoiceStatus.PARTIAL;
+    else if (newBalanceAmount > 0 && paidWithExchange === 0) newStatus = InvoiceStatus.DRAFT;
 
     // Same store-ownership/oversell validation createInvoice already does,
     // against the new items — old items' own stock hasn't been restored
@@ -2270,6 +2304,7 @@ export async function updateInvoice(
           totalAmount,
           roundOffAmount,
           balanceAmount: newBalanceAmount,
+          ...(editOldGoldSplit.applied > 0 ? { paidAmount: paidWithExchange } : {}),
           status: newStatus,
           invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : invoice.invoiceDate,
           dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
@@ -2385,7 +2420,7 @@ export async function updateInvoice(
       // 4. One offsetting ledger entry sized to the actual change — never
       // a rewrite of what's already posted. Payments already recorded
       // keep their own CREDIT entries exactly as they are.
-      const delta = newBalanceAmount - Number(invoice.balanceAmount);
+      const delta = balanceBeforeExchange - Number(invoice.balanceAmount);
       if (delta !== 0) {
         await tx.ledgerEntry.create({
           data: {
@@ -2398,6 +2433,31 @@ export async function updateInvoice(
             description: `Invoice ${invoice.invoiceNumber} revised — balance ${delta > 0 ? "increased" : "decreased"}`,
             locationId: resolvedLocationId ?? undefined,
           },
+        });
+      }
+
+      // 5. The exchange added on this edit — same records as on New Invoice.
+      if (editOldGold.lines.length) {
+        const customer = await tx.customer.findFirst({
+          where: { id: invoice.customerId, storeId },
+          select: { name: true },
+        });
+        await recordOldGoldExchange(tx, {
+          storeId,
+          customerId: invoice.customerId,
+          customerName: customer?.name ?? "Customer",
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          lines: editOldGold.lines,
+          total: editOldGold.total,
+          applied: editOldGoldSplit.applied,
+          excess: editOldGoldSplit.excess,
+          excessMode: editExcessMode,
+          payout: editPayoutMethod
+            ? { method: editPayoutMethod, reference: String(formData.get("oldGoldPayoutReference") || "").trim() || null }
+            : null,
+          locationId: resolvedLocationId,
+          actor,
         });
       }
     }, { timeout: 15000 }));
@@ -2972,7 +3032,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
               phone: true,
             },
           },
-          items: true,
+          items: { include: { components: { orderBy: { sortOrder: "asc" }, include: { metalType: { select: { name: true } } } } } },
         },
       }),
       resolveStoreName(storeId),
@@ -3022,6 +3082,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
         cgstAmount: Number(item.cgstAmount),
         igstAmount: Number(item.igstAmount),
         lineTotal: Number(item.lineTotal),
+        components: item.components,
       })),
       subtotal: Number(invoice.subtotal),
       makingCharges: Number(invoice.makingCharges),

@@ -9,7 +9,15 @@ const rupees = (value: number) => `₹${value.toFixed(2)}`
 
 /** What the customer sold to the shop against this invoice (gold, silver or
  *  stones), and the net amount they paid after it — lib/old-gold/exchange.ts. */
-export function InvoiceOldGoldCard({ exchange, invoiceTotal }: { exchange: Exchange; invoiceTotal: number }) {
+export function InvoiceOldGoldCard({
+  exchange,
+  invoiceTotal,
+  totalLabel = "Invoice total",
+}: {
+  exchange: Exchange
+  invoiceTotal: number
+  totalLabel?: string
+}) {
   return (
     <section className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -35,7 +43,7 @@ export function InvoiceOldGoldCard({ exchange, invoiceTotal }: { exchange: Excha
       </ul>
       <div className="space-y-1 border-t pt-2 text-sm">
         <div className="flex justify-between">
-          <span>Invoice total</span>
+          <span>{totalLabel}</span>
           <span>{rupees(invoiceTotal)}</span>
         </div>
         <div className="flex justify-between text-amber-700">

@@ -5,10 +5,13 @@ import { formatShortDate } from "@/lib/utils"
 import type { KachaInvoice } from "@/lib/actions/kacha-invoice-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { PrintExchangeRows, cashReceived, type PrintExchange } from "@/components/billing/print-exchange-rows"
 
 type KachaPrintMinimalProps = {
   kachaInvoice: KachaInvoice
   settings: BusinessSettings
+  /** Customer Exchange traded in against this slip, if any. */
+  exchange?: PrintExchange | null
 }
 
 function fmt(value: number) {
@@ -66,7 +69,7 @@ function DoubleRule({ className = "" }: { className?: string }) {
  * corner registration marks on the printable card. No color anywhere,
  * including the logo watermark, which renders extra faint and grayscale.
  */
-export function KachaPrintMinimal({ kachaInvoice, settings }: KachaPrintMinimalProps) {
+export function KachaPrintMinimal({ kachaInvoice, settings, exchange }: KachaPrintMinimalProps) {
   const businessAddressLines = [
     settings.address,
     [settings.city, settings.state].filter(Boolean).join(", "),
@@ -241,9 +244,10 @@ export function KachaPrintMinimal({ kachaInvoice, settings }: KachaPrintMinimalP
                   <span>₹{fmt(kachaInvoice.totalAmount)}</span>
                 </div>
               </div>
+              <PrintExchangeRows exchange={exchange} invoiceTotal={kachaInvoice.totalAmount} rowClassName="flex justify-between px-3 pt-2" />
               <div className="flex justify-between px-3 pt-2">
                 <span>Received</span>
-                <span>₹{fmt(kachaInvoice.paidAmount)}</span>
+                <span>₹{fmt(cashReceived(kachaInvoice.paidAmount, exchange))}</span>
               </div>
               <div className="flex justify-between px-3 font-bold">
                 <span>Balance</span>

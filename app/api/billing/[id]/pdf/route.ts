@@ -16,6 +16,8 @@ import autoTable from "jspdf-autotable";
 
 import { getInvoiceById } from "@/lib/actions/invoice-actions";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
+import { getInvoiceOldGoldExchange } from "@/lib/actions/old-gold-actions";
+import { describeComponents } from "@/lib/piece-components";
 import { amountInWords } from "@/lib/number-to-words";
 import { formatShortDate } from "@/lib/utils";
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst";
@@ -36,9 +38,10 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const [invoice, settings] = await Promise.all([
+    const [invoice, settings, exchange] = await Promise.all([
       getInvoiceById(id),
       getBusinessSettings(),
+      getInvoiceOldGoldExchange(id),
     ]);
 
     if (!invoice) {
@@ -151,7 +154,10 @@ export async function GET(
         "Total",
       ]],
       body: invoice.items.map((item) => [
-        item.itemName,
+        // A piece of several metals/stones lists its rows under the name.
+        item.components?.length
+          ? `${item.itemName}\n${describeComponents(item.components)}`
+          : item.itemName,
         item.purity ?? "-",
         `${item.quantity}N`,
         (item.netWeight ?? 0).toFixed(3),
@@ -176,13 +182,29 @@ export async function GET(
       ["Discount", `-${fmt(invoice.discount)}`],
       ["Tax", fmt(invoice.taxAmount)],
       ["Total", fmt(invoice.totalAmount)],
-      ["Paid", fmt(invoice.paidAmount)],
+    );
+    // Customer Exchange: what was bought from the customer and the net
+    // payable; "Paid" is then only money actually received.
+    if (exchange) {
+      totalsRows.push(
+        [`Less: Bought from customer (${exchange.number})`, `-${fmt(exchange.applied)}`],
+        ["Net payable", fmt(Math.max(0, invoice.totalAmount - exchange.applied))],
+      );
+      if (exchange.excess > 0) {
+        totalsRows.push([
+          exchange.excessMode === "PAID_OUT" ? "Balance paid to customer" : "Balance as store credit",
+          fmt(exchange.excess),
+        ]);
+      }
+    }
+    totalsRows.push(
+      ["Paid", fmt(Math.max(0, invoice.paidAmount - (exchange?.applied ?? 0)))],
       ["Balance Due", fmt(invoice.balanceAmount)],
     );
 
     doc.setFontSize(9);
     for (const [label, value] of totalsRows) {
-      const isTotal = label === "Total" || label === "Balance Due";
+      const isTotal = label === "Total" || label === "Balance Due" || label === "Net payable";
       doc.setFont("helvetica", isTotal ? "bold" : "normal");
       doc.text(label, pageWidth - margin - 140, y);
       // jsPDF's built-in fonts (helvetica/times/courier) are the old PDF

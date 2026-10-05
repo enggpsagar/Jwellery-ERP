@@ -32,6 +32,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { SourcePartySelect, type SourcePartyOption } from "@/components/billing/source-party-select"
+import { InvoiceOldGoldCard } from "@/components/billing/invoice-old-gold-card"
+import type { PrintExchange } from "@/components/billing/print-exchange-rows"
 import {
   OldGoldExchangeSection,
   oldGoldLineAmounts,
@@ -422,6 +424,11 @@ type InvoiceFormProps = {
    * fallback when a metal has no purity rows) and today's fine rates. */
   enumFineness?: Record<string, number>
   fineRates?: { gold: number | null; silver: number | null }
+  /** Edit Invoice: the exchange already recorded on this invoice (shown
+   * read-only — never re-edited), and what's been paid so far (a new
+   * exchange added while editing goes against what's still unpaid). */
+  existingExchange?: PrintExchange | null
+  alreadyPaid?: number
 }
 
 export function InvoiceForm({
@@ -456,6 +463,8 @@ export function InvoiceForm({
   defaultNotes,
   enumFineness = {},
   fineRates = { gold: null, silver: null },
+  existingExchange = null,
+  alreadyPaid = 0,
 }: InvoiceFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1413,7 +1422,13 @@ export function InvoiceForm({
       ).total,
     0,
   )
-  const oldGoldSplit = splitOldGoldValue(editInvoiceId ? 0 : oldGoldValue, totalAmount - creditApplied)
+  // New invoice: against the bill less store credit. Editing: against what's
+  // still unpaid — and never when the invoice already has an exchange.
+  const exchangeEditable = !(editInvoiceId && existingExchange)
+  const oldGoldSplit = splitOldGoldValue(
+    exchangeEditable ? oldGoldValue : 0,
+    totalAmount - (editInvoiceId ? alreadyPaid : creditApplied),
+  )
   const paidAmount = paidBeforeOldGold + oldGoldSplit.applied
   const balanceAmount = Math.max(0, totalAmount - paidAmount)
   const oldGoldPayoutMissing =
@@ -1724,13 +1739,16 @@ export function InvoiceForm({
         {/* One row, two cards: how sale lines get added, and — on a new
             invoice — the Customer Exchange (what the customer sells you).
             The exchange's item cards open full width under the lines. */}
-        <div className={editInvoiceId ? undefined : "grid grid-cols-1 gap-3 lg:grid-cols-2"}>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <ScanToAddPanel
             className="h-full"
             onScanned={addScannedStock}
             onAddManualItem={() => setItems((prev) => [...prev, emptyLineItem(gstRateId)])}
           />
-          {!editInvoiceId && (
+          {!exchangeEditable && existingExchange ? (
+            <InvoiceOldGoldCard exchange={existingExchange} invoiceTotal={totalAmount} />
+          ) : null}
+          {exchangeEditable && (
             <OldGoldExchangeSection
               part="header"
               lines={oldGoldLines}
@@ -2617,7 +2635,7 @@ export function InvoiceForm({
 
       {/* Customer → Business: old gold handed in against this sale. A new
           invoice only — an existing exchange is never re-edited here. */}
-      {!editInvoiceId && (
+      {exchangeEditable && (
         <OldGoldExchangeSection
           part="lines"
           lines={oldGoldLines}
@@ -2639,7 +2657,7 @@ export function InvoiceForm({
           onPayoutReferenceChange={setOldGoldPayoutReference}
         />
       )}
-      {!editInvoiceId && (
+      {exchangeEditable && (
         <>
           <input
             type="hidden"

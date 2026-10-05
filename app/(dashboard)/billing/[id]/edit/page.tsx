@@ -9,6 +9,10 @@ import {
 } from "@/lib/actions/invoice-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getSupplierOptions } from "@/lib/actions/customer-actions"
+import { getInvoiceOldGoldExchange } from "@/lib/actions/old-gold-actions"
+import { getLatestMetalRates } from "@/lib/actions/metal-rate-actions"
+import { getFinenessMap } from "@/lib/purity"
+import { requireStoreScope } from "@/lib/store-context"
 import { getStates } from "@/lib/actions/location-actions"
 import { filterDeliveryStates } from "@/lib/delivery-location"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
@@ -56,11 +60,14 @@ export default async function EditInvoicePage({ params }: Props) {
     redirect(`/billing/${id}`)
   }
 
-  const [customers, stockItems, suppliers, businessSettings, locations, metals, origins, categories, styles, caratConversionRates, gstRates, states] =
+  const [customers, stockItems, suppliers, existingExchange, enumFineness, metalRates, businessSettings, locations, metals, origins, categories, styles, caratConversionRates, gstRates, states] =
     await Promise.all([
       getInvoiceFormCustomers(),
       getInvoiceFormStockItems(id),
       getSupplierOptions(),
+      getInvoiceOldGoldExchange(id),
+      requireStoreScope().then(getFinenessMap),
+      getLatestMetalRates(),
       getBusinessSettings(),
       getStoreLocations(),
       getStoreMetals(),
@@ -157,6 +164,13 @@ export default async function EditInvoicePage({ params }: Props) {
         stockItems={stockItems}
         suppliers={suppliers}
         supplierModuleEnabled={businessSettings.supplierModuleEnabled}
+        existingExchange={existingExchange}
+        alreadyPaid={Number(invoice.paidAmount)}
+        enumFineness={enumFineness}
+        fineRates={{
+          gold: metalRates.latest ? Number(metalRates.latest.gold24k) : null,
+          silver: metalRates.latest ? Number(metalRates.latest.silver) : null,
+        }}
         locations={locations}
         metals={metals}
         origins={origins}

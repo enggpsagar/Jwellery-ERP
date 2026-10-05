@@ -2,6 +2,7 @@ import { amountInWords } from "@/lib/number-to-words"
 import { formatShortDate } from "@/lib/utils"
 import { COMPOSITION_DISCLAIMER } from "@/lib/gst"
 import type { Quotation } from "@/lib/actions/quotation-actions"
+import { QuotationExchangeEstimateRows } from "@/components/quotations/quotation-exchange-estimate"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { APP_NAME } from "@/lib/constants/app"
 import { PieceBreakdown } from "@/components/billing/piece-breakdown"
@@ -365,6 +366,12 @@ export function QuotationPrintElegant({ quotation, settings }: QuotationPrintEle
                     ₹{fmt(quotation.totalAmount)}
                   </span>
                 </div>
+                <QuotationExchangeEstimateRows
+                  estimate={quotation.exchangeEstimate}
+                  total={quotation.totalAmount}
+                  rowClassName="flex justify-between gap-3 border-t border-amber-200/70 p-1.5 text-[0.9em]"
+                  netClassName="flex justify-between gap-3 border-t border-amber-200/70 p-1.5 text-[0.9em] font-semibold"
+                />
               </div>
             </div>
 

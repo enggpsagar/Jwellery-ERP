@@ -1182,6 +1182,8 @@ model KachaInvoice {
   locationId     String?
   location       StoreLocation?     @relation(fields: [locationId], references: [id])
 
+  // Old gold / silver / diamonds the customer traded in against this slip.
+  oldGoldExchange   Purchase?        @relation("OldGoldExchangeKacha")
   @@unique([storeId, slipNumber])
   @@index([customerId])
   @@index([invoiceDate])
@@ -1552,6 +1554,10 @@ model Purchase {
   isOldGoldExchange    Boolean            @default(false)
   exchangeInvoiceId    String?            @unique
   exchangeInvoice      Invoice?           @relation("OldGoldExchange", fields: [exchangeInvoiceId], references: [id], onDelete: SetNull)
+  // …or the Kacha slip (Estimate) it was traded against. A slip converted
+  // to a Tax Invoice keeps this and gains exchangeInvoiceId too.
+  exchangeKachaInvoiceId String?          @unique
+  exchangeKachaInvoice   KachaInvoice?    @relation("OldGoldExchangeKacha", fields: [exchangeKachaInvoiceId], references: [id], onDelete: SetNull)
   // How much of the old gold's value went against that invoice, and what
   // was left over (kept as store credit or paid out — oldGoldExcessMode).
   oldGoldAppliedAmount Decimal            @default(0) @db.Decimal(12, 2)
@@ -1910,6 +1916,11 @@ model Quotation {
   locationId      String?
   location        StoreLocation?  @relation(fields: [locationId], references: [id])
 
+  // Customer Exchange ESTIMATE — what the customer says they'll trade in
+  // (lines as submitted + recomputed values, lib/old-gold/exchange.ts). A
+  // quotation buys nothing: on conversion the shop confirms it and it
+  // becomes a real exchange on the new invoice.
+  exchangeEstimate  Json?
   @@unique([storeId, quotationNumber])
   @@index([customerId])
   @@index([quotationDate])

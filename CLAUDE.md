@@ -309,8 +309,10 @@ selling, vendor, artisan or customer.
   weight with a Fine (24K) column beside it; labels say "Fine Wt 24K".
 - Settings → purity with a blank fineness now defaults from its label
   (22K → 91.6, 925 → 92.5, nK → n/24, 3-digit → ‰) instead of 100%, so a
-  new purity can't silently count as pure. Existing purities saved at 100%
-  before this still need checking in Settings.
+  new purity can't silently count as pure. Settings → Metals & Categories
+  also flags any existing purity whose fineness doesn't match its label
+  (`lib/purity-fineness-check.ts`, `getMisconfiguredPurities`) with a
+  one-click `fixPurityFineness`.
 - Not covered: `DraftOrderItem.estimatedWeight` (an estimate, no stock),
   `InventoryTransaction` weights (nothing totals them).
 
@@ -354,8 +356,18 @@ records it in the sale's own transaction via `recordOldGoldExchange`
 - **Sale side**: a new sale line ("Create New Line Item") now asks the same
   stone question first, at the top of its New product details, with the
   stone panel under it; a linked piece shows its stone toggle locked.
-- Not built: exchange on edit (never re-edited), Kacha/Quotation, and the
-  printed invoice templates (screen only).
+- **2026-10-05 — everywhere**: printed on all five invoice templates + the
+  PDF (`PrintExchangeRows`: "Less: Bought from customer", "Net payable";
+  Received/Paid = cash only via `cashReceived`). **Edit Invoice** can add an
+  exchange when there is none (applied against what's still unpaid; the
+  revision's own ledger delta excludes it so the customer isn't credited
+  twice); an existing one shows read-only. **Estimates (Kacha)**: full
+  exchange (`Purchase.exchangeKachaInvoiceId`, migration
+  `20261005140000_exchange_kacha_quotation`); Kacha→Pakka also sets
+  `exchangeInvoiceId`. **Quotations**: `Quotation.exchangeEstimate` (JSON —
+  lines + values at quote time) buys nothing; the convert screen asks
+  "Customer is handing over this old gold now" and, if ticked, records the
+  real exchange on the new invoice with today's values.
 
 ### Added 2026-10-03: pieces made of several metals and stones
 

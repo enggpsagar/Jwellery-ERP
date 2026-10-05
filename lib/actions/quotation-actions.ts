@@ -8,6 +8,8 @@ import {
   InventoryTransactionType,
   LedgerEntryType,
   LedgerSourceType,
+  OldGoldExcessMode,
+  PaymentMethod,
   PurityType,
   Prisma,
   ChargeType,
@@ -46,6 +48,54 @@ import { logger } from "@/lib/logger";
 import { markSourcePartiesAsSuppliers, resolveLineSourceParties } from "@/lib/inventory/line-source-party";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 import { stockOptionProductDetailsSelect, toStockOptionProductDetails } from "@/lib/inventory/stock-option-details";
+import { recordOldGoldExchange, resolveOldGoldLines, type OldGoldLineInput } from "@/lib/old-gold/exchange";
+import { splitOldGoldValue } from "@/lib/old-gold/value";
+
+/**
+ * Quotation.exchangeEstimate — a Customer Exchange ESTIMATE (old gold /
+ * silver / diamonds the customer says they'll trade in). A quotation buys
+ * nothing: no Purchase, no stock, no ledger. `lines` are the submitted
+ * serializeOldGoldLine payloads, re-resolved (resolveOldGoldLines) with
+ * today's data when the quotation is converted and the shop confirms the
+ * hand-over; `total` / `resolvedSummary` are the figures as resolved at
+ * quote time, for display only.
+ */
+export type QuotationExchangeEstimateSummaryLine = {
+  description: string;
+  metalName: string;
+  purity: string | null;
+  netWeight: number;
+  fineWeight: number;
+  caratWeight: number | null;
+  isGemstone: boolean;
+  value: number;
+};
+export type QuotationExchangeEstimate = {
+  lines: OldGoldLineInput[];
+  total: number;
+  resolvedSummary: QuotationExchangeEstimateSummaryLine[];
+};
+
+/** Reads a stored exchangeEstimate defensively — null when absent/empty. */
+function parseExchangeEstimate(value: unknown): QuotationExchangeEstimate | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Partial<QuotationExchangeEstimate>;
+  const lines = Array.isArray(raw.lines) ? raw.lines : [];
+  if (!lines.length) return null;
+  const resolvedSummary = Array.isArray(raw.resolvedSummary)
+    ? raw.resolvedSummary.map((row) => ({
+        description: String(row?.description ?? ""),
+        metalName: String(row?.metalName ?? ""),
+        purity: row?.purity ? String(row.purity) : null,
+        netWeight: Number(row?.netWeight) || 0,
+        fineWeight: Number(row?.fineWeight) || 0,
+        caratWeight: row?.caratWeight != null ? Number(row.caratWeight) || null : null,
+        isGemstone: Boolean(row?.isGemstone),
+        value: Number(row?.value) || 0,
+      }))
+    : [];
+  return { lines, total: Number(raw.total) || 0, resolvedSummary };
+}
 
 export type QuotationLineItemInput = {
   itemName: string;
@@ -348,6 +398,7 @@ function mapQuotation(quotation: any) {
     roundOffAmount: Number(quotation.roundOffAmount ?? 0),
     totalAmount: Number(quotation.totalAmount),
     notes: quotation.notes,
+    exchangeEstimate: parseExchangeEstimate(quotation.exchangeEstimate),
     convertedToId: quotation.convertedToId,
     customer: quotation.customer
       ? {
@@ -834,6 +885,37 @@ export async function createQuotation(
     }
     const resolvedLocationId = locationResolution.locationId;
 
+    // Customer Exchange ESTIMATE — validated and recomputed exactly as
+    // createInvoice does, but only stored (never recordOldGoldExchange):
+    // a quotation buys nothing. The quotation's own totalAmount is not
+    // touched — the estimate is shown as a deduction only.
+    let exchangeInput: OldGoldLineInput[] = [];
+    try {
+      const parsed = JSON.parse(String(formData.get("exchangeEstimateJson") || "[]"));
+      exchangeInput = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return { success: false, message: "Invalid customer exchange lines" };
+    }
+    let exchangeEstimate: QuotationExchangeEstimate | null = null;
+    if (exchangeInput.length) {
+      const resolved = await resolveOldGoldLines(storeId, exchangeInput);
+      if ("error" in resolved) return { success: false, message: resolved.error };
+      exchangeEstimate = {
+        lines: exchangeInput,
+        total: resolved.total,
+        resolvedSummary: resolved.lines.map((line) => ({
+          description: line.description,
+          metalName: line.metalName,
+          purity: line.purityLabel ?? line.purity ?? null,
+          netWeight: line.netWeight,
+          fineWeight: line.fineWeight,
+          caratWeight: line.caratWeight,
+          isGemstone: line.isGemstone,
+          value: line.value,
+        })),
+      };
+    }
+
     const quotationNumber = await generateQuotationNumber(storeId);
 
     const quotation = await prisma.quotation.create({
@@ -855,6 +937,9 @@ export async function createQuotation(
         roundOffAmount,
         totalAmount,
         notes,
+        exchangeEstimate: exchangeEstimate
+          ? (exchangeEstimate as unknown as Prisma.InputJsonValue)
+          : undefined,
         locationId: resolvedLocationId ?? undefined,
         gstRateId: gstRateSnapshot?.gstRateId ?? undefined,
         gstRateName: gstRateSnapshot?.gstRateName ?? undefined,
@@ -1052,7 +1137,7 @@ export async function convertQuotationToInvoice(
       where: { id: quotationId, storeId },
       include: {
         items: { include: { components: { orderBy: { sortOrder: "asc" } } } },
-        customer: { select: { state: true } },
+        customer: { select: { state: true, name: true } },
       },
     });
 
@@ -1150,11 +1235,44 @@ export async function convertQuotationToInvoice(
     // own round-off computed against its own total, independent of whatever
     // roundOffAmount the source Quotation was saved with.
     const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
-    const balanceAmount = Math.max(0, totalAmount - paidAmount);
+
+    // Customer Exchange estimate → a REAL exchange, only when the quotation
+    // carried one and the shop confirms the customer is handing it over
+    // now. Re-resolved with today's data (rates/fineness may have moved
+    // since the quote), applied against what's left after the cash paid
+    // now, excess kept as store credit or paid out — same as createInvoice.
+    const estimate = parseExchangeEstimate(quotation.exchangeEstimate);
+    const exchangeConfirmed = Boolean(estimate) && formData.get("exchangeConfirm") === "on";
+    let exchange: Awaited<ReturnType<typeof resolveOldGoldLines>> | null = null;
+    if (estimate && exchangeConfirmed) {
+      exchange = await resolveOldGoldLines(storeId, estimate.lines);
+      if ("error" in exchange) return { success: false, message: exchange.error };
+    }
+    const exchangeLines = exchange && !("error" in exchange) ? exchange : null;
+    const exchangeExcessMode =
+      formData.get("exchangeExcessMode") === OldGoldExcessMode.PAID_OUT
+        ? OldGoldExcessMode.PAID_OUT
+        : OldGoldExcessMode.STORE_CREDIT;
+    const exchangePayoutMethodRaw = String(formData.get("exchangePayoutMethod") || "");
+    const exchangePayoutMethod = (Object.values(PaymentMethod) as string[]).includes(exchangePayoutMethodRaw)
+      ? (exchangePayoutMethodRaw as PaymentMethod)
+      : null;
+    const exchangePayoutReference = String(formData.get("exchangePayoutReference") || "").trim() || null;
+    const exchangeSplit = exchangeLines
+      ? splitOldGoldValue(exchangeLines.total, totalAmount - paidAmount)
+      : { applied: 0, excess: 0 };
+    if (exchangeSplit.excess > 0 && exchangeExcessMode === OldGoldExcessMode.PAID_OUT && !exchangePayoutMethod) {
+      return { success: false, message: "Choose how the exchange balance is paid out to the customer." };
+    }
+    // paidAmount stays the cash paid now (its own PAYMENT_IN credit below);
+    // the exchange's applied part is covered by its own OLD_GOLD_EXCHANGE
+    // credit, posted by recordOldGoldExchange.
+    const invoicePaidAmount = exchangeSplit.applied > 0 ? round2(paidAmount + exchangeSplit.applied) : paidAmount;
+    const balanceAmount = Math.max(0, totalAmount - invoicePaidAmount);
 
     let status: InvoiceStatus = InvoiceStatus.PAID;
-    if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
-    else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
+    if (balanceAmount > 0 && invoicePaidAmount > 0) status = InvoiceStatus.PARTIAL;
+    else if (balanceAmount > 0 && invoicePaidAmount === 0) status = InvoiceStatus.DRAFT;
 
     const invoiceNumber = await generateInvoiceNumber(storeId);
 
@@ -1178,7 +1296,7 @@ export async function convertQuotationToInvoice(
           taxAmount,
           roundOffAmount,
           totalAmount,
-          paidAmount,
+          paidAmount: invoicePaidAmount,
           balanceAmount,
           notes,
           locationId: quotation.locationId ?? undefined,
@@ -1333,6 +1451,28 @@ export async function convertQuotationToInvoice(
             description: `Payment received for ${invoiceNumber} (from Quotation ${quotation.quotationNumber})`,
             locationId: quotation.locationId ?? undefined,
           },
+        });
+      }
+
+      // Customer → Business half of the confirmed exchange: the EX
+      // purchase, its stock and the customer's ledger entries.
+      if (exchangeLines && exchangeLines.lines.length) {
+        await recordOldGoldExchange(tx, {
+          storeId,
+          customerId: quotation.customerId,
+          customerName: quotation.customer?.name ?? "Customer",
+          invoiceId: created.id,
+          invoiceNumber,
+          lines: exchangeLines.lines,
+          total: exchangeLines.total,
+          applied: exchangeSplit.applied,
+          excess: exchangeSplit.excess,
+          excessMode: exchangeExcessMode,
+          payout: exchangePayoutMethod
+            ? { method: exchangePayoutMethod, reference: exchangePayoutReference }
+            : null,
+          locationId: quotation.locationId,
+          actor,
         });
       }
 

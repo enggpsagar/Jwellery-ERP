@@ -5,6 +5,7 @@ import type { Quotation } from "@/lib/actions/quotation-actions"
 import { formatShortDate } from "@/lib/utils"
 import { QuotationStatusBadge } from "@/components/quotations/quotation-status-badge"
 import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { QuotationExchangeEstimateCard, QuotationExchangeEstimateRows } from "@/components/quotations/quotation-exchange-estimate"
 
 type QuotationItem = Quotation["items"][number]
 
@@ -170,7 +171,17 @@ export function QuotationDetailContent({ quotation }: QuotationDetailContentProp
           <span>Total</span>
           <span>₹{quotation.totalAmount.toFixed(2)}</span>
         </div>
+        <QuotationExchangeEstimateRows
+          estimate={quotation.exchangeEstimate}
+          total={quotation.totalAmount}
+          rowClassName="flex justify-between gap-3 text-amber-700"
+          netClassName="flex justify-between gap-3 font-semibold"
+        />
       </div>
+
+      {quotation.exchangeEstimate && (
+        <QuotationExchangeEstimateCard estimate={quotation.exchangeEstimate} />
+      )}
 
       {quotation.notes && (
         <div className="rounded-xl border bg-card p-6">

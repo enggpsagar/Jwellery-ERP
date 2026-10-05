@@ -1,6 +1,7 @@
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst";
 import { APP_NAME } from "@/lib/constants/app";
 import { formatShortDate } from "@/lib/utils";
+import { describePieceComponentsText, type PieceComponentTextRow } from "@/lib/piece-components-text";
 
 function formatCurrency(value: number) {
   return `₹${Number(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -8,6 +9,26 @@ function formatCurrency(value: number) {
 
 function formatDate(value: string | Date) {
   return formatShortDate(value);
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * A piece made of several metals and stones (PieceComponent rows) lists them
+ * under its item name in plain text — e.g. "Gold 22K 4.000 g · ₹28,000.00 +
+ * Diamond 0.10 ct · ₹5,000.00". Nothing for an ordinary single-metal line.
+ */
+function pieceComponentsLine(components: PieceComponentTextRow[] | null | undefined) {
+  const text = describePieceComponentsText(components);
+  return text
+    ? `<div style="margin-top: 2px; font-size: 10px; line-height: 1.4; color: #6b7280;">${escapeHtml(text)}</div>`
+    : "";
 }
 
 function wrapEmail(storeName: string, title: string, bodyHtml: string, logoUrl?: string | null) {
@@ -40,13 +61,15 @@ function itemsTable(
     makingCharge: number;
     stoneCharge: number;
     lineTotal: number;
+    /** A multi-part piece's metal/stone rows (optional). */
+    components?: PieceComponentTextRow[] | null;
   }[],
 ) {
   const rows = items
     .map(
       (item) => `
       <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${item.itemName}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${item.itemName}${pieceComponentsLine(item.components)}</td>
         <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
         <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.netWeight ? item.netWeight.toFixed(3) + " g" : "-"}</td>
         <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.rate ? formatCurrency(item.rate) : "-"}</td>
@@ -649,6 +672,8 @@ function invoiceLineItemsTable(
     cgstAmount: number;
     igstAmount: number;
     lineTotal: number;
+    /** A multi-part piece's metal/stone rows (optional). */
+    components?: PieceComponentTextRow[] | null;
   }[],
   isInterState: boolean,
 ) {
@@ -662,7 +687,7 @@ function invoiceLineItemsTable(
     .map(
       (item) => `
       <tr>
-        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb;">${item.itemName}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb;">${item.itemName}${pieceComponentsLine(item.components)}</td>
         <td style="padding: 6px; border-bottom: 1px solid #e5e7eb;">${item.purity ?? "-"}</td>
         <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
         <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.netWeight ? item.netWeight.toFixed(3) + " g" : "-"}</td>

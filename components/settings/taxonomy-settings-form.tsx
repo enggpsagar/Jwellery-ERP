@@ -3,13 +3,14 @@
 import * as React from "react";
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 
 import {
   upsertStoreMetal,
   toggleStoreMetalActive,
   deleteStoreMetal,
+  moveStoreMetalToStones,
   getStoreMetalOrigins,
   upsertStoreMetalOrigin,
   toggleStoreMetalOriginActive,
@@ -211,6 +212,7 @@ function MetalsSection({
   const [showAdd, setShowAdd] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [movingId, setMovingId] = useState<string | null>(null);
 
   async function handleToggle(id: string, isActive: boolean) {
     try {
@@ -246,6 +248,25 @@ function MetalsSection({
       toast.error("Failed to delete metal");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleMoveToStones(id: string, name: string) {
+    if (!window.confirm(`Move "${name}" to Stones? It will be weighed in carats with Stone Types instead of purities. Only works if nothing uses it yet.`)) return
+    try {
+      setMovingId(id);
+      const result = await moveStoreMetalToStones(id);
+      if (result.success) {
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to move metal");
+    } finally {
+      setMovingId(null);
     }
   }
 
@@ -303,6 +324,16 @@ function MetalsSection({
                       title="Edit metal"
                     >
                       <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveToStones(metal.id, metal.name)}
+                      disabled={movingId === metal.id}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-amber-50 text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-950/60"
+                      aria-label={`Move ${metal.name} to Stones`}
+                      title="Move to Stones (e.g. Diamond added as a metal by mistake)"
+                    >
+                      <ArrowRightLeft className="h-4 w-4" />
                     </button>
                     <button
                       type="button"

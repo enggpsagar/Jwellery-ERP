@@ -333,6 +333,66 @@ export async function deleteStoreMetal(id: string): Promise<TaxonomyFormState> {
   }
 }
 
+/**
+ * Moves a row from the Metals section to Stones — for a store that set up
+ * e.g. "Diamond" as a Metal, which then never shows in any Stone picker and
+ * blocks adding a Stone of the same name. Only while nothing uses it: an
+ * existing product/stock/invoice line on it was weighed in grams with a
+ * purity, and flipping it under them would change their weight math.
+ */
+export async function moveStoreMetalToStones(id: string): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return { success: false, message: "Only the Store Owner can update these settings." };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const metal = await prisma.storeMetal.findFirst({
+      where: { id, storeId },
+      include: {
+        _count: {
+          select: {
+            products: true,
+            inventoryStocks: true,
+            kachaInvoiceItems: true,
+            invoiceItems: true,
+            ledgerEntries: true,
+            karigarJobs: true,
+            purchaseItems: true,
+            karigarReceiptItems: true,
+            quotationItems: true,
+          },
+        },
+      },
+    });
+
+    if (!metal) return { success: false, message: "Metal not found" };
+    if (metal.isGemstone) return { success: false, message: `"${metal.name}" is already a Stone` };
+
+    const usageCount = Object.values(metal._count).reduce((sum, n) => sum + n, 0);
+    if (usageCount > 0) {
+      return {
+        success: false,
+        message: `"${metal.name}" is used by ${usageCount} existing record(s) as a metal, so it can't be moved. Turn it off and add a new Stone with a different name instead.`,
+      };
+    }
+
+    await prisma.storeMetal.update({
+      where: { id },
+      data: { isGemstone: true, hasPurity: false, primaryUnit: WeightUnit.CARAT },
+    });
+    revalidatePath(TAXONOMY_PATH);
+
+    return { success: true, message: `"${metal.name}" moved to Stones — add its Stone Types next` };
+  } catch (error) {
+    logger.error("moveStoreMetalToStones error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to move metal") };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Store Metal Origins (cascading under a gemstone Stone) — user-facing label
 // is "Stone Types". Free text, Store-Admin-managed, exactly like Store

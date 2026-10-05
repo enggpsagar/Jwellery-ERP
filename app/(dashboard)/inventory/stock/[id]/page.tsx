@@ -101,6 +101,7 @@ export default async function InventoryStockDetailsPage({
         showLocation={locations.length > 1}
         qrCard={
           <StockQrCard
+            stockId={stock.id}
             dataUrl={qrDataUrl}
             stockCode={stock.stockCode}
             productCode={stock.product?.productCode ?? null}

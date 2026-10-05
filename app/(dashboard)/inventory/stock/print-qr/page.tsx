@@ -14,6 +14,9 @@ import {
   tagPurity,
 } from "@/components/inventory/stock/stock-qr-label"
 import { StockQrPrintRoot } from "@/components/inventory/stock/stock-qr-print-root"
+import { StockBarcodeLabel } from "@/components/inventory/stock/stock-barcode-label"
+import { getStockBarcodeTags } from "@/lib/actions/inventory/stock-tag-actions"
+import Link from "next/link"
 
 export const metadata: Metadata = {
   title: "Print QR Codes",
@@ -22,6 +25,7 @@ export const metadata: Metadata = {
 type PrintQrPageProps = {
   searchParams: Promise<{
     ids?: string
+    layout?: string
   }>
 }
 
@@ -38,7 +42,8 @@ function formatWeight(value: unknown) {
 export default async function StockPrintQrPage({
   searchParams,
 }: PrintQrPageProps) {
-  const { ids: idsParam } = await searchParams
+  const { ids: idsParam, layout: layoutParam } = await searchParams
+  const layout = layoutParam === "barcode" ? "barcode" : "qr"
   const ids = (idsParam ?? "")
     .split(",")
     .map((id) => id.trim())
@@ -65,7 +70,9 @@ export default async function StockPrintQrPage({
       })
     : []
 
-  const items = await Promise.all(
+  const barcodeTags = layout === "barcode" ? await getStockBarcodeTags(ids) : []
+
+  const items = layout === "barcode" ? [] : await Promise.all(
     stockItems.map(async (stock) => ({
       id: stock.id,
       stockCode: stock.stockCode,
@@ -83,37 +90,53 @@ export default async function StockPrintQrPage({
     }))
   )
 
+  const count = layout === "barcode" ? barcodeTags.length : items.length
+
   return (
     <main className="space-y-6 p-6">
       {/* Only the tags print — each on its own 80×30mm thermal label,
           outside the dashboard layout. See StockQrLabelPrintStyles. */}
       <StockQrLabelPrintStyles />
       <StockQrPrintRoot id="stock-qr-print-labels">
-        {items.map((item) => (
-          <StockQrLabel key={item.id} label={item} />
-        ))}
+        {layout === "barcode"
+          ? barcodeTags.map((tag) => <StockBarcodeLabel key={tag.id} tag={tag} />)
+          : items.map((item) => <StockQrLabel key={item.id} label={item} />)}
       </StockQrPrintRoot>
 
       <PageBackHeader
-        title="Print Stock QR Codes"
-        description={`Printing QR codes for ${items.length} selected item${
-          items.length === 1 ? "" : "s"
+        title="Print Stock Tags"
+        description={`Printing ${layout === "barcode" ? "barcode" : "QR"} tags for ${count} selected item${
+          count === 1 ? "" : "s"
         }.`}
         backHref="/inventory/stock"
         backLabel="Back to Stock"
-        action={items.length > 0 ? <PrintAllQrButton /> : undefined}
+        action={count > 0 ? <PrintAllQrButton /> : undefined}
       />
 
-      {items.length === 0 ? (
+      {ids.length > 0 && (
+        <div className="inline-flex rounded-lg border p-1 text-sm">
+          {(["qr", "barcode"] as const).map((option) => (
+            <Link
+              key={option}
+              href={`/inventory/stock/print-qr?ids=${ids.join(",")}${option === "barcode" ? "&layout=barcode" : ""}`}
+              className={`rounded-md px-3 py-1.5 ${layout === option ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+            >
+              {option === "qr" ? "QR tag" : "Barcode tag"}
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {count === 0 ? (
         <div className="rounded-xl border bg-white p-6 text-sm text-muted-foreground">
           No stock items selected. Go back to the stock list and select at
           least one item to print.
         </div>
       ) : (
         <div id="stock-qr-print-grid" className="flex flex-wrap gap-4">
-          {items.map((item) => (
-            <StockQrLabel key={item.id} label={item} />
-          ))}
+          {layout === "barcode"
+            ? barcodeTags.map((tag) => <StockBarcodeLabel key={tag.id} tag={tag} />)
+            : items.map((item) => <StockQrLabel key={item.id} label={item} />)}
         </div>
       )}
     </main>

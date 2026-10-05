@@ -108,6 +108,7 @@ export function StockDetailPanel({ stockId, showLocation = true }: StockDetailPa
         showLocation={showLocation}
         qrCard={
           <StockQrCard
+            stockId={stock.id}
             dataUrl={qrDataUrl}
             stockCode={stock.stockCode}
             productCode={stock.product?.productCode ?? null}

@@ -15,6 +15,9 @@ test("Print Stock QR Codes lays each tag out QR-left, details-right", async ({ p
   const first = labels.first()
   const qr = first.locator("img")
   const details = first.locator("div")
+  // The QR is drawn asynchronously — measure only once it's on screen.
+  await expect(qr).toBeVisible()
+  await expect(details).toBeVisible()
   const qrBox = (await qr.boundingBox())!
   const detailsBox = (await details.boundingBox())!
   expect(detailsBox.x).toBeGreaterThanOrEqual(qrBox.x + qrBox.width - 1)

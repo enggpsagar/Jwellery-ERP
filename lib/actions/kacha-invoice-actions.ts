@@ -51,7 +51,7 @@ import {
 import { OversellError } from "@/lib/inventory/oversell-error";
 import { markSourcePartiesAsSuppliers, resolveLineSourceParties } from "@/lib/inventory/line-source-party";
 import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
-import { computeGst } from "@/lib/gst";
+import { conversionGst, toConversionGstItem } from "@/lib/conversion-gst";
 import {
   buildExcelExport,
   buildCsvExportBase64,
@@ -249,9 +249,9 @@ async function resolvePieceLines(
           gstRateId: row.gstRateId,
         };
       });
-    } else {
-      rows = rows.map((row) => ({ ...row, gstRateId: null }));
     }
+    // A hand-typed row keeps its "GST if billed" rate (hidden on the slip),
+    // so conversion taxes each row at its own rate.
     const label = `"${item.itemName || "a line item"}"`;
     if (!rows.some((row) => row.kind === "METAL")) {
       return { error: `${label} needs at least one metal — sell loose stones as their own line.` };
@@ -564,6 +564,7 @@ export async function exportKachaInvoicesToExcel(
       where,
       orderBy,
       include: {
+        items: { include: { components: { orderBy: { sortOrder: "asc" }, include: { metalType: { select: { name: true } } } } } },
         customer: { select: { id: true, name: true, phone: true, gstin: true } },
         convertedTo: { select: { id: true, invoiceNumber: true } },
       },
@@ -587,6 +588,11 @@ export async function exportKachaInvoicesToExcel(
       Paid: kachaInvoice.paidAmount,
       Balance: kachaInvoice.balanceAmount,
       "Converted To Invoice #": kachaInvoice.convertedTo?.invoiceNumber || "",
+      // A piece of several metals/stones — its rows, per line.
+      [METALS_AND_STONES_COLUMN]: kachaInvoices[index].items
+        .filter((item) => item.components.length)
+        .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components)}`)
+        .join(" | "),
     }));
 
     const { fileName, fileBase64 } =
@@ -1179,41 +1185,19 @@ export async function convertKachaToPakka(
     const storeState = invoiceSettings?.state ?? null;
     const customerState = kachaInvoice.customer?.state ?? null;
 
-    const itemTaxableValue = (item: (typeof kachaInvoice.items)[number]) =>
-      Number(item.rate ?? 0) * Number((item.purity === "DIAMOND" ? item.caratWeight : item.netWeight) ?? 0) +
-      Number(item.makingCharge) +
-      Number(item.hmCharge) +
-      Number(item.stoneCharge);
-
-    // A piece made of several metals/stones: each row at its own GST rate
-    // (falling back to the rate picked here — a Kacha row never carries
-    // one today), making/HM at the picked rate — same split as
-    // invoice-form.tsx's lineGst for a multi-part line.
-    const round = (value: number) => Math.round(value * 100) / 100;
-    const itemGst = kachaInvoice.items.map((item) => {
-      if (!item.components.length) {
-        return computeGst(itemTaxableValue(item), gstRatePercent, gstScheme, storeState, customerState);
-      }
-      const quantity = item.quantity || 1;
-      const parts = [
-        ...item.components.map((row) =>
-          computeGst(
-            Number(row.amount) * quantity,
-            row.gstRatePercent != null ? Number(row.gstRatePercent) : gstRatePercent,
-            gstScheme,
-            storeState,
-            customerState,
-          ),
-        ),
-        computeGst(Number(item.makingCharge) + Number(item.hmCharge), gstRatePercent, gstScheme, storeState, customerState),
-      ];
-      return {
-        sgst: round(parts.reduce((sum, part) => sum + round(part.sgst), 0)),
-        cgst: round(parts.reduce((sum, part) => sum + round(part.cgst), 0)),
-        igst: round(parts.reduce((sum, part) => sum + round(part.igst), 0)),
-      };
-    });
-    const taxAmount = itemGst.reduce((sum, g) => sum + g.sgst + g.cgst + g.igst, 0);
+    // Per line, the same base as a direct invoice (metal × quantity +
+    // making + HM + stone; a multi-part piece row by row at each row's own
+    // rate) — shared with the convert screen's preview (lib/conversion-gst.ts)
+    // so the preview is exactly what's saved.
+    const conversion = conversionGst(
+      kachaInvoice.items.map(toConversionGstItem),
+      gstRatePercent,
+      gstScheme,
+      storeState,
+      customerState,
+    );
+    const itemGst = conversion.perItem;
+    const taxAmount = conversion.taxAmount;
 
     const subtotal = Number(kachaInvoice.subtotal);
     const makingCharges = Number(kachaInvoice.makingCharges);

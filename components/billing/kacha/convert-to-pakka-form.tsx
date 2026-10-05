@@ -11,7 +11,7 @@ import {
 import { useToast } from "@/components/providers/toast-provider"
 import { todayForDateInput } from "@/lib/date-input"
 import { computeRoundOff } from "@/lib/round-off"
-import { computeGst } from "@/lib/gst"
+import { conversionGst } from "@/lib/conversion-gst"
 import type { GstScheme } from "@prisma/client"
 
 import { Input } from "@/components/ui/input"
@@ -83,13 +83,8 @@ type ConvertToPakkaFormProps = {
 type RateGroup = { ratePercent: number; sgst: number; cgst: number; igst: number }
 
 /**
- * Mirror of convertKachaToPakka's per-item tax (lib/actions/kacha-invoice-
- * actions.ts) — keep the two in step. A single-metal item is taxed at the
- * picked rate on rate × net (carats for DIAMOND) + making + HM + stone,
- * unrounded; a multi-part item taxes each row's amount × quantity at the
- * row's own rate (fallback: the picked one) and making + HM at the picked
- * rate, each part's SGST/CGST/IGST rounded to paise. The slip-level
- * discount is not taken off the tax base — the server doesn't either.
+ * convertKachaToPakka's own per-item tax (lib/conversion-gst.ts — the same
+ * function the server runs), with the rate-wise groups for the summary.
  */
 function previewTax(
   items: KachaInvoiceSummary["items"],
@@ -98,54 +93,15 @@ function previewTax(
   storeState: string | null,
   customerState: string | null,
 ) {
-  const round = (value: number) => Math.round(value * 100) / 100
-  const groups = new Map<number, RateGroup>()
-  let taxAmount = 0
-  const add = (ratePercent: number, part: { sgst: number; cgst: number; igst: number }) => {
-    const group = groups.get(ratePercent) ?? { ratePercent, sgst: 0, cgst: 0, igst: 0 }
-    group.sgst += part.sgst
-    group.cgst += part.cgst
-    group.igst += part.igst
-    groups.set(ratePercent, group)
-  }
-  for (const item of items) {
-    const components = item.components ?? []
-    if (!components.length) {
-      const taxable =
-        (item.rate ?? 0) * ((item.purity === "DIAMOND" ? item.caratWeight : item.netWeight) ?? 0) +
-        item.makingCharge +
-        item.hmCharge +
-        item.stoneCharge
-      const gst = computeGst(taxable, pickedRate, scheme, storeState, customerState)
-      add(pickedRate, gst)
-      taxAmount += gst.sgst + gst.cgst + gst.igst
-      continue
-    }
-    const quantity = item.quantity || 1
-    const parts = [
-      ...components.map((row) => ({
-        ratePercent: row.gstRatePercent ?? pickedRate,
-        taxable: row.amount * quantity,
-      })),
-      { ratePercent: pickedRate, taxable: item.makingCharge + item.hmCharge },
-    ]
-    let sgst = 0
-    let cgst = 0
-    let igst = 0
-    for (const part of parts) {
-      const gst = computeGst(part.taxable, part.ratePercent, scheme, storeState, customerState)
-      const rounded = { sgst: round(gst.sgst), cgst: round(gst.cgst), igst: round(gst.igst) }
-      add(part.ratePercent, rounded)
-      sgst += rounded.sgst
-      cgst += rounded.cgst
-      igst += rounded.igst
-    }
-    taxAmount += round(sgst) + round(cgst) + round(igst)
-  }
-  const rateGroups = [...groups.values()]
-    .filter((g) => g.sgst + g.cgst + g.igst !== 0)
-    .sort((a, b) => a.ratePercent - b.ratePercent)
-  return { taxAmount, rateGroups }
+  const result = conversionGst(
+    items.map((item) => ({ ...item, components: item.components ?? [] })),
+    pickedRate,
+    scheme,
+    storeState,
+    customerState,
+  )
+  const rateGroups: RateGroup[] = result.groups
+  return { taxAmount: result.taxAmount, rateGroups }
 }
 
 export function ConvertToPakkaForm({

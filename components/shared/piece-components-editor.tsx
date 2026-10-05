@@ -67,6 +67,9 @@ type Props = {
   lockPhysical?: boolean
   /** e.g. "sale" → test ids; purely cosmetic. */
   testIdPrefix?: string
+  /** Label of the per-row GST picker — e.g. "GST if billed" on a Kacha
+   *  slip, where the rate only applies once it's converted. */
+  gstLabel?: string
 }
 
 /**
@@ -89,6 +92,7 @@ export function PieceComponentsEditor({
   rateForMetal,
   lockPhysical = false,
   testIdPrefix = "piece",
+  gstLabel = "GST",
 }: Props) {
   const metalById = new Map(metals.map((metal) => [metal.id, metal]))
   const metalChoices = metals.filter((metal) => !metal.isGemstone && (metal.isActive || rows.some((r) => r.kind === "METAL" && r.metalTypeId === metal.id)))
@@ -127,7 +131,7 @@ export function PieceComponentsEditor({
         const amount = componentAmount(row, valueOptions)
         const gstSelect = showGst ? (
           <div className="space-y-1">
-            <Label className="text-[11px] text-muted-foreground">GST</Label>
+            <Label className="text-[11px] text-muted-foreground">{gstLabel}</Label>
             <Select value={row.gstRateId || defaultGstRateId || undefined} onValueChange={(value) => update(row.key, { gstRateId: value })}>
               <SelectTrigger className="h-9 w-full bg-background">
                 <SelectValue placeholder="GST" />

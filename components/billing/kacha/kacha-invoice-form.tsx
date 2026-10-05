@@ -60,6 +60,7 @@ import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog"
 import { PieceComponentsEditor } from "@/components/shared/piece-components-editor"
 import { MultiPartQuestion } from "@/components/shared/multi-part-question"
+import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 import {
   fromStoredComponents,
   newMetalRow,
@@ -233,6 +234,10 @@ type KachaInvoiceDraft = {
 }
 
 type KachaInvoiceFormProps = {
+  /** For a multi-part piece's per-row "GST if billed" rate — a slip charges
+   * no GST, but converting it to a Tax Invoice taxes each row at its own
+   * rate (lib/conversion-gst.ts). */
+  gstRates?: GstRateRow[]
   customers: CustomerOption[]
   stockItems: StockOption[]
   locations: LocationOption[]
@@ -274,7 +279,11 @@ export function KachaInvoiceForm({
   supplierModuleEnabled = false,
   enumFineness = {},
   fineRates = { gold: null, silver: null },
+  gstRates = [],
 }: KachaInvoiceFormProps) {
+  // A new metal/stone row's "GST if billed" starts at the store's default rate.
+  const defaultGstRateId =
+    gstRates.find((rate) => rate.isDefault && rate.isActive)?.id ?? gstRates.find((rate) => rate.isActive)?.id ?? ""
   // Every hand-typed line needs its source party — see sourcePartyId.
   const missingSourceParty = (lines: LineItem[]) =>
     lines.some((line) => !line.inventoryStockId && !line.sourcePartyId)
@@ -972,8 +981,8 @@ export function KachaInvoiceForm({
                 updateItem(item.key, { multiPart: false, components: [] })
                 return
               }
-              const metalRow = { ...newMetalRow(item.rate), metalTypeId: item.metalTypeId, purity: item.purity, purityLabel: item.purityLabel, grossWeight: item.grossWeight, netWeight: item.netWeight }
-              const rows: PieceComponentDraft[] = [metalRow, newMetalRow(0), newStoneRow()]
+              const metalRow = { ...newMetalRow(item.rate, defaultGstRateId), metalTypeId: item.metalTypeId, purity: item.purity, purityLabel: item.purityLabel, grossWeight: item.grossWeight, netWeight: item.netWeight }
+              const rows: PieceComponentDraft[] = [metalRow, newMetalRow(0, defaultGstRateId), newStoneRow(defaultGstRateId)]
               updateItem(item.key, {
                 multiPart: true,
                 hasStoneComponent: false,
@@ -1000,6 +1009,9 @@ export function KachaInvoiceForm({
                 rateForMetal={(metal) => metal.sellingPrice ?? 0}
                 lockPhysical={isLinked}
                 testIdPrefix="kacha-piece"
+                gstRates={gstRates.length ? gstRates : undefined}
+                defaultGstRateId={defaultGstRateId}
+                gstLabel="GST if billed"
               />
             )
             // Making charge in % mode is a % of the metal value — for a

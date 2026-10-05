@@ -4,6 +4,7 @@ import {
   getKachaInvoiceFormCustomers,
   getKachaInvoiceFormStockItems,
 } from "@/lib/actions/kacha-invoice-actions"
+import { getGstRates } from "@/lib/actions/gst-rate-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getSupplierOptions } from "@/lib/actions/customer-actions"
 import { getLatestMetalRates } from "@/lib/actions/metal-rate-actions"
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
 }
 
 export default async function NewKachaInvoicePage() {
-  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, enumFineness, metalRates] =
+  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, enumFineness, metalRates, gstRates] =
     await Promise.all([
       getKachaInvoiceFormCustomers(),
       getKachaInvoiceFormStockItems(),
@@ -34,6 +35,7 @@ export default async function NewKachaInvoicePage() {
       getCaratConversionRateMap(),
       requireStoreScope().then(getFinenessMap),
       getLatestMetalRates(),
+      getGstRates(),
     ])
 
   return (
@@ -48,6 +50,7 @@ export default async function NewKachaInvoicePage() {
         }}
       >
         <KachaInvoiceForm
+          gstRates={gstRates}
           customers={customers}
           stockItems={stockItems}
           suppliers={suppliers}

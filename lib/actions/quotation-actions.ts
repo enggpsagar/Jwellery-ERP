@@ -16,6 +16,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/piece-components-text";
 import { getFineWeightResolver } from "@/lib/fine-weight";
 import {
   getPieceResolver,
@@ -39,7 +40,7 @@ import {
 } from "@/lib/location-scope";
 import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import { formatShortDate } from "@/lib/utils";
-import { computeGst } from "@/lib/gst";
+import { conversionGst, toConversionGstItem } from "@/lib/conversion-gst";
 import type {
   DataTableExportParams,
   DataTableExportResult,
@@ -577,6 +578,7 @@ export async function exportQuotationsToExcel(
       where,
       orderBy: buildQuotationsOrderBy(sortBy, sortOrder),
       include: {
+        items: { include: { components: { orderBy: { sortOrder: "asc" }, include: { metalType: { select: { name: true } } } } } },
         customer: { select: { id: true, name: true, phone: true } },
         convertedTo: { select: { id: true, invoiceNumber: true } },
       },
@@ -600,6 +602,11 @@ export async function exportQuotationsToExcel(
       "Tax Amount": quotation.taxAmount,
       "Total Amount": quotation.totalAmount,
       "Converted To Invoice": quotation.convertedTo?.invoiceNumber || "",
+      // A piece of several metals/stones — its rows, per line.
+      [METALS_AND_STONES_COLUMN]: quotations[index].items
+        .filter((item) => item.components.length)
+        .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components)}`)
+        .join(" | "),
     }));
 
     const { fileName, fileBase64 } =
@@ -1187,41 +1194,20 @@ export async function convertQuotationToInvoice(
       };
     }
 
-    const itemTaxableValue = (item: (typeof quotation.items)[number]) =>
-      Number(item.rate ?? 0) * Number((item.purity === "DIAMOND" ? item.caratWeight : item.netWeight) ?? 0) +
-      Number(item.makingCharge) +
-      Number(item.hmCharge) +
-      Number(item.stoneCharge);
-
-    // A multi-part piece (several metals/stones, PieceComponent rows) is
-    // taxed row by row at each row's own snapshotted GST rate (falling back
-    // to the document rate), with its making/HM at the document rate — the
-    // same split invoice-form.tsx's lineGst applies. Row amounts are per
-    // piece, so quantity multiplies them.
+    // Per line, the same base as a direct invoice (metal × quantity +
+    // making + HM + stone; a multi-part piece row by row at each row's own
+    // rate) — shared with the convert screen's preview (lib/conversion-gst.ts)
+    // so the preview is exactly what's saved.
+    const conversion = conversionGst(
+      quotation.items.map(toConversionGstItem),
+      gstRatePercent,
+      gstScheme,
+      storeState,
+      customerState,
+    );
+    const itemGst = conversion.perItem;
+    const taxAmount = conversion.taxAmount;
     const round2 = (value: number) => Math.round(value * 100) / 100;
-    const itemGst = quotation.items.map((item) => {
-      if (!item.components.length) {
-        return computeGst(itemTaxableValue(item), gstRatePercent, gstScheme, storeState, customerState);
-      }
-      const quantity = item.quantity || 1;
-      const parts = [
-        ...item.components.map((row) => ({
-          taxable: Number(row.amount) * quantity,
-          percent: row.gstRatePercent != null ? Number(row.gstRatePercent) : gstRatePercent,
-        })),
-        { taxable: Number(item.makingCharge) + Number(item.hmCharge), percent: gstRatePercent },
-      ];
-      const sum = { sgst: 0, cgst: 0, igst: 0 };
-      for (const part of parts) {
-        if (!(part.taxable > 0)) continue;
-        const gst = computeGst(part.taxable, part.percent, gstScheme, storeState, customerState);
-        sum.sgst += round2(gst.sgst);
-        sum.cgst += round2(gst.cgst);
-        sum.igst += round2(gst.igst);
-      }
-      return { sgst: round2(sum.sgst), cgst: round2(sum.cgst), igst: round2(sum.igst) };
-    });
-    const taxAmount = itemGst.reduce((sum, g) => sum + g.sgst + g.cgst + g.igst, 0);
 
     const subtotal = Number(quotation.subtotal);
     const makingCharges = Number(quotation.makingCharges);

@@ -10,6 +10,8 @@ import {
   type QuotationFormState,
 } from "@/lib/actions/quotation-actions"
 import { computeRoundOff } from "@/lib/round-off"
+import { conversionGst } from "@/lib/conversion-gst"
+import type { GstScheme } from "@prisma/client"
 import { splitOldGoldValue, type OldGoldExcessModeValue } from "@/lib/old-gold/value"
 import { QuotationExchangeEstimateCard } from "@/components/quotations/quotation-exchange-estimate"
 import { useToast } from "@/components/providers/toast-provider"
@@ -53,13 +55,19 @@ type QuotationSummary = {
   customer: {
     name: string
     phone: string | null
+    state?: string | null
   } | null
   items: {
     id: string
     itemName: string
     quantity: number
+    purity: string | null
     netWeight: number | null
+    caratWeight: number | null
     rate: number | null
+    makingCharge: number
+    hmCharge: number
+    stoneCharge: number
     lineTotal: number
     /** A piece made of several metals/stones — its rows, each with its own
      * snapshotted GST rate (lib/piece-components.ts). */
@@ -81,6 +89,10 @@ type ConvertToInvoiceFormProps = {
    * Defaults true so an existing caller not yet passing this keeps
    * showing it. */
   showDueDate?: boolean
+  /** For the tax preview — the same per-line computation the server runs
+   * (lib/conversion-gst.ts). */
+  gstScheme?: GstScheme
+  storeState?: string | null
 }
 
 export function ConvertToInvoiceForm({
@@ -88,6 +100,8 @@ export function ConvertToInvoiceForm({
   gstRates,
   defaultTaxAmount = 0,
   showDueDate = true,
+  gstScheme = "REGULAR_B2C",
+  storeState = null,
 }: ConvertToInvoiceFormProps) {
   const router = useRouter()
   const toast = useToast()
@@ -105,23 +119,13 @@ export function ConvertToInvoiceForm({
       "",
   )
   const activeGstRates = useMemo(() => gstRates.filter((r) => r.isActive), [gstRates])
-  // A multi-part piece's metal/stone rows are taxed at their own GST rate
-  // (falling back to the picked one), everything else at the picked rate —
-  // the same split convertQuotationToInvoice applies. With no multi-part
-  // lines this is exactly the old flat base × rate.
-  const taxAt = (ratePercent: number) => {
-    const round = (value: number) => Math.round(value * 100) / 100
-    let pieceBase = 0
-    let pieceTax = 0
-    for (const item of quotation.items) {
-      for (const row of item.components ?? []) {
-        const taxable = row.amount * (item.quantity || 1)
-        pieceBase += taxable
-        pieceTax += round((taxable * (row.gstRatePercent ?? ratePercent)) / 100)
-      }
-    }
-    return round(((subtotalBeforeTax - pieceBase) * ratePercent) / 100) + round(pieceTax)
-  }
+  // Exactly what convertQuotationToInvoice will charge: per line, metal ×
+  // quantity + making + HM + stone at the picked rate, a multi-part piece
+  // row by row at each row's own rate (lib/conversion-gst.ts). The
+  // quotation's discount comes off the total, not the tax base — as on a
+  // direct invoice.
+  const taxAt = (ratePercent: number) =>
+    conversionGst(quotation.items, ratePercent, gstScheme, storeState, quotation.customer?.state ?? null).taxAmount
   const initialGstRate = gstRates.find((r) => r.id === gstRateId)
   const initialTaxAmount = initialGstRate ? taxAt(initialGstRate.ratePercent) : defaultTaxAmount
 
@@ -164,7 +168,8 @@ export function ConvertToInvoiceForm({
   const exchangePayoutMissing =
     exchangeSplit.excess > 0 && exchangeExcessMode === "PAID_OUT" && !exchangePayoutMethod
 
-  const balanceAmount = Math.max(0, totalAmount - paidAmount - exchangeSplit.applied)
+  // Against the rounded total the server saves, not the raw sum.
+  const balanceAmount = Math.max(0, roundedTotal - paidAmount - exchangeSplit.applied)
 
   const convertAction = convertQuotationToInvoice.bind(null, quotation.id)
   const [state, formAction, pending] = useActionState(convertAction, initialState)
@@ -375,9 +380,17 @@ export function ConvertToInvoiceForm({
           <span>Tax</span>
           <span>₹{taxAmount.toFixed(2)}</span>
         </div>
+        {Math.abs(roundedTotal - totalAmount) >= 0.005 && (
+          <div className="flex justify-between">
+            <span>Round Off</span>
+            <span>
+              {roundedTotal - totalAmount > 0 ? "+" : "-"}₹{Math.abs(roundedTotal - totalAmount).toFixed(2)}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
           <span>Total</span>
-          <span>₹{totalAmount.toFixed(2)}</span>
+          <span>₹{roundedTotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between text-blue-600 font-medium">
           <span>Paid Now</span>

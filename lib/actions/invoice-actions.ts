@@ -18,6 +18,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/piece-components-text";
 import { getFineWeightResolver } from "@/lib/fine-weight";
 import {
   getPieceResolver,
@@ -737,6 +738,7 @@ export async function exportInvoicesToExcel(
       where,
       orderBy,
       include: {
+        items: { include: { components: { orderBy: { sortOrder: "asc" }, include: { metalType: { select: { name: true } } } } } },
         customer: { select: { id: true, name: true, phone: true } },
         convertedFromKacha: { select: { id: true, slipNumber: true } },
       },
@@ -760,6 +762,11 @@ export async function exportInvoicesToExcel(
       Total: invoice.totalAmount,
       Paid: invoice.paidAmount,
       Balance: invoice.balanceAmount,
+      // A piece of several metals/stones — its rows, per line.
+      [METALS_AND_STONES_COLUMN]: invoices[index].items
+        .filter((item) => item.components.length)
+        .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components)}`)
+        .join(" | "),
     }));
 
     const { fileName, fileBase64 } =

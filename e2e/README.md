@@ -23,6 +23,7 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `delivery-location.spec.ts` | New Invoice hides Delivery Location when Settings has none picked; shows it once one is |
 | `multi-part.spec.ts` | One piece of gold + silver + diamond on a sale line (per-row value & GST, gold-only pure weight on the line, stock + product breakdown, printed 1.5% GST group, per-row quick edit), a Customer Exchange item, a purchase line, and Kacha / Quotation lines that keep their rows when converted to an invoice |
 | `purity-check.spec.ts` | A 22K purity saved at 100% is flagged in Settings and fixed to 91.6% in one click |
+| `conversion-gst.spec.ts` | Converting a 2-piece Estimate / Quotation line taxes both pieces (preview and saved invoice) |
 | `inventory.spec.ts` | Category → Type filters, Stone Type swap for a stone, footer totals (Products and Stock) |
 | `artisan.spec.ts` | Open Jobs → Receive Items; Receive Material's net weight calculation |
 | `dashboard.spec.ts` | Best Sellers card: every period and tab renders, ranked list shows |

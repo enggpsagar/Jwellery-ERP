@@ -261,6 +261,8 @@ test("a Kacha slip line can be gold + silver + diamond, and keeps its rows on co
 
   await page.goto("/billing/kacha/new")
   await fillSlipPiece(page, "kacha-piece", itemName)
+  // The diamond's "GST if billed" — not shown on the slip, used on conversion.
+  await pick(page, page.getByTestId("kacha-piece-stone-row").first().getByRole("combobox").nth(2), "1.5%")
   await page.getByRole("button", { name: "Create Estimate" }).click()
   await page.waitForURL(/\/billing\/kacha\/(?!new)[^/]+$/)
   await expect(page.getByText(/Silver 925 · 2\.000 g/)).toBeVisible()
@@ -286,6 +288,8 @@ test("a Kacha slip line can be gold + silver + diamond, and keeps its rows on co
     include: { components: true },
   })
   expect(invoiceItem!.components).toHaveLength(3)
+  // Converted at 3%: metals 28,200 × 3% = 846; the diamond's own 1.5% on 5,000 = 75.
+  expect(Number(invoiceItem!.sgstAmount) + Number(invoiceItem!.cgstAmount)).toBeCloseTo(921, 2)
   expect(crashes).toEqual([])
 })
 

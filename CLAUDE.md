@@ -426,6 +426,22 @@ weight, rate per carat, value, GST).
 - % making charge on a multi-part line is on its metals' value
   (value per gram × net), on Invoice/Kacha/Quotation.
 
+### Fixed 2026-10-05: Estimate/Quotation → Tax Invoice tax
+
+`lib/conversion-gst.ts` (`conversionGst`) is the ONE computation of a
+conversion's GST — used by `convertKachaToPakka`, `convertQuotationToInvoice`
+and both convert screens' previews, so the preview is what's saved. Per line:
+metal × **quantity** (it used to ignore quantity, under-taxing any line of
+more than one piece) + making + HM + stone at the picked rate; a multi-part
+piece row by row at each row's own rate (fallback: the picked rate). The
+document discount is NOT taken off the tax base — same convention as a
+direct invoice (invoice-form's taxableValue); the quotation preview used to
+subtract it. The quotation convert screen shows the rounded total, its
+Round Off line, and a balance against the rounded total. Hand-typed
+multi-part Kacha rows now carry a "GST if billed" rate (store default;
+hidden on the slip). Invoice/Kacha/Quotation/Purchase exports have a
+"Metals & Stones" column (`lib/piece-components-text.ts`).
+
 ### Regression tests (added 2026-09-29)
 
 Playwright suite in `e2e/`, run by `.github/workflows/regression.yml` on every push to `main` and every PR: throwaway Postgres in the runner → migrate → `pnpm seed` + `pnpm db:seed:full-demo` → `tsc` → `pnpm build` → `pnpm test:e2e`. Sign-in mints a NextAuth JWT in `e2e/global-setup.ts` (no test login route in the app), which also refuses any non-localhost `DATABASE_URL`. See `e2e/README.md`. **Add a spec for every new feature.** The demo seed must keep creating `UserStoreMembership` rows for its users — `requirePermissionInStore` (createInvoice etc.) reads only that table, so without them the demo Admin can open every page but not save an invoice. Tests run in parallel with Vercel's own deploy on a direct push to `main`; they only *block* a bad change if work goes through a PR (or Vercel's deployment checks are turned on).

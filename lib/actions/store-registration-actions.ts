@@ -9,7 +9,7 @@ import { newStoreRegisteredEmail, storeWelcomeEmail } from "@/lib/email-template
 import { buildUniqueStoreCode } from "@/lib/store-code";
 import { getSuperAdminEmails } from "@/lib/super-admin";
 import { logger } from "@/lib/logger";
-import { STARTER_CLARITIES, STARTER_STYLES } from "@/lib/inventory/starter-masters";
+import { seedStarterMasters } from "@/lib/inventory/starter-masters";
 
 export type RegisterStoreState = {
   success: boolean;
@@ -30,25 +30,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * first thing anyone tries. These are starting points, all renameable under
  * Settings → Taxonomy.
  */
-const STARTER_METALS = [
-  { name: "Gold", hasPurity: true },
-  { name: "Silver", hasPurity: true },
-  { name: "Platinum", hasPurity: true },
-  { name: "Diamond", hasPurity: false },
-  { name: "Other", hasPurity: false },
-];
-
-const STARTER_CATEGORIES: { name: string; types: string[] }[] = [
-  {
-    name: "Ornament",
-    types: ["Ring", "Chain", "Necklace", "Bangle", "Earring", "Bracelet", "Pendant"],
-  },
-  { name: "Coin", types: ["Gold Coin", "Silver Coin"] },
-  { name: "Bar", types: ["Bar"] },
-  { name: "Loose Stone", types: ["Loose Stone"] },
-  { name: "Diamond", types: ["Loose Diamond", "Diamond Jewellery"] },
-];
-
 /**
  * The store's code, built from state + area + name (see lib/store-code).
  *
@@ -228,43 +209,14 @@ export async function registerStoreAction(
         data: { defaultLocationId: mainCounter.id },
       });
 
-      await tx.storeMetal.createMany({
-        data: STARTER_METALS.map((metal) => ({
-          storeId: createdStore.id,
-          name: metal.name,
-          hasPurity: metal.hasPurity,
-        })),
-      });
-
-      await tx.storeStyle.createMany({
-        data: STARTER_STYLES.map((name) => ({ storeId: createdStore.id, name })),
-        skipDuplicates: true,
-      });
-      await tx.storeStoneClarity.createMany({
-        data: STARTER_CLARITIES.map((name) => ({ storeId: createdStore.id, name })),
-        skipDuplicates: true,
-      });
-
-      for (const category of STARTER_CATEGORIES) {
-        const createdCategory = await tx.storeCategory.create({
-          data: { storeId: createdStore.id, name: category.name },
-        });
-
-        await tx.storeCategoryType.createMany({
-          data: category.types.map((type) => ({
-            storeId: createdStore.id,
-            categoryId: createdCategory.id,
-            name: type,
-          })),
-        });
-      }
+      await seedStarterMasters(tx, createdStore.id);
 
       return createdStore;
     }, {
       // Default 5s is too tight for this transaction: it's ~15 sequential
       // writes (store, plan history, owner user + membership, default
-      // location, 5 starter metals, 5 starter categories each with their own
-      // nested types) against a remote Neon connection, and a request that
+      // location, then seedStarterMasters' metals/purities/stone types,
+      // categories with their types, styles, clarities and GST rates) against a remote Neon connection, and a request that
       // happens to compete for a pooled connection at the same moment (e.g.
       // an OTP request for the same phone, fired the instant the owner's
       // "sign in" link appears) is enough to blow past 5s and roll the whole

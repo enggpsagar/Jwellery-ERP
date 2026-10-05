@@ -15,7 +15,7 @@ import { buildUniqueStoreCode } from "@/lib/store-code";
 import { sendInviteEmailSafely } from "@/lib/invite-email";
 import { logger } from "@/lib/logger";
 import { parseDateRangeBoundary } from "@/lib/date-range";
-import { STARTER_CLARITIES, STARTER_STYLES } from "@/lib/inventory/starter-masters";
+import { seedStarterMasters } from "@/lib/inventory/starter-masters";
 
 export type StoreFormState = {
   success: boolean;
@@ -313,14 +313,7 @@ export async function createStoreWithAdmin(
         },
       });
 
-      await tx.storeStyle.createMany({
-        data: STARTER_STYLES.map((name) => ({ storeId: createdStore.id, name })),
-        skipDuplicates: true,
-      });
-      await tx.storeStoneClarity.createMany({
-        data: STARTER_CLARITIES.map((name) => ({ storeId: createdStore.id, name })),
-        skipDuplicates: true,
-      });
+      await seedStarterMasters(tx, createdStore.id);
 
       await tx.user.create({
         data: {
@@ -335,6 +328,10 @@ export async function createStoreWithAdmin(
       });
 
       return createdStore;
+    }, {
+      // Same reason as registerStore's: the starter masters are a dozen-plus
+      // sequential writes against remote Neon, past the 5s default.
+      timeout: 15000,
     });
 
     revalidatePath("/stores");

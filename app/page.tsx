@@ -8,6 +8,7 @@ import {
   Boxes,
   CalendarClock,
   CircleDollarSign,
+  ClipboardList,
   FileText,
   Gem,
   Hammer,
@@ -15,10 +16,12 @@ import {
   Mail,
   MapPin,
   PackagePlus,
+  Repeat2,
   ReceiptText,
   Scale,
   ScanLine,
   ShieldCheck,
+  TicketPercent,
   Truck,
   Users,
 } from "lucide-react"
@@ -49,89 +52,106 @@ export const metadata: Metadata = {
 const MODULES = [
   {
     icon: Users,
-    title: "Parties & Vendors",
-    body: "Separate masters for who you sell to and who you buy from, each with its own running ledger, balance and statement you can email straight from their page.",
+    title: "Parties & Suppliers",
+    body: "One list for everyone you trade with. Each party shows what they owe you and what you owe them as separate balances, with a statement you can email from their page.",
     tint: "var(--chart-1)",
   },
   {
     icon: Boxes,
     title: "Products & Stock",
-    body: "Products define the design — metal, purity, default charges and typical weights. Stock entries are the physical pieces, each with its own weight, tag and status, printable as QR labels.",
+    body: "A product can mix metals and stones — 22K gold with diamonds — each row with its own purity, weight, clarity, IGI number and GST rate. SKUs are generated for you, and every stock piece prints an 80×30 mm QR tag.",
     tint: "var(--chart-3)",
   },
   {
     icon: PackagePlus,
     title: "Purchases",
-    body: "Record what you buy from a vendor and stock is created automatically, one entry per line item. Anything unpaid posts to that vendor's ledger as money you owe.",
+    body: "Record what you buy from any party and stock is created automatically, one entry per line. GST and HSN per line, diamonds in carats, and anything unpaid goes to that supplier's balance.",
     tint: "var(--chart-4)",
+  },
+  {
+    icon: ReceiptText,
+    title: "Tax Invoice & Estimate Billing",
+    body: "Every line is sold from real stock — pick a piece and its details fill in. GST per line, hallmark charge, discounts and round-off, Credit Notes for returns, and print on A4 or thermal or share as a PDF on WhatsApp.",
+    tint: "var(--chart-2)",
+  },
+  {
+    icon: Repeat2,
+    title: "Customer Exchange",
+    body: "Take in a customer's old gold, silver or stones against a new bill. Value is pure weight × pure rate less your deduction, the adjustment prints on the invoice, and any excess becomes store credit.",
+    tint: "var(--chart-5)",
+  },
+  {
+    icon: TicketPercent,
+    title: "Offers & Vouchers",
+    body: "Percentage off, flat off or Buy X Get Y. Issue single-use codes to customers and redeem them on a new invoice, with the discount taken before GST.",
+    tint: "var(--chart-1)",
   },
   {
     icon: FileText,
     title: "Quotations",
-    body: "Quote a party without touching stock or the ledger. Nothing moves until you convert it to an invoice — that single step marks the stock sold and posts the balance.",
-    tint: "var(--chart-5)",
+    body: "Quote a party without touching stock or the ledger. Nothing moves until you convert it to an invoice — that single step sells the stock and posts the balance.",
+    tint: "var(--chart-3)",
   },
   {
-    icon: ReceiptText,
-    title: "Estimate & Tax Invoice Billing",
-    body: "Raise a provisional Estimate now and convert it to a formal Tax Invoice when the paperwork is ready. Both documents stay linked, so the trail is never lost.",
-    tint: "var(--chart-2)",
+    icon: ClipboardList,
+    title: "Draft Orders",
+    body: "Take a custom or phone order with an advance, send it to an artisan, and receive the finished pieces straight into stock — ready to sell.",
+    tint: "var(--chart-4)",
   },
   {
     icon: Hammer,
     title: "Artisan Job Tracking",
-    body: "Issue material to a goldsmith, track the job, and receive finished pieces back. Wastage folds into the fine weight credited, so a job's closing balance actually reconciles.",
-    tint: "var(--chart-1)",
+    body: "Issue material to a goldsmith, track the job, and receive finished pieces back. Wastage folds into the fine weight credited, and each artisan has a money ledger and a material ledger.",
+    tint: "var(--chart-2)",
   },
   {
     icon: CircleDollarSign,
-    title: "Ledger",
-    body: "Every movement across parties, vendors and artisans in one place, plus a metal-wise view showing what was bought and sold each day with a running closing balance.",
-    tint: "var(--chart-3)",
+    title: "Ledger & Payments",
+    body: "Every movement across parties and artisans in one place, Payment In and Payment Out for any party, and a metal-wise daily view with a running closing balance — diamonds in carats.",
+    tint: "var(--chart-5)",
   },
   {
     icon: BarChart3,
     title: "Reports & Exports",
-    body: "Revenue, outstanding balances, stock value, open jobs and a full fine-metal flow — purchased, issued, received, wastage, sold, remaining. Export any of it to Excel or CSV.",
-    tint: "var(--chart-4)",
+    body: "Revenue, outstanding balances, stock, open jobs and the full fine-metal flow. Export to Excel, CSV or PDF, or have reports emailed daily, monthly or quarterly.",
+    tint: "var(--chart-1)",
   },
   {
     icon: ScanLine,
     title: "Scan to Sell",
-    body: "Scan a piece's QR label with a phone camera and its details are already filled in. Pick the party, enter the price, confirm — the invoice is raised and the stock marked sold in one step at the counter.",
-    tint: "var(--chart-2)",
-  },
-  {
-    icon: MapPin,
-    title: "Multi-location Access",
-    body: "Run several counters or branches under one shop, and grant each person access only to the locations they actually work at.",
-    tint: "var(--chart-5)",
+    body: "Scan a piece's QR tag with a phone camera and its details are already filled in. Pick the party, confirm the price, and the invoice is raised with the stock sold in one step.",
+    tint: "var(--chart-3)",
   },
 ]
 
 const FLOW = [
-  { label: "Purchase", body: "Buy from a vendor" },
-  { label: "Stock", body: "Pieces created automatically" },
-  { label: "Quote or Slip", body: "Estimate or quotation" },
-  { label: "Invoice", body: "Tax invoice raised" },
+  { label: "Purchase", body: "Buy from a supplier" },
+  { label: "Stock", body: "Pieces created and tagged" },
+  { label: "Quote or Estimate", body: "Price agreed with the customer" },
+  { label: "Tax Invoice", body: "Sold from stock, GST per line" },
   { label: "Ledger", body: "Balance posted, stock reduced" },
 ]
 
 const JEWELLERY_SPECIFICS = [
+  {
+    icon: Gem,
+    title: "Ready on day one",
+    body: "A new store starts with Gold, Silver and Platinum and their purities, Diamond, Ruby, Emerald and Sapphire, common stone clarities, categories and GST rates already set up — start entering stock straight away, then adjust anything to your own standard.",
+  },
   {
     icon: Scale,
     title: "Fine-weight maths, not guesswork",
     body: "Gold and silver convert to a common fine-weight basis using your own purity table — 24K, 22K, 916, or whatever your house standard is. Issued and received quantities become directly comparable.",
   },
   {
-    icon: Gem,
-    title: "Your materials, your vocabulary",
-    body: "Metals, categories and item types are yours to define. A diamond dealer, a silver trader and a gold jeweller each name their own — nothing is hardcoded to one trade.",
-  },
-  {
     icon: ShieldCheck,
     title: "Wastage that reconciles",
     body: "Each item's wastage percentage folds into the fine weight credited back from an artisan, so a job closes against what was issued instead of reading as unexplained missing metal.",
+  },
+  {
+    icon: MapPin,
+    title: "Counters, branches and delivery",
+    body: "Run several counters or branches under one shop and give each person access only to the locations they work at. An invoice's delivery location decides CGST + SGST or IGST.",
   },
   {
     icon: CalendarClock,
@@ -141,7 +161,7 @@ const JEWELLERY_SPECIFICS = [
   {
     icon: Mail,
     title: "Documents that leave the building",
-    body: "Email an invoice, an Estimate or a party statement directly from its page, under your own business name — not a generic template.",
+    body: "Email an invoice, an estimate or a party statement from its page, or share it as a PDF on WhatsApp — under your own business name, not a generic template.",
   },
 ]
 
@@ -451,7 +471,7 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="max-w-2xl">
             <h2 className="text-3xl font-semibold tracking-tight text-balance">
-              One chain, from vendor to payment
+              One chain, from supplier to payment
             </h2>
             <p className="mt-3 text-muted-foreground">
               Each step carries the last one forward. Nothing is retyped, and

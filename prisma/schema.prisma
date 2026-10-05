@@ -111,6 +111,7 @@ model Store {
   gstRates             GstRate[]
   draftOrders          DraftOrder[]
 
+  promotions          Promotion[]
   @@index([code])
 }
 
@@ -542,6 +543,7 @@ model Customer {
   kachaItemsAsVendor     KachaInvoiceItem[] @relation("KachaInvoiceItemVendor")
   quotationItemsAsVendor QuotationItem[]    @relation("QuotationItemVendor")
 
+  promotionVouchers      PromotionVoucher[]
   @@unique([storeId, customerCode])
   @@unique([storeId, vendorCode])
   @@unique([storeId, phone])
@@ -1042,6 +1044,14 @@ model Invoice {
   replacedBy             Invoice?       @relation("InvoiceReplaces")
   creditNotes            CreditNote[]
 
+  // Offer / gift voucher redeemed on this bill (lib/promotions.ts). Its
+  // discount is spread over the eligible lines' schemeDiscount (pre-GST);
+  // promotionDiscount is the total, promotionCode the code typed.
+  promotionId        String?
+  promotion          Promotion?        @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  promotionVoucher   PromotionVoucher? @relation("VoucherRedeemedOn")
+  promotionCode      String?
+  promotionDiscount  Decimal           @default(0) @db.Decimal(12, 2)
   @@unique([storeId, invoiceNumber])
   @@index([createdById])
   @@index([cancelledById])
@@ -3218,4 +3228,84 @@ model PieceComponent {
   @@index([purchaseItemId])
   @@index([inventoryStockId])
   @@index([metalTypeId])
+}
+
+enum PromotionType {
+  // percentOff % of the target (bill or making charges), capped by maxDiscount.
+  PERCENT_OFF
+  // amountOff ₹ off the target.
+  FLAT_OFF
+  // Buy buyQuantity, get getQuantity pieces (the cheapest) at getPercentOff
+  // off (100 = free).
+  BUY_X_GET_Y
+}
+
+enum PromotionTarget {
+  // The eligible lines' value (metal + making + HM + stone, pre-GST).
+  BILL
+  // Only the eligible lines' making + HM charges.
+  MAKING_CHARGES
+}
+
+/// An offer the Store Owner runs for promotional sales, redeemed on New
+/// Invoice by its public `code` or by a single-use PromotionVoucher code
+/// issued to a customer. Maths in lib/promotions.ts (shared by the invoice
+/// form preview and createInvoice, which re-validates and recomputes).
+model Promotion {
+  id               String             @id @default(cuid())
+  storeId          String
+  store            Store              @relation(fields: [storeId], references: [id])
+  name             String
+  description      String?
+  type             PromotionType
+  target           PromotionTarget    @default(BILL)
+  percentOff       Decimal?           @db.Decimal(5, 2)
+  amountOff        Decimal?           @db.Decimal(12, 2)
+  buyQuantity      Int?
+  getQuantity      Int?
+  getPercentOff    Decimal?           @default(100) @db.Decimal(5, 2)
+  maxDiscount      Decimal?           @db.Decimal(12, 2)
+  minBillAmount    Decimal?           @db.Decimal(12, 2)
+  // Empty = every category / metal.
+  categoryIds      String[]           @default([])
+  metalTypeIds     String[]           @default([])
+  validFrom        DateTime?
+  validUntil       DateTime?
+  isActive         Boolean            @default(true)
+  // Public code anyone can use (optional — vouchers have their own codes).
+  code             String?
+  // Redemptions across all customers / per customer (null = unlimited).
+  usageLimit       Int?
+  perCustomerLimit Int?
+  createdById      String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  vouchers         PromotionVoucher[]
+  invoices         Invoice[]
+
+  @@unique([storeId, code])
+  @@index([storeId])
+}
+
+/// A single-use code for a Promotion, issued to (optionally) one customer.
+/// Used once on an invoice (usedAt / invoiceId); cancelling that invoice
+/// frees it again.
+model PromotionVoucher {
+  id          String    @id @default(cuid())
+  storeId     String
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  code        String
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  note        String?
+  expiresAt   DateTime?
+  issuedAt    DateTime  @default(now())
+  usedAt      DateTime?
+  invoiceId   String?   @unique
+  invoice     Invoice?  @relation("VoucherRedeemedOn", fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, code])
+  @@index([promotionId])
+  @@index([customerId])
 }

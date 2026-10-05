@@ -342,7 +342,7 @@ export function InvoicePrintModern({ invoice, settings, exchange }: InvoicePrint
               </div>
               {invoice.discount > 0 && (
                 <div className="flex justify-between border-b border-slate-200 p-2">
-                  <span>Discount</span>
+                  <span>Discount{invoice.promotionCode ? ` (incl. offer ${invoice.promotionCode})` : ""}</span>
                   <span>-₹{fmt(invoice.discount)}</span>
                 </div>
               )}

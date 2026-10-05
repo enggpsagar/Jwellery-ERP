@@ -8,6 +8,8 @@ import type { GstScheme, PurityType } from "@prisma/client"
 
 import { createInvoice, updateInvoice, type InvoiceFormState } from "@/lib/actions/invoice-actions"
 import { getCustomerAvailableCredit } from "@/lib/actions/payments-actions"
+import { checkPromotionCode } from "@/lib/actions/promotion-redeem-actions"
+import { computePromotion, describePromotion, type PromotionConfig, type PromotionLine } from "@/lib/promotions"
 import { useToast } from "@/components/providers/toast-provider"
 import { ScanToAddPanel } from "@/components/billing/scan-to-add-panel"
 import { todayForDateInput } from "@/lib/date-input"
@@ -495,6 +497,39 @@ export function InvoiceForm({
   // customer change so it can't go stale across a long-open tab; reset to
   // 0 alongside it so switching customers never silently carries over an
   // amount that belonged to the previous one.
+  // Offer / gift voucher applied to this new invoice (code checked by the
+  // server: checkPromotionCode). Cleared when the party changes, since
+  // vouchers and per-customer limits depend on who's buying.
+  const [appliedPromotion, setAppliedPromotion] = useState<{
+    promotion: PromotionConfig
+    voucherId: string | null
+    code: string
+  } | null>(null)
+  const [promoCodeInput, setPromoCodeInput] = useState("")
+  const [promoChecking, setPromoChecking] = useState(false)
+  const [promoError, setPromoError] = useState("")
+  useEffect(() => {
+    setAppliedPromotion(null)
+    setPromoError("")
+  }, [customerId])
+  const applyPromotionCode = async () => {
+    if (!promoCodeInput.trim()) return
+    setPromoChecking(true)
+    setPromoError("")
+    try {
+      const result = await checkPromotionCode(promoCodeInput, customerId || null)
+      if (result.ok) {
+        setAppliedPromotion({ promotion: result.promotion, voucherId: result.voucherId, code: result.code })
+        setPromoCodeInput(result.code)
+      } else {
+        setPromoError(result.reason)
+      }
+    } catch {
+      setPromoError("Couldn't check that code — try again.")
+    } finally {
+      setPromoChecking(false)
+    }
+  }
   const [customerCredit, setCustomerCredit] = useState(0)
   const [creditApplied, setCreditApplied] = useState(0)
   useEffect(() => {
@@ -1295,12 +1330,40 @@ export function InvoiceForm({
   // Taxable value per line: metal + making + HM + stone, less any per-line
   // scheme discount — the same base the reference format's SGST/CGST/IGST
   // columns are computed against.
-  const taxableValue = (item: LineItem) =>
+  const baseTaxableValue = (item: LineItem) =>
     lineMetalValue(item) +
     item.makingCharge +
     item.hmCharge +
     lineStoneValue(item) -
     item.schemeDiscount
+
+  // Offer / gift voucher (lib/promotions.ts) — previewed live from the
+  // applied code; createInvoice re-checks the code and recomputes. Its share
+  // per line comes off that line's taxable value (before GST).
+  const promoLines = (): PromotionLine[] =>
+    items
+      .filter((item) => item.stockLinkDecided && (item.itemName.trim() || item.inventoryStockId))
+      .map((item) => {
+        const stock = item.inventoryStockId ? stockItems.find((s) => s.id === item.inventoryStockId) : undefined
+        const metalTypeIds = item.multiPart
+          ? item.components.flatMap((row) => (row.kind === "METAL" && row.metalTypeId ? [row.metalTypeId] : []))
+          : item.metalTypeId
+            ? [item.metalTypeId]
+            : []
+        return {
+          key: item.key,
+          categoryId: (stock ? stock.categoryId : item.categoryId) || null,
+          metalTypeIds,
+          quantity: item.quantity || 1,
+          value: Math.round(baseTaxableValue(item) * 100) / 100,
+          making: item.makingCharge + item.hmCharge,
+        }
+      })
+  const promoResult = appliedPromotion ? computePromotion(appliedPromotion.promotion, promoLines()) : null
+  const promoOf = (item: LineItem) => (promoResult?.ok ? promoResult.perLine[item.key] ?? 0 : 0)
+  const promoTotal = promoResult?.ok ? promoResult.total : 0
+
+  const taxableValue = (item: LineItem) => baseTaxableValue(item) - promoOf(item)
 
   // This line's own GST %, resolved from its own gstRateId against the
   // full `gstRates` prop — falls back to the document-level default
@@ -1321,8 +1384,11 @@ export function InvoiceForm({
     if (item.multiPart) {
       // Each metal/stone at its own GST rate; making/HM (less any scheme
       // discount) at the line's own rate.
+      // An offer's share of this line scales every part's taxable value.
+      const base = baseTaxableValue(item)
+      const factor = base > 0 ? Math.max(0, (base - promoOf(item)) / base) : 1
       const split = (taxable: number, percent: number) =>
-        computeGst(taxable, gstScheme === "COMPOSITION" ? 0 : percent, gstScheme, storeState, deliveryState)
+        computeGst(taxable * factor, gstScheme === "COMPOSITION" ? 0 : percent, gstScheme, storeState, deliveryState)
       const rateOf = (id: string) => gstRates.find((r) => r.id === id)?.ratePercent ?? lineGstRatePercent(item)
       const parts = pieceGst(item.components, { valuation: "net" }, item.quantity || 1, rateOf, split)
       const making = split(item.makingCharge + item.hmCharge - item.schemeDiscount, lineGstRatePercent(item))
@@ -1393,14 +1459,15 @@ export function InvoiceForm({
         { sgst: 0, cgst: 0, igst: 0, isInterState: false },
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, gstRate, gstScheme, storeState, deliveryState],
+    [items, gstRate, gstScheme, storeState, deliveryState, appliedPromotion],
   )
   const rawTotal =
     subtotal +
     makingChargesTotal +
     stoneChargesTotal -
     discount -
-    schemeDiscountTotal +
+    schemeDiscountTotal -
+    promoTotal +
     taxAmount
   // Standard Indian-billing convention: the Total shown/saved is rounded to
   // the nearest rupee, with the small signed adjustment surfaced as its own
@@ -1465,7 +1532,10 @@ export function InvoiceForm({
         dmoWeight: toUnit(item.dmoWeight) || null,
         stoneWeight: toUnit(item.stoneWeightInput) || null,
         hmCharge: item.hmCharge,
-        schemeDiscount: item.schemeDiscount,
+        // The offer's share rides on the line's scheme discount (pre-GST);
+        // promoDiscount lets the server tell the two apart and re-check it.
+        schemeDiscount: Math.round((item.schemeDiscount + promoOf(item)) * 100) / 100,
+        promoDiscount: promoOf(item),
         sgstAmount: sgst,
         cgstAmount: cgst,
         igstAmount: igst,
@@ -2683,6 +2753,63 @@ export function InvoiceForm({
             value={discount}
             onChange={setDiscount}
           />
+          {!editInvoiceId && (
+            <div className="space-y-1.5 border-t pt-2" data-testid="promo-box">
+              <Label className="text-xs">Offer / voucher code</Label>
+              {appliedPromotion ? (
+                <div className="space-y-1 rounded-md border border-emerald-600/30 bg-emerald-600/10 p-2 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-emerald-800">
+                      {appliedPromotion.code} · {appliedPromotion.promotion.name}
+                    </span>
+                    <button
+                      type="button"
+                      className="text-xs text-red-600 hover:underline"
+                      onClick={() => {
+                        setAppliedPromotion(null)
+                        setPromoCodeInput("")
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <p className="text-xs text-emerald-700">
+                    {describePromotion(appliedPromotion.promotion)}
+                    {promoResult?.ok ? ` — saving ₹${promoTotal.toFixed(2)}` : ""}
+                  </p>
+                  {promoResult && !promoResult.ok ? <p className="text-xs text-amber-700">{promoResult.reason}</p> : null}
+                </div>
+              ) : (
+                <div className="flex gap-1.5">
+                  <Input
+                    value={promoCodeInput}
+                    onChange={(event) => setPromoCodeInput(event.target.value.toUpperCase())}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault()
+                        void applyPromotionCode()
+                      }
+                    }}
+                    placeholder="e.g. DIWALI10"
+                    className="h-9 uppercase"
+                    aria-label="Offer or voucher code"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9"
+                    disabled={promoChecking || !promoCodeInput.trim()}
+                    onClick={() => void applyPromotionCode()}
+                  >
+                    {promoChecking ? "Checking…" : "Apply"}
+                  </Button>
+                </div>
+              )}
+              {promoError ? <p className="text-xs text-destructive">{promoError}</p> : null}
+              <input type="hidden" name="promotionCode" value={promoResult?.ok ? appliedPromotion?.code ?? "" : ""} />
+            </div>
+          )}
         </div>
 
         {editInvoiceId ? (
@@ -2787,6 +2914,12 @@ export function InvoiceForm({
           <span>Scheme / Discount (line items)</span>
           <span>-₹{schemeDiscountTotal.toFixed(2)}</span>
         </div>
+        {promoTotal > 0 && appliedPromotion && (
+          <div className="flex justify-between text-emerald-700" data-testid="promo-total">
+            <span>Offer ({appliedPromotion.code}) — before GST</span>
+            <span>-₹{promoTotal.toFixed(2)}</span>
+          </div>
+        )}
         {gstBreakdownTotal.isInterState ? (
           <div className="flex justify-between">
             <span>Total IGST</span>

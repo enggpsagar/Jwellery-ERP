@@ -442,6 +442,33 @@ multi-part Kacha rows now carry a "GST if billed" rate (store default;
 hidden on the slip). Invoice/Kacha/Quotation/Purchase exports have a
 "Metals & Stones" column (`lib/piece-components-text.ts`).
 
+### Added 2026-10-06: Offers & gift vouchers (promotional sales)
+
+`Promotion` + `PromotionVoucher` (migration `20261006100000_promotions_vouchers`).
+An offer is PERCENT_OFF / FLAT_OFF (target BILL or MAKING_CHARGES, optional
+maxDiscount) or BUY_X_GET_Y (cheapest Y of every X+Y pieces at
+getPercentOff, 100 = free), with optional min bill, validity dates,
+category/metal filters, total and per-customer usage limits. Redeemed by the
+offer's public `code` or a single-use voucher code (optionally tied to one
+customer, optional expiry). Admin: Billing → Offers & Vouchers
+(`/billing/offers`, `lib/actions/promotion-actions.ts`).
+- **Maths** `lib/promotions.ts` (`computePromotion`, client-safe) is shared
+  by the New Invoice preview and `createInvoice`. The discount is spread over
+  the eligible lines and rides on each line's `schemeDiscount` (so it's
+  **before GST** — a discount on the invoice reduces the value of supply);
+  the line payload also carries `promoDiscount` so the server can separate
+  it. A multi-part line scales every part's taxable value by the same factor.
+- **Server** `resolveInvoicePromotion` (invoice-actions.ts) re-checks the code
+  via `lookupPromotionCode` (`lib/promotions.server.ts`: active, dates,
+  limits, voucher unused/unexpired/right customer), recomputes, and refuses if
+  the form's per-line figures differ by > ₹0.05. Invoice keeps
+  `promotionId/promotionCode/promotionDiscount`; a voucher is spent in the
+  same transaction with a conditional `usedAt: null` update (no double use).
+  Cancel/delete frees it. Prints and the detail page label the discount
+  "(incl. offer CODE)".
+- New Invoice only (Edit Invoice keeps the discount already on the lines;
+  not on Kacha/Quotation yet).
+
 ### Regression tests (added 2026-09-29)
 
 Playwright suite in `e2e/`, run by `.github/workflows/regression.yml` on every push to `main` and every PR: throwaway Postgres in the runner → migrate → `pnpm seed` + `pnpm db:seed:full-demo` → `tsc` → `pnpm build` → `pnpm test:e2e`. Sign-in mints a NextAuth JWT in `e2e/global-setup.ts` (no test login route in the app), which also refuses any non-localhost `DATABASE_URL`. See `e2e/README.md`. **Add a spec for every new feature.** The demo seed must keep creating `UserStoreMembership` rows for its users — `requirePermissionInStore` (createInvoice etc.) reads only that table, so without them the demo Admin can open every page but not save an invoice. Tests run in parallel with Vercel's own deploy on a direct push to `main`; they only *block* a bad change if work goes through a PR (or Vercel's deployment checks are turned on).

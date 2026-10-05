@@ -89,6 +89,9 @@ const mainNav: NavItem[] = [
       // No quickAddHref — a Credit Note is always issued from an existing
       // invoice's return flow, there is no standalone "new" page for one.
       { title: "Credit Notes", href: "/billing/credit-notes", countKey: "creditNotes" },
+      // Store-run offers + gift vouchers (lib/promotions.ts), redeemed by
+      // code on New Invoice. Under /billing so the Billing module gates it.
+      { title: "Offers & Vouchers", href: "/billing/offers" },
     ],
   },
   {

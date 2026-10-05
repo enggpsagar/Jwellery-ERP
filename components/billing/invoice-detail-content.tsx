@@ -235,7 +235,7 @@ export function InvoiceDetailContent({
           <span>₹{invoice.subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Discount</span>
+          <span>Discount{invoice.promotionCode ? ` (incl. offer ${invoice.promotionCode})` : ""}</span>
           <span>-₹{invoice.discount.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">

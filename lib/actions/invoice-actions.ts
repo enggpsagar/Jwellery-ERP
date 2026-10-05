@@ -20,6 +20,8 @@ import {
 import { prisma } from "@/lib/prisma";
 import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/piece-components-text";
 import { getFineWeightResolver } from "@/lib/fine-weight";
+import { lookupPromotionCode } from "@/lib/promotions.server";
+import { computePromotion, type PromotionLine } from "@/lib/promotions";
 import {
   getPieceResolver,
   pieceComponentCreates,
@@ -85,6 +87,9 @@ export type InvoiceLineItemInput = {
   stoneWeight?: number | null;
   hmCharge?: number;
   schemeDiscount?: number;
+  // The part of schemeDiscount that is an offer / voucher (lib/promotions.ts)
+  // — re-checked by resolveInvoicePromotion.
+  promoDiscount?: number;
   sgstAmount?: number;
   cgstAmount?: number;
   // Charged instead of sgst+cgst on an inter-state sale — see computeGst()
@@ -206,6 +211,13 @@ async function resolvePerLineGstRateSnapshots(
   return map;
 }
 
+/** A voucher redeemed by another bill between the check and the save. */
+class PromotionVoucherUsedError extends Error {
+  constructor() {
+    super("This voucher was just used on another bill.");
+  }
+}
+
 /**
  * Diamond items price per carat, not per gram — every other purity still
  * prices off netWeight. Net Weight/Carat Weight is a per-piece figure (see
@@ -325,6 +337,67 @@ async function resolvePieceLines(
     });
   }
   return out;
+}
+
+/**
+ * Offer / gift voucher typed on New Invoice: re-checks the code for this
+ * store and party (lib/promotions.server.ts) and recomputes each line's share
+ * with the same engine the form previews (lib/promotions.ts), from the
+ * line's value before the offer. Refuses the save if the form's figures no
+ * longer match (e.g. the offer was edited meanwhile) rather than silently
+ * charging something else.
+ */
+async function resolveInvoicePromotion(
+  storeId: string,
+  customerId: string,
+  items: InvoiceLineItemInput[],
+  rawCode: string,
+): Promise<{ error: string } | { promotionId: string; voucherId: string | null; code: string; total: number } | null> {
+  if (!rawCode.trim()) {
+    if (items.some((item) => toNumber(item.promoDiscount) > 0)) {
+      return { error: "The offer was removed — re-apply it or clear its discount." };
+    }
+    return null;
+  }
+  const found = await lookupPromotionCode(storeId, rawCode, customerId);
+  if (!found.ok) return { error: found.reason };
+
+  const stockIds = items.flatMap((item) => (item.inventoryStockId ? [item.inventoryStockId] : []));
+  const stocks = stockIds.length
+    ? await prisma.inventoryStock.findMany({
+        where: { storeId, id: { in: stockIds } },
+        select: { id: true, product: { select: { categoryId: true } } },
+      })
+    : [];
+  const categoryOfStock = new Map(stocks.map((stock) => [stock.id, stock.product.categoryId]));
+  const keyOf = (index: number) => `line-${index}`;
+  const lines: PromotionLine[] = items.map((item, index) => ({
+    key: keyOf(index),
+    categoryId: (item.inventoryStockId ? categoryOfStock.get(item.inventoryStockId) : item.categoryId) ?? null,
+    metalTypeIds: item.piece
+      ? item.piece.components.flatMap((row) => (row.kind === "METAL" && row.metalTypeId ? [row.metalTypeId] : []))
+      : item.metalTypeId
+        ? [item.metalTypeId]
+        : [],
+    quantity: toNumber(item.quantity, 1) || 1,
+    value:
+      Math.round(
+        (lineMetalValue(item) +
+          toNumber(item.makingCharge) +
+          toNumber(item.hmCharge) +
+          toNumber(item.stoneCharge) -
+          (toNumber(item.schemeDiscount) - toNumber(item.promoDiscount))) *
+          100,
+      ) / 100,
+    making: toNumber(item.makingCharge) + toNumber(item.hmCharge),
+  }));
+  const result = computePromotion(found.promotion, lines);
+  if (!result.ok) return { error: result.reason };
+  const mismatch = items.some(
+    (item, index) => Math.abs((result.perLine[keyOf(index)] ?? 0) - toNumber(item.promoDiscount)) > 0.05,
+  );
+  if (mismatch) return { error: "The offer's discount has changed — remove it and apply the code again." };
+  return { promotionId: found.promotion.id, voucherId: found.voucherId, code: found.code, total: result.total };
 }
 
 function lineTotal(item: InvoiceLineItemInput) {
@@ -489,6 +562,9 @@ function mapInvoice(invoice: any) {
     makingCharges: Number(invoice.makingCharges),
     stoneCharges: Number(invoice.stoneCharges),
     discount: Number(invoice.discount),
+    // Offer / gift voucher redeemed on this bill (part of `discount`).
+    promotionCode: invoice.promotionCode ?? null,
+    promotionDiscount: Number(invoice.promotionDiscount ?? 0),
     taxAmount: Number(invoice.taxAmount),
     totalAmount: Number(invoice.totalAmount),
     roundOffAmount: Number(invoice.roundOffAmount ?? 0),
@@ -1169,6 +1245,10 @@ export async function createInvoice(
     items = pieceLines;
     const fineOf = await getFineWeightResolver(storeId);
 
+    // Offer / gift voucher (see resolveInvoicePromotion).
+    const promotion = await resolveInvoicePromotion(storeId, customerId, items, String(formData.get("promotionCode") || ""));
+    if (promotion && "error" in promotion) return { success: false, message: promotion.error };
+
     // A new line item becomes a real Product on save — it needs everything
     // Add Product would ask for, or it lands outside every category report.
     const manualLineError = await validateManualSaleLines(storeId, items);
@@ -1495,6 +1575,9 @@ export async function createInvoice(
           storeId,
           invoiceNumber,
           customerId,
+          promotionId: promotion?.promotionId ?? undefined,
+          promotionCode: promotion?.code ?? undefined,
+          promotionDiscount: promotion?.total ?? 0,
           invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : new Date(),
           dueDate: dueDateRaw ? new Date(dueDateRaw) : undefined,
           status,
@@ -1708,6 +1791,16 @@ export async function createInvoice(
         });
       }
 
+      // A single-use voucher is spent on this invoice — conditional on it
+      // still being unused, so two bills can't redeem the same code at once.
+      if (promotion?.voucherId) {
+        const spent = await tx.promotionVoucher.updateMany({
+          where: { id: promotion.voucherId, storeId, usedAt: null },
+          data: { usedAt: new Date(), invoiceId: created.id },
+        });
+        if (spent.count !== 1) throw new PromotionVoucherUsedError();
+      }
+
       // Customer → Business half of an Old Gold Exchange: the OG purchase,
       // its old-gold stock and the customer's ledger entries.
       if (oldGold.lines.length) {
@@ -1742,6 +1835,9 @@ export async function createInvoice(
     };
   } catch (error) {
     if (error instanceof OversellError) {
+      return { success: false, message: error.message };
+    }
+    if (error instanceof PromotionVoucherUsedError) {
       return { success: false, message: error.message };
     }
     logger.error("createInvoice error", error);
@@ -2898,6 +2994,11 @@ export async function cancelInvoice(
         });
       }
 
+      // A voucher spent on this bill is usable again.
+      await tx.promotionVoucher.updateMany({
+        where: { storeId, invoiceId: invoice.id },
+        data: { usedAt: null, invoiceId: null },
+      });
       await tx.invoice.update({
         where: { id },
         data: {
@@ -2998,6 +3099,11 @@ export async function deleteInvoice(id: string): Promise<InvoiceFormState> {
         });
       }
 
+      // A voucher spent on this bill is usable again.
+      await tx.promotionVoucher.updateMany({
+        where: { storeId, invoiceId: id },
+        data: { usedAt: null, invoiceId: null },
+      });
       await tx.invoice.delete({ where: { id } });
     }, { timeout: 15000 });
 

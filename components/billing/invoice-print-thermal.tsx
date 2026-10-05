@@ -109,7 +109,7 @@ export function InvoicePrintThermal({ invoice, settings, exchange }: InvoicePrin
         </div>
         {invoice.discount > 0 && (
           <div className="flex justify-between">
-            <span>Discount</span>
+            <span>Discount{invoice.promotionCode ? ` (incl. offer ${invoice.promotionCode})` : ""}</span>
             <span>-₹{fmt(invoice.discount)}</span>
           </div>
         )}

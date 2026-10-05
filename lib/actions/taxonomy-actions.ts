@@ -76,6 +76,8 @@ export type StoreStyleRow = {
   isActive: boolean;
 };
 
+export type StoreStoneClarityRow = StoreStyleRow;
+
 export type StoreCategoryTypeRow = {
   id: string;
   categoryId: string;
@@ -1423,6 +1425,176 @@ export async function deleteStoreStyle(id: string): Promise<TaxonomyFormState> {
   } catch (error) {
     logger.error("deleteStoreStyle error", error);
     return { success: false, message: actionErrorMessage(error, "Failed to delete style") };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Store Stone Clarities (e.g. "FG/VVS-VS") — same CRUD shape as Styles above.
+// ---------------------------------------------------------------------------
+
+export async function getStoreStoneClarities(): Promise<StoreStoneClarityRow[]> {
+  const storeId = await requireStoreScope();
+
+  const clarities = await prisma.storeStoneClarity.findMany({
+    where: { storeId },
+    orderBy: { name: "asc" },
+  });
+
+  return clarities.map((style) => ({
+    id: style.id,
+    name: style.name,
+    isActive: style.isActive,
+  }));
+}
+
+export async function upsertStoreStoneClarity(
+  prevState: TaxonomyFormState,
+  formData: FormData,
+): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return {
+      success: false,
+      message: "Only the Store Owner can update these settings.",
+    };
+  }
+
+  try {
+    const id = String(formData.get("id") || "").trim();
+    const name = String(formData.get("name") || "").trim();
+
+    if (!name) {
+      return {
+        success: false,
+        message: "Please fix the form errors",
+        errors: { name: ["Clarity is required"] },
+      };
+    }
+
+    const storeId = await requireStoreScope();
+
+    const existing = await prisma.storeStoneClarity.findFirst({
+      where: { storeId, name, NOT: id ? { id } : undefined },
+      select: { id: true },
+    });
+
+    if (existing) {
+      return {
+        success: false,
+        message: "This clarity already exists",
+        errors: { name: ["This clarity already exists"] },
+      };
+    }
+
+    let savedId = id;
+
+    if (id) {
+      const { count } = await prisma.storeStoneClarity.updateMany({
+        where: { id, storeId },
+        data: { name },
+      });
+
+      if (count === 0) {
+        return { success: false, message: "Clarity not found" };
+      }
+    } else {
+      const created = await prisma.storeStoneClarity.create({
+        data: { storeId, name },
+        select: { id: true },
+      });
+      savedId = created.id;
+    }
+
+    revalidatePath(TAXONOMY_PATH);
+
+    return {
+      success: true,
+      id: savedId,
+      message: id ? "Clarity updated" : "Clarity added",
+    };
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return {
+        success: false,
+        message: "This clarity already exists",
+        errors: { name: ["This clarity already exists"] },
+      };
+    }
+    logger.error("upsertStoreStoneClarity error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to save clarity") };
+  }
+}
+
+export async function toggleStoreStoneClarityActive(
+  id: string,
+  isActive: boolean,
+): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return {
+      success: false,
+      message: "Only the Store Owner can update these settings.",
+    };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const { count } = await prisma.storeStoneClarity.updateMany({
+      where: { id, storeId },
+      data: { isActive },
+    });
+
+    if (count === 0) {
+      return { success: false, message: "Clarity not found" };
+    }
+
+    revalidatePath(TAXONOMY_PATH);
+
+    return {
+      success: true,
+      message: isActive ? "Clarity activated" : "Clarity deactivated",
+    };
+  } catch (error) {
+    logger.error("toggleStoreStoneClarityActive error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to update clarity") };
+  }
+}
+
+export async function deleteStoreStoneClarity(id: string): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return { success: false, message: "Only a Store Admin or Super Admin can delete a clarity." };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+
+    const style = await prisma.storeStoneClarity.findFirst({ where: { id, storeId } });
+
+    if (!style) return { success: false, message: "Clarity not found" };
+
+    // Products keep the clarity as text, not an FK — count by name.
+    const usedBy = await prisma.productStoneComponent.count({
+      where: { clarity: style.name, product: { storeId } },
+    });
+    if (usedBy > 0) {
+      return {
+        success: false,
+        message: `This clarity is used on ${usedBy} product stone row(s) and cannot be deleted. Disable it instead.`,
+      };
+    }
+
+    await prisma.storeStoneClarity.delete({ where: { id } });
+    revalidatePath(TAXONOMY_PATH);
+
+    return { success: true, message: "Clarity deleted" };
+  } catch (error) {
+    logger.error("deleteStoreStoneClarity error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to delete clarity") };
   }
 }
 

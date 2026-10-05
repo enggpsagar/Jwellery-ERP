@@ -55,6 +55,7 @@ type EditProductFormProps = {
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
   styles: StoreStyleOption[];
+  clarities?: StoreStyleOption[];
   caratConversionRates: Record<PurityType, number>;
   origins: StoreMetalOriginRow[];
   gstRates?: GstRateOption[];
@@ -67,6 +68,7 @@ export function EditProductForm({
   metals,
   categories,
   styles,
+  clarities,
   caratConversionRates,
   origins,
   gstRates,
@@ -127,6 +129,7 @@ export function EditProductForm({
         metals={metals}
         categories={categories}
         styles={styles}
+        clarities={clarities}
         caratConversionRates={caratConversionRates}
         origins={origins}
         gstRates={gstRates}

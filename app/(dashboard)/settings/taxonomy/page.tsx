@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import { UserRole } from "@prisma/client";
 import { redirect } from "next/navigation";
 
-import { getStoreMetals, getStoreCategories, getStoreStyles, getMisconfiguredPurities } from "@/lib/actions/taxonomy-actions";
+import { getStoreMetals, getStoreCategories, getStoreStyles, getStoreStoneClarities, getMisconfiguredPurities } from "@/lib/actions/taxonomy-actions";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { getCurrentUser } from "@/lib/auth/auth";
 
 import { TaxonomySettingsForm } from "@/components/settings/taxonomy-settings-form";
 import { StyleSettingsForm } from "@/components/settings/style-settings-form";
+import { ClaritySettingsForm } from "@/components/settings/clarity-settings-form";
 import { SkuFormatForm } from "@/components/settings/sku-format-form";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { PageBackHeader } from "@/components/shared/page-back-header";
@@ -25,10 +26,11 @@ export default async function TaxonomySettingsPage() {
     currentUser?.role === UserRole.SUPER_ADMIN;
   if (!canEdit) redirect("/dashboard");
 
-  const [metals, categories, styles, businessSettings, misconfiguredPurities] = await Promise.all([
+  const [metals, categories, styles, clarities, businessSettings, misconfiguredPurities] = await Promise.all([
     getStoreMetals(),
     getStoreCategories(),
     getStoreStyles(),
+    getStoreStoneClarities(),
     getBusinessSettings(),
     getMisconfiguredPurities(),
   ]);
@@ -55,6 +57,8 @@ export default async function TaxonomySettingsPage() {
       />
 
       <StyleSettingsForm styles={styles} canEdit={canEdit} />
+
+      <ClaritySettingsForm clarities={clarities} canEdit={canEdit} />
 
       <SkuFormatForm
         skuFormat={businessSettings.skuFormat}

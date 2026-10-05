@@ -22,6 +22,7 @@ import { ProductImagesField } from "@/components/inventory/products/product-imag
 import { AddCategoryTypeDialog } from "@/components/inventory/shared/add-category-type-dialog";
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog";
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog";
+import { AddClarityDialog } from "@/components/inventory/shared/add-clarity-dialog";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -151,6 +152,8 @@ type ProductFormProps = {
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
   styles: StoreStyleOption[];
+  /** Settings → Stone Clarity — picked per stone row; "+" adds one inline. */
+  clarities?: StoreStyleOption[];
   origins: StoreMetalOriginRow[];
   /** Settings > GST Rates — offered per Metal/Stone component row (see
    * MetalComponentRow/StoneComponentRow's own gstRateId), not once for the
@@ -268,6 +271,7 @@ export function ProductForm({
   metals: initialMetals,
   categories: initialCategories,
   styles,
+  clarities: initialClarities = [],
   origins: initialOrigins,
   caratConversionRates,
   locations = [],
@@ -436,6 +440,9 @@ export function ProductForm({
   // rows) can each append a newly-created row without a full page reload.
   const [metals, setMetals] = useState(initialMetals);
   const [origins, setOrigins] = useState(initialOrigins);
+  const [clarities, setClarities] = useState(initialClarities);
+  // Stone row whose "+ Add Clarity" dialog is open.
+  const [addClarityForKey, setAddClarityForKey] = useState<string | null>(null);
 
   // The stone-component repeater (productKind "METAL" only) — replaces the
   // old single hasStoneComponent toggle + one StoneComponentFields
@@ -1557,12 +1564,41 @@ export function ProductForm({
                   <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Clarity</Label>
-                    <Input
-                      list="stone-clarity-grades"
-                      value={row.clarity}
-                      placeholder="e.g. VVS1"
-                      onChange={(event) => updateStoneComponent(row.key, { clarity: event.target.value })}
-                    />
+                    <div className="flex gap-1.5">
+                      <Select
+                        value={row.clarity || "NONE"}
+                        onValueChange={(value) => updateStoneComponent(row.key, { clarity: value === "NONE" ? "" : value })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Not set" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NONE">Not set</SelectItem>
+                          {/* A saved value no longer in the list (renamed or
+                              turned off) still shows rather than vanishing. */}
+                          {row.clarity && !clarities.some((item) => item.name === row.clarity) && (
+                            <SelectItem value={row.clarity}>{row.clarity}</SelectItem>
+                          )}
+                          {clarities
+                            .filter((item) => item.isActive || item.name === row.clarity)
+                            .map((item) => (
+                              <SelectItem key={item.id} value={item.name}>
+                                {item.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        className="shrink-0"
+                        title="Add Clarity"
+                        onClick={() => setAddClarityForKey(row.key)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="space-y-1">
@@ -1621,11 +1657,14 @@ export function ProductForm({
             </div>
           )}
 
-          <datalist id="stone-clarity-grades">
-            {["FL", "IF", "VVS1", "VVS2", "VS1", "VS2", "SI1", "SI2", "I1", "I2", "I3"].map((grade) => (
-              <option key={grade} value={grade} />
-            ))}
-          </datalist>
+          <AddClarityDialog
+            open={addClarityForKey !== null}
+            onOpenChange={(open) => !open && setAddClarityForKey(null)}
+            onCreated={(clarity) => {
+              setClarities((prev) => [...prev, clarity].sort((a, b) => a.name.localeCompare(b.name)));
+              if (addClarityForKey) updateStoneComponent(addClarityForKey, { clarity: clarity.name });
+            }}
+          />
 
           <ErrorText error={state.errors.stoneComponentsJson} />
           <ErrorText error={state.errors.defaultCaratWeight} />

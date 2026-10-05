@@ -6,6 +6,7 @@ import {
   getStoreCategories,
   getStoreMetals,
   getStoreStyles,
+  getStoreStoneClarities,
   getAllStoreMetalOrigins,
 } from "@/lib/actions/taxonomy-actions";
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions";
@@ -31,7 +32,7 @@ export default async function NewProductPage({
   const params = (await searchParams) ?? {};
   const returnTo = safeReturnTo(params.returnTo);
 
-  const [metals, categories, styles, caratConversionRates, origins, locations, defaultLocationId, businessSettings, gstRates] =
+  const [metals, categories, styles, caratConversionRates, origins, locations, defaultLocationId, businessSettings, gstRates, clarities] =
     await Promise.all([
       getStoreMetals(),
       getStoreCategories(),
@@ -42,6 +43,7 @@ export default async function NewProductPage({
       getDefaultLocationId(),
       getBusinessSettings(),
       getGstRates(),
+      getStoreStoneClarities(),
     ]);
 
   return (
@@ -58,6 +60,7 @@ export default async function NewProductPage({
           metals={metals}
           categories={categories}
           styles={styles}
+          clarities={clarities}
           caratConversionRates={caratConversionRates}
           origins={origins}
           locations={locations}

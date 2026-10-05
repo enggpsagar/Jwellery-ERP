@@ -103,6 +103,7 @@ model Store {
   storeMetals          StoreMetal[]
   storeCategories      StoreCategory[]
   storeStyles          StoreStyle[]
+  stoneClarities       StoreStoneClarity[]
   storeLocations       StoreLocation[]
   apiKeys              ApiKey[]
   supportTickets       SupportTicket[]
@@ -446,6 +447,22 @@ model StoreStyle {
   updatedAt DateTime  @updatedAt
   store     Store     @relation(fields: [storeId], references: [id])
   products  Product[]
+
+  @@unique([storeId, name])
+}
+
+// Diamond clarity/colour grades a store tags with (e.g. "FG/VVS-VS") —
+// a short store-managed list, picked on a product's stone rows. The row
+// keeps the name as text (ProductStoneComponent.clarity), same as
+// stoneMetalTypeName, so renaming here doesn't rewrite saved products.
+model StoreStoneClarity {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  store     Store    @relation(fields: [storeId], references: [id])
 
   @@unique([storeId, name])
 }
@@ -805,8 +822,8 @@ model ProductStoneComponent {
   stoneRate          Decimal?   @db.Decimal(12, 2)
   stoneCharge        Decimal?   @db.Decimal(12, 2)
   stoneChargeType    ChargeType @default(FIXED)
-  // Diamond grading — free text (standard grades are only suggested in the
-  // form) since a coloured stone's clarity isn't on the FL..I3 scale.
+  // Name of a StoreStoneClarity (e.g. "FG/VVS-VS"), kept as text like
+  // stoneMetalTypeName.
   clarity            String?
   // IGI (or other lab) certificate number for this stone.
   certificateNumber  String?

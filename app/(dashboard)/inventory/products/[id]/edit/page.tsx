@@ -12,6 +12,7 @@ import {
   getStoreCategories,
   getStoreMetals,
   getStoreStyles,
+  getStoreStoneClarities,
   getAllStoreMetalOrigins,
 } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
@@ -52,7 +53,7 @@ export default async function ProductEditPage({
     redirect(`/inventory/products/${id}`)
   }
 
-  const [product, metals, categories, styles, caratConversionRates, origins, businessSettings, gstRates] = await Promise.all([
+  const [product, metals, categories, styles, caratConversionRates, origins, businessSettings, gstRates, clarities] = await Promise.all([
     getProduct(id),
     getStoreMetals(),
     getStoreCategories(),
@@ -61,6 +62,7 @@ export default async function ProductEditPage({
     getAllStoreMetalOrigins(),
     getBusinessSettings(),
     getGstRates(),
+    getStoreStoneClarities(),
   ])
 
   if (!product) {
@@ -94,6 +96,7 @@ export default async function ProductEditPage({
         metals={metals}
         categories={categories}
         styles={styles}
+        clarities={clarities}
         caratConversionRates={caratConversionRates}
         origins={origins}
         gstRates={gstRates}

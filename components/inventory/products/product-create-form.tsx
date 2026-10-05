@@ -22,6 +22,7 @@ type ProductCreateFormProps = {
   metals: StoreMetalOption[];
   categories: StoreCategoryOption[];
   styles: StoreStyleOption[];
+  clarities?: StoreStyleOption[];
   caratConversionRates: Record<PurityType, number>;
   origins: StoreMetalOriginRow[];
   locations: LocationOption[];
@@ -40,6 +41,7 @@ export function ProductCreateForm({
   metals,
   categories,
   styles,
+  clarities,
   caratConversionRates,
   origins,
   locations,
@@ -107,6 +109,7 @@ export function ProductCreateForm({
         metals={metals}
         categories={categories}
         styles={styles}
+        clarities={clarities}
         caratConversionRates={caratConversionRates}
         origins={origins}
         locations={locations}

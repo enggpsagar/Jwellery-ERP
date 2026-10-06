@@ -91,8 +91,10 @@ export function KachaImportDialog() {
           <DialogTitle>Import Estimates</DialogTitle>
           <DialogDescription>
             One row per line item. Rows sharing a <strong>Slip Ref</strong>{" "}
-            become a single slip. Parties are matched on phone number, then
-            name — they must already exist.
+            become a single slip. The party and each line&apos;s{" "}
+            <strong>Purchased From</strong> must already exist. Each Estimate
+            is posted to the party&apos;s ledger like the New Estimate form.
+            An Estimates Excel export or a delete-all backup imports as-is.
           </DialogDescription>
         </DialogHeader>
 

@@ -53,12 +53,37 @@ import { markSourcePartiesAsSuppliers, resolveLineSourceParties } from "@/lib/in
 import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import { conversionGst, toConversionGstItem } from "@/lib/conversion-gst";
 import {
-  buildExcelExport,
   buildCsvExportBase64,
   buildPdfExportBase64,
   buildMultiSheetExcelExport,
+  buildImportTemplateWithDropdowns,
   parseExcelWorkbook,
 } from "@/lib/excel-export";
+import { assertPlanActiveForExport } from "@/lib/store-context";
+import {
+  KACHA_PAYMENT_METHOD_LABELS,
+  KACHA_SHEET_COLUMNS,
+  KACHA_SHEET_HEADERS,
+  KACHA_SHEET_NOTES,
+  KACHA_STATUS_LABELS,
+  kachaSheetInstructions,
+  parsePaymentMethodCell,
+} from "@/lib/billing/kacha-sheet";
+import {
+  KACHA_BACKUP_ITEMS_SHEET,
+  KACHA_BACKUP_SLIPS_SHEET,
+  KACHA_SHEET_INCLUDE,
+  kachaBackupSheets,
+  kachaSheetRows,
+} from "@/lib/billing/kacha-sheet-rows";
+import { formatSheetDate, parseSheetDate } from "@/lib/inventory/stock-sheet";
+import {
+  PURITY_LABELS,
+  isHallmarkablePurity,
+  matchLegacyPurityType,
+  resolveLegacyPurityLabel,
+} from "@/lib/purity";
+import { classifyPurityFamily } from "@/lib/business-units";
 import { logger } from "@/lib/logger";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 
@@ -829,50 +854,58 @@ export async function exportKachaInvoicesToExcel(
 ): Promise<ExportKachaInvoicesResult> {
   try {
     const storeId = await requireStoreScope();
+    await assertPlanActiveForExport(storeId);
     const scope = await getLocationScope();
     const { where, orderBy } = buildKachaInvoiceQuery(params, storeId, scope);
 
     const kachaInvoices = await prisma.kachaInvoice.findMany({
       where,
       orderBy,
-      include: {
-        items: { include: { components: { orderBy: { sortOrder: "asc" }, include: { metalType: { select: { name: true } } } } } },
-        customer: { select: { id: true, name: true, phone: true, gstin: true } },
-        convertedTo: { select: { id: true, invoiceNumber: true } },
-      },
+      include: KACHA_SHEET_INCLUDE,
     });
 
     if (!kachaInvoices.length) {
       return { success: false, message: "No Estimates found to export." };
     }
 
-    const rows = kachaInvoices.map(mapKachaInvoice).map((kachaInvoice, index) => ({
-      "Sr. No.": index + 1,
-      "Slip #": kachaInvoice.slipNumber,
-      Date: formatShortDate(kachaInvoice.invoiceDate),
-      Party: kachaInvoice.customer?.name || "",
-      Status: kachaInvoice.status,
-      Subtotal: kachaInvoice.subtotal,
-      "Making Charges": kachaInvoice.makingCharges,
-      "Stone Charges": kachaInvoice.stoneCharges,
-      Discount: kachaInvoice.discount,
-      Total: kachaInvoice.totalAmount,
-      Paid: kachaInvoice.paidAmount,
-      Balance: kachaInvoice.balanceAmount,
-      "Converted To Invoice #": kachaInvoice.convertedTo?.invoiceNumber || "",
-      // A piece of several metals/stones — its rows, per line.
-      [METALS_AND_STONES_COLUMN]: kachaInvoices[index].items
-        .filter((item) => item.components.length)
-        .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components)}`)
-        .join(" | "),
-    }));
+    // PDF: one readable row per slip. CSV/Excel: the import template's own
+    // columns, one row per line item, so the file can be imported back.
+    const pdfRows = () =>
+      kachaInvoices.map((kachaInvoice, index) => ({
+        "Sr. No.": index + 1,
+        "Slip #": kachaInvoice.slipNumber,
+        Date: formatShortDate(kachaInvoice.invoiceDate.toISOString()),
+        Party: kachaInvoice.customer?.name || "",
+        Status: KACHA_STATUS_LABELS[kachaInvoice.status] ?? kachaInvoice.status,
+        Subtotal: Number(kachaInvoice.subtotal),
+        "Making Charges": Number(kachaInvoice.makingCharges),
+        "Stone Charges": Number(kachaInvoice.stoneCharges),
+        Discount: Number(kachaInvoice.discount),
+        Total: Number(kachaInvoice.totalAmount),
+        Paid: Number(kachaInvoice.paidAmount),
+        Balance: Number(kachaInvoice.balanceAmount),
+        "Converted To Invoice #": kachaInvoice.convertedTo?.invoiceNumber || "",
+        // A piece of several metals/stones — its rows, per line.
+        [METALS_AND_STONES_COLUMN]: kachaInvoice.items
+          .filter((item) => item.components.length)
+          .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components)}`)
+          .join(" | "),
+      }));
+    const rows = kachaSheetRows(kachaInvoices);
 
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "estimates")
         : params.format === "pdf"
-          ? buildPdfExportBase64(rows, "Estimates", "estimates")
-          : buildExcelExport(rows, "Estimates", "estimates");
+          ? buildPdfExportBase64(pdfRows(), "Estimates", "estimates")
+          : buildImportTemplateWithDropdowns({
+              sheetName: "Estimates",
+              rows,
+              columns: KACHA_SHEET_HEADERS,
+              dropdowns: await loadKachaSheetDropdowns(storeId),
+              instructions: { notes: KACHA_SHEET_NOTES, rows: kachaSheetInstructions() },
+              filePrefix: "estimates",
+            });
 
     return {
       success: true,
@@ -1503,32 +1536,44 @@ export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormSt
   }
 }
 
-/**
- * Column headers the importer reads. Also the template's header row.
- *
- * Deliberately NOT exported: a "use server" module may only export async
- * functions, and exporting this array would break the Next build even
- * though `tsc` is perfectly happy with it.
- */
-const KACHA_IMPORT_COLUMNS = [
-  "Slip Ref",
-  "Party Phone",
-  "Party Name",
-  "Date",
-  "Item Name",
-  "Metal",
-  "Purity",
-  "Quantity",
-  "Gross Weight",
-  "Net Weight",
-  "Rate",
-  "Making Charge",
-  "Making Charge Type",
-  "Stone Charge",
-  "Discount",
-  "Paid Amount",
-  "Notes",
-] as const;
+/** The template/export dropdown lists, from this store's own masters. */
+async function loadKachaSheetDropdowns(storeId: string): Promise<Record<string, string[]>> {
+  const [metals, purities, parties, locations, settings] = await Promise.all([
+    prisma.storeMetal.findMany({
+      where: { storeId, isActive: true },
+      select: { name: true, isGemstone: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.storeMetalPurity.findMany({
+      where: { storeId, isActive: true },
+      select: { label: true },
+      orderBy: [{ storeMetalId: "asc" }, { sortOrder: "asc" }],
+    }),
+    prisma.customer.findMany({
+      where: { storeId, isArchived: false, isActive: true },
+      select: { name: true, isSupplier: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.storeLocation.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
+    prisma.businessSettings.findUnique({ where: { storeId }, select: { supplierModuleEnabled: true } }),
+  ]);
+  const methods = Object.values(KACHA_PAYMENT_METHOD_LABELS);
+
+  return {
+    "Party Name": parties.map((party) => party.name),
+    // Same list as the form's Purchased From picker (getSupplierOptions).
+    "Purchased From": parties
+      .filter((party) => !settings?.supplierModuleEnabled || party.isSupplier)
+      .map((party) => party.name),
+    Location: locations.map((location) => location.name),
+    Metal: metals.map((metal) => metal.name),
+    Purity: purities.map((purity) => purity.label),
+    "Making Charge Type": ["Fixed", "Percentage"],
+    Stone: metals.filter((metal) => metal.isGemstone).map((metal) => metal.name),
+    "Payment Method": methods,
+    "Payment Method 2": methods,
+  };
+}
 
 export type KachaImportResult = {
   success: boolean;
@@ -1539,39 +1584,41 @@ export type KachaImportResult = {
 };
 
 /**
- * A downloadable .xlsx showing the expected columns and one filled-in
- * example row, so nobody has to guess the header spelling.
+ * The import template: the shared columns, an example row that imports as-is
+ * (the store's own first party, metal and purity — never a made-up party),
+ * an Instructions sheet and the store's dropdowns.
  */
 export async function getKachaImportTemplate(): Promise<{
   fileName: string;
   fileBase64: string;
 }> {
-  await getStoreIdForRead();
+  const storeId = await requireStoreScope();
+  const [dropdowns, metal] = await Promise.all([
+    loadKachaSheetDropdowns(storeId),
+    prisma.storeMetal.findFirst({
+      where: { storeId, isActive: true, hasPurity: true },
+      orderBy: { name: "asc" },
+      select: { name: true, purities: { where: { isActive: true }, orderBy: { sortOrder: "asc" }, select: { label: true } } },
+    }),
+  ]);
 
-  const example = {
-    "Slip Ref": "A1",
-    "Party Phone": "9876543210",
-    "Party Name": "Walk-in party",
-    Date: new Date().toLocaleDateString("en-IN"),
-    "Item Name": "Gold Chain 22K",
-    Metal: "Gold",
-    Purity: "K22",
-    Quantity: 1,
-    "Gross Weight": 10.5,
-    "Net Weight": 10.2,
-    Rate: 6200,
-    "Making Charge": 1500,
-    "Making Charge Type": "FIXED",
-    "Stone Charge": 0,
-    Discount: 0,
-    "Paid Amount": 0,
-    Notes: "Rows sharing a Slip Ref become one slip",
-  };
-
-  return buildMultiSheetExcelExport(
-    [{ name: "Estimates", rows: [example], columns: [...KACHA_IMPORT_COLUMNS] }],
-    "estimate-import-template",
+  const example: Record<string, unknown> = Object.fromEntries(
+    KACHA_SHEET_COLUMNS.map((column) => [column.header, column.example]),
   );
+  example.Date = formatSheetDate(new Date());
+  example["Party Name"] = dropdowns["Party Name"][0] ?? "";
+  example["Purchased From"] = dropdowns["Purchased From"][0] ?? dropdowns["Party Name"][0] ?? "";
+  example.Metal = metal?.name ?? "";
+  example.Purity = metal?.purities.find((purity) => /22/.test(purity.label))?.label ?? metal?.purities[0]?.label ?? "";
+
+  return buildImportTemplateWithDropdowns({
+    sheetName: "Estimates Import",
+    rows: [example],
+    columns: KACHA_SHEET_HEADERS,
+    dropdowns,
+    instructions: { notes: KACHA_SHEET_NOTES, rows: kachaSheetInstructions() },
+    filePrefix: "estimate-import-template",
+  });
 }
 
 function cell(row: Record<string, unknown>, key: string): string {
@@ -1579,57 +1626,18 @@ function cell(row: Record<string, unknown>, key: string): string {
 }
 
 /**
- * Parses a date from a spreadsheet cell.
- *
- * `new Date("01/02/2026")` is read as 2 January by JS, but the backup writes
- * dates with `toLocaleDateString("en-IN")`, which emits 1 February — so a
- * plain `new Date()` silently shifts day and month on every re-import, and on
- * any hand-filled sheet written the Indian way. Slash/dash/dot separated
- * values are therefore read day-first, and anything else (ISO, a real Excel
- * date cell) falls through to the built-in parser.
- */
-function parseSheetDate(raw: string): Date | null {
-  if (!raw) return null;
-
-  const dayFirst = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/.exec(raw);
-
-  if (dayFirst) {
-    const [, d, m, y] = dayFirst;
-    const day = Number(d);
-    const month = Number(m);
-
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      // Midday avoids a timezone shift pushing the date onto the day before.
-      const parsed = new Date(Number(y), month - 1, day, 12);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    }
-  }
-
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-/**
- * Sheet names written by the delete-all backup. A workbook carrying both is
- * treated as a backup to restore rather than a hand-filled template.
- */
-const BACKUP_SLIPS_SHEET = "Estimates";
-const BACKUP_ITEMS_SHEET = "Estimate Items";
-
-/**
- * Flattens a backup workbook into the same one-row-per-line-item shape the
- * import template uses, so both formats share one validation and creation
- * path.
- *
- * Without this the backup could not be restored at all: the parser reads
- * only the first sheet, so it saw the slip headers and never the items, and
- * the column names differ on both sheets ("Slip #" vs "Slip Ref", "Customer"
- * vs "Customer Name", "Item" vs "Item Name").
+ * A backup's line-item sheet is the shared Estimate sheet itself (since
+ * 2026-10-06) and is read as-is. Older backups split the slip and its items
+ * across two sheets under other column names ("Slip #", "Party", "Item",
+ * "Paid"); this flattens those into the template's one-row-per-line shape so
+ * every format shares one validation and creation path.
  */
 function flattenBackupWorkbook(
   slips: Record<string, unknown>[],
   items: Record<string, unknown>[],
 ): Record<string, unknown>[] {
+  if (items.length && "Item Name" in items[0]) return items;
+
   const slipByNumber = new Map<string, Record<string, unknown>>();
   for (const slip of slips) {
     const key = cell(slip, "Slip #");
@@ -1644,6 +1652,7 @@ function flattenBackupWorkbook(
       // Grouping key: rows of the same original slip rebuild as one slip.
       "Slip Ref": slipNumber,
       "Party Phone": cell(slip, "Party Phone"),
+      "Party GSTIN": cell(slip, "Party GSTIN"),
       "Party Name": cell(slip, "Party"),
       Date: cell(slip, "Date"),
       "Item Name": cell(item, "Item"),
@@ -1652,35 +1661,46 @@ function flattenBackupWorkbook(
       Quantity: cell(item, "Quantity"),
       "Gross Weight": cell(item, "Gross Weight"),
       "Net Weight": cell(item, "Net Weight"),
+      "DMO Weight": cell(item, "DMO Weight"),
       Rate: cell(item, "Rate"),
       "Making Charge": cell(item, "Making Charge"),
       "Making Charge Type": cell(item, "Making Charge Type"),
+      // Old backups carried no HM charge — 0, not the auto-fill.
+      "HM Charge": 0,
       "Stone Charge": cell(item, "Stone Charge"),
       // Slip-level totals live on the other sheet.
       Discount: cell(slip, "Discount"),
       "Paid Amount": cell(slip, "Paid"),
       Notes: cell(slip, "Notes"),
+      "Converted To Invoice #": cell(slip, "Converted To Invoice"),
     };
   });
 }
 
+/** Slip numbers the app hands out — an Estimate's Slip Ref is kept as its
+ * number only when it has this shape (and is free). */
+const SLIP_NUMBER_RE = /^KACHA-\d{4}-\d+$/;
+
 /**
- * Bulk-creates Kacha slips from an uploaded spreadsheet.
+ * Bulk-creates Estimates from an uploaded spreadsheet: the import template,
+ * an Estimates Excel export, or a delete-all backup (restore).
  *
  * One row is one line item; rows sharing a **Slip Ref** are collapsed into a
- * single slip, which is what makes multi-item slips expressible in a flat
- * sheet. Slip-level values (customer, date, discount, paid, notes) are taken
- * from the first row of each group.
+ * single slip. Slip-level values (party, date, location, discount, payments,
+ * notes) come from the first row of each group.
  *
- * Validation is all-or-nothing on purpose: the whole file is checked before
- * anything is written, and a single bad row rejects the import. A partial
- * import would leave the operator having to work out which half of their
- * spreadsheet made it in.
+ * Applies the New Estimate form's rules (party and "Purchased From" must be
+ * existing parties, the store's metals and purities, a location the user may
+ * bill against, payments no more than the total) and writes every slip
+ * through writeKachaSlip — the form's own write path — so each one posts the
+ * party's SALE debit and payment credits. All-or-nothing: the whole file is
+ * checked first and then written in one transaction.
  *
- * Slips are created sequentially rather than in one transaction because
- * `generateSlipNumber()` derives the next number from a COUNT of committed
- * rows — inside a single transaction every slip would read the same count
- * and collide on the `@@unique([storeId, slipNumber])` constraint.
+ * A Slip Ref that is an app slip number (KACHA-YYYY-NNNN) not in use keeps
+ * that number — restoring a backup or re-importing an export after a delete
+ * gets the original numbers back. A restored slip whose sale is still on the
+ * party's ledger (delete-all removes slips, not ledger entries) is not posted
+ * a second time.
  */
 export async function importKachaInvoicesFromExcel(
   formData: FormData,
@@ -1693,7 +1713,6 @@ export async function importKachaInvoicesFromExcel(
 
   try {
     const storeId = await requireStoreScope();
-    const fineOf = await getFineWeightResolver(storeId);
     const file = formData.get("file");
 
     if (!(file instanceof File) || file.size === 0) {
@@ -1704,16 +1723,15 @@ export async function importKachaInvoicesFromExcel(
     const sheetNames = Object.keys(sheets);
 
     // A backup produced by "Delete all" carries both sheets; anything else is
-    // treated as the flat template. Restoring a backup and filling in the
-    // template then run through identical validation and creation.
+    // treated as the flat template (an export's first sheet is that too).
     const isBackup =
-      sheetNames.includes(BACKUP_SLIPS_SHEET) &&
-      sheetNames.includes(BACKUP_ITEMS_SHEET);
+      sheetNames.includes(KACHA_BACKUP_SLIPS_SHEET) &&
+      sheetNames.includes(KACHA_BACKUP_ITEMS_SHEET);
 
     const rows = isBackup
       ? flattenBackupWorkbook(
-          sheets[BACKUP_SLIPS_SHEET] ?? [],
-          sheets[BACKUP_ITEMS_SHEET] ?? [],
+          sheets[KACHA_BACKUP_SLIPS_SHEET] ?? [],
+          sheets[KACHA_BACKUP_ITEMS_SHEET] ?? [],
         )
       : (sheets[sheetNames[0]] ?? []);
 
@@ -1739,118 +1757,272 @@ export async function importKachaInvoicesFromExcel(
       else groups.set(ref, [entry]);
     });
 
-    const [customers, metals] = await Promise.all([
+    const [customers, metals, storePurities, locations, settings, fineOf, locationScope] = await Promise.all([
       prisma.customer.findMany({
         where: { storeId },
-        select: { id: true, name: true, phone: true },
+        select: { id: true, name: true, phone: true, gstin: true, isArchived: true },
       }),
-      prisma.storeMetal.findMany({ where: { storeId }, select: { id: true, name: true } }),
+      prisma.storeMetal.findMany({ where: { storeId }, select: { id: true, name: true, isGemstone: true } }),
+      prisma.storeMetalPurity.findMany({
+        where: { storeId },
+        select: { storeMetalId: true, label: true, isHallmarkable: true },
+      }),
+      prisma.storeLocation.findMany({ where: { storeId }, select: { id: true, name: true, isActive: true } }),
+      prisma.businessSettings.findUnique({ where: { storeId }, select: { hallmarkChargePerPiece: true } }),
+      getFineWeightResolver(storeId),
+      getLocationScope(),
     ]);
+    // BusinessSettings is created lazily; 45 is its column default.
+    const hallmarkCharge = Number(settings?.hallmarkChargePerPiece ?? 45);
 
-    const byPhone = new Map(
-      customers.filter((c) => c.phone).map((c) => [c.phone!.trim(), c.id]),
-    );
-    const byName = new Map(customers.map((c) => [c.name.trim().toLowerCase(), c.id]));
-    const metalByName = new Map(metals.map((m) => [m.name.trim().toLowerCase(), m.id]));
+    const lower = (value: string) => value.trim().toLowerCase();
+    const liveParties = customers.filter((c) => !c.isArchived);
+    const byPhone = new Map(liveParties.filter((c) => c.phone).map((c) => [c.phone!.trim(), c]));
+    const byGstin = new Map(liveParties.filter((c) => c.gstin).map((c) => [c.gstin!.trim().toUpperCase(), c]));
+    const byName = new Map(liveParties.map((c) => [lower(c.name), c]));
+    const metalByName = new Map(metals.map((m) => [lower(m.name), m]));
+    const locationByName = new Map(locations.map((l) => [lower(l.name), l]));
+    const puritiesByMetal = new Map<string, Map<string, (typeof storePurities)[number]>>();
+    for (const purity of storePurities) {
+      if (!puritiesByMetal.has(purity.storeMetalId)) puritiesByMetal.set(purity.storeMetalId, new Map());
+      puritiesByMetal.get(purity.storeMetalId)!.set(lower(purity.label), purity);
+    }
+    // Older generic labels ("Gold 22K") and the raw enum (old backups wrote
+    // GOLD_22K) stay accepted.
+    const legacyPurityByText = new Map<string, PurityType>();
+    for (const [value, label] of Object.entries(PURITY_LABELS) as [PurityType, string][]) {
+      legacyPurityByText.set(lower(label), value);
+      legacyPurityByText.set(value.toLowerCase(), value);
+    }
 
     const errors: string[] = [];
-    const parsed: {
+    type ParsedSlip = {
+      ref: string;
+      label: string;
       customerId: string;
       invoiceDate: Date;
+      locationId: string | null;
       discount: number;
-      paidAmount: number;
+      payments: PaymentEntryInput[];
       notes: string | null;
+      convertedToInvoiceNumber: string;
       items: KachaInvoiceLineItemInput[];
-    }[] = [];
+    };
+    const parsed: ParsedSlip[] = [];
 
     for (const [ref, entries] of groups) {
       const head = entries[0];
-      const label = cell(head.row, "Slip Ref")
-        ? `Slip Ref "${ref}"`
-        : `Row ${head.line}`;
+      const hasRef = Boolean(cell(head.row, "Slip Ref"));
+      const label = hasRef ? `Slip Ref "${ref}"` : `Row ${head.line}`;
+      const slipErrors: string[] = [];
+
+      /** A number cell: blank = null, anything else must be a number ≥ 0. */
+      const amount = (row: Record<string, unknown>, column: string, where: string) => {
+        const raw = cell(row, column).replace(/,/g, "");
+        if (!raw) return null;
+        const value = Number(raw);
+        if (!Number.isFinite(value) || value < 0) {
+          slipErrors.push(`${where}: ${column} "${cell(row, column)}" is not a valid number.`);
+          return null;
+        }
+        return value;
+      };
 
       const phone = cell(head.row, "Party Phone");
+      const gstin = cell(head.row, "Party GSTIN").toUpperCase();
       const name = cell(head.row, "Party Name");
-      const customerId =
-        (phone && byPhone.get(phone)) || (name && byName.get(name.toLowerCase()));
-
-      if (!customerId) {
-        errors.push(
-          `${label}: no party matches phone "${phone}" or name "${name}". Add the party first.`,
+      const customer =
+        (phone && byPhone.get(phone)) || (gstin && byGstin.get(gstin)) || (name && byName.get(lower(name))) || null;
+      if (!customer) {
+        slipErrors.push(
+          `${label}: no party matches ${[phone && `phone "${phone}"`, gstin && `GSTIN "${gstin}"`, `name "${name}"`].filter(Boolean).join(", ")}. Add the party first.`,
         );
-        continue;
       }
 
       const dateRaw = cell(head.row, "Date");
       const parsedDate = parseSheetDate(dateRaw);
+      if (dateRaw && !parsedDate) slipErrors.push(`${label}: "${dateRaw}" is not a valid date.`);
 
-      if (dateRaw && !parsedDate) {
-        errors.push(`${label}: "${dateRaw}" is not a valid date.`);
-        continue;
+      // Location: by name, then the same rule as the form
+      // (resolveWritableLocationId → isLocationAllowed, or the user's only
+      // location when restricted and left blank).
+      const locationName = cell(head.row, "Location");
+      const location = locationName ? locationByName.get(lower(locationName)) : undefined;
+      let locationId: string | null = null;
+      if (locationName && !location) {
+        slipErrors.push(`${label}: no location named "${locationName}" (Settings › Locations).`);
+      } else if (location && !isLocationAllowed(locationScope, location.id)) {
+        slipErrors.push(`${label}: you don't have access to bill against location "${location.name}".`);
+      } else {
+        const resolution = await resolveWritableLocationId(storeId, location?.id ?? null, locationScope);
+        if (resolution.ok) locationId = resolution.locationId;
+        else slipErrors.push(`${label}: ${resolution.message}.`);
       }
 
-      const invoiceDate = parsedDate ?? new Date();
-
       const items: KachaInvoiceLineItemInput[] = [];
-
       for (const { row, line } of entries) {
+        const where = `Row ${line}`;
         const itemName = cell(row, "Item Name");
-
         if (!itemName) {
-          errors.push(`Row ${line}: Item Name is required.`);
+          slipErrors.push(`${where}: Item Name is required.`);
           continue;
         }
+
+        // "Purchased From" — required on a line with no linked stock, as on
+        // the form (lib/inventory/line-source-party.ts); every imported line
+        // is such a line.
+        const sourceName = cell(row, "Purchased From");
+        const source = sourceName ? byName.get(lower(sourceName)) : undefined;
+        if (!sourceName) slipErrors.push(`${where}: Purchased From is required — who "${itemName}" was purchased from.`);
+        else if (!source) slipErrors.push(`${where}: Purchased From "${sourceName}" doesn't match a party. Add the party first.`);
 
         const metalName = cell(row, "Metal");
-        const metalTypeId = metalName
-          ? metalByName.get(metalName.toLowerCase())
-          : undefined;
-
-        if (metalName && !metalTypeId) {
-          errors.push(
-            `Row ${line}: metal "${metalName}" is not configured for this store (Settings → Taxonomy).`,
-          );
-          continue;
+        const metal = metalName ? metalByName.get(lower(metalName)) : undefined;
+        if (metalName && !metal) {
+          slipErrors.push(`${where}: metal "${metalName}" is not configured for this store (Settings › Taxonomy).`);
         }
 
-        const purityRaw = cell(row, "Purity").toUpperCase();
-        const purity =
-          purityRaw && purityRaw in PurityType
-            ? (purityRaw as PurityType)
-            : null;
-
-        if (purityRaw && !purity) {
-          errors.push(`Row ${line}: "${purityRaw}" is not a valid purity.`);
-          continue;
+        // Purity: the metal's own Settings › Purity label first (sets
+        // purityLabel + the matching legacy enum, as the form's Purity
+        // picker does), else an older generic label / enum value.
+        const purityRaw = cell(row, "Purity");
+        let purity: PurityType | null = null;
+        let purityLabel: string | null = null;
+        let hallmarkable = false;
+        if (purityRaw) {
+          const storePurity = metal ? puritiesByMetal.get(metal.id)?.get(lower(purityRaw)) : undefined;
+          if (storePurity) {
+            purityLabel = storePurity.label;
+            purity = metal ? matchLegacyPurityType(classifyPurityFamily(metal), storePurity.label) : null;
+            hallmarkable = storePurity.isHallmarkable || isHallmarkablePurity(purity);
+          } else {
+            purity = legacyPurityByText.get(lower(purityRaw)) ?? null;
+            if (!purity) {
+              slipErrors.push(
+                `${where}: "${purityRaw}" is not a purity${metal ? ` of ${metal.name}` : ""} — see the Purity dropdown${metal ? "" : " (and fill in Metal)"}.`,
+              );
+            } else {
+              // A generic label still gets the metal's own label, as the
+              // form backfills it (resolveLegacyPurityLabel).
+              const own = metal
+                ? resolveLegacyPurityLabel(purity, [...(puritiesByMetal.get(metal.id)?.values() ?? [])])
+                : null;
+              purityLabel = own?.label ?? null;
+              hallmarkable = (own?.isHallmarkable ?? false) || isHallmarkablePurity(purity);
+            }
+          }
         }
+
+        const quantityRaw = cell(row, "Quantity");
+        const quantity = quantityRaw ? Number(quantityRaw) : 1;
+        if (!Number.isInteger(quantity) || quantity < 1) {
+          slipErrors.push(`${where}: Quantity "${quantityRaw}" must be a whole number of 1 or more.`);
+        }
+
+        const chargeTypeRaw = lower(cell(row, "Making Charge Type"));
+        const makingChargeType =
+          !chargeTypeRaw || chargeTypeRaw === "fixed"
+            ? ChargeType.FIXED
+            : chargeTypeRaw === "percentage" || chargeTypeRaw === "percent"
+              ? ChargeType.PERCENTAGE
+              : null;
+        if (!makingChargeType) {
+          slipErrors.push(`${where}: Making Charge Type "${cell(row, "Making Charge Type")}" must be Fixed or Percentage.`);
+        }
+
+        const stoneName = cell(row, "Stone");
+        const stone = stoneName ? metalByName.get(lower(stoneName)) : undefined;
+        if (stoneName && !stone) slipErrors.push(`${where}: stone "${stoneName}" is not configured for this store (Settings › Taxonomy).`);
+
+        const grossWeight = amount(row, "Gross Weight", where);
+        const stoneWeight = amount(row, "Stone Weight", where);
+        const dmoWeight = amount(row, "DMO Weight", where);
+        const netGiven = amount(row, "Net Weight", where);
+        // Blank Net = Gross − Stone − DMO, the form's deriveNetWeight.
+        const netWeight =
+          netGiven ??
+          (grossWeight ? Math.max(0, Number((grossWeight - (stoneWeight ?? 0) - (dmoWeight ?? 0)).toFixed(5))) : null);
+        const caratWeight = amount(row, "Carat Weight", where);
+        const stoneRate = amount(row, "Stone Rate", where);
+        const stoneChargeGiven = amount(row, "Stone Charge", where);
+        const hmGiven = amount(row, "HM Charge", where);
 
         items.push({
           itemName,
-          metalTypeId: metalTypeId ?? null,
+          vendorId: source?.id ?? null,
+          metalTypeId: metal?.id ?? null,
           purity,
-          quantity: Math.max(1, Math.trunc(toNumber(cell(row, "Quantity"), 1))),
-          grossWeight: cell(row, "Gross Weight") ? toNumber(cell(row, "Gross Weight")) : null,
-          netWeight: cell(row, "Net Weight") ? toNumber(cell(row, "Net Weight")) : null,
-          rate: cell(row, "Rate") ? toNumber(cell(row, "Rate")) : null,
-          makingCharge: toNumber(cell(row, "Making Charge")),
-          makingChargeType: toChargeType(cell(row, "Making Charge Type").toUpperCase()),
-          stoneCharge: toNumber(cell(row, "Stone Charge")),
+          purityLabel,
+          quantity: Number.isInteger(quantity) && quantity >= 1 ? quantity : 1,
+          grossWeight,
+          stoneWeight,
+          dmoWeight,
+          netWeight,
+          rate: amount(row, "Rate", where),
+          makingCharge: amount(row, "Making Charge", where) ?? 0,
+          makingChargeType: makingChargeType ?? ChargeType.FIXED,
+          // Blank = the store's hallmark charge on a hallmarkable purity,
+          // as the form auto-fills it.
+          hmCharge: hmGiven ?? (hallmarkable ? hallmarkCharge : 0),
+          stoneMetalTypeName: stone?.name ?? null,
+          stoneTypeNames: cell(row, "Stone Type") || null,
+          caratWeight,
+          stoneRate,
+          // Blank = Carat Weight × Stone Rate, as the form works it out.
+          stoneCharge: stoneChargeGiven ?? Number(((stoneRate ?? 0) * (caratWeight ?? 0)).toFixed(2)),
+          inventoryStockId: null,
         });
       }
 
-      if (!items.length) {
-        errors.push(`${label}: no valid line items.`);
+      // Payments: up to two, like the form's Paid Now rows.
+      const payments: PaymentEntryInput[] = [];
+      for (const [amountColumn, methodColumn, referenceColumn] of [
+        ["Paid Amount", "Payment Method", "Payment Reference"],
+        ["Paid Amount 2", "Payment Method 2", "Payment Reference 2"],
+      ] as const) {
+        const paid = amount(head.row, amountColumn, label);
+        if (!paid) continue;
+        const method = parsePaymentMethodCell(cell(head.row, methodColumn));
+        if (!method) {
+          slipErrors.push(`${label}: ${methodColumn} "${cell(head.row, methodColumn)}" must be Cash, UPI, Net Banking, Cheque, Card or Other.`);
+          continue;
+        }
+        payments.push({ method, amount: paid, reference: cell(head.row, referenceColumn) || null });
+      }
+
+      const discount = amount(head.row, "Discount", label) ?? 0;
+
+      if (!items.length && !slipErrors.length) slipErrors.push(`${label}: no line items.`);
+      if (slipErrors.length || !customer) {
+        errors.push(...slipErrors);
+        continue;
+      }
+
+      const { totalAmount } = computeKachaTotals(items, discount);
+      const paidAmount = round2(payments.reduce((sum, payment) => sum + payment.amount, 0));
+      if (paidAmount > totalAmount + 0.01) {
+        errors.push(`${label}: paid ₹${paidAmount} is more than the slip total ₹${totalAmount}.`);
         continue;
       }
 
       parsed.push({
-        customerId,
-        invoiceDate,
-        discount: toNumber(cell(head.row, "Discount")),
-        paidAmount: toNumber(cell(head.row, "Paid Amount")),
+        ref: hasRef ? ref : "",
+        label,
+        customerId: customer.id,
+        invoiceDate: parsedDate ?? new Date(),
+        locationId,
+        discount,
+        payments,
         notes: cell(head.row, "Notes") || null,
+        convertedToInvoiceNumber: cell(head.row, "Converted To Invoice #"),
         items,
       });
+    }
+
+    if (!errors.length) {
+      // The form's own server-side check of every "Purchased From" party.
+      const sourceParties = await resolveLineSourceParties(storeId, parsed.flatMap((slip) => slip.items));
+      if ("error" in sourceParties) errors.push(sourceParties.error);
     }
 
     if (errors.length) {
@@ -1861,78 +2033,130 @@ export async function importKachaInvoicesFromExcel(
       };
     }
 
-    let createdCount = 0;
+    const sourcePartyNames = new Map(
+      liveParties.map((party) => [party.id, party.name] as const),
+    );
 
-    for (const slip of parsed) {
-      const subtotal = slip.items.reduce(
-        (sum, item) => sum + toNumber(item.rate) * lineQuantity(item),
-        0,
-      );
-      const makingCharges = slip.items.reduce(
-        (sum, item) => sum + toNumber(item.makingCharge),
-        0,
-      );
-      const stoneCharges = slip.items.reduce(
-        (sum, item) => sum + toNumber(item.stoneCharge),
-        0,
-      );
-      const rawTotal = subtotal + makingCharges + stoneCharges - slip.discount;
-      // Same Indian-billing round-off convention as createKachaInvoice —
-      // imported slips must land with the same whole-rupee Total invariant.
-      const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
-      const balanceAmount = Math.max(0, totalAmount - slip.paidAmount);
+    // Slip numbers: keep a Slip Ref that is a free app slip number.
+    const candidateRefs = [...new Set(parsed.map((slip) => slip.ref).filter((ref) => SLIP_NUMBER_RE.test(ref)))];
+    const liveNumbers = new Set(
+      candidateRefs.length
+        ? (
+            await prisma.kachaInvoice.findMany({
+              where: { storeId, slipNumber: { in: candidateRefs } },
+              select: { slipNumber: true },
+            })
+          ).map((row) => row.slipNumber)
+        : [],
+    );
+    const keptRefs = new Set(candidateRefs.filter((ref) => !liveNumbers.has(ref)));
+    const nextSlipNumber = await slipNumberAllocator(storeId, keptRefs);
 
-      let status: InvoiceStatus = InvoiceStatus.PAID;
-      if (balanceAmount > 0 && slip.paidAmount > 0) status = InvoiceStatus.PARTIAL;
-      else if (balanceAmount > 0 && slip.paidAmount === 0) status = InvoiceStatus.DRAFT;
+    // A kept number whose SALE debit is still on that party's ledger (the
+    // slip was deleted, its ledger rows weren't) is restored without posting
+    // the sale and payments a second time.
+    const ledgerKept = new Set(
+      keptRefs.size
+        ? (
+            await prisma.ledgerEntry.findMany({
+              where: {
+                storeId,
+                sourceType: LedgerSourceType.SALE,
+                description: { in: [...keptRefs].map(kachaSaleLedgerDescription) },
+              },
+              select: { description: true, customerId: true },
+            })
+          ).map((row) => `${row.customerId}::${row.description}`)
+        : [],
+    );
 
-      const slipNumber = await generateSlipNumber(storeId);
+    // Converted To Invoice #: link back when the invoice still exists and no
+    // other Estimate claims it (KachaInvoice.convertedToId is unique).
+    const invoiceNumbers = [...new Set(parsed.map((slip) => slip.convertedToInvoiceNumber).filter(Boolean))];
+    const invoices = invoiceNumbers.length
+      ? await prisma.invoice.findMany({
+          where: { storeId, invoiceNumber: { in: invoiceNumbers } },
+          select: { id: true, invoiceNumber: true, convertedFromKacha: { select: { id: true } } },
+        })
+      : [];
+    const freeInvoiceByNumber = new Map(
+      invoices.filter((invoice) => !invoice.convertedFromKacha).map((invoice) => [invoice.invoiceNumber, invoice.id]),
+    );
 
-      await prisma.kachaInvoice.create({
-        data: {
-          storeId,
-          slipNumber,
-          customerId: slip.customerId,
-          invoiceDate: slip.invoiceDate,
-          status,
-          subtotal,
-          makingCharges,
-          stoneCharges,
-          discount: slip.discount,
-          roundOffAmount,
-          totalAmount,
-          paidAmount: slip.paidAmount,
-          balanceAmount,
-          notes: slip.notes,
-          items: {
-            create: slip.items.map((item) => ({
-              itemName: item.itemName,
-              metalTypeId: item.metalTypeId ?? undefined,
-              purity: item.purity ?? undefined,
-              purityLabel: item.purityLabel ?? undefined,
-              quantity: item.quantity,
-              grossWeight: item.grossWeight ?? undefined,
-              netWeight: item.netWeight ?? undefined,
-              fineWeight: fineOf(item) ?? undefined,
-              rate: item.rate ?? undefined,
-              makingCharge: item.makingCharge,
-              makingChargeType: toChargeType(item.makingChargeType),
-              stoneCharge: item.stoneCharge,
-              lineTotal: lineTotal(item),
-            })),
-          },
-        },
-      });
+    const notes: string[] = [];
+    let renumbered = 0;
+    let withoutLedger = 0;
+    let notRelinked = 0;
 
-      createdCount += 1;
-    }
+    const plans = parsed.map((slip) => {
+      const keep = keptRefs.has(slip.ref);
+      keptRefs.delete(slip.ref); // a ref is one slip; a repeat gets a new number
+      const slipNumber = keep ? slip.ref : nextSlipNumber();
+      if (SLIP_NUMBER_RE.test(slip.ref) && !keep) renumbered += 1;
+
+      const postLedger = !(keep && ledgerKept.has(`${slip.customerId}::${kachaSaleLedgerDescription(slipNumber)}`));
+      if (!postLedger) withoutLedger += 1;
+
+      let convertedToId: string | null = null;
+      if (slip.convertedToInvoiceNumber) {
+        convertedToId = freeInvoiceByNumber.get(slip.convertedToInvoiceNumber) ?? null;
+        if (convertedToId) freeInvoiceByNumber.delete(slip.convertedToInvoiceNumber);
+        else notRelinked += 1;
+      }
+
+      const totals = computeKachaTotals(slip.items, slip.discount);
+      const paidAmount = round2(slip.payments.reduce((sum, payment) => sum + payment.amount, 0));
+      // A converted slip's balance moved to its Tax Invoice — zeroed and
+      // PAID, as convertKachaToPakka leaves it.
+      const { balanceAmount, status } = convertedToId
+        ? { balanceAmount: 0, status: InvoiceStatus.PAID }
+        : kachaPaymentStatus(totals.totalAmount, paidAmount);
+
+      return { slip, slipNumber, postLedger, convertedToId, totals, paidAmount, balanceAmount, status };
+    });
+
+    await prisma.$transaction(
+      async (tx) => {
+        for (const plan of plans) {
+          await writeKachaSlip(tx, {
+            storeId,
+            slipNumber: plan.slipNumber,
+            customerId: plan.slip.customerId,
+            invoiceDate: plan.slip.invoiceDate,
+            totals: plan.totals,
+            paidAmount: plan.paidAmount,
+            balanceAmount: plan.balanceAmount,
+            status: plan.status,
+            notes: plan.slip.notes,
+            locationId: plan.slip.locationId,
+            items: plan.slip.items,
+            validStockIds: new Set(),
+            sourcePartyNames: new Map(
+              plan.slip.items
+                .filter((item) => item.vendorId)
+                .map((item) => [item.vendorId as string, sourcePartyNames.get(item.vendorId as string) ?? ""]),
+            ),
+            fineOf,
+            payments: plan.slip.payments,
+            postLedger: plan.postLedger,
+            convertedToId: plan.convertedToId,
+          });
+        }
+      },
+      { timeout: 15000 + plans.length * 500 },
+    );
+
+    if (renumbered) notes.push(`${renumbered} slip number${renumbered === 1 ? " was" : "s were"} already in use and got new numbers`);
+    if (withoutLedger) notes.push(`${withoutLedger} restored without new ledger entries (their sale is still on the party's ledger)`);
+    if (notRelinked) notes.push(`${notRelinked} not linked back to their Tax Invoice (not found, or already linked to another Estimate)`);
 
     revalidatePath("/billing/kacha");
 
+    const createdCount = plans.length;
     return {
       success: true,
       createdCount,
-      message: `Imported ${createdCount} Estimate${createdCount === 1 ? "" : "s"}.`,
+      message: `Imported ${createdCount} Estimate${createdCount === 1 ? "" : "s"}.${notes.length ? ` ${notes.join("; ")}.` : ""}`,
     };
   } catch (error) {
     logger.error("importKachaInvoicesFromExcel error", error);
@@ -2038,16 +2262,7 @@ export async function deleteAllKachaInvoices(
     const kachaInvoices = await prisma.kachaInvoice.findMany({
       where: { storeId, ...selection },
       orderBy: { invoiceDate: "desc" },
-      include: {
-        customer: { select: { name: true, phone: true, gstin: true } },
-        convertedTo: { select: { invoiceNumber: true } },
-        items: {
-          include: {
-            metalType: { select: { name: true } },
-            components: { orderBy: { sortOrder: "asc" }, include: { metalType: { select: { name: true } } } },
-          },
-        },
-      },
+      include: KACHA_SHEET_INCLUDE,
     });
 
     if (!kachaInvoices.length) {
@@ -2059,52 +2274,11 @@ export async function deleteAllKachaInvoices(
       };
     }
 
-    const slipRows = kachaInvoices.map((kachaInvoice, index) => ({
-      "Sr. No.": index + 1,
-      "Slip #": kachaInvoice.slipNumber,
-      Date: new Date(kachaInvoice.invoiceDate).toLocaleDateString("en-IN"),
-      Party: kachaInvoice.customer?.name || "",
-      "Party Phone": kachaInvoice.customer?.phone || "",
-      "Party GSTIN": kachaInvoice.customer?.gstin || "",
-      Status: kachaInvoice.status,
-      Subtotal: Number(kachaInvoice.subtotal),
-      "Making Charges": Number(kachaInvoice.makingCharges),
-      "Stone Charges": Number(kachaInvoice.stoneCharges),
-      Discount: Number(kachaInvoice.discount),
-      Total: Number(kachaInvoice.totalAmount),
-      Paid: Number(kachaInvoice.paidAmount),
-      Balance: Number(kachaInvoice.balanceAmount),
-      "Converted To Invoice": kachaInvoice.convertedTo?.invoiceNumber || "",
-      Notes: kachaInvoice.notes || "",
-    }));
-
-    // Line items live on their own sheet keyed by slip number — a single
-    // flat sheet would drop them, and a backup that cannot rebuild the
-    // slips it replaced is not a backup.
-    const itemRows = kachaInvoices.flatMap((kachaInvoice) =>
-      kachaInvoice.items.map((item) => ({
-        "Slip #": kachaInvoice.slipNumber,
-        Item: item.itemName,
-        Metal: item.metalType?.name || "",
-        Purity: item.purity || "",
-        Quantity: item.quantity,
-        "Gross Weight": item.grossWeight ? Number(item.grossWeight) : "",
-        "Net Weight": item.netWeight ? Number(item.netWeight) : "",
-        "DMO Weight": item.dmoWeight ? Number(item.dmoWeight) : "",
-        Rate: item.rate ? Number(item.rate) : "",
-        "Making Charge": Number(item.makingCharge),
-        "Making Charge Type": item.makingChargeType,
-        "Stone Charge": Number(item.stoneCharge),
-        "Line Total": Number(item.lineTotal),
-        [METALS_AND_STONES_COLUMN]: describePieceComponentsText(item.components),
-      })),
-    );
-
+    // A per-slip summary sheet plus the line items in the import template's own
+    // columns (lib/billing/kacha-sheet-rows.ts) — a backup that cannot rebuild
+    // the slips it replaced is not a backup, so a restore reads that sheet.
     const { fileName, fileBase64 } = buildMultiSheetExcelExport(
-      [
-        { name: "Estimates", rows: slipRows },
-        { name: "Estimate Items", rows: itemRows, columns: ["Slip #", "Item"] },
-      ],
+      kachaBackupSheets(kachaInvoices),
       "estimates-backup",
     );
 

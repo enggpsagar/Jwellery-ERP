@@ -486,6 +486,14 @@ it as "Your Selling Rates" above the "Market Rates" table. Store export and Forc
 Delete include the table (its FK is RESTRICT). Don't make a market API fill the
 selling price. Spec: `e2e/header-rates.spec.ts`.
 
+### Fixed 2026-10-06: picking a stock piece brings every metal and stone
+
+Add Stock (and the stock import) store only the Product's first metal / first stone on the stock row and write no `PieceComponent` rows, so a multi-part piece used to open on a sale as one metal + one stone (no pcs, no stone rate) and the save collapsed it again. Now:
+- Rows come from `stockPieceComponents` (`lib/inventory/stock-piece-rows.ts`): the piece's own PieceComponents, else its Product's metal/stone rows when it has more than one of either. All three `resolvePieceLines` (invoice / kacha / quotation) lock the same rows via `lockedStockPieceRows` — never read `stock.components` directly for a sale.
+- Pick rates (`lib/inventory/stock-pick-rates.ts`, shared by Invoice, Kacha, Quotation and the invoice scan path): stone = piece/Product stone rate → Stone Type selling price → stone metal's; metal = purity selling price → metal's → fine rate × fineness.
+- Pcs / clarity / certificate show under each picked stone but are **not saved** — `PieceComponent` has no columns for them (a nullable-column migration would fix that). Add Stock still doesn't write rows for a multi-metal Product (fix at source = separate item).
+- The Settings → Tags preview is a hard-coded sample tag, not real piece data.
+
 ### Added 2026-10-06: Excel import/export overhaul
 
 Every import template and its export now share **one column definition**, so an exported file is a filled-in template and re-imports cleanly (labels, not raw enums; plain numbers, not "₹ 1,000"); export-only computed columns sit at the ends and imports ignore them. Each template has an Instructions sheet and store-scoped dropdowns. Imports are **all-or-nothing** (one transaction) and run the same rules as the Add/Edit form. Exports call `assertPlanActiveForExport`. Sheet definitions:

@@ -56,7 +56,7 @@ async function seedPiece() {
       },
       stoneComponents: {
         create: [
-          { stoneMetalTypeName: diamond.name, stoneTypeNames: "Natural", caratWeight: 0.28, pieces: 12, clarity: "VVS", gstRateId: gst3.id, sortOrder: 0 },
+          { stoneMetalTypeName: diamond.name, stoneTypeNames: "Natural", caratWeight: 0.28, pieces: 12, clarity: "VVS", certificateNumber: "IGI-123", gstRateId: gst3.id, sortOrder: 0 },
           { stoneMetalTypeName: ruby.name, caratWeight: 0.1, pieces: 2, stoneRate: 20000, gstRateId: gst3.id, sortOrder: 1 },
         ],
       },
@@ -122,8 +122,15 @@ async function expectPieceRows(page: Page, prefix: string) {
   await expect(page.getByTestId(`${prefix}-stone-rate`).nth(1)).toHaveValue("20000")
   await expect(page.getByTestId(`${prefix}-stone-value`).nth(0)).toHaveValue("16800")
   await expect(page.getByTestId(`${prefix}-stone-value`).nth(1)).toHaveValue("2000")
-  await expect(page.getByTestId(`${prefix}-stone-extras`).nth(0)).toHaveText("12 pcs · VVS")
-  await expect(page.getByTestId(`${prefix}-stone-extras`).nth(1)).toHaveText("2 pcs")
+  // Pcs / clarity / certificate come from the Product's stone rows — read-only
+  // where recorded, still fillable where not (the ruby has no clarity).
+  await expect(page.getByTestId(`${prefix}-pcs`).nth(0)).toHaveValue("12")
+  await expect(page.getByTestId(`${prefix}-clarity`).nth(0)).toHaveValue("VVS")
+  await expect(page.getByTestId(`${prefix}-cert`).nth(0)).toHaveValue("IGI-123")
+  await expect(page.getByTestId(`${prefix}-pcs`).nth(0)).toHaveAttribute("readonly", "")
+  await expect(page.getByTestId(`${prefix}-pcs`).nth(1)).toHaveValue("2")
+  await expect(page.getByTestId(`${prefix}-clarity`).nth(1)).toHaveValue("")
+  await expect(page.getByTestId(`${prefix}-clarity`).nth(1)).not.toHaveAttribute("readonly", "")
 }
 
 test("picking a gold + silver + diamond + ruby stock piece opens every metal and stone", async ({ page }) => {
@@ -140,6 +147,8 @@ test("picking a gold + silver + diamond + ruby stock piece opens every metal and
     await expect(page.getByTestId("sale-line-net")).toHaveText("2.294 g")
     // The piece's facts are locked; only rates stay editable.
     await expect(page.getByTestId("sale-piece-net").first()).toHaveAttribute("readonly", "")
+    // A clarity the ruby's Product row never recorded can be typed in.
+    await page.getByTestId("sale-piece-clarity").nth(1).fill("AAA")
 
     await page.getByRole("button", { name: "Create Invoice" }).click()
     await page.waitForURL(/\/billing\/(?!new)[^/]+$/)
@@ -167,10 +176,34 @@ test("picking a gold + silver + diamond + ruby stock piece opens every metal and
     expect(Number(rubyRow.caratWeight)).toBeCloseTo(0.1, 3)
     expect(Number(rubyRow.rate)).toBeCloseTo(20000, 2)
     expect(Number(rubyRow.amount)).toBeCloseTo(2000, 2)
+    // Pcs / clarity / certificate are saved on the stone rows.
+    expect(diamondRow.pieces).toBe(12)
+    expect(diamondRow.clarity).toBe("VVS")
+    expect(diamondRow.certificateNumber).toBe("IGI-123")
+    expect(rubyRow.pieces).toBe(2)
+    expect(rubyRow.clarity).toBe("AAA")
+    expect(rubyRow.certificateNumber).toBeNull()
+    expect(goldRow.pieces).toBeNull()
     // The line summarises: first metal, all metals' net, both stones' value.
     expect(line.metalTypeId).toBe(gold.id)
     expect(Number(line.netWeight)).toBeCloseTo(2.294, 4)
     expect(Number(line.stoneCharge)).toBeCloseTo(18800, 2)
+
+    // Shown under each stone on the invoice, its A4 print and the thermal receipt.
+    const invoiceUrl = page.url()
+    await expect(page.getByText(/0\.28 ct · 12 pcs · VVS · Cert IGI-123/).first()).toBeVisible()
+    await expect(page.getByText(/0\.10 ct · 2 pcs · AAA/).first()).toBeVisible()
+    await page.goto(`${invoiceUrl}/print`)
+    await expect(page.getByText(/12 pcs · VVS · Cert IGI-123/).first()).toBeVisible()
+    const settings = await db().businessSettings.findUniqueOrThrow({ where: { storeId }, select: { printLayout: true } })
+    await db().businessSettings.update({ where: { storeId }, data: { printLayout: "THERMAL" } })
+    try {
+      await page.goto(`${invoiceUrl}/print`)
+      await page.waitForLoadState("networkidle")
+      await expect(page.getByText(/12 pcs · VVS · Cert IGI-123/).first()).toBeVisible()
+    } finally {
+      await db().businessSettings.update({ where: { storeId }, data: settings })
+    }
     expect(crashes).toEqual([])
   } finally {
     await cleanUp(seeded)
@@ -203,13 +236,26 @@ test("a one-stone piece prices its stone from the Stone Type and shows its piece
   await db().productStoneComponent.deleteMany({ where: { productId: seeded.product.id, stoneMetalTypeName: seeded.ruby.name } })
   try {
     await page.goto("/billing/new")
+    await page.getByRole("combobox").filter({ hasText: "Select a party" }).click()
+    await page.getByRole("option", { name: /Ananya Kulkarni/ }).click()
     await pickStock(page, seeded.product.productCode)
     await expect(page.getByTestId("sale-piece-metal-row")).toHaveCount(0)
     const field = (label: string) => page.getByText(label, { exact: true }).locator("xpath=..").locator("input").first()
     await expect(field("Stone Carat Weight (ct)")).toHaveValue("0.28")
     await expect(field("Stone Rate (₹/ct)")).toHaveValue("60000")
     await expect(field("Stone Charge")).toHaveValue("16800")
-    await expect(page.getByTestId("sale-linked-stone-extras")).toHaveText("12 pcs · VVS")
+    await expect(page.getByTestId("sale-line-stone-pcs")).toHaveValue("12")
+    await expect(page.getByTestId("sale-line-stone-clarity")).toHaveValue("VVS")
+    await expect(page.getByTestId("sale-line-stone-cert")).toHaveValue("IGI-123")
+
+    // Saved on the line, and shown under it.
+    await page.getByRole("button", { name: "Create Invoice" }).click()
+    await page.waitForURL(/\/billing\/(?!new)[^/]+$/)
+    const line = await db().invoiceItem.findFirstOrThrow({ where: { inventoryStockId: seeded.stock.id } })
+    expect(line.stonePieces).toBe(12)
+    expect(line.stoneClarity).toBe("VVS")
+    expect(line.stoneCertificateNumber).toBe("IGI-123")
+    await expect(page.getByTestId("line-stone-details").first()).toContainText("0.28 ct · 12 pcs · VVS · Cert IGI-123")
     expect(crashes).toEqual([])
   } finally {
     await cleanUp(seeded)

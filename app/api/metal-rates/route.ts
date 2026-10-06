@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
+import { getEffectiveStoreId } from "@/lib/store-context";
 
 export async function GET() {
   try {
+    // /api is outside middleware's matcher, so this route must check the
+    // session itself — it used to return the latest rates of any store.
+    const storeId = await getEffectiveStoreId();
+    if (!storeId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const current = await prisma.metalRate.findFirst({
+      where: { storeId },
       orderBy: {
         createdAt: "desc",
       },
@@ -22,6 +31,7 @@ export async function GET() {
     }
 
     const previous = await prisma.metalRate.findFirst({
+      where: { storeId },
       orderBy: {
         createdAt: "desc",
       },

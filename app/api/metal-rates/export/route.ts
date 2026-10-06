@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { formatShortDate } from "@/lib/utils";
 import { logger } from "@/lib/logger";
-import * as XLSX from "xlsx";
+import {
+  getEffectiveStoreId,
+  assertPlanActiveForExport,
+  PlanExpiredError,
+} from "@/lib/store-context";
+import { buildCsvExport, buildExcelExport } from "@/lib/excel-export";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -11,7 +16,16 @@ export async function GET(req: NextRequest) {
     const format =
       req.nextUrl.searchParams.get("format") ?? "csv";
 
+    // /api is outside middleware's matcher, so this route must check the
+    // session itself — it used to return every store's rates to anyone.
+    const storeId = await getEffectiveStoreId();
+    if (!storeId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    await assertPlanActiveForExport(storeId);
+
     const rates = await prisma.metalRate.findMany({
+      where: { storeId },
       orderBy: {
         createdAt: "desc",
       },
@@ -47,6 +61,9 @@ export async function GET(req: NextRequest) {
         );
     }
   } catch (error) {
+    if (error instanceof PlanExpiredError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
     logger.error("GET /api/metal-rates/export error", error);
 
     return NextResponse.json(
@@ -72,53 +89,30 @@ function getFileName(extension: string) {
   return `metal-rates-${yyyy}-${mm}-${dd}-${hh}-${min}.${extension}`;
 }
 
-function exportCSV(rows: any[]) {
-  const headers = Object.keys(rows[0]).join(",");
+function exportCSV(rows: Record<string, unknown>[]) {
+  const { fileName, content } = buildCsvExport(rows, "metal-rates");
 
-  const csvRows = rows.map((row) =>
-    Object.values(row)
-      .map((value) => `"${value}"`)
-      .join(","),
-  );
-
-  const csv = [headers, ...csvRows].join("\n");
-
-  return new NextResponse(csv, {
+  return new NextResponse(content, {
     headers: {
       "Content-Type": "text/csv",
-      "Content-Disposition":
-        `attachment; filename="${getFileName("csv")}"`
+      "Content-Disposition": `attachment; filename="${fileName}"`,
     },
   });
 }
 
-function exportExcel(rows: any[]) {
-  const workbook = XLSX.utils.book_new();
+function exportExcel(rows: Record<string, unknown>[]) {
+  const { fileName, fileBase64 } = buildExcelExport(rows, "Metal Rates", "metal-rates");
 
-  const worksheet = XLSX.utils.json_to_sheet(rows);
-
-  XLSX.utils.book_append_sheet(
-    workbook,
-    worksheet,
-    "Metal Rates",
-  );
-
-  const buffer = XLSX.write(workbook, {
-    type: "buffer",
-    bookType: "xlsx",
-  });
-
-  return new NextResponse(buffer, {
+  return new NextResponse(Buffer.from(fileBase64, "base64"), {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition":
-        `attachment; filename="${getFileName("xlsx")}"`
+      "Content-Disposition": `attachment; filename="${fileName}"`,
     },
   });
 }
 
-function exportPDF(rows: any[]) {
+function exportPDF(rows: Record<string, any>[]) {
   const doc = new jsPDF();
 
   doc.setFontSize(18);

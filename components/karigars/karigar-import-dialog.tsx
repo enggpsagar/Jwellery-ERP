@@ -88,10 +88,12 @@ export function KarigarImportDialog() {
           <DialogDescription>
             One row per artisan. <strong>Name</strong> is the only required
             field. Metal Type / Assigned Metals &amp; Stones / Location must
-            match what's already set up under Settings &gt; Taxonomy. Artisan
-            codes are generated automatically, and no login is created for
-            any Mobile/Email in the file — add one later from the artisan's
-            edit page if needed.
+            match what's already set up in Settings (the template has
+            dropdowns and an Instructions sheet). An Artisans export has the
+            same columns, so it can be edited and imported back. Each Mobile
+            must be unique. Artisan codes are generated automatically, and no
+            login is created for any Mobile/Email in the file — add one later
+            from the artisan's edit page if needed.
           </DialogDescription>
         </DialogHeader>
 

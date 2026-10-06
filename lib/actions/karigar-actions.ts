@@ -4,18 +4,34 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead, assertPlanActiveForExport } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
-import { getLocationScope, locationWhere, type LocationScope } from "@/lib/location-scope";
+import {
+  getLocationScope,
+  isLocationAllowed,
+  locationWhere,
+  resolveWritableLocationId,
+  type LocationScope,
+} from "@/lib/location-scope";
 import { UserRole, UserStatus, Prisma, type PartyGstType } from "@prisma/client";
-import * as XLSX from "xlsx";
 import {
   buildCsvExportBase64,
   buildPdfExportBase64,
-  buildMultiSheetExcelExport,
+  buildImportTemplateWithDropdowns,
   parseExcelUpload,
 } from "@/lib/excel-export";
-import { PARTY_GST_TYPE_OPTIONS } from "@/lib/gst";
+import { PARTY_GST_TYPE_OPTIONS, gstinRequired, partyGstTypeLabel } from "@/lib/gst";
+import {
+  KARIGAR_EXPORT_HEADERS,
+  KARIGAR_SHEET_COLUMNS,
+  KARIGAR_SHEET_HEADERS,
+  KARIGAR_SHEET_NOTES,
+  karigarSheetCell,
+  karigarSheetInstructions,
+  parseKarigarSheetNumber,
+  parseKarigarSheetYesNo,
+} from "@/lib/karigars/karigar-sheet";
+import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
@@ -119,6 +135,9 @@ export type ExportKarigarsParams = {
   type?: string;
   dateFrom?: string;
   dateTo?: string;
+  /** Without a selection: which list to export — active artisans (the
+   * default, the main Artisans list) or disabled ones. */
+  active?: boolean;
   format?: "csv" | "xlsx" | "pdf";
 };
 
@@ -425,16 +444,43 @@ async function validateAssignedMetalTypeIds(
   return null;
 }
 
-/** Karigar.code is always system-generated, never typed — mirrors
- * generateJobNumber's own count-based scheme (lib/actions/inventory-stock-actions.ts)
- * for the same reason: one predictable, unique-per-store, human-readable id. */
-async function generateKarigarCode(storeId: string) {
-  const year = new Date().getFullYear();
-  const count = await prisma.karigar.count({
+/** Highest KAR-<year>-NNNN sequence already used in this store. Max-based,
+ * not count-based: a count goes back down after a deletion and would hand
+ * out a code that's still in use. */
+async function highestKarigarCodeSeq(
+  client: Prisma.TransactionClient | typeof prisma,
+  storeId: string,
+  year: number,
+) {
+  const existing = await client.karigar.findMany({
     where: { storeId, code: { startsWith: `KAR-${year}-` } },
+    select: { code: true },
   });
+  return existing.reduce((max, row) => {
+    const match = /^KAR-\d{4}-(\d+)$/.exec(row.code ?? "");
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+}
 
-  return `KAR-${year}-${String(count + 1).padStart(4, "0")}`;
+function formatKarigarCode(year: number, seq: number) {
+  return `KAR-${year}-${String(seq).padStart(4, "0")}`;
+}
+
+/** Karigar.code is always system-generated, never typed — one predictable,
+ * unique-per-store, human-readable id. */
+async function generateKarigarCode(storeId: string, client: Prisma.TransactionClient | typeof prisma = prisma) {
+  const year = new Date().getFullYear();
+  return formatKarigarCode(year, (await highestKarigarCodeSeq(client, storeId, year)) + 1);
+}
+
+/** Another artisan in this store already on file with this mobile — a
+ * bulk-imported artisan has no login yet, so the User check alone misses
+ * them, and giving their login later would then fail on the duplicate. */
+async function findKarigarWithMobile(storeId: string, mobile: string, excludeKarigarId?: string) {
+  return prisma.karigar.findFirst({
+    where: { storeId, mobile, ...(excludeKarigarId ? { id: { not: excludeKarigarId } } : {}) },
+    select: { name: true },
+  });
 }
 
 /**
@@ -523,19 +569,34 @@ export async function createKarigar(
 
     const storeId = await requireStoreScope();
 
-    if (data.locationId) {
-      const location = await prisma.storeLocation.findFirst({
-        where: { id: data.locationId, storeId },
-        select: { id: true },
-      });
-      if (!location) {
-        return {
-          success: false,
-          message: "Selected location is invalid",
-          errors: { locationId: ["Selected location could not be found"] },
-        };
-      }
+    if (data.mobile && (await findKarigarWithMobile(storeId, data.mobile))) {
+      return {
+        success: false,
+        message: "Please fix the form errors",
+        errors: { mobile: ["Another artisan already has this mobile number"] },
+      };
     }
+
+    // A location-restricted user may only file an artisan under one of their
+    // own locations; with none chosen they get their only location (or must
+    // pick one) — otherwise the new artisan would vanish from their own list.
+    const locationScope = await getLocationScope();
+    if (data.locationId && !isLocationAllowed(locationScope, data.locationId)) {
+      return {
+        success: false,
+        message: "You don't have access to this location",
+        errors: { locationId: ["You don't have access to this location"] },
+      };
+    }
+    const locationResolution = await resolveWritableLocationId(storeId, data.locationId, locationScope);
+    if (!locationResolution.ok) {
+      return {
+        success: false,
+        message: locationResolution.message,
+        errors: { locationId: [locationResolution.message] },
+      };
+    }
+    data.locationId = locationResolution.locationId;
 
     if (data.metalTypeId) {
       const metal = await prisma.storeMetal.findFirst({
@@ -557,12 +618,11 @@ export async function createKarigar(
       return { success: false, message: "Please fix the form errors", errors: assignedMetalErrors };
     }
 
-    const code = await generateKarigarCode(storeId);
-
     // A mobile or email doubles as the karigar's login — create their User
     // account in the same step, matching how a Store's initial Admin is
     // created alongside the Store itself.
     const karigar = await prisma.$transaction(async (tx) => {
+      const code = await generateKarigarCode(storeId, tx);
       const created = await tx.karigar.create({ data: { ...data, code, storeId } });
 
       if (assignedMetalTypeIds.length > 0) {
@@ -657,6 +717,14 @@ export async function updateKarigar(
 
     const storeId = await requireStoreScope();
 
+    if (data.mobile && (await findKarigarWithMobile(storeId, data.mobile, id))) {
+      return {
+        success: false,
+        message: "Please fix the form errors",
+        errors: { mobile: ["Another artisan already has this mobile number"] },
+      };
+    }
+
     if (data.locationId) {
       const location = await prisma.storeLocation.findFirst({
         where: { id: data.locationId, storeId },
@@ -667,6 +735,13 @@ export async function updateKarigar(
           success: false,
           message: "Selected location is invalid",
           errors: { locationId: ["Selected location could not be found"] },
+        };
+      }
+      if (!isLocationAllowed(await getLocationScope(), data.locationId)) {
+        return {
+          success: false,
+          message: "You don't have access to this location",
+          errors: { locationId: ["You don't have access to this location"] },
         };
       }
     }
@@ -927,24 +1002,30 @@ export async function bulkDeleteKarigars(ids: string[]): Promise<BulkDeleteResul
   return { deletedCount, failures };
 }
 
-function formatCurrencyINR(value: number) {
-  return `₹ ${value.toLocaleString("en-IN")}`;
-}
+/** The template/export dropdown lists, from this store's own masters. A
+ * location-restricted user is only offered their own locations. */
+async function loadKarigarSheetDropdowns(storeId: string, scope: LocationScope): Promise<Record<string, string[]>> {
+  const [metals, locations, states] = await Promise.all([
+    prisma.storeMetal.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
+    prisma.storeLocation.findMany({
+      where: { storeId, isActive: true, ...(scope.restricted ? { id: { in: scope.locationIds } } : {}) },
+      select: { name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.state.findMany({ select: { name: true }, orderBy: { name: "asc" } }),
+  ]);
+  const names = (rows: { name: string }[]) => rows.map((row) => row.name);
 
-function formatDateIST(date?: Date | null) {
-  return formatShortDate(date);
-}
-
-function getKarigarExportFileName() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
-  const seconds = String(now.getSeconds()).padStart(2, "0");
-
-  return `artisans-${year}-${month}-${day}-${hours}-${minutes}-${seconds}.xlsx`;
+  return {
+    State: names(states),
+    "GST Type": PARTY_GST_TYPE_OPTIONS.map((option) => option.label),
+    "Metal Type": names(metals),
+    // A single-value dropdown; several comma-joined names stay typeable
+    // (the dropdown only warns).
+    "Assigned Metals/Stones": names(metals),
+    Location: names(locations),
+    Active: ["Yes", "No"],
+  };
 }
 
 export async function exportKarigarsToExcel(
@@ -954,98 +1035,97 @@ export async function exportKarigarsToExcel(
     const { selectedIds, search, sortBy = "createdAt", sortOrder = "desc" } = params;
 
     const storeId = await requireStoreScope();
+    await assertPlanActiveForExport(storeId);
     const scope = await getLocationScope();
 
+    // Without a selection the export follows the list it was started from
+    // (the active Artisans list unless `active: false`), the same rule the
+    // Parties export uses. A selection exports exactly those rows.
     const where = selectedIds?.length
       ? { id: { in: selectedIds }, storeId, ...locationWhere(scope) }
-      : getWhere(storeId, search, scope, true, params.type, params.dateFrom, params.dateTo);
+      : getWhere(storeId, search, scope, params.active ?? true, params.type, params.dateFrom, params.dateTo);
 
     const karigars = await prisma.karigar.findMany({
       where,
       orderBy: getOrderBy(sortBy, sortOrder),
-      include: { metalType: { select: { name: true } } },
+      include: {
+        metalType: { select: { name: true } },
+        location: { select: { name: true } },
+        assignedMetals: { select: { metalType: { select: { name: true } } } },
+      },
     });
 
     if (!karigars.length) {
       return { success: false, message: "No artisans found to export." };
     }
 
-    const rows = karigars.map((karigar, index) => ({
-      "Sr No": index + 1,
-      "Artisan Code": karigar.code ?? "",
-      Name: karigar.name,
-      Mobile: karigar.mobile ?? "",
-      WhatsApp: karigar.whatsapp ?? "",
-      Email: karigar.email ?? "",
-      Address: karigar.address ?? "",
-      City: karigar.city ?? "",
-      Pincode: karigar.pincode ?? "",
-      Specialization: karigar.specialization ?? "",
-      "Metal Type": karigar.metalType?.name ?? "",
-      GSTIN: karigar.gstNumber ?? "",
-      "PAN Number": karigar.panNumber ?? "",
-      "Aadhaar Number": karigar.aadhaarNumber ?? "",
-      "Opening Gold (g)": Number(karigar.openingGold ?? 0),
-      "Opening Cash": formatCurrencyINR(Number(karigar.openingCash ?? 0)),
-      Status: karigar.isActive ? "Active" : "Inactive",
-      Notes: karigar.notes ?? "",
-      "Created At": formatDateIST(karigar.createdAt),
-    }));
+    // Exactly the import template's columns and value forms (plain numbers,
+    // labels, Yes/No), plus read-only Sr No / Artisan Code / Created At the
+    // import ignores — so an exported file re-imports as the same artisans.
+    const rows = karigars.map((karigar, index) => {
+      const values: Record<string, unknown> = {
+        "Sr No": index + 1,
+        "Artisan Code": karigar.code ?? "",
+        Name: karigar.name,
+        Mobile: karigar.mobile ?? "",
+        WhatsApp: karigar.whatsapp ?? "",
+        Email: karigar.email ?? "",
+        Address: karigar.address ?? "",
+        City: karigar.city ?? "",
+        State: karigar.state ?? "",
+        Pincode: karigar.pincode ?? "",
+        "GST Number": karigar.gstNumber ?? "",
+        "GST Type": partyGstTypeLabel(karigar.gstType),
+        "PAN Number": karigar.panNumber ?? "",
+        "Aadhaar Number": karigar.aadhaarNumber ?? "",
+        Specialization: karigar.specialization ?? "",
+        "Metal Type": karigar.metalType?.name ?? "",
+        "Assigned Metals/Stones": karigar.assignedMetals.map((row) => row.metalType.name).sort().join(", "),
+        Location: karigar.location?.name ?? "",
+        "Opening Gold (g)": Number(karigar.openingGold ?? 0),
+        "Opening Cash": Number(karigar.openingCash ?? 0),
+        Notes: karigar.notes ?? "",
+        Active: karigar.isActive ? "Yes" : "No",
+        "Created At": formatShortDate(karigar.createdAt),
+      };
+      return Object.fromEntries(KARIGAR_EXPORT_HEADERS.map((header) => [header, values[header] ?? ""]));
+    });
+
+    const message = `Exported ${karigars.length} artisan(s) successfully.`;
 
     if (params.format === "csv") {
-      const { fileName, fileBase64 } = buildCsvExportBase64(rows, "artisans");
-      return {
-        success: true,
-        message: `Exported ${karigars.length} artisan(s) successfully.`,
-        fileBase64,
-        fileName,
-      };
+      return { success: true, message, ...buildCsvExportBase64(rows, "artisans") };
     }
 
     if (params.format === "pdf") {
-      const { fileName, fileBase64 } = buildPdfExportBase64(rows, "Artisans", "artisans");
-      return {
-        success: true,
-        message: `Exported ${karigars.length} artisan(s) successfully.`,
-        fileBase64,
-        fileName,
-      };
+      // A shorter column set: every sheet column on one landscape page left
+      // each only a few characters wide. CSV/Excel carry them all.
+      const pdfRows = rows.map((row) => ({
+        "Sr No": row["Sr No"],
+        "Artisan Code": row["Artisan Code"],
+        Name: row.Name,
+        Mobile: row.Mobile,
+        City: row.City,
+        "Metal Type": row["Metal Type"],
+        Location: row.Location,
+        "Opening Gold (g)": row["Opening Gold (g)"],
+        "Opening Cash": row["Opening Cash"],
+        Status: row.Active === "Yes" ? "Active" : "Inactive",
+      }));
+      return { success: true, message, ...buildPdfExportBase64(pdfRows, "Artisans", "artisans") };
     }
-
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-
-    worksheet["!cols"] = [
-      { wch: 8 },
-      { wch: 14 },
-      { wch: 24 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 26 },
-      { wch: 30 },
-      { wch: 16 },
-      { wch: 12 },
-      { wch: 22 },
-      { wch: 18 },
-      { wch: 14 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 12 },
-      { wch: 30 },
-      { wch: 16 },
-    ];
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Artisans");
-
-    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-    const fileName = getKarigarExportFileName();
 
     return {
       success: true,
-      message: `Exported ${karigars.length} artisan(s) successfully.`,
-      fileBase64: buffer.toString("base64"),
-      fileName,
+      message,
+      ...buildImportTemplateWithDropdowns({
+        sheetName: "Artisans",
+        rows,
+        columns: KARIGAR_EXPORT_HEADERS,
+        dropdowns: await loadKarigarSheetDropdowns(storeId, scope),
+        instructions: { notes: KARIGAR_SHEET_NOTES, rows: karigarSheetInstructions() },
+        filePrefix: "artisans",
+      }),
     };
   } catch (error) {
     logger.error("exportKarigarsToExcel error", error);
@@ -1063,82 +1143,61 @@ export type KarigarImportResult = {
 };
 
 /**
- * A downloadable .xlsx showing the expected columns and one filled-in
- * example row. Metal Type/Assigned Metals/Location are entered as names,
- * matched against this store's own Settings > Taxonomy / Locations.
- * Artisan Code is never a column — it's auto-generated on import exactly
- * like the single "Add Artisan" form generates it.
+ * A downloadable .xlsx with the shared artisan columns (lib/karigars/
+ * karigar-sheet.ts), one example row, an Instructions sheet and dropdowns
+ * from this store's own metals, locations and states. Artisan Code is never
+ * a column — it's auto-generated on import exactly like the "Add Artisan"
+ * form generates it.
  */
 export async function getKarigarImportTemplate(): Promise<{
   fileName: string;
   fileBase64: string;
 }> {
-  await requireStoreScope();
+  const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
+  const example = Object.fromEntries(KARIGAR_SHEET_COLUMNS.map((column) => [column.header, column.example]));
 
-  const example = {
-    Name: "Ramesh Sonar",
-    Mobile: "",
-    WhatsApp: "",
-    Email: "",
-    Address: "",
-    City: "Mumbai",
-    State: "Maharashtra",
-    Pincode: "400001",
-    "GST Number": "",
-    "GST Type": "Not GST Registered",
-    "PAN Number": "",
-    "Aadhaar Number": "",
-    Specialization: "Chain making",
-    "Metal Type": "Gold",
-    "Assigned Metals/Stones": "Gold, Silver",
-    Location: "",
-    "Opening Gold": 0,
-    "Opening Cash": 0,
-    Notes: "",
-    Active: "Yes",
-  };
-
-  return buildMultiSheetExcelExport(
-    [{ name: "Artisans Import", rows: [example], columns: Object.keys(example) }],
-    "artisans-import-template",
-  );
+  return buildImportTemplateWithDropdowns({
+    sheetName: "Artisans Import",
+    rows: [example],
+    columns: KARIGAR_SHEET_HEADERS,
+    dropdowns: await loadKarigarSheetDropdowns(storeId, scope),
+    instructions: { notes: KARIGAR_SHEET_NOTES, rows: karigarSheetInstructions() },
+    filePrefix: "artisans-import-template",
+  });
 }
 
-function karigarImportCell(row: Record<string, unknown>, key: string): string {
-  return String(row[key] ?? "").trim();
-}
-
-function parseKarigarGstTypeLabel(raw: string): PartyGstType {
+/** A GST Type cell: its label (as exported) or the raw enum value. Blank →
+ * Not GST Registered; anything else → null (an error). */
+function parseKarigarGstType(raw: string): PartyGstType | null {
+  if (!raw) return "UNREGISTERED";
+  const lower = raw.toLowerCase();
   const match = PARTY_GST_TYPE_OPTIONS.find(
-    (option) => option.label.toLowerCase() === raw.toLowerCase(),
+    (option) => option.label.toLowerCase() === lower || option.value.toLowerCase() === lower,
   );
-  return (match?.value ?? "UNREGISTERED") as PartyGstType;
-}
-
-function karigarImportYesNo(row: Record<string, unknown>, key: string, fallback: boolean): boolean {
-  const raw = karigarImportCell(row, key).toLowerCase();
-  if (raw === "yes" || raw === "true") return true;
-  if (raw === "no" || raw === "false") return false;
-  return fallback;
+  return match ? (match.value as PartyGstType) : null;
 }
 
 /**
- * Bulk-adds artisans from one spreadsheet — mirrors importProductsFromExcel's
- * contract exactly: batch-resolve every FK name up front, validate every row
- * with zero writes, and only once the whole file is clean assign codes and
- * write. Deliberately does NOT create a User login for a row's Mobile/Email
- * (unlike the single "Add Artisan" form) — doing that per-row on a bulk
- * import would silently mass-invite/email everyone in the file. Mobile/Email
- * are still stored on the Karigar row; a login can be added later the normal
- * way (edit the artisan) if wanted. Since no User row is created, the
- * mobile/email-must-be-a-unique-login check the single form does doesn't
- * apply here either.
+ * Bulk-adds artisans from one spreadsheet, with the same checks as the "Add
+ * Artisan" form: KYC ids, GSTIN required for a registered artisan, mobile/
+ * email unique (within the file, against this store's artisans and against
+ * every user's login, so adding a login later can't fail), metals and
+ * location from this store, and a location-restricted user only ever files
+ * artisans under their own locations. Validates every row with zero writes,
+ * then writes everything in one transaction — all or nothing.
+ *
+ * Deliberately does NOT create a User login for a row's Mobile/Email (unlike
+ * the single "Add Artisan" form) — doing that per-row on a bulk import would
+ * silently mass-invite/email everyone in the file. A login can be added
+ * later by editing the artisan.
  */
 export async function importKarigarsFromExcel(
   formData: FormData,
 ): Promise<KarigarImportResult> {
   try {
     const storeId = await requireStoreScope();
+    const scope = await getLocationScope();
     const file = formData.get("file");
 
     if (!(file instanceof File) || file.size === 0) {
@@ -1151,13 +1210,44 @@ export async function importKarigarsFromExcel(
       return { success: false, message: "That file has no rows to import." };
     }
 
-    const [metals, locations] = await Promise.all([
+    const [metals, locations, settings] = await Promise.all([
       prisma.storeMetal.findMany({ where: { storeId }, select: { id: true, name: true } }),
       prisma.storeLocation.findMany({ where: { storeId }, select: { id: true, name: true } }),
+      getBusinessSettings(),
     ]);
 
     const metalByName = new Map(metals.map((m) => [m.name.trim().toLowerCase(), m]));
     const locationByName = new Map(locations.map((l) => [l.name.trim().toLowerCase(), l.id]));
+    // What a blank Location means for this user — the same rule the form
+    // applies (resolveWritableLocationId): none when unrestricted, their only
+    // location when they have one, otherwise they must name one.
+    const blankLocation = await resolveWritableLocationId(storeId, null, scope);
+
+    // Contact values already taken, checked in two batched queries rather
+    // than per row.
+    const fileMobiles = rows.map((row) => karigarSheetCell(row, "Mobile")).filter(Boolean);
+    const fileEmails = rows.map((row) => karigarSheetCell(row, "Email")).filter(Boolean);
+    const [karigarsWithMobile, usersWithContact] = await Promise.all([
+      fileMobiles.length
+        ? prisma.karigar.findMany({ where: { storeId, mobile: { in: fileMobiles } }, select: { mobile: true, name: true } })
+        : Promise.resolve([]),
+      fileMobiles.length || fileEmails.length
+        ? prisma.user.findMany({
+            where: {
+              OR: [
+                ...(fileMobiles.length ? [{ phone: { in: fileMobiles } }] : []),
+                ...(fileEmails.length ? [{ email: { in: fileEmails } }] : []),
+              ],
+            },
+            select: { phone: true, email: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const karigarNameByMobile = new Map(karigarsWithMobile.map((k) => [k.mobile as string, k.name]));
+    const userPhones = new Set(usersWithContact.map((u) => u.phone).filter(Boolean) as string[]);
+    const userEmails = new Set(usersWithContact.map((u) => u.email?.toLowerCase()).filter(Boolean) as string[]);
+    const firstLineByMobile = new Map<string, number>();
+    const firstLineByEmail = new Map<string, number>();
 
     type ResolvedRow = {
       fields: Omit<Prisma.KarigarCreateManyInput, "storeId" | "code">;
@@ -1171,54 +1261,91 @@ export async function importKarigarsFromExcel(
       // +2 = one for the header row, one for 1-based spreadsheet numbering.
       const line = index + 2;
       const rowErrors: string[] = [];
+      const cell = (header: string) => karigarSheetCell(row, header);
 
-      const name = karigarImportCell(row, "Name");
+      const name = cell("Name");
       if (!name) rowErrors.push("Name is required");
 
-      const aadhaarNumber = karigarImportCell(row, "Aadhaar Number");
+      const mobile = cell("Mobile");
+      if (mobile) {
+        const earlier = firstLineByMobile.get(mobile);
+        if (earlier) rowErrors.push(`Mobile ${mobile} is also on row ${earlier}`);
+        else firstLineByMobile.set(mobile, line);
+        const owner = karigarNameByMobile.get(mobile);
+        if (owner) rowErrors.push(`Mobile ${mobile} already belongs to artisan "${owner}"`);
+        else if (userPhones.has(mobile)) rowErrors.push(`Mobile ${mobile} is already in use as another user's login`);
+      }
+
+      const email = cell("Email");
+      if (email) {
+        const key = email.toLowerCase();
+        const earlier = firstLineByEmail.get(key);
+        if (earlier) rowErrors.push(`Email ${email} is also on row ${earlier}`);
+        else firstLineByEmail.set(key, line);
+        if (userEmails.has(key)) rowErrors.push(`Email ${email} is already in use as another user's login`);
+      }
+
+      const aadhaarNumber = cell("Aadhaar Number");
       if (aadhaarNumber && !isValidAadhaarNumber(aadhaarNumber)) {
         rowErrors.push(AADHAAR_INVALID_MESSAGE);
       }
 
-      const panNumber = karigarImportCell(row, "PAN Number");
+      const panNumber = cell("PAN Number");
       if (panNumber && !isValidPanNumber(panNumber)) {
         rowErrors.push(PAN_INVALID_MESSAGE);
       }
 
-      const metalName = karigarImportCell(row, "Metal Type");
+      const rawGstType = cell("GST Type");
+      const gstType = parseKarigarGstType(rawGstType);
+      if (!gstType) {
+        rowErrors.push(`GST Type "${rawGstType}" isn't one of ${PARTY_GST_TYPE_OPTIONS.map((o) => o.label).join(", ")}`);
+      }
+      const gstNumber = cell("GST Number");
+      if (gstType && !gstNumber && gstinRequired(settings.gstScheme, gstType)) {
+        rowErrors.push(`GST Number is required for a ${partyGstTypeLabel(gstType)} artisan`);
+      }
+
+      const metalName = cell("Metal Type");
       const metal = metalName ? metalByName.get(metalName.toLowerCase()) : undefined;
       if (metalName && !metal) {
         rowErrors.push(`No metal type found named "${metalName}"`);
       }
 
-      const assignedNamesRaw = karigarImportCell(row, "Assigned Metals/Stones");
-      const assignedMetalTypeIds: string[] = [];
-      if (assignedNamesRaw) {
-        for (const rawName of assignedNamesRaw.split(",")) {
-          const trimmed = rawName.trim();
-          if (!trimmed) continue;
-          const assigned = metalByName.get(trimmed.toLowerCase());
-          if (!assigned) {
-            rowErrors.push(`No metal/stone found named "${trimmed}"`);
-          } else {
-            assignedMetalTypeIds.push(assigned.id);
-          }
+      // A Set, like the form's checkboxes: "Gold, gold" assigns Gold once.
+      const assignedMetalTypeIds = new Set<string>();
+      for (const rawName of cell("Assigned Metals/Stones").split(",")) {
+        const trimmed = rawName.trim();
+        if (!trimmed) continue;
+        const assigned = metalByName.get(trimmed.toLowerCase());
+        if (!assigned) rowErrors.push(`No metal/stone found named "${trimmed}"`);
+        else assignedMetalTypeIds.add(assigned.id);
+      }
+
+      const locationName = cell("Location");
+      let locationId: string | null = null;
+      if (locationName) {
+        locationId = locationByName.get(locationName.toLowerCase()) ?? null;
+        if (!locationId) rowErrors.push(`No location found named "${locationName}"`);
+        else if (!isLocationAllowed(scope, locationId)) {
+          rowErrors.push(`You don't have access to location "${locationName}"`);
         }
+      } else if (blankLocation.ok) {
+        locationId = blankLocation.locationId;
+      } else {
+        rowErrors.push("Location is required — enter one of your locations");
       }
 
-      const locationName = karigarImportCell(row, "Location");
-      const locationId = locationName ? (locationByName.get(locationName.toLowerCase()) ?? null) : null;
-      if (locationName && !locationId) {
-        rowErrors.push(`No location found named "${locationName}"`);
-      }
+      const rawOpeningGold = cell("Opening Gold (g)");
+      const openingGold = parseKarigarSheetNumber(rawOpeningGold);
+      if (openingGold === null) rowErrors.push(`Opening Gold (g) "${rawOpeningGold}" must be a number`);
 
-      const rawOpeningGold = karigarImportCell(row, "Opening Gold");
-      const openingGold = rawOpeningGold === "" ? 0 : Number(rawOpeningGold);
-      if (!Number.isFinite(openingGold)) rowErrors.push("Opening Gold must be a number");
+      const rawOpeningCash = cell("Opening Cash");
+      const openingCash = parseKarigarSheetNumber(rawOpeningCash);
+      if (openingCash === null) rowErrors.push(`Opening Cash "${rawOpeningCash}" must be a number`);
 
-      const rawOpeningCash = karigarImportCell(row, "Opening Cash");
-      const openingCash = rawOpeningCash === "" ? 0 : Number(rawOpeningCash);
-      if (!Number.isFinite(openingCash)) rowErrors.push("Opening Cash must be a number");
+      const rawActive = cell("Active");
+      const isActive = parseKarigarSheetYesNo(rawActive, true);
+      if (isActive === null) rowErrors.push(`Active "${rawActive}" must be Yes or No`);
 
       if (rowErrors.length > 0) {
         for (const message of rowErrors) errors.push(`Row ${line}: ${message}`);
@@ -1228,26 +1355,26 @@ export async function importKarigarsFromExcel(
       resolvedRows.push({
         fields: {
           name,
-          mobile: karigarImportCell(row, "Mobile") || null,
-          whatsapp: karigarImportCell(row, "WhatsApp") || null,
-          email: karigarImportCell(row, "Email") || null,
-          address: karigarImportCell(row, "Address") || null,
-          city: karigarImportCell(row, "City") || null,
-          state: karigarImportCell(row, "State") || null,
-          pincode: karigarImportCell(row, "Pincode") || null,
-          gstNumber: karigarImportCell(row, "GST Number") || null,
-          gstType: parseKarigarGstTypeLabel(karigarImportCell(row, "GST Type")),
+          mobile: mobile || null,
+          whatsapp: cell("WhatsApp") || null,
+          email: email || null,
+          address: cell("Address") || null,
+          city: cell("City") || null,
+          state: cell("State") || null,
+          pincode: cell("Pincode") || null,
+          gstNumber: gstNumber || null,
+          gstType: gstType!,
           panNumber: panNumber ? normalizePanNumber(panNumber) : null,
           aadhaarNumber: aadhaarNumber ? normalizeAadhaarNumber(aadhaarNumber) : null,
-          specialization: karigarImportCell(row, "Specialization") || null,
-          notes: karigarImportCell(row, "Notes") || null,
-          openingGold,
-          openingCash,
-          isActive: karigarImportYesNo(row, "Active", true),
+          specialization: cell("Specialization") || null,
+          notes: cell("Notes") || null,
+          openingGold: openingGold!,
+          openingCash: openingCash!,
+          isActive: isActive!,
           locationId,
           metalTypeId: metal?.id ?? null,
         },
-        assignedMetalTypeIds,
+        assignedMetalTypeIds: [...assignedMetalTypeIds],
       });
     }
 
@@ -1263,53 +1390,43 @@ export async function importKarigarsFromExcel(
       return { success: false, message: "That file has no rows to import." };
     }
 
-    // Same max-based derivation as generateKarigarCode's own single-row
-    // logic, computed once and incremented in-memory per row rather than
-    // re-counting the table on every row.
-    const year = new Date().getFullYear();
-    const existingCodes = await prisma.karigar.findMany({
-      where: { storeId, code: { startsWith: `KAR-${year}-` } },
-      select: { code: true },
-    });
-    let highestSeq = existingCodes.reduce((max, row) => {
-      const match = /^KAR-\d{4}-(\d+)$/.exec(row.code ?? "");
-      return match ? Math.max(max, Number(match[1])) : max;
-    }, 0);
+    // One transaction: the artisans, their codes and their assigned metals
+    // all land together or not at all.
+    const createdCount = await prisma.$transaction(async (tx) => {
+      const year = new Date().getFullYear();
+      let highestSeq = await highestKarigarCodeSeq(tx, storeId, year);
 
-    const toCreate: Prisma.KarigarCreateManyInput[] = resolvedRows.map((row) => {
-      highestSeq += 1;
-      return {
-        storeId,
-        code: `KAR-${year}-${String(highestSeq).padStart(4, "0")}`,
-        ...row.fields,
-      };
-    });
+      const toCreate: Prisma.KarigarCreateManyInput[] = resolvedRows.map((row) => {
+        highestSeq += 1;
+        return { storeId, code: formatKarigarCode(year, highestSeq), ...row.fields };
+      });
 
-    const createdKarigars = await prisma.karigar.createManyAndReturn({
-      data: toCreate,
-      select: { id: true, code: true },
-    });
-    const karigarIdByCode = new Map(createdKarigars.map((k) => [k.code, k.id]));
+      const created = await tx.karigar.createManyAndReturn({
+        data: toCreate,
+        select: { id: true, code: true },
+      });
+      const karigarIdByCode = new Map(created.map((k) => [k.code, k.id]));
 
-    const karigarMetalRows: Prisma.KarigarMetalCreateManyInput[] = [];
-    for (const [index, created] of toCreate.entries()) {
-      const karigarId = karigarIdByCode.get(created.code!);
-      if (!karigarId) continue;
-      for (const metalTypeId of resolvedRows[index].assignedMetalTypeIds) {
-        karigarMetalRows.push({ karigarId, metalTypeId });
+      const karigarMetalRows: Prisma.KarigarMetalCreateManyInput[] = toCreate.flatMap((row, index) => {
+        const karigarId = karigarIdByCode.get(row.code!);
+        if (!karigarId) throw new Error(`Created artisan ${row.code} not returned`);
+        return resolvedRows[index].assignedMetalTypeIds.map((metalTypeId) => ({ karigarId, metalTypeId }));
+      });
+
+      if (karigarMetalRows.length) {
+        await tx.karigarMetal.createMany({ data: karigarMetalRows });
       }
-    }
 
-    if (karigarMetalRows.length) {
-      await prisma.karigarMetal.createMany({ data: karigarMetalRows });
-    }
+      return toCreate.length;
+    });
 
     revalidatePath("/karigars");
+    revalidatePath("/karigars/disabled");
 
     return {
       success: true,
-      message: `Added ${toCreate.length} ${toCreate.length === 1 ? "artisan" : "artisans"}.`,
-      createdCount: toCreate.length,
+      message: `Added ${createdCount} ${createdCount === 1 ? "artisan" : "artisans"}.`,
+      createdCount,
     };
   } catch (error) {
     logger.error("importKarigarsFromExcel error", error);

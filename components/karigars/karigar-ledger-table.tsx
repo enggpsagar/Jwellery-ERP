@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react"
 import type { KarigarLedgerRow, KarigarLedgerMetalGroup } from "@/lib/actions/ledger-actions"
 import { cn } from "@/lib/utils"
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
+import { PAYMENT_METHOD_LABELS } from "@/lib/karigars/karigar-sheet"
 
 import {
   Table,
@@ -20,14 +21,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  CASH: "Cash",
-  UPI: "UPI",
-  NET_BANKING: "Net Banking",
-  CHEQUE: "Cheque",
-  CARD: "Card",
-  OTHER: "Other",
-}
 
 const PAGE_SIZE = 10
 

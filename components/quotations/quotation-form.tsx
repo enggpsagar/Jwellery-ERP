@@ -1522,6 +1522,7 @@ export function QuotationForm({
         </div>
         <OldGoldExchangeSection
           part="lines"
+          clarities={clarities}
           lines={exchangeLines}
           onLinesChange={setExchangeLines}
           metals={metals}

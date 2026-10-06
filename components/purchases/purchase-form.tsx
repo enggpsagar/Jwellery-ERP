@@ -311,6 +311,8 @@ type PurchaseFormProps = {
   /** Store's per-enum fineness (Settings > Purity) — only shown as each
    * multi-part metal row's pure weight; never priced on here. */
   enumFineness?: Record<string, number>
+  /** Settings → Stone Clarity names, suggested on a stone row's Clarity. */
+  clarities?: string[]
   /** The store's own state, compared against the selected vendor's state to
    * tell an inter-state purchase (IGST) from an intra-state one (SGST+CGST). */
   storeState?: string | null
@@ -372,6 +374,7 @@ export function PurchaseForm({
   gstRates,
   defaultGstRate = 0,
   enumFineness = {},
+  clarities = [],
   storeState,
   initialLocationId,
   editPurchaseId,
@@ -1499,6 +1502,7 @@ export function PurchaseForm({
                             puritiesByMetal={metalPuritiesCache}
                             ensurePurities={ensureMetalPurities}
                             enumFineness={enumFineness}
+                            clarities={clarities}
                             valuation="net"
                             gstRates={selectedVendor && isVendorGstApplicable(selectedVendor.gstType) ? gstRates : undefined}
                             defaultGstRateId={item.gstRateId}

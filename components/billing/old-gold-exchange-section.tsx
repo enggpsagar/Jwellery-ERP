@@ -170,6 +170,8 @@ type Props = {
   onPayoutMethodChange: (method: string) => void
   payoutReference: string
   onPayoutReferenceChange: (reference: string) => void
+  /** Settings → Stone Clarity names, suggested on a stone's Clarity. */
+  clarities?: string[]
 }
 
 /**
@@ -198,6 +200,7 @@ export function OldGoldExchangeSection({
   onPayoutMethodChange,
   payoutReference,
   onPayoutReferenceChange,
+  clarities = [],
 }: Props) {
   // Gold, silver, platinum (anything with a purity) — or a loose diamond /
   // gemstone, which is weighed in carats and has no purity.
@@ -377,6 +380,7 @@ export function OldGoldExchangeSection({
                     enumFineness={enumFineness}
                     valuation="fine"
                     rateForMetal={(m) => rateFor(m.id)}
+                    clarities={clarities}
                     testIdPrefix="exchange-piece"
                   />
                 </div>

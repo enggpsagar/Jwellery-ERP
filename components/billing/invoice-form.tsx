@@ -1847,6 +1847,7 @@ export function InvoiceForm({
           {exchangeEditable && (
             <OldGoldExchangeSection
               part="header"
+              clarities={clarities}
               lines={oldGoldLines}
               onLinesChange={setOldGoldLines}
               metals={metals}
@@ -2759,6 +2760,7 @@ export function InvoiceForm({
       {exchangeEditable && (
         <OldGoldExchangeSection
           part="lines"
+          clarities={clarities}
           lines={oldGoldLines}
           onLinesChange={setOldGoldLines}
           metals={metals}

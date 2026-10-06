@@ -10,7 +10,7 @@ import {
 } from "@/lib/actions/purchase-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
-import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
+import { getStoreMetals, getAllStoreMetalOrigins, getStoreStoneClarities } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
 import { requireStoreScope } from "@/lib/store-context"
@@ -53,7 +53,7 @@ export default async function EditPurchasePage({ params }: Props) {
     redirect(`/purchases/${id}`)
   }
 
-  const [vendors, products, locations, businessSettings, metals, origins, caratConversionRates, gstRates, enumFineness] =
+  const [vendors, products, locations, businessSettings, metals, origins, caratConversionRates, gstRates, enumFineness, clarityRows] =
     await Promise.all([
       getPurchaseFormParties(),
       getPurchaseFormProducts(),
@@ -64,6 +64,7 @@ export default async function EditPurchasePage({ params }: Props) {
       getCaratConversionRateMap(),
       getGstRates(),
       requireStoreScope().then(getFinenessMap),
+      getStoreStoneClarities(),
     ])
 
   // Saved weights are persisted in each line's own metal's configured
@@ -149,6 +150,7 @@ export default async function EditPurchasePage({ params }: Props) {
             gstRates={gstRates}
             defaultGstRate={businessSettings.defaultGstRate}
             enumFineness={enumFineness}
+            clarities={clarityRows.filter((row) => row.isActive).map((row) => row.name)}
             storeState={businessSettings.state}
             initialLocationId={purchase.locationId}
             editPurchaseId={purchase.id}

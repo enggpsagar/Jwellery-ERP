@@ -308,6 +308,12 @@ function SidebarNavItem({
   // one closes whichever was open.
   const open = openMenu === undefined ? routeOpen : openMenu === item.title;
 
+  // Every nav link is prefetch={false}. Each page is dynamic, so a prefetch
+  // is a real server render of the (dashboard) layout — sidebar counts and
+  // all — and the sidebar shows ~20 links at once. That multiplied every
+  // page view into ~20 function invocations and was the bulk of Vercel's
+  // Fluid Active CPU usage. Each section's loading.tsx still shows instantly
+  // on click.
   if (!hasSubItems) {
     return (
       <SidebarMenuItem>
@@ -317,7 +323,7 @@ function SidebarNavItem({
           tooltip={item.title}
           className={ACTIVE_NAV_CLASS}
         >
-          <Link href={item.href}>
+          <Link href={item.href} prefetch={false}>
             <Icon className="h-4 w-4" />
             <span>
               {item.title}
@@ -333,6 +339,7 @@ function SidebarNavItem({
           <SidebarMenuAction asChild className={QUICK_ADD_HIGHLIGHT_CLASS}>
             <Link
               href={item.quickAddHref}
+              prefetch={false}
               title={`Add new ${item.title}`}
               aria-label={`Add new ${item.title}`}
             >
@@ -355,7 +362,7 @@ function SidebarNavItem({
         onClick={() => setOpenMenu(item.title)}
         className={ACTIVE_NAV_CLASS}
       >
-        <Link href={item.href}>
+        <Link href={item.href} prefetch={false}>
           <Icon className="h-4 w-4" />
           <span>{item.title}</span>
         </Link>
@@ -388,7 +395,7 @@ function SidebarNavItem({
                 isActive={pathname === subItem.href}
                 className={ACTIVE_NAV_CLASS}
               >
-                <Link href={subItem.href}>
+                <Link href={subItem.href} prefetch={false}>
                   <span>
                     {subItem.title}
                     {subItem.countKey && <NavCount count={counts[subItem.countKey]} />}
@@ -403,6 +410,7 @@ function SidebarNavItem({
                 <SidebarMenuAction asChild className={NAV_CONTROL_CLASS}>
                   <Link
                     href={subItem.quickAddHref}
+                    prefetch={false}
                     title={`Add new ${subItem.title}`}
                     aria-label={`Add new ${subItem.title}`}
                   >

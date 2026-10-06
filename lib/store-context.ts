@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
@@ -125,6 +126,14 @@ async function totalMembershipRowsFor(user: { id?: string; role?: string | null 
  * them — honoured only if it names a store they are really a member of.
  */
 export async function getEffectiveStoreId(): Promise<string | null> {
+  return resolveEffectiveStoreId(await requestedStoreId());
+}
+
+// Memoised per request, keyed on the cookie value rather than on nothing: a
+// store-switch Server Action sets the cookie and then re-renders in the same
+// request, and must not get the pre-switch answer back. Saves two membership
+// queries per call — and a page's Promise.all of getters calls this once each.
+const resolveEffectiveStoreId = cache(async (requested: string | null): Promise<string | null> => {
   const user = await getCurrentUser();
   if (!user) return null;
 
@@ -134,13 +143,8 @@ export async function getEffectiveStoreId(): Promise<string | null> {
   // the former may fall back to User.storeId.
   const total = await totalMembershipRowsFor(user);
 
-  return resolveActiveStoreId(
-    user,
-    await requestedStoreId(),
-    memberships,
-    total,
-  );
-}
+  return resolveActiveStoreId(user, requested, memberships, total);
+});
 
 export async function requireStoreScope(): Promise<string> {
   const storeId = await getEffectiveStoreId();

@@ -124,12 +124,21 @@ export function ScanToAddPanel({
       }
     }
 
-    const interval = setInterval(tick, POLL_MS)
+    // Hidden tabs don't poll (each poll is a server invocation, and a
+    // forgotten session would otherwise run for its full hour). Nothing is
+    // lost: `since` picks up every scan made meanwhile once the tab is shown.
+    const visibleTick = () => {
+      if (document.visibilityState === "visible") tick()
+    }
+
+    const interval = setInterval(visibleTick, POLL_MS)
+    document.addEventListener("visibilitychange", visibleTick)
     tick()
 
     return () => {
       cancelled = true
       clearInterval(interval)
+      document.removeEventListener("visibilitychange", visibleTick)
     }
   }, [sessionId])
 

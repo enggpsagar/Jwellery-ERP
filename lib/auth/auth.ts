@@ -1,5 +1,6 @@
 // File: src/lib/auth.ts
 
+import { cache } from "react";
 import { getServerSession } from "next-auth";
 import { UserRole } from "@prisma/client";
 import { authOptions } from "@/lib/auth/auth-options";
@@ -15,9 +16,11 @@ import {
   resolveActiveStoreId,
 } from "@/lib/store-membership";
 
-export async function auth() {
-  return getServerSession(authOptions);
-}
+// Memoised per request with React cache(): getServerSession decrypts the
+// JWT every call, and one page render or Server Action can reach this dozens
+// of times (via getCurrentUser/getEffectiveStoreId in each action it runs) —
+// pure duplicated CPU, billed as Vercel Active CPU.
+export const auth = cache(async () => getServerSession(authOptions));
 
 export async function getCurrentUser() {
   const session = await auth();

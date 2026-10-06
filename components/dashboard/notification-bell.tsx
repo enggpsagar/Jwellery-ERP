@@ -59,12 +59,21 @@ export function NotificationBell() {
       }
     }
 
+    // Every poll is a server function invocation, and a dashboard tab tends
+    // to stay open all day — so skip polls while the tab is hidden, and
+    // catch up as soon as it is shown again.
+    const tick = () => {
+      if (document.visibilityState === "visible") load();
+    };
+
     load();
-    const interval = setInterval(load, 60_000);
+    const interval = setInterval(tick, 5 * 60_000);
+    document.addEventListener("visibilitychange", tick);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", tick);
     };
   }, []);
 

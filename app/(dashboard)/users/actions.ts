@@ -27,9 +27,14 @@ import {
 import { requireAuth, hasPermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { ROLE_LABELS } from "@/lib/roles";
-import { requireStoreScope, getEffectiveStoreId } from "@/lib/store-context";
+import {
+  requireStoreScope,
+  getEffectiveStoreId,
+  assertPlanActiveForExport,
+  PlanExpiredError,
+} from "@/lib/store-context";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
-import { buildExcelExport } from "@/lib/excel-export";
+import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import { logger } from "@/lib/logger";
 
 export type UserActionState = {
@@ -303,14 +308,22 @@ export async function enableUserAction(id: string): Promise<UserActionState> {
 }
 
 export type ExportUsersParams = {
+  selectedIds?: string[];
   search?: string;
   sortBy?: string;
   sortOrder?: SortOrder;
   status?: string;
   dateFrom?: string;
   dateTo?: string;
+  format?: "csv" | "xlsx" | "pdf";
 };
 
+/**
+ * Same contract as the other toolbar exports (DataTableToolbar): the
+ * selected rows when there are any, else the filtered list; CSV / Excel /
+ * PDF per `format`. Selected ids are intersected with the store-scoped set,
+ * so an id from another store is silently ignored.
+ */
 export async function exportUsersToExcel(params: ExportUsersParams = {}): Promise<{
   success: boolean;
   message: string;
@@ -326,14 +339,23 @@ export async function exportUsersToExcel(params: ExportUsersParams = {}): Promis
     }
 
     const storeId = await getEffectiveStoreId();
-    const users = await getAllUsersForExport(storeId, {
-      search: params.search,
-      sortBy: params.sortBy as UserSortBy,
-      sortOrder: params.sortOrder,
-      status: params.status as UserStatus | undefined,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-    });
+    if (storeId) await assertPlanActiveForExport(storeId);
+
+    const selectedIds = new Set((params.selectedIds ?? []).filter(Boolean));
+    const scopedUsers = await getAllUsersForExport(
+      storeId,
+      selectedIds.size
+        ? { sortBy: params.sortBy as UserSortBy, sortOrder: params.sortOrder }
+        : {
+            search: params.search,
+            sortBy: params.sortBy as UserSortBy,
+            sortOrder: params.sortOrder,
+            status: params.status as UserStatus | undefined,
+            dateFrom: params.dateFrom,
+            dateTo: params.dateTo,
+          },
+    );
+    const users = selectedIds.size ? scopedUsers.filter((user) => selectedIds.has(user.id)) : scopedUsers;
 
     if (!users.length) {
       return { success: false, message: "No users found to export." };
@@ -350,7 +372,12 @@ export async function exportUsersToExcel(params: ExportUsersParams = {}): Promis
       "Created At": new Date(user.createdAt).toLocaleString("en-IN"),
     }));
 
-    const { fileName, fileBase64 } = buildExcelExport(rows, "Users", "users");
+    const { fileName, fileBase64 } =
+      params.format === "csv"
+        ? buildCsvExportBase64(rows, "users")
+        : params.format === "pdf"
+          ? buildPdfExportBase64(rows, "Users", "users")
+          : buildExcelExport(rows, "Users", "users");
 
     return {
       success: true,
@@ -359,6 +386,9 @@ export async function exportUsersToExcel(params: ExportUsersParams = {}): Promis
       fileBase64,
     };
   } catch (error) {
+    if (error instanceof PlanExpiredError) {
+      return { success: false, message: error.message };
+    }
     logger.error("exportUsersToExcel error", error);
     return { success: false, message: "Failed to export users." };
   }

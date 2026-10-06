@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { PurityType, LedgerEntryType, LedgerSourceType, PaymentMethod } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead, assertPlanActiveForExport } from "@/lib/store-context";
+import { draftOrderStatusLabel } from "@/lib/status-labels";
+import { formatShortDate } from "@/lib/utils";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
@@ -262,26 +264,38 @@ export async function exportDraftOrdersToExcel(params: ExportDraftOrdersParams =
       params.sortOrder || "desc",
     );
 
+    await assertPlanActiveForExport(storeId);
+
     const orders = await prisma.draftOrder.findMany({
       where,
       orderBy,
-      include: DRAFT_ORDER_INCLUDE,
+      include: { ...DRAFT_ORDER_INCLUDE, location: { select: { name: true } } },
     });
 
     if (!orders.length) {
       return { success: false, message: "No draft orders found to export" };
     }
 
-    const rows = orders.map((order, index) => ({
-      "Sr. No.": index + 1,
-      "Order #": order.orderNumber,
-      Date: order.orderDate.toISOString().slice(0, 10),
-      Party: order.customer?.name ?? "",
-      Phone: order.customer?.phone ?? "",
-      Items: order._count.items,
-      Status: order.status,
-      "Artisan Job": order.karigarJob?.jobNumber ?? "",
-    }));
+    const rows = orders.map((order, index) => {
+      const estimatedTotal = Number(order.estimatedTotal);
+      const advancePaid = Number(order.paidAmount);
+      return {
+        "Sr. No.": index + 1,
+        "Order #": order.orderNumber,
+        Date: formatShortDate(order.orderDate),
+        "Expected Date": order.expectedDate ? formatShortDate(order.expectedDate) : "",
+        Party: order.customer?.name ?? "",
+        Phone: order.customer?.phone ?? "",
+        Items: order._count.items,
+        "Estimated Total": estimatedTotal,
+        "Advance Paid": advancePaid,
+        "Balance (Estimated)": Math.round((estimatedTotal - advancePaid) * 100) / 100,
+        Status: draftOrderStatusLabel(order.status),
+        Location: order.location?.name ?? "",
+        "Artisan Job": order.karigarJob?.jobNumber ?? "",
+        Notes: order.notes ?? "",
+      };
+    });
 
     const { fileName, fileBase64 } =
       params.format === "csv"

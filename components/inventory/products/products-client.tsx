@@ -115,6 +115,7 @@ export function ProductsClient({
               { value: "categoryType", label: "Sort by Type" },
               { value: "metalType", label: "Sort by Metal" },
               { value: "defaultPurity", label: "Sort by Purity" },
+              { value: "defaultGrossWeight", label: "Sort by Gross Weight" },
               { value: "defaultNetWeight", label: "Sort by Net Weight" },
               { value: "isActive", label: "Sort by Status" },
             ]}

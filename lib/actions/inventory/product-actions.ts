@@ -377,6 +377,7 @@ export type ProductSortBy =
   | "metalType"
   | "defaultPurity"
   | "defaultNetWeight"
+  | "defaultGrossWeight"
   | "isActive";
 export type ProductSortOrder = "asc" | "desc";
 
@@ -478,6 +479,7 @@ function getProductOrderBy(
     : sortBy === "metalType" ? { metalType: { name: sortOrder } }
     : sortBy === "defaultPurity" ? { defaultPurity: sortOrder }
     : sortBy === "defaultNetWeight" ? { defaultNetWeight: sortOrder }
+    : sortBy === "defaultGrossWeight" ? { defaultGrossWeight: sortOrder }
     : sortBy === "isActive" ? { isActive: sortOrder }
     : { createdAt: sortOrder };
 
@@ -584,7 +586,7 @@ export async function getProducts(params: GetProductsParams = {}) {
       include: { ...PRODUCT_RELATIONS, storeMetalPurity: { select: { label: true } } },
     }),
     // Footer totals across every matching product, not just this page.
-    prisma.product.aggregate({ where, _sum: { defaultNetWeight: true } }),
+    prisma.product.aggregate({ where, _sum: { defaultNetWeight: true, defaultGrossWeight: true } }),
     prisma.inventoryStock.aggregate({
       where: { storeId, product: where },
       _sum: { quantity: true },
@@ -635,6 +637,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   return {
     products,
     totals: {
+      grossWeight: Number(weightSum._sum.defaultGrossWeight ?? 0),
       netWeight: Number(weightSum._sum.defaultNetWeight ?? 0),
       fineWeight: fineRows.reduce((sum, row) => sum + (productFineWeight(row) ?? 0), 0),
       stockQty: stockQtySum._sum.quantity ?? 0,
@@ -660,6 +663,7 @@ async function getAllProductsForExport(params: ExportProductsParams = {}) {
     "metalType",
     "defaultPurity",
     "defaultNetWeight",
+    "defaultGrossWeight",
     "isActive",
   ];
   const sortBy: ProductSortBy = validSortBy.includes(params.sortBy as ProductSortBy)

@@ -44,7 +44,7 @@ type ProductsTableProps = {
   onActivate?: (id: string) => void
   /** Sums across every product matching the current filters (all pages),
    *  from getProducts — shown as the table's footer row. */
-  totals?: { netWeight: number; fineWeight?: number; stockQty: number }
+  totals?: { grossWeight?: number; netWeight: number; fineWeight?: number; stockQty: number }
 }
 
 export function ProductsTable({
@@ -115,9 +115,11 @@ export function ProductsTable({
                   className="h-4 w-4 rounded border-input"
                 />
               </th>
-              <SortableTableHead label="Product Code" sortKey="productCode" defaultSortBy="createdAt" />
-              <th className="px-4 py-3 text-left font-medium">Stock Qty</th>
+              {/* One column, like the Stock list: the product code with its
+                  qty in stock beside it — "PRD-0012 (3)". */}
+              <SortableTableHead label="Product Code (Qty)" sortKey="productCode" defaultSortBy="createdAt" />
               <SortableTableHead label="Title" sortKey="name" defaultSortBy="createdAt" />
+              <SortableTableHead label="Gross Weight" sortKey="defaultGrossWeight" defaultSortBy="createdAt" />
               <SortableTableHead label="Net Weight" sortKey="defaultNetWeight" defaultSortBy="createdAt" />
               <th className="px-4 py-3 text-left font-medium">Fine Weight</th>
             </tr>
@@ -149,10 +151,9 @@ export function ProductsTable({
                   </td>
 
                   <td className="px-4 py-3 font-medium text-foreground">
-                    {/* First column carries the hover-card preview, matching
-                        every other table in the app (Customers, Purchases,
-                        Invoices) — it used to sit on the Title column
-                        instead, one column later than everywhere else. */}
+                    {/* The Product Code carries the hover-card preview, like
+                        the record identifier in every other table (Customers,
+                        Purchases, Invoices). */}
                     <RecordHoverCard
                       label={product.productCode}
                       href={onActivate ? undefined : `/inventory/products/${product.id}`}
@@ -196,14 +197,15 @@ export function ProductsTable({
                         },
                       ]}
                     />
-                  </td>
-
-                  <td className="px-4 py-3 text-foreground">
-                    {product.stockQty > 0 ? (
-                      product.stockQty
-                    ) : (
-                      <span className="text-muted-foreground">0</span>
-                    )}
+                    {" "}
+                    <span
+                      className={cn(
+                        "font-normal tabular-nums",
+                        product.stockQty > 0 ? "text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      ({product.stockQty})
+                    </span>
                   </td>
 
                   <td className="px-4 py-3 text-foreground">
@@ -215,6 +217,14 @@ export function ProductsTable({
                           .filter(Boolean)
                           .join(" · ")}
                       </div>
+                    )}
+                  </td>
+
+                  <td className="px-4 py-3 text-foreground">
+                    {product.defaultGrossWeight != null ? (
+                      `${product.defaultGrossWeight.toFixed(3)} g`
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </td>
 
@@ -245,12 +255,14 @@ export function ProductsTable({
                 <td className="px-4 py-3">
                   Total
                   <div className="text-xs font-normal text-muted-foreground">
-                    {pagination.totalCount} product{pagination.totalCount === 1 ? "" : "s"}
+                    {pagination.totalCount} product{pagination.totalCount === 1 ? "" : "s"} · {totals.stockQty} in stock
                     {pagination.totalPages > 1 ? ", all pages" : ""}
                   </div>
                 </td>
-                <td className="px-4 py-3 tabular-nums">{totals.stockQty}</td>
                 <td className="px-4 py-3" />
+                <td className="px-4 py-3 tabular-nums">
+                  {totals.grossWeight != null ? `${totals.grossWeight.toFixed(3)} g` : ""}
+                </td>
                 <td className="px-4 py-3 tabular-nums">{totals.netWeight.toFixed(3)} g</td>
                 <td className="px-4 py-3 tabular-nums">
                   {totals.fineWeight != null ? `${totals.fineWeight.toFixed(3)} g` : ""}

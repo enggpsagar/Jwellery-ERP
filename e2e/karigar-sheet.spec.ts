@@ -73,14 +73,14 @@ test("artisan export → import round trip; duplicate mobile rejected", async ({
     // Re-importing it unchanged is refused: the mobile is already this artisan's.
     const before = await db().karigar.count({ where: { storeId } })
     await importArtisans(page, sheet([row], "test-results/karigar-dup.xlsx"))
-    await expect(page.getByText(new RegExp(`Mobile ${mobile} already belongs to artisan`))).toBeVisible()
+    await expect(page.getByText(new RegExp(`Mobile ${mobile} already belongs to an artisan`))).toBeVisible()
     // Two rows sharing one new mobile are refused too.
     const otherMobile = `8${String(stamp).slice(-9)}`
     await importArtisans(page, sheet([
       { Name: `${prefix} A`, Mobile: otherMobile },
       { Name: `${prefix} B`, Mobile: otherMobile },
     ], "test-results/karigar-dup2.xlsx"))
-    await expect(page.getByText(new RegExp(`Mobile ${otherMobile} is also on row 2`))).toBeVisible()
+    await expect(page.getByText(new RegExp(`Mobile ${otherMobile} is repeated in this file`))).toBeVisible()
     expect(await db().karigar.count({ where: { storeId } })).toBe(before)
 
     // With a new name and mobile it imports back as an equal artisan.

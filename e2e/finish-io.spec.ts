@@ -56,8 +56,31 @@ test("finish: product import, stock import, both exports", async ({ page }) => {
   expect(stockCsv).not.toMatch(/KACHA|PAKKA/)
   const productCsv = await exportCsv(page, "/inventory/products")
   expect(productCsv).toContain("Finished / Hallmarked")
+  // Export uses the import template's headers, in its order.
+  const header = productCsv.replace(/^\uFEFF/, "").split(/\r?\n/)[0]
+  expect(header.indexOf("Product Name")).toBeLessThan(header.indexOf("Metal Type"))
+  expect(header.indexOf("Metal Type")).toBeLessThan(header.indexOf("Category"))
+  expect(header.indexOf("Net Weight")).toBeLessThan(header.indexOf("Design Code"))
+  expect(header.indexOf("Active")).toBeLessThan(header.indexOf("Finish"))
+  expect(header).not.toContain("Default Making Charge")
   expect(productCsv).not.toMatch(/KACHA|PAKKA/)
 
+  // Round trip: the exported row, renamed, imports back as an equal product.
+  const exported = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+    XLSX.read(productCsv.replace(/^\uFEFF/, ""), { type: "string" }).Sheets.Sheet1,
+  )
+  const ownRow = exported.find((row) => row["Product Name"] === name)!
+  const copyName = `${name} copy`
+  await page.goto("/inventory/products")
+  await page.getByRole("button", { name: "Import from Excel" }).click()
+  await page.locator("#product-import-file").setInputFiles(sheet([{ ...ownRow, "Product Name": copyName }], "test-results/finish-roundtrip.xlsx"))
+  await page.getByRole("button", { name: "Import", exact: true }).click()
+  await expect.poll(async () => (await db().product.findFirst({ where: { storeId, name: copyName } }))?.defaultFinish ?? null, { timeout: 15000 }).toBe("PAKKA")
+  const copy = await db().product.findFirstOrThrow({ where: { storeId, name: copyName } })
+  const fields = ["metalTypeId", "categoryId", "categoryTypeId", "targetStyleId", "defaultGrossWeight", "defaultNetWeight", "isActive", "hsnCode"] as const
+  for (const field of fields) expect(String(copy[field]), field).toBe(String(product[field]))
+
+  await db().product.delete({ where: { id: copy.id } })
   await db().inventoryStock.deleteMany({ where: { productId: product.id } })
   await db().product.delete({ where: { id: product.id } })
   if (!existingStyle) await db().storeStyle.delete({ where: { id: style.id } })

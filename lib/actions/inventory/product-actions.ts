@@ -492,6 +492,7 @@ function mapProductRow(row: {
   categoryType: { name: string } | null;
   metalType: { name: string } | null;
   targetStyle: { id: string; name: string } | null;
+  stoneOriginOption?: { name: string } | null;
   defaultPurity: PurityType | null;
   defaultMakingCharge: { toString(): string } | null;
   defaultMakingChargeType: ChargeType;
@@ -522,6 +523,7 @@ function mapProductRow(row: {
     ornamentType: row.categoryType?.name ?? null,
     metalType: row.metalType?.name ?? "-",
     targetStyle: row.targetStyle,
+    stoneType: row.stoneOriginOption?.name ?? null,
     defaultPurity: row.defaultPurity,
     defaultMakingCharge:
       row.defaultMakingCharge != null ? Number(row.defaultMakingCharge) : null,
@@ -711,35 +713,51 @@ export async function exportProductsToExcel(
       };
     }
 
+    // Same headers, order and value forms as the import template (see
+    // getProductImportTemplate), so an export reads like that sheet and its
+    // rows can be pasted into it. Export-only: Sr. No./Product Code lead,
+    // Created At trails; the template's Stock Quantity/Location are
+    // per-import choices, not product facts, so they aren't exported.
+    const blank = (value: unknown) =>
+      value === null || value === undefined || value === "-" ? "" : value;
+    const chargeType = (value: ChargeType) => (value === ChargeType.PERCENTAGE ? "Percentage" : "Fixed");
     const rows = products.map((product, index) => ({
       "Sr. No.": index + 1,
       "Product Code": product.productCode,
-      Name: product.name,
-      Category: product.category || "-",
-      Type: product.ornamentType || "-",
-      "Metal Type": product.metalType || "-",
-      Purity: product.defaultPurity || "-",
-      "Design Code": product.designCode || "-",
-      "HSN Code": product.hsnCode || "-",
-      "Default Making Charge": product.defaultMakingCharge ?? "-",
-      "Making Charge Type": product.defaultMakingChargeType,
-      "Default Stone Charge": product.defaultStoneCharge ?? "-",
-      "Stone Charge Type": product.defaultStoneChargeType,
-      Finish: finishLabel(product.defaultFinish),
-      "Gross Weight (g)": product.defaultGrossWeight ?? "-",
-      "Net Weight (g)": product.defaultNetWeight ?? "-",
-      "Stone Weight (g)": product.defaultStoneWeight ?? "-",
-      "Carat Weight (ct)": product.defaultCaratWeight ?? "-",
+      // Basic Information
+      "Product Name": product.name,
+      "Metal Type": blank(product.metalType),
+      Category: blank(product.category),
+      "Category Type": blank(product.ornamentType),
+      Style: blank(product.targetStyle?.name),
+      "Stone Type": blank(product.stoneType),
+      // Metals
+      Purity: product.defaultPurity ? PURITY_LABELS[product.defaultPurity] : "",
+      "Gross Weight": blank(product.defaultGrossWeight),
+      // Stone Pricing
       "Has Stone Component": product.hasStoneComponent ? "Yes" : "No",
-      "Stone Rate (₹/ct)": product.defaultStoneRate ?? "-",
-      Stone: product.defaultStoneMetalTypeName ?? "-",
-      "Stone Types": product.defaultStoneTypeNames ?? "-",
-      Description: product.description || "-",
-      Notes: product.notes || "-",
-      Status: product.isActive ? "Active" : "Inactive",
+      "Stone Metal Type Name": blank(product.defaultStoneMetalTypeName),
+      "Stone Type Names": blank(product.defaultStoneTypeNames),
+      "Carat Weight": blank(product.defaultCaratWeight),
+      "Stone Rate": blank(product.defaultStoneRate),
+      "Stone Charge": blank(product.defaultStoneCharge),
+      "Stone Charge Type": chargeType(product.defaultStoneChargeType),
+      "Stone Weight": blank(product.defaultStoneWeight),
+      "Net Weight": blank(product.defaultNetWeight),
+      // Charges
+      "Making Charge": blank(product.defaultMakingCharge),
+      "Making Charge Type": chargeType(product.defaultMakingChargeType),
+      // Product Details
+      "Design Code": blank(product.designCode),
+      "HSN Code": blank(product.hsnCode),
+      Active: product.isActive ? "Yes" : "No",
+      Finish: finishLabel(product.defaultFinish),
+      // Additional Information
+      Description: blank(product.description),
+      Notes: blank(product.notes),
       "Created At": product.createdAt
         ? new Date(product.createdAt).toLocaleString("en-IN")
-        : "-",
+        : "",
     }));
 
     // The PDF gets its own shorter column set — all 25 export columns on one

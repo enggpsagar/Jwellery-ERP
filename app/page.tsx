@@ -1,7 +1,5 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { redirect } from "next/navigation"
-import { getServerSession } from "next-auth"
 import {
   ArrowRight,
   BarChart3,
@@ -26,7 +24,6 @@ import {
   Users,
 } from "lucide-react"
 
-import { authOptions } from "@/lib/auth/auth-options"
 import { APP_NAME } from "@/lib/constants/app"
 import { getStates } from "@/lib/actions/location-actions"
 import { getPlans } from "@/lib/actions/plan-actions"
@@ -290,14 +287,12 @@ function AppPreview() {
   )
 }
 
+// Static, regenerated at most hourly (and on demand when a Super Admin edits
+// plans — see lib/actions/plan-actions.ts). Signed-in visitors are redirected
+// to /dashboard by middleware.ts before they reach this page.
+export const revalidate = 3600
+
 export default async function LandingPage() {
-  const session = await getServerSession(authOptions)
-
-  // Anyone already signed in has no use for the sales pitch.
-  if (session?.user) {
-    redirect("/dashboard")
-  }
-
   const [states, plans] = await Promise.all([
     getStates(),
     getPlans({ activeOnly: true }),

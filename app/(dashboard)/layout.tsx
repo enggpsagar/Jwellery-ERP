@@ -25,6 +25,7 @@ import {
 } from "@/lib/branding";
 
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
+import { SessionProvider } from "@/components/providers/session-provider";
 import { TopBar } from "@/components/dashboard/top-bar";
 
 import { Button } from "@/components/ui/button";
@@ -351,21 +352,23 @@ export default async function DashboardLayout({
           }
         `}</style>
       )}
-      <SidebarProvider side={sidebarSide}>
-        {/* DOM order, not just <Sidebar side=...>, is what actually moves
-            the sidebar to the right — see sidebarSide's own comment above. */}
-        {sidebarSide === "right" ? (
-          <>
-            {content}
-            {sidebar}
-          </>
-        ) : (
-          <>
-            {sidebar}
-            {content}
-          </>
-        )}
-      </SidebarProvider>
+      <SessionProvider session={session}>
+        <SidebarProvider side={sidebarSide}>
+          {/* DOM order, not just <Sidebar side=...>, is what actually moves
+              the sidebar to the right — see sidebarSide's own comment above. */}
+          {sidebarSide === "right" ? (
+            <>
+              {content}
+              {sidebar}
+            </>
+          ) : (
+            <>
+              {sidebar}
+              {content}
+            </>
+          )}
+        </SidebarProvider>
+      </SessionProvider>
     </div>
   );
 }

@@ -1,12 +1,14 @@
 // lib/actions/sidebar-actions.ts
 "use server"
 
+import { unstable_cache } from "next/cache"
 import { UserRole } from "@prisma/client"
 
 import { LedgerSourceType } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
-import { getLocationScope, locationWhere } from "@/lib/location-scope"
+import { sidebarCountsTag } from "@/lib/cache-tags"
+import { getLocationScope, locationWhere, type LocationScope } from "@/lib/location-scope"
 
 export type SidebarCounts = {
   customers: number
@@ -68,6 +70,29 @@ export async function getSidebarCounts(
   }
 
   const scope = await getLocationScope()
+
+  // Cached across requests for 30s: the (dashboard) layout re-runs on every
+  // page load and router.refresh(), and these ~14 counts were a large share
+  // of the app's Vercel Active CPU. Keyed by every argument (store, role,
+  // the user's location scope), so a location-restricted Staff user never
+  // sees an unrestricted user's numbers.
+  //
+  // Deliberately TTL-only, no revalidateTag() on writes: calling it inside a
+  // Server Action makes Next re-render the whole page into the action's
+  // response, and the one central hook (requireStoreScope) is also hit by
+  // read-only actions such as polls — that would cost more CPU than the
+  // cache saves. A badge may lag a fresh write by up to 30s.
+  return unstable_cache(storeCounts, ["sidebar-counts"], {
+    revalidate: 30,
+    tags: [sidebarCountsTag(storeId)],
+  })(storeId, role, scope)
+}
+
+async function storeCounts(
+  storeId: string,
+  role: UserRole | undefined,
+  scope: LocationScope,
+): Promise<SidebarCounts> {
   const withLocation = locationWhere(scope)
 
   const [

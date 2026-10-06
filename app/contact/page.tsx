@@ -12,7 +12,9 @@ export const metadata: Metadata = {
   title: "Contact Us",
 }
 
-export const dynamic = "force-dynamic"
+// Static, regenerated hourly at most; editing platform content revalidates
+// this path immediately (CONTENT_CONSUMER_PATHS in platform-content-actions).
+export const revalidate = 3600
 
 /**
  * Public Contact Us page — no session required (excluded from the auth

@@ -88,6 +88,8 @@ export async function createPlan(prevState: PlanFormState, formData: FormData): 
     });
 
     revalidatePath(PLANS_PATH);
+    // The landing page lists active plans and is statically cached.
+    revalidatePath("/");
     return { success: true, message: `Plan "${name}" created` };
   } catch (error) {
     logger.error("createPlan error", error);
@@ -121,6 +123,8 @@ export async function updatePlan(prevState: PlanFormState, formData: FormData): 
     }
 
     revalidatePath(PLANS_PATH);
+    // The landing page lists active plans and is statically cached.
+    revalidatePath("/");
     return { success: true, message: `Plan "${name}" updated` };
   } catch (error) {
     logger.error("updatePlan error", error);
@@ -148,6 +152,8 @@ export async function setPlanActive(id: string, isActive: boolean): Promise<Plan
     await prisma.plan.update({ where: { id }, data: { isActive } });
 
     revalidatePath(PLANS_PATH);
+    // The landing page lists active plans and is statically cached.
+    revalidatePath("/");
     return {
       success: true,
       message: `Plan "${plan.name}" ${isActive ? "reactivated" : "deactivated"}`,

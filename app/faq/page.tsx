@@ -11,7 +11,9 @@ export const metadata: Metadata = {
   title: "FAQ",
 }
 
-export const dynamic = "force-dynamic"
+// Static, regenerated hourly at most; editing platform content revalidates
+// this path immediately (CONTENT_CONSUMER_PATHS in platform-content-actions).
+export const revalidate = 3600
 
 /**
  * Public FAQ page — no session required (excluded from the auth middleware

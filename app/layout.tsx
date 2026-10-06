@@ -15,15 +15,12 @@ import {
   Oswald,
 } from "next/font/google";
 import Script from "next/script";
-import { getServerSession } from "next-auth";
 
 import { cn } from "@/lib/utils";
 import { ToastProvider } from "@/components/providers/toast-provider";
-import { SessionProvider } from "@/components/providers/session-provider";
 import { NumberInputWheelGuard } from "@/components/providers/number-input-wheel-guard";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { APP_NAME } from "@/lib/constants/app";
-import { authOptions } from "@/lib/auth/auth-options";
 
 // One plain sans for everything, headings included — matches the clean,
 // utilitarian look of business apps like Vyapar. Previously paired with
@@ -76,13 +73,11 @@ export const metadata: Metadata = {
 const betterStackRumToken = process.env.BETTERSTACK_RUM_TOKEN;
 const betterStackEnvironment = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "development";
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getServerSession(authOptions);
-
   return (
     <html
       lang="en"
@@ -131,11 +126,13 @@ export default async function RootLayout({
           quirk further down the tree, since nothing sits above <body>. */}
       <body className="overflow-x-hidden">
         <NumberInputWheelGuard />
-        <SessionProvider session={session}>
-          <TooltipProvider>
-            <ToastProvider>{children}</ToastProvider>
-          </TooltipProvider>
-        </SessionProvider>
+        {/* SessionProvider lives in app/(dashboard)/layout.tsx, the only
+            subtree that calls useSession(). Reading the session here made
+            every page — the public home/FAQ/contact pages included — render
+            per request on the server instead of being served from the CDN. */}
+        <TooltipProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </TooltipProvider>
       </body>
     </html>
   );

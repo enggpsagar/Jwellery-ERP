@@ -43,6 +43,16 @@ export async function middleware(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET,
   });
 
+  // The landing page is public and statically cached; only a signed-in
+  // visitor is sent on to their dashboard. Done here rather than in the
+  // page, because reading the session in the page forced it to render on
+  // the server for every visitor (and bot) instead of coming from the CDN.
+  if (pathname === "/") {
+    return token && token.disabled !== true
+      ? NextResponse.redirect(new URL("/dashboard", request.url))
+      : NextResponse.next();
+  }
+
   if (!token) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
@@ -175,8 +185,11 @@ export const config = {
   // `.*` the capture can be empty, so "/" itself matched and every visitor
   // was redirected to /login before the page rendered. Requiring at least
   // one character after the slash leaves "/" public and protects everything
-  // below it exactly as before.
+  // below it exactly as before. "/" is listed on its own only so a signed-in
+  // visitor can be redirected to /dashboard — the early `pathname === "/"`
+  // branch in middleware() lets everyone else through.
   matcher: [
+    "/",
     "/((?!api|_next/static|_next/image|favicon.ico|login|register|contact|faq).+)",
   ],
 };

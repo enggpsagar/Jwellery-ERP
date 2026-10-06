@@ -5,6 +5,7 @@ import { Upload, Download } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 
 import {
+  exportStonesAndStoneTypesToExcel,
   getStoneTypeImportTemplate,
   importStonesAndStoneTypesFromExcel,
 } from "@/lib/actions/taxonomy-actions"
@@ -88,9 +89,9 @@ export function StoneTypeImportDialog() {
           <DialogTitle>Bulk import stones &amp; stone types</DialogTitle>
           <DialogDescription>
             One file, two sheets — <strong>Stones</strong> and{" "}
-            <strong>Stone Types</strong>. A Stone Type row's Stone Name can
-            refer to a stone already set up, or one listed in the Stones
-            sheet of the same file.
+            <strong>Stone Types</strong>. Selling price and grams per carat go
+            on Stone Types. A name that already exists is updated, a new one
+            is added; an export from here imports back unchanged.
           </DialogDescription>
         </DialogHeader>
 
@@ -147,5 +148,33 @@ export function StoneTypeImportDialog() {
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** Downloads the store's current list in the import template's layout. */
+export function StoneTypeExportButton() {
+  const [pending, startTransition] = useTransition()
+  const toast = useToast()
+
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const result = await exportStonesAndStoneTypesToExcel()
+          if (result.success && result.fileBase64 && result.fileName) {
+            downloadBase64File(result.fileBase64, result.fileName)
+          } else {
+            toast.error(result.message)
+          }
+        })
+      }
+    >
+      {pending ? <Loader className="mr-2 h-4 w-4" /> : <Download className="mr-2 h-4 w-4" />}
+      Export Stones &amp; Stone Types
+    </Button>
   )
 }

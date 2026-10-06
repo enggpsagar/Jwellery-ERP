@@ -52,8 +52,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/providers/toast-provider";
-import { MetalCategoryImportDialog } from "@/components/settings/metal-category-import-dialog";
-import { StoneTypeImportDialog } from "@/components/settings/stone-type-import-dialog";
+import { MetalCategoryImportDialog, MetalCategoryExportButton } from "@/components/settings/metal-category-import-dialog";
+import { StoneTypeImportDialog, StoneTypeExportButton } from "@/components/settings/stone-type-import-dialog";
 import { finenessMismatch } from "@/lib/purity-fineness-check";
 // Note: StoneTypesSection below still uses the plain Select above for the
 // *parent stone* picker (unchanged) — only the child Stone Type value
@@ -368,6 +368,7 @@ function MetalsSection({
                 Add Metal
               </Button>
               <MetalCategoryImportDialog />
+              <MetalCategoryExportButton />
             </div>
           )
         ) : null}
@@ -621,6 +622,7 @@ function StonesSection({
                 Add Stone
               </Button>
               <StoneTypeImportDialog />
+              <StoneTypeExportButton />
             </div>
           )
         ) : null}

@@ -71,7 +71,7 @@ export function buildExcelExport(
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
   const fileName = timestampedFileName(filePrefix, "xlsx");
-  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+  const buffer = styleHeaderRow(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
 
   return { fileName, fileBase64: Buffer.from(buffer).toString("base64") };
 }
@@ -149,7 +149,7 @@ export function buildMultiSheetExcelExport(
   }
 
   const fileName = timestampedFileName(filePrefix, "xlsx");
-  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+  const buffer = styleHeaderRow(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
 
   return { fileName, fileBase64: Buffer.from(buffer).toString("base64") };
 }
@@ -238,10 +238,91 @@ export function buildImportTemplateWithDropdowns({
     buffer = Buffer.from(XLSX.CFB.write(zip, { fileType: "zip", type: "buffer" }) as Uint8Array);
   }
 
+  buffer = styleHeaderRow(buffer);
+
   return {
     fileName: timestampedFileName(filePrefix, "xlsx"),
     fileBase64: buffer.toString("base64"),
   };
+}
+
+
+/**
+ * Every workbook this app writes gets the same header treatment: row 1 frozen
+ * (stays in view while scrolling) and filled yellow + bold, so a column's
+ * name is never lost on a long sheet. SheetJS's community build can't write
+ * styles or panes, so — like the dropdowns in buildImportTemplateWithDropdowns
+ * — it's patched into the saved file's XML: one extra cellXfs entry in
+ * styles.xml, a frozen pane in each sheet's sheetView, and that style on
+ * every row-1 cell. Sheets whose row 1 isn't a header (Instructions, which
+ * opens with notes) are left alone.
+ */
+const HEADERLESS_SHEETS = new Set(["Instructions"]);
+
+export function styleHeaderRow(buffer: Buffer): Buffer {
+  const zip = XLSX.CFB.read(buffer, { type: "buffer" });
+  const read = (path: string) => {
+    const entry = XLSX.CFB.find(zip, path);
+    return entry?.content ? Buffer.from(entry.content as Uint8Array).toString("utf8") : null;
+  };
+  const write = (path: string, xml: string) => {
+    const entry = XLSX.CFB.find(zip, path)!;
+    entry.content = Buffer.from(xml, "utf8");
+    entry.size = entry.content.length;
+  };
+
+  const stylesXml = read("/xl/styles.xml");
+  const workbookXml = read("/xl/workbook.xml");
+  if (!stylesXml || !workbookXml) return buffer;
+
+  // Append a bold font, a solid yellow fill and an xf using both; the new
+  // xf's index is the old cellXfs count.
+  const bump = (xml: string, tag: string, add: string) => {
+    const m = xml.match(new RegExp(`<${tag} count="(\\d+)">`));
+    if (!m) return { xml, index: -1 };
+    const index = Number(m[1]);
+    return {
+      xml: xml.replace(m[0], `<${tag} count="${index + 1}">`).replace(`</${tag}>`, `${add}</${tag}>`),
+      index,
+    };
+  };
+  let styles = stylesXml;
+  const font = bump(styles, "fonts", '<font><b/><sz val="12"/><color theme="1"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>');
+  styles = font.xml;
+  const fill = bump(styles, "fills", '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill>');
+  styles = fill.xml;
+  if (font.index < 0 || fill.index < 0) return buffer;
+  const xf = bump(
+    styles,
+    "cellXfs",
+    `<xf numFmtId="0" fontId="${font.index}" fillId="${fill.index}" borderId="0" xfId="0" applyFont="1" applyFill="1"/>`,
+  );
+  if (xf.index < 0) return buffer;
+  write("/xl/styles.xml", xf.xml);
+
+  const sheetNames = [...workbookXml.matchAll(/<sheet [^>]*name="([^"]*)"/g)].map((m) => m[1]);
+  sheetNames.forEach((name, i) => {
+    if (HEADERLESS_SHEETS.has(name)) return;
+    const path = `/xl/worksheets/sheet${i + 1}.xml`;
+    let xml = read(path);
+    if (!xml) return;
+
+    const pane =
+      '<sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>' +
+      '<selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView>';
+    if (/<sheetViews>[\s\S]*?<\/sheetViews>/.test(xml)) {
+      xml = xml.replace(/<sheetViews>[\s\S]*?<\/sheetViews>/, `<sheetViews>${pane}</sheetViews>`);
+    } else {
+      xml = xml.replace(/(<sheetFormatPr|<cols>|<sheetData)/, `<sheetViews>${pane}</sheetViews>$1`);
+    }
+
+    xml = xml.replace(/<row r="1"([^>]*)>([\s\S]*?)<\/row>/, (_m, attrs: string, cells: string) =>
+      `<row r="1"${attrs}>${cells.replace(/<c r="([A-Z]+1)"(?: s="\d+")?/g, `<c r="$1" s="${xf.index}"`)}</row>`,
+    );
+    write(path, xml);
+  });
+
+  return Buffer.from(XLSX.CFB.write(zip, { fileType: "zip", type: "buffer" }) as Uint8Array);
 }
 
 function escapeXml(value: string) {

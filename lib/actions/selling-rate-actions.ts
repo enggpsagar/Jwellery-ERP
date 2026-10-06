@@ -12,7 +12,6 @@ import {
   recordSellingRateChange,
   type SellingRateKind,
 } from "@/lib/selling-rates";
-import { STARTER_METALS } from "@/lib/inventory/starter-masters";
 import { defaultFinenessForLabel } from "@/lib/purity-fineness-check";
 
 export type SellingRateUpdate = {
@@ -113,88 +112,6 @@ async function requireStoreOwner(): Promise<string | null> {
   const access = await getEffectiveAccess();
   if (!access || (access.role !== UserRole.ADMIN && access.role !== UserRole.SUPER_ADMIN)) return null;
   return requireStoreScope();
-}
-
-const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
-
-/**
- * "Add standard rates": for every metal / stone the store ALREADY has whose
- * name matches a starter metal (lib/inventory/starter-masters.ts), adds the
- * standard purities (Gold 24K/22K/20K/18K/14K, Silver 999/925, Platinum
- * 950/900) or stone types (Natural, Lab-Grown) it is missing. Never creates
- * a metal, never touches an existing row — stores created before
- * 2026-10-05 weren't seeded with these, and back-filling them silently was
- * ruled out, so it is the owner's click. A metal with Has Purity off is
- * skipped (turning it on changes how its products are entered).
- */
-export async function addStandardSellingRates(): Promise<SellingRateResult> {
-  const storeId = await requireStoreOwner();
-  if (!storeId) return { success: false, message: "Only the Store Owner can add rates." };
-
-  try {
-    const added = await prisma.$transaction(async (tx) => {
-      const metals = await tx.storeMetal.findMany({
-        where: { storeId },
-        select: {
-          id: true,
-          name: true,
-          hasPurity: true,
-          isGemstone: true,
-          purities: { select: { label: true, sortOrder: true } },
-          origins: { select: { name: true } },
-        },
-      });
-
-      let count = 0;
-      const purityOff: string[] = [];
-      for (const metal of metals) {
-        const starter = STARTER_METALS.find((s) => sameName(s.name, metal.name));
-        if (!starter) continue;
-        if (!metal.isGemstone && !metal.hasPurity && starter.purities?.length) purityOff.push(metal.name);
-
-        if (!metal.isGemstone && metal.hasPurity && starter.purities) {
-          const missing = starter.purities.filter((p) => !metal.purities.some((x) => sameName(x.label, p.label)));
-          const baseOrder = metal.purities.reduce((m, x) => Math.max(m, x.sortOrder), -1) + 1;
-          if (missing.length) {
-            await tx.storeMetalPurity.createMany({
-              data: missing.map((p, i) => ({
-                storeId,
-                storeMetalId: metal.id,
-                label: p.label,
-                skuCode: p.skuCode,
-                finenessPercent: p.finenessPercent,
-                isHallmarkable: p.isHallmarkable,
-                sortOrder: baseOrder + i,
-              })),
-            });
-            count += missing.length;
-          }
-        }
-
-        if (metal.isGemstone && starter.stoneTypes) {
-          const missing = starter.stoneTypes.filter((t) => !metal.origins.some((x) => sameName(x.name, t)));
-          if (missing.length) {
-            await tx.storeMetalOrigin.createMany({
-              data: missing.map((name) => ({ storeId, storeMetalId: metal.id, name })),
-            });
-            count += missing.length;
-          }
-        }
-      }
-      return { count, purityOff };
-    });
-
-    revalidatePath("/", "layout");
-    const skipped = added.purityOff.length
-      ? ` ${added.purityOff.join(", ")}: turn on Has Purity in Settings to add its purities.`
-      : "";
-    return added.count === 0
-      ? { success: true, message: `Every standard purity and stone type is already there.${skipped}` }
-      : { success: true, message: `Added ${added.count} purities / stone types — enter their rates and save.${skipped}` };
-  } catch (error) {
-    logger.error("addStandardSellingRates failed", error);
-    return { success: false, message: "Could not add the standard rates." };
-  }
 }
 
 /**

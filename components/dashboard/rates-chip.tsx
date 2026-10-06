@@ -11,7 +11,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useToast } from "@/components/providers/toast-provider";
 import {
   addSellingRateOption,
-  addStandardSellingRates,
   updateSellingRates,
   type SellingRateUpdate,
 } from "@/lib/actions/selling-rate-actions";
@@ -45,6 +44,8 @@ function updatedLabel(last: NonNullable<SellingRateLastUpdate>) {
  * of Settings > Taxonomy. Edits write the same columns Settings does
  * (lib/actions/selling-rate-actions.ts), so billing uses them immediately,
  * and every change is kept as history (Metal Rates → Your Selling Rates).
+ * The rows are exactly the store's active purities / stone types from
+ * Settings > Metals & Categories — nothing here is a fixed list.
  */
 export function RatesChip({ groups, canEdit, lastUpdate = null }: RatesChipProps) {
   const router = useRouter();
@@ -124,18 +125,6 @@ export function RatesChip({ groups, canEdit, lastUpdate = null }: RatesChipProps
     });
   }
 
-  function addStandard() {
-    startTransition(async () => {
-      const result = await addStandardSellingRates();
-      if (result.success) {
-        toast.success(result.message);
-        router.refresh();
-      } else {
-        toast.error(result.message);
-      }
-    });
-  }
-
   function addOption(metalId: string) {
     const price = parsePrice(newPrice);
     if (price === undefined) {
@@ -198,16 +187,6 @@ export function RatesChip({ groups, canEdit, lastUpdate = null }: RatesChipProps
               ? "used on new invoices, estimates and quotations."
               : "set by the Store Owner."}
           </p>
-          {canEdit && (
-            <button
-              type="button"
-              onClick={addStandard}
-              disabled={pending}
-              className="mt-2 text-xs font-medium text-[var(--chart-1)] underline-offset-2 hover:underline disabled:opacity-50"
-            >
-              Add standard purities &amp; stone types (24K, 22K, 18K … Natural, Lab-Grown)
-            </button>
-          )}
         </div>
 
         <div className="max-h-[60vh] space-y-4 overflow-y-auto px-4 py-3">

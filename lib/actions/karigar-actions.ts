@@ -717,7 +717,16 @@ export async function updateKarigar(
 
     const storeId = await requireStoreScope();
 
-    if (data.mobile && (await findKarigarWithMobile(storeId, data.mobile, id))) {
+    // Only judge a mobile this edit changes: two artisans saved with the same
+    // number before this check existed must still be editable.
+    const storedMobile = (
+      await prisma.karigar.findFirst({ where: { id, storeId }, select: { mobile: true } })
+    )?.mobile;
+    if (
+      data.mobile &&
+      data.mobile !== storedMobile &&
+      (await findKarigarWithMobile(storeId, data.mobile, id))
+    ) {
       return {
         success: false,
         message: "Please fix the form errors",

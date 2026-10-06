@@ -53,30 +53,24 @@ test("the Store Owner edits a selling rate from the header", async ({ page }) =>
 })
 
 /**
- * Stores created before 2026-10-05 only have the purities they added by
- * hand. "Add standard purities & stone types" fills in the missing standard
- * ones under metals the store already has; "+ Add purity" adds any other.
+ * The popover lists exactly the store's purities from Settings; "+ Add
+ * purity" adds one there (with its first rate and a history row).
  */
-test("the rates popover adds missing standard purities and a custom one", async ({ page }) => {
+test("the rates popover adds a purity to Settings with its rate", async ({ page }) => {
   const storeId = await demoStoreId()
   const gold = await db().storeMetal.findFirstOrThrow({ where: { storeId, name: "Gold" }, select: { id: true } })
-  const before = await db().storeMetalPurity.findMany({ where: { storeMetalId: gold.id }, select: { id: true } })
-  const keep = new Set(before.map((p) => p.id))
-  // Take 14K away so the standard add has something to restore.
-  const fourteen = await db().storeMetalPurity.findFirst({ where: { storeMetalId: gold.id, label: "14K" } })
-  if (fourteen) await db().storeMetalPurity.delete({ where: { id: fourteen.id } }).catch(() => {})
-  const stillThere = fourteen && (await db().storeMetalPurity.findUnique({ where: { id: fourteen.id } }))
+  const keep = new Set(
+    (await db().storeMetalPurity.findMany({ where: { storeMetalId: gold.id }, select: { id: true } })).map((p) => p.id),
+  )
 
   try {
     await page.goto("/dashboard")
     await page.getByRole("button", { name: "Today's selling rates" }).click()
-    await page.getByRole("button", { name: /Add standard purities/ }).click()
-    if (!stillThere) {
-      await expect
-        .poll(async () => db().storeMetalPurity.count({ where: { storeMetalId: gold.id, label: "14K" } }))
-        .toBe(1)
-      await expect(page.getByLabel("Gold 14K", { exact: true })).toBeVisible()
+    // Every active Settings purity is listed, and nothing else.
+    for (const p of await db().storeMetalPurity.findMany({ where: { storeMetalId: gold.id, isActive: true } })) {
+      await expect(page.getByLabel(`Gold ${p.label}`, { exact: true })).toBeVisible()
     }
+    await expect(page.getByRole("button", { name: /Add standard/ })).toHaveCount(0)
 
     const goldSection = page.getByText("Gold (per g)").locator("..")
     await goldSection.getByRole("button", { name: "Add purity" }).click()
@@ -90,6 +84,7 @@ test("the rates popover adds missing standard purities and a custom one", async 
     const added = await db().storeMetalPurity.findFirstOrThrow({ where: { storeMetalId: gold.id, label: "23K" } })
     expect(Number(added.finenessPercent)).toBeCloseTo(95.8, 1)
     expect(await db().sellingRateEntry.count({ where: { storeId, refId: added.id } })).toBe(1)
+    await expect(page.getByLabel("Gold 23K", { exact: true })).toBeVisible()
     await expect(page.getByText(/Last updated today/)).toBeVisible()
   } finally {
     const extra = await db().storeMetalPurity.findMany({
@@ -98,9 +93,5 @@ test("the rates popover adds missing standard purities and a custom one", async 
     })
     await db().sellingRateEntry.deleteMany({ where: { refId: { in: extra.map((p) => p.id) } } })
     await db().storeMetalPurity.deleteMany({ where: { id: { in: extra.map((p) => p.id) } } })
-    if (fourteen && !(await db().storeMetalPurity.findUnique({ where: { id: fourteen.id } }))) {
-      const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = fourteen
-      await db().storeMetalPurity.create({ data: rest }).catch(() => {})
-    }
   }
 })

@@ -131,6 +131,10 @@ export function CustomersToolbar({
   }
 
   const hasSelection = selectedCustomerIds.length > 0
+  const exportNoun = supplierOnly ? "suppliers" : "parties"
+  const exportLabel = hasSelection
+    ? `Export selected ${exportNoun} (${selectedCustomerIds.length})`
+    : `Export ${exportNoun}`
 
   /**
    * One button instead of two: exports the current selection when there is
@@ -234,8 +238,8 @@ export function CustomersToolbar({
           size="icon"
           onClick={handleExport}
           disabled={isExporting}
-          title={hasSelection ? `Export selected parties (${selectedCustomerIds.length})` : "Export parties"}
-          aria-label={hasSelection ? `Export selected parties (${selectedCustomerIds.length})` : "Export parties"}
+          title={exportLabel}
+          aria-label={exportLabel}
           className="shadow-sm"
         >
           {isExporting ? <Loader className="h-4 w-4" /> : <Download className="h-4 w-4" />}

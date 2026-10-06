@@ -75,7 +75,7 @@ export function StockQrLabel({
 
   return (
     <div className="stock-qr-label flex w-[76mm] items-center gap-2 rounded-lg border bg-white p-2 text-black">
-      <div className="flex w-[24mm] shrink-0 flex-col items-center font-mono font-bold leading-tight">
+      <div data-testid="stock-tag-qr" className="flex w-[24mm] shrink-0 flex-col items-center font-mono font-bold leading-tight">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={qrDataUrl}
@@ -88,7 +88,7 @@ export function StockQrLabel({
         )}
         {showCode && <p className="w-full truncate text-center text-[8px]">{tag.code}</p>}
       </div>
-      <div className="min-w-0 flex-1 font-mono leading-tight" style={{ fontSize: tagFontSize(lines.length) }}>
+      <div data-testid="stock-tag-details" className="min-w-0 flex-1 font-mono leading-tight" style={{ fontSize: tagFontSize(lines.length) }}>
         {lines.map((line) => (
           <p key={line.key} className={`truncate ${line.bold ? "font-bold" : ""}`}>
             {line.text}

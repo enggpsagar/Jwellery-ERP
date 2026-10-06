@@ -53,12 +53,13 @@ export function StockDetailContent({
   showLocation?: boolean
 }) {
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <DetailSection title="Basic Information" icon={Boxes} tint="var(--chart-1)">
-        <DetailGrid>
+    <div className="grid items-start gap-4 lg:grid-cols-2">
+      <DetailSection title="Basic Information" icon={Boxes} tint="var(--chart-1)" compact>
+        <DetailGrid dense>
           <DetailField label="Tag Number" value={stock.tagNumber} />
           <DetailField
             label="Product"
+            span
             value={`${stock.product?.productCode} — ${stock.product?.name}`}
           />
           <DetailField label="Status" value={<StockStatusBadge status={stock.status} />} />
@@ -71,8 +72,8 @@ export function StockDetailContent({
 
       {qrCard}
 
-      <DetailSection title="Weight Details" icon={Scale} tint="var(--chart-3)">
-        <DetailGrid>
+      <DetailSection title="Weight Details" icon={Scale} tint="var(--chart-3)" compact>
+        <DetailGrid dense>
           <DetailField label="Gross Weight" value={formatNumber(stock.grossWeight)} />
           <DetailField label="Less Weight" value={formatNumber(stock.lessWeight)} />
           <DetailField label="Net Weight" value={formatNumber(stock.netWeight)} />
@@ -81,22 +82,27 @@ export function StockDetailContent({
         </DetailGrid>
       </DetailSection>
 
-      <DetailSection title="Pricing Details" icon={IndianRupee} tint="var(--chart-2)">
-        <DetailGrid>
-          <DetailField label="Purchase Rate" value={formatNumber(stock.purchaseRate)} />
-          <DetailField label="Sale Rate" value={formatNumber(stock.saleRate)} />
-          <DetailField label="Making Charge" value={formatNumber(stock.makingCharge)} />
-          <DetailField label="Stone Charge" value={formatNumber(stock.stoneCharge)} />
-          <DetailField label="Other Charge" value={formatNumber(stock.otherCharge)} />
-          <DetailField label="Purchase Amount" value={formatNumber(stock.purchaseAmount)} />
-          <DetailField label="Sale Amount" value={formatNumber(stock.saleAmount)} />
-        </DetailGrid>
-      </DetailSection>
+      {/* Same rule as the card below: no prices entered, no empty card. */}
+      {[stock.purchaseRate, stock.saleRate, stock.makingCharge, stock.stoneCharge, stock.otherCharge, stock.purchaseAmount, stock.saleAmount].some(
+        (value) => formatNumber(value) !== "-",
+      ) && (
+        <DetailSection title="Pricing Details" icon={IndianRupee} tint="var(--chart-2)" compact>
+          <DetailGrid dense>
+            <DetailField label="Purchase Rate" value={formatNumber(stock.purchaseRate)} />
+            <DetailField label="Sale Rate" value={formatNumber(stock.saleRate)} />
+            <DetailField label="Making Charge" value={formatNumber(stock.makingCharge)} />
+            <DetailField label="Stone Charge" value={formatNumber(stock.stoneCharge)} />
+            <DetailField label="Other Charge" value={formatNumber(stock.otherCharge)} />
+            <DetailField label="Purchase Amount" value={formatNumber(stock.purchaseAmount)} />
+            <DetailField label="Sale Amount" value={formatNumber(stock.saleAmount)} />
+          </DetailGrid>
+        </DetailSection>
+      )}
 
       {/* Every field here is optional — hide the card when none is set. */}
       {(stock.vendorName || stock.purchaseDate || (showLocation && stock.location?.name) || stock.remarks) && (
-        <DetailSection title="Source / Extra Details" icon={Truck} tint="var(--chart-4)">
-          <DetailGrid>
+        <DetailSection title="Source / Extra Details" icon={Truck} tint="var(--chart-4)" compact>
+          <DetailGrid dense>
             <DetailField label="Vendor Name" value={stock.vendorName} />
             <DetailField label="Purchase Date" value={formatDate(stock.purchaseDate)} />
             {showLocation && <DetailField label="Location" value={stock.location?.name} />}

@@ -15,6 +15,7 @@ export function DetailSection({
   icon: Icon,
   tint,
   action,
+  compact = false,
   children,
 }: {
   title: string
@@ -23,15 +24,17 @@ export function DetailSection({
   /** A chart-palette hue, so section marks match the KPI tiles and charts. */
   tint?: string
   action?: React.ReactNode
+  /** Tighter header and padding, for a section shown in a narrow side panel. */
+  compact?: boolean
   children: React.ReactNode
 }) {
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className="flex flex-row items-start justify-between gap-3 border-b py-5">
+      <CardHeader className={`flex flex-row items-start justify-between gap-3 border-b ${compact ? "px-4 py-3" : "py-5"}`}>
         <div className="flex min-w-0 items-center gap-3">
           {Icon && tint ? (
             <div
-              className="flex size-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset"
+              className={`flex ${compact ? "size-7" : "size-9"} shrink-0 items-center justify-center rounded-lg ring-1 ring-inset`}
               style={{
                 backgroundColor: `color-mix(in oklab, ${tint} 12%, transparent)`,
                 color: tint,
@@ -54,7 +57,7 @@ export function DetailSection({
         {action}
       </CardHeader>
 
-      <CardContent className="@container p-6">{children}</CardContent>
+      <CardContent className={`@container ${compact ? "p-4" : "p-6"}`}>{children}</CardContent>
     </Card>
   )
 }
@@ -70,9 +73,23 @@ export function DetailSection({
  * ("Rajasthan", "Receivable", "09/09/26") into a column too tight for
  * them and breaking them mid-word.
  */
-export function DetailGrid({ children }: { children: React.ReactNode }) {
+export function DetailGrid({
+  children,
+  dense = false,
+}: {
+  children: React.ReactNode
+  /** Two columns from the start with tighter gaps — for short values
+   * (status, weights, amounts) in a narrow side panel. */
+  dense?: boolean
+}) {
   return (
-    <div className="grid grid-cols-1 gap-x-8 gap-y-5 @sm:grid-cols-2 @lg:grid-cols-3">
+    <div
+      className={
+        dense
+          ? "grid grid-cols-2 gap-x-4 gap-y-3 @lg:grid-cols-3"
+          : "grid grid-cols-1 gap-x-8 gap-y-5 @sm:grid-cols-2 @lg:grid-cols-3"
+      }
+    >
       {children}
     </div>
   )
@@ -104,7 +121,7 @@ export function DetailField({
   if (empty) return null
 
   return (
-    <div className={span ? "@sm:col-span-2 @lg:col-span-3" : undefined}>
+    <div className={span ? "col-span-full" : undefined}>
       <p className="text-xs uppercase tracking-wide text-muted-foreground">
         {label}
       </p>

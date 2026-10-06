@@ -66,12 +66,12 @@ export function StockQrCard({ stockId, dataUrl }: StockQrCardProps) {
   )
 
   return (
-    <section className="rounded-xl border bg-card p-5">
+    <section className="rounded-xl border bg-card p-4">
       {/* Prints just the tag, laid out for an 80mm thermal printer — same
           StockQrLabel as the bulk Print QR Codes page. */}
       <StockQrLabelPrintStyles />
 
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
           <QrCode className="h-5 w-5" />
           Tag

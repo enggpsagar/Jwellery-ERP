@@ -1224,25 +1224,6 @@ export function ProductForm({
               <ErrorText error={state.errors.targetStyleId} />
             </div>
           )}
-
-          <div>
-            <Label htmlFor="defaultFinish">Finish</Label>
-
-            <Select value={defaultFinish} onValueChange={(value) => setDefaultFinish(value as "KACHA" | "PAKKA")}>
-              <SelectTrigger id="defaultFinish" className="h-11 w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(["KACHA", "PAKKA"] as const).map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {FINISH_LABELS[item]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <input type="hidden" name="defaultFinish" value={defaultFinish} />
-          </div>
         </div>
       </div>
 
@@ -1831,7 +1812,7 @@ export function ProductForm({
       <div className="rounded-xl border p-6">
         <h3 className="mb-6 text-lg font-semibold">Product Details</h3>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <Label htmlFor="designCode">Design Code</Label>
 
@@ -1876,6 +1857,24 @@ export function ProductForm({
             <input type="hidden" name="isActive" value={isActive} />
 
             <ErrorText error={state.errors.isActive} />
+          </div>
+          <div>
+            <Label htmlFor="defaultFinish">Finish</Label>
+
+            <Select value={defaultFinish} onValueChange={(value) => setDefaultFinish(value as "KACHA" | "PAKKA")}>
+              <SelectTrigger id="defaultFinish" className="h-11 w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(["KACHA", "PAKKA"] as const).map((item) => (
+                  <SelectItem key={item} value={item}>
+                    {FINISH_LABELS[item]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <input type="hidden" name="defaultFinish" value={defaultFinish} />
           </div>
         </div>
       </div>

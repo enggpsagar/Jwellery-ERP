@@ -22,7 +22,12 @@ export const PRODUCT_SHEET_COLUMNS: ProductSheetColumn[] = [
     example: "",
   },
   // Basic Information
-  { header: "Product Name", required: "Yes", help: "Name of the design.", example: "Classic Gold Ring" },
+  {
+    header: "Product Name",
+    required: "Yes (blank on a follow-on row)",
+    help: "Name of the design. Leave it blank on a row to add one more metal and/or stone to the product above (see the notes at the top).",
+    example: "Two-tone Ring",
+  },
   {
     header: "Metal Type",
     required: "Yes",
@@ -50,32 +55,32 @@ export const PRODUCT_SHEET_COLUMNS: ProductSheetColumn[] = [
     help: "One of this metal's purities from Settings › Purity (see the dropdown, e.g. 22K). Older generic labels like \"Gold 22K\" are also accepted.",
     example: "22K",
   },
-  { header: "Gross Weight", required: "Yes", help: "Typical gross weight of the design, in grams.", example: 8.5 },
+  { header: "Gross Weight", required: "Yes", help: "Typical gross weight of the design, in grams.", example: 3.2 },
   { header: "Metal GST Rate", required: "No", help: "GST rate for the metal, by its name in Settings › GST Rates (see the dropdown).", example: "" },
   // Stone Pricing
   {
     header: "Has Stone Component",
     required: "No (default No)",
     help: "Yes for a metal piece with an embedded stone. The stone columns (Stone through Stone GST Rate) are only saved when this is Yes and a Stone is given.",
-    example: "No",
+    example: "Yes",
   },
-  { header: "Stone Metal Type Name", required: "No", help: "The embedded stone, e.g. Diamond (see the dropdown).", example: "" },
+  { header: "Stone Metal Type Name", required: "No", help: "The embedded stone, e.g. Diamond (see the dropdown).", example: "Diamond" },
   {
     header: "Stone Type Names",
     required: "No",
     help: "Kinds of that stone, comma-separated if more than one, e.g. Natural, Lab-Grown.",
-    example: "",
+    example: "Natural",
   },
-  { header: "Carat Weight", required: "No", help: "Stone weight in carats (ct).", example: "" },
-  { header: "Stone Rate", required: "No", help: "Price per carat (₹/ct).", example: "" },
-  { header: "Stone Charge", required: "No", help: "Stone charge amount (₹), or a percentage if Stone Charge Type is Percentage.", example: "" },
+  { header: "Carat Weight", required: "No", help: "Stone weight in carats (ct).", example: 0.1 },
+  { header: "Stone Rate", required: "No", help: "Price per carat (₹/ct).", example: 50000 },
+  { header: "Stone Charge", required: "No", help: "Stone charge amount (₹), or a percentage if Stone Charge Type is Percentage.", example: 5000 },
   { header: "Stone Charge Type", required: "No (default Fixed)", help: "Fixed or Percentage.", example: "Fixed" },
-  { header: "Stone Pcs", required: "No", help: "Number of stones (whole number).", example: "" },
-  { header: "Stone Clarity", required: "No", help: "Clarity grade, e.g. FG/VVS-VS (see the dropdown for your list).", example: "" },
+  { header: "Stone Pcs", required: "No", help: "Number of stones (whole number).", example: 6 },
+  { header: "Stone Clarity", required: "No", help: "Clarity grade, e.g. FG/VVS-VS (see the dropdown for your list).", example: "VVS" },
   { header: "IGI Certificate No.", required: "No", help: "Stone certificate number.", example: "" },
   { header: "Stone GST Rate", required: "No", help: "GST rate for the stone, by its name in Settings › GST Rates (see the dropdown).", example: "" },
-  { header: "Stone Weight", required: "No", help: "Stone weight in grams.", example: "" },
-  { header: "Net Weight", required: "Yes", help: "Typical net weight of the design, in grams.", example: 8.2 },
+  { header: "Stone Weight", required: "No", help: "Stone weight in grams.", example: 0.02 },
+  { header: "Net Weight", required: "Yes", help: "Typical net weight of the design, in grams.", example: 4.27 },
   // Charges
   { header: "Making Charge", required: "No", help: "Making charge amount (₹), or a percentage if Making Charge Type is Percentage.", example: 500 },
   { header: "Making Charge Type", required: "No (default Fixed)", help: "Fixed or Percentage.", example: "Fixed" },
@@ -90,7 +95,7 @@ export const PRODUCT_SHEET_COLUMNS: ProductSheetColumn[] = [
     example: "Unfinished",
   },
   // Additional Information
-  { header: "Description", required: "No", help: "Shown on the product.", example: "22K gold ladies ring" },
+  { header: "Description", required: "No", help: "Shown on the product.", example: "Gold + silver ladies ring with diamonds and a ruby"},
   { header: "Notes", required: "No", help: "Internal notes.", example: "" },
   // Stock entry
   {
@@ -108,6 +113,20 @@ export const PRODUCT_SHEET_COLUMNS: ProductSheetColumn[] = [
 ]
 
 export const PRODUCT_SHEET_HEADERS = PRODUCT_SHEET_COLUMNS.map((column) => column.header)
+
+/** The template's second example row: Product Name blank, so it adds one
+ * more metal and one more stone to the "Two-tone Ring" above it. */
+export const PRODUCT_SHEET_FOLLOW_ON_EXAMPLE: Record<string, string | number> = {
+  "Metal Type": "Silver",
+  Purity: "925",
+  "Gross Weight": 1.1,
+  "Stone Metal Type Name": "Ruby",
+  "Carat Weight": 0.05,
+  "Stone Rate": 20000,
+  "Stone Charge": 1000,
+  "Stone Charge Type": "Fixed",
+  "Stone Pcs": 2,
+}
 
 /** The Instructions sheet's rows. */
 export function productSheetInstructions() {

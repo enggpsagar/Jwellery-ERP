@@ -27,6 +27,7 @@ import {
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { TopBar } from "@/components/dashboard/top-bar";
+import { getSellingRateGroups } from "@/lib/selling-rates";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -157,7 +158,15 @@ export default async function DashboardLayout({
 
   // Brand the sidebar with the store actually being worked in, not the one
   // on the User row — those differ the moment someone switches.
-  const [storeInfo, sidebarCounts, brandingSettings] = await Promise.all([
+  // Role in the active store, not on the User row (same rule as
+  // resolveAccess): an Admin of one store may be Staff in this one.
+  const activeRole = isSuperAdmin
+    ? UserRole.SUPER_ADMIN
+    : memberships.find((m) => m.storeId === activeStoreId)?.role ?? session.user.role;
+  // Karigars see only their own jobs, never store prices.
+  const showRates = Boolean(activeStoreId) && activeRole !== UserRole.KARIGAR;
+
+  const [storeInfo, sidebarCounts, brandingSettings, sellingRates] = await Promise.all([
     activeStoreId
       ? prisma.store.findUnique({
           where: { id: activeStoreId },
@@ -175,6 +184,7 @@ export default async function DashboardLayout({
     activeStoreId
       ? prisma.storeBranding.findUnique({ where: { storeId: activeStoreId } })
       : Promise.resolve(null),
+    showRates && activeStoreId ? getSellingRateGroups(activeStoreId) : Promise.resolve([]),
   ]);
 
   // Resolved fresh on every layout render, not read off the session token —
@@ -306,6 +316,8 @@ export default async function DashboardLayout({
         activeStoreId={activeStoreId}
         canSwitchStores={isSuperAdmin || stores.length > 1}
         planExpired={isPlanExpired}
+        sellingRates={sellingRates}
+        canEditRates={activeRole === UserRole.ADMIN || activeRole === UserRole.SUPER_ADMIN}
       />
 
       {/* bg-background, not a hardcoded slate — this is the one thing

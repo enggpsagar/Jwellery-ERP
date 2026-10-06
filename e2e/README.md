@@ -33,6 +33,7 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `stock-qr-print.spec.ts` | Stock QR tags: QR left / details right; print is one 80×30mm thermal label per page, at the paper edge |
 | `stock-autofill.spec.ts` | Picking an 18K + diamond piece with no selling price fills Purity, the stone and Rate / g (today's 24K × fineness); QR/Barcode tags print every metal and stone and follow Settings → QR & Barcode Tags; Stock list shows Product Code over `STOCK-CODE (qty)` and Fine Weight |
 | `product-images.spec.ts` | Product Images: add / make cover / remove / save order; square tiles for any photo shape; non-Blob URLs rejected |
+| `header-rates.spec.ts` | Top bar "Today's Rates": the Store Owner changes Gold 22K's selling rate and it lands on the purity's own selling price |
 | `reports.spec.ts` | Every report tab renders; Stock report's Available / Out of Stock split; CSV export |
 
 **When you build a feature, add a test for it here** — that's what keeps

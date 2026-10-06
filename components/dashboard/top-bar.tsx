@@ -23,6 +23,8 @@ import { avatarColor, initialsOf } from "@/lib/avatar-color";
 import { GlobalSearch } from "@/components/dashboard/global-search";
 import { StoreSwitcher } from "@/components/dashboard/store-switcher";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { RatesChip } from "@/components/dashboard/rates-chip";
+import type { SellingRateGroup } from "@/lib/selling-rates";
 
 type StoreOption = {
   id: string;
@@ -38,6 +40,10 @@ type TopBarProps = {
   /** The active store's plan has expired — resolved server-side (never off
    * the session token, which is frozen for the life of the login). */
   planExpired?: boolean;
+  /** Active store's selling rates for the Today's Rates chip; empty hides it. */
+  sellingRates?: SellingRateGroup[];
+  /** Store Owner in the active store — may edit the rates from the chip. */
+  canEditRates?: boolean;
 };
 
 export function TopBar({
@@ -45,6 +51,8 @@ export function TopBar({
   activeStoreId = null,
   canSwitchStores = false,
   planExpired = false,
+  sellingRates = [],
+  canEditRates = false,
 }: TopBarProps) {
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
@@ -118,7 +126,9 @@ export function TopBar({
         </Link>
       )}
 
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="ml-auto flex min-w-0 items-center gap-1.5">
+        <RatesChip groups={sellingRates} canEdit={canEditRates} />
+
         {canAccessBilling && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

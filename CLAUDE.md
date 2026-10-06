@@ -453,6 +453,22 @@ multi-part Kacha rows now carry a "GST if billed" rate (store default;
 hidden on the slip). Invoice/Kacha/Quotation/Purchase exports have a
 "Metals & Stones" column (`lib/piece-components-text.ts`).
 
+### Added 2026-10-06: Today's Rates chip in the top bar
+
+`components/dashboard/rates-chip.tsx` shows the active store's selling rates and lets
+the Store Owner edit them without opening Settings. It reads and writes the **same
+columns Settings > Taxonomy does** — `StoreMetalPurity.sellingPrice`,
+`StoreMetalOrigin.sellingPrice` (stone types), `StoreMetal.sellingPrice` for a metal
+with neither — so billing picks the change up directly. Read: `lib/selling-rates.ts`
+(server-only helper, called by `app/(dashboard)/layout.tsx` with the session's store —
+deliberately not a server action, so a client can't pass another storeId). Write:
+`updateSellingRates` (`lib/actions/selling-rate-actions.ts`), gated on the role in the
+**active store** (`getEffectiveAccess`), one transaction, every id matched by
+`{ id, storeId }`. Hidden for KARIGAR. It does **not** touch `MetalRate`: that table is
+the market rate the `/api/cron/metal-rates` job copies to every store, and a store-
+entered history row there needs a `source` column (migration) — not done yet.
+Spec: `e2e/header-rates.spec.ts`.
+
 ### Added 2026-10-06: Offers & gift vouchers (promotional sales)
 
 `Promotion` + `PromotionVoucher` (migration `20261006100000_promotions_vouchers`).

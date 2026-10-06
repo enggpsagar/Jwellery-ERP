@@ -111,6 +111,12 @@ rules, and **Metal Selling Rates per purity** — the rate that pre-fills on a s
 Fineness drives every fine-weight figure in artisan jobs, Customer Exchange and
 reports, so get it right early.
 
+> **Changing rates every day?** You don't need Settings for that. Click the
+> **rates chip** in the top bar (e.g. "Gold 22K ₹6,000 · Silver ₹98"), type the new
+> rates and press **Save**. It changes the same rates as Settings, and the next invoice,
+> estimate or quotation uses them. Only the Store Owner can edit them; Staff see them
+> read-only.
+
 ### Step 4 — Locations (Settings → Locations)
 
 - **Store Locations** — your counters or branches. One is the **Default Location** and

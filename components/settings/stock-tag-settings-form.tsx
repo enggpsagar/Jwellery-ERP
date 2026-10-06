@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react"
 import QRCode from "qrcode"
-import { ArrowDown, ArrowUp, Plus, QrCode, ScanBarcode, X } from "lucide-react"
+import { ArrowDown, ArrowUp, GripVertical, Plus, QrCode, ScanBarcode, X } from "lucide-react"
 
 import { updateStockTagFields, type SettingsFormState } from "@/lib/actions/settings-actions"
 import type { StockTagData, StockTagSettings } from "@/lib/actions/inventory/stock-tag-actions"
@@ -15,6 +15,7 @@ import {
 import { StockQrLabel } from "@/components/inventory/stock/stock-qr-label"
 import { StockBarcodeLabel } from "@/components/inventory/stock/stock-barcode-label"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader } from "@/components/ui/loader"
 import { useToast } from "@/components/providers/toast-provider"
@@ -162,6 +163,42 @@ function TagFieldsCard({
     onChange(next)
   }
 
+  // Drag and drop (desktop): drag a printed row to reorder it, drag an "Add
+  // a field" chip into the list to insert it at that spot, or drag a printed
+  // row back onto "Add a field" to remove it. The arrows stay for keyboard
+  // and touch, where native drag and drop doesn't fire.
+  const [dragged, setDragged] = useState<StockTagField | null>(null)
+  const [dropAt, setDropAt] = useState<number | null>(null)
+
+  const dropInto = (at: number) => {
+    if (!dragged) return
+    const without = fields.filter((f) => f !== dragged)
+    const from = fields.indexOf(dragged)
+    // Removing a row above the drop point shifts that point up by one.
+    const index = from !== -1 && from < at ? at - 1 : at
+    const next = [...without]
+    next.splice(Math.max(0, Math.min(index, next.length)), 0, dragged)
+    onChange(next)
+  }
+
+  const endDrag = () => {
+    setDragged(null)
+    setDropAt(null)
+  }
+
+  const dragProps = (field: StockTagField) =>
+    canEdit
+      ? {
+          draggable: true,
+          onDragStart: (e: React.DragEvent) => {
+            e.dataTransfer.effectAllowed = "move"
+            e.dataTransfer.setData("text/plain", field)
+            setDragged(field)
+          },
+          onDragEnd: endDrag,
+        }
+      : {}
+
   return (
     <Card data-testid={testId}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -178,11 +215,44 @@ function TagFieldsCard({
       <CardContent className="space-y-4">
         <div className="flex justify-center rounded-lg bg-muted/50 p-3">{preview}</div>
 
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground">Printed, in this order</p>
+        <div
+          className="space-y-1"
+          data-testid={`${testId}-printed`}
+          onDragOver={(e) => {
+            if (!dragged) return
+            e.preventDefault()
+            // Below the last row (or an empty list) = append.
+            if (e.target === e.currentTarget) setDropAt(fields.length)
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            if (dropAt !== null) dropInto(dropAt)
+            endDrag()
+          }}
+        >
+          <p className="text-xs font-medium text-muted-foreground">
+            Printed, in this order{canEdit ? " — drag to reorder" : ""}
+          </p>
           {fields.length === 0 && <p className="text-sm text-muted-foreground">Nothing — only the code prints.</p>}
           {fields.map((field, index) => (
-            <div key={field} className="flex items-center gap-1 rounded-md border px-2 py-1 text-sm">
+            <div
+              key={field}
+              {...dragProps(field)}
+              onDragOver={(e) => {
+                if (!dragged) return
+                e.preventDefault()
+                const box = e.currentTarget.getBoundingClientRect()
+                setDropAt(e.clientY < box.top + box.height / 2 ? index : index + 1)
+              }}
+              className={cn(
+                "flex items-center gap-1 rounded-md border px-2 py-1 text-sm",
+                canEdit && "cursor-grab active:cursor-grabbing",
+                dragged === field && "opacity-40",
+                dropAt === index && dragged && "border-t-2 border-t-primary",
+                dropAt === index + 1 && index === fields.length - 1 && dragged && "border-b-2 border-b-primary",
+              )}
+            >
+              {canEdit && <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />}
               <span className="flex-1">{LABELS.get(field)}</span>
               {canEdit && (
                 <>
@@ -201,12 +271,31 @@ function TagFieldsCard({
           ))}
         </div>
 
-        {canEdit && unused.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">Add a field</p>
+        {canEdit && (unused.length > 0 || (dragged && fields.includes(dragged))) && (
+          <div
+            className={cn(
+              "space-y-1 rounded-md",
+              dragged && fields.includes(dragged) && "outline-2 outline-dashed outline-offset-4 outline-muted-foreground/40",
+            )}
+            data-testid={`${testId}-unused`}
+            onDragOver={(e) => {
+              // Only a printed row can be dropped here (= remove it).
+              if (!dragged || !fields.includes(dragged)) return
+              e.preventDefault()
+              setDropAt(null)
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (dragged && fields.includes(dragged)) onChange(fields.filter((f) => f !== dragged))
+              endDrag()
+            }}
+          >
+            <p className="text-xs font-medium text-muted-foreground">
+              Add a field{dragged && fields.includes(dragged) ? " — drop here to remove" : " — click, or drag into the list"}
+            </p>
             <div className="flex flex-wrap gap-1.5">
               {unused.map((field) => (
-                <Button key={field.key} type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => onChange([...fields, field.key])}>
+                <Button key={field.key} type="button" variant="outline" size="sm" className="h-7 cursor-grab text-xs" {...dragProps(field.key)} onClick={() => onChange([...fields, field.key])}>
                   <Plus className="mr-1 h-3 w-3" />
                   {field.label}
                 </Button>

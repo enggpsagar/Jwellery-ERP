@@ -91,12 +91,12 @@ export function StockImportDialog() {
         <DialogHeader>
           <DialogTitle>Bulk add stock</DialogTitle>
           <DialogDescription>
-            One row per product. <strong>Product Code</strong> and{" "}
-            <strong>Quantity</strong> are all that's required — metal,
-            purity, charges and Finish come from each matched product.
-            Location is optional, and so is <strong>Finish</strong>
-            (Unfinished / Finished) — fill it in only to override the
-            product's own.
+            One row per stock entry. <strong>Product Code</strong> is required
+            and must be a product that already exists — stock is only added to
+            existing products. Every other Add Stock field (tag, weights,
+            rates, status, finish, vendor, dates, location) is optional; blank
+            weights come from the product. Download the template for
+            dropdowns and an Instructions sheet.
           </DialogDescription>
         </DialogHeader>
 

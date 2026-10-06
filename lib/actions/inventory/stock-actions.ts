@@ -26,14 +26,25 @@ import {
 import type { StockFormState } from "@/lib/inventory/stock-types"
 import { finishLabel, parseFinishLabel } from "@/lib/inventory/finish"
 import {
-  buildExcelExport,
   buildCsvExportBase64,
   buildPdfExportBase64,
-  buildMultiSheetExcelExport,
+  buildImportTemplateWithDropdowns,
   parseExcelUpload,
 } from "@/lib/excel-export"
+import {
+  IMPORTABLE_STOCK_STATUSES,
+  STOCK_SHEET_COLUMNS,
+  STOCK_SHEET_HEADERS,
+  STOCK_SHEET_NOTES,
+  STOCK_STATUS_LABELS,
+  formatSheetDate,
+  parseImportStockStatus,
+  parseSheetDate,
+  stockSheetInstructions,
+} from "@/lib/inventory/stock-sheet"
+import { PURITY_LABELS } from "@/lib/purity"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
-import { resolveFineWeight } from "@/lib/fine-weight"
+import { getFineWeightResolver, resolveFineWeight } from "@/lib/fine-weight"
 import { describePieceComponentsText, METALS_AND_STONES_COLUMN } from "@/lib/piece-components-text"
 import { formatShortDate, formatShortDateTime } from "@/lib/utils"
 import { logger } from "@/lib/logger";
@@ -390,7 +401,45 @@ export async function exportInventoryStockToExcel(
       }
     }
 
-    const rows = stockItems.map((item, index) => ({
+    // CSV/Excel: exactly the stock import template's columns, in its order,
+    // with values the import reads back (so an exported file can be edited
+    // and imported — clear Stock Code to add rows as new pieces). The PDF
+    // keeps its own shorter, readable column set.
+    const num = (value: { toString(): string } | null | undefined) => (value == null ? "" : Number(value))
+    const rows = stockItems.map((item) => {
+      const values: Record<string, unknown> = {
+        "Product Code": item.product?.productCode ?? "",
+        "Product Name": item.product?.name ?? "",
+        "Stock Code": item.stockCode,
+        "Tag Number": item.tagNumber ?? "",
+        Status: STOCK_STATUS_LABELS[item.status as InventoryStockStatus] ?? "",
+        Finish: finishLabel(item.finish),
+        Quantity: item.quantity,
+        "Gross Weight (g)": num(item.grossWeight),
+        "Less Weight (g)": num(item.lessWeight),
+        "Net Weight (g)": num(item.netWeight),
+        "Stone Weight (g)": num(item.stoneWeight),
+        "Carat Weight (ct)": num(item.caratWeight),
+        "Purchase Rate": num(item.purchaseRate),
+        "Sale Rate": num(item.saleRate),
+        "Other Charge": num(item.otherCharge),
+        "Purchase Amount": num(item.purchaseAmount),
+        "Sale Amount": num(item.saleAmount),
+        "Vendor Name": item.vendorName ?? "",
+        "Purchase Date": formatSheetDate(item.purchaseDate),
+        "Date of Manufacture": formatSheetDate(item.manufactureDate),
+        Location: item.location?.name ?? "",
+        Remarks: item.remarks ?? "",
+        "Metal Type": item.metalType?.name ?? "",
+        Purity: item.purityLabel ?? (item.purity ? PURITY_LABELS[item.purity as PurityType] : ""),
+        "Fine Weight (g)": num(item.fineWeight),
+        "Metals & Stones": describePieceComponentsText(item.components),
+        "Created At": item.createdAt ? formatShortDateTime(item.createdAt) : "",
+      }
+      return Object.fromEntries(STOCK_SHEET_HEADERS.map((header) => [header, values[header] ?? ""]))
+    })
+    const pdfRows = () =>
+      stockItems.map((item, index) => ({
       "Sr. No.": index + 1,
       "Stock Code": item.stockCode,
       "Tag Number": item.tagNumber || "-",
@@ -421,8 +470,15 @@ export async function exportInventoryStockToExcel(
       params.format === "csv"
         ? buildCsvExportBase64(rows, "inventory-stock")
         : params.format === "pdf"
-          ? buildPdfExportBase64(rows, "Inventory Stock", "inventory-stock")
-          : buildExcelExport(rows, "Inventory Stock", "inventory-stock")
+          ? buildPdfExportBase64(pdfRows(), "Inventory Stock", "inventory-stock")
+          : buildImportTemplateWithDropdowns({
+              sheetName: "Stock",
+              rows,
+              columns: STOCK_SHEET_HEADERS,
+              dropdowns: await loadStockSheetDropdowns(await requireStoreScope()),
+              instructions: { notes: STOCK_SHEET_NOTES, rows: stockSheetInstructions() },
+              filePrefix: "inventory-stock",
+            })
 
     return {
       success: true,
@@ -1312,31 +1368,39 @@ export type StockImportResult = {
   errors?: string[]
 }
 
+/** The stock template/export dropdown lists, from this store's own records. */
+async function loadStockSheetDropdowns(storeId: string): Promise<Record<string, string[]>> {
+  const [products, locations] = await Promise.all([
+    prisma.product.findMany({ where: { storeId, isActive: true }, select: { productCode: true }, orderBy: { productCode: "asc" } }),
+    prisma.storeLocation.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
+  ])
+  return {
+    "Product Code": products.map((product) => product.productCode),
+    Status: IMPORTABLE_STOCK_STATUSES.map((status) => STOCK_STATUS_LABELS[status]),
+    Finish: ["Unfinished", "Finished / Hallmarked"],
+    Location: locations.map((location) => location.name),
+  }
+}
+
 /**
- * A downloadable .xlsx showing the expected columns and one filled-in
- * example row. Only Product Code and Quantity are required — everything
- * else a stock entry needs (metal, purity, making/stone charges) comes from
- * the matched product, same as the single "Stock entry" checkbox on Product
- * Create ("needs nothing but a quantity").
+ * The stock import template: every Add Stock field in the form's order
+ * (see lib/inventory/stock-sheet.ts), an example row, an Instructions sheet
+ * and dropdowns from this store's own products and locations.
  */
 export async function getStockImportTemplate(): Promise<{
   fileName: string
   fileBase64: string
 }> {
-  await getStoreIdForRead()
-
-  const example = {
-    "Product Code": "PRD-0001",
-    Quantity: 5,
-    Location: "",
-    // Optional — blank takes the product's own Finish.
-    Finish: "",
-  }
-
-  return buildMultiSheetExcelExport(
-    [{ name: "Stock Import", rows: [example], columns: Object.keys(example) }],
-    "stock-import-template",
-  )
+  const storeId = await requireStoreScope()
+  const example = Object.fromEntries(STOCK_SHEET_COLUMNS.map((column) => [column.header, column.example]))
+  return buildImportTemplateWithDropdowns({
+    sheetName: "Stock Import",
+    rows: [example],
+    columns: STOCK_SHEET_HEADERS,
+    dropdowns: await loadStockSheetDropdowns(storeId),
+    instructions: { notes: STOCK_SHEET_NOTES, rows: stockSheetInstructions() },
+    filePrefix: "stock-import-template",
+  })
 }
 
 function stockImportCell(row: Record<string, unknown>, key: string): string {
@@ -1344,13 +1408,13 @@ function stockImportCell(row: Record<string, unknown>, key: string): string {
 }
 
 /**
- * Bulk-adds stock quantity across many products from one spreadsheet —
- * the "multi-row form" alternative: one row per product, Product Code +
- * Quantity (+ optional Location), instead of repeating the single Add Stock
- * form by hand for every product. Each row becomes its own new
- * InventoryStock row (a fresh stock code, quantity from the sheet) rather
- * than incrementing an existing one, matching how "Add Stock" always
- * creates a new row too.
+ * Bulk Add Stock from a spreadsheet: one row = one new stock entry, with
+ * every Add Stock field (lib/inventory/stock-sheet.ts) and the same rules —
+ * the product must already exist (never created here), blank weights come
+ * from the product, stock codes are unique, the stone charge follows the
+ * product's stone rate, and each entry posts the same "stock added" Ledger
+ * entry createInventoryStock does. All-or-nothing: any row error imports
+ * nothing.
  */
 export async function importInventoryStockFromExcel(
   formData: FormData,
@@ -1370,7 +1434,7 @@ export async function importInventoryStockFromExcel(
       return { success: false, message: "That file has no rows to import." }
     }
 
-    const [products, locations, existingCodes] = await Promise.all([
+    const [products, locations, existingCodes, metals] = await Promise.all([
       prisma.product.findMany({
         where: { storeId },
         select: {
@@ -1387,13 +1451,15 @@ export async function importInventoryStockFromExcel(
           defaultStoneMetalTypeName: true,
           defaultStoneTypeNames: true,
           defaultFinish: true,
+          defaultGrossWeight: true,
+          defaultNetWeight: true,
+          defaultStoneWeight: true,
+          defaultCaratWeight: true,
         },
       }),
       prisma.storeLocation.findMany({ where: { storeId }, select: { id: true, name: true } }),
-      prisma.inventoryStock.findMany({
-        where: { storeId, stockCode: { startsWith: "STK-" } },
-        select: { stockCode: true },
-      }),
+      prisma.inventoryStock.findMany({ where: { storeId }, select: { stockCode: true } }),
+      prisma.storeMetal.findMany({ where: { storeId }, select: { id: true, hasPurity: true } }),
     ])
 
     const productByCode = new Map(
@@ -1402,103 +1468,196 @@ export async function importInventoryStockFromExcel(
     const locationByName = new Map(
       locations.map((location) => [location.name.trim().toLowerCase(), location.id]),
     )
+    const metalHasPurity = new Map(metals.map((metal) => [metal.id, metal.hasPurity]))
     const locationScope = await getLocationScope()
+    const fineOf = await getFineWeightResolver(storeId)
 
+    const usedCodes = new Set(existingCodes.map((row) => row.stockCode.trim().toLowerCase()))
     let highestCode = existingCodes.reduce((max, row) => {
       const match = /^STK-(?:\d{4}-)?(\d+)$/.exec(row.stockCode)
       return match ? Math.max(max, Number(match[1])) : max
     }, 0)
     const year = new Date().getFullYear()
+    const nextAutoCode = () => {
+      let code: string
+      do {
+        highestCode += 1
+        code = `STK-${year}-${String(highestCode).padStart(4, "0")}`
+      } while (usedCodes.has(code.toLowerCase()))
+      return code
+    }
 
     const errors: string[] = []
     const toCreate: Prisma.InventoryStockCreateManyInput[] = []
+    const ledgerRows: Prisma.LedgerEntryCreateManyInput[] = []
 
     for (const [index, row] of rows.entries()) {
       // +2 = one for the header row, one for 1-based spreadsheet numbering.
       const line = index + 2
-      const productCode = stockImportCell(row, "Product Code")
+      const rowErrors: string[] = []
+      const number = (column: string) => {
+        const raw = stockImportCell(row, column).replace(/,/g, "")
+        if (!raw) return null
+        const value = Number(raw)
+        if (!Number.isFinite(value) || value < 0) {
+          rowErrors.push(`${column} must be a number, 0 or more`)
+          return null
+        }
+        return value
+      }
 
+      // Stock is only ever added against a product that already exists.
+      const productCode = stockImportCell(row, "Product Code")
+      const product = productCode ? productByCode.get(productCode.toLowerCase()) : undefined
       if (!productCode) {
         errors.push(`Row ${line}: Product Code is required`)
         continue
       }
-
-      const product = productByCode.get(productCode.trim().toLowerCase())
       if (!product) {
-        errors.push(`Row ${line}: No product found with code "${productCode}"`)
+        errors.push(`Row ${line}: No product found with code "${productCode}" — add the product first`)
         continue
       }
-
       if (!product.metalTypeId) {
-        errors.push(
-          `Row ${line}: "${productCode}" has no metal set — add one on the product first`,
-        )
+        errors.push(`Row ${line}: "${productCode}" has no metal set — add one on the product first`)
         continue
       }
 
-      const rawQuantity = stockImportCell(row, "Quantity")
-      const quantity = rawQuantity === "" ? 0 : Number(rawQuantity)
-      if (!Number.isFinite(quantity) || quantity < 0) {
-        errors.push(`Row ${line}: Quantity must be 0 or more`)
-        continue
+      const typedCode = stockImportCell(row, "Stock Code")
+      if (typedCode && usedCodes.has(typedCode.toLowerCase())) {
+        rowErrors.push(`Stock Code "${typedCode}" already exists — leave it blank for an automatic one`)
       }
+
+      const statusRaw = stockImportCell(row, "Status")
+      const status = statusRaw ? parseImportStockStatus(statusRaw) : InventoryStockStatus.IN_STOCK
+      if (!status) rowErrors.push(`"${statusRaw}" is not an importable Status — use In Stock, Reserved or Damaged`)
 
       const finishRaw = stockImportCell(row, "Finish")
       const finish = finishRaw ? parseFinishLabel(finishRaw) : product.defaultFinish
-      if (!finish) {
-        errors.push(`Row ${line}: "${finishRaw}" is not a valid Finish — use Unfinished or Finished, or leave it blank`)
-        continue
+      if (!finish) rowErrors.push(`"${finishRaw}" is not a valid Finish — use Unfinished or Finished, or leave it blank`)
+
+      const quantityRaw = stockImportCell(row, "Quantity")
+      const quantity = quantityRaw ? Number(quantityRaw) : 1
+      if (!Number.isInteger(quantity) || quantity < 1) rowErrors.push("Quantity must be a whole number, 1 or more")
+
+      // Weights: blank takes the product's typical weight, the way the Add
+      // Stock form pre-fills them; a blank Net is Gross − Less − Stone once
+      // any of those is given on the row (the form's own auto-calculation).
+      const grossTyped = number("Gross Weight (g)")
+      const lessWeight = number("Less Weight (g)")
+      const stoneTyped = number("Stone Weight (g)")
+      const caratTyped = number("Carat Weight (ct)")
+      const netTyped = number("Net Weight (g)")
+      const decimalOrNull = (value: { toString(): string } | null) => (value == null ? null : Number(value))
+      const grossWeight = grossTyped ?? decimalOrNull(product.defaultGrossWeight)
+      const stoneWeight = stoneTyped ?? decimalOrNull(product.defaultStoneWeight)
+      const caratWeight = caratTyped ?? decimalOrNull(product.defaultCaratWeight)
+      const netWeight =
+        netTyped ??
+        (grossTyped !== null || lessWeight !== null || stoneTyped !== null
+          ? grossWeight !== null
+            ? Number(Math.max(0, grossWeight - (lessWeight ?? 0) - (stoneWeight ?? 0)).toFixed(5))
+            : null
+          : decimalOrNull(product.defaultNetWeight))
+      if (grossWeight === null) rowErrors.push("Gross Weight (g) is required (the product has none to fall back on)")
+      if (netWeight === null) rowErrors.push("Net Weight (g) is required (the product has none to fall back on)")
+
+      const purchaseRate = number("Purchase Rate")
+      const saleRate = number("Sale Rate")
+      const otherCharge = number("Other Charge")
+      const purchaseAmount = number("Purchase Amount")
+      const saleAmount = number("Sale Amount")
+
+      const dateCell = (column: string) => {
+        const raw = stockImportCell(row, column)
+        if (!raw) return null
+        const date = parseSheetDate(raw)
+        if (!date) rowErrors.push(`${column} "${raw}" is not a date — use DD/MM/YYYY`)
+        return date
       }
+      const purchaseDate = dateCell("Purchase Date")
+      const manufactureDate = dateCell("Date of Manufacture")
 
       const locationName = stockImportCell(row, "Location")
       let resolvedLocationId: string | null = null
-      if (locationName) {
-        const matchedLocationId = locationByName.get(locationName.trim().toLowerCase())
-        if (!matchedLocationId) {
-          errors.push(`Row ${line}: No location found named "${locationName}"`)
-          continue
-        }
-        const resolution = await resolveWritableLocationId(storeId, matchedLocationId, locationScope)
-        if (!resolution.ok) {
-          errors.push(`Row ${line}: ${resolution.message}`)
-          continue
-        }
-        resolvedLocationId = resolution.locationId
+      const requestedLocationId = locationName ? (locationByName.get(locationName.toLowerCase()) ?? null) : null
+      if (locationName && !requestedLocationId) {
+        rowErrors.push(`No location found named "${locationName}"`)
       } else {
-        const resolution = await resolveWritableLocationId(storeId, null, locationScope)
-        if (!resolution.ok) {
-          errors.push(`Row ${line}: ${resolution.message}`)
-          continue
-        }
-        resolvedLocationId = resolution.locationId
+        const resolution = await resolveWritableLocationId(storeId, requestedLocationId, locationScope)
+        if (!resolution.ok) rowErrors.push(resolution.message)
+        else resolvedLocationId = resolution.locationId
       }
 
-      highestCode += 1
+      if (rowErrors.length > 0) {
+        for (const message of rowErrors) errors.push(`Row ${line}: ${message}`)
+        continue
+      }
+
+      const stockCode = typedCode || nextAutoCode()
+      usedCodes.add(stockCode.toLowerCase())
+      const tagNumber = stockImportCell(row, "Tag Number") || null
+      const purityLabel = product.storeMetalPurity?.label ?? null
+      // Same stone-charge rule as createInventoryStock: a product with a
+      // stone rate charges this piece's own carats × that rate.
+      const stoneCharge =
+        product.hasStoneComponent && product.defaultStoneRate != null && caratWeight
+          ? new Prisma.Decimal(product.defaultStoneRate).mul(caratWeight)
+          : product.defaultStoneCharge
+      const fineWeight = fineOf({ metalTypeId: product.metalTypeId, purity: product.defaultPurity, purityLabel, netWeight })
 
       toCreate.push({
         storeId,
         productId: product.id,
-        stockCode: `STK-${year}-${String(highestCode).padStart(4, "0")}`,
-        quantity: Math.trunc(quantity),
-        finish,
+        stockCode,
+        tagNumber,
+        status: status!,
+        finish: finish!,
+        quantity,
         metalTypeId: product.metalTypeId,
         purity: product.defaultPurity,
-        purityLabel: product.storeMetalPurity?.label ?? undefined,
-        makingCharge: product.defaultMakingCharge ?? undefined,
+        purityLabel,
+        grossWeight: grossWeight!,
+        lessWeight,
+        netWeight: netWeight!,
+        fineWeight,
+        stoneWeight,
+        caratWeight,
+        purchaseRate,
+        saleRate,
+        makingCharge: product.defaultMakingCharge,
         makingChargeType: product.defaultMakingChargeType,
-        stoneCharge: product.hasStoneComponent ? product.defaultStoneCharge ?? undefined : undefined,
-        stoneRate: product.hasStoneComponent ? product.defaultStoneRate ?? undefined : undefined,
-        stoneMetalTypeName: product.hasStoneComponent
-          ? product.defaultStoneMetalTypeName ?? undefined
-          : undefined,
-        stoneTypeNames: product.hasStoneComponent
-          ? product.defaultStoneTypeNames ?? undefined
-          : undefined,
-        locationId: resolvedLocationId ?? undefined,
+        stoneCharge,
+        stoneRate: product.hasStoneComponent ? product.defaultStoneRate : null,
+        stoneMetalTypeName: product.hasStoneComponent ? product.defaultStoneMetalTypeName : null,
+        stoneTypeNames: product.hasStoneComponent ? product.defaultStoneTypeNames : null,
+        otherCharge,
+        purchaseAmount,
+        saleAmount,
+        vendorName: stockImportCell(row, "Vendor Name") || null,
+        purchaseDate,
+        manufactureDate,
+        locationId: resolvedLocationId,
+        remarks: stockImportCell(row, "Remarks") || null,
         createdById: currentUser?.id ?? undefined,
         createdByName: currentUser?.name ?? undefined,
         createdByRole: currentUser?.role ?? undefined,
       })
+
+      // Same ledger entry Add Stock posts, so imported gold shows on the Ledger.
+      if (netWeight && netWeight > 0) {
+        const hasPurity = metalHasPurity.get(product.metalTypeId) ?? false
+        ledgerRows.push({
+          storeId,
+          type: LedgerEntryType.DEBIT,
+          sourceType: LedgerSourceType.ADJUSTMENT,
+          metalTypeId: product.metalTypeId,
+          metalWeight: hasPurity ? undefined : netWeight,
+          metalWeightFine: hasPurity && fineWeight ? fineWeight : undefined,
+          amount: 0,
+          description: `Stock added — ${stockCode}${tagNumber ? ` (Tag ${tagNumber})` : ""} (import)`,
+          locationId: resolvedLocationId ?? undefined,
+        })
+      }
     }
 
     if (errors.length > 0) {
@@ -1513,10 +1672,14 @@ export async function importInventoryStockFromExcel(
       return { success: false, message: "That file has no rows to import." }
     }
 
-    await prisma.inventoryStock.createMany({ data: toCreate })
+    await prisma.$transaction([
+      prisma.inventoryStock.createMany({ data: toCreate }),
+      ...(ledgerRows.length ? [prisma.ledgerEntry.createMany({ data: ledgerRows })] : []),
+    ])
 
     revalidatePath("/inventory")
     revalidatePath("/inventory/stock")
+    revalidatePath("/ledger")
 
     return {
       success: true,

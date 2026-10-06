@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { Prisma, WeightUnit } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -83,4 +85,105 @@ export async function getSellingRateGroups(storeId: string): Promise<SellingRate
 
     return { metalId: metal.id, metalName: metal.name, unit, isGemstone: metal.isGemstone, rows };
   });
+}
+
+type Tx = Prisma.TransactionClient;
+
+/**
+ * The rate as it stands now, with the label/unit a history row snapshots.
+ * Null when the id isn't this store's.
+ */
+export async function describeSellingRate(
+  tx: Tx,
+  storeId: string,
+  kind: SellingRateKind,
+  id: string,
+): Promise<{ label: string; unit: string; price: number | null } | null> {
+  const unitOf = (u: WeightUnit) => (u === "CARAT" ? "ct" : "g");
+
+  if (kind === "purity") {
+    const row = await tx.storeMetalPurity.findFirst({
+      where: { id, storeId },
+      select: { label: true, sellingPrice: true, storeMetal: { select: { name: true, primaryUnit: true } } },
+    });
+    return row
+      ? { label: `${row.storeMetal.name} ${row.label}`, unit: unitOf(row.storeMetal.primaryUnit), price: num(row.sellingPrice) }
+      : null;
+  }
+  if (kind === "stoneType") {
+    const row = await tx.storeMetalOrigin.findFirst({
+      where: { id, storeId },
+      select: { name: true, sellingPrice: true, storeMetal: { select: { name: true, primaryUnit: true } } },
+    });
+    return row
+      ? { label: `${row.storeMetal.name} ${row.name}`, unit: unitOf(row.storeMetal.primaryUnit), price: num(row.sellingPrice) }
+      : null;
+  }
+  const row = await tx.storeMetal.findFirst({
+    where: { id, storeId },
+    select: { name: true, sellingPrice: true, primaryUnit: true },
+  });
+  return row ? { label: row.name, unit: unitOf(row.primaryUnit), price: num(row.sellingPrice) } : null;
+}
+
+/**
+ * Appends a SellingRateEntry when a rate actually changed. Call it in the
+ * same transaction as the update, after it, with the value read before it.
+ */
+export async function recordSellingRateChange(
+  tx: Tx,
+  args: {
+    storeId: string;
+    kind: SellingRateKind;
+    refId: string;
+    before: number | null;
+    after: number | null;
+    changedById: string | null;
+  },
+) {
+  if (args.before === args.after) return;
+  const now = await describeSellingRate(tx, args.storeId, args.kind, args.refId);
+  if (!now) return;
+  await tx.sellingRateEntry.create({
+    data: {
+      storeId: args.storeId,
+      kind: args.kind,
+      refId: args.refId,
+      label: now.label,
+      unit: now.unit,
+      sellingPrice: args.after,
+      changedById: args.changedById,
+    },
+  });
+}
+
+export type SellingRateHistoryRow = {
+  id: string;
+  date: string;
+  label: string;
+  unit: string;
+  price: number | null;
+  changedBy: string | null;
+};
+
+/** Newest first, for the Metal Rates page. */
+export async function getSellingRateHistory(storeId: string, take = 200): Promise<SellingRateHistoryRow[]> {
+  const rows = await prisma.sellingRateEntry.findMany({
+    where: { storeId },
+    orderBy: { createdAt: "desc" },
+    take,
+  });
+  const userIds = [...new Set(rows.map((r) => r.changedById).filter((x): x is string => !!x))];
+  const users = userIds.length
+    ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } })
+    : [];
+  const names = new Map(users.map((u) => [u.id, u.name]));
+  return rows.map((r) => ({
+    id: r.id,
+    date: r.createdAt.toISOString(),
+    label: r.label,
+    unit: r.unit,
+    price: num(r.sellingPrice),
+    changedBy: r.changedById ? names.get(r.changedById) ?? null : null,
+  }));
 }

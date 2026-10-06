@@ -615,6 +615,7 @@ export async function forceDeleteStore(storeId: string): Promise<{ success: bool
 
       // --- Store-level singletons / settings tables ---
       prisma.metalRate.deleteMany({ where: { storeId } }),
+      prisma.sellingRateEntry.deleteMany({ where: { storeId } }),
       prisma.metalSellingRate.deleteMany({ where: { storeId } }),
       prisma.purityFineness.deleteMany({ where: { storeId } }),
       prisma.caratConversionRate.deleteMany({ where: { storeId } }),

@@ -464,10 +464,18 @@ with neither — so billing picks the change up directly. Read: `lib/selling-rat
 deliberately not a server action, so a client can't pass another storeId). Write:
 `updateSellingRates` (`lib/actions/selling-rate-actions.ts`), gated on the role in the
 **active store** (`getEffectiveAccess`), one transaction, every id matched by
-`{ id, storeId }`. Hidden for KARIGAR. It does **not** touch `MetalRate`: that table is
-the market rate the `/api/cron/metal-rates` job copies to every store, and a store-
-entered history row there needs a `source` column (migration) — not done yet.
-Spec: `e2e/header-rates.spec.ts`.
+`{ id, storeId }`. Hidden for KARIGAR.
+
+**Two kinds of rate, kept apart (user decision 2026-10-06):** `MetalRate` is the
+*market* rate — fetched by `/api/cron/metal-rates` (goldapi.io; more APIs planned) and
+copied to every store, a reference only. The *selling* rate per purity (24K, 22K, …)
+is always the Store Owner's own. Every change to it, from the chip or from Settings'
+purity / stone-type save (`saveWithRateHistory` in `taxonomy-actions.ts`), appends a
+`SellingRateEntry` (migration `20261010100000_selling_rate_entries`; label/unit
+snapshotted) in the same transaction, via `recordSellingRateChange`. Metal Rates shows
+it as "Your Selling Rates" above the "Market Rates" table. Store export and Force
+Delete include the table (its FK is RESTRICT). Don't make a market API fill the
+selling price. Spec: `e2e/header-rates.spec.ts`.
 
 ### Added 2026-10-06: Offers & gift vouchers (promotional sales)
 

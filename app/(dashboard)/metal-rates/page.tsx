@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 
 import { prisma } from "@/lib/prisma";
 import { MetalRatesTable } from "@/components/metal-rates/metal-rates-table";
+import { SellingRateHistory } from "@/components/metal-rates/selling-rate-history";
+import { getSellingRateHistory } from "@/lib/selling-rates";
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { requireStoreScope } from "@/lib/store-context";
 
@@ -12,15 +14,18 @@ export const metadata: Metadata = {
 export default async function MetalRatesPage() {
   const storeId = await requireStoreScope();
 
-  const rates = await prisma.metalRate.findMany({
-    where: {
-      storeId,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 100,
-  });
+  const [rates, sellingHistory] = await Promise.all([
+    prisma.metalRate.findMany({
+      where: {
+        storeId,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 100,
+    }),
+    getSellingRateHistory(storeId),
+  ]);
 
   const formattedRates = rates.map((rate) => ({
     id: rate.id,
@@ -36,10 +41,12 @@ export default async function MetalRatesPage() {
     <main className="flex flex-1 flex-col gap-6 p-6">
       <PageBackHeader
         title="Metal Rate History"
-        description="View historical Gold & Silver prices, trends and export reports."
+        description="Your own selling rates, and the market Gold & Silver prices fetched daily."
         backHref="/dashboard"
         backLabel="Back to Dashboard"
       />
+
+      <SellingRateHistory rows={sellingHistory} />
 
       <MetalRatesTable data={formattedRates} />
     </main>

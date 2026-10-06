@@ -6,7 +6,12 @@ import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope, getEffectiveAccess } from "@/lib/store-context";
 import { logger } from "@/lib/logger";
-import type { SellingRateKind } from "@/lib/selling-rates";
+import { getCurrentUser } from "@/lib/auth/auth";
+import {
+  describeSellingRate,
+  recordSellingRateChange,
+  type SellingRateKind,
+} from "@/lib/selling-rates";
 
 export type SellingRateUpdate = {
   kind: SellingRateKind;
@@ -55,21 +60,34 @@ export async function updateSellingRates(
   }
 
   const storeId = await requireStoreScope();
+  const changedById = (await getCurrentUser())?.id ?? null;
 
   try {
-    // updateMany scoped by storeId: an id from another store matches
-    // nothing, and throwing inside the transaction rolls the whole save back.
+    // Every id is looked up with { id, storeId }: one from another store
+    // isn't found, and throwing inside the transaction rolls the save back.
+    // Each real change also appends a SellingRateEntry (rate history).
     await prisma.$transaction(async (tx) => {
       for (const u of updates) {
-        const data = { sellingPrice: u.price === null ? null : Math.round(u.price * 100) / 100 };
+        const current = await describeSellingRate(tx, storeId, u.kind, u.id);
+        if (!current) throw new RateNotFoundError();
+
+        const after = u.price === null ? null : Math.round(u.price * 100) / 100;
+        if (after === current.price) continue;
+
+        const data = { sellingPrice: after };
         const where = { id: u.id, storeId };
-        const { count } =
-          u.kind === "purity"
-            ? await tx.storeMetalPurity.updateMany({ where, data })
-            : u.kind === "stoneType"
-              ? await tx.storeMetalOrigin.updateMany({ where, data })
-              : await tx.storeMetal.updateMany({ where, data });
-        if (count === 0) throw new RateNotFoundError();
+        if (u.kind === "purity") await tx.storeMetalPurity.updateMany({ where, data });
+        else if (u.kind === "stoneType") await tx.storeMetalOrigin.updateMany({ where, data });
+        else await tx.storeMetal.updateMany({ where, data });
+
+        await recordSellingRateChange(tx, {
+          storeId,
+          kind: u.kind,
+          refId: u.id,
+          before: current.price,
+          after,
+          changedById,
+        });
       }
     });
   } catch (error) {
@@ -80,8 +98,8 @@ export async function updateSellingRates(
     return { success: false, message: "Could not save rates." };
   }
 
-  // The header lives in the dashboard layout, so refresh that; Settings
-  // shows the same columns.
+  // The header lives in the dashboard layout, so refresh that; Settings and
+  // Metal Rates show the same data.
   revalidatePath("/", "layout");
 
   return { success: true, message: "Selling rates updated." };

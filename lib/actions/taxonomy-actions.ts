@@ -9,6 +9,8 @@ import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
 import { buildMultiSheetExcelExport, parseExcelWorkbook } from "@/lib/excel-export";
+import { getCurrentUser } from "@/lib/auth/auth";
+import { recordSellingRateChange, type SellingRateKind } from "@/lib/selling-rates";
 import { defaultFinenessForLabel, expectedFinenessForLabel, finenessMismatch } from "@/lib/purity-fineness-check";
 
 export type StoreMetalRow = {
@@ -518,22 +520,25 @@ export async function upsertStoreMetalOrigin(
 
     let savedId = id;
 
-    if (id) {
-      const { count } = await prisma.storeMetalOrigin.updateMany({
-        where: { id, storeId },
-        data: { name, storeMetalId, gramsPerCarat, sellingPrice },
-      });
-
-      if (count === 0) {
-        return { success: false, message: "Stone Type not found" };
+    const saved = await saveWithRateHistory(storeId, "stoneType", id, async (tx) => {
+      if (id) {
+        const { count } = await tx.storeMetalOrigin.updateMany({
+          where: { id, storeId },
+          data: { name, storeMetalId, gramsPerCarat, sellingPrice },
+        });
+        return count === 0 ? null : id;
       }
-    } else {
-      const created = await prisma.storeMetalOrigin.create({
+      const created = await tx.storeMetalOrigin.create({
         data: { storeId, storeMetalId, name, gramsPerCarat, sellingPrice },
         select: { id: true },
       });
-      savedId = created.id;
+      return created.id;
+    }, sellingPrice);
+
+    if (!saved) {
+      return { success: false, message: "Stone Type not found" };
     }
+    savedId = saved;
 
     revalidatePath(TAXONOMY_PATH);
 
@@ -736,22 +741,25 @@ export async function upsertStoreMetalPurity(
     let savedId = id;
     const data = { label, skuCode, finenessPercent, sellingPrice, isHallmarkable, storeMetalId };
 
-    if (id) {
-      const { count } = await prisma.storeMetalPurity.updateMany({
-        where: { id, storeId },
-        data,
-      });
-
-      if (count === 0) {
-        return { success: false, message: "Purity not found" };
+    const saved = await saveWithRateHistory(storeId, "purity", id, async (tx) => {
+      if (id) {
+        const { count } = await tx.storeMetalPurity.updateMany({
+          where: { id, storeId },
+          data,
+        });
+        return count === 0 ? null : id;
       }
-    } else {
-      const created = await prisma.storeMetalPurity.create({
+      const created = await tx.storeMetalPurity.create({
         data: { storeId, ...data },
         select: { id: true },
       });
-      savedId = created.id;
+      return created.id;
+    }, sellingPrice);
+
+    if (!saved) {
+      return { success: false, message: "Purity not found" };
     }
+    savedId = saved;
 
     revalidatePath(TAXONOMY_PATH);
 
@@ -2195,4 +2203,38 @@ export async function importStonesAndStoneTypesFromExcel(
     logger.error("importStonesAndStoneTypesFromExcel error", error);
     return { success: false, message: actionErrorMessage(error, "Failed to import stones/stone types.") };
   }
+}
+
+/**
+ * Runs a purity / stone-type save and, in the same transaction, appends a
+ * SellingRateEntry when its sellingPrice changed — so the rate history on
+ * Metal Rates covers Settings edits as well as the top bar's rates chip.
+ * `write` returns the saved id, or null when the row wasn't found.
+ */
+async function saveWithRateHistory(
+  storeId: string,
+  kind: Extract<SellingRateKind, "purity" | "stoneType">,
+  id: string,
+  write: (tx: Prisma.TransactionClient) => Promise<string | null>,
+  sellingPrice: number | null,
+): Promise<string | null> {
+  const changedById = (await getCurrentUser())?.id ?? null;
+
+  return prisma.$transaction(async (tx) => {
+    let before: number | null = null;
+    if (id) {
+      const row =
+        kind === "purity"
+          ? await tx.storeMetalPurity.findFirst({ where: { id, storeId }, select: { sellingPrice: true } })
+          : await tx.storeMetalOrigin.findFirst({ where: { id, storeId }, select: { sellingPrice: true } });
+      before = row?.sellingPrice != null ? Number(row.sellingPrice) : null;
+    }
+
+    const savedId = await write(tx);
+    if (!savedId) return null;
+
+    const after = sellingPrice === null ? null : Math.round(sellingPrice * 100) / 100;
+    await recordSellingRateChange(tx, { storeId, kind, refId: savedId, before, after, changedById });
+    return savedId;
+  });
 }

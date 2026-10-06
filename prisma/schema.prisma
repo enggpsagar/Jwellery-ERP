@@ -93,6 +93,7 @@ model Store {
   ledgerEntries        LedgerEntry[]
   karigarJobs          KarigarJob[]
   metalRates           MetalRate[]
+  sellingRateEntries   SellingRateEntry[]
   businessSettings     BusinessSettings?
   reportSettings       ReportSettings?
   branding             StoreBranding?
@@ -1709,6 +1710,29 @@ model CaratConversionRate {
   store         Store      @relation(fields: [storeId], references: [id])
 
   @@unique([storeId, purity])
+}
+
+// History of the Store Owner's own selling rates (Gold 24K, 22K, Diamond
+// Natural, ...), one row per rate per change — written whenever a
+// sellingPrice changes from the top bar's Today's Rates chip or Settings >
+// Taxonomy. Deliberately separate from MetalRate, which is the market rate
+// the /api/cron/metal-rates job fetches and copies to every store. refId is
+// the StoreMetalPurity / StoreMetalOrigin / StoreMetal id (kind says which);
+// label and unit are snapshotted so history reads right after a rename or
+// delete. sellingPrice null = the rate was cleared.
+model SellingRateEntry {
+  id           String   @id @default(cuid())
+  storeId      String
+  kind         String
+  refId        String
+  label        String
+  unit         String
+  sellingPrice Decimal? @db.Decimal(12, 2)
+  changedById  String?
+  createdAt    DateTime @default(now())
+  store        Store    @relation(fields: [storeId], references: [id])
+
+  @@index([storeId, createdAt])
 }
 
 // A store-configured selling price per metal karat/fineness — Settings >

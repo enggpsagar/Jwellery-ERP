@@ -115,7 +115,9 @@ reports, so get it right early.
 > **rates chip** in the top bar (e.g. "Gold 22K ₹6,000 · Silver ₹98"), type the new
 > rates and press **Save**. It changes the same rates as Settings, and the next invoice,
 > estimate or quotation uses them. Only the Store Owner can edit them; Staff see them
-> read-only.
+> read-only. Every change is listed under **Metal Rates → Your Selling Rates** (when,
+> which rate, who). The **Market Rates** table below it is the daily market price, for
+> reference only — it never changes your selling rates.
 
 ### Step 4 — Locations (Settings → Locations)
 

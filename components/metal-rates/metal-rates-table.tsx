@@ -164,9 +164,11 @@ export function MetalRatesTable({ data }: Props) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Metal Rate History</CardTitle>
+            <CardTitle>Market Rates</CardTitle>
 
-            <CardDescription>Gold & Silver historical prices</CardDescription>
+            <CardDescription>
+              Gold &amp; Silver market prices, fetched daily — a reference, not your selling rate
+            </CardDescription>
           </div>
 
           <DropdownMenu>

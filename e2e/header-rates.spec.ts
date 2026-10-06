@@ -5,7 +5,8 @@ import { db, demoStoreId } from "./helpers"
 /**
  * Header "Today's Rates" chip: the Store Owner changes a purity's selling
  * rate from the top bar, and it lands on the same column Settings edits
- * (StoreMetalPurity.sellingPrice), which billing reads.
+ * (StoreMetalPurity.sellingPrice), which billing reads, and is logged in
+ * the store's selling-rate history on Metal Rates.
  */
 test("the Store Owner edits a selling rate from the header", async ({ page }) => {
   const storeId = await demoStoreId()
@@ -32,6 +33,20 @@ test("the Store Owner edits a selling rate from the header", async ({ page }) =>
     await page.reload()
     await page.getByRole("button", { name: "Today's selling rates" }).click()
     await expect(page.getByLabel("Gold 22K", { exact: true })).toHaveValue("7123.45")
+
+    // The change is logged as the store's own rate history (not MetalRate,
+    // which is the market rate), and shown on Metal Rates.
+    const entry = await db().sellingRateEntry.findFirst({
+      where: { storeId, refId: purity.id },
+      orderBy: { createdAt: "desc" },
+    })
+    expect(entry?.label).toBe("Gold 22K")
+    expect(Number(entry?.sellingPrice)).toBeCloseTo(7123.45, 2)
+    expect(entry?.changedById).toBeTruthy()
+
+    await page.goto("/metal-rates")
+    await expect(page.getByText("Your Selling Rates")).toBeVisible()
+    await expect(page.getByRole("cell", { name: /₹7,123\.45/ }).first()).toBeVisible()
   } finally {
     await db().storeMetalPurity.update({ where: { id: purity.id }, data: { sellingPrice: before } })
   }

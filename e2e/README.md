@@ -42,6 +42,7 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `store-admin-scope.spec.ts` | Store data export has every table, Force Delete Store removes a seeded store, Users export CSV of selected rows, location-restricted staff can't see other locations' credit notes / draft orders |
 | `tag-fields-dnd.spec.ts` | QR tag fields reordered, added and removed by drag and drop |
 | `stock-sheet.spec.ts` / `product-sheet-multi.spec.ts` / `finish-io.spec.ts` | Stock and Product import/export: every field, multi-metal pieces, Finish |
+| `sheet-features.spec.ts` | Style off → no Style column in product/stock templates and exports, old files still import; E-way Bill / E-Invoice off → no such invoice export columns |
 | `reports.spec.ts` | Every report tab renders; Stock report's Available / Out of Stock split; CSV export |
 
 **When you build a feature, add a test for it here** — that's what keeps

@@ -332,6 +332,11 @@ locations. An **exported file has exactly the template's columns**, so you can e
 edit in Excel and import the same file back.
 
 - The header row stays frozen and yellow while you scroll.
+- Columns are sized to fit what's in them.
+- **Your sheets match your settings.** If you switch off Style, E-way Bill, E-Invoice or
+  Send to Artisan, or haven't set up Locations or GST Rates, those columns don't appear in
+  your templates and exports. An older file that still has them imports normally — the
+  column is simply ignored.
 - An import is **all or nothing**: if any row has a problem, nothing is saved and every
   problem is listed — often with a suggestion such as *"Did you mean Gold 22K?"* or
   *"Already saved as …"*.

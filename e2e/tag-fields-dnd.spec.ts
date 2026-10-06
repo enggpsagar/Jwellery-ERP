@@ -20,12 +20,13 @@ test("tag fields reorder, add and remove by drag and drop", async ({ page }) => 
     const printed = page.getByTestId("qr-tag-fields-printed")
     const row = (label: string) => printed.locator("[draggable=true]").filter({ hasText: label })
 
-    // Drag "Manufacture date" (last) onto the top half of "Tag / stock code"
-    // (first). Retried: a drag before hydration does nothing.
-    await expect(async () => {
-      await row("Manufacture date").dragTo(row("Tag / stock code"), { targetPosition: { x: 20, y: 2 } })
-      await expect(printed.locator("[draggable=true]").first()).toContainText("Manufacture date", { timeout: 1_000 })
-    }).toPass()
+    // A drag before React hydrates does nothing; wait for the page to settle
+    // rather than retrying (a retried drag that half-took moves rows twice).
+    await page.waitForLoadState("networkidle")
+
+    // Drag "Manufacture date" (last) onto the top half of "Tag / stock code" (first).
+    await row("Manufacture date").dragTo(row("Tag / stock code"), { targetPosition: { x: 20, y: 2 } })
+    await expect(printed.locator("[draggable=true]").first()).toContainText("Manufacture date")
 
     // Drag the "Category & type" chip in, just above "Gross weight".
     await page

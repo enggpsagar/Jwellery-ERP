@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useEffect, useState } from "react"
+import { useActionState, useEffect, useRef, useState } from "react"
 import QRCode from "qrcode"
 import { ArrowDown, ArrowUp, GripVertical, Plus, QrCode, ScanBarcode, X } from "lucide-react"
 
@@ -167,23 +167,34 @@ function TagFieldsCard({
   // a field" chip into the list to insert it at that spot, or drag a printed
   // row back onto "Add a field" to remove it. The arrows stay for keyboard
   // and touch, where native drag and drop doesn't fire.
+  // The dragged field lives in a ref as well as state: dragover/drop fire
+  // faster than React re-renders, so handlers read the ref (always current)
+  // and state only drives the visuals.
+  const draggedRef = useRef<StockTagField | null>(null)
   const [dragged, setDragged] = useState<StockTagField | null>(null)
   const [dropAt, setDropAt] = useState<number | null>(null)
 
   const dropInto = (at: number) => {
-    if (!dragged) return
-    const without = fields.filter((f) => f !== dragged)
-    const from = fields.indexOf(dragged)
+    const field = draggedRef.current
+    if (!field) return
+    const from = fields.indexOf(field)
     // Removing a row above the drop point shifts that point up by one.
     const index = from !== -1 && from < at ? at - 1 : at
-    const next = [...without]
-    next.splice(Math.max(0, Math.min(index, next.length)), 0, dragged)
+    const next = fields.filter((f) => f !== field)
+    next.splice(Math.max(0, Math.min(index, next.length)), 0, field)
     onChange(next)
   }
 
   const endDrag = () => {
+    draggedRef.current = null
     setDragged(null)
     setDropAt(null)
+  }
+
+  /** Above or below this row's middle → insert before or after it. */
+  const rowDropIndex = (e: React.DragEvent, index: number) => {
+    const box = e.currentTarget.getBoundingClientRect()
+    return e.clientY < box.top + box.height / 2 ? index : index + 1
   }
 
   const dragProps = (field: StockTagField) =>
@@ -193,6 +204,7 @@ function TagFieldsCard({
           onDragStart: (e: React.DragEvent) => {
             e.dataTransfer.effectAllowed = "move"
             e.dataTransfer.setData("text/plain", field)
+            draggedRef.current = field
             setDragged(field)
           },
           onDragEnd: endDrag,
@@ -219,14 +231,15 @@ function TagFieldsCard({
           className="space-y-1"
           data-testid={`${testId}-printed`}
           onDragOver={(e) => {
-            if (!dragged) return
+            if (!draggedRef.current) return
             e.preventDefault()
             // Below the last row (or an empty list) = append.
             if (e.target === e.currentTarget) setDropAt(fields.length)
           }}
           onDrop={(e) => {
+            // Rows handle their own drops; this is the space below them.
             e.preventDefault()
-            if (dropAt !== null) dropInto(dropAt)
+            dropInto(fields.length)
             endDrag()
           }}
         >
@@ -239,10 +252,15 @@ function TagFieldsCard({
               key={field}
               {...dragProps(field)}
               onDragOver={(e) => {
-                if (!dragged) return
+                if (!draggedRef.current) return
                 e.preventDefault()
-                const box = e.currentTarget.getBoundingClientRect()
-                setDropAt(e.clientY < box.top + box.height / 2 ? index : index + 1)
+                setDropAt(rowDropIndex(e, index))
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                dropInto(rowDropIndex(e, index))
+                endDrag()
               }}
               className={cn(
                 "flex items-center gap-1 rounded-md border px-2 py-1 text-sm",
@@ -280,13 +298,15 @@ function TagFieldsCard({
             data-testid={`${testId}-unused`}
             onDragOver={(e) => {
               // Only a printed row can be dropped here (= remove it).
-              if (!dragged || !fields.includes(dragged)) return
+              const field = draggedRef.current
+              if (!field || !fields.includes(field)) return
               e.preventDefault()
               setDropAt(null)
             }}
             onDrop={(e) => {
               e.preventDefault()
-              if (dragged && fields.includes(dragged)) onChange(fields.filter((f) => f !== dragged))
+              const field = draggedRef.current
+              if (field && fields.includes(field)) onChange(fields.filter((f) => f !== field))
               endDrag()
             }}
           >

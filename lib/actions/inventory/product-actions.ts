@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { ChargeType, InventoryFinish, PurityType, Prisma } from "@prisma/client";
 import { finishLabel, parseFinishLabel } from "@/lib/inventory/finish";
+import { PRODUCT_SHEET_COLUMNS, PRODUCT_SHEET_HEADERS, productSheetInstructions } from "@/lib/inventory/product-sheet";
 
 import { prisma } from "@/lib/prisma";
 import { getFineWeightResolver, resolveFineWeight } from "@/lib/fine-weight";
@@ -15,10 +16,9 @@ import { buildSkuPrefix } from "@/lib/inventory/product-sku";
 import { PURITY_LABELS, matchLegacyPurityType } from "@/lib/purity";
 import { classifyPurityFamily } from "@/lib/business-units";
 import {
-  buildExcelExport,
   buildCsvExportBase64,
   buildPdfExportBase64,
-  buildMultiSheetExcelExport,
+  buildImportTemplateWithDropdowns,
   parseExcelUpload,
 } from "@/lib/excel-export";
 import { logger } from "@/lib/logger";
@@ -713,52 +713,47 @@ export async function exportProductsToExcel(
       };
     }
 
-    // Same headers, order and value forms as the import template (see
-    // getProductImportTemplate), so an export reads like that sheet and its
-    // rows can be pasted into it. Export-only: Sr. No./Product Code lead,
-    // Created At trails; the template's Stock Quantity/Location are
-    // per-import choices, not product facts, so they aren't exported.
+    // Exactly the import template's columns, in its order, with values the
+    // import reads back (purity labels, Fixed/Percentage, Yes/No, blank for
+    // empty) — so an exported file is a filled-in template. Stock Quantity/
+    // Location are per-import choices, so an export leaves them blank.
     const blank = (value: unknown) =>
       value === null || value === undefined || value === "-" ? "" : value;
     const chargeType = (value: ChargeType) => (value === ChargeType.PERCENTAGE ? "Percentage" : "Fixed");
-    const rows = products.map((product, index) => ({
-      "Sr. No.": index + 1,
-      "Product Code": product.productCode,
-      // Basic Information
-      "Product Name": product.name,
-      "Metal Type": blank(product.metalType),
-      Category: blank(product.category),
-      "Category Type": blank(product.ornamentType),
-      Style: blank(product.targetStyle?.name),
-      "Stone Type": blank(product.stoneType),
-      // Metals
-      Purity: product.defaultPurity ? PURITY_LABELS[product.defaultPurity] : "",
-      "Gross Weight": blank(product.defaultGrossWeight),
-      // Stone Pricing
-      "Has Stone Component": product.hasStoneComponent ? "Yes" : "No",
-      "Stone Metal Type Name": blank(product.defaultStoneMetalTypeName),
-      "Stone Type Names": blank(product.defaultStoneTypeNames),
-      "Carat Weight": blank(product.defaultCaratWeight),
-      "Stone Rate": blank(product.defaultStoneRate),
-      "Stone Charge": blank(product.defaultStoneCharge),
-      "Stone Charge Type": chargeType(product.defaultStoneChargeType),
-      "Stone Weight": blank(product.defaultStoneWeight),
-      "Net Weight": blank(product.defaultNetWeight),
-      // Charges
-      "Making Charge": blank(product.defaultMakingCharge),
-      "Making Charge Type": chargeType(product.defaultMakingChargeType),
-      // Product Details
-      "Design Code": blank(product.designCode),
-      "HSN Code": blank(product.hsnCode),
-      Active: product.isActive ? "Yes" : "No",
-      Finish: finishLabel(product.defaultFinish),
-      // Additional Information
-      Description: blank(product.description),
-      Notes: blank(product.notes),
-      "Created At": product.createdAt
-        ? new Date(product.createdAt).toLocaleString("en-IN")
-        : "",
-    }));
+    const rows = products.map((product) => {
+      const values: Record<string, unknown> = {
+        "Product Code": product.productCode,
+        "Product Name": product.name,
+        "Metal Type": blank(product.metalType),
+        Category: blank(product.category),
+        "Category Type": blank(product.ornamentType),
+        Style: blank(product.targetStyle?.name),
+        "Stone Type": blank(product.stoneType),
+        Purity: product.defaultPurity ? PURITY_LABELS[product.defaultPurity] : "",
+        "Gross Weight": blank(product.defaultGrossWeight),
+        "Has Stone Component": product.hasStoneComponent ? "Yes" : "No",
+        "Stone Metal Type Name": blank(product.defaultStoneMetalTypeName),
+        "Stone Type Names": blank(product.defaultStoneTypeNames),
+        "Carat Weight": blank(product.defaultCaratWeight),
+        "Stone Rate": blank(product.defaultStoneRate),
+        "Stone Charge": blank(product.defaultStoneCharge),
+        "Stone Charge Type": chargeType(product.defaultStoneChargeType),
+        "Stone Weight": blank(product.defaultStoneWeight),
+        "Net Weight": blank(product.defaultNetWeight),
+        "Making Charge": blank(product.defaultMakingCharge),
+        "Making Charge Type": chargeType(product.defaultMakingChargeType),
+        "Design Code": blank(product.designCode),
+        "HSN Code": blank(product.hsnCode),
+        Active: product.isActive ? "Yes" : "No",
+        Finish: finishLabel(product.defaultFinish),
+        Description: blank(product.description),
+        Notes: blank(product.notes),
+        "Stock Quantity": "",
+        Location: "",
+      };
+      // Built from the shared header list so order and names can't drift.
+      return Object.fromEntries(PRODUCT_SHEET_HEADERS.map((header) => [header, values[header] ?? ""]));
+    });
 
     // The PDF gets its own shorter column set — all 25 export columns on one
     // landscape page left each only a few characters wide, so names, codes
@@ -793,7 +788,14 @@ export async function exportProductsToExcel(
         ? buildCsvExportBase64(rows, "products")
         : params.format === "pdf"
           ? buildPdfExportBase64(pdfRows(), "Products", "products")
-          : buildExcelExport(rows, "Products", "products");
+          : buildImportTemplateWithDropdowns({
+              sheetName: "Products",
+              rows,
+              columns: PRODUCT_SHEET_HEADERS,
+              dropdowns: await loadProductSheetDropdowns(await requireStoreScope()),
+              instructions: { notes: PRODUCT_SHEET_NOTES, rows: productSheetInstructions() },
+              filePrefix: "products",
+            });
 
     return {
       success: true,
@@ -1865,56 +1867,62 @@ const CHARGE_TYPE_LABELS: Record<string, ChargeType> = {
  * are the bulk equivalent of "Add Product"'s own "create a stock entry too"
  * checkbox — leave Stock Quantity blank to import the product alone.
  */
+const PRODUCT_SHEET_NOTES = [
+  "How to fill in the Products sheet",
+  "• One row per product. Replace or delete the example row before importing.",
+  "• Columns can be in any order — they are matched by their header names, so don't rename the headers.",
+  "• Dropdowns list your store's own names (from Settings). The Options sheet shows every list.",
+  "• Nothing is imported if any row has an error — the import lists each problem with its row number.",
+  "• A Products export has these same columns, so an exported file can be edited and imported as new products.",
+]
+
+/** The template/export dropdown lists, from this store's own masters. */
+async function loadProductSheetDropdowns(storeId: string): Promise<Record<string, string[]>> {
+  const [metals, categories, categoryTypes, styles, origins, locations] = await Promise.all([
+    prisma.storeMetal.findMany({ where: { storeId, isActive: true }, select: { name: true, isGemstone: true }, orderBy: { name: "asc" } }),
+    prisma.storeCategory.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
+    prisma.storeCategoryType.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
+    prisma.storeStyle.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
+    prisma.storeMetalOrigin.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
+    prisma.storeLocation.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
+  ]);
+  const names = (rows: { name: string }[]) => rows.map((row) => row.name);
+  const yesNo = ["Yes", "No"];
+  const chargeTypes = ["Fixed", "Percentage"];
+
+  return {
+    "Metal Type": names(metals),
+    Category: names(categories),
+    "Category Type": names(categoryTypes),
+    Style: names(styles),
+    "Stone Type": names(origins),
+    Purity: Object.values(PURITY_LABELS),
+    "Has Stone Component": yesNo,
+    "Stone Metal Type Name": names(metals.filter((metal) => metal.isGemstone)),
+    "Stone Type Names": names(origins),
+    "Stone Charge Type": chargeTypes,
+    "Making Charge Type": chargeTypes,
+    Active: yesNo,
+    Finish: ["Unfinished", "Finished / Hallmarked"],
+    Location: names(locations),
+  };
+}
+
 export async function getProductImportTemplate(): Promise<{
   fileName: string;
   fileBase64: string;
 }> {
-  await requireStoreScope();
+  const storeId = await requireStoreScope();
+  const example = Object.fromEntries(PRODUCT_SHEET_COLUMNS.map((column) => [column.header, column.example]));
 
-  // Same order as the Add Product form, section by section, so a sheet
-  // reads like the form. The import matches columns by header name, not
-  // position, so older sheets in any order still import.
-  const example = {
-    // Basic Information (Metal / Stone leads, as on the form)
-    "Product Name": "Classic Gold Ring",
-    "Metal Type": "Gold",
-    Category: "Ring",
-    "Category Type": "",
-    Style: "Ladies",
-    "Stone Type": "",
-    // Metals
-    Purity: "Gold 22K",
-    "Gross Weight": 8.5,
-    // Stone Pricing
-    "Has Stone Component": "No",
-    "Stone Metal Type Name": "",
-    "Stone Type Names": "",
-    "Carat Weight": "",
-    "Stone Rate": "",
-    "Stone Charge": "",
-    "Stone Charge Type": "Fixed",
-    "Stone Weight": "",
-    "Net Weight": 8.2,
-    // Charges (not on the form; kept for imports that carry them)
-    "Making Charge": 500,
-    "Making Charge Type": "Fixed",
-    // Product Details
-    "Design Code": "RG-001",
-    "HSN Code": "7113",
-    Active: "Yes",
-    Finish: "Unfinished",
-    // Additional Information
-    Description: "22K gold ladies ring",
-    Notes: "",
-    // Stock entry
-    "Stock Quantity": "",
-    Location: "",
-  };
-
-  return buildMultiSheetExcelExport(
-    [{ name: "Products Import", rows: [example], columns: Object.keys(example) }],
-    "products-import-template",
-  );
+  return buildImportTemplateWithDropdowns({
+    sheetName: "Products Import",
+    rows: [example],
+    columns: PRODUCT_SHEET_HEADERS,
+    dropdowns: await loadProductSheetDropdowns(storeId),
+    instructions: { notes: PRODUCT_SHEET_NOTES, rows: productSheetInstructions() },
+    filePrefix: "products-import-template",
+  });
 }
 
 function productImportCell(row: Record<string, unknown>, key: string): string {

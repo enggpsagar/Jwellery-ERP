@@ -155,6 +155,100 @@ export function buildMultiSheetExcelExport(
 }
 
 /**
+ * An import template with in-cell dropdowns: the template sheet first (the
+ * import reads the first sheet), then an optional "Instructions" sheet, then
+ * an "Options" sheet listing each dropdown's values (also a readable
+ * reference). SheetJS's community build can't write data validation, so the
+ * dropdowns are added to the saved file's sheet XML directly. They warn on a
+ * value that isn't listed but still allow it — the import's own name checks
+ * stay the real gate, and free-text columns (e.g. several comma-joined Stone
+ * Types) remain typeable.
+ */
+export function buildImportTemplateWithDropdowns({
+  sheetName,
+  rows,
+  columns,
+  dropdowns,
+  filePrefix,
+  instructions,
+  rowsWithDropdowns = 1000,
+}: {
+  sheetName: string;
+  rows: Record<string, unknown>[];
+  columns: string[];
+  /** Template column header → the values its dropdown offers. Empty lists get no dropdown. */
+  dropdowns: Record<string, string[]>;
+  filePrefix: string;
+  /** General notes (one per line) above a table explaining each column. */
+  instructions?: { notes: string[]; rows: Record<string, unknown>[] };
+  rowsWithDropdowns?: number;
+}): { fileName: string; fileBase64: string } {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet(rows, { header: columns }),
+    sheetName.slice(0, 31),
+  );
+
+  if (instructions) {
+    const sheet = XLSX.utils.aoa_to_sheet([...instructions.notes.map((note) => [note]), []]);
+    XLSX.utils.sheet_add_json(sheet, instructions.rows, { origin: instructions.notes.length + 1 });
+    sheet["!cols"] = [{ wch: 4 }, { wch: 24 }, { wch: 26 }, { wch: 110 }];
+    XLSX.utils.book_append_sheet(workbook, sheet, "Instructions");
+  }
+
+  const lists = Object.entries(dropdowns)
+    .map(([column, values]) => [column, [...new Set(values.map((v) => v.trim()).filter(Boolean))]] as const)
+    .filter(([column, values]) => values.length > 0 && columns.includes(column));
+
+  const optionsSheet = XLSX.utils.aoa_to_sheet([lists.map(([column]) => column)]);
+  lists.forEach(([, values], listIndex) => {
+    XLSX.utils.sheet_add_aoa(optionsSheet, values.map((value) => [value]), {
+      origin: { r: 1, c: listIndex },
+    });
+  });
+  XLSX.utils.book_append_sheet(workbook, optionsSheet, "Options");
+
+  const validations = lists.map(([column, values], listIndex) => {
+    const target = XLSX.utils.encode_col(columns.indexOf(column));
+    const source = XLSX.utils.encode_col(listIndex);
+    return (
+      `<dataValidation type="list" allowBlank="1" showErrorMessage="1" errorStyle="warning" ` +
+      `errorTitle="Not in the list" error="This value isn't in your store's list for ${escapeXml(column)}. Check the Options sheet." ` +
+      `sqref="${target}2:${target}${rowsWithDropdowns + 1}">` +
+      `<formula1>Options!$${source}$2:$${source}$${values.length + 1}</formula1></dataValidation>`
+    );
+  });
+
+  let buffer: Buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+  if (validations.length) {
+    const zip = XLSX.CFB.read(buffer, { type: "buffer" });
+    const entry = XLSX.CFB.find(zip, "/xl/worksheets/sheet1.xml");
+    if (!entry?.content) throw new Error("Template sheet XML not found");
+    const xml = Buffer.from(entry.content as Uint8Array).toString("utf8");
+    // dataValidations sits right after sheetData in the schema's element
+    // order (before ignoredErrors/pageMargins that SheetJS may add).
+    const withValidations = xml.replace(
+      "</sheetData>",
+      `</sheetData><dataValidations count="${validations.length}">${validations.join("")}</dataValidations>`,
+    );
+    entry.content = Buffer.from(withValidations, "utf8");
+    entry.size = entry.content.length;
+    buffer = Buffer.from(XLSX.CFB.write(zip, { fileType: "zip", type: "buffer" }) as Uint8Array);
+  }
+
+  return {
+    fileName: timestampedFileName(filePrefix, "xlsx"),
+    fileBase64: buffer.toString("base64"),
+  };
+}
+
+function escapeXml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/**
  * Reads every sheet of an uploaded workbook, keyed by sheet name. Needed to
  * re-import a backup, which splits parent rows and line items across two
  * sheets — reading only the first would silently drop every line item.

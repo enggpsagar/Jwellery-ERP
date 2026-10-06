@@ -1,12 +1,13 @@
 // lib/actions/ledger-actions.ts
 "use server"
 
-import { LedgerEntryType, InvoiceStatus } from "@prisma/client"
+import { LedgerEntryType, InvoiceStatus, type Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context"
 import { getLocationScope, locationWhere } from "@/lib/location-scope"
 import { formatLedgerSource } from "@/lib/ledger-format"
+import { ledgerEntryMatches } from "@/lib/ledger-filters"
 import { MONEY_UNIT } from "@/lib/business-units"
 import { getActiveBusinessUnits, type BusinessUnitOption } from "@/lib/business-units.server"
 import { formatShortDate } from "@/lib/utils"
@@ -58,6 +59,20 @@ function initials(name: string) {
     .toUpperCase()
 }
 
+const LEDGER_ENTRY_INCLUDE = {
+  customer: { select: { id: true, name: true } },
+  vendor: { select: { id: true, name: true } },
+  karigar: { select: { id: true, name: true } },
+  invoice: { select: { id: true, invoiceNumber: true } },
+  metalType: { select: { name: true } },
+} as const
+
+const LEDGER_ENTRY_ORDER = [
+  { entryDate: "desc" as const },
+  { createdAt: "desc" as const },
+  { id: "desc" as const },
+]
+
 /** Recent ledger activity across every customer and karigar account in the store. */
 export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
   const storeId = await requireStoreScope()
@@ -65,18 +80,72 @@ export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
 
   const entries = await prisma.ledgerEntry.findMany({
     where: { storeId, ...locationWhere(scope) },
-    orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
+    orderBy: LEDGER_ENTRY_ORDER,
     take: 500,
-    include: {
-      customer: { select: { id: true, name: true } },
-      vendor: { select: { id: true, name: true } },
-      karigar: { select: { id: true, name: true } },
-      invoice: { select: { id: true, invoiceNumber: true } },
-      metalType: { select: { name: true } },
-    },
+    include: LEDGER_ENTRY_INCLUDE,
   })
 
-  return entries.map((entry) => {
+  return entries.map(mapLedgerEntry)
+}
+
+/** The Ledger page's filters, as its export link passes them. */
+export type LedgerEntryFilters = {
+  /** Account name, as in the page's Account picker. */
+  account?: string
+  /** Source label, as in the page's Type picker (e.g. "Sale"). */
+  type?: string
+  /** YYYY-MM-DD, inclusive. */
+  dateFrom?: string
+  dateTo?: string
+  search?: string
+}
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Every ledger entry matching the Ledger page's filters — for the export,
+ * which must not stop at the page's 500-row window. Read in batches so a
+ * large ledger isn't one giant query; the date range is applied in the
+ * query, the name-based filters (account/type/search) on the mapped rows
+ * with the same rules as LedgerView's client-side filter
+ * (ledgerEntryMatches, lib/ledger-filters.ts).
+ */
+export async function getLedgerEntriesForExport(filters: LedgerEntryFilters = {}): Promise<LedgerEntryRow[]> {
+  const storeId = await requireStoreScope()
+  const scope = await getLocationScope()
+
+  const entryDate: { gte?: Date; lte?: Date } = {}
+  if (filters.dateFrom && ISO_DAY.test(filters.dateFrom)) entryDate.gte = new Date(`${filters.dateFrom}T00:00:00.000Z`)
+  if (filters.dateTo && ISO_DAY.test(filters.dateTo)) entryDate.lte = new Date(`${filters.dateTo}T23:59:59.999Z`)
+  const where = {
+    storeId,
+    ...locationWhere(scope),
+    ...(entryDate.gte || entryDate.lte ? { entryDate } : {}),
+  }
+
+  const BATCH = 1000
+  const rows: LedgerEntryRow[] = []
+  for (let skip = 0; ; skip += BATCH) {
+    const batch = await prisma.ledgerEntry.findMany({
+      where,
+      orderBy: LEDGER_ENTRY_ORDER,
+      skip,
+      take: BATCH,
+      include: LEDGER_ENTRY_INCLUDE,
+    })
+    for (const entry of batch) {
+      const row = mapLedgerEntry(entry)
+      if (ledgerEntryMatches(row, filters)) rows.push(row)
+    }
+    if (batch.length < BATCH) break
+  }
+  return rows
+}
+
+type LedgerEntryWithRelations = Prisma.LedgerEntryGetPayload<{ include: typeof LEDGER_ENTRY_INCLUDE }>
+
+function mapLedgerEntry(entry: LedgerEntryWithRelations): LedgerEntryRow {
+  {
     // customerId and vendorId can both be set on the same underlying Party
     // row (post Vendor→Customer merge) but never on the SAME entry — an
     // entry is always either this Party's customer-side activity or its
@@ -123,7 +192,7 @@ export async function getLedgerEntries(): Promise<LedgerEntryRow[]> {
       invoiceId: entry.invoiceId,
       invoiceNumber: entry.invoice?.invoiceNumber ?? null,
     }
-  })
+  }
 }
 
 export type KarigarLedgerRow = {

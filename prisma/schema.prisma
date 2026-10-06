@@ -695,6 +695,9 @@ model Product {
   defaultMakingChargeType   ChargeType           @default(FIXED)
   defaultStoneCharge        Decimal?             @db.Decimal(12, 2)
   defaultStoneChargeType    ChargeType           @default(FIXED)
+  // Finish a stock entry created from this product starts with (see
+  // InventoryStock.finish) — still editable per piece on the stock row.
+  defaultFinish             InventoryFinish      @default(KACHA)
   // Typical weights for this design, used to prefill a stock entry rather
   // than to describe any one piece — two rings off the same design are never
   // identical to the milligram, so the per-piece truth stays on

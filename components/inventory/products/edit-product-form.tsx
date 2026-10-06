@@ -36,6 +36,7 @@ type EditProductFormProps = {
     defaultMakingChargeType: "FIXED" | "PERCENTAGE" | null;
     defaultStoneCharge: string | null;
     defaultStoneChargeType: "FIXED" | "PERCENTAGE" | null;
+    defaultFinish?: "KACHA" | "PAKKA" | null;
     defaultGrossWeight: string | null;
     defaultNetWeight: string | null;
     defaultStoneWeight: string | null;

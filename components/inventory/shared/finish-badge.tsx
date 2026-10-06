@@ -1,12 +1,8 @@
 import { InventoryFinish } from "@prisma/client";
 
 import { cn } from "@/lib/utils";
+import { FINISH_LABELS } from "@/lib/inventory/finish";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-
-const FINISH_LABELS: Record<InventoryFinish, string> = {
-  KACHA: "Unfinished",
-  PAKKA: "Finished / Hallmarked",
-};
 
 // Same text on every screen except PAKKA, whose full label is what breaks
 // the stock table's layout on narrow screens — shortened there, with the

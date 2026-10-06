@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ChargeType, PurityType, Prisma } from "@prisma/client";
+import { ChargeType, InventoryFinish, PurityType, Prisma } from "@prisma/client";
+import { finishLabel, parseFinishLabel } from "@/lib/inventory/finish";
 
 import { prisma } from "@/lib/prisma";
 import { getFineWeightResolver, resolveFineWeight } from "@/lib/fine-weight";
@@ -239,6 +240,7 @@ function serializeProduct(product: {
   defaultMakingChargeType: ChargeType;
   defaultStoneCharge: { toString(): string } | null;
   defaultStoneChargeType: ChargeType;
+  defaultFinish: InventoryFinish;
   defaultGrossWeight: { toString(): string } | null;
   defaultNetWeight: { toString(): string } | null;
   defaultStoneWeight: { toString(): string } | null;
@@ -304,6 +306,7 @@ function serializeProduct(product: {
     defaultMakingChargeType: product.defaultMakingChargeType,
     defaultStoneCharge: product.defaultStoneCharge?.toString() ?? null,
     defaultStoneChargeType: product.defaultStoneChargeType,
+    defaultFinish: product.defaultFinish,
     defaultGrossWeight: product.defaultGrossWeight?.toString() ?? null,
     defaultNetWeight: product.defaultNetWeight?.toString() ?? null,
     defaultStoneWeight: product.defaultStoneWeight?.toString() ?? null,
@@ -494,6 +497,7 @@ function mapProductRow(row: {
   defaultMakingChargeType: ChargeType;
   defaultStoneCharge: { toString(): string } | null;
   defaultStoneChargeType: ChargeType;
+  defaultFinish: InventoryFinish;
   defaultGrossWeight: { toString(): string } | null;
   defaultNetWeight: { toString(): string } | null;
   defaultStoneWeight: { toString(): string } | null;
@@ -525,6 +529,7 @@ function mapProductRow(row: {
     defaultStoneCharge:
       row.defaultStoneCharge != null ? Number(row.defaultStoneCharge) : null,
     defaultStoneChargeType: row.defaultStoneChargeType,
+    defaultFinish: row.defaultFinish,
     defaultGrossWeight:
       row.defaultGrossWeight != null ? Number(row.defaultGrossWeight) : null,
     defaultNetWeight:
@@ -720,6 +725,7 @@ export async function exportProductsToExcel(
       "Making Charge Type": product.defaultMakingChargeType,
       "Default Stone Charge": product.defaultStoneCharge ?? "-",
       "Stone Charge Type": product.defaultStoneChargeType,
+      Finish: finishLabel(product.defaultFinish),
       "Gross Weight (g)": product.defaultGrossWeight ?? "-",
       "Net Weight (g)": product.defaultNetWeight ?? "-",
       "Stone Weight (g)": product.defaultStoneWeight ?? "-",
@@ -976,6 +982,12 @@ export async function createProduct(
         Object.values(ChargeType),
       ) ?? ChargeType.FIXED;
 
+    const defaultFinish =
+      parseOptionalEnum(
+        formData.get("defaultFinish"),
+        Object.values(InventoryFinish),
+      ) ?? InventoryFinish.KACHA;
+
     // Typical weights for the design. Required as of the 2026 tightening —
     // every product master now records a real Gross/Net Weight (validated
     // below), even a coin/bar/loose stone previously left blank under the
@@ -1145,6 +1157,7 @@ export async function createProduct(
             defaultMakingChargeType,
             defaultStoneCharge,
             defaultStoneChargeType,
+            defaultFinish,
             defaultGrossWeight,
             defaultNetWeight,
             defaultStoneWeight,
@@ -1277,6 +1290,7 @@ export async function createProduct(
               productId: createdProduct.id,
               stockCode: `STK-${year}-${String(highest + 1 + attempt).padStart(4, "0")}`,
               quantity: Math.trunc(quantity),
+              finish: defaultFinish,
               locationId: resolvedLocationId,
               metalTypeId: metalTypeId || null,
               purity: resolvedDefaultPurity,
@@ -1393,6 +1407,12 @@ export async function updateProduct(
         formData.get("defaultStoneChargeType"),
         Object.values(ChargeType),
       ) ?? ChargeType.FIXED;
+
+    const defaultFinish =
+      parseOptionalEnum(
+        formData.get("defaultFinish"),
+        Object.values(InventoryFinish),
+      ) ?? InventoryFinish.KACHA;
 
     // Typical weights for the design. Required as of the 2026 tightening —
     // every product master now records a real Gross/Net Weight (validated
@@ -1512,6 +1532,7 @@ export async function updateProduct(
         defaultMakingChargeType,
         defaultStoneCharge,
         defaultStoneChargeType,
+        defaultFinish,
         defaultGrossWeight,
         defaultNetWeight,
         defaultStoneWeight,
@@ -1844,6 +1865,7 @@ export async function getProductImportTemplate(): Promise<{
     "Making Charge Type": "Fixed",
     "Stone Charge": "",
     "Stone Charge Type": "Fixed",
+    Finish: "Unfinished",
     "Gross Weight": 8.5,
     "Net Weight": 8.2,
     "Stone Weight": "",
@@ -2055,6 +2077,17 @@ export async function importProductsFromExcel(
         }
       }
 
+      const finishRaw = productImportCell(row, "Finish");
+      let defaultFinish: InventoryFinish = InventoryFinish.KACHA;
+      if (finishRaw) {
+        const matched = parseFinishLabel(finishRaw);
+        if (!matched) {
+          rowErrors.push(`"${finishRaw}" is not a valid Finish — use Unfinished or Finished`);
+        } else {
+          defaultFinish = matched;
+        }
+      }
+
       const numericFields: Record<string, number | null> = {};
       let numericError = false;
       for (const key of [
@@ -2154,6 +2187,7 @@ export async function importProductsFromExcel(
           defaultMakingChargeType,
           defaultStoneCharge: numericFields["Stone Charge"],
           defaultStoneChargeType,
+          defaultFinish,
           defaultGrossWeight: numericFields["Gross Weight"],
           defaultNetWeight: numericFields["Net Weight"],
           defaultStoneWeight: numericFields["Stone Weight"],
@@ -2270,6 +2304,7 @@ export async function importProductsFromExcel(
           productId: productIdByCode.get(row.productCode)!,
           stockCode: `STK-${year}-${String(highestStockSeq).padStart(4, "0")}`,
           quantity: row.stockQuantity!,
+          finish: row.defaultFinish,
           locationId: row.stockLocationId,
           metalTypeId: row.metalTypeId,
           purity: row.defaultPurity,

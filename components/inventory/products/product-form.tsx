@@ -6,6 +6,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { PurityType } from "@prisma/client";
 
 import type { ProductFormState } from "@/lib/inventory/product-types";
+import { FINISH_LABELS } from "@/lib/inventory/finish";
 import {
   getStoreCategoryTypes,
   getStoreCategoriesForMetal,
@@ -102,6 +103,7 @@ type Product = {
   defaultMakingChargeType: "FIXED" | "PERCENTAGE" | null;
   defaultStoneCharge: string | null;
   defaultStoneChargeType: "FIXED" | "PERCENTAGE" | null;
+  defaultFinish?: "KACHA" | "PAKKA" | null;
   defaultGrossWeight: string | null;
   defaultNetWeight: string | null;
   defaultStoneWeight: string | null;
@@ -664,6 +666,12 @@ export function ProductForm({
     product?.isActive === false ? "false" : "true",
   );
 
+  // Starting Finish for stock entries made from this product — each stock
+  // row can still be changed on its own.
+  const [defaultFinish, setDefaultFinish] = useState<"KACHA" | "PAKKA">(
+    product?.defaultFinish ?? "KACHA",
+  );
+
   // Create-only: offer to open the stock entry in the same step, so a new
   // product doesn't need a second trip to Inventory to become stockable.
   const [createStock, setCreateStock] = useState(false);
@@ -1216,6 +1224,25 @@ export function ProductForm({
               <ErrorText error={state.errors.targetStyleId} />
             </div>
           )}
+
+          <div>
+            <Label htmlFor="defaultFinish">Finish</Label>
+
+            <Select value={defaultFinish} onValueChange={(value) => setDefaultFinish(value as "KACHA" | "PAKKA")}>
+              <SelectTrigger id="defaultFinish" className="h-11 w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(["KACHA", "PAKKA"] as const).map((item) => (
+                  <SelectItem key={item} value={item}>
+                    {FINISH_LABELS[item]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <input type="hidden" name="defaultFinish" value={defaultFinish} />
+          </div>
         </div>
       </div>
 

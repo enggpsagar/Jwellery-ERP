@@ -11,6 +11,7 @@ import {
 } from "@prisma/client";
 
 import type { StockFormState } from "@/lib/inventory/stock-types";
+import { FINISH_LABELS } from "@/lib/inventory/finish";
 import { isCaratWeighedMetal, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity";
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions";
 
@@ -51,6 +52,7 @@ type ProductOption = {
   defaultNetWeight: string | null;
   defaultStoneWeight: string | null;
   defaultCaratWeight: string | null;
+  defaultFinish?: string;
   isActive: boolean;
 };
 
@@ -370,6 +372,7 @@ export function StockForm({
     if (mode !== "create" || !selectedProductId || !selectedProduct) return;
     if (appliedProductDefaultsRef.current === selectedProductId) return;
     appliedProductDefaultsRef.current = selectedProductId;
+    if (selectedProduct.defaultFinish) setFinish(selectedProduct.defaultFinish);
     if (weightsTouched) return;
 
     if (selectedProduct.defaultGrossWeight) setGrossWeight(selectedProduct.defaultGrossWeight);
@@ -741,7 +744,7 @@ export function StockForm({
                 <SelectContent>
                   {Object.values(InventoryFinish).map((item) => (
                     <SelectItem key={item} value={item}>
-                      {item === "PAKKA" ? "Finished / Hallmarked" : "Unfinished"}
+                      {FINISH_LABELS[item]}
                     </SelectItem>
                   ))}
                 </SelectContent>

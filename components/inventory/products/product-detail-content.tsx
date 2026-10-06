@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge"
 import { ActiveBadge } from "@/components/shared/active-badge"
+import { FinishBadge } from "@/components/inventory/shared/finish-badge"
 import { ProductStatusToggle } from "@/components/inventory/products/product-status-toggle"
 import { formatShortDate } from "@/lib/utils"
 import type { getProductById } from "@/lib/actions/inventory/product-actions"
@@ -105,6 +106,7 @@ export function ProductDetailContent({
         <Field label="Product Code" value={product.productCode} />
         <Field label="Category" value={product.category?.name} />
         <Field label="Item Type" value={product.categoryType?.name} />
+        <Field label="Finish" value={<FinishBadge finish={product.defaultFinish} />} />
         {!hideStatusField && (
           <Field
             label="Status"

@@ -24,6 +24,7 @@ import {
   type LocationScope,
 } from "@/lib/location-scope"
 import type { StockFormState } from "@/lib/inventory/stock-types"
+import { finishLabel } from "@/lib/inventory/finish"
 import {
   buildExcelExport,
   buildCsvExportBase64,
@@ -409,7 +410,7 @@ export async function exportInventoryStockToExcel(
       "Purchase Amount": item.purchaseAmount || "-",
       "Sale Amount": item.saleAmount || "-",
       Status: item.status || "-",
-      Finish: item.finish || "-",
+      Finish: finishLabel(item.finish),
       Location: item.location?.name || "-",
       "Vendor Name": item.vendorName || "-",
       "Purchase Date": item.purchaseDate ? formatShortDate(item.purchaseDate) : "-",
@@ -463,6 +464,7 @@ export async function getInventoryStockFormProducts() {
       defaultNetWeight: true,
       defaultStoneWeight: true,
       defaultCaratWeight: true,
+      defaultFinish: true,
       isActive: true,
     },
   })
@@ -1382,6 +1384,7 @@ export async function importInventoryStockFromExcel(
           hasStoneComponent: true,
           defaultStoneMetalTypeName: true,
           defaultStoneTypeNames: true,
+          defaultFinish: true,
         },
       }),
       prisma.storeLocation.findMany({ where: { storeId }, select: { id: true, name: true } }),
@@ -1468,6 +1471,7 @@ export async function importInventoryStockFromExcel(
         productId: product.id,
         stockCode: `STK-${year}-${String(highestCode).padStart(4, "0")}`,
         quantity: Math.trunc(quantity),
+        finish: product.defaultFinish,
         metalTypeId: product.metalTypeId,
         purity: product.defaultPurity,
         purityLabel: product.storeMetalPurity?.label ?? undefined,

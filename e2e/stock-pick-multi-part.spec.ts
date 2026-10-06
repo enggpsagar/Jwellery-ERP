@@ -100,8 +100,8 @@ async function cleanUp(seeded: Seeded) {
   await db().storeMetal.deleteMany({ where: { id: { in: [gold.id, silver.id, diamond.id, ruby.id] } } })
 }
 
-async function pickStock(page: Page, productCode: string) {
-  await page.getByRole("combobox").filter({ hasText: "Search stock item" }).first().click()
+async function pickStock(page: Page, productCode: string, placeholder = "Search stock item") {
+  await page.getByRole("combobox").filter({ hasText: placeholder }).first().click()
   await page.getByPlaceholder(/search/i).last().fill(productCode)
   await page.getByRole("option", { name: new RegExp(productCode) }).click()
 }
@@ -182,12 +182,34 @@ test("Estimate and Quotation open the same piece with every metal and stone", as
   const seeded = await seedPiece()
   try {
     await page.goto("/billing/kacha/new")
-    await pickStock(page, seeded.product.productCode)
+    await pickStock(page, seeded.product.productCode, "Not linked to stock")
     await expectPieceRows(page, "kacha-piece")
 
     await page.goto("/quotations/new")
-    await pickStock(page, seeded.product.productCode)
+    await pickStock(page, seeded.product.productCode, "Not linked to stock")
     await expectPieceRows(page, "quotation-piece")
+    expect(crashes).toEqual([])
+  } finally {
+    await cleanUp(seeded)
+  }
+})
+
+test("a one-stone piece prices its stone from the Stone Type and shows its pieces", async ({ page }) => {
+  const crashes = watchForPageCrash(page)
+  const seeded = await seedPiece()
+  // Same piece, but its Product has only the gold and the diamond — an
+  // ordinary single line with "Includes a Stone".
+  await db().productMetalComponent.deleteMany({ where: { productId: seeded.product.id, metalTypeId: seeded.silver.id } })
+  await db().productStoneComponent.deleteMany({ where: { productId: seeded.product.id, stoneMetalTypeName: seeded.ruby.name } })
+  try {
+    await page.goto("/billing/new")
+    await pickStock(page, seeded.product.productCode)
+    await expect(page.getByTestId("sale-piece-metal-row")).toHaveCount(0)
+    const field = (label: string) => page.getByText(label, { exact: true }).locator("xpath=..").locator("input").first()
+    await expect(field("Stone Carat Weight (ct)")).toHaveValue("0.28")
+    await expect(field("Stone Rate (₹/ct)")).toHaveValue("60000")
+    await expect(field("Stone Charge")).toHaveValue("16800")
+    await expect(page.getByTestId("sale-linked-stone-extras")).toHaveText("12 pcs · VVS")
     expect(crashes).toEqual([])
   } finally {
     await cleanUp(seeded)

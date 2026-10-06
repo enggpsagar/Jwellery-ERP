@@ -39,7 +39,7 @@ async function fillLine(page: Page, itemName: string, quantity: string) {
 
 async function applyCode(page: Page, code: string) {
   await page.getByLabel("Offer or voucher code").fill(code)
-  await page.getByRole("button", { name: "Apply" }).click()
+  await page.getByRole("button", { name: "Apply", exact: true }).click()
 }
 
 async function createPromotion(data: Record<string, unknown>) {

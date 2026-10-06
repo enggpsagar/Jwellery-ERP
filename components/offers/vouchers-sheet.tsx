@@ -45,13 +45,27 @@ type VouchersSheetProps = {
 }
 
 export function VouchersSheet({ offer, onOpenChange, canEdit, customers }: VouchersSheetProps) {
+  // The codes just issued live here, above the sheet's content: issuing
+  // revalidates the offers page, and if that refresh remounts the panel its
+  // own state (and an effect watching the action's result) is gone — the
+  // codes were created but never shown (flaky offers e2e).
+  const [issued, setIssued] = useState<{ offerId: string; codes: string[] } | null>(null)
   return (
     <Sheet open={Boolean(offer)} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
         className="w-full gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-xl"
       >
-        {offer ? <VouchersPanel key={offer.id} offer={offer} canEdit={canEdit} customers={customers} /> : null}
+        {offer ? (
+          <VouchersPanel
+            key={offer.id}
+            offer={offer}
+            canEdit={canEdit}
+            customers={customers}
+            issuedCodes={issued?.offerId === offer.id ? issued.codes : []}
+            onCodesIssued={(codes) => setIssued({ offerId: offer.id, codes })}
+          />
+        ) : null}
       </SheetContent>
     </Sheet>
   )
@@ -61,10 +75,14 @@ function VouchersPanel({
   offer,
   canEdit,
   customers,
+  issuedCodes,
+  onCodesIssued,
 }: {
   offer: PromotionRow
   canEdit: boolean
   customers: PromotionCustomerOption[]
+  issuedCodes: string[]
+  onCodesIssued: (codes: string[]) => void
 }) {
   const router = useRouter()
   const toast = useToast()
@@ -153,7 +171,9 @@ function VouchersPanel({
           <IssueVoucherForm
             offer={offer}
             customers={customers}
-            onIssued={() => {
+            lastCodes={issuedCodes}
+            onIssued={(codes) => {
+              onCodesIssued(codes)
               void load()
               router.refresh()
             }}
@@ -286,25 +306,33 @@ function VouchersPanel({
 function IssueVoucherForm({
   offer,
   customers,
+  lastCodes,
   onIssued,
 }: {
   offer: PromotionRow
   customers: PromotionCustomerOption[]
-  onIssued: () => void
+  lastCodes: string[]
+  onIssued: (codes: string[]) => void
 }) {
   const toast = useToast()
   const [mode, setMode] = useState<"customer" | "bulk">("customer")
-  const [state, formAction, pending] = useActionState(issueVouchers, initialIssueState)
-  const [lastCodes, setLastCodes] = useState<string[]>([])
+  // Success is handled inside the action call, not in an effect on `state`
+  // (same as offer-form-dialog.tsx): the issue revalidates the offers page,
+  // and a remount on that refresh means an effect never sees success.
+  const [state, formAction, pending] = useActionState(
+    async (prev: IssueVouchersState, formData: FormData) => {
+      const result = await issueVouchers(prev, formData)
+      if (result.success) {
+        toast.success(result.message)
+        onIssued(result.codes ?? [])
+      }
+      return result
+    },
+    initialIssueState,
+  )
 
   useEffect(() => {
-    if (state.success) {
-      toast.success(state.message)
-      setLastCodes(state.codes ?? [])
-      onIssued()
-    } else if (state.message) {
-      toast.error(state.message)
-    }
+    if (!state.success && state.message) toast.error(state.message)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 

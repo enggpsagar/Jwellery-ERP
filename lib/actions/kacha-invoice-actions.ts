@@ -17,7 +17,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { getFineWeightResolver } from "@/lib/fine-weight";
+import { getFineWeightResolver, type FineWeightResolver } from "@/lib/fine-weight";
 import {
   getPieceResolver,
   pieceComponentCreates,
@@ -291,6 +291,253 @@ function lineTotal(item: KachaInvoiceLineItemInput) {
   );
 }
 
+type KachaTotals = {
+  subtotal: number;
+  makingCharges: number;
+  stoneCharges: number;
+  discount: number;
+  roundOffAmount: number;
+  totalAmount: number;
+};
+
+/** A slip's totals from its (resolved) lines — shared by the form and the
+ * Excel import so both land on the same figures. */
+function computeKachaTotals(items: KachaInvoiceLineItemInput[], discount: number): KachaTotals {
+  const subtotal = items.reduce((sum, item) => sum + lineMetalValue(item), 0);
+  // Hallmarking charge folds into the slip's Making Charges total — same
+  // convention as invoice-actions.ts's own makingCharges.
+  const makingCharges = items.reduce(
+    (sum, item) => sum + toNumber(item.makingCharge) + toNumber(item.hmCharge),
+    0,
+  );
+  const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
+  const rawTotal = subtotal + makingCharges + stoneCharges - discount;
+  // Indian-billing convention: the persisted Total is always a whole
+  // rupee, with the (small, signed) adjustment recorded separately rather
+  // than silently absorbed — see lib/round-off.ts.
+  const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
+  return { subtotal, makingCharges, stoneCharges, discount, roundOffAmount, totalAmount };
+}
+
+function kachaPaymentStatus(totalAmount: number, paidAmount: number) {
+  const balanceAmount = Math.max(0, totalAmount - paidAmount);
+  let status: InvoiceStatus = InvoiceStatus.PAID;
+  if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
+  else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
+  return { balanceAmount, status };
+}
+
+type WriteKachaSlipInput = {
+  storeId: string;
+  slipNumber: string;
+  customerId: string;
+  invoiceDate: Date;
+  totals: KachaTotals;
+  paidAmount: number;
+  balanceAmount: number;
+  status: InvoiceStatus;
+  notes: string | null;
+  locationId: string | null;
+  items: KachaInvoiceLineItemInput[];
+  /** Stock rows (already checked to be this store's) the lines may sell. */
+  validStockIds: ReadonlySet<string>;
+  /** "Purchased From" party names by id, from resolveLineSourceParties. */
+  sourcePartyNames: Map<string, string>;
+  fineOf: FineWeightResolver;
+  payments: PaymentEntryInput[];
+  /** False only when restoring a slip whose ledger rows are still on the
+   * ledger (delete-all removes slips, not their ledger entries). */
+  postLedger?: boolean;
+  convertedToId?: string | null;
+};
+
+/**
+ * Writes one slip and every side effect it has — the slip and its lines,
+ * "Purchased From" parties flagged as suppliers, linked stock sold, and the
+ * party's ledger (SALE debit for the total + one PAYMENT_IN credit per
+ * payment). The single write path for both the New Estimate form
+ * (createKachaInvoice) and the Excel import, so an imported slip moves the
+ * party balance exactly like a typed one. Runs inside the caller's
+ * transaction; the caller validates everything first.
+ */
+async function writeKachaSlip(tx: Prisma.TransactionClient, input: WriteKachaSlipInput) {
+  const {
+    storeId,
+    slipNumber,
+    customerId,
+    totals,
+    items,
+    validStockIds,
+    sourcePartyNames,
+    fineOf,
+    payments,
+  } = input;
+  const locationId = input.locationId ?? undefined;
+  const isManualLine = (item: KachaInvoiceLineItemInput) =>
+    !item.inventoryStockId || !validStockIds.has(item.inventoryStockId);
+
+  const created = await tx.kachaInvoice.create({
+    data: {
+      storeId,
+      slipNumber,
+      customerId,
+      invoiceDate: input.invoiceDate,
+      status: input.status,
+      subtotal: totals.subtotal,
+      makingCharges: totals.makingCharges,
+      stoneCharges: totals.stoneCharges,
+      discount: totals.discount,
+      roundOffAmount: totals.roundOffAmount,
+      totalAmount: totals.totalAmount,
+      paidAmount: input.paidAmount,
+      balanceAmount: input.balanceAmount,
+      notes: input.notes,
+      locationId,
+      convertedToId: input.convertedToId ?? undefined,
+      items: {
+        create: items.map((item) => ({
+          itemName: item.itemName,
+          metalTypeId: item.metalTypeId ?? undefined,
+          purity: item.purity ?? undefined,
+          purityLabel: item.purityLabel ?? undefined,
+          quantity: item.quantity || 1,
+          grossWeight: item.grossWeight ?? undefined,
+          netWeight: item.netWeight ?? undefined,
+          fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
+          components: item.piece ? { create: pieceComponentCreates(item.piece.components) } : undefined,
+          stoneWeight: item.stoneWeight ?? undefined,
+          caratWeight: item.caratWeight ?? undefined,
+          rate: item.rate ?? undefined,
+          makingCharge: item.makingCharge,
+          makingChargeType: toChargeType(item.makingChargeType),
+          stoneCharge: item.stoneCharge,
+          stoneRate: item.stoneRate ?? undefined,
+          stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
+          stoneTypeNames: item.stoneTypeNames ?? undefined,
+          dmoWeight: item.dmoWeight ?? undefined,
+          hmCharge: item.hmCharge ?? 0,
+          lineTotal: lineTotal(item),
+          inventoryStockId: isManualLine(item) ? undefined : (item.inventoryStockId as string),
+          vendorId: isManualLine(item) ? item.vendorId ?? undefined : undefined,
+          vendorName: isManualLine(item) && item.vendorId ? sourcePartyNames.get(item.vendorId) : undefined,
+        })),
+      },
+    },
+  });
+
+  await markSourcePartiesAsSuppliers(tx, storeId, sourcePartyNames.keys());
+
+  for (const item of items) {
+    if (isManualLine(item)) continue;
+    const stockId = item.inventoryStockId as string;
+
+    // Decrement rather than flipping the whole row to SOLD: a row of
+    // 100 pieces that sells 2 still has 98 on hand. Marking it SOLD
+    // outright made the remainder vanish from stock.
+    const soldQty = Math.max(1, item.quantity || 1);
+
+    // The `quantity: { gte: soldQty }` guard is what actually prevents
+    // overselling under concurrency — see invoice-actions.ts's
+    // createInvoice for the full reasoning (identical here). A stale
+    // JS-side `quantity` read beforehand can never provide that
+    // guarantee, since two concurrent slips can both read the same
+    // starting value before either decrements.
+    // saleAmount is deliberately left untouched — see the identical
+    // comment in invoice-actions.ts's createInvoice.
+    const { count } = await tx.inventoryStock.updateMany({
+      where: { id: stockId, storeId, quantity: { gte: soldQty } },
+      data: { quantity: { decrement: soldQty } },
+    });
+
+    if (count === 0) {
+      throw new OversellError(
+        `Not enough stock left for ${item.itemName || "an item"} — it may have just been sold in another sale. Refresh and try again.`,
+      );
+    }
+
+    // Only the last piece leaving turns the row SOLD — read the
+    // post-decrement quantity back rather than computing it from the
+    // pre-decrement value, which the guard above proved cannot be
+    // trusted under concurrency.
+    const updatedStock = await tx.inventoryStock.findUniqueOrThrow({
+      where: { id: stockId },
+      select: { quantity: true, status: true },
+    });
+    if (updatedStock.quantity <= 0 && updatedStock.status !== InventoryStockStatus.SOLD) {
+      await tx.inventoryStock.update({
+        where: { id: stockId },
+        data: { status: InventoryStockStatus.SOLD },
+      });
+    }
+
+    await tx.inventoryTransaction.create({
+      data: {
+        inventoryStockId: stockId,
+        transactionType: InventoryTransactionType.SALE,
+        quantity: soldQty,
+        netWeight: item.netWeight ?? undefined,
+        referenceType: "KachaInvoice",
+        referenceId: created.id,
+      },
+    });
+  }
+
+  if (input.postLedger === false) return created;
+
+  // DEBIT is the full totalAmount, not balanceAmount — same fix and same
+  // reasoning as invoice-actions.ts's createInvoice: debiting only the
+  // net-of-upfront-payment balanceAmount while *also* crediting that same
+  // upfront payment (the loop below) double-counts it, making the ledger
+  // balance too negative by the paid-at-creation amount. Gated on
+  // totalAmount so a fully-paid-at-creation estimate still gets this
+  // DEBIT to offset its own CREDIT rows.
+  if (totals.totalAmount > 0) {
+    await tx.ledgerEntry.create({
+      data: {
+        storeId,
+        type: LedgerEntryType.DEBIT,
+        sourceType: LedgerSourceType.SALE,
+        customerId,
+        amount: totals.totalAmount,
+        description: kachaSaleLedgerDescription(slipNumber),
+        locationId,
+      },
+    });
+  }
+
+  // One CREDIT entry per payment-method row actually collected at the
+  // moment of sale. LedgerEntry has no kachaInvoiceId column (only
+  // invoiceId/purchaseId) — same limitation the balance-due entry above
+  // already lives with, and recordKachaInvoicePayment's own CREDIT entry
+  // does too — so these rows are identified by customerId + description
+  // only, same as every other Kacha ledger entry today.
+  for (const [index, payment] of payments.entries()) {
+    await tx.ledgerEntry.create({
+      data: {
+        storeId,
+        type: LedgerEntryType.CREDIT,
+        sourceType: LedgerSourceType.PAYMENT_IN,
+        customerId,
+        amount: payment.amount,
+        paymentMethod: payment.method as PaymentMethod,
+        paymentReference: payment.reference ?? undefined,
+        bankName: payment.bankName ?? undefined,
+        attachmentUrl: payment.attachmentUrl ?? undefined,
+        locationId,
+        description: index === 0 ? `Payment received for ${slipNumber}` : undefined,
+      },
+    });
+  }
+
+  return created;
+}
+
+/** The SALE debit's description — the only link from a ledger row back to
+ * its slip (LedgerEntry has no kachaInvoiceId). */
+function kachaSaleLedgerDescription(slipNumber: string) {
+  return `Estimate ${slipNumber} balance due`;
+}
+
 /**
  * A disabled input on kacha-invoice-form.tsx is a UI courtesy, not
  * enforcement — a direct/tampered request can still submit anything for a
@@ -352,15 +599,40 @@ async function lockLinkedStockFields(
 }
 
 async function generateSlipNumber(storeId: string) {
-  const year = new Date().getFullYear();
-  const count = await prisma.kachaInvoice.count({
-    where: {
-      storeId,
-      slipNumber: { startsWith: `KACHA-${year}-` },
-    },
-  });
+  return (await slipNumberAllocator(storeId))();
+}
 
-  return `KACHA-${year}-${String(count + 1).padStart(4, "0")}`;
+/**
+ * Hands out this year's next slip numbers, one per call. Counts on from the
+ * highest number already used rather than from a COUNT of slips — a count
+ * repeats a number still in use once any slip has been deleted (or a deleted
+ * slip restored under its own number), and the second create then fails on
+ * @@unique([storeId, slipNumber]). `reserved` = numbers about to be written
+ * by the same caller (an import keeping original numbers), skipped too.
+ */
+async function slipNumberAllocator(storeId: string, reserved: ReadonlySet<string> = new Set()) {
+  const prefix = `KACHA-${new Date().getFullYear()}-`;
+  const existing = await prisma.kachaInvoice.findMany({
+    where: { storeId, slipNumber: { startsWith: prefix } },
+    select: { slipNumber: true },
+  });
+  const taken = new Set([...existing.map((row) => row.slipNumber), ...reserved]);
+  let next =
+    Math.max(
+      0,
+      ...[...taken]
+        .filter((number) => number.startsWith(prefix))
+        .map((number) => Number(number.slice(prefix.length)))
+        .filter((value) => Number.isInteger(value)),
+    ) + 1;
+
+  return () => {
+    let number = `${prefix}${String(next).padStart(4, "0")}`;
+    while (taken.has(number)) number = `${prefix}${String(++next).padStart(4, "0")}`;
+    next += 1;
+    taken.add(number);
+    return number;
+  };
 }
 
 function mapKachaInvoice(kachaInvoice: any) {
@@ -746,19 +1018,8 @@ export async function createKachaInvoice(
     const notes = String(formData.get("notes") || "").trim() || null;
     const locationId = String(formData.get("locationId") || "").trim() || null;
 
-    const subtotal = items.reduce((sum, item) => sum + lineMetalValue(item), 0);
-    // Hallmarking charge folds into the slip's Making Charges total — same
-    // convention as invoice-actions.ts's own makingCharges.
-    const makingCharges = items.reduce(
-      (sum, item) => sum + toNumber(item.makingCharge) + toNumber(item.hmCharge),
-      0,
-    );
-    const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
-    const rawTotal = subtotal + makingCharges + stoneCharges - discount;
-    // Indian-billing convention: the persisted Total is always a whole
-    // rupee, with the (small, signed) adjustment recorded separately rather
-    // than silently absorbed — see lib/round-off.ts.
-    const { roundOffAmount, totalAmount } = computeRoundOff(rawTotal);
+    const totals = computeKachaTotals(items, discount);
+    const { totalAmount } = totals;
 
     // The exchange goes against the slip first (Kacha has no store-credit
     // apply); cash only covers what's left, and any value beyond the slip is
@@ -775,11 +1036,7 @@ export async function createKachaInvoice(
         message: `Payments exceed what's left to pay after the customer exchange (₹${Math.max(0, totalAmount - oldGoldSplit.applied).toFixed(2)}).`,
       };
     }
-    const balanceAmount = Math.max(0, totalAmount - paidAmount);
-
-    let status: InvoiceStatus = InvoiceStatus.PAID;
-    if (balanceAmount > 0 && paidAmount > 0) status = InvoiceStatus.PARTIAL;
-    else if (balanceAmount > 0 && paidAmount === 0) status = InvoiceStatus.DRAFT;
+    const { balanceAmount, status } = kachaPaymentStatus(totalAmount, paidAmount);
 
     // storeId was already resolved above (ahead of the subtotal/totals
     // calculation, so lockLinkedStockFields could run before them) — not
@@ -855,159 +1112,23 @@ export async function createKachaInvoice(
     // (non-local) DB connection and throw P2028 ("Transaction not found").
     // Same fix as createInvoice/createPurchase's identical transactions.
     const kachaInvoice = await prisma.$transaction(async (tx) => {
-      const created = await tx.kachaInvoice.create({
-        data: {
-          storeId,
-          slipNumber,
-          customerId,
-          invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : new Date(),
-          status,
-          subtotal,
-          makingCharges,
-          stoneCharges,
-          discount,
-          roundOffAmount,
-          totalAmount,
-          paidAmount,
-          balanceAmount,
-          notes,
-          locationId: resolvedLocationId ?? undefined,
-          items: {
-            create: items.map((item) => ({
-              itemName: item.itemName,
-              metalTypeId: item.metalTypeId ?? undefined,
-              purity: item.purity ?? undefined,
-              purityLabel: item.purityLabel ?? undefined,
-              quantity: item.quantity || 1,
-              grossWeight: item.grossWeight ?? undefined,
-              netWeight: item.netWeight ?? undefined,
-              fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
-              components: item.piece ? { create: pieceComponentCreates(item.piece.components) } : undefined,
-              stoneWeight: item.stoneWeight ?? undefined,
-              caratWeight: item.caratWeight ?? undefined,
-              rate: item.rate ?? undefined,
-              makingCharge: item.makingCharge,
-              makingChargeType: toChargeType(item.makingChargeType),
-              stoneCharge: item.stoneCharge,
-              stoneRate: item.stoneRate ?? undefined,
-              stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
-              stoneTypeNames: item.stoneTypeNames ?? undefined,
-              dmoWeight: item.dmoWeight ?? undefined,
-              hmCharge: item.hmCharge ?? 0,
-              lineTotal: lineTotal(item),
-              inventoryStockId:
-                item.inventoryStockId && validStockIds.has(item.inventoryStockId)
-                  ? item.inventoryStockId
-                  : undefined,
-              vendorId: isManualLine(item) ? item.vendorId ?? undefined : undefined,
-              vendorName: isManualLine(item) && item.vendorId ? sourceParties.names.get(item.vendorId) : undefined,
-            })),
-          },
-        },
+      const created = await writeKachaSlip(tx, {
+        storeId,
+        slipNumber,
+        customerId,
+        invoiceDate: invoiceDateRaw ? new Date(invoiceDateRaw) : new Date(),
+        totals,
+        paidAmount,
+        balanceAmount,
+        status,
+        notes,
+        locationId: resolvedLocationId,
+        items,
+        validStockIds,
+        sourcePartyNames: sourceParties.names,
+        fineOf,
+        payments,
       });
-
-      await markSourcePartiesAsSuppliers(tx, storeId, sourceParties.names.keys());
-
-      for (const item of items) {
-        if (!item.inventoryStockId || !validStockIds.has(item.inventoryStockId)) continue;
-
-        // Decrement rather than flipping the whole row to SOLD: a row of
-        // 100 pieces that sells 2 still has 98 on hand. Marking it SOLD
-        // outright made the remainder vanish from stock.
-        const soldQty = Math.max(1, item.quantity || 1);
-
-        // The `quantity: { gte: soldQty }` guard is what actually prevents
-        // overselling under concurrency — see invoice-actions.ts's
-        // createInvoice for the full reasoning (identical here). A stale
-        // JS-side `quantity` read beforehand can never provide that
-        // guarantee, since two concurrent slips can both read the same
-        // starting value before either decrements.
-        // saleAmount is deliberately left untouched — see the identical
-        // comment in invoice-actions.ts's createInvoice.
-        const { count } = await tx.inventoryStock.updateMany({
-          where: { id: item.inventoryStockId, storeId, quantity: { gte: soldQty } },
-          data: {
-            quantity: { decrement: soldQty },
-          },
-        });
-
-        if (count === 0) {
-          throw new OversellError(
-            `Not enough stock left for ${item.itemName || "an item"} — it may have just been sold in another sale. Refresh and try again.`,
-          );
-        }
-
-        // Only the last piece leaving turns the row SOLD — read the
-        // post-decrement quantity back rather than computing it from the
-        // pre-decrement value, which the guard above proved cannot be
-        // trusted under concurrency.
-        const updatedStock = await tx.inventoryStock.findUniqueOrThrow({
-          where: { id: item.inventoryStockId },
-          select: { quantity: true, status: true },
-        });
-        if (updatedStock.quantity <= 0 && updatedStock.status !== InventoryStockStatus.SOLD) {
-          await tx.inventoryStock.update({
-            where: { id: item.inventoryStockId },
-            data: { status: InventoryStockStatus.SOLD },
-          });
-        }
-
-        await tx.inventoryTransaction.create({
-          data: {
-            inventoryStockId: item.inventoryStockId,
-            transactionType: InventoryTransactionType.SALE,
-            quantity: soldQty,
-            netWeight: item.netWeight ?? undefined,
-            referenceType: "KachaInvoice",
-            referenceId: created.id,
-          },
-        });
-      }
-
-      // DEBIT is the full totalAmount, not balanceAmount — same fix and same
-      // reasoning as invoice-actions.ts's createInvoice: debiting only the
-      // net-of-upfront-payment balanceAmount while *also* crediting that same
-      // upfront payment (the loop below) double-counts it, making the ledger
-      // balance too negative by the paid-at-creation amount. Gated on
-      // totalAmount so a fully-paid-at-creation estimate still gets this
-      // DEBIT to offset its own CREDIT rows.
-      if (totalAmount > 0) {
-        await tx.ledgerEntry.create({
-          data: {
-            storeId,
-            type: LedgerEntryType.DEBIT,
-            sourceType: LedgerSourceType.SALE,
-            customerId,
-            amount: totalAmount,
-            description: `Estimate ${slipNumber} balance due`,
-            locationId: resolvedLocationId ?? undefined,
-          },
-        });
-      }
-
-      // One CREDIT entry per payment-method row actually collected at the
-      // moment of sale. LedgerEntry has no kachaInvoiceId column (only
-      // invoiceId/purchaseId) — same limitation the balance-due entry above
-      // already lives with, and recordKachaInvoicePayment's own CREDIT entry
-      // does too — so these rows are identified by customerId + description
-      // only, same as every other Kacha ledger entry today.
-      for (const [index, payment] of payments.entries()) {
-        await tx.ledgerEntry.create({
-          data: {
-            storeId,
-            type: LedgerEntryType.CREDIT,
-            sourceType: LedgerSourceType.PAYMENT_IN,
-            customerId,
-            amount: payment.amount,
-            paymentMethod: payment.method as PaymentMethod,
-            paymentReference: payment.reference ?? undefined,
-            bankName: payment.bankName ?? undefined,
-            attachmentUrl: payment.attachmentUrl ?? undefined,
-            locationId: resolvedLocationId ?? undefined,
-            description: index === 0 ? `Payment received for ${slipNumber}` : undefined,
-          },
-        });
-      }
 
       // Customer → Business half of a Customer Exchange: the EX purchase,
       // its stock and the customer's OLD_GOLD_EXCHANGE credit (keyed by the

@@ -126,8 +126,11 @@ export function StockItemSelect<T extends StockItemBase>({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
 
-      <SelectContent>
-        <div className="p-2">
+      {/* Opens below the field at a fixed height (it used to grow to the
+          whole screen with hundreds of pieces); the search box stays pinned
+          at the top while the list scrolls. */}
+      <SelectContent position="popper" className="max-h-80">
+        <div className="sticky top-0 z-10 bg-popover p-2">
           <Input
             placeholder="Search by product code, name, category or stock code..."
             value={search}

@@ -97,16 +97,21 @@ test("stock tags print every metal and stone, per Settings > Tags", async ({ pag
 
   // Settings > Tags: drop Stones from the QR tag, add Category; save.
   await page.goto("/settings/tags")
+  // A click that lands before React hydrates the form is silently lost
+  // (seen in CI), and a "button gone" check can pass while the page is
+  // still swapping in — the save then still carried STONES. Wait for the
+  // page to settle, then confirm against the printed list itself.
+  await page.waitForLoadState("networkidle")
   const qrCard = page.getByTestId("qr-tag-fields")
-  // Retried until it takes: a click that lands before React hydrates the
-  // form is silently lost (seen in CI), and the next click then works, so
-  // the save carried CATEGORY but still had STONES.
+  const printed = page.getByTestId("qr-tag-fields-printed")
   const removeStones = qrCard.getByRole("button", { name: /Remove Stones/ })
   await expect(async () => {
     if (await removeStones.count()) await removeStones.click({ timeout: 1_000 })
-    await expect(removeStones).toHaveCount(0, { timeout: 1_000 })
+    await expect(printed).not.toContainText("Stones (each stone", { timeout: 1_000 })
   }).toPass()
   await qrCard.getByRole("button", { name: /Category & type/ }).click()
+  await expect(printed).toContainText("Category & type")
+  await expect(printed).not.toContainText("Stones (each stone")
   await page.getByRole("button", { name: "Save tag fields" }).click()
   const savedFields = async () =>
     (await db().businessSettings.findUniqueOrThrow({ where: { storeId }, select: { qrTagFields: true } })).qrTagFields

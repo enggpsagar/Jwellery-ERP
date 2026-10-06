@@ -284,3 +284,8 @@ export function parseExcelUpload(fileBuffer: ArrayBuffer): Record<string, unknow
     raw: false,
   });
 }
+
+/** TEMP stub — replaced by the real styleHeaderRow on merge. */
+export function styleHeaderRow(buffer: Buffer): Buffer {
+  return buffer;
+}

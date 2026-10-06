@@ -48,6 +48,12 @@ import { getFineWeightResolver, resolveFineWeight } from "@/lib/fine-weight"
 import { describePieceComponentsText, METALS_AND_STONES_COLUMN } from "@/lib/piece-components-text"
 import { formatShortDate, formatShortDateTime } from "@/lib/utils"
 import { logger } from "@/lib/logger";
+import {
+  existingRecordHint,
+  IMPORT_SUGGESTION_MARK,
+  namesAsCandidates,
+  suggestFrom,
+} from "@/lib/import-suggest";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 
 function parseNullableString(value: FormDataEntryValue | null) {
@@ -1440,6 +1446,7 @@ export async function importInventoryStockFromExcel(
         select: {
           id: true,
           productCode: true,
+          name: true,
           metalTypeId: true,
           defaultPurity: true,
           storeMetalPurity: { select: { label: true } },
@@ -1458,7 +1465,10 @@ export async function importInventoryStockFromExcel(
         },
       }),
       prisma.storeLocation.findMany({ where: { storeId }, select: { id: true, name: true } }),
-      prisma.inventoryStock.findMany({ where: { storeId }, select: { stockCode: true } }),
+      prisma.inventoryStock.findMany({
+        where: { storeId },
+        select: { stockCode: true, product: { select: { productCode: true, name: true } } },
+      }),
       prisma.storeMetal.findMany({ where: { storeId }, select: { id: true, hasPurity: true } }),
     ])
 
@@ -1473,6 +1483,14 @@ export async function importInventoryStockFromExcel(
     const fineOf = await getFineWeightResolver(storeId)
 
     const usedCodes = new Set(existingCodes.map((row) => row.stockCode.trim().toLowerCase()))
+    const stockByCode = new Map(existingCodes.map((row) => [row.stockCode.trim().toLowerCase(), row]))
+    // A mistyped code is matched against both codes and product names, so a
+    // row that names the product instead of its code still gets pointed at it.
+    const productCandidates = products.map((product) => ({
+      name: product.productCode,
+      detail: product.name,
+      aliases: [product.name],
+    }))
     let highestCode = existingCodes.reduce((max, row) => {
       const match = /^STK-(?:\d{4}-)?(\d+)$/.exec(row.stockCode)
       return match ? Math.max(max, Number(match[1])) : max
@@ -1514,7 +1532,12 @@ export async function importInventoryStockFromExcel(
         continue
       }
       if (!product) {
-        errors.push(`Row ${line}: No product found with code "${productCode}" — add the product first`)
+        errors.push(
+          `Row ${line}: No product found with code "${productCode}"${
+            suggestFrom(productCode, productCandidates, { listUpTo: 0 }) ||
+            `${IMPORT_SUGGESTION_MARK}Add the product first, or check the code on the Products page`
+          }`,
+        )
         continue
       }
       if (!product.metalTypeId) {
@@ -1524,7 +1547,13 @@ export async function importInventoryStockFromExcel(
 
       const typedCode = stockImportCell(row, "Stock Code")
       if (typedCode && usedCodes.has(typedCode.toLowerCase())) {
-        rowErrors.push(`Stock Code "${typedCode}" already exists — leave it blank for an automatic one`)
+        const owner = stockByCode.get(typedCode.toLowerCase())
+        rowErrors.push(
+          `Stock Code "${typedCode}" already exists${existingRecordHint(
+            { name: typedCode, detail: owner?.product ? `${owner.product.name} (ref ${owner.product.productCode})` : null },
+            "Leave Stock Code blank for an automatic one, or remove this row if it's the same piece",
+          )}`,
+        )
       }
 
       const statusRaw = stockImportCell(row, "Status")
@@ -1581,7 +1610,7 @@ export async function importInventoryStockFromExcel(
       let resolvedLocationId: string | null = null
       const requestedLocationId = locationName ? (locationByName.get(locationName.toLowerCase()) ?? null) : null
       if (locationName && !requestedLocationId) {
-        rowErrors.push(`No location found named "${locationName}"`)
+        rowErrors.push(`No location found named "${locationName}"${suggestFrom(locationName, namesAsCandidates(locations.map((l) => l.name)))}`)
       } else {
         const resolution = await resolveWritableLocationId(storeId, requestedLocationId, locationScope)
         if (!resolution.ok) rowErrors.push(resolution.message)

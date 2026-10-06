@@ -92,6 +92,15 @@ The Hobby plan's Fluid Active CPU (4h/month) is the binding limit, so server wor
 - The root layout doesn't read the session (`SessionProvider` lives in the `(dashboard)` layout), so `/`, `/faq`, `/contact` are static (revalidate 1h); middleware redirects a signed-in visitor from `/` to `/dashboard`.
 - Client polling (notification bell, scan panel) pauses while the tab is hidden.
 
+### Excel import errors suggest from existing records (2026-10-06)
+
+Every `import*FromExcel` action appends a hint to its "not found" and "already exists" row errors, built with `lib/import-suggest.ts` (pure, client-safe):
+- `suggestFrom()` returns the closest existing names, matched case-, space- and typo-tolerantly, along with each record's ref.
+- `existingRecordHint()` names the saved record and its code.
+- `earlierRowHint()` points at the earlier row of a duplicate in the same file.
+
+Hints start with `IMPORT_SUGGESTION_MARK` (" → "). `components/shared/import-error-list.tsx` splits on it and highlights the hint, and all 7 import dialogs use it. A new importer should follow the same pattern, reusing the rows it already loaded for validation rather than running extra queries. Suggestions are hints only: the import never auto-applies them.
+
 ### Email
 
 `lib/mailer.ts` wraps a single `nodemailer` SMTP transporter built from `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`MAIL_FROM`. `sendMail()` never throws — a missing config or send failure returns `{ sent: false, message }` so callers can toast a status without failing the action that triggered it. Templates live in `lib/email-templates.ts`. Wired into: user creation (welcome/invite email, `app/(dashboard)/users/actions.ts`), invoice/Kacha-slip "Email Invoice"/"Email Slip" buttons, and the customer ledger card's "Email Statement" button.

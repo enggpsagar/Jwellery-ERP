@@ -22,6 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { ImportErrorList } from "@/components/shared/import-error-list"
 
 /**
  * Bulk-adds artisans from one spreadsheet — mirrors StockImportDialog's
@@ -128,18 +129,7 @@ export function KarigarImportDialog() {
             />
           </div>
 
-          {errors.length > 0 && (
-            <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-destructive/40 bg-destructive/5 p-3">
-              <p className="text-sm font-medium text-destructive">
-                Nothing was imported. Fix these and try again:
-              </p>
-              <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
-                {errors.map((error, index) => (
-                  <li key={index}>{error}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <ImportErrorList errors={errors} />
 
           <DialogFooter>
             <Button type="submit" disabled={pending || !fileName}>

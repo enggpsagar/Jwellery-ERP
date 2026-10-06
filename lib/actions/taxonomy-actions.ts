@@ -8,6 +8,7 @@ import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
+import { earlierRowHint, existingRecordHint, namesAsCandidates, suggestFrom } from "@/lib/import-suggest";
 import { buildMultiSheetExcelExport, parseExcelWorkbook } from "@/lib/excel-export";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { recordSellingRateChange, type SellingRateKind } from "@/lib/selling-rates";
@@ -1918,8 +1919,8 @@ export async function importMetalsAndCategoriesFromExcel(
     const existingCategoryNames = new Set(existingCategories.map((c) => c.name.trim().toLowerCase()));
 
     const errors: string[] = [];
-    const seenMetalNames = new Set<string>();
-    const seenCategoryNames = new Set<string>();
+    const seenMetalNames = new Map<string, number>();
+    const seenCategoryNames = new Map<string, number>();
     const metalsToCreate: Prisma.StoreMetalCreateManyInput[] = [];
     const categoriesToCreate: { name: string; categoryTypeNames: string[] }[] = [];
 
@@ -1933,11 +1934,11 @@ export async function importMetalsAndCategoriesFromExcel(
         continue;
       }
       if (existingMetalNames.has(key)) {
-        errors.push(`Metals Row ${line}: A metal named "${name}" already exists`);
+        errors.push(`Metals Row ${line}: A metal named "${name}" already exists${existingRecordHint({ name }, "Remove this row — it's already set up")}`);
         continue;
       }
       if (seenMetalNames.has(key)) {
-        errors.push(`Metals Row ${line}: "${name}" is duplicated in this sheet`);
+        errors.push(`Metals Row ${line}: "${name}" is duplicated in this sheet${earlierRowHint(seenMetalNames.get(key)!)}`);
         continue;
       }
 
@@ -1948,7 +1949,7 @@ export async function importMetalsAndCategoriesFromExcel(
         continue;
       }
 
-      seenMetalNames.add(key);
+      seenMetalNames.set(key, line);
       metalsToCreate.push({
         storeId,
         name,
@@ -1969,11 +1970,11 @@ export async function importMetalsAndCategoriesFromExcel(
         continue;
       }
       if (existingCategoryNames.has(key)) {
-        errors.push(`Categories Row ${line}: A category named "${name}" already exists`);
+        errors.push(`Categories Row ${line}: A category named "${name}" already exists${existingRecordHint({ name }, "Remove this row — it's already set up")}`);
         continue;
       }
       if (seenCategoryNames.has(key)) {
-        errors.push(`Categories Row ${line}: "${name}" is duplicated in this sheet`);
+        errors.push(`Categories Row ${line}: "${name}" is duplicated in this sheet${earlierRowHint(seenCategoryNames.get(key)!)}`);
         continue;
       }
 
@@ -1985,7 +1986,7 @@ export async function importMetalsAndCategoriesFromExcel(
           .filter(Boolean),
       )];
 
-      seenCategoryNames.add(key);
+      seenCategoryNames.set(key, line);
       categoriesToCreate.push({ name, categoryTypeNames });
     }
 
@@ -2080,7 +2081,7 @@ export async function importStonesAndStoneTypesFromExcel(
     const existingStoneIdByName = new Map(existingStones.map((s) => [s.name.trim().toLowerCase(), s.id]));
 
     const errors: string[] = [];
-    const seenStoneNames = new Set<string>();
+    const seenStoneNames = new Map<string, number>();
     const stonesToCreate: Prisma.StoreMetalCreateManyInput[] = [];
 
     for (const [index, row] of stoneRows.entries()) {
@@ -2093,11 +2094,11 @@ export async function importStonesAndStoneTypesFromExcel(
         continue;
       }
       if (existingStoneNames.has(key)) {
-        errors.push(`Stones Row ${line}: A stone named "${name}" already exists`);
+        errors.push(`Stones Row ${line}: A stone named "${name}" already exists${existingRecordHint({ name }, "Remove this row — it's already set up")}`);
         continue;
       }
       if (seenStoneNames.has(key)) {
-        errors.push(`Stones Row ${line}: "${name}" is duplicated in this sheet`);
+        errors.push(`Stones Row ${line}: "${name}" is duplicated in this sheet${earlierRowHint(seenStoneNames.get(key)!)}`);
         continue;
       }
 
@@ -2108,7 +2109,7 @@ export async function importStonesAndStoneTypesFromExcel(
         continue;
       }
 
-      seenStoneNames.add(key);
+      seenStoneNames.set(key, line);
       stonesToCreate.push({
         storeId,
         name,
@@ -2123,7 +2124,7 @@ export async function importStonesAndStoneTypesFromExcel(
     // (but before anything is written) — a Stone Name can refer to either
     // an existing stone or one this same file is about to create.
     const stoneTypesToCreate: { stoneName: string; typeName: string }[] = [];
-    const seenStoneTypePairs = new Set<string>();
+    const seenStoneTypePairs = new Map<string, number>();
 
     for (const [index, row] of stoneTypeRows.entries()) {
       const line = index + 2;
@@ -2142,16 +2143,22 @@ export async function importStonesAndStoneTypesFromExcel(
       const stoneKey = stoneName.toLowerCase();
       const knownStone = existingStoneNames.has(stoneKey) || seenStoneNames.has(stoneKey);
       if (!knownStone) {
-        errors.push(`Stone Types Row ${line}: No stone found named "${stoneName}" (add it to the Stones sheet or check the spelling)`);
+        const stoneHint = suggestFrom(stoneName, [
+          ...namesAsCandidates(existingStones.map((st) => st.name)),
+          ...stonesToCreate.map((st) => ({ name: st.name, detail: "in this file's Stones sheet" })),
+        ]);
+        errors.push(
+          `Stone Types Row ${line}: No stone found named "${stoneName}"${stoneHint || " (add it to the Stones sheet or check the spelling)"}`,
+        );
         continue;
       }
 
       const pairKey = `${stoneKey}::${typeName.toLowerCase()}`;
       if (seenStoneTypePairs.has(pairKey)) {
-        errors.push(`Stone Types Row ${line}: "${typeName}" is duplicated for "${stoneName}" in this sheet`);
+        errors.push(`Stone Types Row ${line}: "${typeName}" is duplicated for "${stoneName}" in this sheet${earlierRowHint(seenStoneTypePairs.get(pairKey)!)}`);
         continue;
       }
-      seenStoneTypePairs.add(pairKey);
+      seenStoneTypePairs.set(pairKey, line);
 
       stoneTypesToCreate.push({ stoneName, typeName });
     }

@@ -55,6 +55,7 @@ import {
 } from "@/lib/core/customer"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { logger } from "@/lib/logger";
+import { earlierRowHint, existingRecordHint, namesAsCandidates, suggestFrom } from "@/lib/import-suggest"
 
 // Re-declared (not re-exported via `export type {...} from`, which Next's
 // "use server" export transform can't handle) so every existing
@@ -591,12 +592,14 @@ export async function importCustomersFromExcel(
 
     const existingPhoneRows = await prisma.customer.findMany({
       where: { storeId, phone: { not: null } },
-      select: { phone: true },
+      select: { phone: true, name: true, customerCode: true, vendorCode: true },
     })
-    const existingPhones = new Set(
-      existingPhoneRows.map((row) => (row.phone ?? "").trim()).filter(Boolean),
+    const partyByPhone = new Map(
+      existingPhoneRows
+        .filter((row) => (row.phone ?? "").trim())
+        .map((row) => [(row.phone ?? "").trim(), row]),
     )
-    const seenPhonesInFile = new Set<string>()
+    const firstLineByPhone = new Map<string, number>()
 
     // States by lower-cased name; cities only for the states the file uses.
     const states = await prisma.state.findMany({ select: { id: true, name: true } })
@@ -647,7 +650,7 @@ export async function importCustomersFromExcel(
       const state = rawState ? stateByName.get(rawState.toLowerCase()) : undefined
       let cityName = ""
       if (rawState && !state) {
-        rowErrors.push(`State "${rawState}" is not in the State list`)
+        rowErrors.push(`State "${rawState}" is not in the State list${suggestFrom(rawState, namesAsCandidates(states.map((st) => st.name)))}`)
       }
       if (rawCity) {
         if (!rawState) {
@@ -655,7 +658,14 @@ export async function importCustomersFromExcel(
         } else if (state) {
           const match = cityByStateAndName.get(`${state.id}:${rawCity.toLowerCase()}`)
           if (match) cityName = match
-          else rowErrors.push(`City "${rawCity}" is not in ${state.name}'s city list`)
+          else
+            rowErrors.push(
+              `City "${rawCity}" is not in ${state.name}'s city list${suggestFrom(
+                rawCity,
+                namesAsCandidates(cities.filter((city) => city.stateId === state.id).map((city) => city.name)),
+                { listUpTo: 0 },
+              )}`,
+            )
         }
       }
 
@@ -681,12 +691,19 @@ export async function importCustomersFromExcel(
 
       const phone = input.phone.trim()
       if (phone) {
-        if (seenPhonesInFile.has(phone)) {
-          rowErrors.push(`Phone number "${phone}" is duplicated in this file`)
-        } else if (existingPhones.has(phone)) {
-          rowErrors.push(`A party with phone number "${phone}" already exists`)
+        const earlierLine = firstLineByPhone.get(phone)
+        const existingParty = partyByPhone.get(phone)
+        if (earlierLine) {
+          rowErrors.push(`Phone number "${phone}" is duplicated in this file${earlierRowHint(earlierLine)}`)
+        } else if (existingParty) {
+          rowErrors.push(
+            `A party with phone number "${phone}" already exists${existingRecordHint(
+              { name: existingParty.name, ref: existingParty.customerCode ?? existingParty.vendorCode },
+              "Remove this row, or edit that party instead",
+            )}`,
+          )
         }
-        seenPhonesInFile.add(phone)
+        if (!earlierLine) firstLineByPhone.set(phone, line)
       }
 
       const rawOpeningBalance = customerImportCell(row, "Opening Balance")

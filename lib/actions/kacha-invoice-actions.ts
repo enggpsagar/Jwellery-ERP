@@ -60,6 +60,7 @@ import {
   parseExcelWorkbook,
 } from "@/lib/excel-export";
 import { logger } from "@/lib/logger";
+import { IMPORT_SUGGESTION_MARK, namesAsCandidates, suggestFrom } from "@/lib/import-suggest";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 
 export type KachaInvoiceLineItemInput = {
@@ -1621,10 +1622,20 @@ export async function importKachaInvoicesFromExcel(
     const [customers, metals] = await Promise.all([
       prisma.customer.findMany({
         where: { storeId },
-        select: { id: true, name: true, phone: true },
+        select: { id: true, name: true, phone: true, customerCode: true, vendorCode: true },
       }),
       prisma.storeMetal.findMany({ where: { storeId }, select: { id: true, name: true } }),
     ]);
+
+    // A party is matched by name or phone, so a near-miss on either points
+    // at the same record — shown with its code and phone to tell apart
+    // two parties with similar names.
+    const partyCandidates = customers.map((c) => ({
+      name: c.name,
+      ref: c.customerCode ?? c.vendorCode,
+      detail: c.phone ? `phone ${c.phone}` : null,
+      aliases: [c.phone],
+    }));
 
     const byPhone = new Map(
       customers.filter((c) => c.phone).map((c) => [c.phone!.trim(), c.id]),
@@ -1654,9 +1665,11 @@ export async function importKachaInvoicesFromExcel(
         (phone && byPhone.get(phone)) || (name && byName.get(name.toLowerCase()));
 
       if (!customerId) {
-        errors.push(
-          `${label}: no party matches phone "${phone}" or name "${name}". Add the party first.`,
-        );
+        const hint =
+          suggestFrom(name || phone, partyCandidates, { listUpTo: 0 }) ||
+          (name && phone ? suggestFrom(phone, partyCandidates, { listUpTo: 0 }) : "") ||
+          `${IMPORT_SUGGESTION_MARK}Add the party first, then import again`;
+        errors.push(`${label}: no party matches phone "${phone}" or name "${name}"${hint}`);
         continue;
       }
 
@@ -1687,7 +1700,10 @@ export async function importKachaInvoicesFromExcel(
 
         if (metalName && !metalTypeId) {
           errors.push(
-            `Row ${line}: metal "${metalName}" is not configured for this store (Settings → Taxonomy).`,
+            `Row ${line}: metal "${metalName}" is not configured for this store${
+              suggestFrom(metalName, namesAsCandidates(metals.map((m) => m.name))) ||
+              `${IMPORT_SUGGESTION_MARK}Add it under Settings › Taxonomy`
+            }`,
           );
           continue;
         }
@@ -1699,7 +1715,7 @@ export async function importKachaInvoicesFromExcel(
             : null;
 
         if (purityRaw && !purity) {
-          errors.push(`Row ${line}: "${purityRaw}" is not a valid purity.`);
+          errors.push(`Row ${line}: "${purityRaw}" is not a valid purity${suggestFrom(purityRaw, namesAsCandidates(Object.keys(PurityType)))}`);
           continue;
         }
 

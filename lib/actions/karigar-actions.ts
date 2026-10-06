@@ -48,6 +48,7 @@ import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-loc
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions";
 import type { StoreLocationRow } from "@/lib/actions/store-location-actions";
 import { logger } from "@/lib/logger";
+import { earlierRowHint, existingRecordHint, namesAsCandidates, suggestFrom } from "@/lib/import-suggest";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 
 export type Karigar = {
@@ -1238,7 +1239,7 @@ export async function importKarigarsFromExcel(
     const fileEmails = rows.map((row) => karigarSheetCell(row, "Email")).filter(Boolean);
     const [karigarsWithMobile, usersWithContact] = await Promise.all([
       fileMobiles.length
-        ? prisma.karigar.findMany({ where: { storeId, mobile: { in: fileMobiles } }, select: { mobile: true, name: true } })
+        ? prisma.karigar.findMany({ where: { storeId, mobile: { in: fileMobiles } }, select: { mobile: true, name: true, code: true } })
         : Promise.resolve([]),
       fileMobiles.length || fileEmails.length
         ? prisma.user.findMany({
@@ -1252,7 +1253,9 @@ export async function importKarigarsFromExcel(
           })
         : Promise.resolve([]),
     ]);
-    const karigarNameByMobile = new Map(karigarsWithMobile.map((k) => [k.mobile as string, k.name]));
+    const karigarByMobile = new Map(karigarsWithMobile.map((k) => [k.mobile as string, k]));
+    const metalCandidates = namesAsCandidates(metals.map((m) => m.name));
+    const locationCandidates = namesAsCandidates(locations.map((l) => l.name));
     const userPhones = new Set(usersWithContact.map((u) => u.phone).filter(Boolean) as string[]);
     const userEmails = new Set(usersWithContact.map((u) => u.email?.toLowerCase()).filter(Boolean) as string[]);
     const firstLineByMobile = new Map<string, number>();
@@ -1278,10 +1281,17 @@ export async function importKarigarsFromExcel(
       const mobile = cell("Mobile");
       if (mobile) {
         const earlier = firstLineByMobile.get(mobile);
-        if (earlier) rowErrors.push(`Mobile ${mobile} is also on row ${earlier}`);
+        if (earlier) rowErrors.push(`Mobile ${mobile} is repeated in this file${earlierRowHint(earlier)}`);
         else firstLineByMobile.set(mobile, line);
-        const owner = karigarNameByMobile.get(mobile);
-        if (owner) rowErrors.push(`Mobile ${mobile} already belongs to artisan "${owner}"`);
+        const owner = karigarByMobile.get(mobile);
+        if (owner) {
+          rowErrors.push(
+            `Mobile ${mobile} already belongs to an artisan${existingRecordHint(
+              { name: owner.name, ref: owner.code },
+              "Remove this row, or edit that artisan instead",
+            )}`,
+          );
+        }
         else if (userPhones.has(mobile)) rowErrors.push(`Mobile ${mobile} is already in use as another user's login`);
       }
 
@@ -1289,7 +1299,7 @@ export async function importKarigarsFromExcel(
       if (email) {
         const key = email.toLowerCase();
         const earlier = firstLineByEmail.get(key);
-        if (earlier) rowErrors.push(`Email ${email} is also on row ${earlier}`);
+        if (earlier) rowErrors.push(`Email ${email} is repeated in this file${earlierRowHint(earlier)}`);
         else firstLineByEmail.set(key, line);
         if (userEmails.has(key)) rowErrors.push(`Email ${email} is already in use as another user's login`);
       }
@@ -1317,7 +1327,7 @@ export async function importKarigarsFromExcel(
       const metalName = cell("Metal Type");
       const metal = metalName ? metalByName.get(metalName.toLowerCase()) : undefined;
       if (metalName && !metal) {
-        rowErrors.push(`No metal type found named "${metalName}"`);
+        rowErrors.push(`No metal type found named "${metalName}"${suggestFrom(metalName, metalCandidates)}`);
       }
 
       // A Set, like the form's checkboxes: "Gold, gold" assigns Gold once.
@@ -1326,7 +1336,7 @@ export async function importKarigarsFromExcel(
         const trimmed = rawName.trim();
         if (!trimmed) continue;
         const assigned = metalByName.get(trimmed.toLowerCase());
-        if (!assigned) rowErrors.push(`No metal/stone found named "${trimmed}"`);
+        if (!assigned) rowErrors.push(`No metal/stone found named "${trimmed}"${suggestFrom(trimmed, metalCandidates)}`);
         else assignedMetalTypeIds.add(assigned.id);
       }
 
@@ -1334,7 +1344,7 @@ export async function importKarigarsFromExcel(
       let locationId: string | null = null;
       if (locationName) {
         locationId = locationByName.get(locationName.toLowerCase()) ?? null;
-        if (!locationId) rowErrors.push(`No location found named "${locationName}"`);
+        if (!locationId) rowErrors.push(`No location found named "${locationName}"${suggestFrom(locationName, locationCandidates)}`);
         else if (!isLocationAllowed(scope, locationId)) {
           rowErrors.push(`You don't have access to location "${locationName}"`);
         }

@@ -22,6 +22,7 @@ import {
   parseExcelUpload,
 } from "@/lib/excel-export";
 import { logger } from "@/lib/logger";
+import { namesAsCandidates, suggestFrom } from "@/lib/import-suggest";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 
 function parseNullableString(value: FormDataEntryValue | null) {
@@ -2074,6 +2075,7 @@ export async function importProductsFromExcel(
     const locationByName = new Map(locations.map((l) => [l.name.trim().toLowerCase(), l.id]));
     const styleByName = new Map(styles.map((s) => [s.name.trim().toLowerCase(), s]));
     const locationScope = await getLocationScope();
+    const metalCandidates = namesAsCandidates(metals.map((m) => m.name));
 
     const categoryTypesByCategory = new Map<string, Map<string, { id: string; name: string }>>();
     for (const type of categoryTypes) {
@@ -2104,7 +2106,7 @@ export async function importProductsFromExcel(
       const raw = productImportCell(row, column);
       if (!raw) return null;
       const rate = gstRateByName.get(raw.toLowerCase());
-      if (!rate) rowErrors.push(`No GST rate found named "${raw}" (${column})`);
+      if (!rate) rowErrors.push(`No GST rate found named "${raw}" (${column})${suggestFrom(raw, namesAsCandidates(gstRates.map((r) => r.name)))}`);
       return rate?.id ?? null;
     };
 
@@ -2129,7 +2131,12 @@ export async function importProductsFromExcel(
         return { storePurity, legacy: matchLegacyPurityType(classifyPurityFamily(metalRow), storePurity.label) };
       }
       const legacy = purityByLabel.get(raw.toLowerCase());
-      if (!legacy) rowErrors.push(`"${raw}" is not a purity of ${metalRow.name} — see the Purity dropdown`);
+      if (!legacy) {
+        const storeLabels = storePurities.filter((p) => p.storeMetalId === metalRow.id).map((p) => p.label);
+        rowErrors.push(
+          `"${raw}" is not a purity of ${metalRow.name}${suggestFrom(raw, namesAsCandidates(storeLabels.length ? storeLabels : Object.values(PURITY_LABELS)))}`,
+        );
+      }
       return { legacy: legacy ?? null };
     };
 
@@ -2212,19 +2219,19 @@ export async function importProductsFromExcel(
       const categoryName = productImportCell(row, "Category");
       const category = categoryName ? categoryByName.get(categoryName.toLowerCase()) : undefined;
       if (!categoryName) rowErrors.push("Category is required");
-      else if (!category) rowErrors.push(`No category found named "${categoryName}"`);
+      else if (!category) rowErrors.push(`No category found named "${categoryName}"${suggestFrom(categoryName, namesAsCandidates(categories.map((c) => c.name)))}`);
 
       const metalName = productImportCell(row, "Metal Type");
       const metal = metalName ? metalByName.get(metalName.toLowerCase()) : undefined;
       if (!metalName) rowErrors.push("Metal Type is required");
-      else if (!metal) rowErrors.push(`No metal type found named "${metalName}"`);
+      else if (!metal) rowErrors.push(`No metal type found named "${metalName}"${suggestFrom(metalName, metalCandidates)}`);
 
       const styleRaw = productImportCell(row, "Style");
       const style = styleRaw ? styleByName.get(styleRaw.toLowerCase()) : undefined;
       if (!styleRaw) {
         if (businessSettings?.styleFieldEnabled !== false) rowErrors.push("Style is required");
       } else if (!style) {
-        rowErrors.push(`No style found named "${styleRaw}"`);
+        rowErrors.push(`No style found named "${styleRaw}"${suggestFrom(styleRaw, namesAsCandidates(styles.map((st) => st.name)))}`);
       }
 
       const categoryTypeName = productImportCell(row, "Category Type");
@@ -2232,7 +2239,12 @@ export async function importProductsFromExcel(
       if (categoryTypeName && category) {
         categoryType = categoryTypesByCategory.get(category.id)?.get(categoryTypeName.toLowerCase());
         if (!categoryType) {
-          rowErrors.push(`Category Type "${categoryTypeName}" does not belong to category "${categoryName}"`);
+          rowErrors.push(
+            `Category Type "${categoryTypeName}" does not belong to category "${categoryName}"${suggestFrom(
+              categoryTypeName,
+              namesAsCandidates([...(categoryTypesByCategory.get(category.id)?.values() ?? [])].map((t) => t.name)),
+            )}`,
+          );
         }
       }
 
@@ -2241,7 +2253,12 @@ export async function importProductsFromExcel(
       if (stoneTypeName && metal) {
         stoneOrigin = metalOriginsByMetal.get(metal.id)?.get(stoneTypeName.toLowerCase());
         if (!stoneOrigin) {
-          rowErrors.push(`Stone Type "${stoneTypeName}" does not belong to metal type "${metalName}"`);
+          rowErrors.push(
+            `Stone Type "${stoneTypeName}" does not belong to metal type "${metalName}"${suggestFrom(
+              stoneTypeName,
+              namesAsCandidates([...(metalOriginsByMetal.get(metal.id)?.values() ?? [])].map((o) => o.name)),
+            )}`,
+          );
         }
       }
 
@@ -2261,7 +2278,7 @@ export async function importProductsFromExcel(
         const extraMetalName = productImportCell(extra.row, "Metal Type");
         if (extraMetalName) {
           const extraMetal = metalByName.get(extraMetalName.toLowerCase());
-          if (!extraMetal) extraErrors.push(`No metal type found named "${extraMetalName}"`);
+          if (!extraMetal) extraErrors.push(`No metal type found named "${extraMetalName}"${suggestFrom(extraMetalName, metalCandidates)}`);
           else if (extraMetal.isGemstone || metal?.isGemstone) {
             extraErrors.push(`"${extraMetalName}": extra metal rows are for metal products — put a stone in the Stone column instead`);
           } else {
@@ -2366,7 +2383,7 @@ export async function importProductsFromExcel(
           : null;
 
         if (locationName && !requestedLocationId) {
-          rowErrors.push(`No location found named "${locationName}"`);
+          rowErrors.push(`No location found named "${locationName}"${suggestFrom(locationName, namesAsCandidates(locations.map((l) => l.name)))}`);
         } else {
           const resolution = await resolveWritableLocationId(storeId, requestedLocationId, locationScope);
           if (!resolution.ok) {

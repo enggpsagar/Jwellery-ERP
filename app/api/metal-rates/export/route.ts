@@ -31,12 +31,21 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // 14K gold and Platinum 95 are optional rates — their columns appear
+    // only when some row has one, so a gold/silver-only store's file stays
+    // as it was.
+    const has14k = rates.some((rate) => rate.gold14k != null);
+    const hasPlatinum = rates.some((rate) => rate.platinum95 != null);
+    const optional = (value: { toString(): string } | null) => (value != null ? Number(value) : "");
+
     const rows = rates.map((rate) => ({
       Date: formatShortDate(rate.createdAt),
       "24K Gold": Number(rate.gold24k),
       "22K Gold": Number(rate.gold22k),
       "18K Gold": Number(rate.gold18k),
+      ...(has14k ? { "14K Gold": optional(rate.gold14k) } : {}),
       Silver: Number(rate.silver),
+      ...(hasPlatinum ? { "Platinum 95": optional(rate.platinum95) } : {}),
       Unit: rate.unit,
     }));
 
@@ -128,25 +137,10 @@ function exportPDF(rows: Record<string, any>[]) {
   autoTable(doc, {
     startY: 35,
 
-    head: [
-      [
-        "Date",
-        "24K",
-        "22K",
-        "18K",
-        "Silver",
-        "Unit",
-      ],
-    ],
+    // Same columns as the CSV/Excel rows (incl. 14K / Platinum 95 when present).
+    head: [Object.keys(rows[0] ?? { Date: "", Unit: "" }).map((key) => key.replace(" Gold", ""))],
 
-    body: rows.map((row) => [
-      row.Date,
-      row["24K Gold"],
-      row["22K Gold"],
-      row["18K Gold"],
-      row.Silver,
-      row.Unit,
-    ]),
+    body: rows.map((row) => Object.values(row)),
 
     styles: {
       fontSize: 9,

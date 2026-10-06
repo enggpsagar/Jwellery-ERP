@@ -20,6 +20,7 @@ import { prisma } from "@/lib/prisma";
 import { getFineWeightResolver, type FineWeightResolver } from "@/lib/fine-weight";
 import {
   getPieceResolver,
+  resolveLineStoneDetails,
   pieceComponentCreates,
   serializeStoredComponents,
   type ResolvedPiece,
@@ -109,6 +110,10 @@ export type KachaInvoiceLineItemInput = {
   stoneRate?: number | null;
   stoneMetalTypeName?: string | null;
   stoneTypeNames?: string | null;
+  // A single stone's pcs / clarity / certificate (resolveLineStoneDetails).
+  stonePieces?: number | null;
+  stoneClarity?: string | null;
+  stoneCertificateNumber?: string | null;
   dmoWeight?: number | null;
   // Hallmarking charge, folded into the slip's Making Charges total — same
   // convention as InvoiceLineItemInput.hmCharge's own doc comment.
@@ -227,6 +232,21 @@ async function resolvePieceLines(
   storeId: string,
   items: KachaInvoiceLineItemInput[],
 ): Promise<{ error: string } | KachaInvoiceLineItemInput[]> {
+  const resolved = await resolvePieceRows(storeId, items);
+  if ("error" in resolved) return resolved;
+  const out: KachaInvoiceLineItemInput[] = [];
+  for (const item of resolved) {
+    const next = resolveLineStoneDetails(item, Boolean(item.piece));
+    if ("error" in next) return next;
+    out.push(next);
+  }
+  return out;
+}
+
+async function resolvePieceRows(
+  storeId: string,
+  items: KachaInvoiceLineItemInput[],
+): Promise<{ error: string } | KachaInvoiceLineItemInput[]> {
   const isPiece = (item: KachaInvoiceLineItemInput) => Boolean(item.multiPart && item.components?.length);
   if (!items.some(isPiece)) return items.map((item) => ({ ...item, piece: undefined }));
 
@@ -262,6 +282,11 @@ async function resolvePieceLines(
           stoneTypeNames: row.stoneTypeNames,
           caratWeight: row.caratWeight,
           stoneWeight: row.stoneWeight,
+          // The piece's own count / clarity / certificate win; the form may
+          // fill one the stock never recorded.
+          pieces: row.pieces ?? sent?.pieces ?? null,
+          clarity: row.clarity ?? sent?.clarity ?? null,
+          certificateNumber: row.certificateNumber ?? sent?.certificateNumber ?? null,
           rate: sent?.rate ?? null,
           amount: row.kind === "STONE" ? sent?.amount ?? null : null,
           // Kept (not shown on the slip) so converting to a Pakka invoice
@@ -434,6 +459,9 @@ async function writeKachaSlip(tx: Prisma.TransactionClient, input: WriteKachaSli
           stoneRate: item.stoneRate ?? undefined,
           stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
           stoneTypeNames: item.stoneTypeNames ?? undefined,
+          stonePieces: item.stonePieces ?? null,
+          stoneClarity: item.stoneClarity ?? null,
+          stoneCertificateNumber: item.stoneCertificateNumber ?? null,
           dmoWeight: item.dmoWeight ?? undefined,
           hmCharge: item.hmCharge ?? 0,
           lineTotal: lineTotal(item),
@@ -703,6 +731,9 @@ function mapKachaInvoice(kachaInvoice: any) {
       stoneRate: item.stoneRate ? Number(item.stoneRate) : null,
       stoneMetalTypeName: item.stoneMetalTypeName ?? null,
       stoneTypeNames: item.stoneTypeNames ?? null,
+      stonePieces: item.stonePieces ?? null,
+      stoneClarity: item.stoneClarity ?? null,
+      stoneCertificateNumber: item.stoneCertificateNumber ?? null,
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
       hmCharge: Number(item.hmCharge ?? 0),
       lineTotal: Number(item.lineTotal),
@@ -1422,6 +1453,9 @@ export async function convertKachaToPakka(
               stoneRate: item.stoneRate ?? undefined,
               stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
               stoneTypeNames: item.stoneTypeNames ?? undefined,
+              stonePieces: item.stonePieces ?? null,
+              stoneClarity: item.stoneClarity ?? null,
+              stoneCertificateNumber: item.stoneCertificateNumber ?? null,
               dmoWeight: item.dmoWeight ?? undefined,
               hmCharge: item.hmCharge,
               lineTotal: item.lineTotal,
@@ -1445,6 +1479,9 @@ export async function convertKachaToPakka(
                       stoneTypeNames: row.stoneTypeNames,
                       caratWeight: row.caratWeight,
                       stoneWeight: row.stoneWeight,
+                      pieces: row.pieces,
+                      clarity: row.clarity,
+                      certificateNumber: row.certificateNumber,
                       rate: row.rate,
                       amount: row.amount,
                       gstRateId: row.gstRateId,
@@ -1981,6 +2018,10 @@ export async function importKachaInvoicesFromExcel(
         const stoneRate = amount(row, "Stone Rate", where);
         const stoneChargeGiven = amount(row, "Stone Charge", where);
         const hmGiven = amount(row, "HM Charge", where);
+        const stonePiecesGiven = amount(row, "Stone Pcs", where);
+        if (stonePiecesGiven != null && stonePiecesGiven !== 0 && !(Number.isInteger(stonePiecesGiven) && stonePiecesGiven >= 1)) {
+          slipErrors.push(`${where}: Stone Pcs must be a whole number of 1 or more.`);
+        }
 
         items.push({
           itemName,
@@ -2001,6 +2042,10 @@ export async function importKachaInvoicesFromExcel(
           hmCharge: hmGiven ?? (hallmarkable ? hallmarkCharge : 0),
           stoneMetalTypeName: stone?.name ?? null,
           stoneTypeNames: cell(row, "Stone Type") || null,
+          // Kept only on a line with a stone, as the form saves them.
+          stonePieces: stone && stonePiecesGiven ? stonePiecesGiven : null,
+          stoneClarity: stone ? cell(row, "Stone Clarity").slice(0, 120) || null : null,
+          stoneCertificateNumber: stone ? cell(row, "IGI Certificate No.").slice(0, 120) || null : null,
           caratWeight,
           stoneRate,
           // Blank = Carat Weight × Stone Rate, as the form works it out.

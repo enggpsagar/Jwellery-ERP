@@ -24,6 +24,7 @@ import { lookupPromotionCode } from "@/lib/promotions.server";
 import { computePromotion, type PromotionLine } from "@/lib/promotions";
 import {
   getPieceResolver,
+  resolveLineStoneDetails,
   pieceComponentCreates,
   serializeStoredComponents,
   type ResolvedPiece,
@@ -87,6 +88,10 @@ export type InvoiceLineItemInput = {
   stoneRate?: number | null;
   stoneMetalTypeName?: string | null;
   stoneTypeNames?: string | null;
+  // A single stone's pcs / clarity / certificate (resolveLineStoneDetails).
+  stonePieces?: number | null;
+  stoneClarity?: string | null;
+  stoneCertificateNumber?: string | null;
   dmoWeight?: number | null;
   stoneWeight?: number | null;
   hmCharge?: number;
@@ -261,6 +266,21 @@ async function resolvePieceLines(
   storeId: string,
   items: InvoiceLineItemInput[],
 ): Promise<{ error: string } | InvoiceLineItemInput[]> {
+  const resolved = await resolvePieceRows(storeId, items);
+  if ("error" in resolved) return resolved;
+  const out: InvoiceLineItemInput[] = [];
+  for (const item of resolved) {
+    const next = resolveLineStoneDetails(item, Boolean(item.piece));
+    if ("error" in next) return next;
+    out.push(next);
+  }
+  return out;
+}
+
+async function resolvePieceRows(
+  storeId: string,
+  items: InvoiceLineItemInput[],
+): Promise<{ error: string } | InvoiceLineItemInput[]> {
   const isPiece = (item: InvoiceLineItemInput) => Boolean(item.multiPart && item.components?.length);
   if (!items.some(isPiece)) return items.map((item) => ({ ...item, piece: undefined }));
 
@@ -296,6 +316,11 @@ async function resolvePieceLines(
           stoneTypeNames: row.stoneTypeNames,
           caratWeight: row.caratWeight,
           stoneWeight: row.stoneWeight,
+          // The piece's own count / clarity / certificate win; the form may
+          // fill one the stock never recorded.
+          pieces: row.pieces ?? sent?.pieces ?? null,
+          clarity: row.clarity ?? sent?.clarity ?? null,
+          certificateNumber: row.certificateNumber ?? sent?.certificateNumber ?? null,
           rate: sent?.rate ?? null,
           amount: row.kind === "STONE" ? sent?.amount ?? null : null,
           gstRateId: sent?.gstRateId ?? row.gstRateId,
@@ -528,6 +553,9 @@ export type InvoiceItemView = {
   stoneRate: number | null;
   stoneMetalTypeName: string | null;
   stoneTypeNames: string | null;
+  stonePieces: number | null;
+  stoneClarity: string | null;
+  stoneCertificateNumber: string | null;
   dmoWeight: number | null;
   stoneWeight: number | null;
   hmCharge: number;
@@ -626,6 +654,9 @@ function mapInvoice(invoice: any) {
       stoneRate: item.stoneRate ? Number(item.stoneRate) : null,
       stoneMetalTypeName: item.stoneMetalTypeName ?? null,
       stoneTypeNames: item.stoneTypeNames ?? null,
+      stonePieces: item.stonePieces ?? null,
+      stoneClarity: item.stoneClarity ?? null,
+      stoneCertificateNumber: item.stoneCertificateNumber ?? null,
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
       stoneWeight: item.stoneWeight ? Number(item.stoneWeight) : null,
       hmCharge: Number(item.hmCharge ?? 0),
@@ -1663,6 +1694,9 @@ export async function createInvoice(
               stoneRate: item.stoneRate ?? undefined,
               stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
               stoneTypeNames: item.stoneTypeNames ?? undefined,
+              stonePieces: item.stonePieces ?? null,
+              stoneClarity: item.stoneClarity ?? null,
+              stoneCertificateNumber: item.stoneCertificateNumber ?? null,
               dmoWeight: item.dmoWeight ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               hmCharge: item.hmCharge ?? 0,
@@ -2480,6 +2514,9 @@ export async function updateInvoice(
               stoneRate: item.stoneRate ?? undefined,
               stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
               stoneTypeNames: item.stoneTypeNames ?? undefined,
+              stonePieces: item.stonePieces ?? null,
+              stoneClarity: item.stoneClarity ?? null,
+              stoneCertificateNumber: item.stoneCertificateNumber ?? null,
               dmoWeight: item.dmoWeight ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               hmCharge: item.hmCharge ?? 0,

@@ -391,6 +391,9 @@ async function createProductFromManualEntry(
             stoneCharge: row.amount,
             gstRateId: row.gstRateId,
             sortOrder: index,
+            pieces: row.pieces,
+            clarity: row.clarity,
+            certificateNumber: row.certificateNumber,
           })),
         },
       }

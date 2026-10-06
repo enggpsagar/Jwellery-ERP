@@ -5,6 +5,8 @@
 //
 // e.g. "Gold 22K 4.000 g · ₹28,000.00 + Silver 925 2.000 g · ₹200.00 + Diamond 0.10 ct · ₹5,000.00"
 
+import { stoneDetailsText } from "./piece-components"
+
 export const METALS_AND_STONES_COLUMN = "Metals & Stones"
 
 export type PieceComponentTextRow = {
@@ -18,6 +20,9 @@ export type PieceComponentTextRow = {
   stoneMetalTypeName?: string | null
   stoneTypeNames?: string | null
   caratWeight?: unknown
+  pieces?: number | null
+  clarity?: string | null
+  certificateNumber?: string | null
   amount?: unknown
 }
 
@@ -40,7 +45,8 @@ export function describePieceComponentText(row: PieceComponentTextRow) {
     return `${name} ${(num(row.netWeight) ?? 0).toFixed(3)} g${value}`
   }
   const name = [row.stoneMetalTypeName, row.stoneTypeNames].filter(Boolean).join(" ") || "Stone"
-  return `${name} ${(num(row.caratWeight) ?? 0).toFixed(2)} ct${value}`
+  const details = stoneDetailsText(row)
+  return `${name} ${(num(row.caratWeight) ?? 0).toFixed(2)} ct${details ? ` · ${details}` : ""}${value}`
 }
 
 /** The whole piece, rows joined with " + "; "" for a single-metal line (no rows). */

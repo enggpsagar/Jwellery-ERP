@@ -58,7 +58,7 @@ import { StockItemSelect } from "@/components/inventory/shared/stock-item-select
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog"
-import { PieceComponentsEditor, StoneExtras } from "@/components/shared/piece-components-editor"
+import { PieceComponentsEditor, StoneDetailsInputs } from "@/components/shared/piece-components-editor"
 import { stockPieceDrafts, stoneSellingRate, type LinkedStoneDetails } from "@/lib/inventory/stock-pick-rates"
 import { MultiPartQuestion } from "@/components/shared/multi-part-question"
 import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
@@ -136,6 +136,11 @@ type LineItem = {
   netStoneWeightTouched: boolean
   stoneMetalTypeName: string
   stoneTypeNames: string[]
+  /** The single stone's pcs / clarity / certificate (saved on the line's
+   * stonePieces / stoneClarity / stoneCertificateNumber). */
+  stonePieces?: number | null
+  stoneClarity?: string | null
+  stoneCertificateNumber?: string | null
   dmoWeight: number
   dmoWeightUnit: "GRAM" | "CARAT"
   /** Always in grams internally — see grossWeightUnit's doc comment above. */
@@ -266,6 +271,8 @@ type KachaInvoiceFormProps = {
   /** Today's fine rates (Metal Rates) to prefill a Customer Exchange line's
    * rate — same prop as invoice-form.tsx's. */
   fineRates?: { gold: number | null; silver: number | null }
+  /** Settings → Stone Clarity names, suggested on every stone's Clarity. */
+  clarities?: string[]
 }
 
 export function KachaInvoiceForm({
@@ -282,6 +289,7 @@ export function KachaInvoiceForm({
   enumFineness = {},
   fineRates = { gold: null, silver: null },
   gstRates = [],
+  clarities = [],
 }: KachaInvoiceFormProps) {
   // A new metal/stone row's "GST if billed" starts at the store's default rate.
   const defaultGstRateId =
@@ -624,6 +632,10 @@ export function KachaInvoiceForm({
       stoneTypeNames: stock.stoneTypeNames
         ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
         : [],
+      // The stone's pcs / clarity / certificate — its Product's stone row.
+      stonePieces: stock.linkedStone?.pieces ?? null,
+      stoneClarity: stock.linkedStone?.clarity ?? null,
+      stoneCertificateNumber: stock.linkedStone?.certificateNumber ?? null,
       // Same reasoning as netStoneWeightTouched above — InventoryStock
       // carries no hmCharge of its own, so there's nothing authoritative to
       // protect; left untouched so the Purity-driven auto-fill populates it.
@@ -853,6 +865,10 @@ export function KachaInvoiceForm({
           item.hasStoneComponent && item.stoneTypeNames.length
             ? item.stoneTypeNames.join(", ")
             : null,
+        stonePieces: item.hasStoneComponent && !item.multiPart ? item.stonePieces || null : null,
+        stoneClarity: item.hasStoneComponent && !item.multiPart ? item.stoneClarity?.trim() || null : null,
+        stoneCertificateNumber:
+          item.hasStoneComponent && !item.multiPart ? item.stoneCertificateNumber?.trim() || null : null,
         dmoWeight: toUnit(item.dmoWeight) || null,
         stoneWeight: toUnit(item.stoneWeightInput) || null,
         hmCharge: item.hmCharge,
@@ -981,7 +997,7 @@ export function KachaInvoiceForm({
         </div>
 
         <div className="space-y-3">
-          {items.map((item) => {
+          {items.map((item, index) => {
             // Once a line is linked to a Stock Item, the physical facts
             // about that piece come from Inventory and are locked here,
             // same as Invoice already does — see isLinked there.
@@ -1035,6 +1051,7 @@ export function KachaInvoiceForm({
                 rateForMetal={(metal) => metal.sellingPrice ?? 0}
                 lockPhysical={isLinked}
                 testIdPrefix="kacha-piece"
+                clarities={clarities}
                 gstRates={gstRates.length ? gstRates : undefined}
                 defaultGstRateId={defaultGstRateId}
                 gstLabel="GST if billed"
@@ -1568,10 +1585,25 @@ export function KachaInvoiceForm({
                       lockPhysicalFields={isLinked}
                     />
                   )}
-                  {item.hasStoneComponent && isLinked && (
-                    <StoneExtras
-                      row={stockItems.find((s) => s.id === item.inventoryStockId)?.linkedStone ?? {}}
-                      testId="kacha-linked-stone-extras"
+                  {item.hasStoneComponent && (
+                    <StoneDetailsInputs
+                      className="mt-2"
+                      value={{
+                        pieces: item.stonePieces,
+                        clarity: item.stoneClarity,
+                        certificateNumber: item.stoneCertificateNumber,
+                      }}
+                      onChange={(patch) =>
+                        updateItem(item.key, {
+                          ...("pieces" in patch ? { stonePieces: patch.pieces } : {}),
+                          ...("clarity" in patch ? { stoneClarity: patch.clarity } : {}),
+                          ...("certificateNumber" in patch ? { stoneCertificateNumber: patch.certificateNumber } : {}),
+                        })
+                      }
+                      clarities={clarities}
+                      locked={isLinked ? stockItems.find((s) => s.id === item.inventoryStockId)?.linkedStone : undefined}
+                      testIdPrefix="kacha-line-stone"
+                      index={index}
                     />
                   )}
                 </div>

@@ -20,6 +20,7 @@ import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/pie
 import { getFineWeightResolver } from "@/lib/fine-weight";
 import {
   getPieceResolver,
+  resolveLineStoneDetails,
   pieceComponentCreates,
   serializeStoredComponents,
   type ResolvedPiece,
@@ -117,6 +118,10 @@ export type QuotationLineItemInput = {
   stoneRate?: number | null;
   stoneMetalTypeName?: string | null;
   stoneTypeNames?: string | null;
+  // A single stone's pcs / clarity / certificate (resolveLineStoneDetails).
+  stonePieces?: number | null;
+  stoneClarity?: string | null;
+  stoneCertificateNumber?: string | null;
   // Hallmarking charge, folded into the quotation's Making Charges total —
   // same convention as InvoiceLineItemInput.hmCharge's own doc comment.
   hmCharge?: number;
@@ -192,6 +197,21 @@ async function resolvePieceLines(
   storeId: string,
   items: QuotationLineItemInput[],
 ): Promise<{ error: string } | QuotationLineItemInput[]> {
+  const resolved = await resolvePieceRows(storeId, items);
+  if ("error" in resolved) return resolved;
+  const out: QuotationLineItemInput[] = [];
+  for (const item of resolved) {
+    const next = resolveLineStoneDetails(item, Boolean(item.piece));
+    if ("error" in next) return next;
+    out.push(next);
+  }
+  return out;
+}
+
+async function resolvePieceRows(
+  storeId: string,
+  items: QuotationLineItemInput[],
+): Promise<{ error: string } | QuotationLineItemInput[]> {
   const isPiece = (item: QuotationLineItemInput) => Boolean(item.multiPart && item.components?.length);
   if (!items.some(isPiece)) return items.map((item) => ({ ...item, piece: undefined }));
 
@@ -227,6 +247,11 @@ async function resolvePieceLines(
           stoneTypeNames: row.stoneTypeNames,
           caratWeight: row.caratWeight,
           stoneWeight: row.stoneWeight,
+          // The piece's own count / clarity / certificate win; the form may
+          // fill one the stock never recorded.
+          pieces: row.pieces ?? sent?.pieces ?? null,
+          clarity: row.clarity ?? sent?.clarity ?? null,
+          certificateNumber: row.certificateNumber ?? sent?.certificateNumber ?? null,
           rate: sent?.rate ?? null,
           amount: row.kind === "STONE" ? sent?.amount ?? null : null,
           gstRateId: sent?.gstRateId ?? row.gstRateId,
@@ -432,6 +457,9 @@ function mapQuotation(quotation: any) {
       stoneRate: item.stoneRate ? Number(item.stoneRate) : null,
       stoneMetalTypeName: item.stoneMetalTypeName ?? null,
       stoneTypeNames: item.stoneTypeNames ?? null,
+      stonePieces: item.stonePieces ?? null,
+      stoneClarity: item.stoneClarity ?? null,
+      stoneCertificateNumber: item.stoneCertificateNumber ?? null,
       hmCharge: Number(item.hmCharge ?? 0),
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
@@ -966,6 +994,9 @@ export async function createQuotation(
             stoneRate: item.stoneRate ?? undefined,
             stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
             stoneTypeNames: item.stoneTypeNames ?? undefined,
+            stonePieces: item.stonePieces ?? null,
+            stoneClarity: item.stoneClarity ?? null,
+            stoneCertificateNumber: item.stoneCertificateNumber ?? null,
             hmCharge: item.hmCharge ?? 0,
             lineTotal: lineTotal(item),
             inventoryStockId:
@@ -1308,6 +1339,9 @@ export async function convertQuotationToInvoice(
               stoneRate: item.stoneRate ?? undefined,
               stoneMetalTypeName: item.stoneMetalTypeName ?? undefined,
               stoneTypeNames: item.stoneTypeNames ?? undefined,
+              stonePieces: item.stonePieces ?? null,
+              stoneClarity: item.stoneClarity ?? null,
+              stoneCertificateNumber: item.stoneCertificateNumber ?? null,
               hmCharge: item.hmCharge,
               lineTotal: item.lineTotal,
               inventoryStockId: item.inventoryStockId ?? undefined,
@@ -1327,6 +1361,9 @@ export async function convertQuotationToInvoice(
                       stoneTypeNames: row.stoneTypeNames,
                       caratWeight: row.caratWeight,
                       stoneWeight: row.stoneWeight,
+                      pieces: row.pieces,
+                      clarity: row.clarity,
+                      certificateNumber: row.certificateNumber,
                       rate: row.rate,
                       amount: row.amount,
                       gstRateId: row.gstRateId,

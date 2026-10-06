@@ -1265,6 +1265,12 @@ model KachaInvoiceItem {
   // doc comment for why.
   stoneMetalTypeName String?
   stoneTypeNames     String?
+  // The single stone's number of stones / clarity / lab certificate —
+  // same meaning as PieceComponent.pieces/clarity/certificateNumber (a
+  // multi-part line keeps them on its rows instead).
+  stonePieces        Int?
+  stoneClarity       String?
+  stoneCertificateNumber String?
   lineTotal          Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId   String?
   createdAt          DateTime        @default(now())
@@ -1322,6 +1328,12 @@ model InvoiceItem {
   // doc comment for why.
   stoneMetalTypeName String?
   stoneTypeNames     String?
+  // The single stone's number of stones / clarity / lab certificate —
+  // same meaning as PieceComponent.pieces/clarity/certificateNumber (a
+  // multi-part line keeps them on its rows instead).
+  stonePieces        Int?
+  stoneClarity       String?
+  stoneCertificateNumber String?
   // Per-line scheme/discount amount, separate from Invoice.discount (which
   // is an invoice-level total) — the printed format wants one column per
   // line, not a single amount split across items after the fact.
@@ -2022,6 +2034,12 @@ model QuotationItem {
   // doc comment for why.
   stoneMetalTypeName String?
   stoneTypeNames     String?
+  // The single stone's number of stones / clarity / lab certificate —
+  // same meaning as PieceComponent.pieces/clarity/certificateNumber (a
+  // multi-part line keeps them on its rows instead).
+  stonePieces        Int?
+  stoneClarity       String?
+  stoneCertificateNumber String?
   lineTotal          Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId   String?
   quotation          Quotation       @relation(fields: [quotationId], references: [id], onDelete: Cascade)
@@ -3261,6 +3279,13 @@ model PieceComponent {
   stoneTypeNames     String?
   caratWeight        Decimal?           @db.Decimal(10, 3)
   stoneWeight        Decimal?           @db.Decimal(12, 5)
+  // Number of stones in this row (e.g. 12 diamonds totalling 0.28 ct),
+  // their clarity (a StoreStoneClarity name kept as text, free text
+  // allowed) and lab certificate number — same meaning as on
+  // ProductStoneComponent, which a stock piece's rows are copied from.
+  pieces             Int?
+  clarity            String?
+  certificateNumber  String?
   // Pricing — per gram of metal (per gram of pure metal on a Customer
   // Exchange item) or per carat of stone; amount = this component's value
   // per piece before GST. GST is per component (snapshot, like InvoiceItem).

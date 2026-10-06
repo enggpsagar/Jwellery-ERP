@@ -10,7 +10,7 @@ import { formatShortDate } from "@/lib/utils"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { RecordKachaPaymentDialog } from "@/components/billing/kacha/record-kacha-payment-dialog"
 import { EmailKachaInvoiceButton } from "@/components/billing/kacha/email-kacha-invoice-button"
-import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { LineStoneDetails, PieceBreakdown } from "@/components/billing/piece-breakdown"
 import { InvoiceOldGoldCard } from "@/components/billing/invoice-old-gold-card"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
@@ -164,6 +164,7 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
                       {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
                     </span>
                   ) : null}
+                  <LineStoneDetails item={item} />
                 </td>
                 <td className="px-4 py-3">{item.quantity}</td>
                 <td className="px-4 py-3">

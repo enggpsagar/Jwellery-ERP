@@ -69,7 +69,7 @@ import { StoneComponentFields } from "@/components/inventory/shared/stone-compon
 import { StockItemSelect } from "@/components/inventory/shared/stock-item-select"
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 import { StonePresenceQuestion } from "@/components/shared/stone-presence-question"
-import { PieceComponentsEditor, StoneExtras } from "@/components/shared/piece-components-editor"
+import { PieceComponentsEditor, StoneDetailsInputs } from "@/components/shared/piece-components-editor"
 import { MultiPartQuestion } from "@/components/shared/multi-part-question"
 import {
   newMetalRow,
@@ -205,6 +205,13 @@ export type LineItem = {
    * Product.defaultStoneMetalTypeName schema comment for why. */
   stoneMetalTypeName: string
   stoneTypeNames: string[]
+  /** The single stone's number of stones, clarity and certificate number
+   * (InvoiceItem.stonePieces / stoneClarity / stoneCertificateNumber) —
+   * prefilled from a picked piece's Product stone row, else typed. Optional
+   * (older drafts / initialItems may not carry them). */
+  stonePieces?: number | null
+  stoneClarity?: string | null
+  stoneCertificateNumber?: string | null
   dmoWeight: number
   dmoWeightUnit: "GRAM" | "CARAT"
   /** Always in grams internally — see grossWeightUnit's doc comment above. */
@@ -445,6 +452,8 @@ type InvoiceFormProps = {
    * exchange added while editing goes against what's still unpaid). */
   existingExchange?: PrintExchange | null
   alreadyPaid?: number
+  /** Settings → Stone Clarity names, suggested on every stone's Clarity. */
+  clarities?: string[]
 }
 
 export function InvoiceForm({
@@ -481,6 +490,7 @@ export function InvoiceForm({
   fineRates = { gold: null, silver: null },
   existingExchange = null,
   alreadyPaid = 0,
+  clarities = [],
 }: InvoiceFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -803,6 +813,10 @@ export function InvoiceForm({
       stoneTypeNames: stock.stoneTypeNames
         ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
         : [],
+      // The stone's pcs / clarity / certificate — its Product's stone row.
+      stonePieces: stock.linkedStone?.pieces ?? null,
+      stoneClarity: stock.linkedStone?.clarity ?? null,
+      stoneCertificateNumber: stock.linkedStone?.certificateNumber ?? null,
       // InventoryStock carries no hmCharge of its own — left untouched so
       // the Purity-driven auto-fill populates it.
       hmCharge: isHallmarkablePurity(stock.purity) ? hallmarkChargePerPiece : 0,
@@ -841,6 +855,9 @@ export function InvoiceForm({
       stoneWeightInput: 0,
       stoneMetalTypeName: "",
       stoneTypeNames: [],
+      stonePieces: null,
+      stoneClarity: null,
+      stoneCertificateNumber: null,
     }
   }
 
@@ -1534,6 +1551,10 @@ export function InvoiceForm({
           item.hasStoneComponent && item.stoneTypeNames.length
             ? item.stoneTypeNames.join(", ")
             : null,
+        stonePieces: item.hasStoneComponent && !item.multiPart ? item.stonePieces || null : null,
+        stoneClarity: item.hasStoneComponent && !item.multiPart ? item.stoneClarity?.trim() || null : null,
+        stoneCertificateNumber:
+          item.hasStoneComponent && !item.multiPart ? item.stoneCertificateNumber?.trim() || null : null,
         dmoWeight: toUnit(item.dmoWeight) || null,
         stoneWeight: toUnit(item.stoneWeightInput) || null,
         hmCharge: item.hmCharge,
@@ -1878,7 +1899,7 @@ export function InvoiceForm({
               <span />
             </div>
 
-            {items.map((item) => {
+            {items.map((item, index) => {
             // Once a line is linked to a Stock Item, the physical facts
             // about that piece (weight, purity, HSN, stone details) come
             // from Inventory and are shown read-only here — the invoice
@@ -1954,6 +1975,7 @@ export function InvoiceForm({
                 rateForMetal={(metal) => metal.sellingPrice ?? 0}
                 lockPhysical={isLinked}
                 testIdPrefix="sale-piece"
+                clarities={clarities}
               />
             )
             const stoneFields = (
@@ -1988,12 +2010,25 @@ export function InvoiceForm({
                   netStoneWeightTouched={item.netStoneWeightTouched}
                   lockPhysicalFields={isLinked}
                 />
-                {isLinked && (
-                  <StoneExtras
-                    row={stockItems.find((s) => s.id === item.inventoryStockId)?.linkedStone ?? {}}
-                    testId="sale-linked-stone-extras"
-                  />
-                )}
+                <StoneDetailsInputs
+                  className="mt-2"
+                  value={{
+                    pieces: item.stonePieces,
+                    clarity: item.stoneClarity,
+                    certificateNumber: item.stoneCertificateNumber,
+                  }}
+                  onChange={(patch) =>
+                    updateItem(item.key, {
+                      ...("pieces" in patch ? { stonePieces: patch.pieces } : {}),
+                      ...("clarity" in patch ? { stoneClarity: patch.clarity } : {}),
+                      ...("certificateNumber" in patch ? { stoneCertificateNumber: patch.certificateNumber } : {}),
+                    })
+                  }
+                  clarities={clarities}
+                  locked={isLinked ? stockItems.find((s) => s.id === item.inventoryStockId)?.linkedStone : undefined}
+                  testIdPrefix="sale-line-stone"
+                  index={index}
+                />
               </div>
             )
             const linkedStock = isLinked ? stockItems.find((s) => s.id === item.inventoryStockId) : undefined

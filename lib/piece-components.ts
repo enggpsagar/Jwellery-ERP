@@ -41,12 +41,15 @@ export type PieceStoneDraft = {
   amount: number
   amountTouched: boolean
   gstRateId: string
-  /** Number of stones, clarity and certificate — shown on a picked stock
-   * piece's row, read from its Product's matching stone row. Display only:
-   * PieceComponent has no column for them. */
+  /** Number of stones, clarity and certificate — saved on the row
+   * (PieceComponent.pieces/clarity/certificateNumber); a picked stock piece
+   * brings them from its own rows, else its Product's matching stone row. */
   pieces?: number | null
   clarity?: string | null
   certificateNumber?: string | null
+  /** The values the row arrived with from a stock piece / saved line —
+   * read-only in the editor while its physical facts are locked. */
+  fixedDetails?: { pieces?: number | null; clarity?: string | null; certificateNumber?: string | null } | null
 }
 
 export type PieceComponentDraft = PieceMetalDraft | PieceStoneDraft
@@ -68,6 +71,9 @@ export type PieceComponentPayload = {
   rate?: number | null
   amount?: number | null
   gstRateId?: string | null
+  pieces?: number | null
+  clarity?: string | null
+  certificateNumber?: string | null
 }
 
 /** A stored row as the server hands it back (edit pages, linked stock). */
@@ -91,13 +97,14 @@ export type StoredPieceComponent = {
   /** For display, when the query included the metal / GST snapshot. */
   metalName?: string | null
   gstRatePercent?: number | null
-  /** Picker hints on a stock piece's rows (lib/inventory/stock-piece-rows.ts),
-   * from the Product's matching row — never stored on a PieceComponent.
-   * Stones: pieces / clarity / certificate and the Product's own stone rate.
-   * Metals: the purity's configured selling price and fineness %. */
+  /** A stone row's number of stones / clarity / certificate (stored). */
   pieces?: number | null
   clarity?: string | null
   certificateNumber?: string | null
+  /** Picker hints on a stock piece's rows (lib/inventory/stock-piece-rows.ts),
+   * from the Product's matching row — never stored on a PieceComponent.
+   * Stones: the Product's own stone rate. Metals: the purity's configured
+   * selling price and fineness %. */
   catalogRate?: number | null
   puritySellingPrice?: number | null
   purityFineness?: number | null
@@ -249,6 +256,9 @@ export function toComponentPayload(rows: PieceComponentDraft[], options: PieceVa
           rate: row.rate || null,
           amount: componentAmount(row, options),
           gstRateId: row.gstRateId || null,
+          pieces: row.pieces && row.pieces > 0 ? Math.round(row.pieces) : null,
+          clarity: row.clarity?.trim() || null,
+          certificateNumber: row.certificateNumber?.trim() || null,
         },
   )
 }
@@ -284,8 +294,22 @@ export function fromStoredComponents(rows: StoredPieceComponent[]): PieceCompone
           pieces: row.pieces ?? null,
           clarity: row.clarity ?? null,
           certificateNumber: row.certificateNumber ?? null,
+          fixedDetails: { pieces: row.pieces ?? null, clarity: row.clarity ?? null, certificateNumber: row.certificateNumber ?? null },
         },
   )
+}
+
+/** "12 pcs · VVS · Cert IGI-123" — a stone's count / clarity / certificate,
+ * each part only when set (empty string when none). Shared by every
+ * screen and print that shows a stone. */
+export function stoneDetailsText(row: { pieces?: number | null; clarity?: string | null; certificateNumber?: string | null }) {
+  return [
+    row.pieces ? `${row.pieces} pcs` : null,
+    row.clarity?.trim() || null,
+    row.certificateNumber?.trim() ? `Cert ${row.certificateNumber.trim()}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ")
 }
 
 /** Short human summary, e.g. "Gold 22K 8.200 g + Silver 925 3.000 g + Diamond 0.40 ct". */

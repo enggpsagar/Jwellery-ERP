@@ -9,7 +9,7 @@ import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getSupplierOptions } from "@/lib/actions/customer-actions"
 import { getLatestMetalRates } from "@/lib/actions/metal-rate-actions"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
-import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
+import { getStoreMetals, getAllStoreMetalOrigins, getStoreStoneClarities } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getFinenessMap } from "@/lib/purity-db"
 import { requireStoreScope } from "@/lib/store-context"
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 }
 
 export default async function NewKachaInvoicePage() {
-  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, enumFineness, metalRates, gstRates] =
+  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, clarityRows, caratConversionRates, enumFineness, metalRates, gstRates] =
     await Promise.all([
       getKachaInvoiceFormCustomers(),
       getKachaInvoiceFormStockItems(),
@@ -32,6 +32,7 @@ export default async function NewKachaInvoicePage() {
       getBusinessSettings(),
       getStoreMetals(),
       getAllStoreMetalOrigins(),
+      getStoreStoneClarities(),
       getCaratConversionRateMap(),
       requireStoreScope().then(getFinenessMap),
       getLatestMetalRates(),
@@ -58,6 +59,7 @@ export default async function NewKachaInvoicePage() {
           locations={locations}
           metals={metals}
           origins={origins}
+          clarities={clarityRows.filter((row) => row.isActive).map((row) => row.name)}
           caratConversionRates={caratConversionRates}
           hallmarkChargePerPiece={businessSettings.hallmarkChargePerPiece}
           enumFineness={enumFineness}

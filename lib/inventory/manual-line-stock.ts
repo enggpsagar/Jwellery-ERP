@@ -44,6 +44,9 @@ export type ManualSaleLine = {
   stoneRate?: number | null;
   stoneMetalTypeName?: string | null;
   stoneTypeNames?: string | null;
+  stonePieces?: number | null;
+  stoneClarity?: string | null;
+  stoneCertificateNumber?: string | null;
   hsnCode?: string | null;
   // The catalog classification Add Product asks for — required here too
   // (see validateManualSaleLines) so a product minted at sale time lands
@@ -392,6 +395,9 @@ export async function createStockForManualSaleLine(
           stoneCharge: toDecimal(row.amount) ?? null,
           gstRateId: row.gstRateId,
           sortOrder: index,
+          pieces: row.pieces,
+          clarity: row.clarity,
+          certificateNumber: row.certificateNumber,
         })),
       });
     }
@@ -418,6 +424,9 @@ export async function createStockForManualSaleLine(
         stoneWeight: toDecimal(line.stoneWeight) ?? null,
         stoneRate: toDecimal(line.stoneRate) ?? null,
         stoneCharge: toDecimal(line.stoneCharge) ?? null,
+        pieces: line.stonePieces ?? null,
+        clarity: line.stoneClarity ?? null,
+        certificateNumber: line.stoneCertificateNumber ?? null,
         gstRateId: gstRateRow?.id ?? null,
         sortOrder: 0,
       },

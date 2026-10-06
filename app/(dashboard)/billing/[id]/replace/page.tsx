@@ -20,6 +20,7 @@ import {
   getAllStoreMetalOrigins,
   getStoreCategories,
   getStoreStyles,
+  getStoreStoneClarities,
 } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
@@ -58,7 +59,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     redirect(`/billing/${id}`)
   }
 
-  const [customers, stockItems, suppliers, enumFineness, metalRates, businessSettings, locations, metals, origins, categories, styles, caratConversionRates, defaultLocationId, gstRates, states] =
+  const [customers, stockItems, suppliers, enumFineness, metalRates, businessSettings, locations, metals, origins, categories, styles, clarityRows, caratConversionRates, defaultLocationId, gstRates, states] =
     await Promise.all([
       getInvoiceFormCustomers(),
       getInvoiceFormStockItems(),
@@ -71,6 +72,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
       getAllStoreMetalOrigins(),
       getStoreCategories(),
       getStoreStyles(),
+      getStoreStoneClarities(),
       getCaratConversionRateMap(),
       getDefaultLocationId(),
       getGstRates(),
@@ -126,6 +128,9 @@ export default async function ReplaceInvoicePage({ params }: Props) {
     stoneTypeNames: item.stoneTypeNames
       ? item.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
       : [],
+    stonePieces: item.stonePieces,
+    stoneClarity: item.stoneClarity,
+    stoneCertificateNumber: item.stoneCertificateNumber,
     dmoWeight: toGrams(item.dmoWeight),
     dmoWeightUnit: unit,
     stoneWeightInput: toGrams(item.stoneWeight),
@@ -181,6 +186,7 @@ export default async function ReplaceInvoicePage({ params }: Props) {
         origins={origins}
         categories={categories}
         styles={styles}
+        clarities={clarityRows.filter((row) => row.isActive).map((row) => row.name)}
         styleFieldEnabled={businessSettings.styleFieldEnabled}
         caratConversionRates={caratConversionRates}
         gstRates={gstRates}

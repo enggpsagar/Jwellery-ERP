@@ -70,6 +70,9 @@ type Props = {
   /** Label of the per-row GST picker — e.g. "GST if billed" on a Kacha
    *  slip, where the rate only applies once it's converted. */
   gstLabel?: string
+  /** Settings → Stone Clarity names, suggested on each stone row's
+   *  Clarity (free text allowed). */
+  clarities?: string[]
 }
 
 /**
@@ -93,6 +96,7 @@ export function PieceComponentsEditor({
   lockPhysical = false,
   testIdPrefix = "piece",
   gstLabel = "GST",
+  clarities = [],
 }: Props) {
   const metalById = new Map(metals.map((metal) => [metal.id, metal]))
   const metalChoices = metals.filter((metal) => !metal.isGemstone && (metal.isActive || rows.some((r) => r.kind === "METAL" && r.metalTypeId === metal.id)))
@@ -334,7 +338,6 @@ export function PieceComponentsEditor({
                 value={row.caratWeight || ""}
                 onChange={(e) => update(row.key, { caratWeight: Number(e.target.value) || 0 })}
               />
-              <StoneExtras row={row} testId={`${testIdPrefix}-stone-extras`} />
             </div>
             <div className="space-y-1">
               <Label className="text-[11px] text-muted-foreground">Weight g</Label>
@@ -374,6 +377,15 @@ export function PieceComponentsEditor({
               />
             </div>
             <RemoveButton disabled={lockPhysical} onClick={() => onRowsChange(rows.filter((r) => r.key !== row.key))} />
+            <StoneDetailsInputs
+              className="col-span-2 md:col-span-8"
+              value={row}
+              onChange={(patch) => update(row.key, patch)}
+              clarities={clarities}
+              locked={lockPhysical ? row.fixedDetails ?? undefined : undefined}
+              testIdPrefix={testIdPrefix}
+              index={index}
+            />
           </div>
         )
       })}
@@ -421,6 +433,93 @@ export function PieceComponentsEditor({
             <span className="font-semibold text-foreground">{rupees(totals.total)}</span>
           </span>
         </div>
+      </div>
+    </div>
+  )
+}
+
+type StoneDetailsValue = { pieces?: number | null; clarity?: string | null; certificateNumber?: string | null }
+
+/**
+ * A stone's number of stones (pcs), clarity and certificate number — small
+ * optional inputs under a stone (a multi-part stone row, or a line's single
+ * stone). Clarity suggests the store's Settings → Stone Clarity list and
+ * accepts any text. `locked` holds a stock piece's recorded values: a field
+ * it has is read-only (a fact, like its weights); one it never recorded can
+ * still be filled in.
+ */
+export function StoneDetailsInputs({
+  value,
+  onChange,
+  clarities = [],
+  locked,
+  testIdPrefix = "piece",
+  index = 0,
+  className,
+}: {
+  value: StoneDetailsValue
+  onChange: (patch: { pieces?: number | null; clarity?: string | null; certificateNumber?: string | null }) => void
+  clarities?: string[]
+  locked?: StoneDetailsValue | null
+  testIdPrefix?: string
+  index?: number
+  className?: string
+}) {
+  const listId = `${testIdPrefix}-clarities-${index}`
+  const lockPieces = Boolean(locked?.pieces)
+  const lockClarity = Boolean(locked?.clarity)
+  const lockCert = Boolean(locked?.certificateNumber)
+  return (
+    <div className={cn("grid grid-cols-3 gap-2", className)} data-testid={`${testIdPrefix}-stone-details`}>
+      <div className="space-y-1">
+        <Label className="text-[11px] text-muted-foreground">Pcs</Label>
+        <Input
+          type="number"
+          step={1}
+          min={1}
+          inputMode="numeric"
+          readOnly={lockPieces}
+          className={cn("h-8 text-xs", lockPieces && "bg-muted")}
+          data-testid={`${testIdPrefix}-pcs`}
+          placeholder="Stones"
+          value={value.pieces ?? ""}
+          onChange={(e) => {
+            const n = Math.floor(Number(e.target.value))
+            onChange({ pieces: Number.isFinite(n) && n >= 1 ? n : null })
+          }}
+        />
+      </div>
+      <div className="space-y-1">
+        <Label className="text-[11px] text-muted-foreground">Clarity</Label>
+        <Input
+          list={clarities.length ? listId : undefined}
+          maxLength={120}
+          readOnly={lockClarity}
+          className={cn("h-8 text-xs", lockClarity && "bg-muted")}
+          data-testid={`${testIdPrefix}-clarity`}
+          placeholder="e.g. VVS"
+          value={value.clarity ?? ""}
+          onChange={(e) => onChange({ clarity: e.target.value })}
+        />
+        {clarities.length ? (
+          <datalist id={listId}>
+            {clarities.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        ) : null}
+      </div>
+      <div className="space-y-1">
+        <Label className="text-[11px] text-muted-foreground">Certificate No.</Label>
+        <Input
+          maxLength={120}
+          readOnly={lockCert}
+          className={cn("h-8 text-xs", lockCert && "bg-muted")}
+          data-testid={`${testIdPrefix}-cert`}
+          placeholder="e.g. IGI 123"
+          value={value.certificateNumber ?? ""}
+          onChange={(e) => onChange({ certificateNumber: e.target.value })}
+        />
       </div>
     </div>
   )

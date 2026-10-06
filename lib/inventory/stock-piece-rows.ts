@@ -41,6 +41,9 @@ type StockWithRows = {
     stoneTypeNames: string | null;
     caratWeight: Decimalish;
     stoneWeight: Decimalish;
+    pieces?: number | null;
+    clarity?: string | null;
+    certificateNumber?: string | null;
     rate: Decimalish;
     amount: Prisma.Decimal;
     gstRateId: string | null;
@@ -72,8 +75,8 @@ function nthMatcher<T>(rows: T[], keyOf: (row: T) => string | null) {
 
 /**
  * The rows a picked stock piece opens with (empty = an ordinary single
- * line), each carrying the Product's matching row's pieces / clarity /
- * certificate / stone rate and its purity's selling price as picker hints.
+ * line), each carrying its pieces / clarity / certificate (its own, else
+ * the Product's matching row's), the Product row's stone rate and its purity's selling price as picker hints.
  */
 export function stockPieceComponents(stock: StockWithRows): StoredPieceComponent[] {
   const product = stock.product;
@@ -150,9 +153,10 @@ export function stockPieceComponents(stock: StockWithRows): StoredPieceComponent
     return {
       ...row,
       stoneTypeNames: row.stoneTypeNames || match?.stoneTypeNames || null,
-      pieces: match?.pieces ?? null,
-      clarity: match?.clarity ?? null,
-      certificateNumber: match?.certificateNumber ?? null,
+      // The piece's own saved values win; else its Product's stone row.
+      pieces: row.pieces ?? match?.pieces ?? null,
+      clarity: row.clarity || match?.clarity || null,
+      certificateNumber: row.certificateNumber || match?.certificateNumber || null,
       catalogRate: num(match?.stoneRate),
     };
   });

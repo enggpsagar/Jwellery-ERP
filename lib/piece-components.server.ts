@@ -24,6 +24,9 @@ export type ResolvedPieceComponent = {
   stoneTypeNames: string | null;
   caratWeight: number | null;
   stoneWeight: number | null;
+  pieces: number | null;
+  clarity: string | null;
+  certificateNumber: string | null;
   rate: number | null;
   amount: number;
   gstRateId: string | null;
@@ -95,6 +98,8 @@ export async function getPieceResolver(storeId: string, options: { valuation: Pi
         const stoneWeight = toNumber(row.stoneWeight);
         const rate = toNumber(row.rate);
         if (caratWeight < 0 || stoneWeight < 0 || rate < 0) return { error: `Stone values on ${label} can't be negative.` };
+        const details = parseStoneDetails(row, label);
+        if ("error" in details) return details;
         const typed = row.amount != null ? toNumber(row.amount) : null;
         const amount = round2(typed != null && typed >= 0 ? typed : caratWeight * rate);
         components.push({
@@ -111,6 +116,7 @@ export async function getPieceResolver(storeId: string, options: { valuation: Pi
           stoneTypeNames: row.stoneTypeNames?.trim() || null,
           caratWeight: caratWeight || null,
           stoneWeight: stoneWeight || null,
+          ...details,
           rate: rate || null,
           amount,
           ...gstFields,
@@ -149,6 +155,9 @@ export async function getPieceResolver(storeId: string, options: { valuation: Pi
         stoneTypeNames: null,
         caratWeight: null,
         stoneWeight: null,
+        pieces: null,
+        clarity: null,
+        certificateNumber: null,
         rate: rate || null,
         amount: round2(valued * rate),
         ...gstFields,
@@ -187,6 +196,33 @@ export async function getPieceResolver(storeId: string, options: { valuation: Pi
   };
 }
 
+const MAX_TEXT = 120;
+
+/**
+ * A stone's number of stones (whole number ≥ 1), clarity and certificate
+ * number — all optional. Shared by multi-part stone rows and single-stone
+ * sale lines (`label` names the piece in errors).
+ */
+export function parseStoneDetails(
+  row: { pieces?: unknown; clarity?: unknown; certificateNumber?: unknown },
+  label: string,
+): { error: string } | { pieces: number | null; clarity: string | null; certificateNumber: string | null } {
+  let pieces: number | null = null;
+  if (row.pieces != null && row.pieces !== "" && row.pieces !== 0) {
+    const n = Number(row.pieces);
+    if (!Number.isInteger(n) || n < 1) return { error: `Stone pcs on ${label} must be a whole number of 1 or more.` };
+    if (n > 1_000_000) return { error: `Stone pcs on ${label} is too large.` };
+    pieces = n;
+  }
+  const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+  const clarity = text(row.clarity);
+  const certificateNumber = text(row.certificateNumber);
+  if (clarity.length > MAX_TEXT || certificateNumber.length > MAX_TEXT) {
+    return { error: `Stone clarity / certificate on ${label} is too long.` };
+  }
+  return { pieces, clarity: clarity || null, certificateNumber: certificateNumber || null };
+}
+
 /** Nested-create payload for a parent's `components: { create: ... }`. */
 export function pieceComponentCreates(components: ResolvedPieceComponent[]) {
   return components.map((row) => ({
@@ -202,6 +238,9 @@ export function pieceComponentCreates(components: ResolvedPieceComponent[]) {
     stoneTypeNames: row.stoneTypeNames,
     caratWeight: row.caratWeight,
     stoneWeight: row.stoneWeight,
+    pieces: row.pieces,
+    clarity: row.clarity,
+    certificateNumber: row.certificateNumber,
     rate: row.rate,
     amount: row.amount,
     gstRateId: row.gstRateId,
@@ -225,6 +264,9 @@ export function serializeStoredComponents(
     stoneTypeNames: string | null;
     caratWeight: Prisma.Decimal | null;
     stoneWeight: Prisma.Decimal | null;
+    pieces?: number | null;
+    clarity?: string | null;
+    certificateNumber?: string | null;
     rate: Prisma.Decimal | null;
     amount: Prisma.Decimal;
     gstRateId: string | null;
@@ -249,10 +291,44 @@ export function serializeStoredComponents(
       stoneTypeNames: row.stoneTypeNames,
       caratWeight: n(row.caratWeight),
       stoneWeight: n(row.stoneWeight),
+      pieces: row.pieces ?? null,
+      clarity: row.clarity ?? null,
+      certificateNumber: row.certificateNumber ?? null,
       rate: n(row.rate),
       amount: Number(row.amount),
       gstRateId: row.gstRateId,
       metalName: row.metalType?.name ?? null,
       gstRatePercent: row.gstRatePercent != null ? Number(row.gstRatePercent) : null,
     }));
+}
+
+type LineStoneFields = {
+  itemName?: string | null;
+  stoneMetalTypeName?: string | null;
+  stonePieces?: number | null;
+  stoneClarity?: string | null;
+  stoneCertificateNumber?: string | null;
+};
+
+/**
+ * A single-stone sale line's pcs / clarity / certificate (InvoiceItem,
+ * KachaInvoiceItem, QuotationItem .stonePieces/.stoneClarity/
+ * .stoneCertificateNumber), validated like a multi-part stone row. Cleared
+ * on a line with no stone, and on a multi-part line (its rows carry them).
+ */
+export function resolveLineStoneDetails<T extends LineStoneFields>(item: T, multiPart: boolean): { error: string } | T {
+  if (multiPart || !item.stoneMetalTypeName?.trim()) {
+    return { ...item, stonePieces: null, stoneClarity: null, stoneCertificateNumber: null };
+  }
+  const details = parseStoneDetails(
+    { pieces: item.stonePieces, clarity: item.stoneClarity, certificateNumber: item.stoneCertificateNumber },
+    `"${item.itemName || "a line item"}"`,
+  );
+  if ("error" in details) return details;
+  return {
+    ...item,
+    stonePieces: details.pieces,
+    stoneClarity: details.clarity,
+    stoneCertificateNumber: details.certificateNumber,
+  };
 }

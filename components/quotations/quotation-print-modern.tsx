@@ -6,7 +6,7 @@ import type { Quotation } from "@/lib/actions/quotation-actions"
 import { QuotationExchangeEstimateRows } from "@/components/quotations/quotation-exchange-estimate"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
 import { APP_NAME } from "@/lib/constants/app"
-import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { LineStoneDetails, PieceBreakdown } from "@/components/billing/piece-breakdown"
 
 type QuotationPrintModernProps = {
   quotation: Quotation
@@ -231,6 +231,7 @@ export function QuotationPrintModern({ quotation, settings }: QuotationPrintMode
                       <td className="font-medium">
                         {item.itemName}
                         <PieceBreakdown components={item.components} className="mt-0.5 space-y-0 text-[10px] font-normal leading-snug text-gray-600" />
+                        <LineStoneDetails item={item} className="mt-0.5 text-[10px] font-normal leading-snug text-gray-600" />
                       </td>
                       <td className="text-right whitespace-nowrap">{unit === "Pcs" ? qty : qty.toFixed(3)}</td>
                       <td>{unit}</td>

@@ -1,4 +1,4 @@
-import { round5, type StoredPieceComponent } from "@/lib/piece-components"
+import { round5, stoneDetailsText, type StoredPieceComponent } from "@/lib/piece-components"
 
 const rupees = (value: number) =>
   `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -35,14 +35,53 @@ export function PieceBreakdown({
             </li>
           )
         }
+        const details = stoneDetailsText(row)
         return (
           <li key={index}>
             {[row.stoneMetalTypeName, row.stoneTypeNames].filter(Boolean).join(" · ") || "Stone"} ·{" "}
-            {(row.caratWeight ?? 0).toFixed(2)} ct · {rupees(row.amount)}
+            {(row.caratWeight ?? 0).toFixed(2)} ct{details ? ` · ${details}` : ""} · {rupees(row.amount)}
             {gst}
           </li>
         )
       })}
     </ul>
+  )
+}
+
+/**
+ * A single-stone line's stone count / clarity / certificate under the item
+ * (InvoiceItem / KachaInvoiceItem / QuotationItem .stonePieces etc.), e.g.
+ * "Diamond Natural 0.28 ct · 12 pcs · VVS · Cert IGI-123". Renders nothing
+ * when none of the three is set, or on a multi-part line (its rows show them).
+ */
+export function LineStoneDetails({
+  item,
+  className = "mt-0.5 text-[11px] leading-snug text-muted-foreground",
+}: {
+  item: {
+    stoneMetalTypeName?: string | null
+    stoneTypeNames?: string | null
+    caratWeight?: number | null
+    stonePieces?: number | null
+    stoneClarity?: string | null
+    stoneCertificateNumber?: string | null
+    components?: unknown[] | null
+  }
+  className?: string
+}) {
+  if (item.components?.length) return null
+  const details = stoneDetailsText({
+    pieces: item.stonePieces,
+    clarity: item.stoneClarity,
+    certificateNumber: item.stoneCertificateNumber,
+  })
+  if (!details) return null
+  const name = [item.stoneMetalTypeName, item.stoneTypeNames].filter(Boolean).join(" ") || "Stone"
+  const carats = item.caratWeight ? ` ${Number(item.caratWeight).toFixed(2)} ct` : ""
+  return (
+    <p className={className} data-testid="line-stone-details">
+      {name}
+      {carats} · {details}
+    </p>
   )
 }

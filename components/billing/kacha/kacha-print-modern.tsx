@@ -5,7 +5,7 @@ import { amountInWords } from "@/lib/number-to-words"
 import { formatShortDate } from "@/lib/utils"
 import type { KachaInvoice } from "@/lib/actions/kacha-invoice-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
-import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { LineStoneDetails, PieceBreakdown } from "@/components/billing/piece-breakdown"
 import { PrintExchangeRows, cashReceived, type PrintExchange } from "@/components/billing/print-exchange-rows"
 
 type KachaPrintModernProps = {
@@ -191,6 +191,7 @@ export function KachaPrintModern({ kachaInvoice, settings, exchange }: KachaPrin
                         <td className="font-medium">
                           {item.itemName}
                           <PieceBreakdown components={item.components} showGst={false} className="mt-0.5 space-y-0 text-[10px] font-normal leading-snug text-gray-600" />
+                          <LineStoneDetails item={item} className="mt-0.5 text-[10px] font-normal leading-snug text-gray-600" />
                         </td>
                         <td className="text-right whitespace-nowrap">{unit === "Pcs" ? qty : qty.toFixed(3)}</td>
                         <td>{unit}</td>

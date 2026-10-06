@@ -7,7 +7,7 @@ import {
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { getSupplierOptions } from "@/lib/actions/customer-actions"
 import { getDefaultLocationId, getStoreLocations } from "@/lib/actions/store-location-actions"
-import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
+import { getStoreMetals, getAllStoreMetalOrigins, getStoreStoneClarities } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
 import { getFinenessMap } from "@/lib/purity-db"
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 }
 
 export default async function NewQuotationPage() {
-  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, caratConversionRates, gstRates, enumFineness, metalRates] =
+  const [customers, stockItems, suppliers, locations, defaultLocationId, businessSettings, metals, origins, clarityRows, caratConversionRates, gstRates, enumFineness, metalRates] =
     await Promise.all([
       getQuotationFormCustomers(),
       getQuotationFormStockItems(),
@@ -32,6 +32,7 @@ export default async function NewQuotationPage() {
       getBusinessSettings(),
       getStoreMetals(),
       getAllStoreMetalOrigins(),
+      getStoreStoneClarities(),
       getCaratConversionRateMap(),
       getGstRates(),
       requireStoreScope().then(getFinenessMap),
@@ -58,6 +59,7 @@ export default async function NewQuotationPage() {
           defaultLocationId={defaultLocationId}
           metals={metals}
           origins={origins}
+          clarities={clarityRows.filter((row) => row.isActive).map((row) => row.name)}
           caratConversionRates={caratConversionRates}
           gstRates={gstRates}
           defaultGstRate={businessSettings.defaultGstRate}

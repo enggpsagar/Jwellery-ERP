@@ -8,7 +8,7 @@ import { updateInvoiceLineItem, type InvoiceFormState } from "@/lib/actions/invo
 import { useToast } from "@/components/providers/toast-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { LineStoneDetails, PieceBreakdown } from "@/components/billing/piece-breakdown"
 import type { StoredPieceComponent } from "@/lib/piece-components"
 
 export type InvoiceItemRow = {
@@ -127,6 +127,7 @@ function InvoiceItemRowView({
               {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
             </span>
           ) : null}
+          <LineStoneDetails item={item} />
         </td>
         <td className="px-4 py-3">{item.quantity}</td>
         <td className="px-4 py-3">

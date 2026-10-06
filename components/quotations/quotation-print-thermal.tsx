@@ -3,7 +3,7 @@ import { formatShortDate } from "@/lib/utils"
 import { COMPOSITION_DISCLAIMER } from "@/lib/gst"
 import type { Quotation } from "@/lib/actions/quotation-actions"
 import type { BusinessSettings } from "@/lib/actions/settings-actions"
-import { PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { LineStoneDetails, PieceBreakdown } from "@/components/billing/piece-breakdown"
 import { QuotationExchangeEstimateRows } from "@/components/quotations/quotation-exchange-estimate"
 
 type QuotationPrintThermalProps = {
@@ -102,6 +102,7 @@ export function QuotationPrintThermal({ quotation, settings }: QuotationPrintThe
             <div key={item.id}>
               <p className="font-medium">{item.itemName}</p>
               <PieceBreakdown components={item.components} className="mt-0.5 space-y-0 text-[10px] font-normal leading-snug text-gray-600" />
+              <LineStoneDetails item={item} className="mt-0.5 text-[10px] font-normal leading-snug text-gray-600" />
               <div className="flex justify-between">
                 <span>
                   {unit === "Pcs" ? qty : qty.toFixed(3)} {unit} x {item.components?.length ? "rate per row" : <>₹{fmt(item.rate ?? 0)}</>}

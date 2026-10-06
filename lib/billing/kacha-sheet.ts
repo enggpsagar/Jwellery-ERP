@@ -88,6 +88,9 @@ export const KACHA_SHEET_COLUMNS: KachaSheetColumn[] = [
   { header: "Carat Weight", required: "No", help: "Stone weight in carats (ct).", example: "" },
   { header: "Stone Rate", required: "No", help: "Price per carat (₹/ct).", example: "" },
   { header: "Stone Charge", required: "No", help: "Stone charge (₹). Blank = Carat Weight × Stone Rate.", example: "" },
+  { header: "Stone Pcs", required: "No", help: "Number of stones (whole number, 1 or more).", example: "" },
+  { header: "Stone Clarity", required: "No", help: "Clarity grade, e.g. FG/VVS-VS — your Settings list or any text.", example: "" },
+  { header: "IGI Certificate No.", required: "No", help: "Stone certificate number.", example: "" },
   // Slip totals and payment (first row of the slip)
   { header: "Discount", required: "No", help: "Discount on the whole slip (₹).", example: 0 },
   {

@@ -67,17 +67,27 @@ export function StockQrLabel({
   qrDataUrl: string
   fields: readonly StockTagField[]
 }) {
-  const lines = stockTagLines(tag, fields, { codePrefix: "LR# " })
+  // Store name and tag code print under the QR (same as the barcode
+  // layout prints them beside its barcode), not in the text column.
+  const lines = stockTagLines(tag, fields, { skip: ["STORE_NAME", "TAG_CODE"] })
+  const showStoreName = fields.includes("STORE_NAME")
+  const showCode = fields.includes("TAG_CODE")
 
   return (
     <div className="stock-qr-label flex w-[76mm] items-center gap-2 rounded-lg border bg-white p-2 text-black">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={qrDataUrl}
-        alt={`QR code for stock ${tag.stockCode}`}
-        className="h-[24mm] w-[24mm] shrink-0"
-        style={{ imageRendering: "pixelated" }}
-      />
+      <div className="flex w-[24mm] shrink-0 flex-col items-center font-mono font-bold leading-tight">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={qrDataUrl}
+          alt={`QR code for stock ${tag.stockCode}`}
+          className={showStoreName || showCode ? "h-[19mm] w-[19mm]" : "h-[24mm] w-[24mm]"}
+          style={{ imageRendering: "pixelated" }}
+        />
+        {showStoreName && (
+          <p className="w-full truncate text-center text-[7px] uppercase">{tag.storeName}</p>
+        )}
+        {showCode && <p className="w-full truncate text-center text-[8px]">{tag.code}</p>}
+      </div>
       <div className="min-w-0 flex-1 font-mono leading-tight" style={{ fontSize: tagFontSize(lines.length) }}>
         {lines.map((line) => (
           <p key={line.key} className={`truncate ${line.bold ? "font-bold" : ""}`}>

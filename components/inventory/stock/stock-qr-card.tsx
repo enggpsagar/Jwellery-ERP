@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { Printer, QrCode } from "lucide-react"
 
 import {
@@ -35,6 +35,29 @@ export function StockQrCard({ stockId, dataUrl }: StockQrCardProps) {
       cancelled = true
     }
   }, [stockId])
+
+  // On screen only: shrink the preview to fit a narrow panel. The tag keeps
+  // its real 76mm width, so the printed copy (StockQrPrintRoot) is unaffected.
+  const previewBoxRef = useRef<HTMLDivElement>(null)
+  const previewTagRef = useRef<HTMLDivElement>(null)
+  const [preview, setPreview] = useState({ scale: 1, height: 0 })
+
+  useLayoutEffect(() => {
+    const box = previewBoxRef.current
+    const inner = previewTagRef.current
+    if (!box || !inner) return
+    const measure = () => {
+      const width = inner.offsetWidth
+      if (!width) return
+      const scale = Math.min(1, box.clientWidth / width)
+      setPreview({ scale, height: inner.offsetHeight * scale })
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(box)
+    observer.observe(inner)
+    return () => observer.disconnect()
+  }, [tagData, layout])
 
   const tag = !tagData ? null : layout === "barcode" ? (
     <StockBarcodeLabel tag={tagData.tag} fields={tagData.settings.barcode} />
@@ -81,8 +104,20 @@ export function StockQrCard({ stockId, dataUrl }: StockQrCardProps) {
         </Button>
       </div>
 
-      <div id="stock-qr-print" className="flex justify-center">
-        {tag ?? <p className="text-sm text-muted-foreground">Loading tag…</p>}
+      <div id="stock-qr-print" ref={previewBoxRef} className="flex justify-center overflow-hidden">
+        {tag ? (
+          <div style={{ height: preview.height || undefined }}>
+            <div
+              ref={previewTagRef}
+              className="w-max"
+              style={{ transform: `scale(${preview.scale})`, transformOrigin: "top center" }}
+            >
+              {tag}
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Loading tag…</p>
+        )}
       </div>
       <StockQrPrintRoot id="stock-qr-print-label">{tag}</StockQrPrintRoot>
     </section>

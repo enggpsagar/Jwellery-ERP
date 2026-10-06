@@ -500,8 +500,8 @@ export async function getStoreRecordCounts(storeId: string): Promise<StoreRecord
 /**
  * Permanently deletes a Store and every row anywhere in the schema that
  * belongs to it — direct storeId rows AND transitive children that only
- * belong to it via a parent (InvoiceItem, PurchaseItem, etc). Only 22 of the
- * ~29 storeId-bearing models cascade at the DB level, so a bare
+ * belong to it via a parent (InvoiceItem, PurchaseItem, etc). Most
+ * storeId FKs are ON DELETE RESTRICT (only ~10 cascade), so a bare
  * `store.delete()` fails on any store with real data — this walks the full
  * dependency graph by hand instead of widening the schema's cascade
  * behaviour just for this one rare admin action.
@@ -511,6 +511,13 @@ export async function getStoreRecordCounts(storeId: string): Promise<StoreRecord
  * operation — never a half-deleted store. Every operation below is scoped
  * either directly by `storeId` or through a parent relation/id list that is
  * itself derived from `storeId` — never a bare deleteMany({}).
+ *
+ * Audited 2026-10-06 against the live FK constraints (pg_constraint
+ * confdeltype, not the schema's onDelete annotations — several "default"
+ * relations are RESTRICT in the migrations): every RESTRICT FK into Store or
+ * into a row deleted here is either deleted below, before its target, or
+ * cascades from a row deleted below. When you add a model whose FK to Store
+ * (or to one of these tables) is not ON DELETE CASCADE, add it here.
  *
  * Two circular/self-referential FKs need clearing BEFORE their target rows
  * can be deleted, or the delete throws:
@@ -599,6 +606,11 @@ export async function forceDeleteStore(storeId: string): Promise<{ success: bool
       prisma.purchase.deleteMany({ where: { storeId } }),
       prisma.reminder.deleteMany({ where: { storeId } }),
       prisma.userLocationAccess.deleteMany({ where: { location: { storeId } } }),
+      // A deleted user's grants into any other store's locations (RESTRICT on userId).
+      prisma.userLocationAccess.deleteMany({ where: { userId: { in: userIds } } }),
+      // Promotion.storeId is RESTRICT; PromotionVoucher cascades with it and
+      // Invoice.promotionId is SET NULL — the invoices are already gone here.
+      prisma.promotion.deleteMany({ where: { storeId } }),
 
       // --- Parties / catalog ---
       prisma.karigar.deleteMany({ where: { storeId } }),
@@ -607,6 +619,11 @@ export async function forceDeleteStore(storeId: string): Promise<{ success: bool
       prisma.product.deleteMany({ where: { storeId } }),
 
       // --- Taxonomy (must outlive Product, which references all of these) ---
+      // StoreStyle / StoreStoneClarity are RESTRICT to Store and every store
+      // created since 2026-10-05 has them (seedStarterMasters) — missing them
+      // here made store.delete throw for every new store.
+      prisma.storeStyle.deleteMany({ where: { storeId } }),
+      prisma.storeStoneClarity.deleteMany({ where: { storeId } }),
       prisma.storeCategoryType.deleteMany({ where: { storeId } }),
       prisma.storeCategory.deleteMany({ where: { storeId } }),
       prisma.storeMetalOrigin.deleteMany({ where: { storeId } }),

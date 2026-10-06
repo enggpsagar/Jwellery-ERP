@@ -98,7 +98,14 @@ test("stock tags print every metal and stone, per Settings > Tags", async ({ pag
   // Settings > Tags: drop Stones from the QR tag, add Category; save.
   await page.goto("/settings/tags")
   const qrCard = page.getByTestId("qr-tag-fields")
-  await qrCard.getByRole("button", { name: /Remove Stones/ }).click()
+  // Retried until it takes: a click that lands before React hydrates the
+  // form is silently lost (seen in CI), and the next click then works, so
+  // the save carried CATEGORY but still had STONES.
+  const removeStones = qrCard.getByRole("button", { name: /Remove Stones/ })
+  await expect(async () => {
+    if (await removeStones.count()) await removeStones.click({ timeout: 1_000 })
+    await expect(removeStones).toHaveCount(0, { timeout: 1_000 })
+  }).toPass()
   await qrCard.getByRole("button", { name: /Category & type/ }).click()
   await page.getByRole("button", { name: "Save tag fields" }).click()
   const savedFields = async () =>

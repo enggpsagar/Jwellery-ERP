@@ -25,6 +25,7 @@ import { computePromotion, type PromotionLine } from "@/lib/promotions";
 import {
   getPieceResolver,
   resolveLineStoneDetails,
+  parseStoneDetails,
   pieceComponentCreates,
   serializeStoredComponents,
   type ResolvedPiece,
@@ -2677,6 +2678,13 @@ export async function updateInvoice(
  * IGST) as before. That keeps this action independent of business
  * settings/customer state lookups — it only ever needs numbers already
  * sitting on the line being edited.
+ *
+ * A stone's pcs / clarity / certificate (a single-stone line's
+ * stonePieces/stoneClarity/stoneCertificateNumber, or each stone row of a
+ * multi-part line) can be corrected here too — validated by
+ * parseStoneDetails, same as the save actions. They don't price anything,
+ * so totals, GST and the ledger don't move for them; only this invoice's
+ * record changes, never the stock piece's.
  */
 export async function updateInvoiceLineItem(
   invoiceId: string,
@@ -2723,10 +2731,40 @@ export async function updateInvoiceLineItem(
       return { success: false, message: "Enter a weight greater than 0." };
     }
 
+    // The stone's pcs / clarity / certificate — only when the form sent
+    // them (stoneDetails=1) and the line has a stone; otherwise untouched.
+    let stoneDetails: { stonePieces: number | null; stoneClarity: string | null; stoneCertificateNumber: string | null } | null =
+      null;
+    if (formData.get("stoneDetails") === "1" && item.stoneMetalTypeName?.trim()) {
+      const parsed = parseStoneDetails(
+        {
+          pieces: String(formData.get("stonePieces") ?? "").trim(),
+          clarity: formData.get("stoneClarity"),
+          certificateNumber: formData.get("stoneCertificateNumber"),
+        },
+        `"${item.itemName || "this line"}"`,
+      );
+      if ("error" in parsed) return { success: false, message: parsed.error };
+      stoneDetails = {
+        stonePieces: parsed.pieces,
+        stoneClarity: parsed.clarity,
+        stoneCertificateNumber: parsed.certificateNumber,
+      };
+    }
+
     const isDiamond = item.purity === PurityType.DIAMOND;
     const round = (value: number) => Math.round(value * 100) / 100;
 
     const oldQuantity = isDiamond ? toNumber(item.caratWeight) : toNumber(item.netWeight);
+
+    // Only the stone's details changed: nothing is re-priced (re-deriving
+    // GST from the line's ratio can move a paisa and post a "revised" entry).
+    if (stoneDetails && Math.abs(rate - toNumber(item.rate)) < 0.005 && Math.abs(weight - oldQuantity) < 0.000005) {
+      await prisma.invoiceItem.update({ where: { id: itemId }, data: stoneDetails });
+      revalidatePath("/billing");
+      revalidatePath(`/billing/${invoiceId}`);
+      return { success: true, message: "Line item updated" };
+    }
     const oldTaxable =
       toNumber(item.rate) * oldQuantity +
       toNumber(item.makingCharge) +
@@ -2789,6 +2827,7 @@ export async function updateInvoiceLineItem(
           cgstAmount: newCgst,
           igstAmount: newIgst,
           lineTotal: newLineTotal,
+          ...(stoneDetails ?? {}),
         },
       });
 
@@ -2852,7 +2891,14 @@ async function updatePieceLineItem({
   item: Prisma.InvoiceItemGetPayload<{ include: { components: true } }>;
   formData: FormData;
 }): Promise<InvoiceFormState> {
-  let edits: { id: string; rate?: number | null; amount?: number | null }[] = [];
+  let edits: {
+    id: string;
+    rate?: number | null;
+    amount?: number | null;
+    // A stone row's pcs / clarity / certificate — replaced only when the
+    // edit carries `details` (parseStoneDetails); else kept as stored.
+    details?: { pieces?: unknown; clarity?: unknown; certificateNumber?: unknown } | null;
+  }[] = [];
   try {
     const parsed = JSON.parse(String(formData.get("componentsJson") || "[]"));
     edits = Array.isArray(parsed) ? parsed : [];
@@ -2879,13 +2925,25 @@ async function updatePieceLineItem({
     }
   };
 
-  const updates: { id: string; rate: number | null; amount: number }[] = [];
+  type StoneDetails = { pieces: number | null; clarity: string | null; certificateNumber: string | null };
+  const updates: { id: string; rate: number | null; amount: number; details?: StoneDetails }[] = [];
+  let stoneIndex = 0;
   for (const row of item.components) {
     const edit = editById.get(row.id);
     const rate = edit?.rate != null ? toNumber(edit.rate) : toNumber(row.rate);
     if (rate < 0) return { success: false, message: "Rates can't be negative." };
     let amount: number;
+    let details: StoneDetails | undefined;
     if (row.kind === "STONE") {
+      stoneIndex++;
+      if (edit?.details && typeof edit.details === "object") {
+        const parsed = parseStoneDetails(
+          edit.details,
+          `${row.stoneMetalTypeName || `stone ${stoneIndex}`} of "${item.itemName || "this line"}"`,
+        );
+        if ("error" in parsed) return { success: false, message: parsed.error };
+        details = parsed;
+      }
       const typed = edit?.amount != null ? toNumber(edit.amount) : null;
       amount = round(typed != null && typed >= 0 ? typed : toNumber(row.caratWeight) * rate);
       stoneValue += amount * quantity;
@@ -2894,9 +2952,30 @@ async function updatePieceLineItem({
       metalValue += amount * quantity;
     }
     addTax(amount * quantity, toNumber(row.gstRatePercent));
-    updates.push({ id: row.id, rate: rate || null, amount });
+    updates.push({ id: row.id, rate: rate || null, amount, details });
   }
   if (!(metalValue + stoneValue > 0)) return { success: false, message: "Enter the rates for this piece's metals and stones." };
+
+  // Only stone details changed (every row's rate and value as stored):
+  // save them without re-pricing, which could move a paisa of GST rounding
+  // and post a "revised" ledger entry for an edit that changed no amount.
+  const repriced = item.components.some((row, index) => {
+    const update = updates[index];
+    return Math.abs(toNumber(update.rate) - toNumber(row.rate)) >= 0.005 || Math.abs(update.amount - toNumber(row.amount)) >= 0.005;
+  });
+  if (!repriced) {
+    const detailUpdates = updates.filter((update) => update.details);
+    if (detailUpdates.length) {
+      await prisma.$transaction(
+        detailUpdates.map((update) =>
+          prisma.pieceComponent.updateMany({ where: { id: update.id, invoiceItemId: item.id }, data: update.details! }),
+        ),
+      );
+    }
+    revalidatePath("/billing");
+    revalidatePath(`/billing/${invoice.id}`);
+    return { success: true, message: "Line item updated" };
+  }
 
   const making = toNumber(item.makingCharge) + toNumber(item.hmCharge) - toNumber(item.schemeDiscount);
   addTax(making, toNumber(item.gstRatePercent));
@@ -2935,7 +3014,7 @@ async function updatePieceLineItem({
     for (const update of updates) {
       await tx.pieceComponent.updateMany({
         where: { id: update.id, invoiceItemId: item.id },
-        data: { rate: update.rate, amount: update.amount },
+        data: { rate: update.rate, amount: update.amount, ...(update.details ?? {}) },
       });
     }
     await tx.invoiceItem.update({

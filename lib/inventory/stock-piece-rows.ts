@@ -339,3 +339,91 @@ export function newStockPieceRows(
     metals,
   };
 }
+
+type StoredStockRow = {
+  id: string;
+  kind: PieceComponentKind;
+  metalTypeId: string | null;
+  purityLabel: string | null;
+  grossWeight: Decimalish;
+  netWeight: Decimalish;
+  stoneMetalTypeName: string | null;
+  caratWeight: Decimalish;
+  stoneWeight: Decimalish;
+  rate: Decimalish;
+  amount: Prisma.Decimal;
+};
+
+/**
+ * Whether a stock piece's stored rows are exactly the proportional split
+ * newStockPieceRows makes of its Product for the weights the stock row
+ * carries — i.e. Add Stock / the stock import wrote them and nobody typed
+ * them row by row (a Purchase or a multi-part sale line records each row's
+ * own weights). Compared on the physical facts only, in row order, to the
+ * precision the columns store (weights 5 dp, carats 3 dp).
+ */
+export function isProportionalStockSplit(stored: StoredStockRow[], expected: NewStockPieceRows | null): boolean {
+  if (!expected || !stored.length || stored.length !== expected.components.length) return false;
+  const close = (a: unknown, b: unknown, tolerance: number) => {
+    const x = a == null ? null : Number(a);
+    const y = b == null ? null : Number(b);
+    if (x == null || y == null) return x === y;
+    return Math.abs(x - y) <= tolerance;
+  };
+  return stored.every((row, index) => {
+    const want = expected.components[index];
+    if (row.kind !== want.kind) return false;
+    if (row.kind === "METAL") {
+      return (
+        row.metalTypeId === (want.metalTypeId ?? null) &&
+        (row.purityLabel ?? null) === (want.purityLabel ?? null) &&
+        close(row.netWeight, want.netWeight, 0.00002) &&
+        close(row.grossWeight, want.grossWeight, 0.00002)
+      );
+    }
+    return (
+      (row.stoneMetalTypeName ?? null) === (want.stoneMetalTypeName ?? null) &&
+      close(row.caratWeight, want.caratWeight, 0.0006) &&
+      close(row.stoneWeight, want.stoneWeight, 0.00002)
+    );
+  });
+}
+
+/**
+ * Re-split an Add Stock piece's rows for new weights (same Product, rows
+ * already proven a proportional split): each row takes the new split's
+ * weights and pure weight and keeps its own pcs / clarity / certificate,
+ * rate and GST; a stone with a rate is re-valued at rate × new carats, as
+ * newStockPieceRows values it. Also returns the stock row's summaries,
+ * computed as on create: fineWeight = the first metal's own pure weight,
+ * stoneCharge = all stones' value.
+ */
+export function resplitStockPieceRows(stored: StoredStockRow[], next: NewStockPieceRows) {
+  let stoneCharge = 0;
+  const updates = stored.map((row, index) => {
+    const want = next.components[index];
+    if (row.kind === "METAL") {
+      return {
+        id: row.id,
+        data: {
+          grossWeight: want.grossWeight ?? null,
+          netWeight: want.netWeight ?? null,
+          fineWeight: want.fineWeight ?? null,
+        } satisfies Prisma.PieceComponentUpdateInput,
+      };
+    }
+    const caratWeight = want.caratWeight == null ? null : Number(want.caratWeight);
+    const rate = num(row.rate);
+    const amount = rate != null && caratWeight != null ? round2(rate * caratWeight) : Number(row.amount);
+    stoneCharge += amount;
+    return {
+      id: row.id,
+      data: {
+        caratWeight: want.caratWeight ?? null,
+        stoneWeight: want.stoneWeight ?? null,
+        amount,
+      } satisfies Prisma.PieceComponentUpdateInput,
+    };
+  });
+  return { updates, fineWeight: next.fineWeight, stoneCharge: round2(stoneCharge) };
+}

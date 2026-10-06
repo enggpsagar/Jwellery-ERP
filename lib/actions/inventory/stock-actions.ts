@@ -53,7 +53,7 @@ import { getFineWeightResolver, resolveFineWeight } from "@/lib/fine-weight"
 import { describePieceComponentsText, METALS_AND_STONES_COLUMN } from "@/lib/piece-components-text"
 import { formatShortDate, formatShortDateTime } from "@/lib/utils"
 import { logger } from "@/lib/logger";
-import { newStockPieceRows } from "@/lib/inventory/stock-piece-rows"
+import { isProportionalStockSplit, newStockPieceRows, resplitStockPieceRows } from "@/lib/inventory/stock-piece-rows"
 import { stockOptionProductDetailsSelect } from "@/lib/inventory/stock-option-details"
 import {
   existingRecordHint,
@@ -1012,6 +1012,16 @@ export async function updateInventoryStock(
           select: { id: true },
           take: 1,
         },
+        // For re-splitting an Add Stock piece's metal / stone rows when its
+        // weights change (see below): what it was split from, and whether a
+        // Purchase or an artisan receipt wrote its rows instead.
+        productId: true,
+        netWeight: true,
+        caratWeight: true,
+        fineWeight: true,
+        components: { orderBy: { sortOrder: "asc" } },
+        purchaseItems: { select: { id: true }, take: 1 },
+        karigarReceiptItems: { select: { id: true }, take: 1 },
       },
     })
 
@@ -1224,6 +1234,19 @@ export async function updateInventoryStock(
       stoneTypeNames = product.hasStoneComponent ? product.defaultStoneTypeNames : null
     }
 
+    // A piece with its own metal / stone rows (lib/inventory/stock-piece-rows.ts).
+    // Rows Add Stock / the import split from the Product (newStockPieceRows)
+    // follow a weight edit: re-split in the Product's proportions, summaries
+    // recomputed as on create. Any other rows (Purchase, artisan receipt, a
+    // hand-typed multi-part sale line) are physical facts recorded row by
+    // row — left exactly as they are, and so are the stock row's fine weight
+    // and stone value, which summarise them.
+    const pieceRowsPlan = isLockedForCoreChanges ? null : await planStockPieceRowsEdit(storeId, existingStock, {
+      productId,
+      netWeight,
+      caratWeight,
+    })
+
     /**
      * If stock is already linked to invoice / karigar jobs,
      * block changes to structural fields that can break history.
@@ -1253,7 +1276,14 @@ export async function updateInventoryStock(
       }
     }
 
-    await prisma.inventoryStock.update({
+    const summary = pieceRowsPlan?.summary
+    const fineWeight = summary
+      ? summary.fineWeight
+      : toDecimal(await resolveFineWeight(storeId, { metalTypeId, purityLabel, purity, netWeight })) ?? null
+
+    await prisma.$transaction([
+      ...(pieceRowsPlan?.writes ?? []),
+      prisma.inventoryStock.update({
       where: { id },
       data: {
         productId,
@@ -1268,7 +1298,7 @@ export async function updateInventoryStock(
         grossWeight: toDecimal(grossWeight),
         lessWeight: toDecimal(lessWeight),
         netWeight: toDecimal(netWeight),
-        fineWeight: toDecimal(await resolveFineWeight(storeId, { metalTypeId, purityLabel, purity, netWeight })),
+        fineWeight,
         stoneWeight: toDecimal(stoneWeight),
         caratWeight: toDecimal(caratWeight),
         dmoWeight: toDecimal(dmoWeight),
@@ -1277,7 +1307,7 @@ export async function updateInventoryStock(
         saleRate: toDecimal(saleRate),
         makingCharge,
         makingChargeType,
-        stoneCharge,
+        stoneCharge: summary ? summary.stoneCharge : stoneCharge,
         stoneRate,
         stoneMetalTypeName,
         stoneTypeNames,
@@ -1290,7 +1320,8 @@ export async function updateInventoryStock(
         locationId,
         remarks,
       },
-    })
+      }),
+    ])
 
     revalidatePath("/inventory")
     revalidatePath("/inventory/stock")
@@ -1309,6 +1340,102 @@ export async function updateInventoryStock(
       message: actionErrorMessage(error, "Failed to update stock"),
       errors: {},
     }
+  }
+}
+
+type StockForPieceEdit = {
+  id: string
+  productId: string
+  netWeight: Prisma.Decimal | null
+  caratWeight: Prisma.Decimal | null
+  fineWeight: Prisma.Decimal | null
+  stoneCharge: Prisma.Decimal | null
+  components: Prisma.PieceComponentGetPayload<object>[]
+  purchaseItems: { id: string }[]
+  karigarReceiptItems: { id: string }[]
+}
+
+/**
+ * What an (unlocked) stock edit does to a piece's metal / stone rows.
+ * null = the piece has no rows: the stock row's own fields are saved as
+ * before. Otherwise `summary` replaces the stock row's fineWeight /
+ * stoneCharge and `writes` run in the same transaction as the update.
+ *
+ * The rule for "Add Stock split these rows": the piece wasn't bought on a
+ * Purchase or received from an artisan, and its rows are exactly what
+ * newStockPieceRows makes of its (current) Product for the weights the
+ * stock row carried before this edit. Only then are they re-split — in
+ * place for the same Product (each row keeps its pcs / clarity /
+ * certificate, rate and GST), or rewritten from the new Product's rows when
+ * the Product changed. Rows that don't pass (Purchase, artisan receipt, a
+ * multi-part sale line's hand-entered rows, or a Product whose rows were
+ * edited since) are left untouched, with the summaries they already had.
+ */
+async function planStockPieceRowsEdit(
+  storeId: string,
+  stock: StockForPieceEdit,
+  next: { productId: string; netWeight: number | null; caratWeight: number | null },
+): Promise<null | {
+  /** null = compute the stock row's own fields as for a plain piece. */
+  summary: { fineWeight: Prisma.Decimal | null; stoneCharge: Prisma.Decimal | null } | null
+  writes: Prisma.PrismaPromise<unknown>[]
+}> {
+  if (!stock.components.length) return null
+  const keepAsIs = {
+    summary: { fineWeight: stock.fineWeight, stoneCharge: stock.stoneCharge },
+    writes: [],
+  }
+  if (stock.purchaseItems.length || stock.karigarReceiptItems.length) return keepAsIs
+
+  const productSelect = {
+    metalComponents: stockOptionProductDetailsSelect.metalComponents,
+    stoneComponents: stockOptionProductDetailsSelect.stoneComponents,
+  } satisfies Prisma.ProductSelect
+  const [fineOf, gstRates, previousProduct] = await Promise.all([
+    getFineWeightResolver(storeId),
+    prisma.gstRate.findMany({ where: { storeId }, select: { id: true, name: true, ratePercent: true } }),
+    prisma.product.findFirst({ where: { id: stock.productId, storeId }, select: productSelect }),
+  ])
+  if (!previousProduct) return keepAsIs
+  const options = { fineOf, gstById: new Map(gstRates.map((rate) => [rate.id, rate])) }
+  const asNumber = (value: Prisma.Decimal | null) => (value == null ? null : Number(value))
+  const previousSplit = newStockPieceRows(
+    previousProduct,
+    { netWeight: asNumber(stock.netWeight), caratWeight: asNumber(stock.caratWeight) },
+    options,
+  )
+  if (!isProportionalStockSplit(stock.components, previousSplit)) return keepAsIs
+
+  const decimal = (value: number | null) => (value == null ? null : new Prisma.Decimal(value))
+  const entered = { netWeight: next.netWeight, caratWeight: next.caratWeight }
+
+  if (next.productId === stock.productId) {
+    const split = newStockPieceRows(previousProduct, entered, options)
+    if (!split) return keepAsIs
+    const resplit = resplitStockPieceRows(stock.components, split)
+    return {
+      summary: { fineWeight: decimal(resplit.fineWeight), stoneCharge: new Prisma.Decimal(resplit.stoneCharge) },
+      writes: resplit.updates.map((update) =>
+        prisma.pieceComponent.update({ where: { id: update.id }, data: update.data }),
+      ),
+    }
+  }
+
+  // A different Product: the old split goes; the new Product's rows come in
+  // exactly as Add Stock writes them (none for a single-metal, single-stone
+  // Product, whose stock row's own fields then describe it).
+  const newProduct = await prisma.product.findFirst({ where: { id: next.productId, storeId }, select: productSelect })
+  const split = newProduct ? newStockPieceRows(newProduct, entered, options) : null
+  const clear = prisma.pieceComponent.deleteMany({ where: { inventoryStockId: stock.id } })
+  if (!split) return { summary: null, writes: [clear] }
+  return {
+    summary: { fineWeight: decimal(split.fineWeight), stoneCharge: new Prisma.Decimal(split.stoneCharge) },
+    writes: [
+      clear,
+      prisma.pieceComponent.createMany({
+        data: split.components.map((component) => ({ ...component, inventoryStockId: stock.id })),
+      }),
+    ],
   }
 }
 

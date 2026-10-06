@@ -976,6 +976,7 @@ export function KachaInvoiceForm({
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <OldGoldExchangeSection
             part="header"
+            clarities={clarities}
             lines={oldGoldLines}
             onLinesChange={setOldGoldLines}
             metals={metals}
@@ -1627,6 +1628,7 @@ export function KachaInvoiceForm({
       {/* Customer → Business: what the customer sells against this slip. */}
       <OldGoldExchangeSection
         part="lines"
+        clarities={clarities}
         lines={oldGoldLines}
         onLinesChange={setOldGoldLines}
         metals={metals}

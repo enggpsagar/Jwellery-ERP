@@ -38,6 +38,8 @@ type InvoiceDetailContentProps = {
    * due date" nudge banner when off. Defaults true so an existing caller
    * not yet passing this keeps showing both. */
   showDueDate?: boolean
+  /** Settings → Stone Clarity names, suggested by the line quick edit. */
+  clarities?: string[]
 }
 
 /**
@@ -57,6 +59,7 @@ export function InvoiceDetailContent({
   ewayBillEnabled = true,
   eInvoiceEnabled = true,
   showDueDate = true,
+  clarities = [],
 }: InvoiceDetailContentProps) {
   const isCancelled = invoice.status === "CANCELLED"
   const isCancellable = invoice.status === "DRAFT" || invoice.status === "PARTIAL"
@@ -227,7 +230,7 @@ export function InvoiceDetailContent({
         </div>
       )}
 
-      <InvoiceItemsTable invoiceId={invoice.id} items={invoice.items} canEdit={canFullyEdit} />
+      <InvoiceItemsTable invoiceId={invoice.id} items={invoice.items} canEdit={canFullyEdit} clarities={clarities} />
 
       <div className="ml-auto max-w-sm space-y-1 rounded-xl border bg-card p-5 text-sm">
         <div className="flex justify-between">

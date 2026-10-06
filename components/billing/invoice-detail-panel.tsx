@@ -10,6 +10,7 @@ import {
   type CreditNoteView,
 } from "@/lib/actions/credit-note-actions"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
+import { getStoreStoneClarities } from "@/lib/actions/taxonomy-actions"
 import { InvoiceActionsBar, InvoiceQuickActions } from "@/components/billing/invoice-actions-bar"
 import { InvoiceDetailContent } from "@/components/billing/invoice-detail-content"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -40,6 +41,7 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
   const [eInvoiceEnabled, setEInvoiceEnabled] = useState(true)
   const [showDueDate, setShowDueDate] = useState(true)
   const [hasReturnableItems, setHasReturnableItems] = useState(false)
+  const [clarities, setClarities] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -55,8 +57,9 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
       getCreditNotesForInvoice(invoiceId),
       getBusinessSettings(),
       getReturnableInvoiceItems(invoiceId),
+      getStoreStoneClarities(),
     ])
-      .then(([invoiceResult, creditNotesResult, settings, returnableItems]) => {
+      .then(([invoiceResult, creditNotesResult, settings, returnableItems, clarityRows]) => {
         if (cancelled) return
         setInvoice(invoiceResult)
         setCreditNotes(creditNotesResult)
@@ -67,6 +70,7 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
         setEInvoiceEnabled(settings.eInvoiceEnabled)
         setShowDueDate(settings.showDueDate)
         setHasReturnableItems((returnableItems ?? []).length > 0)
+        setClarities(clarityRows.filter((row) => row.isActive).map((row) => row.name))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -122,6 +126,7 @@ export function InvoiceDetailPanel({ invoiceId, locations }: InvoiceDetailPanelP
         ewayBillEnabled={ewayBillEnabled}
         eInvoiceEnabled={eInvoiceEnabled}
         showDueDate={showDueDate}
+        clarities={clarities}
       />
     </div>
   )

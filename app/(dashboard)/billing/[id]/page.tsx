@@ -6,6 +6,7 @@ import { getInvoiceById } from "@/lib/actions/invoice-actions"
 import { getCreditNotesForInvoice, getReturnableInvoiceItems } from "@/lib/actions/credit-note-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { getInvoiceOldGoldExchange } from "@/lib/actions/old-gold-actions"
+import { getStoreStoneClarities } from "@/lib/actions/taxonomy-actions"
 import { resolveBackLink } from "@/lib/safe-return-to"
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { toTitleCase } from "@/lib/utils"
@@ -42,10 +43,11 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
     href: "/billing",
     label: "Back to Billing",
   })
-  const [invoice, settings, locations] = await Promise.all([
+  const [invoice, settings, locations, clarityRows] = await Promise.all([
     getInvoice(id),
     getBusinessSettings(),
     getStoreLocations(),
+    getStoreStoneClarities(),
   ])
 
   if (!invoice) notFound()
@@ -86,6 +88,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         ewayBillEnabled={settings.ewayBillEnabled}
         eInvoiceEnabled={settings.eInvoiceEnabled}
         showDueDate={settings.showDueDate}
+        clarities={clarityRows.filter((row) => row.isActive).map((row) => row.name)}
       />
 
       {oldGoldExchange ? (

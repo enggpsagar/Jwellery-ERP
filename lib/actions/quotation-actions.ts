@@ -28,7 +28,8 @@ import type { PieceComponentPayload } from "@/lib/piece-components";
 import { computeRoundOff } from "@/lib/round-off";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
-import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead, assertPlanActiveForExport } from "@/lib/store-context";
+import { quotationStatusLabel } from "@/lib/status-labels";
 import { actionErrorMessage } from "@/lib/action-error";
 import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import {
@@ -565,6 +566,7 @@ export async function exportQuotationsToExcel(
     }
 
     const storeId = await requireStoreScope();
+    await assertPlanActiveForExport(storeId);
     const scope = await getLocationScope();
     const sortBy = toQuotationSortBy(params.sortBy);
     const sortOrder = params.sortOrder || "desc";
@@ -594,7 +596,7 @@ export async function exportQuotationsToExcel(
       Date: formatShortDate(quotation.quotationDate),
       "Valid Until": quotation.validUntil ? formatShortDate(quotation.validUntil) : "",
       Party: quotation.customer?.name || "",
-      Status: quotation.status,
+      Status: quotationStatusLabel(quotation.status),
       Subtotal: quotation.subtotal,
       "Making Charges": quotation.makingCharges,
       "Stone Charges": quotation.stoneCharges,

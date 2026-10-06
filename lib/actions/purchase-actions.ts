@@ -20,7 +20,8 @@ import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/pie
 import { getFineWeightResolver } from "@/lib/fine-weight";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
-import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead, assertPlanActiveForExport } from "@/lib/store-context";
+import { invoiceStatusLabel } from "@/lib/status-labels";
 import { actionErrorMessage } from "@/lib/action-error";
 import { isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst";
 import { computeRoundOff } from "@/lib/round-off";
@@ -992,6 +993,7 @@ export async function exportPurchasesToExcel(
     }
 
     const storeId = await requireStoreScope();
+    await assertPlanActiveForExport(storeId);
     const scope = await getLocationScope();
     const sortBy = toPurchaseSortBy(params.sortBy);
     const sortOrder = params.sortOrder || "desc";
@@ -1020,7 +1022,9 @@ export async function exportPurchasesToExcel(
       "Purchase Number": purchase.purchaseNumber,
       Date: formatShortDate(purchase.purchaseDate),
       Vendor: purchase.vendor?.name || "",
-      Status: purchase.status,
+      // Bought from a customer against a sale (Customer Exchange), not a supplier bill.
+      Type: purchases[index].isOldGoldExchange ? "Old Gold Exchange" : "Purchase",
+      Status: invoiceStatusLabel(purchase.status),
       Subtotal: purchase.subtotal,
       "Making Charges": purchase.makingCharges,
       "Stone Charges": purchase.stoneCharges,

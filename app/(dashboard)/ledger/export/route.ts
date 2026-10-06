@@ -3,8 +3,9 @@ export const runtime = "nodejs"
 import { NextRequest, NextResponse } from "next/server"
 
 import {
-  getLedgerEntries,
+  getLedgerEntriesForExport,
   getMetalDailyLedger,
+  type LedgerEntryFilters,
 } from "@/lib/actions/ledger-actions"
 import { requireStoreScope, assertPlanActiveForExport, PlanExpiredError } from "@/lib/store-context"
 import { buildCsvExport, buildExcelExport } from "@/lib/excel-export"
@@ -13,18 +14,30 @@ import { logger } from "@/lib/logger";
 type Scope = "entries" | "metal-wise"
 type Format = "csv" | "excel"
 
-async function buildEntriesRows() {
-  const entries = await getLedgerEntries()
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: "Cash",
+  UPI: "UPI",
+  NET_BANKING: "Net Banking",
+  CHEQUE: "Cheque",
+  CARD: "Card",
+  OTHER: "Other",
+}
+
+/** Every entry matching the page's filters (no 500-row cap). */
+async function buildEntriesRows(filters: LedgerEntryFilters) {
+  const entries = await getLedgerEntriesForExport(filters)
 
   return entries.map((entry) => ({
     Date: entry.date,
     Account: entry.account,
+    "Account Type": entry.accountType ?? "",
     Type: entry.type === "DEBIT" ? "Debit" : "Credit",
     Source: entry.sourceLabel,
     Metal: entry.metalType ?? "",
     "Fine Wt 24K (g)": entry.metalWeight ?? "",
     "Carat Weight (ct)": entry.caratWeight ?? "",
     "Amount (₹)": entry.amount,
+    "Payment Method": entry.paymentMethod ? PAYMENT_METHOD_LABELS[entry.paymentMethod] ?? entry.paymentMethod : "",
     Invoice: entry.invoiceNumber ?? "",
     Description: entry.description,
   }))
@@ -56,8 +69,16 @@ export async function GET(request: NextRequest) {
     const storeId = await requireStoreScope()
     await assertPlanActiveForExport(storeId)
 
+    const filters: LedgerEntryFilters = {
+      account: searchParams.get("account") || undefined,
+      type: searchParams.get("type") || undefined,
+      dateFrom: searchParams.get("dateFrom") || undefined,
+      dateTo: searchParams.get("dateTo") || undefined,
+      search: searchParams.get("search") || undefined,
+    }
+
     const rows =
-      scope === "metal-wise" ? await buildMetalWiseRows() : await buildEntriesRows()
+      scope === "metal-wise" ? await buildMetalWiseRows() : await buildEntriesRows(filters)
 
     const filePrefix = scope === "metal-wise" ? "ledger-metal-wise" : "ledger-entries"
 

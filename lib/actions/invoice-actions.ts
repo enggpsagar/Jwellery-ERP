@@ -34,7 +34,8 @@ import { round2, splitOldGoldValue } from "@/lib/old-gold/value";
 import { computeRoundOff } from "@/lib/round-off";
 import { requirePermission, requirePermissionInStore } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
-import { requireStoreScope, resolveActingStoreId, getStoreIdForRead } from "@/lib/store-context";
+import { requireStoreScope, resolveActingStoreId, getStoreIdForRead, assertPlanActiveForExport } from "@/lib/store-context";
+import { invoiceStatusLabel } from "@/lib/status-labels";
 import { actionErrorMessage } from "@/lib/action-error";
 import {
   getLocationScope,
@@ -807,6 +808,7 @@ export async function exportInvoicesToExcel(
 ): Promise<ExportInvoicesResult> {
   try {
     const storeId = await requireStoreScope();
+    await assertPlanActiveForExport(storeId);
     const scope = await getLocationScope();
     const { where, orderBy } = buildInvoiceQuery(params, storeId, scope);
 
@@ -817,6 +819,8 @@ export async function exportInvoicesToExcel(
         items: { include: { components: { orderBy: { sortOrder: "asc" }, include: { metalType: { select: { name: true } } } } } },
         customer: { select: { id: true, name: true, phone: true } },
         convertedFromKacha: { select: { id: true, slipNumber: true } },
+        location: { select: { name: true } },
+        oldGoldExchange: { select: { totalAmount: true } },
       },
     });
 
@@ -824,32 +828,66 @@ export async function exportInvoicesToExcel(
       return { success: false, message: "No invoices found to export." };
     }
 
-    const rows = invoices.map(mapInvoice).map((invoice, index) => ({
-      "Sr. No.": index + 1,
-      "Invoice #": invoice.invoiceNumber,
-      Date: formatShortDate(invoice.invoiceDate),
-      Party: invoice.customer?.name || "",
-      Status: invoice.status,
-      Subtotal: invoice.subtotal,
-      "Making Charges": invoice.makingCharges,
-      "Stone Charges": invoice.stoneCharges,
-      Discount: invoice.discount,
-      Tax: invoice.taxAmount,
-      Total: invoice.totalAmount,
-      Paid: invoice.paidAmount,
-      Balance: invoice.balanceAmount,
-      // A piece of several metals/stones — its rows, per line.
-      [METALS_AND_STONES_COLUMN]: invoices[index].items
-        .filter((item) => item.components.length)
-        .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components)}`)
-        .join(" | "),
-    }));
+    const money = (value: number) => Math.round(value * 100) / 100;
+
+    const rows = invoices.map(mapInvoice).map((invoice, index) => {
+      const raw = invoices[index];
+      const sumItems = (field: "cgstAmount" | "sgstAmount" | "igstAmount") =>
+        money(raw.items.reduce((sum, item) => sum + Number(item[field] ?? 0), 0));
+      // Every rate charged on the bill — lines, and each row of a multi-part piece.
+      const rates = [
+        ...new Set(
+          raw.items
+            .flatMap((item) => [item.gstRatePercent, ...item.components.map((c) => c.gstRatePercent)])
+            .filter((rate): rate is NonNullable<typeof rate> => rate != null)
+            .map((rate) => Number(rate))
+            .concat(raw.items.length ? [] : invoice.gstRatePercent != null ? [invoice.gstRatePercent] : []),
+        ),
+      ].sort((a, b) => a - b);
+
+      return {
+        "Sr. No.": index + 1,
+        "Invoice #": invoice.invoiceNumber,
+        Date: formatShortDate(invoice.invoiceDate),
+        Party: invoice.customer?.name || "",
+        Status: invoiceStatusLabel(invoice.status),
+        Location: raw.location?.name ?? "",
+        Subtotal: invoice.subtotal,
+        "Making Charges": invoice.makingCharges,
+        "Stone Charges": invoice.stoneCharges,
+        Discount: invoice.discount,
+        "Offer / Voucher Code": invoice.promotionCode ?? "",
+        "Offer / Voucher Discount": invoice.promotionDiscount,
+        "GST Rate(s) %": rates.join(", "),
+        CGST: sumItems("cgstAmount"),
+        SGST: sumItems("sgstAmount"),
+        IGST: sumItems("igstAmount"),
+        Tax: invoice.taxAmount,
+        "Round Off": invoice.roundOffAmount,
+        Total: invoice.totalAmount,
+        "Old Gold Exchange Value": raw.oldGoldExchange ? Number(raw.oldGoldExchange.totalAmount) : "",
+        Paid: invoice.paidAmount,
+        Balance: invoice.balanceAmount,
+        "E-way Bill No.": invoice.ewayBillNumber ?? "",
+        IRN: invoice.irnNumber ?? "",
+        // A piece of several metals/stones — its rows, per line.
+        [METALS_AND_STONES_COLUMN]: raw.items
+          .filter((item) => item.components.length)
+          .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components)}`)
+          .join(" | "),
+      };
+    });
+
+    // The PDF is a printed summary — a page can't hold every column.
+    const PDF_COLUMNS = ["Sr. No.", "Invoice #", "Date", "Party", "Status", "Subtotal", "Discount", "Tax", "Total", "Paid", "Balance"] as const;
+    const pdfRows = () =>
+      rows.map((row) => Object.fromEntries(PDF_COLUMNS.map((column) => [column, row[column]])));
 
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, "invoices")
         : params.format === "pdf"
-          ? buildPdfExportBase64(rows, "Invoices", "invoices")
+          ? buildPdfExportBase64(pdfRows(), "Invoices", "invoices")
           : buildExcelExport(rows, "Invoices", "invoices");
 
     return { success: true, message: "Invoices exported successfully.", fileName, fileBase64 };

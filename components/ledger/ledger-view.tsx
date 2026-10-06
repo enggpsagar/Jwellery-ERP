@@ -46,6 +46,7 @@ import { Input } from "@/components/ui/input"
 import { DateRangePicker, type DateRangeValue } from "@/components/ui/date-range-picker"
 import { LedgerDetailDrawer } from "@/components/ledger/ledger-detail-drawer"
 import { ExportMenu } from "@/components/shared/export-menu"
+import { ledgerEntryMatches, ledgerExportHref } from "@/lib/ledger-filters"
 
 function formatCurrency(value: number, withSign = false) {
   const abs = Math.abs(value)
@@ -79,17 +80,6 @@ function formatEntryValue(entry: LedgerEntryRow) {
   }
 
   return formatCurrency(entry.amount)
-}
-
-/** "YYYY-MM-DD" range bound -> epoch ms, at the start or end of that local
- * calendar day, so a range filter is inclusive of both endpoints. */
-function dateRangeBound(value: string, endOfDay: boolean): number | null {
-  if (!value) return null
-  const [y, m, d] = value.split("-").map(Number)
-  if (!y || !m || !d) return null
-  return endOfDay
-    ? new Date(y, m - 1, d, 23, 59, 59, 999).getTime()
-    : new Date(y, m - 1, d, 0, 0, 0, 0).getTime()
 }
 
 const pageSizeOptions = [10, 20, 50, 100]
@@ -136,25 +126,24 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
     [entries],
   )
 
-  const filtered = useMemo(() => {
-    return entries.filter((entry) => {
-      if (account !== "all" && entry.account !== account) return false
-      if (txnType !== "all" && entry.sourceLabel !== txnType) return false
-      if (dateRange.from || dateRange.to) {
-        const entryTime = new Date(entry.dateISO).getTime()
-        const fromTime = dateRangeBound(dateRange.from, false)
-        const toTime = dateRangeBound(dateRange.to, true)
-        if (fromTime != null && entryTime < fromTime) return false
-        if (toTime != null && entryTime > toTime) return false
-      }
-      if (search) {
-        const q = search.toLowerCase()
-        const haystack = `${entry.account} ${entry.id} ${entry.invoiceNumber ?? ""} ${entry.description}`.toLowerCase()
-        if (!haystack.includes(q)) return false
-      }
-      return true
-    })
-  }, [entries, account, txnType, dateRange, search])
+  // One set of filters for the table and the export link, applied by the
+  // same ledgerEntryMatches the export route uses — so the file holds every
+  // matching entry, not just the page's latest-500 window.
+  const filters = useMemo(
+    () => ({
+      account: account !== "all" ? account : undefined,
+      type: txnType !== "all" ? txnType : undefined,
+      dateFrom: dateRange.from || undefined,
+      dateTo: dateRange.to || undefined,
+      search: search || undefined,
+    }),
+    [account, txnType, dateRange, search],
+  )
+
+  const filtered = useMemo(
+    () => entries.filter((entry) => ledgerEntryMatches(entry, filters)),
+    [entries, filters],
+  )
 
   const hasFilters =
     account !== "all" || txnType !== "all" || search.length > 0 || Boolean(dateRange.from || dateRange.to)
@@ -328,7 +317,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
                 Money movement across all party and artisan accounts.
               </CardDescription>
             </div>
-            <ExportMenu href="/ledger/export?scope=entries" label="Export" iconOnly />
+            <ExportMenu href={ledgerExportHref(filters)} label="Export" iconOnly />
           </div>
 
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

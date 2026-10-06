@@ -14,6 +14,7 @@ import {
   type DateRange,
 } from "@/lib/actions/report-actions"
 import { formatShortDate } from "@/lib/utils"
+import { invoiceStatusLabel, stockStatusLabel } from "@/lib/status-labels"
 
 /**
  * Extracted from what was originally app/(dashboard)/reports/export/route.ts's
@@ -68,7 +69,7 @@ export async function getReportRows(type: ReportType, range: DateRange) {
         "Invoice #": invoice.invoiceNumber,
         Date: formatShortDate(invoice.invoiceDate),
         Party: invoice.customerName,
-        Status: invoice.status,
+        Status: invoiceStatusLabel(invoice.status),
         "Total (₹)": invoice.totalAmount,
         "Balance (₹)": invoice.balanceAmount,
       }))
@@ -102,7 +103,7 @@ export async function getReportRows(type: ReportType, range: DateRange) {
     case "inventory": {
       const report = await getInventoryValuationReport()
       return report.byStatus.map((row) => ({
-        Status: row.status,
+        Status: stockStatusLabel(row.status),
         Count: row.count,
         "Fine Wt 24K (g)": row.netWeight,
         "Estimated Value (₹)": row.estimatedValue,
@@ -119,7 +120,7 @@ export async function getReportRows(type: ReportType, range: DateRange) {
         Metal: row.metal,
         Purity: row.purity,
         Availability: row.availability === "AVAILABLE" ? "Available" : "Out of Stock",
-        Status: row.status,
+        Status: stockStatusLabel(row.status),
         "Qty on Hand": row.quantity,
         "Net Weight / pc (g)": row.netWeight,
         "Total Net Weight (g)": row.totalNetWeight,
@@ -188,7 +189,7 @@ export async function getReportRows(type: ReportType, range: DateRange) {
       return report.rows.map((row) => ({
         "Stock Code": row.stockCode,
         Item: row.productName,
-        Status: row.status,
+        Status: stockStatusLabel(row.status),
         "Qty On Hand": row.quantityRemaining,
         "Net Weight (g)": row.netWeight,
         "Fine Wt 24K (g)": row.fineWeight,

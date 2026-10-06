@@ -5,6 +5,7 @@ import { Upload, Download } from "lucide-react"
 import { Loader } from "@/components/ui/loader"
 
 import {
+  exportMetalsAndCategoriesToExcel,
   getMetalCategoryImportTemplate,
   importMetalsAndCategoriesFromExcel,
 } from "@/lib/actions/taxonomy-actions"
@@ -87,9 +88,10 @@ export function MetalCategoryImportDialog() {
         <DialogHeader>
           <DialogTitle>Bulk import metals &amp; categories</DialogTitle>
           <DialogDescription>
-            One file, two sheets — <strong>Metals</strong> and{" "}
-            <strong>Categories</strong>. A Category row can optionally list
-            Category Types (comma-separated) to create alongside it.
+            One file, three sheets — <strong>Metals</strong>,{" "}
+            <strong>Purities</strong> and <strong>Categories</strong>. Selling
+            prices go on Purities. A name that already exists is updated, a
+            new one is added; an export from here imports back unchanged.
           </DialogDescription>
         </DialogHeader>
 
@@ -135,5 +137,33 @@ export function MetalCategoryImportDialog() {
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** Downloads the store's current list in the import template's layout. */
+export function MetalCategoryExportButton() {
+  const [pending, startTransition] = useTransition()
+  const toast = useToast()
+
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const result = await exportMetalsAndCategoriesToExcel()
+          if (result.success && result.fileBase64 && result.fileName) {
+            downloadBase64File(result.fileBase64, result.fileName)
+          } else {
+            toast.error(result.message)
+          }
+        })
+      }
+    >
+      {pending ? <Loader className="mr-2 h-4 w-4" /> : <Download className="mr-2 h-4 w-4" />}
+      Export Metals &amp; Categories
+    </Button>
   )
 }

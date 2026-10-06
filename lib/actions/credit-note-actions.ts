@@ -13,7 +13,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
-import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
+import { requireStoreScope, getStoreIdForRead, assertPlanActiveForExport } from "@/lib/store-context";
 import { getLocationScope, locationWhere, type LocationScope } from "@/lib/location-scope";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
@@ -364,6 +364,7 @@ export async function exportCreditNotesToExcel(params: ExportCreditNotesParams =
   fileBase64?: string;
 }> {
   try {
+    await assertPlanActiveForExport(await requireStoreScope());
     const creditNotes = await getAllCreditNotesForExport(params);
 
     if (!creditNotes.length) {
@@ -376,6 +377,11 @@ export async function exportCreditNotesToExcel(params: ExportCreditNotesParams =
       Date: formatShortDate(creditNote.creditNoteDate),
       Party: creditNote.customer?.name || "",
       "Against Invoice": creditNote.invoice.invoiceNumber,
+      "Items Returned": creditNote.items.reduce((sum, item) => sum + item.quantity, 0),
+      // What came back, line by line: "Ring × 1 (₹45,000)".
+      "Returned Lines": creditNote.items
+        .map((item) => `${item.itemName} × ${item.quantity} (₹${item.lineTotal.toLocaleString("en-IN", { maximumFractionDigits: 2 })})`)
+        .join(" | "),
       "Amount Refunded": creditNote.totalAmount,
       Reason: creditNote.reason || "",
       "Created By": creditNote.createdByName || "",

@@ -200,3 +200,33 @@ export function computePurchaseGst(
 
   return splitGst(taxableValue, ratePercent, storeState, vendorState)
 }
+
+// GSTIN layout: 2-digit state code, the holder's 10-character PAN, the
+// entity number (1-9 or A-Z), a fixed "Z", and a check character — e.g.
+// 27ABCDE1234F1Z5. The check character itself isn't verified, only the
+// structure. Shared by the Party form's action and the Party import.
+const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
+
+export function isValidGstin(rawValue: string): boolean {
+  return GSTIN_REGEX.test(rawValue.trim().toUpperCase())
+}
+
+/** Always stored uppercase — GSTIN has no lowercase form. */
+export function normalizeGstin(rawValue: string): string {
+  return rawValue.trim().toUpperCase()
+}
+
+export const GSTIN_INVALID_MESSAGE = "Enter a valid 15-character GSTIN (e.g. 27ABCDE1234F1Z5)"
+export const GSTIN_REQUIRED_MESSAGE = "GST Number is required for a Regular or Composition GST registered party"
+
+/** A Party's GST Type from a spreadsheet cell: its label ("Not GST
+ *  Registered", "Regular", "Composition Scheme") or the raw value
+ *  (UNREGISTERED/REGULAR/COMPOSITION), case-insensitive. null = not one of them. */
+export function parsePartyGstType(raw: string): PartyGstType | null {
+  const value = raw.trim().toLowerCase()
+  return (
+    PARTY_GST_TYPE_OPTIONS.find(
+      (option) => option.label.toLowerCase() === value || option.value.toLowerCase() === value,
+    )?.value ?? null
+  )
+}

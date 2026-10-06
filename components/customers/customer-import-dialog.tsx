@@ -86,8 +86,11 @@ export function CustomerImportDialog() {
         <DialogHeader>
           <DialogTitle>Bulk import parties</DialogTitle>
           <DialogDescription>
-            One row per party. <strong>Party Name</strong> is the only
-            required field — everything else, including Phone, is optional.
+            One row per party, checked like the Add Party form.{" "}
+            <strong>Party Name</strong> is required, and <strong>GST Number</strong>{" "}
+            too for a Regular or Composition Scheme party. The template&apos;s
+            Instructions sheet explains every column; an exported Parties file
+            imports back as-is.
           </DialogDescription>
         </DialogHeader>
 

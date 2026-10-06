@@ -188,6 +188,7 @@ export function CustomerCreateForm({
               placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : "Optional"}
               required={gstinRequiredNow}
             />
+            <FieldError errors={state.errors?.gstNumber} />
           </div>
 
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -222,6 +223,7 @@ export function CustomerCreateForm({
               Email
             </label>
             <input name="email" type="email" className={FIELD} placeholder="name@example.com" />
+            <FieldError errors={state.errors?.email} />
           </div>
 
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -302,6 +304,7 @@ export function CustomerCreateForm({
               Pincode
             </label>
             <input name="pincode" className={FIELD} placeholder="440001" />
+            <FieldError errors={state.errors?.pincode} />
           </div>
 
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">

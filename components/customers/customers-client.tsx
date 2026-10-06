@@ -42,6 +42,8 @@ type CustomersClientProps = {
   archivedHref?: string
   archivedLabel?: string
   showImport?: boolean
+  /** The Suppliers page — its export covers suppliers only. */
+  supplierOnly?: boolean
 }
 
 export function CustomersClient({
@@ -57,6 +59,7 @@ export function CustomersClient({
   archivedHref = "/customers/archived",
   archivedLabel = "Archived Parties",
   showImport = true,
+  supplierOnly = false,
 }: CustomersClientProps) {
   const [selectedCustomerIds, setSelectedCustomerIds] = React.useState<string[]>([])
   // Which row's full detail shows in the right-hand panel — defaults to
@@ -109,6 +112,7 @@ export function CustomersClient({
         <div className="space-y-4">
           <CustomersToolbar
             selectedCustomerIds={selectedCustomerIds}
+            supplierOnly={supplierOnly}
             bulkActions={
               <BulkDeleteButton
                 selectedIds={selectedCustomerIds}

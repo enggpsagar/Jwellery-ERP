@@ -66,6 +66,7 @@ export default async function SuppliersPage({ searchParams }: SuppliersPageProps
       archivedHref="/customers/archived"
       archivedLabel="All Parties"
       showImport={false}
+      supplierOnly
     />
   )
 }

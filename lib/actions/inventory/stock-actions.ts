@@ -24,7 +24,7 @@ import {
   type LocationScope,
 } from "@/lib/location-scope"
 import type { StockFormState } from "@/lib/inventory/stock-types"
-import { finishLabel } from "@/lib/inventory/finish"
+import { finishLabel, parseFinishLabel } from "@/lib/inventory/finish"
 import {
   buildExcelExport,
   buildCsvExportBase64,
@@ -1329,6 +1329,8 @@ export async function getStockImportTemplate(): Promise<{
     "Product Code": "PRD-0001",
     Quantity: 5,
     Location: "",
+    // Optional — blank takes the product's own Finish.
+    Finish: "",
   }
 
   return buildMultiSheetExcelExport(
@@ -1441,6 +1443,13 @@ export async function importInventoryStockFromExcel(
         continue
       }
 
+      const finishRaw = stockImportCell(row, "Finish")
+      const finish = finishRaw ? parseFinishLabel(finishRaw) : product.defaultFinish
+      if (!finish) {
+        errors.push(`Row ${line}: "${finishRaw}" is not a valid Finish — use Unfinished or Finished, or leave it blank`)
+        continue
+      }
+
       const locationName = stockImportCell(row, "Location")
       let resolvedLocationId: string | null = null
       if (locationName) {
@@ -1471,7 +1480,7 @@ export async function importInventoryStockFromExcel(
         productId: product.id,
         stockCode: `STK-${year}-${String(highestCode).padStart(4, "0")}`,
         quantity: Math.trunc(quantity),
-        finish: product.defaultFinish,
+        finish,
         metalTypeId: product.metalTypeId,
         purity: product.defaultPurity,
         purityLabel: product.storeMetalPurity?.label ?? undefined,

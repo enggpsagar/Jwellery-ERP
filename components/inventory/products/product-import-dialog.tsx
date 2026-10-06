@@ -92,7 +92,9 @@ export function ProductImportDialog() {
             names must match what's already set up under Settings &gt;
             Taxonomy. Product codes are generated automatically, same as the
             "Add Product" form. Fill in <strong>Stock Quantity</strong> on a
-            row to also create an opening stock entry for that product.
+            row to also create an opening stock entry for that product.{" "}
+            <strong>Finish</strong> (Unfinished / Finished) is optional and
+            defaults to Unfinished; that opening stock takes the same Finish.
           </DialogDescription>
         </DialogHeader>
 

@@ -93,8 +93,10 @@ export function StockImportDialog() {
           <DialogDescription>
             One row per product. <strong>Product Code</strong> and{" "}
             <strong>Quantity</strong> are all that's required — metal,
-            purity and charges come from each matched product. Location is
-            optional.
+            purity, charges and Finish come from each matched product.
+            Location is optional, and so is <strong>Finish</strong>
+            (Unfinished / Finished) — fill it in only to override the
+            product's own.
           </DialogDescription>
         </DialogHeader>
 

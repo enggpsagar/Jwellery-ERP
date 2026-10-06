@@ -39,14 +39,17 @@ test("finish: product import, stock import, both exports", async ({ page }) => {
   const product = await db().product.findFirstOrThrow({ where: { storeId, name }, include: { stockItems: true } })
   expect(product.stockItems.map((s) => s.finish)).toEqual(["PAKKA"])
 
-  // Stock import for that product inherits its Finish.
+  // Stock import: a blank Finish inherits the product's, a filled one overrides it.
   await page.goto("/inventory/stock")
   await page.getByRole("button", { name: "Import from Excel" }).click()
-  await page.locator("#stock-import-file").setInputFiles(sheet([{ "Product Code": product.productCode, Quantity: 2 }], "test-results/finish-stock.xlsx"))
+  await page.locator("#stock-import-file").setInputFiles(sheet([
+    { "Product Code": product.productCode, Quantity: 2, Finish: "" },
+    { "Product Code": product.productCode, Quantity: 1, Finish: "Unfinished" },
+  ], "test-results/finish-stock.xlsx"))
   await page.getByRole("button", { name: "Import", exact: true }).click()
-  await expect.poll(async () => db().inventoryStock.count({ where: { storeId, productId: product.id } }), { timeout: 15000 }).toBe(2)
+  await expect.poll(async () => db().inventoryStock.count({ where: { storeId, productId: product.id } }), { timeout: 15000 }).toBe(3)
   const stocks = await db().inventoryStock.findMany({ where: { storeId, productId: product.id } })
-  expect(stocks.every((s) => s.finish === "PAKKA")).toBe(true)
+  expect(stocks.map((s) => `${s.quantity}:${s.finish}`).sort()).toEqual(["1:KACHA", "1:PAKKA", "2:PAKKA"])
 
   // Exports show labels, never raw enum values.
   const stockCsv = await exportCsv(page, "/inventory/stock")

@@ -552,6 +552,26 @@ export async function updateCustomerCore(
     const phone = input.phone.trim();
 
     const errors = validateCustomerInput(input, { gstScheme });
+
+    // GSTIN / email / pincode checks are new (2026-10-06): a party saved
+    // before them may hold a value they reject. Only judge what this edit
+    // changes, so an old record can still be edited for something else.
+    if (errors.gstNumber || errors.email || errors.pincode) {
+      const stored = await prisma.customer.findFirst({
+        where: { id, storeId },
+        select: { gstin: true, gstType: true, email: true, pincode: true },
+      });
+      const same = (a: string | null | undefined, b: string | null | undefined) =>
+        (a ?? "").trim().toUpperCase() === (b ?? "").trim().toUpperCase();
+      if (stored) {
+        if (same(stored.gstin, input.gstNumber) && stored.gstType === (input.gstType ?? stored.gstType)) {
+          delete errors.gstNumber;
+        }
+        if (same(stored.email, input.email)) delete errors.email;
+        if (same(stored.pincode, input.pincode)) delete errors.pincode;
+      }
+    }
+
     if (Object.keys(errors).length > 0) {
       return { success: false, message: "Please fix the form errors", errors };
     }

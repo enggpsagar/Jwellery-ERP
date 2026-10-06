@@ -26,6 +26,8 @@ import {
   buildCsvExportBase64,
   buildPdfExportBase64,
 } from "@/lib/excel-export";
+import { omitHiddenKeys } from "@/lib/sheet-features";
+import { getSheetFeatures } from "@/lib/sheet-features.server";
 
 export type CreditNoteFormState = {
   success: boolean;
@@ -364,14 +366,16 @@ export async function exportCreditNotesToExcel(params: ExportCreditNotesParams =
   fileBase64?: string;
 }> {
   try {
-    await assertPlanActiveForExport(await requireStoreScope());
+    const storeId = await requireStoreScope();
+    await assertPlanActiveForExport(storeId);
     const creditNotes = await getAllCreditNotesForExport(params);
 
     if (!creditNotes.length) {
       return { success: false, message: "No credit notes found to export." };
     }
 
-    const rows = creditNotes.map((creditNote, index) => ({
+    // No Location column for a store without locations (lib/sheet-features.ts).
+    const rows = omitHiddenKeys(creditNotes.map((creditNote, index) => ({
       "Sr. No.": index + 1,
       "Credit Note #": creditNote.creditNoteNumber,
       Date: formatShortDate(creditNote.creditNoteDate),
@@ -386,7 +390,7 @@ export async function exportCreditNotesToExcel(params: ExportCreditNotesParams =
       Reason: creditNote.reason || "",
       "Created By": creditNote.createdByName || "",
       Location: creditNote.locationName || "",
-    }));
+    })), { Location: "locations" }, await getSheetFeatures(storeId));
 
     const { fileName, fileBase64 } =
       params.format === "csv"

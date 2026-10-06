@@ -1,3 +1,5 @@
+import { ALL_SHEET_FEATURES, sheetColumnsFor, type SheetFeature, type SheetFeatures } from "../sheet-features"
+
 /**
  * The artisan (karigar) spreadsheet's columns — one definition shared by the
  * import template, its Instructions sheet and the artisan export, so all
@@ -17,6 +19,8 @@ export type KarigarSheetColumn = {
   help: string
   /** The template's example row. */
   example: string | number
+  /** Only in this store's sheets while the feature is on (lib/sheet-features.ts). */
+  feature?: SheetFeature
 }
 
 export const KARIGAR_SHEET_COLUMNS: KarigarSheetColumn[] = [
@@ -68,6 +72,7 @@ export const KARIGAR_SHEET_COLUMNS: KarigarSheetColumn[] = [
   },
   {
     header: "Location",
+    feature: "locations",
     required: "When you only have access to some locations",
     help: "Must match one of your locations under Settings › Locations (see the dropdown). Blank = no location — or, if your access is limited to one location, that location.",
     example: "",
@@ -107,6 +112,25 @@ export const KARIGAR_EXPORT_HEADERS = [
   ...KARIGAR_EXPORT_TRAILING_HEADERS,
 ]
 
+/** The columns this store's artisan sheets carry. */
+export function karigarSheetColumns(features: SheetFeatures = ALL_SHEET_FEATURES) {
+  return sheetColumnsFor(KARIGAR_SHEET_COLUMNS, features)
+}
+
+export function karigarSheetHeaders(features: SheetFeatures = ALL_SHEET_FEATURES) {
+  return karigarSheetColumns(features).map((column) => column.header)
+}
+
+/** The export's headers for this store (sheet columns plus the read-only ones). */
+export function karigarExportHeaders(features: SheetFeatures = ALL_SHEET_FEATURES) {
+  return [...KARIGAR_EXPORT_LEADING_HEADERS, ...karigarSheetHeaders(features), ...KARIGAR_EXPORT_TRAILING_HEADERS]
+}
+
+/** Headers (with their older aliases) the import ignores for this store. */
+export function karigarHiddenHeaders(features: SheetFeatures) {
+  return KARIGAR_SHEET_COLUMNS.filter((column) => column.feature && !features[column.feature]).flatMap((column) => [column.header, ...(column.aliases ?? [])])
+}
+
 export const KARIGAR_SHEET_NOTES = [
   "How to fill in the Artisans sheet",
   "• One row per artisan. Replace or delete the example row before importing.",
@@ -118,8 +142,8 @@ export const KARIGAR_SHEET_NOTES = [
 ]
 
 /** The Instructions sheet's rows. */
-export function karigarSheetInstructions() {
-  return KARIGAR_SHEET_COLUMNS.map((column, index) => ({
+export function karigarSheetInstructions(features: SheetFeatures = ALL_SHEET_FEATURES) {
+  return karigarSheetColumns(features).map((column, index) => ({
     "#": index + 1,
     Column: column.header,
     Required: column.required,

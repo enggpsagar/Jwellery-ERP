@@ -14,6 +14,9 @@ import {
   type DateRange,
 } from "@/lib/actions/report-actions"
 import { formatShortDate } from "@/lib/utils"
+import { requireStoreScope } from "@/lib/store-context"
+import { omitHiddenKeys } from "@/lib/sheet-features"
+import { getSheetFeatures } from "@/lib/sheet-features.server"
 import { invoiceStatusLabel, stockStatusLabel } from "@/lib/status-labels"
 
 /**
@@ -111,7 +114,9 @@ export async function getReportRows(type: ReportType, range: DateRange) {
     }
     case "stock": {
       const report = await getStockReport()
-      return report.rows.map((row) => ({
+      // No Location column for a store without locations (lib/sheet-features.ts).
+      const features = await getSheetFeatures(await requireStoreScope())
+      return omitHiddenKeys(report.rows.map((row) => ({
         "Stock Code": row.stockCode,
         "Tag #": row.tagNumber ?? "",
         Product: row.productName,
@@ -129,7 +134,7 @@ export async function getReportRows(type: ReportType, range: DateRange) {
         "Estimated Value (₹)": row.estimatedValue,
         Location: row.location,
         "Purchase Date": row.purchaseDate ? formatShortDate(row.purchaseDate) : "",
-      }))
+      })), { Location: "locations" }, features)
     }
     case "karigar": {
       const report = await getKarigarOutstandingReport()

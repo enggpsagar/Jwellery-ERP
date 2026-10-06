@@ -34,14 +34,17 @@ import {
 import {
   IMPORTABLE_STOCK_STATUSES,
   STOCK_SHEET_COLUMNS,
-  STOCK_SHEET_HEADERS,
   STOCK_SHEET_NOTES,
   STOCK_STATUS_LABELS,
   formatSheetDate,
   parseImportStockStatus,
   parseSheetDate,
+  stockSheetColumns,
+  stockSheetHeaders,
   stockSheetInstructions,
 } from "@/lib/inventory/stock-sheet"
+import { dropdownsFor, hiddenSheetHeaders, pickSheetRow, stripHiddenSheetColumns } from "@/lib/sheet-features"
+import { getSheetFeatures } from "@/lib/sheet-features.server"
 import { PURITY_LABELS } from "@/lib/purity"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 import { getFineWeightResolver, resolveFineWeight } from "@/lib/fine-weight"
@@ -412,6 +415,10 @@ export async function exportInventoryStockToExcel(
     // and imported — clear Stock Code to add rows as new pieces). The PDF
     // keeps its own shorter, readable column set.
     const num = (value: { toString(): string } | null | undefined) => (value == null ? "" : Number(value))
+    // This store's columns only (lib/sheet-features.ts).
+    const storeId = await requireStoreScope()
+    const features = await getSheetFeatures(storeId)
+    const headers = stockSheetHeaders(features)
     const rows = stockItems.map((item) => {
       const values: Record<string, unknown> = {
         "Product Code": item.product?.productCode ?? "",
@@ -442,7 +449,7 @@ export async function exportInventoryStockToExcel(
         "Metals & Stones": describePieceComponentsText(item.components),
         "Created At": item.createdAt ? formatShortDateTime(item.createdAt) : "",
       }
-      return Object.fromEntries(STOCK_SHEET_HEADERS.map((header) => [header, values[header] ?? ""]))
+      return pickSheetRow(values, headers)
     })
     const pdfRows = () =>
       stockItems.map((item, index) => ({
@@ -480,9 +487,9 @@ export async function exportInventoryStockToExcel(
           : buildImportTemplateWithDropdowns({
               sheetName: "Stock",
               rows,
-              columns: STOCK_SHEET_HEADERS,
-              dropdowns: await loadStockSheetDropdowns(await requireStoreScope()),
-              instructions: { notes: STOCK_SHEET_NOTES, rows: stockSheetInstructions() },
+              columns: headers,
+              dropdowns: dropdownsFor(await loadStockSheetDropdowns(storeId), headers),
+              instructions: { notes: STOCK_SHEET_NOTES, rows: stockSheetInstructions(features) },
               filePrefix: "inventory-stock",
             })
 
@@ -1398,13 +1405,15 @@ export async function getStockImportTemplate(): Promise<{
   fileBase64: string
 }> {
   const storeId = await requireStoreScope()
-  const example = Object.fromEntries(STOCK_SHEET_COLUMNS.map((column) => [column.header, column.example]))
+  const features = await getSheetFeatures(storeId)
+  const headers = stockSheetHeaders(features)
+  const example = Object.fromEntries(stockSheetColumns(features).map((column) => [column.header, column.example]))
   return buildImportTemplateWithDropdowns({
     sheetName: "Stock Import",
     rows: [example],
-    columns: STOCK_SHEET_HEADERS,
-    dropdowns: await loadStockSheetDropdowns(storeId),
-    instructions: { notes: STOCK_SHEET_NOTES, rows: stockSheetInstructions() },
+    columns: headers,
+    dropdowns: dropdownsFor(await loadStockSheetDropdowns(storeId), headers),
+    instructions: { notes: STOCK_SHEET_NOTES, rows: stockSheetInstructions(features) },
     filePrefix: "stock-import-template",
   })
 }
@@ -1434,7 +1443,12 @@ export async function importInventoryStockFromExcel(
       return { success: false, message: "Choose a .xlsx or .csv file to import." }
     }
 
-    const rows = parseExcelUpload(await file.arrayBuffer())
+    // A column this store's sheets leave out (Location with no locations set
+    // up) is ignored if an older file still has it — never an error.
+    const rows = stripHiddenSheetColumns(
+      parseExcelUpload(await file.arrayBuffer()),
+      hiddenSheetHeaders(STOCK_SHEET_COLUMNS, await getSheetFeatures(storeId)),
+    )
 
     if (!rows.length) {
       return { success: false, message: "That file has no rows to import." }

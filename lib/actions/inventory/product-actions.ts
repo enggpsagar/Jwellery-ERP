@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { ChargeType, InventoryFinish, PurityType, Prisma } from "@prisma/client";
 import { finishLabel, parseFinishLabel } from "@/lib/inventory/finish";
-import { PRODUCT_SHEET_COLUMNS, PRODUCT_SHEET_FOLLOW_ON_EXAMPLE, PRODUCT_SHEET_HEADERS, productSheetInstructions } from "@/lib/inventory/product-sheet";
+import { PRODUCT_SHEET_COLUMNS, PRODUCT_SHEET_FOLLOW_ON_EXAMPLE, productSheetColumns, productSheetHeaders, productSheetInstructions } from "@/lib/inventory/product-sheet";
+import { dropdownsFor, hiddenSheetHeaders, pickSheetRow, stripHiddenSheetColumns } from "@/lib/sheet-features";
+import { getSheetFeatures } from "@/lib/sheet-features.server";
 
 import { prisma } from "@/lib/prisma";
 import { getFineWeightResolver, resolveFineWeight } from "@/lib/fine-weight";
@@ -774,8 +776,12 @@ export async function exportProductsToExcel(
             "Stone Weight": num(stone.stoneWeight),
           }
         : {};
-    const toRow = (values: Record<string, unknown>) =>
-      Object.fromEntries(PRODUCT_SHEET_HEADERS.map((header) => [header, values[header] ?? ""]));
+    // This store's columns only — a switched-off feature's column (Style,
+    // GST Rate, Location) is left out, never its stored value changed.
+    const storeId = await requireStoreScope();
+    const features = await getSheetFeatures(storeId);
+    const headers = productSheetHeaders(features);
+    const toRow = (values: Record<string, unknown>) => pickSheetRow(values, headers);
 
     const rows = products.flatMap((product) => {
       const [firstMetal, ...moreMetals] = product.metals;
@@ -858,9 +864,9 @@ export async function exportProductsToExcel(
           : buildImportTemplateWithDropdowns({
               sheetName: "Products",
               rows,
-              columns: PRODUCT_SHEET_HEADERS,
-              dropdowns: await loadProductSheetDropdowns(await requireStoreScope()),
-              instructions: { notes: PRODUCT_SHEET_NOTES, rows: productSheetInstructions() },
+              columns: headers,
+              dropdowns: dropdownsFor(await loadProductSheetDropdowns(storeId), headers),
+              instructions: { notes: PRODUCT_SHEET_NOTES, rows: productSheetInstructions(features) },
               filePrefix: "products",
             });
 
@@ -1989,14 +1995,16 @@ export async function getProductImportTemplate(): Promise<{
   fileBase64: string;
 }> {
   const storeId = await requireStoreScope();
-  const example = Object.fromEntries(PRODUCT_SHEET_COLUMNS.map((column) => [column.header, column.example]));
+  const features = await getSheetFeatures(storeId);
+  const headers = productSheetHeaders(features);
+  const example = Object.fromEntries(productSheetColumns(features).map((column) => [column.header, column.example]));
 
   return buildImportTemplateWithDropdowns({
     sheetName: "Products Import",
-    rows: [example, PRODUCT_SHEET_FOLLOW_ON_EXAMPLE],
-    columns: PRODUCT_SHEET_HEADERS,
-    dropdowns: await loadProductSheetDropdowns(storeId),
-    instructions: { notes: PRODUCT_SHEET_NOTES, rows: productSheetInstructions() },
+    rows: [example, pickSheetRow(PRODUCT_SHEET_FOLLOW_ON_EXAMPLE, headers)],
+    columns: headers,
+    dropdowns: dropdownsFor(await loadProductSheetDropdowns(storeId), headers),
+    instructions: { notes: PRODUCT_SHEET_NOTES, rows: productSheetInstructions(features) },
     filePrefix: "products-import-template",
   });
 }
@@ -2050,7 +2058,13 @@ export async function importProductsFromExcel(
       return { success: false, message: "Choose a .xlsx or .csv file to import." };
     }
 
-    const rows = parseExcelUpload(await file.arrayBuffer());
+    // A column this store's sheets leave out (Style while it's switched off,
+    // GST Rate / Location with no such master) is ignored if an older file
+    // still has it — read as blank, never an error, never written.
+    const rows = stripHiddenSheetColumns(
+      parseExcelUpload(await file.arrayBuffer()),
+      hiddenSheetHeaders(PRODUCT_SHEET_COLUMNS, await getSheetFeatures(storeId)),
+    );
 
     if (!rows.length) {
       return { success: false, message: "That file has no rows to import." };

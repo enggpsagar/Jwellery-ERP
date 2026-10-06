@@ -29,7 +29,7 @@ import { ImportErrorList } from "@/components/shared/import-error-list"
  * pattern exactly. Row-level problems come back as a list and nothing is
  * created until the file is clean.
  */
-export function ProductImportDialog() {
+export function ProductImportDialog({ styleFieldEnabled = true }: { styleFieldEnabled?: boolean }) {
   const [open, setOpen] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [fileName, setFileName] = useState("")
@@ -88,8 +88,15 @@ export function ProductImportDialog() {
           <DialogTitle>Bulk import products</DialogTitle>
           <DialogDescription>
             One row per product. <strong>Product Name</strong>,{" "}
-            <strong>Category</strong>, <strong>Metal Type</strong> and{" "}
-            <strong>Style</strong> are required — Category and Metal Type
+            <strong>Category</strong>
+            {styleFieldEnabled ? ", " : " and "}
+            <strong>Metal Type</strong>
+            {styleFieldEnabled ? (
+              <>
+                {" "}and <strong>Style</strong>
+              </>
+            ) : null}{" "}
+            are required — Category and Metal Type
             names must match what's already set up under Settings &gt;
             Taxonomy. Product codes are generated automatically, same as the
             "Add Product" form. Fill in <strong>Stock Quantity</strong> on a

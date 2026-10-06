@@ -22,15 +22,18 @@ import {
 } from "@/lib/excel-export";
 import { PARTY_GST_TYPE_OPTIONS, gstinRequired, partyGstTypeLabel } from "@/lib/gst";
 import {
-  KARIGAR_EXPORT_HEADERS,
-  KARIGAR_SHEET_COLUMNS,
-  KARIGAR_SHEET_HEADERS,
   KARIGAR_SHEET_NOTES,
+  karigarExportHeaders,
+  karigarHiddenHeaders,
   karigarSheetCell,
+  karigarSheetColumns,
+  karigarSheetHeaders,
   karigarSheetInstructions,
   parseKarigarSheetNumber,
   parseKarigarSheetYesNo,
 } from "@/lib/karigars/karigar-sheet";
+import { dropdownsFor, pickSheetRow, stripHiddenSheetColumns } from "@/lib/sheet-features";
+import { getSheetFeatures } from "@/lib/sheet-features.server";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { sendInviteEmailSafely, resolveStoreName } from "@/lib/invite-email";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
@@ -1069,6 +1072,10 @@ export async function exportKarigarsToExcel(
       return { success: false, message: "No artisans found to export." };
     }
 
+    // This store's columns only (lib/sheet-features.ts).
+    const features = await getSheetFeatures(storeId);
+    const exportHeaders = karigarExportHeaders(features);
+
     // Exactly the import template's columns and value forms (plain numbers,
     // labels, Yes/No), plus read-only Sr No / Artisan Code / Created At the
     // import ignores — so an exported file re-imports as the same artisans.
@@ -1098,7 +1105,7 @@ export async function exportKarigarsToExcel(
         Active: karigar.isActive ? "Yes" : "No",
         "Created At": formatShortDate(karigar.createdAt),
       };
-      return Object.fromEntries(KARIGAR_EXPORT_HEADERS.map((header) => [header, values[header] ?? ""]));
+      return pickSheetRow(values, exportHeaders);
     });
 
     const message = `Exported ${karigars.length} artisan(s) successfully.`;
@@ -1117,7 +1124,7 @@ export async function exportKarigarsToExcel(
         Mobile: row.Mobile,
         City: row.City,
         "Metal Type": row["Metal Type"],
-        Location: row.Location,
+        ...(features.locations ? { Location: row.Location } : {}),
         "Opening Gold (g)": row["Opening Gold (g)"],
         "Opening Cash": row["Opening Cash"],
         Status: row.Active === "Yes" ? "Active" : "Inactive",
@@ -1131,9 +1138,9 @@ export async function exportKarigarsToExcel(
       ...buildImportTemplateWithDropdowns({
         sheetName: "Artisans",
         rows,
-        columns: KARIGAR_EXPORT_HEADERS,
-        dropdowns: await loadKarigarSheetDropdowns(storeId, scope),
-        instructions: { notes: KARIGAR_SHEET_NOTES, rows: karigarSheetInstructions() },
+        columns: exportHeaders,
+        dropdowns: dropdownsFor(await loadKarigarSheetDropdowns(storeId, scope), exportHeaders),
+        instructions: { notes: KARIGAR_SHEET_NOTES, rows: karigarSheetInstructions(features) },
         filePrefix: "artisans",
       }),
     };
@@ -1165,14 +1172,16 @@ export async function getKarigarImportTemplate(): Promise<{
 }> {
   const storeId = await requireStoreScope();
   const scope = await getLocationScope();
-  const example = Object.fromEntries(KARIGAR_SHEET_COLUMNS.map((column) => [column.header, column.example]));
+  const features = await getSheetFeatures(storeId);
+  const headers = karigarSheetHeaders(features);
+  const example = Object.fromEntries(karigarSheetColumns(features).map((column) => [column.header, column.example]));
 
   return buildImportTemplateWithDropdowns({
     sheetName: "Artisans Import",
     rows: [example],
-    columns: KARIGAR_SHEET_HEADERS,
-    dropdowns: await loadKarigarSheetDropdowns(storeId, scope),
-    instructions: { notes: KARIGAR_SHEET_NOTES, rows: karigarSheetInstructions() },
+    columns: headers,
+    dropdowns: dropdownsFor(await loadKarigarSheetDropdowns(storeId, scope), headers),
+    instructions: { notes: KARIGAR_SHEET_NOTES, rows: karigarSheetInstructions(features) },
     filePrefix: "artisans-import-template",
   });
 }
@@ -1214,7 +1223,12 @@ export async function importKarigarsFromExcel(
       return { success: false, message: "Choose a .xlsx or .csv file to import." };
     }
 
-    const rows = parseExcelUpload(await file.arrayBuffer());
+    // A column this store's sheets leave out (Location with no locations set
+    // up) is ignored if an older file still has it — never an error.
+    const rows = stripHiddenSheetColumns(
+      parseExcelUpload(await file.arrayBuffer()),
+      karigarHiddenHeaders(await getSheetFeatures(storeId)),
+    );
 
     if (!rows.length) {
       return { success: false, message: "That file has no rows to import." };

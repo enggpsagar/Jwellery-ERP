@@ -8,6 +8,7 @@ import { hasPermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { getCategoryFilterOptions, getStoreMetals } from "@/lib/actions/taxonomy-actions";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
+import { getBusinessSettings } from "@/lib/actions/settings-actions";
 
 import { ProductsClient } from "@/components/inventory/products/products-client";
 
@@ -48,11 +49,12 @@ export default async function InventoryProductsPage({
   // Resolved here rather than in the client component: session permissions
   // are on the JWT, and a client-side check would be advisory only. The
   // create/edit routes enforce the same permissions themselves.
-  const [canCreate, canEdit, metals, categoryFilter] = await Promise.all([
+  const [canCreate, canEdit, metals, categoryFilter, businessSettings] = await Promise.all([
     hasPermission(PERMISSIONS.PRODUCT_CREATE),
     hasPermission(PERMISSIONS.PRODUCT_UPDATE),
     getStoreMetals(),
     getCategoryFilterOptions(),
+    getBusinessSettings(),
   ]);
 
   const validMetalTypeIds = new Set([...metals.map((m) => m.id), UNASSIGNED_METAL_TYPE]);
@@ -114,6 +116,7 @@ export default async function InventoryProductsPage({
       canEdit={canEdit}
       metals={metals}
       categoryFilter={categoryFilter}
+      styleFieldEnabled={businessSettings.styleFieldEnabled}
     />
   );
 }

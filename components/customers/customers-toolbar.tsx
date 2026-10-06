@@ -17,6 +17,9 @@ type CustomersToolbarProps = {
    * renders nothing when nothing is selected, so this slot is simply empty
    * until a row is ticked. */
   bulkActions?: React.ReactNode
+  /** The Suppliers page: export only parties tagged isSupplier, the same
+   * set its list shows. */
+  supplierOnly?: boolean
 }
 
 function downloadBase64File(base64: string, fileName: string) {
@@ -45,6 +48,7 @@ function downloadBase64File(base64: string, fileName: string) {
 export function CustomersToolbar({
   selectedCustomerIds,
   bulkActions,
+  supplierOnly = false,
 }: CustomersToolbarProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -139,8 +143,14 @@ export function CustomersToolbar({
 
       const result = await exportCustomersToExcel(
         hasSelection
-          ? { selectedIds: selectedCustomerIds, sortBy: currentSortBy, sortOrder: currentSortOrder }
+          ? {
+              selectedIds: selectedCustomerIds,
+              sortBy: currentSortBy,
+              sortOrder: currentSortOrder,
+              supplierOnly,
+            }
           : {
+              supplierOnly,
               search: currentSearch,
               sortBy: currentSortBy,
               sortOrder: currentSortOrder,

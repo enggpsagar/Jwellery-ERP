@@ -153,6 +153,7 @@ export function CustomerEditForm({
               placeholder={gstinRequiredNow ? "Required for a B2B tax invoice" : undefined}
               required={gstinRequiredNow}
             />
+            <FieldError errors={state.errors?.gstNumber} />
           </div>
 
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -208,6 +209,7 @@ export function CustomerEditForm({
               className={FIELD}
               defaultValue={customer.email ?? ""}
             />
+            <FieldError errors={state.errors?.email} />
           </div>
 
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -306,6 +308,7 @@ export function CustomerEditForm({
               className={FIELD}
               defaultValue={customer.pincode ?? ""}
             />
+            <FieldError errors={state.errors?.pincode} />
           </div>
 
           <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">

@@ -12,7 +12,14 @@
 // a "use server" file to be an async function).
 
 import { prisma } from "@/lib/prisma";
-import type { PartyGstType } from "@prisma/client";
+import type { GstScheme, PartyGstType } from "@prisma/client";
+import {
+  gstinRequired,
+  isValidGstin,
+  normalizeGstin,
+  GSTIN_INVALID_MESSAGE,
+  GSTIN_REQUIRED_MESSAGE,
+} from "@/lib/gst";
 import { isValidAadhaarNumber, normalizeAadhaarNumber, AADHAAR_INVALID_MESSAGE } from "@/lib/aadhaar";
 import { isValidPanNumber, normalizePanNumber, PAN_INVALID_MESSAGE } from "@/lib/pan";
 import { formatShortDate } from "@/lib/utils";
@@ -48,6 +55,9 @@ export type CustomerRecord = {
   totalOrders?: number;
   totalPurchaseValue?: string;
   pendingAmount?: string;
+  /** The same two figures as plain numbers (for the Party export). */
+  totalPurchaseValueAmount?: number;
+  pendingAmountValue?: number;
   lastPurchaseDate?: string;
   lastPaymentDate?: string;
   notes?: string;
@@ -142,6 +152,10 @@ export type CustomerActorContext = {
   storeId: string;
   actorId: string | null;
   actorName: string | null;
+  /** The store's own GST scheme, when the caller has it — enables the
+   *  "GSTIN required for a registered party" rule (see gstinRequired). The
+   *  web form's actions pass it; the REST API / MCP callers don't yet. */
+  gstScheme?: GstScheme;
 };
 
 function formatCurrency(value: number) {
@@ -345,6 +359,8 @@ export function mapCustomer(customer: any): CustomerRecord {
     totalOrders,
     totalPurchaseValue: formatCurrency(totalPurchaseValueNumber),
     pendingAmount: formatCurrency(pendingAmountNumber),
+    totalPurchaseValueAmount: totalPurchaseValueNumber,
+    pendingAmountValue: pendingAmountNumber,
     lastPurchaseDate,
     lastPaymentDate,
     notes: customer.notes ?? "",
@@ -414,7 +430,18 @@ export async function getCustomerByIdCore(
   return mapCustomer(customer);
 }
 
-export function validateCustomerInput(input: CustomerInput) {
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PINCODE_REGEX = /^[1-9][0-9]{5}$/;
+
+/**
+ * The Party rules shared by the Add/Edit form actions, the Party import and
+ * the REST/MCP callers. `gstScheme` (the store's own) is optional: given, a
+ * Regular/Composition party must have a GSTIN, as the form requires.
+ */
+export function validateCustomerInput(
+  input: CustomerInput,
+  options: { gstScheme?: GstScheme } = {},
+) {
   const errors: Record<string, string[]> = {};
   if (!input.name?.trim()) errors.name = ["Party name is required"];
   if (input.aadhaarNumber?.trim() && !isValidAadhaarNumber(input.aadhaarNumber)) {
@@ -422,6 +449,22 @@ export function validateCustomerInput(input: CustomerInput) {
   }
   if (input.panNumber?.trim() && !isValidPanNumber(input.panNumber)) {
     errors.panNumber = [PAN_INVALID_MESSAGE];
+  }
+  const gstNumber = input.gstNumber?.trim() ?? "";
+  if (gstNumber && !isValidGstin(gstNumber)) {
+    errors.gstNumber = [GSTIN_INVALID_MESSAGE];
+  } else if (
+    !gstNumber &&
+    options.gstScheme &&
+    gstinRequired(options.gstScheme, input.gstType ?? "UNREGISTERED")
+  ) {
+    errors.gstNumber = [GSTIN_REQUIRED_MESSAGE];
+  }
+  if (input.email?.trim() && !EMAIL_REGEX.test(input.email.trim())) {
+    errors.email = ["Enter a valid email address"];
+  }
+  if (input.pincode?.trim() && !PINCODE_REGEX.test(input.pincode.trim())) {
+    errors.pincode = ["Pincode must be 6 digits"];
   }
   return errors;
 }
@@ -434,7 +477,7 @@ export async function createCustomerCore(
     const name = input.name.trim();
     const phone = input.phone.trim();
 
-    const errors = validateCustomerInput(input);
+    const errors = validateCustomerInput(input, { gstScheme: ctx.gstScheme });
     if (Object.keys(errors).length > 0) {
       return { success: false, message: "Please fix the form errors", errors };
     }
@@ -469,7 +512,7 @@ export async function createCustomerCore(
         city: input.city?.trim() || null,
         state: input.state?.trim() || null,
         pincode: input.pincode?.trim() || null,
-        gstin: input.gstNumber?.trim() || null,
+        gstin: input.gstNumber?.trim() ? normalizeGstin(input.gstNumber) : null,
         gstType: input.gstType ?? "UNREGISTERED",
         panNumber: input.panNumber?.trim() ? normalizePanNumber(input.panNumber) : null,
         aadhaarNumber: input.aadhaarNumber?.trim()
@@ -502,12 +545,13 @@ export async function updateCustomerCore(
   id: string,
   input: CustomerInput,
   storeId: string,
+  gstScheme?: GstScheme,
 ): Promise<CustomerFormState> {
   try {
     const name = input.name.trim();
     const phone = input.phone.trim();
 
-    const errors = validateCustomerInput(input);
+    const errors = validateCustomerInput(input, { gstScheme });
     if (Object.keys(errors).length > 0) {
       return { success: false, message: "Please fix the form errors", errors };
     }
@@ -538,7 +582,7 @@ export async function updateCustomerCore(
         city: input.city?.trim() || null,
         state: input.state?.trim() || null,
         pincode: input.pincode?.trim() || null,
-        gstin: input.gstNumber?.trim() || null,
+        gstin: input.gstNumber?.trim() ? normalizeGstin(input.gstNumber) : null,
         gstType: input.gstType ?? "UNREGISTERED",
         panNumber: input.panNumber?.trim() ? normalizePanNumber(input.panNumber) : null,
         aadhaarNumber: input.aadhaarNumber?.trim()

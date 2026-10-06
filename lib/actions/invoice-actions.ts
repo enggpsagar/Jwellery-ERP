@@ -65,6 +65,7 @@ import { formatShortDate } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 import { stockOptionProductDetailsSelect, toStockOptionProductDetails } from "@/lib/inventory/stock-option-details";
+import { lockedStockPieceRows, stockPieceOption } from "@/lib/inventory/stock-piece-rows";
 
 export type InvoiceLineItemInput = {
   itemName: string;
@@ -265,19 +266,9 @@ async function resolvePieceLines(
 
   const resolvePiece = await getPieceResolver(storeId, { valuation: "net" });
   const linkedIds = items.filter((item) => isPiece(item) && item.inventoryStockId).map((item) => item.inventoryStockId as string);
-  const stored = linkedIds.length
-    ? await prisma.pieceComponent.findMany({
-        where: { inventoryStockId: { in: linkedIds }, inventoryStock: { storeId } },
-        orderBy: { sortOrder: "asc" },
-      })
-    : [];
-  const storedByStock = new Map<string, typeof stored>();
-  for (const row of stored) {
-    const list = storedByStock.get(row.inventoryStockId as string) ?? [];
-    list.push(row);
-    storedByStock.set(row.inventoryStockId as string, list);
-  }
-  const num = (value: Prisma.Decimal | null) => (value == null ? null : Number(value));
+  // A linked piece's rows: its own, else its multi-metal/multi-stone
+  // Product's (lib/inventory/stock-piece-rows.ts) — physical facts locked.
+  const storedByStock = await lockedStockPieceRows(storeId, linkedIds);
 
   const out: InvoiceLineItemInput[] = [];
   for (const item of items) {
@@ -299,12 +290,12 @@ async function resolvePieceLines(
           metalTypeId: row.metalTypeId,
           purityLabel: row.purityLabel,
           purity: row.purity,
-          grossWeight: num(row.grossWeight),
-          netWeight: num(row.netWeight),
+          grossWeight: row.grossWeight,
+          netWeight: row.netWeight,
           stoneMetalTypeName: row.stoneMetalTypeName,
           stoneTypeNames: row.stoneTypeNames,
-          caratWeight: num(row.caratWeight),
-          stoneWeight: num(row.stoneWeight),
+          caratWeight: row.caratWeight,
+          stoneWeight: row.stoneWeight,
           rate: sent?.rate ?? null,
           amount: row.kind === "STONE" ? sent?.amount ?? null : null,
           gstRateId: sent?.gstRateId ?? row.gstRateId,
@@ -1134,8 +1125,10 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
     makingChargeType: stock.makingChargeType,
     quantity: stock.quantity,
     ...toStockOptionProductDetails(stock.product),
-    // A piece made of several metals/stones — see lib/piece-components.ts.
-    components: serializeStoredComponents(stock.components),
+    // A piece made of several metals/stones — its own rows, else its
+    // Product's (lib/inventory/stock-piece-rows.ts) — plus a single stone's
+    // pieces / clarity / certificate / catalog rate.
+    ...stockPieceOption(stock),
   }));
 
   if (!includeInvoiceId) return mapped;
@@ -1210,7 +1203,7 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       makingChargeType: stock.makingChargeType,
       quantity: stock.quantity + claimed,
       ...toStockOptionProductDetails(stock.product),
-      components: serializeStoredComponents(stock.components),
+      ...stockPieceOption(stock),
     });
   }
 

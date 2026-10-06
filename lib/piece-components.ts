@@ -41,6 +41,12 @@ export type PieceStoneDraft = {
   amount: number
   amountTouched: boolean
   gstRateId: string
+  /** Number of stones, clarity and certificate — shown on a picked stock
+   * piece's row, read from its Product's matching stone row. Display only:
+   * PieceComponent has no column for them. */
+  pieces?: number | null
+  clarity?: string | null
+  certificateNumber?: string | null
 }
 
 export type PieceComponentDraft = PieceMetalDraft | PieceStoneDraft
@@ -85,6 +91,16 @@ export type StoredPieceComponent = {
   /** For display, when the query included the metal / GST snapshot. */
   metalName?: string | null
   gstRatePercent?: number | null
+  /** Picker hints on a stock piece's rows (lib/inventory/stock-piece-rows.ts),
+   * from the Product's matching row — never stored on a PieceComponent.
+   * Stones: pieces / clarity / certificate and the Product's own stone rate.
+   * Metals: the purity's configured selling price and fineness %. */
+  pieces?: number | null
+  clarity?: string | null
+  certificateNumber?: string | null
+  catalogRate?: number | null
+  puritySellingPrice?: number | null
+  purityFineness?: number | null
 }
 
 export function round2(value: number) {
@@ -265,6 +281,9 @@ export function fromStoredComponents(rows: StoredPieceComponent[]): PieceCompone
           amount: row.amount ?? 0,
           amountTouched: true,
           gstRateId: row.gstRateId ?? "",
+          pieces: row.pieces ?? null,
+          clarity: row.clarity ?? null,
+          certificateNumber: row.certificateNumber ?? null,
         },
   )
 }

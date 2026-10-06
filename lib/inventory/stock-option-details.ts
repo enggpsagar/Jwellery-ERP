@@ -17,14 +17,38 @@ export const stockOptionProductDetailsSelect = {
   hasStoneComponent: true,
   defaultMakingCharge: true,
   defaultMakingChargeType: true,
+  // Every metal / stone row (Add Product's components): the first metal's
+  // GST rate and purity feed the fields below; all of them feed a picked
+  // piece's multi-part rows (lib/inventory/stock-piece-rows.ts).
   metalComponents: {
     orderBy: { sortOrder: "asc" },
-    take: 1,
-    select: { gstRateId: true, storeMetalPurity: { select: { label: true, finenessPercent: true } } },
+    select: {
+      metalTypeId: true,
+      grossWeight: true,
+      netWeight: true,
+      gstRateId: true,
+      metalType: { select: { name: true, isGemstone: true } },
+      storeMetalPurity: { select: { label: true, finenessPercent: true, sellingPrice: true } },
+    },
+  },
+  stoneComponents: {
+    orderBy: { sortOrder: "asc" },
+    select: {
+      stoneMetalTypeName: true,
+      stoneTypeNames: true,
+      caratWeight: true,
+      stoneWeight: true,
+      stoneRate: true,
+      stoneCharge: true,
+      gstRateId: true,
+      pieces: true,
+      clarity: true,
+      certificateNumber: true,
+    },
   },
 } satisfies Prisma.ProductSelect;
 
-type ProductDetails = Prisma.ProductGetPayload<{ select: typeof stockOptionProductDetailsSelect }>;
+export type ProductDetails = Prisma.ProductGetPayload<{ select: typeof stockOptionProductDetailsSelect }>;
 
 export type StockOptionProductDetails = {
   categoryId: string | null;

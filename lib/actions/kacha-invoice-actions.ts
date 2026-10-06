@@ -24,6 +24,7 @@ import {
   serializeStoredComponents,
   type ResolvedPiece,
 } from "@/lib/piece-components.server";
+import { lockedStockPieceRows } from "@/lib/inventory/stock-piece-rows";
 import type { PieceComponentPayload } from "@/lib/piece-components";
 import { computeRoundOff } from "@/lib/round-off";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
@@ -231,19 +232,9 @@ async function resolvePieceLines(
 
   const resolvePiece = await getPieceResolver(storeId, { valuation: "net" });
   const linkedIds = items.filter((item) => isPiece(item) && item.inventoryStockId).map((item) => item.inventoryStockId as string);
-  const stored = linkedIds.length
-    ? await prisma.pieceComponent.findMany({
-        where: { inventoryStockId: { in: linkedIds }, inventoryStock: { storeId } },
-        orderBy: { sortOrder: "asc" },
-      })
-    : [];
-  const storedByStock = new Map<string, typeof stored>();
-  for (const row of stored) {
-    const list = storedByStock.get(row.inventoryStockId as string) ?? [];
-    list.push(row);
-    storedByStock.set(row.inventoryStockId as string, list);
-  }
-  const num = (value: Prisma.Decimal | null) => (value == null ? null : Number(value));
+  // A linked piece's rows: its own, else its multi-metal/multi-stone
+  // Product's (lib/inventory/stock-piece-rows.ts) — physical facts locked.
+  const storedByStock = await lockedStockPieceRows(storeId, linkedIds);
 
   const out: KachaInvoiceLineItemInput[] = [];
   for (const item of items) {
@@ -265,12 +256,12 @@ async function resolvePieceLines(
           metalTypeId: row.metalTypeId,
           purityLabel: row.purityLabel,
           purity: row.purity,
-          grossWeight: num(row.grossWeight),
-          netWeight: num(row.netWeight),
+          grossWeight: row.grossWeight,
+          netWeight: row.netWeight,
           stoneMetalTypeName: row.stoneMetalTypeName,
           stoneTypeNames: row.stoneTypeNames,
-          caratWeight: num(row.caratWeight),
-          stoneWeight: num(row.stoneWeight),
+          caratWeight: row.caratWeight,
+          stoneWeight: row.stoneWeight,
           rate: sent?.rate ?? null,
           amount: row.kind === "STONE" ? sent?.amount ?? null : null,
           // Kept (not shown on the slip) so converting to a Pakka invoice

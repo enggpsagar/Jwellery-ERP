@@ -33,7 +33,7 @@ export type KachaSheetSlip = Prisma.KachaInvoiceGetPayload<{ include: typeof KAC
  * values are written on each slip's first row only — the import reads them
  * from there; Slip Ref, Date and Party Name repeat for readability.
  */
-export function kachaSheetRows(slips: KachaSheetSlip[]): Record<string, unknown>[] {
+export function kachaSheetRows(slips: KachaSheetSlip[], headers: string[] = KACHA_SHEET_HEADERS): Record<string, unknown>[] {
   const num = (value: { toString(): string } | null | undefined) => (value == null ? "" : Number(value))
   return slips.flatMap((slip) =>
     slip.items.map((item, index) => {
@@ -79,7 +79,7 @@ export function kachaSheetRows(slips: KachaSheetSlip[]): Record<string, unknown>
         "Line Total": Number(item.lineTotal),
         [METALS_AND_STONES_COLUMN]: describePieceComponentsText(item.components),
       }
-      return Object.fromEntries(KACHA_SHEET_HEADERS.map((header) => [header, values[header] ?? ""]))
+      return Object.fromEntries(headers.map((header) => [header, values[header] ?? ""]))
     }),
   )
 }

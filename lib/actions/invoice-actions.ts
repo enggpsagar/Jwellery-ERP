@@ -53,6 +53,8 @@ import { getReturnEligibility } from "@/lib/return-window";
 import { amountInWords } from "@/lib/number-to-words";
 import { resolveStoreName } from "@/lib/invite-email";
 import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
+import { omitHiddenKeys, type SheetFeature } from "@/lib/sheet-features";
+import { getSheetFeatures } from "@/lib/sheet-features.server";
 import { OversellError } from "@/lib/inventory/oversell-error";
 import {
   createStockForManualSaleLine,
@@ -802,6 +804,13 @@ export type ExportInvoicesResult = {
   fileBase64?: string;
 };
 
+/** Invoice export columns that hang off a store feature (lib/sheet-features.ts). */
+const INVOICE_EXPORT_GATED_COLUMNS: Record<string, SheetFeature> = {
+  Location: "locations",
+  "E-way Bill No.": "ewayBill",
+  IRN: "eInvoice",
+};
+
 /** Exports the same filtered/sorted set the Invoices list is currently showing. */
 export async function exportInvoicesToExcel(
   params: ExportInvoicesParams = {},
@@ -830,7 +839,9 @@ export async function exportInvoicesToExcel(
 
     const money = (value: number) => Math.round(value * 100) / 100;
 
-    const rows = invoices.map(mapInvoice).map((invoice, index) => {
+    // Columns of a feature the store has switched off (or a master it has
+    // none of) are left out — the invoices' saved values aren't touched.
+    const rows = omitHiddenKeys(invoices.map(mapInvoice).map((invoice, index) => {
       const raw = invoices[index];
       const sumItems = (field: "cgstAmount" | "sgstAmount" | "igstAmount") =>
         money(raw.items.reduce((sum, item) => sum + Number(item[field] ?? 0), 0));
@@ -876,7 +887,7 @@ export async function exportInvoicesToExcel(
           .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components)}`)
           .join(" | "),
       };
-    });
+    }), INVOICE_EXPORT_GATED_COLUMNS, await getSheetFeatures(storeId));
 
     // The PDF is a printed summary — a page can't hold every column.
     const PDF_COLUMNS = ["Sr. No.", "Invoice #", "Date", "Party", "Status", "Subtotal", "Discount", "Tax", "Total", "Paid", "Balance"] as const;

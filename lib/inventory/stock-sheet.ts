@@ -1,5 +1,7 @@
 import type { InventoryStockStatus } from "@prisma/client"
 
+import { ALL_SHEET_FEATURES, sheetColumnsFor, type SheetFeature, type SheetFeatures } from "../sheet-features"
+
 /**
  * The stock spreadsheet's columns — one definition shared by the stock import
  * template, its Instructions sheet and the stock export, so all three carry
@@ -12,6 +14,8 @@ export type StockSheetColumn = {
   required: string
   help: string
   example: string | number
+  /** Only in this store's sheets while the feature is on (lib/sheet-features.ts). */
+  feature?: SheetFeature
 }
 
 export const STOCK_SHEET_COLUMNS: StockSheetColumn[] = [
@@ -86,6 +90,7 @@ export const STOCK_SHEET_COLUMNS: StockSheetColumn[] = [
   { header: "Date of Manufacture", required: "No", help: "DD/MM/YYYY (or an Excel date).", example: "" },
   {
     header: "Location",
+    feature: "locations",
     required: "No",
     help: "Store location (Settings › Locations, see the dropdown). Blank = your default location.",
     example: "",
@@ -104,7 +109,17 @@ export const STOCK_SHEET_COLUMNS: StockSheetColumn[] = [
   { header: "Created At", required: "No — export only", help: "When the entry was created. Ignored on import.", example: "" },
 ]
 
+/** Every header, every feature on (the demo store's layout). */
 export const STOCK_SHEET_HEADERS = STOCK_SHEET_COLUMNS.map((column) => column.header)
+
+/** The columns this store's stock sheets carry. */
+export function stockSheetColumns(features: SheetFeatures = ALL_SHEET_FEATURES) {
+  return sheetColumnsFor(STOCK_SHEET_COLUMNS, features)
+}
+
+export function stockSheetHeaders(features: SheetFeatures = ALL_SHEET_FEATURES) {
+  return stockSheetColumns(features).map((column) => column.header)
+}
 
 export const STOCK_SHEET_NOTES = [
   "How to fill in the Stock sheet",
@@ -117,8 +132,8 @@ export const STOCK_SHEET_NOTES = [
   "• Each imported entry is added to the Ledger as stock added, the same as Add Stock.",
 ]
 
-export function stockSheetInstructions() {
-  return STOCK_SHEET_COLUMNS.map((column, index) => ({
+export function stockSheetInstructions(features: SheetFeatures = ALL_SHEET_FEATURES) {
+  return stockSheetColumns(features).map((column, index) => ({
     "#": index + 1,
     Column: column.header,
     Required: column.required,

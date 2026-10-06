@@ -14,6 +14,8 @@ import { getLocationScope, isLocationAllowed, locationWhere, type LocationScope 
 import { toFineWeight } from "@/lib/purity";
 import { getFinenessMap } from "@/lib/purity-db";
 import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
+import { omitHiddenKeys } from "@/lib/sheet-features";
+import { getSheetFeatures } from "@/lib/sheet-features.server";
 import {
   assertKarigarAssignedMetal,
   generateJobNumber,
@@ -282,7 +284,9 @@ export async function exportDraftOrdersToExcel(params: ExportDraftOrdersParams =
       return { success: false, message: "No draft orders found to export" };
     }
 
-    const rows = orders.map((order, index) => {
+    // No Artisan Job column while Send to Artisan is off, no Location column
+    // without locations (lib/sheet-features.ts) — saved values untouched.
+    const rows = omitHiddenKeys(orders.map((order, index) => {
       const estimatedTotal = Number(order.estimatedTotal);
       const advancePaid = Number(order.paidAmount);
       return {
@@ -301,7 +305,7 @@ export async function exportDraftOrdersToExcel(params: ExportDraftOrdersParams =
         "Artisan Job": order.karigarJob?.jobNumber ?? "",
         Notes: order.notes ?? "",
       };
-    });
+    }), { Location: "locations", "Artisan Job": "sendToArtisan" }, await getSheetFeatures(storeId));
 
     const { fileName, fileBase64 } =
       params.format === "csv"

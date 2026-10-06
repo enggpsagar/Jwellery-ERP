@@ -1,5 +1,7 @@
 import type { InvoiceStatus, PaymentMethod } from "@prisma/client"
 
+import { ALL_SHEET_FEATURES, sheetColumnsFor, type SheetFeature, type SheetFeatures } from "../sheet-features"
+
 /**
  * The Estimate (Kacha slip) spreadsheet's columns — one definition shared by
  * the import template, its Instructions sheet, the Estimates export and the
@@ -14,6 +16,8 @@ export type KachaSheetColumn = {
   required: string
   help: string
   example: string | number
+  /** Only in this store's sheets while the feature is on (lib/sheet-features.ts). */
+  feature?: SheetFeature
 }
 
 export const KACHA_SHEET_COLUMNS: KachaSheetColumn[] = [
@@ -35,6 +39,7 @@ export const KACHA_SHEET_COLUMNS: KachaSheetColumn[] = [
   { header: "Party GSTIN", required: "No", help: "The party's GSTIN, if you'd rather match on it.", example: "" },
   {
     header: "Location",
+    feature: "locations",
     required: "No (yes if you have access to several locations)",
     help: "A location under Settings › Locations (see the dropdown). Blank = none, or your only location if your access is limited to one.",
     example: "",
@@ -122,7 +127,18 @@ export const KACHA_SHEET_COLUMNS: KachaSheetColumn[] = [
   },
 ]
 
+/** Every header, every feature on (the demo store's layout; the delete-all
+ *  backup always carries all of them). */
 export const KACHA_SHEET_HEADERS = KACHA_SHEET_COLUMNS.map((column) => column.header)
+
+/** The columns this store's Estimate sheets carry. */
+export function kachaSheetColumns(features: SheetFeatures = ALL_SHEET_FEATURES) {
+  return sheetColumnsFor(KACHA_SHEET_COLUMNS, features)
+}
+
+export function kachaSheetHeaders(features: SheetFeatures = ALL_SHEET_FEATURES) {
+  return kachaSheetColumns(features).map((column) => column.header)
+}
 
 /** Read from a slip's first row only. */
 export const KACHA_SLIP_LEVEL_HEADERS = [
@@ -157,8 +173,8 @@ export const KACHA_SHEET_NOTES = [
   "• Not covered by the sheet: linking a line to stock, multi-metal pieces and customer exchange (old gold) — use the form for those.",
 ]
 
-export function kachaSheetInstructions() {
-  return KACHA_SHEET_COLUMNS.map((column, index) => ({
+export function kachaSheetInstructions(features: SheetFeatures = ALL_SHEET_FEATURES) {
+  return kachaSheetColumns(features).map((column, index) => ({
     "#": index + 1,
     Column: column.header,
     Required: column.required,

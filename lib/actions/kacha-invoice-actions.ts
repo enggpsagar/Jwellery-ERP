@@ -63,8 +63,9 @@ import { assertPlanActiveForExport } from "@/lib/store-context";
 import {
   KACHA_PAYMENT_METHOD_LABELS,
   KACHA_SHEET_COLUMNS,
-  KACHA_SHEET_HEADERS,
   KACHA_SHEET_NOTES,
+  kachaSheetColumns,
+  kachaSheetHeaders,
   KACHA_STATUS_LABELS,
   kachaSheetInstructions,
   parsePaymentMethodCell,
@@ -77,6 +78,8 @@ import {
   kachaSheetRows,
 } from "@/lib/billing/kacha-sheet-rows";
 import { formatSheetDate, parseSheetDate } from "@/lib/inventory/stock-sheet";
+import { dropdownsFor, hiddenSheetHeaders, stripHiddenSheetColumns } from "@/lib/sheet-features";
+import { getSheetFeatures } from "@/lib/sheet-features.server";
 import {
   PURITY_LABELS,
   isHallmarkablePurity,
@@ -892,7 +895,10 @@ export async function exportKachaInvoicesToExcel(
           .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components)}`)
           .join(" | "),
       }));
-    const rows = kachaSheetRows(kachaInvoices);
+    // This store's columns only (lib/sheet-features.ts).
+    const features = await getSheetFeatures(storeId);
+    const headers = kachaSheetHeaders(features);
+    const rows = kachaSheetRows(kachaInvoices, headers);
 
     const { fileName, fileBase64 } =
       params.format === "csv"
@@ -902,9 +908,9 @@ export async function exportKachaInvoicesToExcel(
           : buildImportTemplateWithDropdowns({
               sheetName: "Estimates",
               rows,
-              columns: KACHA_SHEET_HEADERS,
-              dropdowns: await loadKachaSheetDropdowns(storeId),
-              instructions: { notes: KACHA_SHEET_NOTES, rows: kachaSheetInstructions() },
+              columns: headers,
+              dropdowns: dropdownsFor(await loadKachaSheetDropdowns(storeId), headers),
+              instructions: { notes: KACHA_SHEET_NOTES, rows: kachaSheetInstructions(features) },
               filePrefix: "estimates",
             });
 
@@ -1594,6 +1600,8 @@ export async function getKachaImportTemplate(): Promise<{
   fileBase64: string;
 }> {
   const storeId = await requireStoreScope();
+  const features = await getSheetFeatures(storeId);
+  const headers = kachaSheetHeaders(features);
   const [dropdowns, metal] = await Promise.all([
     loadKachaSheetDropdowns(storeId),
     prisma.storeMetal.findFirst({
@@ -1604,7 +1612,7 @@ export async function getKachaImportTemplate(): Promise<{
   ]);
 
   const example: Record<string, unknown> = Object.fromEntries(
-    KACHA_SHEET_COLUMNS.map((column) => [column.header, column.example]),
+    kachaSheetColumns(features).map((column) => [column.header, column.example]),
   );
   example.Date = formatSheetDate(new Date());
   example["Party Name"] = dropdowns["Party Name"][0] ?? "";
@@ -1615,9 +1623,9 @@ export async function getKachaImportTemplate(): Promise<{
   return buildImportTemplateWithDropdowns({
     sheetName: "Estimates Import",
     rows: [example],
-    columns: KACHA_SHEET_HEADERS,
-    dropdowns,
-    instructions: { notes: KACHA_SHEET_NOTES, rows: kachaSheetInstructions() },
+    columns: headers,
+    dropdowns: dropdownsFor(dropdowns, headers),
+    instructions: { notes: KACHA_SHEET_NOTES, rows: kachaSheetInstructions(features) },
     filePrefix: "estimate-import-template",
   });
 }
@@ -1729,12 +1737,17 @@ export async function importKachaInvoicesFromExcel(
       sheetNames.includes(KACHA_BACKUP_SLIPS_SHEET) &&
       sheetNames.includes(KACHA_BACKUP_ITEMS_SHEET);
 
-    const rows = isBackup
-      ? flattenBackupWorkbook(
-          sheets[KACHA_BACKUP_SLIPS_SHEET] ?? [],
-          sheets[KACHA_BACKUP_ITEMS_SHEET] ?? [],
-        )
-      : (sheets[sheetNames[0]] ?? []);
+    // A column this store's sheets leave out (Location with no locations set
+    // up) is ignored if a file still has it — never an error.
+    const rows = stripHiddenSheetColumns(
+      isBackup
+        ? flattenBackupWorkbook(
+            sheets[KACHA_BACKUP_SLIPS_SHEET] ?? [],
+            sheets[KACHA_BACKUP_ITEMS_SHEET] ?? [],
+          )
+        : (sheets[sheetNames[0]] ?? []),
+      hiddenSheetHeaders(KACHA_SHEET_COLUMNS, await getSheetFeatures(storeId)),
+    );
 
     if (!rows.length) {
       return {

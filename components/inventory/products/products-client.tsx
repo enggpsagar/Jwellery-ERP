@@ -43,6 +43,9 @@ type ProductsClientProps = {
   metals?: StoreMetalRow[]
   /** Category → Type filter options (getCategoryFilterOptions). */
   categoryFilter?: CategoryFilterOptions
+  /** BusinessSettings.styleFieldEnabled — the import dialog only asks for
+   * Style while it's on. */
+  styleFieldEnabled?: boolean
 }
 
 export function ProductsClient({
@@ -53,6 +56,7 @@ export function ProductsClient({
   canEdit = false,
   metals = [],
   categoryFilter,
+  styleFieldEnabled = true,
 }: ProductsClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   // Forces ProductDetailPanel to re-fetch even when the selected product id
@@ -88,7 +92,7 @@ export function ProductsClient({
             <Link href="/inventory/products/archived">
               <Button variant="outline">Archived Products</Button>
             </Link>
-            {canCreate ? <ProductImportDialog /> : null}
+            {canCreate ? <ProductImportDialog styleFieldEnabled={styleFieldEnabled} /> : null}
             {canCreate ? (
               <Link href="/inventory/products/new">
                 <Button>Add Product</Button>

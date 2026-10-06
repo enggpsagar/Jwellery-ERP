@@ -1,5 +1,8 @@
 import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+import { PrismaPg } from "@prisma/adapter-pg";
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
 const store = await prisma.store.findFirst({
   where: { name: { contains: "Giri", mode: "insensitive" } },
   select: { id: true, name: true },

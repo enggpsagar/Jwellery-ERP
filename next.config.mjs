@@ -15,7 +15,7 @@ const nextConfig = {
   // the direct cause of Vercel's "Functions Storage" usage ballooning far
   // past the free-tier limit (each deployment pays this cost ~120 times
   // over, then multiplies again across every retained deployment).
-  serverExternalPackages: ["@prisma/client", "@prisma/engines"],
+  serverExternalPackages: ["@prisma/client", "@prisma/engines", "@prisma/adapter-pg", "pg"],
   // Customer Exchange moved from /billing/old-gold to Purchases → From
   // Customers; keep old links and bookmarks (and a still-open tab's old
   // sidebar link) working. Not permanent, so browsers don't cache it.

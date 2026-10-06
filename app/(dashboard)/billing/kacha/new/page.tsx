@@ -11,7 +11,7 @@ import { getLatestMetalRates } from "@/lib/actions/metal-rate-actions"
 import { getStoreLocations, getDefaultLocationId } from "@/lib/actions/store-location-actions"
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
-import { getFinenessMap } from "@/lib/purity"
+import { getFinenessMap } from "@/lib/purity-db"
 import { requireStoreScope } from "@/lib/store-context"
 
 import { KachaInvoiceForm } from "@/components/billing/kacha/kacha-invoice-form"

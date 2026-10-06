@@ -3,6 +3,7 @@ import { LedgerEntryType, ReportFrequency } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { buildMultiSheetExcelExport } from "@/lib/excel-export";
 import { formatShortDate } from "@/lib/utils";
+import { ALL_FREQUENCIES, FREQUENCY_LABELS } from "@/lib/report-frequencies";
 
 /**
  * One store's trading activity over an arbitrary period — day, month,
@@ -193,21 +194,9 @@ export function currentWindowForFrequency(
   }
 }
 
-export const FREQUENCY_LABELS: Record<ReportFrequency, string> = {
-  [ReportFrequency.DAILY]: "Daily",
-  [ReportFrequency.MONTHLY]: "Monthly",
-  [ReportFrequency.QUARTERLY]: "Quarterly",
-  [ReportFrequency.ANNUAL]: "Annual",
-};
-
-/** Every frequency, in the fixed display order used across the settings
- *  form and email/report content. */
-export const ALL_FREQUENCIES: ReportFrequency[] = [
-  ReportFrequency.DAILY,
-  ReportFrequency.MONTHLY,
-  ReportFrequency.QUARTERLY,
-  ReportFrequency.ANNUAL,
-];
+// Defined in lib/report-frequencies.ts (client-safe, no DB import) and
+// re-exported so existing server-side imports keep working.
+export { ALL_FREQUENCIES, FREQUENCY_LABELS };
 
 export type LastSentField =
   | "dailyLastSentAt"

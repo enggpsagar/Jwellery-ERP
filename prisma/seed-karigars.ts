@@ -4,8 +4,9 @@
 // (or: npx prisma db seed, if you wire this into package.json's prisma.seed config)
 
 import { PrismaClient } from "@prisma/client";
+import { prismaAdapter } from "../lib/prisma-adapter";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: prismaAdapter() });
 
 const karigars = [
   {

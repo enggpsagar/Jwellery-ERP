@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
+import { prismaAdapter } from "../lib/prisma-adapter";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: prismaAdapter() });
 
 // Staff user "ram" (restricted to one location) created these two invoices
 // before resolveWritableLocationId() existed — both saved with

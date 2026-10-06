@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client"
+import { prismaAdapter } from "@/lib/prisma-adapter"
 
 const globalForPrisma = globalThis as unknown as {
   db: PrismaClient | undefined
@@ -7,6 +8,7 @@ const globalForPrisma = globalThis as unknown as {
 export const db =
   globalForPrisma.db ??
   new PrismaClient({
+    adapter: prismaAdapter(),
     log: ["warn", "error"],
   })
 

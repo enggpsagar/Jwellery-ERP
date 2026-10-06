@@ -27,8 +27,9 @@ import {
   PartyGstType,
   GstScheme,
 } from "@prisma/client";
+import { prismaAdapter } from "../lib/prisma-adapter";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: prismaAdapter() });
 
 const STORE_CODE = "DEMO-AURUM";
 const STORE_NAME = "Aurum Demo Jewellers";

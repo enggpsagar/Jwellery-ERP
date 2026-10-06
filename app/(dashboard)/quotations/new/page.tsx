@@ -10,7 +10,7 @@ import { getDefaultLocationId, getStoreLocations } from "@/lib/actions/store-loc
 import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-actions"
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
-import { getFinenessMap } from "@/lib/purity"
+import { getFinenessMap } from "@/lib/purity-db"
 import { getLatestMetalRates } from "@/lib/actions/metal-rate-actions"
 import { requireStoreScope } from "@/lib/store-context"
 

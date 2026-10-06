@@ -81,6 +81,17 @@ Google sign-in, however, goes through the NextAuth Prisma adapter, which *does* 
 
 The database migration and the code deploy are two independent steps — running a migration against the shared Neon DB does **not** deploy the new code, and pushing code doesn't imply the DB is already migrated. If the deployed app's Prisma Client predates a schema change (e.g. a new required column), production requests can fail even though local `tsc`/dev server are clean. When making a schema change, flag to the user that both the migration *and* a deploy are needed.
 
+### Vercel CPU budget (2026-10-06)
+
+The Hobby plan's Fluid Active CPU (4h/month) is the binding limit, so server work per page view matters:
+
+- **Prisma runs with `engineType = "client"`** (TypeScript query compiler over `@prisma/adapter-pg`), not the Rust engine. Every `PrismaClient` — app, seeds, scripts, e2e — must be built with `{ adapter: prismaAdapter() }` (`lib/prisma-adapter.ts`); a bare `new PrismaClient()` throws.
+- **Client components must never import `lib/prisma` (or `lib/db`)**, even transitively — it now drags `pg` into the browser bundle and fails the build. Keep DB helpers in server-only modules (`lib/purity-db.ts`, `lib/report-builder.ts`) and pure constants/helpers in client-safe ones (`lib/purity.ts`, `lib/report-frequencies.ts`).
+- Sidebar nav links are `prefetch={false}` (each prefetch was a full dynamic layout render); sidebar counts are cached 30s (`unstable_cache`, TTL-only — `revalidateTag` in a Server Action re-renders the page into the response).
+- `auth()` and `getEffectiveStoreId()` are memoised per request with React `cache()`.
+- The root layout doesn't read the session (`SessionProvider` lives in the `(dashboard)` layout), so `/`, `/faq`, `/contact` are static (revalidate 1h); middleware redirects a signed-in visitor from `/` to `/dashboard`.
+- Client polling (notification bell, scan panel) pauses while the tab is hidden.
+
 ### Email
 
 `lib/mailer.ts` wraps a single `nodemailer` SMTP transporter built from `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`MAIL_FROM`. `sendMail()` never throws — a missing config or send failure returns `{ sent: false, message }` so callers can toast a status without failing the action that triggered it. Templates live in `lib/email-templates.ts`. Wired into: user creation (welcome/invite email, `app/(dashboard)/users/actions.ts`), invoice/Kacha-slip "Email Invoice"/"Email Slip" buttons, and the customer ledger card's "Email Statement" button.

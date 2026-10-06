@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test"
 import { PrismaClient } from "@prisma/client"
+import { prismaAdapter } from "../lib/prisma-adapter"
 
 /** Collects uncaught browser errors (a crashed component, a failed
  *  hydration) for the page's lifetime — assert it's empty at the end. */
@@ -14,7 +15,7 @@ let prisma: PrismaClient | undefined
 /** Direct DB access for asserting what a UI flow actually wrote. Same
  *  throwaway DATABASE_URL the app under test uses (see global-setup). */
 export function db() {
-  prisma ??= new PrismaClient()
+  prisma ??= new PrismaClient({ adapter: prismaAdapter() })
   return prisma
 }
 

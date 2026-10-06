@@ -1,6 +1,5 @@
 import { PurityType } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
 
 export const DEFAULT_FINENESS: Record<PurityType, number> = {
   GOLD_24K: 100.0,
@@ -18,40 +17,6 @@ export const DEFAULT_FINENESS: Record<PurityType, number> = {
   DIAMOND: 100.0,
   OTHER: 100.0,
 };
-
-/**
- * Fine-gold (or fine-silver) percentage per PurityType for a store, lazily
- * seeded from DEFAULT_FINENESS on first read so every store always has a
- * complete table without a separate provisioning step (same pattern as
- * getBusinessSettings()'s lazy-create-on-first-read).
- */
-export async function getFinenessMap(
-  storeId: string,
-): Promise<Record<PurityType, number>> {
-  const rows = await prisma.purityFineness.findMany({ where: { storeId } });
-
-  const map = { ...DEFAULT_FINENESS };
-  for (const row of rows) {
-    map[row.purity] = Number(row.finenessPercent);
-  }
-
-  const missing = (Object.keys(DEFAULT_FINENESS) as PurityType[]).filter(
-    (purity) => !rows.some((row) => row.purity === purity),
-  );
-
-  if (missing.length > 0) {
-    await prisma.purityFineness.createMany({
-      data: missing.map((purity) => ({
-        storeId,
-        purity,
-        finenessPercent: DEFAULT_FINENESS[purity],
-      })),
-      skipDuplicates: true,
-    });
-  }
-
-  return map;
-}
 
 export const PURITY_LABELS: Record<PurityType, string> = {
   GOLD_24K: "Gold 24K",
@@ -106,41 +71,6 @@ export const DEFAULT_GRAMS_PER_CARAT: Record<PurityType, number> = {
   DIAMOND: GRAMS_PER_CARAT,
   OTHER: GRAMS_PER_CARAT,
 };
-
-/**
- * Grams-per-carat per PurityType for a store, lazily seeded from
- * DEFAULT_GRAMS_PER_CARAT on first read — same pattern as getFinenessMap.
- * Server-only (reads the DB), so every client form that needs this fetches
- * it once server-side and receives the resolved map as a prop; the actual
- * per-keystroke conversion then runs client-side via resolveGramsPerCarat.
- */
-export async function getGramsPerCaratMap(
-  storeId: string,
-): Promise<Record<PurityType, number>> {
-  const rows = await prisma.caratConversionRate.findMany({ where: { storeId } });
-
-  const map = { ...DEFAULT_GRAMS_PER_CARAT };
-  for (const row of rows) {
-    map[row.purity] = Number(row.gramsPerCarat);
-  }
-
-  const missing = (Object.keys(DEFAULT_GRAMS_PER_CARAT) as PurityType[]).filter(
-    (purity) => !rows.some((row) => row.purity === purity),
-  );
-
-  if (missing.length > 0) {
-    await prisma.caratConversionRate.createMany({
-      data: missing.map((purity) => ({
-        storeId,
-        purity,
-        gramsPerCarat: DEFAULT_GRAMS_PER_CARAT[purity],
-      })),
-      skipDuplicates: true,
-    });
-  }
-
-  return map;
-}
 
 /**
  * Resolves which grams-per-carat figure applies to a line, from the map

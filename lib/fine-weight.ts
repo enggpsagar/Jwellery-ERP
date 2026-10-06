@@ -21,7 +21,7 @@ import "server-only";
 import type { Prisma, PurityType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { getFinenessMap } from "@/lib/purity";
+import { getFinenessMap } from "@/lib/purity-db";
 
 export type FineWeightLine = {
   metalTypeId?: string | null;

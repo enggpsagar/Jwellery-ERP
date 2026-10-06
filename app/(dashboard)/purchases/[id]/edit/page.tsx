@@ -14,7 +14,8 @@ import { getStoreMetals, getAllStoreMetalOrigins } from "@/lib/actions/taxonomy-
 import { getCaratConversionRateMap } from "@/lib/actions/purity-actions"
 import { getGstRates } from "@/lib/actions/gst-rate-actions"
 import { requireStoreScope } from "@/lib/store-context"
-import { getFinenessMap, resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
+import { resolveGramsPerCarat, toPrimaryUnit } from "@/lib/purity"
+import { getFinenessMap } from "@/lib/purity-db"
 import { fromStoredComponents } from "@/lib/piece-components"
 
 import { PurchaseForm, type LineItem } from "@/components/purchases/purchase-form"

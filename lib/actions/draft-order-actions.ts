@@ -9,7 +9,8 @@ import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
-import { getFinenessMap, toFineWeight } from "@/lib/purity";
+import { toFineWeight } from "@/lib/purity";
+import { getFinenessMap } from "@/lib/purity-db";
 import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
 import {
   assertKarigarAssignedMetal,

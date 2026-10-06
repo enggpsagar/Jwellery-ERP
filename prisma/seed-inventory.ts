@@ -1,6 +1,7 @@
 import { PrismaClient, PurityType, InventoryStockStatus } from "@prisma/client"
+import { prismaAdapter } from "../lib/prisma-adapter"
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({ adapter: prismaAdapter() })
 
 function requireId(map: Map<string, string>, name: string, label: string): string {
   const id = map.get(name)

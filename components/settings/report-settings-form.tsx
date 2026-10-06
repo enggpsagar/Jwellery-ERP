@@ -9,7 +9,7 @@ import {
   generateAndSendReportNow,
   type ReportSettingsData,
 } from "@/lib/actions/report-settings-actions"
-import { ALL_FREQUENCIES, FREQUENCY_LABELS } from "@/lib/report-builder"
+import { ALL_FREQUENCIES, FREQUENCY_LABELS } from "@/lib/report-frequencies"
 import { formatShortDateTime } from "@/lib/utils"
 import { useToast } from "@/components/providers/toast-provider"
 import { Button } from "@/components/ui/button"

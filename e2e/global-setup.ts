@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs"
 import path from "node:path"
 
 import { PrismaClient } from "@prisma/client"
+import { prismaAdapter } from "../lib/prisma-adapter"
 import { encode } from "next-auth/jwt"
 
 export const E2E_ADMIN_EMAIL = "admin@aurumdemo.test"
@@ -39,7 +40,7 @@ export default async function globalSetup() {
   const secret = process.env.NEXTAUTH_SECRET
   if (!secret) throw new Error("NEXTAUTH_SECRET must be set for e2e tests")
 
-  const prisma = new PrismaClient()
+  const prisma = new PrismaClient({ adapter: prismaAdapter() })
   try {
     const admin = await prisma.user.findUnique({
       where: { email: E2E_ADMIN_EMAIL },

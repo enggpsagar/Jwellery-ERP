@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
+import { prismaAdapter } from "../lib/prisma-adapter";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: prismaAdapter() });
 
 async function main() {
   const jobs = await prisma.karigarJob.findMany({

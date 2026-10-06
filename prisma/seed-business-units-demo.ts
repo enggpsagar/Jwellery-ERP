@@ -19,8 +19,9 @@ import {
   InvoiceStatus,
   PurityType,
 } from "@prisma/client";
+import { prismaAdapter } from "../lib/prisma-adapter";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: prismaAdapter() });
 
 type LedgerSeed = {
   type: LedgerEntryType;

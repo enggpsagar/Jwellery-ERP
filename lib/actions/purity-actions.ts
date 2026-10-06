@@ -9,10 +9,9 @@ import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import {
   DEFAULT_FINENESS,
-  getFinenessMap,
   DEFAULT_GRAMS_PER_CARAT,
-  getGramsPerCaratMap,
 } from "@/lib/purity";
+import { getFinenessMap, getGramsPerCaratMap } from "@/lib/purity-db";
 import { logger } from "@/lib/logger";
 
 export type PurityFinenessRow = {

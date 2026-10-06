@@ -1,6 +1,7 @@
 import { PrismaClient, PurityType } from "@prisma/client";
+import { prismaAdapter } from "../lib/prisma-adapter";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: prismaAdapter() });
 
 // Mirrors product-form.tsx's PURITY_OPTIONS_BY_METAL — the app's only
 // existing approximation of "purity is per-metal" before this migration.

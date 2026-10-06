@@ -1,5 +1,8 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  // TypeScript query compiler + node-postgres driver adapter instead of the
+  // Rust query engine — less CPU per query on Vercel. See lib/prisma-adapter.ts.
+  engineType = "client"
 }
 
 datasource db {

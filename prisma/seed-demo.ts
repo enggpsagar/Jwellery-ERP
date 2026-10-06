@@ -5,8 +5,9 @@ import {
   LedgerEntryType,
   LedgerSourceType,
 } from "@prisma/client";
+import { prismaAdapter } from "../lib/prisma-adapter";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: prismaAdapter() });
 
 const CUSTOMERS = [
   {

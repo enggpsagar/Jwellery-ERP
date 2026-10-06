@@ -1,7 +1,8 @@
 import { PrismaClient, UserRole, UserStatus } from "@prisma/client"
+import { prismaAdapter } from "../lib/prisma-adapter"
 import { INDIA_STATES_AND_CITIES } from "./india-states-cities"
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({ adapter: prismaAdapter() })
 
 async function seedStatesAndCities() {
   console.log("Starting seed...")

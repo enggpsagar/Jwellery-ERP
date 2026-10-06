@@ -34,6 +34,14 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `stock-autofill.spec.ts` | Picking an 18K + diamond piece with no selling price fills Purity, the stone and Rate / g (today's 24K × fineness); QR/Barcode tags print every metal and stone and follow Settings → QR & Barcode Tags; Stock list shows Product Code over `STOCK-CODE (qty)` and Fine Weight |
 | `product-images.spec.ts` | Product Images: add / make cover / remove / save order; square tiles for any photo shape; non-Blob URLs rejected |
 | `header-rates.spec.ts` | Top bar "Today's Rates": the Store Owner changes Gold 22K's selling rate and it lands on the purity's own selling price and in Metal Rates → Your Selling Rates |
+| `party-sheet.spec.ts` | Parties template = export columns, bad rows reject the whole file, an exported party re-imports equal, Suppliers export is suppliers only |
+| `karigar-sheet.spec.ts` | Artisan export → import round trip (opening cash, inactive, GST, metals, location), duplicate mobiles refused, ledger export columns |
+| `kacha-sheet.spec.ts` | Estimate import posts the party ledger, export → re-import is equal, backup → restore keeps slip number and DMO weight |
+| `taxonomy-io.spec.ts` | Metals/Purities and Stones/Stone Types export → import round trip, metal/stone name clash rejects the file, price changes logged |
+| `export-columns.spec.ts` | Ledger export past 500 rows with the page's filters; invoice export GST split and status labels |
+| `store-admin-scope.spec.ts` | Store data export has every table, Force Delete Store removes a seeded store, Users export CSV of selected rows, location-restricted staff can't see other locations' credit notes / draft orders |
+| `tag-fields-dnd.spec.ts` | QR tag fields reordered, added and removed by drag and drop |
+| `stock-sheet.spec.ts` / `product-sheet-multi.spec.ts` / `finish-io.spec.ts` | Stock and Product import/export: every field, multi-metal pieces, Finish |
 | `reports.spec.ts` | Every report tab renders; Stock report's Available / Out of Stock split; CSV export |
 
 **When you build a feature, add a test for it here** — that's what keeps

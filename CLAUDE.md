@@ -162,7 +162,7 @@ A second "Metal-wise" tab (`components/ledger/metal-daily-ledger.tsx`, data from
 
 **Diamond is carat-based, not money-based.** Diamond used to be tracked in the Ledger as a rupee-equivalent value (`BusinessUnit`'s `DIAMOND` fell through `formatUnitValue`'s default ₹ branch, and `LedgerEntry`/manual customer-ledger entries stored a Diamond transaction's `amount` instead of a quantity). This was changed so Diamond is quantity-based like Gold/Silver, just in carats instead of grams: `lib/business-units.ts`'s `CARAT_BASED_UNITS` (parallel to `WEIGHT_BASED_UNITS`) drives `formatUnitValue`'s "X.XXX ct" branch; `LedgerEntry.caratWeight` (`Decimal(10,3)`, migration `20260902200000_add_ledger_entry_carat_weight`) holds the quantity for a Diamond entry, mirroring how `metalWeight`/`metalWeightFine` hold it for Gold/Silver; `getLedgerTotals()`/`getCustomerLedgerSummary()`'s per-unit totals and `getMetalDailyLedger()`'s `valueFor()` all read `caratWeight` (or the relevant `PurchaseItem`/`InvoiceItem`/`KachaInvoiceItem.caratWeight` column) for the DIAMOND case instead of `amount`; and the manual "Add Sale Entry"/"Add Refund Entry" dialogs (`components/customers/ledger/`) now ask Diamond for a metal type + carat quantity, the same shape as Gold/Silver's metal type + gram weight, instead of a bare ₹ amount. **Not changed**: the Karigar issue/receive-material flow (`lib/actions/inventory-stock-actions.ts`, `issueMaterialToKarigar`/`receiveItemsFromKarigar`) still measures a Diamond job in the same weight (grams) fields as Gold/Silver (`KarigarJob.issueWeight`/`receiveWeight`) — converting that to carats would also touch the wastage-percent fine-weight reconciliation math described above and wasn't part of this change; flag it for a deliberate decision before touching.
 
-Both the Ledger (`/ledger/export`) and Reports (`/reports/export`) pages export to CSV/XLSX via `<ExportMenu>` (`components/shared/export-menu.tsx`) hitting a route handler that re-calls the same `lib/actions/*.ts` functions the page already renders from, so exported rows can never drift from what's on screen. `lib/excel-export.ts`'s `buildCsvExport`/`buildExcelExport` are the shared row→file builders — use them for any new export route instead of hand-rolling XLSX/CSV again (the pre-existing `customers/export`, `vendors/export`, and `metal-rates/export` routes each still hand-roll their own, left as-is).
+Both the Ledger (`/ledger/export`) and Reports (`/reports/export`) pages export to CSV/XLSX via `<ExportMenu>` (`components/shared/export-menu.tsx`) hitting a route handler that re-calls the same `lib/actions/*.ts` functions the page already renders from, so exported rows can never drift from what's on screen. `lib/excel-export.ts`'s `buildCsvExport`/`buildExcelExport` are the shared row→file builders — use them for any new export route instead of hand-rolling XLSX/CSV again. Since 2026-10-06 nothing hand-rolls XLSX any more (the dead `customers/export` route is deleted; Artisans and metal rates use the builders), and the builders give every workbook a frozen, bold yellow header row (`styleHeaderRow`, patched into the saved XML — SheetJS community can't write styles).
 
 ### Fixed 2026-09-03/04: Making Charge / stone-weight staleness, plus a UI convention worth reusing
 
@@ -288,7 +288,7 @@ on, every party when it's off. Server rules live in
   links back to it).
 - The party is flagged `isSupplier` when the piece is sold (Invoice, Kacha,
   Quotation *conversion*) — not when a quotation is merely created.
-- Kacha Excel import is exempt (no such column in the template).
+- Kacha Excel import requires it too since 2026-10-06 (a Purchased From column per line).
 Not `CustomerSelect` on purpose: it reacts to `newCustomerId` and writes a
 hidden `customerId`, so one per line would hijack the document's own party.
 No metal `LedgerEntry` is written against the party — it's attribution,
@@ -473,7 +473,7 @@ with neither — so billing picks the change up directly. Read: `lib/selling-rat
 deliberately not a server action, so a client can't pass another storeId). Write:
 `updateSellingRates` (`lib/actions/selling-rate-actions.ts`), gated on the role in the
 **active store** (`getEffectiveAccess`), one transaction, every id matched by
-`{ id, storeId }`. Hidden for KARIGAR.
+`{ id, storeId }`. Hidden for KARIGAR. The popover lists exactly the store's active Settings purities / stone types (no fixed list — an earlier "add standard purities" link was removed after it duplicated a store's own "18" as "18K"); "+ Add purity / stone type" adds one there with its first rate, and the header shows when and by whom rates last changed.
 
 **Two kinds of rate, kept apart (user decision 2026-10-06):** `MetalRate` is the
 *market* rate — fetched by `/api/cron/metal-rates` (goldapi.io; more APIs planned) and
@@ -485,6 +485,24 @@ snapshotted) in the same transaction, via `recordSellingRateChange`. Metal Rates
 it as "Your Selling Rates" above the "Market Rates" table. Store export and Force
 Delete include the table (its FK is RESTRICT). Don't make a market API fill the
 selling price. Spec: `e2e/header-rates.spec.ts`.
+
+### Added 2026-10-06: Excel import/export overhaul
+
+Every import template and its export now share **one column definition**, so an exported file is a filled-in template and re-imports cleanly (labels, not raw enums; plain numbers, not "₹ 1,000"); export-only computed columns sit at the ends and imports ignore them. Each template has an Instructions sheet and store-scoped dropdowns. Imports are **all-or-nothing** (one transaction) and run the same rules as the Add/Edit form. Exports call `assertPlanActiveForExport`. Sheet definitions:
+
+- Products / Stock: `lib/inventory/product-sheet.ts`, `stock-sheet.ts`.
+- Parties: `lib/customers/customer-sheet.ts`. `validateCustomerInput(input, { gstScheme })` is the single rule set (GSTIN format + required for Regular/Composition, PAN, Aadhaar, email, 6-digit pincode); State/City checked against the lists. **Edits only judge fields they change** (`updateCustomerCore`), so a party saved before these checks stays editable. Suppliers page exports suppliers only.
+- Artisans: `lib/karigars/karigar-sheet.ts` (old headers still read via aliases). Mobile/email unique within the file, across the store's artisans and every user login; artisan edit only checks a mobile it changes. Location-restricted users import/create under their own locations (`resolveWritableLocationId`). Ledger export: Source with the artisan's name, Issued By, payment-method labels, opening balances.
+- Estimates (Kacha): `lib/billing/kacha-sheet.ts` + `kacha-sheet-rows.ts`, one row per line grouped by Slip Ref, shared by template, export and the delete-all backup. Import writes through `writeKachaSlip` (the form's path), so it posts the SALE debit and payment credits; purity uses the store's labels; Purchased From required. Restore keeps a free `KACHA-YYYY-NNNN`, skips re-posting when "Estimate X balance due" is still on the ledger (no `kachaInvoiceId` on LedgerEntry), relinks Converted To Invoice. Slip numbers now count on from the highest used number.
+- Settings taxonomy: `lib/inventory/taxonomy-sheet.ts` — Metals + Purities + Categories file, Stones + Stone Types file, with exports. Existing names are **updated**, new ones added, nothing deleted; metals and stones share one name space. Selling prices live only on Purities / Stone Types; every change logs a `SellingRateEntry`.
+- Ledger export returns every match for the page's filters (`lib/ledger-filters.ts`; the page itself still loads 500). Document exports: invoice GST split, offer, old-gold exchange, location, e-way/IRN; status labels from `lib/status-labels.ts`.
+- Row errors carry a "did you mean / already saved as / first used on row N" hint (`lib/import-suggest.ts`, shown by `components/shared/import-error-list.tsx`).
+
+Same pass: store data export covers every store-scoped table and Force Delete Store deletes the RESTRICT-FK tables it missed (styles, clarities, promotions — it failed for every store). **Check `pg_constraint.confdeltype`, not the schema, before adding a model to either list.** Users export honours format/selection. Credit notes and draft orders are location-scoped like invoices (list, detail, export, mutations).
+
+**Forms: handle a successful save inside the action, not in an effect on `useActionState`'s state.** A save that revalidates can suspend and remount the form (New Purchase sits in `<Suspense fallback={null}>`), and the remounted form never sees success — the purchase was saved but the user was left on a blank page (flaky `multi-part`/`offers` specs, fixed in `purchase-form.tsx` / `offer-form-dialog.tsx`). Other forms still use the effect pattern; convert them if they show the same symptom.
+
+Settings → QR & Barcode Tags: printed fields can be dragged to reorder, chips dragged in, rows dragged out (native DnD; handlers read a ref because dragover outruns React re-renders).
 
 ### Added 2026-10-06: Offers & gift vouchers (promotional sales)
 

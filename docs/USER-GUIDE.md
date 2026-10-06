@@ -323,6 +323,28 @@ wastage, sold, remaining. Filter by financial year or dates. Reports and Ledger 
 Sales trend by metal, best sellers, metal stock and money KPIs, with Daily/Monthly
 toggles. Cards can be dragged and resized; your layout is remembered.
 
+### Importing and exporting with Excel
+
+Parties, Products, Stock, Artisans, Estimates and Settings → Metals & Categories can all
+be exported to Excel and imported back. Start from **Download template** — it has an
+**Instructions** sheet and drop-down lists of your own metals, purities, parties and
+locations. An **exported file has exactly the template's columns**, so you can export,
+edit in Excel and import the same file back.
+
+- The header row stays frozen and yellow while you scroll.
+- An import is **all or nothing**: if any row has a problem, nothing is saved and every
+  problem is listed — often with a suggestion such as *"Did you mean Gold 22K?"* or
+  *"Already saved as …"*.
+- Estimates imported from Excel post to the party's ledger, just like ones typed in.
+- Ledger export includes every entry matching the filters on screen, not just the
+  latest 500.
+
+### Printed tags (Settings → QR & Barcode Tags)
+
+Choose which details print on QR and barcode tags. **Drag** a field to change its order,
+drag a field from *Add a field* into the list, or drag one back out to remove it. The
+arrow buttons do the same on a phone.
+
 ---
 
 ## 6. Search, notifications and help

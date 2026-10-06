@@ -215,3 +215,127 @@ export async function lockedStockPieceRows(storeId: string, stockIds: string[]) 
   }
   return out;
 }
+
+type NewStockProduct = Pick<ProductDetails, "metalComponents" | "stoneComponents">;
+
+export type NewStockPieceRows = {
+  /** PieceComponent rows for the new stock row (no parent id set). */
+  components: Prisma.PieceComponentCreateManyInventoryStockInput[];
+  /** The stock row's summary fields (see PieceComponent's doc): fineWeight =
+   * only the first metal's own pure weight; stoneCharge = all stones. */
+  fineWeight: number | null;
+  stoneCharge: number;
+  /** Per metal (for the stock-added ledger entries), in row order. */
+  metals: { metalTypeId: string; netWeight: number; fineWeight: number | null }[];
+};
+
+/**
+ * The metal / stone rows Add Stock (and the stock import) write for a piece
+ * of a Product with more than one metal or more than one stone — null for an
+ * ordinary single-metal / single-stone Product, which keeps the stock row's
+ * own fields as before.
+ *
+ * Add Stock captures one net weight and one carat weight for the piece, not
+ * one per row, so the rows take the Product's own per-metal / per-stone
+ * weights, scaled so they add up to what was entered: a one-metal Product
+ * with several stones puts the whole net weight on that metal; several
+ * metals share it in the Product's proportions (as entered on Add Product).
+ * Stones likewise share the entered carats. Blank / 0 entered = the
+ * Product's weights as they are. Pieces / clarity / certificate and the
+ * stone rate come from the Product's stone rows.
+ */
+export function newStockPieceRows(
+  product: NewStockProduct,
+  entered: { netWeight: number | null; caratWeight: number | null },
+  options: {
+    fineOf: (line: { metalTypeId: string; purityLabel: string | null; purity: PurityType | null; netWeight: number }) => number | null;
+    gstById: Map<string, { name: string; ratePercent: Prisma.Decimal | number }>;
+  },
+): NewStockPieceRows | null {
+  if (!isMultiComponentProduct({ metalComponents: product.metalComponents, stoneComponents: product.stoneComponents })) {
+    return null;
+  }
+  const scale = (values: (number | null)[], total: number | null) => {
+    const sum = values.reduce<number>((acc, v) => acc + (v ?? 0), 0);
+    if (total == null || !(total > 0) || !(sum > 0)) return 1;
+    return total / sum;
+  };
+  const gstFields = (gstRateId: string | null) => {
+    const gst = gstRateId ? options.gstById.get(gstRateId) : undefined;
+    return {
+      gstRateId: gst ? gstRateId : null,
+      gstRateName: gst?.name ?? null,
+      gstRatePercent: gst ? Number(gst.ratePercent) : null,
+    };
+  };
+
+  const metalNets = product.metalComponents.map((row) => num(row.netWeight) ?? num(row.grossWeight));
+  const metalFactor = scale(metalNets, entered.netWeight);
+  const components: NewStockPieceRows["components"] = [];
+  const metals: NewStockPieceRows["metals"] = [];
+  product.metalComponents.forEach((row, index) => {
+    const productNet = metalNets[index];
+    const net = productNet != null ? round5(productNet * metalFactor) : null;
+    const productGross = num(row.grossWeight);
+    const gross = productGross != null ? round5(productGross * metalFactor) : null;
+    const purityLabel = row.storeMetalPurity?.label ?? null;
+    const purity = matchLegacyPurityType(classifyPurityFamily(row.metalType), purityLabel) as PurityType | null;
+    const fineWeight = net != null && net > 0 ? options.fineOf({ metalTypeId: row.metalTypeId, purityLabel, purity, netWeight: net }) : null;
+    components.push({
+      kind: "METAL",
+      sortOrder: components.length,
+      metalTypeId: row.metalTypeId,
+      purity,
+      purityLabel,
+      grossWeight: gross != null && net != null ? Math.max(gross, net) : gross ?? net,
+      netWeight: net,
+      fineWeight,
+      amount: 0,
+      ...gstFields(row.gstRateId),
+    });
+    if (net != null && net > 0) metals.push({ metalTypeId: row.metalTypeId, netWeight: net, fineWeight });
+  });
+
+  const stoneCarats = product.stoneComponents.map((row) => num(row.caratWeight));
+  const stoneFactor = scale(stoneCarats, entered.caratWeight);
+  let stoneCharge = 0;
+  product.stoneComponents.forEach((row, index) => {
+    const productCarats = stoneCarats[index];
+    const caratWeight = productCarats != null ? round5(productCarats * stoneFactor) : null;
+    const productGrams = num(row.stoneWeight);
+    const stoneWeight =
+      productGrams != null
+        ? round5(productGrams * stoneFactor)
+        : caratWeight != null
+          ? round5(caratWeight * GRAMS_PER_CARAT)
+          : null;
+    const rate = num(row.stoneRate);
+    const amount = rate != null && caratWeight != null ? round2(rate * caratWeight) : num(row.stoneCharge) ?? 0;
+    stoneCharge += amount;
+    components.push({
+      kind: "STONE",
+      sortOrder: components.length,
+      stoneMetalTypeName: row.stoneMetalTypeName,
+      stoneTypeNames: row.stoneTypeNames,
+      caratWeight,
+      stoneWeight,
+      pieces: row.pieces ?? null,
+      clarity: row.clarity ?? null,
+      certificateNumber: row.certificateNumber ?? null,
+      rate,
+      amount,
+      ...gstFields(row.gstRateId),
+    });
+  });
+
+  const firstMetalId = product.metalComponents[0]?.metalTypeId;
+  const firstFine = metals
+    .filter((row) => row.metalTypeId === firstMetalId)
+    .reduce<number | null>((acc, row) => (row.fineWeight == null ? acc : (acc ?? 0) + row.fineWeight), null);
+  return {
+    components,
+    fineWeight: firstFine != null ? round5(firstFine) : null,
+    stoneCharge: round2(stoneCharge),
+    metals,
+  };
+}

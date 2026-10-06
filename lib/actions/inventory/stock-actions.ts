@@ -1,6 +1,8 @@
 // lib/actions/inventory/stock-actions.ts
 "use server"
 
+import { randomUUID } from "node:crypto"
+
 import { revalidatePath } from "next/cache"
 import {
   InventoryStockStatus,
@@ -51,6 +53,8 @@ import { getFineWeightResolver, resolveFineWeight } from "@/lib/fine-weight"
 import { describePieceComponentsText, METALS_AND_STONES_COLUMN } from "@/lib/piece-components-text"
 import { formatShortDate, formatShortDateTime } from "@/lib/utils"
 import { logger } from "@/lib/logger";
+import { newStockPieceRows } from "@/lib/inventory/stock-piece-rows"
+import { stockOptionProductDetailsSelect } from "@/lib/inventory/stock-option-details"
 import {
   existingRecordHint,
   IMPORT_SUGGESTION_MARK,
@@ -754,6 +758,8 @@ export async function createInventoryStock(
         defaultStoneRate: true,
         defaultStoneMetalTypeName: true,
         defaultStoneTypeNames: true,
+        metalComponents: stockOptionProductDetailsSelect.metalComponents,
+        stoneComponents: stockOptionProductDetailsSelect.stoneComponents,
       },
     })
 
@@ -855,8 +861,41 @@ export async function createInventoryStock(
     // Pure-metal weight, stored on the row and posted to the ledger — same
     // rule as every other metal line (lib/fine-weight.ts), which also reads
     // the metal's own purity row instead of only the legacy enum.
-    const fineWeight = await resolveFineWeight(storeId, { metalTypeId, purityLabel, purity, netWeight })
+    // A Product of several metals / stones: the piece gets one row per
+    // metal and stone (lib/inventory/stock-piece-rows.ts newStockPieceRows),
+    // the stock row keeps the summary, and the ledger gets one entry per metal.
+    const pieceRows = await (async () => {
+      if (product.metalComponents.length < 2 && product.stoneComponents.length < 2) return null
+      const [fineOf, gstRates, storeMetals] = await Promise.all([
+        getFineWeightResolver(storeId),
+        prisma.gstRate.findMany({ where: { storeId }, select: { id: true, name: true, ratePercent: true } }),
+        prisma.storeMetal.findMany({ where: { storeId }, select: { id: true, hasPurity: true } }),
+      ])
+      const rows = newStockPieceRows(
+        product,
+        { netWeight, caratWeight },
+        { fineOf, gstById: new Map(gstRates.map((rate) => [rate.id, rate])) },
+      )
+      return rows ? { rows, hasPurity: new Map(storeMetals.map((metal) => [metal.id, metal.hasPurity])) } : null
+    })()
+
+    const fineWeight = pieceRows
+      ? pieceRows.rows.fineWeight
+      : await resolveFineWeight(storeId, { metalTypeId, purityLabel, purity, netWeight })
     const metalWeightFine = storeMetal?.hasPurity && fineWeight ? fineWeight : undefined
+    const stockAddedDescription = `Stock added — ${stockCode}${tagNumber ? ` (Tag ${tagNumber})` : ""}`
+    const ledgerMetals = pieceRows
+      ? pieceRows.rows.metals.map((row) => {
+          const hasPurity = pieceRows.hasPurity.get(row.metalTypeId) ?? false
+          return {
+            metalTypeId: row.metalTypeId,
+            metalWeight: hasPurity ? undefined : row.netWeight,
+            metalWeightFine: hasPurity && row.fineWeight ? row.fineWeight : undefined,
+          }
+        })
+      : netWeight && netWeight > 0
+        ? [{ metalTypeId, metalWeight: storeMetal?.hasPurity ? undefined : netWeight, metalWeightFine }]
+        : []
 
     await prisma.$transaction([
       prisma.inventoryStock.create({
@@ -883,7 +922,7 @@ export async function createInventoryStock(
           saleRate: toDecimal(saleRate),
           makingCharge,
           makingChargeType,
-          stoneCharge,
+          stoneCharge: pieceRows ? pieceRows.rows.stoneCharge : stoneCharge,
           stoneRate: stoneRate ?? undefined,
           stoneMetalTypeName: stoneMetalTypeName ?? undefined,
           stoneTypeNames: stoneTypeNames ?? undefined,
@@ -898,25 +937,24 @@ export async function createInventoryStock(
           createdById: currentUser?.id ?? undefined,
           createdByName: currentUser?.name ?? undefined,
           createdByRole: currentUser?.role ?? undefined,
+          ...(pieceRows ? { components: { createMany: { data: pieceRows.rows.components } } } : {}),
         },
       }),
-      ...(netWeight && netWeight > 0
-        ? [
-            prisma.ledgerEntry.create({
-              data: {
-                storeId,
-                type: LedgerEntryType.DEBIT,
-                sourceType: LedgerSourceType.ADJUSTMENT,
-                metalTypeId,
-                metalWeight: storeMetal?.hasPurity ? undefined : netWeight,
-                metalWeightFine,
-                amount: 0,
-                description: `Stock added — ${stockCode}${tagNumber ? ` (Tag ${tagNumber})` : ""}`,
-                locationId: locationId ?? undefined,
-              },
-            }),
-          ]
-        : []),
+      ...ledgerMetals.map((metal) =>
+        prisma.ledgerEntry.create({
+          data: {
+            storeId,
+            type: LedgerEntryType.DEBIT,
+            sourceType: LedgerSourceType.ADJUSTMENT,
+            metalTypeId: metal.metalTypeId,
+            metalWeight: metal.metalWeight,
+            metalWeightFine: metal.metalWeightFine,
+            amount: 0,
+            description: stockAddedDescription,
+            locationId: locationId ?? undefined,
+          },
+        }),
+      ),
     ])
 
     revalidatePath("/inventory")
@@ -1476,6 +1514,8 @@ export async function importInventoryStockFromExcel(
           defaultNetWeight: true,
           defaultStoneWeight: true,
           defaultCaratWeight: true,
+          metalComponents: stockOptionProductDetailsSelect.metalComponents,
+          stoneComponents: stockOptionProductDetailsSelect.stoneComponents,
         },
       }),
       prisma.storeLocation.findMany({ where: { storeId }, select: { id: true, name: true } }),
@@ -1522,6 +1562,17 @@ export async function importInventoryStockFromExcel(
     const errors: string[] = []
     const toCreate: Prisma.InventoryStockCreateManyInput[] = []
     const ledgerRows: Prisma.LedgerEntryCreateManyInput[] = []
+    // Rows of pieces whose Product has several metals / stones — same as
+    // Add Stock (newStockPieceRows); the stock id is set here so they can be
+    // written with createMany in the same transaction.
+    const componentRows: Prisma.PieceComponentCreateManyInput[] = []
+    const gstById = products.some((product) => product.metalComponents.length > 1 || product.stoneComponents.length > 1)
+      ? new Map(
+          (await prisma.gstRate.findMany({ where: { storeId }, select: { id: true, name: true, ratePercent: true } })).map(
+            (rate) => [rate.id, rate],
+          ),
+        )
+      : new Map<string, { name: string; ratePercent: Prisma.Decimal }>()
 
     for (const [index, row] of rows.entries()) {
       // +2 = one for the header row, one for 1-based spreadsheet numbering.
@@ -1646,9 +1697,17 @@ export async function importInventoryStockFromExcel(
         product.hasStoneComponent && product.defaultStoneRate != null && caratWeight
           ? new Prisma.Decimal(product.defaultStoneRate).mul(caratWeight)
           : product.defaultStoneCharge
-      const fineWeight = fineOf({ metalTypeId: product.metalTypeId, purity: product.defaultPurity, purityLabel, netWeight })
+      const pieceRows = newStockPieceRows(product, { netWeight, caratWeight }, { fineOf, gstById })
+      const fineWeight = pieceRows
+        ? pieceRows.fineWeight
+        : fineOf({ metalTypeId: product.metalTypeId, purity: product.defaultPurity, purityLabel, netWeight })
+      const stockId = randomUUID()
+      if (pieceRows) {
+        for (const component of pieceRows.components) componentRows.push({ ...component, inventoryStockId: stockId })
+      }
 
       toCreate.push({
+        id: stockId,
         storeId,
         productId: product.id,
         stockCode,
@@ -1669,7 +1728,7 @@ export async function importInventoryStockFromExcel(
         saleRate,
         makingCharge: product.defaultMakingCharge,
         makingChargeType: product.defaultMakingChargeType,
-        stoneCharge,
+        stoneCharge: pieceRows ? pieceRows.stoneCharge : stoneCharge,
         stoneRate: product.hasStoneComponent ? product.defaultStoneRate : null,
         stoneMetalTypeName: product.hasStoneComponent ? product.defaultStoneMetalTypeName : null,
         stoneTypeNames: product.hasStoneComponent ? product.defaultStoneTypeNames : null,
@@ -1686,8 +1745,24 @@ export async function importInventoryStockFromExcel(
         createdByRole: currentUser?.role ?? undefined,
       })
 
-      // Same ledger entry Add Stock posts, so imported gold shows on the Ledger.
-      if (netWeight && netWeight > 0) {
+      // Same ledger entries Add Stock posts, so imported gold shows on the
+      // Ledger — one per metal for a piece of several.
+      if (pieceRows) {
+        for (const metal of pieceRows.metals) {
+          const hasPurity = metalHasPurity.get(metal.metalTypeId) ?? false
+          ledgerRows.push({
+            storeId,
+            type: LedgerEntryType.DEBIT,
+            sourceType: LedgerSourceType.ADJUSTMENT,
+            metalTypeId: metal.metalTypeId,
+            metalWeight: hasPurity ? undefined : metal.netWeight,
+            metalWeightFine: hasPurity && metal.fineWeight ? metal.fineWeight : undefined,
+            amount: 0,
+            description: `Stock added — ${stockCode}${tagNumber ? ` (Tag ${tagNumber})` : ""} (import)`,
+            locationId: resolvedLocationId ?? undefined,
+          })
+        }
+      } else if (netWeight && netWeight > 0) {
         const hasPurity = metalHasPurity.get(product.metalTypeId) ?? false
         ledgerRows.push({
           storeId,
@@ -1717,6 +1792,7 @@ export async function importInventoryStockFromExcel(
 
     await prisma.$transaction([
       prisma.inventoryStock.createMany({ data: toCreate }),
+      ...(componentRows.length ? [prisma.pieceComponent.createMany({ data: componentRows })] : []),
       ...(ledgerRows.length ? [prisma.ledgerEntry.createMany({ data: ledgerRows })] : []),
     ])
 

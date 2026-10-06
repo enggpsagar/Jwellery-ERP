@@ -334,6 +334,7 @@ export function PieceComponentsEditor({
                 value={row.caratWeight || ""}
                 onChange={(e) => update(row.key, { caratWeight: Number(e.target.value) || 0 })}
               />
+              <StoneExtras row={row} testId={`${testIdPrefix}-stone-extras`} />
             </div>
             <div className="space-y-1">
               <Label className="text-[11px] text-muted-foreground">Weight g</Label>
@@ -422,6 +423,28 @@ export function PieceComponentsEditor({
         </div>
       </div>
     </div>
+  )
+}
+
+/** A picked stock piece's stone count / clarity / certificate (from its
+ * Product's stone row) — read-only, under the carats. */
+export function StoneExtras({
+  row,
+  testId,
+}: {
+  row: { pieces?: number | null; clarity?: string | null; certificateNumber?: string | null }
+  testId?: string
+}) {
+  const parts = [
+    row.pieces ? `${row.pieces} pcs` : null,
+    row.clarity || null,
+    row.certificateNumber ? `Cert ${row.certificateNumber}` : null,
+  ].filter(Boolean)
+  if (!parts.length) return null
+  return (
+    <p className="text-[10px] leading-tight text-muted-foreground" data-testid={testId}>
+      {parts.join(" · ")}
+    </p>
   )
 }
 

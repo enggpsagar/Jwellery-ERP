@@ -46,10 +46,10 @@ import { StockItemSelect } from "@/components/inventory/shared/stock-item-select
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog"
-import { PieceComponentsEditor } from "@/components/shared/piece-components-editor"
+import { PieceComponentsEditor, StoneExtras } from "@/components/shared/piece-components-editor"
+import { stockPieceDrafts, stoneSellingRate, type LinkedStoneDetails } from "@/lib/inventory/stock-pick-rates"
 import { MultiPartQuestion } from "@/components/shared/multi-part-question"
 import {
-  fromStoredComponents,
   newMetalRow,
   newStoneRow,
   pieceGst,
@@ -96,6 +96,8 @@ type StockOption = {
   stoneOriginRate: number | null
   /** A piece made of several metals/stones — its rows (lib/piece-components.ts). */
   components?: StoredPieceComponent[]
+  /** A single stone's pieces / clarity / certificate / catalog rate. */
+  linkedStone?: LinkedStoneDetails | null
 } & StockOptionProductDetails
 
 type LineItem = {
@@ -345,13 +347,6 @@ export function QuotationForm({
     }
     updateItem(item.key, patch)
   }
-  // Stone components are tracked by name (stoneMetalTypeName), not id — no
-  // stoneMetalTypeId field exists — so the stone-rate fallback needs its
-  // own name-keyed lookup instead of reusing metalById.
-  const metalByName = useMemo(
-    () => new Map(metals.map((m) => [m.name.toLowerCase(), m])),
-    [metals],
-  )
   // The line's own metal's configured Primary Unit (Settings > Taxonomy) —
   // what Net Weight/Stone Weight are actually persisted in at submit,
   // regardless of what unit is currently toggled for display/entry.
@@ -555,6 +550,52 @@ export function QuotationForm({
     // picks which unit the toggle starts on, not a value conversion.
     const linkedUnit = metalById.get(stock.metalType?.id ?? "")?.primaryUnit ?? "GRAM"
 
+    const linkedStoneRate = stoneSellingRate(
+      {
+        name: stock.stoneMetalTypeName,
+        types: stock.stoneTypeNames,
+        ownRate: stock.stoneRate ?? stock.linkedStone?.catalogRate,
+      },
+      metals,
+      origins,
+    )
+    // A piece has a stone when its stock row or its Product says so — not
+    // only when a stone rate was recorded (same rule as invoice-form.tsx).
+    const linkedHasStone =
+      stock.stoneRate != null ||
+      (stock.caratWeight ?? 0) > 0 ||
+      Boolean(stock.stoneMetalTypeName) ||
+      stock.productHasStone
+    const linkedStoneCharge =
+      linkedStoneRate > 0 && (stock.caratWeight ?? 0) > 0
+        ? Number((linkedStoneRate * (stock.caratWeight ?? 0)).toFixed(2))
+        : 0
+
+    // A multi-metal / multi-stone piece (its own rows, else its Product's —
+    // lib/inventory/stock-piece-rows.ts) brings every row; physical facts
+    // locked, priced at today's rates (lib/inventory/stock-pick-rates.ts).
+    const linkedPieceFields: Partial<LineItem> = (() => {
+      if (!stock.components?.length) return { multiPart: false, components: [] }
+      const rows = stockPieceDrafts(stock.components, { metals, origins, fineRates })
+      const firstMetal = rows.find((row) => row.kind === "METAL")
+      const totals = pieceTotals(rows, { valuation: "net" })
+      return {
+        multiPart: true,
+        components: rows,
+        metalTypeId: firstMetal?.kind === "METAL" ? firstMetal.metalTypeId : stock.metalType?.id ?? "",
+        purity: firstMetal?.kind === "METAL" ? firstMetal.purity : stock.purity ?? "",
+        purityLabel: firstMetal?.kind === "METAL" ? firstMetal.purityLabel : stock.purityLabel || stock.productPurityLabel || "",
+        netWeight: totals.metalNet,
+        grossWeight: stock.grossWeight ?? (totals.metalGross + totals.stoneGrams || totals.metalNet),
+        hasStoneComponent: false,
+        stoneCharge: 0,
+        stoneRate: 0,
+        caratWeight: 0,
+        stoneMetalTypeName: "",
+        stoneTypeNames: [],
+      }
+    })()
+
     updateItem(key, {
       inventoryStockId: stockId,
       itemName: stock.productName,
@@ -572,16 +613,13 @@ export function QuotationForm({
       // (Settings > Taxonomy) now wins over the legacy metal-level fallback.
       rate: resolveStockSellingRate(stock, metalById.get(stock.metalType?.id ?? "")?.sellingPrice),
       caratWeight: stock.caratWeight ?? 0,
-      stoneRate:
-        stock.stoneRate ??
-        metalByName.get((stock.stoneMetalTypeName ?? "").toLowerCase())?.sellingPrice ??
-        0,
+      // The piece's / Product's own stone rate, else the Stone Type's
+      // Selling Price, else the stone's — so Stone Charge fills in.
+      stoneRate: linkedStoneRate,
       // A multi-part piece's stones are rows of their own (components
       // below), never the single-stone fields.
-      hasStoneComponent: !stock.components?.length && stock.stoneRate != null,
-      stoneCharge: !stock.components?.length && stock.stoneRate != null && stock.caratWeight != null
-        ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
-        : 0,
+      hasStoneComponent: linkedHasStone,
+      stoneCharge: linkedStoneCharge,
       stoneChargeTouched: false,
       stoneMetalTypeName: stock.stoneMetalTypeName ?? "",
       stoneTypeNames: stock.stoneTypeNames
@@ -597,20 +635,8 @@ export function QuotationForm({
       // A multi-metal / multi-stone piece brings its rows; their physical
       // facts are locked, rates start from today's selling prices — same as
       // invoice-form.tsx's applyStockToItem.
-      ...(stock.components?.length
-        ? {
-            multiPart: true,
-            components: fromStoredComponents(stock.components).map((row) =>
-              row.kind === "METAL"
-                ? { ...row, rate: metalById.get(row.metalTypeId)?.sellingPrice ?? row.rate }
-                : {
-                    ...row,
-                    rate: metalByName.get(row.stoneMetalTypeName.toLowerCase())?.sellingPrice ?? row.rate,
-                    amountTouched: false,
-                  },
-            ),
-          }
-        : { multiPart: false, components: [] }),
+      // Last, so a multi-part piece's summary wins — see linkedPieceFields.
+      ...linkedPieceFields,
     })
     for (const component of stock.components ?? []) {
       if (component.metalTypeId) ensureMetalPurities(component.metalTypeId)
@@ -1401,6 +1427,12 @@ export function QuotationForm({
                       onStoneWeightUnitChange={(unit) => updateItem(item.key, { stoneWeightUnit: unit })}
                       netStoneWeightTouched={item.netStoneWeightTouched}
                       lockPhysicalFields={isLinked}
+                    />
+                  )}
+                  {item.hasStoneComponent && isLinked && (
+                    <StoneExtras
+                      row={stockItems.find((s) => s.id === item.inventoryStockId)?.linkedStone ?? {}}
+                      testId="quotation-linked-stone-extras"
                     />
                   )}
                 </div>

@@ -69,10 +69,9 @@ import { StoneComponentFields } from "@/components/inventory/shared/stone-compon
 import { StockItemSelect } from "@/components/inventory/shared/stock-item-select"
 import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 import { StonePresenceQuestion } from "@/components/shared/stone-presence-question"
-import { PieceComponentsEditor } from "@/components/shared/piece-components-editor"
+import { PieceComponentsEditor, StoneExtras } from "@/components/shared/piece-components-editor"
 import { MultiPartQuestion } from "@/components/shared/multi-part-question"
 import {
-  fromStoredComponents,
   newMetalRow,
   newStoneRow,
   pieceGst,
@@ -87,6 +86,7 @@ import { AddCategoryDialog } from "@/components/inventory/shared/add-category-di
 import { AddCategoryTypeDialog } from "@/components/inventory/shared/add-category-type-dialog"
 import { LinkedProductDetails } from "@/components/inventory/shared/linked-product-details"
 import type { StockOptionProductDetails } from "@/lib/inventory/stock-option-details"
+import { stockPieceDrafts, stoneSellingRate, type LinkedStoneDetails } from "@/lib/inventory/stock-pick-rates"
 
 type CustomerOption = {
   id: string
@@ -124,6 +124,8 @@ type StockOption = {
   quantity: number
   /** A piece made of several metals/stones — its rows (lib/piece-components.ts). */
   components?: StoredPieceComponent[]
+  /** A single stone's pieces / clarity / certificate / catalog rate. */
+  linkedStone?: LinkedStoneDetails | null
 } & StockOptionProductDetails
 
 /**
@@ -742,21 +744,34 @@ export function InvoiceForm({
     return Math.max(0, stock.quantity - claimedByOtherLines)
   }
 
-  const applyStockToItem = (key: string, stockId: string) => {
-    const stock = stockItems.find((s) => s.id === stockId)
-    if (!stock) {
-      updateItem(key, { inventoryStockId: "" })
-      return
-    }
-
-    const available = availableForStock(stockId, key)
-    if (stock.metalType?.id) ensureMetalPurities(stock.metalType.id)
+  /**
+   * Everything a picked or scanned stock piece puts on its line — one
+   * function for both paths so a scanned piece opens exactly like a picked
+   * one (the scan path used to skip a multi-part piece's rows entirely).
+   *
+   * A piece of several metals/stones (its own rows, else its Product's —
+   * lib/inventory/stock-piece-rows.ts) opens multi-part: every metal and
+   * every stone on its own row, physical facts locked, priced at today's
+   * rates (lib/inventory/stock-pick-rates.ts). A single-stone piece prices
+   * its stone the same way (the piece's / Product's stone rate, else the
+   * Stone Type's Selling Price, else the stone's), so Stone Charge fills in.
+   */
+  const linkedStockFields = (stock: StockOption): Partial<LineItem> => {
     // Already stored in the metal's own configured primary unit — this just
     // picks which unit the toggle starts on, not a value conversion.
     const linkedUnit = metalById.get(stock.metalType?.id ?? "")?.primaryUnit ?? "GRAM"
-
-    updateItem(key, {
-      inventoryStockId: stockId,
+    const stoneRate = stoneSellingRate(
+      {
+        name: stock.stoneMetalTypeName,
+        types: stock.stoneTypeNames,
+        ownRate: stock.stoneRate ?? stock.linkedStone?.catalogRate,
+      },
+      metals,
+      origins,
+    )
+    const caratWeight = stock.caratWeight ?? 0
+    const base: Partial<LineItem> = {
+      stockLinkDecided: true,
       itemName: stock.productName,
       metalTypeId: stock.metalType?.id ?? "",
       purity: stock.purity ?? "",
@@ -769,75 +784,84 @@ export function InvoiceForm({
       stoneWeightUnit: linkedUnit,
       // A specific piece's own recorded sale rate wins when it has one;
       // otherwise the store's own configured per-Purity/per-Stone-Type
-      // Selling Price (Settings > Taxonomy > Purities / Stone Types), then
-      // the metal's flat legacy Selling Price (Settings > Taxonomy) so the
-      // field isn't just silently 0 — still fully editable either way, and
-      // plain manual entry when none of these are set. See
-      // resolveStockSellingRate (lib/purity.ts).
+      // Selling Price, then the metal's, then today's fine rate — see
+      // stockSellingRate. Still fully editable.
       rate: stockSellingRate(stock),
       hsnCode: stock.hsnCode ?? "",
-      caratWeight: stock.caratWeight ?? 0,
-      stoneRate:
-        stock.stoneRate ??
-        metalByName.get((stock.stoneMetalTypeName ?? "").toLowerCase())?.sellingPrice ??
-        0,
+      caratWeight,
+      stoneRate,
       hasStoneComponent: stockHasStone(stock),
-      stoneCharge: stock.stoneRate != null && stock.caratWeight != null
-        ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
-        : 0,
+      stoneCharge: stoneRate > 0 && caratWeight > 0 ? Number((stoneRate * caratWeight).toFixed(2)) : 0,
       stoneChargeTouched: false,
       // Only lock the auto-fill when the linked stock row actually has a
       // recorded stone weight worth protecting — a fresh stock item with no
       // stoneWeight set (0/null) has nothing authoritative to preserve, and
-      // locking it anyway (unconditional `true`, the previous bug here)
-      // permanently blocked Net Stone Weight from ever auto-filling from
-      // Stone Carat Weight on that line, even after "Includes a Stone" was
-      // just checked and a fresh carat weight typed in.
+      // locking it anyway permanently blocked Net Stone Weight from ever
+      // auto-filling from Stone Carat Weight on that line.
       netStoneWeightTouched: stock.stoneWeight != null && Number(stock.stoneWeight) > 0,
       stoneMetalTypeName: stock.stoneMetalTypeName ?? "",
       stoneTypeNames: stock.stoneTypeNames
         ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
         : [],
-      // Recorded on the stock row at Add Stock time — carried over here so
-      // a piece's own making charge doesn't have to be re-typed on every
-      // sale (previously always reset to 0/FIXED regardless of what was
-      // set on the stock item).
-      // InventoryStock carries no hmCharge field of its own — there's
-      // nothing authoritative here to protect (same reasoning as
-      // netStoneWeightTouched above when a stock row has no recorded stone
-      // weight), so this stays untouched and lets the Purity-driven
-      // auto-fill below populate it instead of locking in a stale 0.
+      // InventoryStock carries no hmCharge of its own — left untouched so
+      // the Purity-driven auto-fill populates it.
       hmCharge: isHallmarkablePurity(stock.purity) ? hallmarkChargePerPiece : 0,
       hmChargeTouched: false,
       // The linked stock row's own net weight is authoritative — the
-      // gross/stone/dmo calc below must not silently recompute over it.
+      // gross/stone/dmo calc must not silently recompute over it.
       netTouched: true,
+      // Purity, GST Rate (the Product's Metal row) and Making Charge — the
+      // stock row's own value first, then the Product's, then (GST only)
+      // the document's default. See stockCatalogFields.
+      ...stockCatalogFields(stock, gstRateId),
+      multiPart: false,
+      components: [],
+    }
+    if (!stock.components?.length) return base
+
+    const rows = stockPieceDrafts(stock.components, { metals, origins, fineRates })
+    const firstMetal = rows.find((row) => row.kind === "METAL")
+    const totals = pieceTotals(rows, { valuation: "net" })
+    return {
+      ...base,
+      multiPart: true,
+      components: rows,
+      // The line's own fields summarise the rows (first metal, all metals'
+      // net) — same as setComponents on a hand-built multi-part line.
+      metalTypeId: firstMetal?.kind === "METAL" ? firstMetal.metalTypeId : base.metalTypeId,
+      purity: firstMetal?.kind === "METAL" ? firstMetal.purity : base.purity,
+      purityLabel: firstMetal?.kind === "METAL" ? firstMetal.purityLabel : base.purityLabel,
+      netWeight: totals.metalNet,
+      grossWeight: stock.grossWeight ?? (totals.metalGross + totals.stoneGrams || totals.metalNet),
+      // The stones live on their rows, not on the line's single stone.
+      hasStoneComponent: false,
+      stoneCharge: 0,
+      stoneRate: 0,
+      caratWeight: 0,
+      stoneWeightInput: 0,
+      stoneMetalTypeName: "",
+      stoneTypeNames: [],
+    }
+  }
+
+  const applyStockToItem = (key: string, stockId: string) => {
+    const stock = stockItems.find((s) => s.id === stockId)
+    if (!stock) {
+      updateItem(key, { inventoryStockId: "" })
+      return
+    }
+
+    const available = availableForStock(stockId, key)
+    if (stock.metalType?.id) ensureMetalPurities(stock.metalType.id)
+
+    updateItem(key, {
+      inventoryStockId: stockId,
+      ...linkedStockFields(stock),
       // Re-linking to a different stock item resets quantity to a sane
       // default for it (1, or 0 if it's already fully claimed by other
       // lines) rather than carrying over a quantity that made sense for
       // the previous stock item.
       quantity: available > 0 ? 1 : 0,
-      // Purity, GST Rate (the Product's Metal row) and Making Charge — the
-      // stock row's own value first, then the Product's, then (GST only)
-      // the document's default. See stockCatalogFields.
-      ...stockCatalogFields(stock, gstRateId),
-      stockLinkDecided: true,
-      // A multi-metal / multi-stone piece brings its rows; their physical
-      // facts are locked, rates start from today's selling prices.
-      ...(stock.components?.length
-        ? {
-            multiPart: true,
-            components: fromStoredComponents(stock.components).map((row) =>
-              row.kind === "METAL"
-                ? { ...row, rate: metalById.get(row.metalTypeId)?.sellingPrice ?? row.rate }
-                : {
-                    ...row,
-                    rate: metalByName.get(row.stoneMetalTypeName.toLowerCase())?.sellingPrice ?? row.rate,
-                    amountTouched: false,
-                  },
-            ),
-          }
-        : { multiPart: false, components: [] }),
     })
     for (const component of stock.components ?? []) {
       if (component.metalTypeId) ensureMetalPurities(component.metalTypeId)
@@ -917,53 +941,11 @@ export function InvoiceForm({
           return prev
         }
 
-        // Already stored in the metal's own configured primary unit — this
-        // just picks which unit the toggle starts on, not a value conversion.
-        const linkedUnit = metalById.get(stock.metalType?.id ?? "")?.primaryUnit ?? "GRAM"
-
         const scanned: LineItem = {
           ...emptyLineItem(gstRateId),
           inventoryStockId: stock.id,
-          stockLinkDecided: true,
-          itemName: stock.productName,
-          metalTypeId: stock.metalType?.id ?? "",
-          purity: stock.purity ?? "",
-          grossWeight: stock.grossWeight ?? 0,
-          grossWeightUnit: linkedUnit,
-          netWeight: stock.netWeight ?? 0,
-          netWeightUnit: linkedUnit,
-          dmoWeightUnit: linkedUnit,
-          stoneWeightInput: stock.stoneWeight ?? 0,
-          stoneWeightUnit: linkedUnit,
-          // See applyStockToItem's identical comment above.
-          rate: stockSellingRate(stock),
-          hsnCode: stock.hsnCode ?? "",
-          caratWeight: stock.caratWeight ?? 0,
-          stoneRate:
-            stock.stoneRate ??
-            metalByName.get((stock.stoneMetalTypeName ?? "").toLowerCase())?.sellingPrice ??
-            0,
-          hasStoneComponent: stockHasStone(stock),
-          stoneCharge: stock.stoneRate != null && stock.caratWeight != null
-            ? Number((stock.stoneRate * stock.caratWeight).toFixed(2))
-            : 0,
-          stoneChargeTouched: false,
-          // See applyStockToItem's identical comment above — only lock the
-          // auto-fill when this stock row actually has a stone weight worth
-          // protecting.
-          netStoneWeightTouched: stock.stoneWeight != null && Number(stock.stoneWeight) > 0,
-          stoneMetalTypeName: stock.stoneMetalTypeName ?? "",
-          stoneTypeNames: stock.stoneTypeNames
-            ? stock.stoneTypeNames.split(",").map((name) => name.trim()).filter(Boolean)
-            : [],
-          // Same reasoning as applyStockToItem — carry over the stock
-          // item's own recorded making charge instead of resetting to 0.
-          ...stockCatalogFields(stock, gstRateId),
-          // Same reasoning as applyStockToItem — InventoryStock has no
-          // hmCharge of its own, so this is left untouched.
-          hmCharge: isHallmarkablePurity(stock.purity) ? hallmarkChargePerPiece : 0,
-          hmChargeTouched: false,
-          netTouched: true,
+          // Same fields as picking it from the dropdown — see linkedStockFields.
+          ...linkedStockFields(stock),
         }
 
         touchedKey = scanned.key
@@ -981,6 +963,10 @@ export function InvoiceForm({
         return
       }
 
+      for (const component of stock.components ?? []) {
+        if (component.metalTypeId) ensureMetalPurities(component.metalTypeId)
+      }
+
       if (touchedKey) {
         const key = touchedKey
         setExpandedKeys((prev) => new Set(prev).add(key))
@@ -994,7 +980,7 @@ export function InvoiceForm({
     // document's CURRENT default rather than whatever was default when
     // this callback was first created.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [stockItems, gstRateId],
+    [stockItems, gstRateId, metals, origins, fineRates],
   )
 
   // Rows that actually hold something. The form always keeps one blank line
@@ -1224,13 +1210,6 @@ export function InvoiceForm({
     updateItem(item.key, patch)
   }
 
-  // Stone components are tracked by name (stoneMetalTypeName), not id — no
-  // stoneMetalTypeId field exists — so the stone-rate fallback needs its
-  // own name-keyed lookup instead of reusing metalById.
-  const metalByName = useMemo(
-    () => new Map(metals.map((m) => [m.name.toLowerCase(), m])),
-    [metals],
-  )
   const primaryUnitFor = (item: LineItem) => metalById.get(item.metalTypeId)?.primaryUnit ?? "GRAM"
 
   // Whether this line's Carat Weight field should show/convert: an explicit
@@ -2009,6 +1988,12 @@ export function InvoiceForm({
                   netStoneWeightTouched={item.netStoneWeightTouched}
                   lockPhysicalFields={isLinked}
                 />
+                {isLinked && (
+                  <StoneExtras
+                    row={stockItems.find((s) => s.id === item.inventoryStockId)?.linkedStone ?? {}}
+                    testId="sale-linked-stone-extras"
+                  />
+                )}
               </div>
             )
             const linkedStock = isLinked ? stockItems.find((s) => s.id === item.inventoryStockId) : undefined

@@ -14,6 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
+import { getLocationScope, locationWhere, type LocationScope } from "@/lib/location-scope";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { getReturnEligibility, type ReturnEligibility } from "@/lib/return-window";
@@ -214,8 +215,9 @@ const CREDIT_NOTE_INCLUDE = {
 
 export async function getCreditNoteById(id: string): Promise<CreditNoteView | null> {
   const storeId = await getStoreIdForRead();
+  const scope = await getLocationScope();
   const creditNote = await prisma.creditNote.findFirst({
-    where: { id, storeId },
+    where: { id, storeId, ...locationWhere(scope) },
     include: CREDIT_NOTE_INCLUDE,
   });
   if (!creditNote) return null;
@@ -225,8 +227,9 @@ export async function getCreditNoteById(id: string): Promise<CreditNoteView | nu
 /** Every credit note raised against one invoice — shown on the invoice detail page. */
 export async function getCreditNotesForInvoice(invoiceId: string): Promise<CreditNoteView[]> {
   const storeId = await getStoreIdForRead();
+  const scope = await getLocationScope();
   const creditNotes = await prisma.creditNote.findMany({
-    where: { invoiceId, storeId },
+    where: { invoiceId, storeId, ...locationWhere(scope) },
     orderBy: { creditNoteDate: "desc" },
     include: CREDIT_NOTE_INCLUDE,
   });
@@ -266,13 +269,24 @@ type ExportCreditNotesParams = {
   format?: "csv" | "xlsx" | "pdf";
 };
 
-function getCreditNoteWhere(storeId: string, search?: string, dateFrom?: string, dateTo?: string) {
+/**
+ * Store + location scoped, like buildInvoiceQuery — a location-restricted
+ * Staff user only sees credit notes filed against their own locations.
+ */
+function getCreditNoteWhere(
+  storeId: string,
+  scope: LocationScope,
+  search?: string,
+  dateFrom?: string,
+  dateTo?: string,
+) {
   const query = String(search || "").trim();
   const from = parseDateRangeBoundary(dateFrom, false);
   const to = parseDateRangeBoundary(dateTo, true);
 
   return {
     storeId,
+    ...locationWhere(scope),
     ...(from || to
       ? { creditNoteDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
       : {}),
@@ -302,7 +316,8 @@ export async function getCreditNotes(params: GetCreditNotesParams = {}): Promise
   const sortOrder = params.sortOrder || "desc";
 
   const storeId = await requireStoreScope();
-  const where = getCreditNoteWhere(storeId, params.search, params.dateFrom, params.dateTo);
+  const scope = await getLocationScope();
+  const where = getCreditNoteWhere(storeId, scope, params.search, params.dateFrom, params.dateTo);
   const orderBy = getCreditNoteOrderBy(sortBy, sortOrder);
 
   const [totalCount, creditNotes] = await Promise.all([
@@ -332,9 +347,10 @@ async function getAllCreditNotesForExport(params: ExportCreditNotesParams = {}):
   const sortOrder = params.sortOrder || "desc";
 
   const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
   const where = params.selectedIds?.length
-    ? { id: { in: params.selectedIds }, storeId }
-    : getCreditNoteWhere(storeId, params.search, params.dateFrom, params.dateTo);
+    ? { id: { in: params.selectedIds }, storeId, ...locationWhere(scope) }
+    : getCreditNoteWhere(storeId, scope, params.search, params.dateFrom, params.dateTo);
   const orderBy = getCreditNoteOrderBy(sortBy, sortOrder);
 
   const creditNotes = await prisma.creditNote.findMany({ where, orderBy, include: CREDIT_NOTE_INCLUDE });

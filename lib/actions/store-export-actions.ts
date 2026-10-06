@@ -28,13 +28,14 @@ function pad(value: number) {
  * are also left out — they describe a Super Admin's platform-level access
  * to this store, not anything the store itself produced.
  *
- * Modeled directly on forceDeleteStore's own manual model list (same file
- * area, lib/actions/store-actions.ts) — that function is the
- * already-audited source of truth for "every table a Store row owns", kept
- * current because a missing entry there throws a loud FK error on delete.
- * A table with no direct storeId column is read through its owning
- * relation instead (e.g. invoiceItems via invoice.storeId), matching how
- * forceDeleteStore itself reaches those same tables.
+ * The list was audited model-by-model against prisma/schema.prisma
+ * (2026-10-06): every model with a storeId, plus every model reachable only
+ * through a store-owned parent (line items, PieceComponent, product
+ * components, metal purities, category↔metal links, voucher rows). It is NOT
+ * the same as forceDeleteStore's list — that one can skip tables the DB
+ * cascades away, this one can't. When you add a store-scoped model, add it
+ * here too. A table with no direct storeId column is read through its owning
+ * relation (e.g. invoiceItems via invoice.storeId).
  */
 export async function exportStoreData(storeId: string): Promise<StoreExportResult> {
   try {
@@ -45,17 +46,32 @@ export async function exportStoreData(storeId: string): Promise<StoreExportResul
       return { success: false, message: "Store not found" };
     }
 
+    // A user belongs to this store by their default storeId OR by a
+    // UserStoreMembership row (staff invited from another store keep their
+    // own default storeId).
+    const storeUserWhere = {
+      OR: [{ storeId }, { storeMemberships: { some: { storeId } } }],
+    };
+
     const [
       users,
       apiKeys,
       inviteTokens,
       employees,
+      userStoreMemberships,
+      userLocationAccess,
       storeLocations,
       storeMetals,
       storeMetalOrigins,
+      storeMetalPurities,
       storeCategories,
       storeCategoryTypes,
+      storeCategoryMetals,
+      storeStyles,
+      storeStoneClarities,
       businessSettings,
+      storeBrandings,
+      reportSettings,
       metalRates,
       sellingRateEntries,
       metalSellingRates,
@@ -67,6 +83,8 @@ export async function exportStoreData(storeId: string): Promise<StoreExportResul
       karigars,
       karigarMetals,
       products,
+      productMetalComponents,
+      productStoneComponents,
       inventoryStocks,
       inventoryTransactions,
       invoices,
@@ -90,17 +108,28 @@ export async function exportStoreData(storeId: string): Promise<StoreExportResul
       supportTickets,
       supportTicketMessages,
       storePlanHistory,
+      pieceComponents,
+      promotions,
+      promotionVouchers,
     ] = await Promise.all([
-      prisma.user.findMany({ where: { storeId } }),
+      prisma.user.findMany({ where: storeUserWhere }),
       prisma.apiKey.findMany({ where: { storeId }, omit: { keyHash: true } }),
       prisma.inviteToken.findMany({ where: { storeId }, omit: { tokenHash: true } }),
-      prisma.employee.findMany({ where: { user: { storeId } } }),
+      prisma.employee.findMany({ where: { user: storeUserWhere } }),
+      prisma.userStoreMembership.findMany({ where: { storeId } }),
+      prisma.userLocationAccess.findMany({ where: { location: { storeId } } }),
       prisma.storeLocation.findMany({ where: { storeId } }),
       prisma.storeMetal.findMany({ where: { storeId } }),
       prisma.storeMetalOrigin.findMany({ where: { storeId } }),
+      prisma.storeMetalPurity.findMany({ where: { storeMetal: { storeId } } }),
       prisma.storeCategory.findMany({ where: { storeId } }),
       prisma.storeCategoryType.findMany({ where: { storeId } }),
+      prisma.storeCategoryMetal.findMany({ where: { storeCategory: { storeId } } }),
+      prisma.storeStyle.findMany({ where: { storeId } }),
+      prisma.storeStoneClarity.findMany({ where: { storeId } }),
       prisma.businessSettings.findMany({ where: { storeId } }),
+      prisma.storeBranding.findMany({ where: { storeId } }),
+      prisma.reportSettings.findMany({ where: { storeId } }),
       prisma.metalRate.findMany({ where: { storeId } }),
       prisma.sellingRateEntry.findMany({ where: { storeId } }),
       prisma.metalSellingRate.findMany({ where: { storeId } }),
@@ -112,6 +141,8 @@ export async function exportStoreData(storeId: string): Promise<StoreExportResul
       prisma.karigar.findMany({ where: { storeId } }),
       prisma.karigarMetal.findMany({ where: { karigar: { storeId } } }),
       prisma.product.findMany({ where: { storeId } }),
+      prisma.productMetalComponent.findMany({ where: { product: { storeId } } }),
+      prisma.productStoneComponent.findMany({ where: { product: { storeId } } }),
       prisma.inventoryStock.findMany({ where: { storeId } }),
       prisma.inventoryTransaction.findMany({ where: { inventoryStock: { storeId } } }),
       prisma.invoice.findMany({ where: { storeId } }),
@@ -135,6 +166,21 @@ export async function exportStoreData(storeId: string): Promise<StoreExportResul
       prisma.supportTicket.findMany({ where: { storeId } }),
       prisma.supportTicketMessage.findMany({ where: { ticket: { storeId } } }),
       prisma.storePlanHistory.findMany({ where: { storeId } }),
+      // PieceComponent has no storeId and up to five optional parents —
+      // reached through whichever one it hangs off.
+      prisma.pieceComponent.findMany({
+        where: {
+          OR: [
+            { invoiceItem: { invoice: { storeId } } },
+            { purchaseItem: { purchase: { storeId } } },
+            { inventoryStock: { storeId } },
+            { kachaInvoiceItem: { kachaInvoice: { storeId } } },
+            { quotationItem: { quotation: { storeId } } },
+          ],
+        },
+      }),
+      prisma.promotion.findMany({ where: { storeId } }),
+      prisma.promotionVoucher.findMany({ where: { promotion: { storeId } } }),
     ]);
 
     const payload = {
@@ -144,12 +190,20 @@ export async function exportStoreData(storeId: string): Promise<StoreExportResul
       apiKeys,
       inviteTokens,
       employees,
+      userStoreMemberships,
+      userLocationAccess,
       storeLocations,
       storeMetals,
       storeMetalOrigins,
+      storeMetalPurities,
       storeCategories,
       storeCategoryTypes,
+      storeCategoryMetals,
+      storeStyles,
+      storeStoneClarities,
       businessSettings,
+      storeBrandings,
+      reportSettings,
       metalRates,
       sellingRateEntries,
       metalSellingRates,
@@ -161,6 +215,8 @@ export async function exportStoreData(storeId: string): Promise<StoreExportResul
       karigars,
       karigarMetals,
       products,
+      productMetalComponents,
+      productStoneComponents,
       inventoryStocks,
       inventoryTransactions,
       invoices,
@@ -184,6 +240,9 @@ export async function exportStoreData(storeId: string): Promise<StoreExportResul
       supportTickets,
       supportTicketMessages,
       storePlanHistory,
+      pieceComponents,
+      promotions,
+      promotionVouchers,
     };
 
     const json = JSON.stringify(

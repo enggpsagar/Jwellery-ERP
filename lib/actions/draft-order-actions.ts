@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getCurrentUser } from "@/lib/auth/auth";
-import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
+import { getLocationScope, isLocationAllowed, locationWhere, type LocationScope } from "@/lib/location-scope";
 import { toFineWeight } from "@/lib/purity";
 import { getFinenessMap } from "@/lib/purity-db";
 import { buildExcelExport, buildCsvExportBase64, buildPdfExportBase64 } from "@/lib/excel-export";
@@ -150,8 +150,10 @@ export type DraftOrdersListResponse = {
   };
 };
 
+/** Store + location scoped, like buildInvoiceQuery. */
 function getDraftOrdersWhere(
   storeId: string,
+  scope: LocationScope,
   search?: string,
   status?: string,
   dateFrom?: string,
@@ -163,6 +165,7 @@ function getDraftOrdersWhere(
 
   return {
     storeId,
+    ...locationWhere(scope),
     ...(status ? { status } : {}),
     ...(from || to ? { orderDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(query
@@ -198,7 +201,8 @@ export async function getDraftOrders(
   const sortBy: DraftOrderSortBy = params.sortBy || "orderDate";
   const sortOrder: SortOrder = params.sortOrder || "desc";
 
-  const where = getDraftOrdersWhere(storeId, params.search, params.status, params.dateFrom, params.dateTo);
+  const scope = await getLocationScope();
+  const where = getDraftOrdersWhere(storeId, scope, params.search, params.status, params.dateFrom, params.dateTo);
   const orderBy = getDraftOrdersOrderBy(sortBy, sortOrder);
 
   const [totalCount, orders] = await Promise.all([
@@ -246,11 +250,13 @@ export async function exportDraftOrdersToExcel(params: ExportDraftOrdersParams =
 }> {
   try {
     const storeId = await requireStoreScope();
+    const scope = await getLocationScope();
 
     const where = params.selectedIds?.length
-      ? { id: { in: params.selectedIds }, storeId }
+      ? { id: { in: params.selectedIds }, storeId, ...locationWhere(scope) }
       : getDraftOrdersWhere(
           storeId,
+          scope,
           params.search,
           params.status,
           params.dateFrom,
@@ -307,7 +313,7 @@ export async function deleteDraftOrder(orderId: string): Promise<DraftOrderFormS
     const storeId = await requireStoreScope();
 
     const order = await prisma.draftOrder.findFirst({
-      where: { id: orderId, storeId },
+      where: { id: orderId, storeId, ...locationWhere(await getLocationScope()) },
       select: { id: true, orderNumber: true, status: true },
     });
     if (!order) return { success: false, message: "Order not found" };
@@ -379,9 +385,10 @@ export type DraftOrderDetail = DraftOrderRow & {
 
 export async function getDraftOrderById(id: string): Promise<DraftOrderDetail | null> {
   const storeId = await getStoreIdForRead();
+  const scope = await getLocationScope();
 
   const order = await prisma.draftOrder.findFirst({
-    where: { id, storeId },
+    where: { id, storeId, ...locationWhere(scope) },
     include: {
       customer: { select: { id: true, name: true, phone: true } },
       karigarJob: { select: { id: true, jobNumber: true, karigarId: true, karigar: { select: { name: true } } } },
@@ -615,7 +622,7 @@ export async function cancelDraftOrder(orderId: string): Promise<DraftOrderFormS
     const storeId = await requireStoreScope();
 
     const order = await prisma.draftOrder.findFirst({
-      where: { id: orderId, storeId },
+      where: { id: orderId, storeId, ...locationWhere(await getLocationScope()) },
       select: { id: true, status: true },
     });
     if (!order) return { success: false, message: "Order not found" };
@@ -656,7 +663,7 @@ export async function updateDraftOrder(
     const storeId = await requireStoreScope();
 
     const order = await prisma.draftOrder.findFirst({
-      where: { id: orderId, storeId },
+      where: { id: orderId, storeId, ...locationWhere(await getLocationScope()) },
       select: { id: true, status: true },
     });
     if (!order) return { success: false, message: "Order not found" };
@@ -714,7 +721,7 @@ export async function sendDraftOrderToKarigar(
     }
 
     const order = await prisma.draftOrder.findFirst({
-      where: { id: orderId, storeId },
+      where: { id: orderId, storeId, ...locationWhere(await getLocationScope()) },
       include: { items: true },
     });
     if (!order) return { success: false, message: "Order not found" };

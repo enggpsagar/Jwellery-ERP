@@ -44,13 +44,19 @@ export const PRODUCT_SHEET_COLUMNS: ProductSheetColumn[] = [
     example: "",
   },
   // Metals
-  { header: "Purity", required: "No", help: "Pick from the dropdown (e.g. Gold 22K).", example: "Gold 22K" },
+  {
+    header: "Purity",
+    required: "No",
+    help: "One of this metal's purities from Settings › Purity (see the dropdown, e.g. 22K). Older generic labels like \"Gold 22K\" are also accepted.",
+    example: "22K",
+  },
   { header: "Gross Weight", required: "Yes", help: "Typical gross weight of the design, in grams.", example: 8.5 },
+  { header: "Metal GST Rate", required: "No", help: "GST rate for the metal, by its name in Settings › GST Rates (see the dropdown).", example: "" },
   // Stone Pricing
   {
     header: "Has Stone Component",
     required: "No (default No)",
-    help: "Yes for a metal piece with an embedded stone. The Stone, Stone Types and Stone Rate columns are only saved when this is Yes.",
+    help: "Yes for a metal piece with an embedded stone. The stone columns (Stone through Stone GST Rate) are only saved when this is Yes and a Stone is given.",
     example: "No",
   },
   { header: "Stone Metal Type Name", required: "No", help: "The embedded stone, e.g. Diamond (see the dropdown).", example: "" },
@@ -64,6 +70,10 @@ export const PRODUCT_SHEET_COLUMNS: ProductSheetColumn[] = [
   { header: "Stone Rate", required: "No", help: "Price per carat (₹/ct).", example: "" },
   { header: "Stone Charge", required: "No", help: "Stone charge amount (₹), or a percentage if Stone Charge Type is Percentage.", example: "" },
   { header: "Stone Charge Type", required: "No (default Fixed)", help: "Fixed or Percentage.", example: "Fixed" },
+  { header: "Stone Pcs", required: "No", help: "Number of stones (whole number).", example: "" },
+  { header: "Stone Clarity", required: "No", help: "Clarity grade, e.g. FG/VVS-VS (see the dropdown for your list).", example: "" },
+  { header: "IGI Certificate No.", required: "No", help: "Stone certificate number.", example: "" },
+  { header: "Stone GST Rate", required: "No", help: "GST rate for the stone, by its name in Settings › GST Rates (see the dropdown).", example: "" },
   { header: "Stone Weight", required: "No", help: "Stone weight in grams.", example: "" },
   { header: "Net Weight", required: "Yes", help: "Typical net weight of the design, in grams.", example: 8.2 },
   // Charges

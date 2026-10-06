@@ -28,18 +28,43 @@ test("finish: product import, stock import, both exports", async ({ page }) => {
   // Import requires a Style; the demo store may not have one.
   const existingStyle = await db().storeStyle.findFirst({ where: { storeId, isActive: true } })
   const style = existingStyle ?? (await db().storeStyle.create({ data: { storeId, name: "Finish IO Style" } }))
-  // Product import with Finish = Finished and a stock quantity.
+  // Masters the stone/metal columns refer to (created if the demo store lacks them).
+  const gold = await db().storeMetal.findFirstOrThrow({ where: { storeId, name: "Gold" } })
+  const existingPurity = await db().storeMetalPurity.findFirst({ where: { storeId, storeMetalId: gold.id, isActive: true } })
+  const purity = existingPurity ?? (await db().storeMetalPurity.create({ data: { storeId, storeMetalId: gold.id, label: "22K", skuCode: "22", finenessPercent: 91.6 } }))
+  const existingGst = await db().gstRate.findFirst({ where: { storeId, isActive: true } })
+  const gst = existingGst ?? (await db().gstRate.create({ data: { storeId, name: "GST 3%", ratePercent: 3 } }))
+
+  // Product import with Finish = Finished, a stock quantity, and a stone
+  // with every field the Add Product form has.
   await page.goto("/inventory/products")
   await page.getByRole("button", { name: "Import from Excel" }).click()
   await page.locator("#product-import-file").setInputFiles(sheet([{
     "Product Name": name, Category: "Ornament", "Category Type": "Ring", "Metal Type": "Gold", ...(style ? { Style: style.name } : {}),
     "Gross Weight": 2, "Net Weight": 2, Finish: "Finished", "Stock Quantity": 1,
+    Purity: purity.label, "Metal GST Rate": gst.name,
+    "Has Stone Component": "Yes", "Stone Metal Type Name": "Diamond", "Stone Type Names": "Natural",
+    "Carat Weight": 0.25, "Stone Rate": 50000, "Stone Pcs": 6, "Stone Clarity": "VVS", "IGI Certificate No.": "IGI-12345", "Stone GST Rate": gst.name,
   }], "test-results/finish-products.xlsx"))
   await page.getByRole("button", { name: "Import", exact: true }).click()
   await expect.poll(async () => (await db().product.findFirst({ where: { storeId, name } }))?.defaultFinish ?? null, { timeout: 15000 })
     .toBe("PAKKA")
   const product = await db().product.findFirstOrThrow({ where: { storeId, name }, include: { stockItems: true } })
   expect(product.stockItems.map((s) => s.finish)).toEqual(["PAKKA"])
+  expect(product.storeMetalPurityId).toBe(purity.id)
+  const stoneOf = async (productId: string) => {
+    const [metal] = await db().productMetalComponent.findMany({ where: { productId } })
+    const [stone] = await db().productStoneComponent.findMany({ where: { productId } })
+    return {
+      metal: metal && { metalTypeId: metal.metalTypeId, purity: metal.storeMetalPurityId, gst: metal.gstRateId },
+      stone: stone && { name: stone.stoneMetalTypeName, types: stone.stoneTypeNames, carat: Number(stone.caratWeight), rate: Number(stone.stoneRate), pcs: stone.pieces, clarity: stone.clarity, igi: stone.certificateNumber, gst: stone.gstRateId },
+    }
+  }
+  const imported = await stoneOf(product.id)
+  expect(imported).toEqual({
+    metal: { metalTypeId: gold.id, purity: purity.id, gst: gst.id },
+    stone: { name: "Diamond", types: "Natural", carat: 0.25, rate: 50000, pcs: 6, clarity: "VVS", igi: "IGI-12345", gst: gst.id },
+  })
 
   // Stock import: a blank Finish inherits the product's, a filled one overrides it.
   await page.goto("/inventory/stock")
@@ -85,9 +110,13 @@ test("finish: product import, stock import, both exports", async ({ page }) => {
   const copy = await db().product.findFirstOrThrow({ where: { storeId, name: copyName } })
   const fields = ["metalTypeId", "categoryId", "categoryTypeId", "targetStyleId", "defaultGrossWeight", "defaultNetWeight", "isActive", "hsnCode"] as const
   for (const field of fields) expect(String(copy[field]), field).toBe(String(product[field]))
+  expect(copy.storeMetalPurityId).toBe(purity.id)
+  expect(await stoneOf(copy.id)).toEqual(imported)
 
   await db().product.delete({ where: { id: copy.id } })
   await db().inventoryStock.deleteMany({ where: { productId: product.id } })
   await db().product.delete({ where: { id: product.id } })
   if (!existingStyle) await db().storeStyle.delete({ where: { id: style.id } })
+  if (!existingPurity) await db().storeMetalPurity.delete({ where: { id: purity.id } })
+  if (!existingGst) await db().gstRate.delete({ where: { id: gst.id } })
 })

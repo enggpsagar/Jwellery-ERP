@@ -689,10 +689,22 @@ async function getAllProductsForExport(params: ExportProductsParams = {}) {
   const rows = await prisma.product.findMany({
     where,
     orderBy: getProductOrderBy(sortBy, sortOrder),
-    include: PRODUCT_RELATIONS,
+    include: {
+      ...PRODUCT_RELATIONS,
+      // The per-metal / per-stone rows the form saves — the export reads
+      // purity, GST rates and stone Pcs/Clarity/IGI No. from these.
+      storeMetalPurity: { select: { label: true } },
+      metalComponents: { orderBy: { sortOrder: "asc" }, take: 1, select: { gstRate: { select: { name: true } } } },
+      stoneComponents: { orderBy: { sortOrder: "asc" }, include: { gstRate: { select: { name: true } } } },
+    },
   });
 
-  return rows.map(mapProductRow);
+  return rows.map((row) => ({
+    ...mapProductRow(row),
+    purityLabel: row.storeMetalPurity?.label ?? null,
+    metalGstRate: row.metalComponents[0]?.gstRate?.name ?? null,
+    stones: row.stoneComponents,
+  }));
 }
 
 export async function exportProductsToExcel(
@@ -721,6 +733,9 @@ export async function exportProductsToExcel(
       value === null || value === undefined || value === "-" ? "" : value;
     const chargeType = (value: ChargeType) => (value === ChargeType.PERCENTAGE ? "Percentage" : "Fixed");
     const rows = products.map((product) => {
+      // One stone per sheet row: the first stone row when the product has
+      // them (the form's own records), else the older single-stone fields.
+      const stone = product.stones[0];
       const values: Record<string, unknown> = {
         "Product Code": product.productCode,
         "Product Name": product.name,
@@ -729,16 +744,21 @@ export async function exportProductsToExcel(
         "Category Type": blank(product.ornamentType),
         Style: blank(product.targetStyle?.name),
         "Stone Type": blank(product.stoneType),
-        Purity: product.defaultPurity ? PURITY_LABELS[product.defaultPurity] : "",
+        Purity: product.purityLabel ?? (product.defaultPurity ? PURITY_LABELS[product.defaultPurity] : ""),
         "Gross Weight": blank(product.defaultGrossWeight),
-        "Has Stone Component": product.hasStoneComponent ? "Yes" : "No",
-        "Stone Metal Type Name": blank(product.defaultStoneMetalTypeName),
-        "Stone Type Names": blank(product.defaultStoneTypeNames),
-        "Carat Weight": blank(product.defaultCaratWeight),
-        "Stone Rate": blank(product.defaultStoneRate),
-        "Stone Charge": blank(product.defaultStoneCharge),
-        "Stone Charge Type": chargeType(product.defaultStoneChargeType),
-        "Stone Weight": blank(product.defaultStoneWeight),
+        "Metal GST Rate": blank(product.metalGstRate),
+        "Has Stone Component": product.hasStoneComponent || stone ? "Yes" : "No",
+        "Stone Metal Type Name": blank(stone ? stone.stoneMetalTypeName : product.defaultStoneMetalTypeName),
+        "Stone Type Names": blank(stone ? stone.stoneTypeNames : product.defaultStoneTypeNames),
+        "Carat Weight": blank(stone ? (stone.caratWeight == null ? null : Number(stone.caratWeight)) : product.defaultCaratWeight),
+        "Stone Rate": blank(stone ? (stone.stoneRate == null ? null : Number(stone.stoneRate)) : product.defaultStoneRate),
+        "Stone Charge": blank(stone ? (stone.stoneCharge == null ? null : Number(stone.stoneCharge)) : product.defaultStoneCharge),
+        "Stone Charge Type": chargeType(stone ? stone.stoneChargeType : product.defaultStoneChargeType),
+        "Stone Pcs": blank(stone?.pieces),
+        "Stone Clarity": blank(stone?.clarity),
+        "IGI Certificate No.": blank(stone?.certificateNumber),
+        "Stone GST Rate": blank(stone?.gstRate?.name),
+        "Stone Weight": blank(stone ? (stone.stoneWeight == null ? null : Number(stone.stoneWeight)) : product.defaultStoneWeight),
         "Net Weight": blank(product.defaultNetWeight),
         "Making Charge": blank(product.defaultMakingCharge),
         "Making Charge Type": chargeType(product.defaultMakingChargeType),
@@ -1878,13 +1898,16 @@ const PRODUCT_SHEET_NOTES = [
 
 /** The template/export dropdown lists, from this store's own masters. */
 async function loadProductSheetDropdowns(storeId: string): Promise<Record<string, string[]>> {
-  const [metals, categories, categoryTypes, styles, origins, locations] = await Promise.all([
+  const [metals, categories, categoryTypes, styles, origins, locations, purities, gstRates, clarities] = await Promise.all([
     prisma.storeMetal.findMany({ where: { storeId, isActive: true }, select: { name: true, isGemstone: true }, orderBy: { name: "asc" } }),
     prisma.storeCategory.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
     prisma.storeCategoryType.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
     prisma.storeStyle.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
     prisma.storeMetalOrigin.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
     prisma.storeLocation.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
+    prisma.storeMetalPurity.findMany({ where: { storeId, isActive: true }, select: { label: true }, orderBy: [{ storeMetalId: "asc" }, { sortOrder: "asc" }] }),
+    prisma.gstRate.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
+    prisma.storeStoneClarity.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
   ]);
   const names = (rows: { name: string }[]) => rows.map((row) => row.name);
   const yesNo = ["Yes", "No"];
@@ -1896,11 +1919,14 @@ async function loadProductSheetDropdowns(storeId: string): Promise<Record<string
     "Category Type": names(categoryTypes),
     Style: names(styles),
     "Stone Type": names(origins),
-    Purity: Object.values(PURITY_LABELS),
+    Purity: purities.map((purity) => purity.label),
+    "Metal GST Rate": names(gstRates),
     "Has Stone Component": yesNo,
     "Stone Metal Type Name": names(metals.filter((metal) => metal.isGemstone)),
     "Stone Type Names": names(origins),
     "Stone Charge Type": chargeTypes,
+    "Stone Clarity": names(clarities),
+    "Stone GST Rate": names(gstRates),
     "Making Charge Type": chargeTypes,
     Active: yesNo,
     Finish: ["Unfinished", "Finished / Hallmarked"],
@@ -1980,9 +2006,9 @@ export async function importProductsFromExcel(
       return { success: false, message: "That file has no rows to import." };
     }
 
-    const [categories, metals, categoryTypes, metalOrigins, locations, styles, businessSettings] = await Promise.all([
+    const [categories, metals, categoryTypes, metalOrigins, locations, styles, businessSettings, storePurities, gstRates] = await Promise.all([
       prisma.storeCategory.findMany({ where: { storeId }, select: { id: true, name: true } }),
-      prisma.storeMetal.findMany({ where: { storeId }, select: { id: true, name: true } }),
+      prisma.storeMetal.findMany({ where: { storeId }, select: { id: true, name: true, isGemstone: true } }),
       prisma.storeCategoryType.findMany({
         where: { storeId },
         select: { id: true, name: true, categoryId: true },
@@ -1994,6 +2020,8 @@ export async function importProductsFromExcel(
       prisma.storeLocation.findMany({ where: { storeId }, select: { id: true, name: true } }),
       prisma.storeStyle.findMany({ where: { storeId }, select: { id: true, name: true } }),
       prisma.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true, styleFieldEnabled: true } }),
+      prisma.storeMetalPurity.findMany({ where: { storeId }, select: { id: true, label: true, skuCode: true, storeMetalId: true } }),
+      prisma.gstRate.findMany({ where: { storeId }, select: { id: true, name: true } }),
     ]);
 
     const categoryByName = new Map(categories.map((c) => [c.name.trim().toLowerCase(), c]));
@@ -2018,6 +2046,23 @@ export async function importProductsFromExcel(
       metalOriginsByMetal.get(origin.storeMetalId)!.set(origin.name.trim().toLowerCase(), origin);
     }
 
+    // The store's own purities (Settings › Purity), per metal — what the Add
+    // Product form offers. The generic labels below stay accepted for older
+    // sheets.
+    const storePuritiesByMetal = new Map<string, Map<string, (typeof storePurities)[number]>>();
+    for (const purity of storePurities) {
+      if (!storePuritiesByMetal.has(purity.storeMetalId)) storePuritiesByMetal.set(purity.storeMetalId, new Map());
+      storePuritiesByMetal.get(purity.storeMetalId)!.set(purity.label.trim().toLowerCase(), purity);
+    }
+    const gstRateByName = new Map(gstRates.map((rate) => [rate.name.trim().toLowerCase(), rate]));
+    const gstRateCell = (row: Record<string, unknown>, column: string, rowErrors: string[]) => {
+      const raw = productImportCell(row, column);
+      if (!raw) return null;
+      const rate = gstRateByName.get(raw.toLowerCase());
+      if (!rate) rowErrors.push(`No GST rate found named "${raw}" (${column})`);
+      return rate?.id ?? null;
+    };
+
     const purityByLabel = new Map(
       (Object.entries(PURITY_LABELS) as [PurityType, string][]).map(([value, label]) => [
         label.toLowerCase(),
@@ -2031,6 +2076,11 @@ export async function importProductsFromExcel(
        * too" checkbox — null means this row is product-only. */
       stockQuantity: number | null;
       stockLocationId: string | null;
+      /** Store purity label, carried onto the opening stock entry. */
+      purityLabel: string | null;
+      /** The per-metal / per-stone rows the Add Product form also saves. */
+      metalComponent: Omit<Prisma.ProductMetalComponentCreateManyInput, "productId"> | null;
+      stoneComponent: Omit<Prisma.ProductStoneComponentCreateManyInput, "productId"> | null;
     };
 
     const errors: string[] = [];
@@ -2082,13 +2132,30 @@ export async function importProductsFromExcel(
 
       const purityRaw = productImportCell(row, "Purity");
       let defaultPurity: PurityType | null = null;
+      let storePurity: (typeof storePurities)[number] | undefined;
       if (purityRaw) {
-        const matched = purityByLabel.get(purityRaw.toLowerCase());
-        if (!matched) {
-          rowErrors.push(`"${purityRaw}" is not a valid Purity — see the template's Purity column for valid values`);
+        storePurity = metal ? storePuritiesByMetal.get(metal.id)?.get(purityRaw.toLowerCase()) : undefined;
+        if (storePurity && metal) {
+          // Same best-effort legacy mapping createProduct does.
+          defaultPurity = matchLegacyPurityType(classifyPurityFamily(metal), storePurity.label);
         } else {
-          defaultPurity = matched;
+          const matched = purityByLabel.get(purityRaw.toLowerCase());
+          if (!matched) {
+            rowErrors.push(`"${purityRaw}" is not a purity of ${metal?.name ?? "this metal"} — see the Purity dropdown`);
+          } else {
+            defaultPurity = matched;
+          }
         }
+      }
+      const metalGstRateId = gstRateCell(row, "Metal GST Rate", rowErrors);
+      const stoneGstRateId = gstRateCell(row, "Stone GST Rate", rowErrors);
+
+      const rawPieces = productImportCell(row, "Stone Pcs");
+      let stonePieces: number | null = null;
+      if (rawPieces) {
+        const parsed = Number(rawPieces);
+        if (!Number.isInteger(parsed) || parsed < 0) rowErrors.push("Stone Pcs must be a whole number");
+        else stonePieces = parsed;
       }
 
       const makingChargeTypeRaw = productImportCell(row, "Making Charge Type");
@@ -2201,16 +2268,46 @@ export async function importProductsFromExcel(
       const skuPrefix = buildSkuPrefix({
         metalName: resolvedMetal.name,
         purity: defaultPurity,
+        purityCode: storePurity?.skuCode,
         targetStyleName: resolvedStyle?.name ?? null,
         categoryTypeName: categoryType?.name ?? null,
         categoryName: resolvedCategory.name,
         format: businessSettings?.skuFormat,
       });
 
+      const stoneName = productImportCell(row, "Stone Metal Type Name");
       resolvedRows.push({
         skuPrefix,
         stockQuantity,
         stockLocationId,
+        purityLabel: storePurity?.label ?? null,
+        metalComponent: resolvedMetal.isGemstone
+          ? null
+          : {
+              metalTypeId: resolvedMetal.id,
+              storeMetalPurityId: storePurity?.id ?? null,
+              grossWeight: numericFields["Gross Weight"],
+              netWeight: numericFields["Net Weight"],
+              gstRateId: metalGstRateId,
+              sortOrder: 0,
+            },
+        stoneComponent:
+          hasStoneComponent && stoneName
+            ? {
+                stoneMetalTypeName: stoneName,
+                stoneTypeNames: productImportCell(row, "Stone Type Names") || null,
+                caratWeight: numericFields["Carat Weight"],
+                stoneWeight: numericFields["Stone Weight"],
+                stoneRate: numericFields["Stone Rate"],
+                stoneCharge: numericFields["Stone Charge"],
+                stoneChargeType: defaultStoneChargeType,
+                clarity: productImportCell(row, "Stone Clarity") || null,
+                certificateNumber: productImportCell(row, "IGI Certificate No.") || null,
+                pieces: stonePieces,
+                gstRateId: stoneGstRateId,
+                sortOrder: 0,
+              }
+            : null,
         fields: {
           name,
           categoryId: resolvedCategory.id,
@@ -2219,6 +2316,7 @@ export async function importProductsFromExcel(
           targetStyleId: resolvedStyle?.id ?? null,
           stoneOriginOptionId: stoneOrigin?.id ?? null,
           defaultPurity,
+          storeMetalPurityId: storePurity?.id ?? null,
           defaultMakingCharge: numericFields["Making Charge"],
           defaultMakingChargeType,
           defaultStoneCharge: numericFields["Stone Charge"],
@@ -2295,6 +2393,9 @@ export async function importProductsFromExcel(
     const toCreate: (Prisma.ProductCreateManyInput & {
       stockQuantity: number | null;
       stockLocationId: string | null;
+      purityLabel: string | null;
+      metalComponent: ResolvedRow["metalComponent"];
+      stoneComponent: ResolvedRow["stoneComponent"];
     })[] = resolvedRows.map((row) => {
       const nextSeq = (highestSeqByPrefix.get(row.skuPrefix) ?? 0) + 1;
       highestSeqByPrefix.set(row.skuPrefix, nextSeq);
@@ -2303,6 +2404,9 @@ export async function importProductsFromExcel(
         productCode: `${row.skuPrefix}-${String(nextSeq).padStart(3, "0")}`,
         stockQuantity: row.stockQuantity,
         stockLocationId: row.stockLocationId,
+        purityLabel: row.purityLabel,
+        metalComponent: row.metalComponent,
+        stoneComponent: row.stoneComponent,
         ...row.fields,
       };
     });
@@ -2313,10 +2417,21 @@ export async function importProductsFromExcel(
     // trusting the returned rows' order, which Prisma doesn't guarantee
     // matches the input array's order.
     const createdProducts = await prisma.product.createManyAndReturn({
-      data: toCreate.map(({ stockQuantity, stockLocationId, ...productData }) => productData),
+      data: toCreate.map(
+        ({ stockQuantity, stockLocationId, purityLabel, metalComponent, stoneComponent, ...productData }) => productData,
+      ),
       select: { id: true, productCode: true },
     });
     const productIdByCode = new Map(createdProducts.map((p) => [p.productCode, p.id]));
+
+    const metalComponentRows = toCreate.flatMap((row) =>
+      row.metalComponent ? [{ ...row.metalComponent, productId: productIdByCode.get(row.productCode)! }] : [],
+    );
+    const stoneComponentRows = toCreate.flatMap((row) =>
+      row.stoneComponent ? [{ ...row.stoneComponent, productId: productIdByCode.get(row.productCode)! }] : [],
+    );
+    if (metalComponentRows.length) await prisma.productMetalComponent.createMany({ data: metalComponentRows });
+    if (stoneComponentRows.length) await prisma.productStoneComponent.createMany({ data: stoneComponentRows });
 
     const rowsWantingStock = toCreate.filter((row) => row.stockQuantity !== null);
     let stockCreatedCount = 0;
@@ -2344,12 +2459,13 @@ export async function importProductsFromExcel(
           locationId: row.stockLocationId,
           metalTypeId: row.metalTypeId,
           purity: row.defaultPurity,
+          purityLabel: row.purityLabel,
           makingCharge: row.defaultMakingCharge,
           makingChargeType: row.defaultMakingChargeType,
           stoneCharge: row.defaultStoneCharge,
           grossWeight: row.defaultGrossWeight,
           netWeight: row.defaultNetWeight,
-          fineWeight: fineOf({ metalTypeId: row.metalTypeId, purity: row.defaultPurity, netWeight: row.defaultNetWeight == null ? null : Number(row.defaultNetWeight) }),
+          fineWeight: fineOf({ metalTypeId: row.metalTypeId, purity: row.defaultPurity, purityLabel: row.purityLabel, netWeight: row.defaultNetWeight == null ? null : Number(row.defaultNetWeight) }),
           stoneWeight: row.defaultStoneWeight,
           caratWeight: row.defaultCaratWeight,
           stoneRate: row.defaultStoneRate,

@@ -1853,32 +1853,42 @@ export async function getProductImportTemplate(): Promise<{
 }> {
   await requireStoreScope();
 
+  // Same order as the Add Product form, section by section, so a sheet
+  // reads like the form. The import matches columns by header name, not
+  // position, so older sheets in any order still import.
   const example = {
+    // Basic Information (Metal / Stone leads, as on the form)
     "Product Name": "Classic Gold Ring",
-    Category: "Ring",
     "Metal Type": "Gold",
-    Style: "Ladies",
+    Category: "Ring",
     "Category Type": "",
+    Style: "Ladies",
     "Stone Type": "",
+    // Metals
     Purity: "Gold 22K",
-    "Making Charge": 500,
-    "Making Charge Type": "Fixed",
-    "Stone Charge": "",
-    "Stone Charge Type": "Fixed",
-    Finish: "Unfinished",
     "Gross Weight": 8.5,
-    "Net Weight": 8.2,
-    "Stone Weight": "",
-    "Carat Weight": "",
+    // Stone Pricing
     "Has Stone Component": "No",
-    "Stone Rate": "",
     "Stone Metal Type Name": "",
     "Stone Type Names": "",
+    "Carat Weight": "",
+    "Stone Rate": "",
+    "Stone Charge": "",
+    "Stone Charge Type": "Fixed",
+    "Stone Weight": "",
+    "Net Weight": 8.2,
+    // Charges (not on the form; kept for imports that carry them)
+    "Making Charge": 500,
+    "Making Charge Type": "Fixed",
+    // Product Details
     "Design Code": "RG-001",
     "HSN Code": "7113",
+    Active: "Yes",
+    Finish: "Unfinished",
+    // Additional Information
     Description: "22K gold ladies ring",
     Notes: "",
-    Active: "Yes",
+    // Stock entry
     "Stock Quantity": "",
     Location: "",
   };

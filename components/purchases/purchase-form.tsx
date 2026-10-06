@@ -454,19 +454,29 @@ export function PurchaseForm({
 
   const selectedVendor = vendors.find((vendor) => vendor.id === vendorId)
 
+  // Success navigates from inside the action call, not from an effect on
+  // `state`: the save revalidates /purchases, and that refresh can suspend
+  // this form (the page wraps it in <Suspense fallback={null}>) and remount
+  // it with fresh state — the effect then never saw success and the user was
+  // left on a blank New Purchase page with the purchase already saved.
   const [state, formAction, pending] = useActionState(
-    editPurchaseId ? updatePurchase.bind(null, editPurchaseId) : createPurchase,
+    async (prev: typeof initialState, formData: FormData) => {
+      const result = editPurchaseId
+        ? await updatePurchase(editPurchaseId, prev, formData)
+        : await createPurchase(prev, formData)
+      if (result.success) {
+        toast.success(result.message || (editPurchaseId ? "Purchase updated" : "Purchase created"))
+        router.push(`/purchases/${editPurchaseId ?? result.purchaseId}`)
+      }
+      return result
+    },
     initialState,
   )
 
   useEffect(() => {
-    if (state.success) {
-      toast.success(state.message || (editPurchaseId ? "Purchase updated" : "Purchase created"))
-      router.push(`/purchases/${editPurchaseId ?? state.purchaseId}`)
-    } else if (!state.success && state.message) {
+    if (!state.success && state.message) {
       toast.error(state.message)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 
   /**

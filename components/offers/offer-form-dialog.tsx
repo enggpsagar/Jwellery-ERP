@@ -53,7 +53,21 @@ type OfferFormDialogProps = {
 export function OfferFormDialog({ open, onOpenChange, offer, categories, metals }: OfferFormDialogProps) {
   const router = useRouter()
   const toast = useToast()
-  const [state, formAction, pending] = useActionState(upsertPromotion, initialState)
+  // Success is handled inside the action call, not in an effect on `state`:
+  // the save revalidates the offers page, and if that refresh remounts this
+  // dialog the effect never sees success (no toast, dialog left open).
+  const [state, formAction, pending] = useActionState(
+    async (prev: PromotionFormState, formData: FormData) => {
+      const result = await upsertPromotion(prev, formData)
+      if (result.success) {
+        toast.success(result.message)
+        router.refresh()
+        onOpenChange(false)
+      }
+      return result
+    },
+    initialState,
+  )
 
   const [type, setType] = useState<OfferType>(offer?.type ?? "PERCENT_OFF")
   const [target, setTarget] = useState<OfferTarget>(offer?.target ?? "BILL")
@@ -66,13 +80,7 @@ export function OfferFormDialog({ open, onOpenChange, offer, categories, metals 
   const [metalTypeIds, setMetalTypeIds] = useState<string[]>(offer?.metalTypeIds ?? [])
 
   useEffect(() => {
-    if (state.success) {
-      toast.success(state.message)
-      router.refresh()
-      onOpenChange(false)
-    } else if (state.message) {
-      toast.error(state.message)
-    }
+    if (!state.success && state.message) toast.error(state.message)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 

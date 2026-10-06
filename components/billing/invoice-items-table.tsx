@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useEffect, useState } from "react"
+import { startTransition, useActionState, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Check, Pencil, X } from "lucide-react"
 
@@ -9,6 +9,7 @@ import { useToast } from "@/components/providers/toast-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { LineStoneDetails, PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { StoneDetailsInputs } from "@/components/shared/piece-components-editor"
 import type { StoredPieceComponent } from "@/lib/piece-components"
 
 export type InvoiceItemRow = {
@@ -26,8 +27,14 @@ export type InvoiceItemRow = {
   stoneCharge: number
   stoneMetalTypeName: string | null
   stoneTypeNames: string | null
+  /** A single stone's pcs / clarity / certificate (no components). */
+  stonePieces?: number | null
+  stoneClarity?: string | null
+  stoneCertificateNumber?: string | null
   lineTotal: number
 }
+
+type StoneDetails = { pieces: number | null; clarity: string; certificateNumber: string }
 
 const initialState: InvoiceFormState = { success: false, message: "" }
 
@@ -43,12 +50,14 @@ function InvoiceItemRowView({
   canEdit,
   showMaking,
   showStone,
+  clarities,
 }: {
   invoiceId: string
   item: InvoiceItemRow
   canEdit: boolean
   showMaking: boolean
   showStone: boolean
+  clarities: string[]
 }) {
   const [editing, setEditing] = useState(false)
   const router = useRouter()
@@ -65,17 +74,44 @@ function InvoiceItemRowView({
   const isPiece = pieceRows.length > 0
   const pieceInputsFrom = () =>
     Object.fromEntries(
-      pieceRows.map((row) => [row.id ?? "", { rate: row.rate != null ? String(row.rate) : "", amount: String(row.amount ?? "") }]),
+      pieceRows.map((row) => [
+        row.id ?? "",
+        {
+          rate: row.rate != null ? String(row.rate) : "",
+          amount: String(row.amount ?? ""),
+          details: { pieces: row.pieces ?? null, clarity: row.clarity ?? "", certificateNumber: row.certificateNumber ?? "" },
+        },
+      ]),
     )
-  const [pieceInputs, setPieceInputs] = useState<Record<string, { rate: string; amount: string }>>(pieceInputsFrom)
+  const [pieceInputs, setPieceInputs] = useState<Record<string, { rate: string; amount: string; details: StoneDetails }>>(
+    pieceInputsFrom,
+  )
+  // A single stone's pcs / clarity / certificate (stonePieces etc.).
+  const hasLineStone = !isPiece && Boolean(item.stoneMetalTypeName?.trim())
+  const lineStoneFrom = (): StoneDetails => ({
+    pieces: item.stonePieces ?? null,
+    clarity: item.stoneClarity ?? "",
+    certificateNumber: item.stoneCertificateNumber ?? "",
+  })
+  const [lineStone, setLineStone] = useState<StoneDetails>(lineStoneFrom)
 
-  const action = updateInvoiceLineItem.bind(null, invoiceId, item.id)
-  const [state, formAction, pending] = useActionState(action, initialState)
+  // Success is handled inside the action call, not in an effect on `state`
+  // (see CLAUDE.md "Forms"): the save revalidates this page.
+  const [state, formAction, pending] = useActionState(async (prev: InvoiceFormState, formData: FormData) => {
+    const result = await updateInvoiceLineItem(invoiceId, item.id, prev, formData)
+    if (result.success) {
+      toast.success(result.message || "Line item updated")
+      setEditing(false)
+      router.refresh()
+    }
+    return result
+  }, initialState)
 
   const startEditing = () => {
     setRateInput(item.rate ? String(item.rate) : "")
     setWeightInput(quantity != null ? String(quantity) : "")
     setPieceInputs(pieceInputsFrom())
+    setLineStone(lineStoneFrom())
     setEditing(true)
   }
 
@@ -94,25 +130,27 @@ function InvoiceItemRowView({
               row.kind === "STONE" && input && input.amount.trim() && Number(input.amount) !== row.amount
                 ? Number(input.amount)
                 : null
-            return { id: row.id, rate, amount: typedAmount }
+            return {
+              id: row.id,
+              rate,
+              amount: typedAmount,
+              details: row.kind === "STONE" && input ? input.details : null,
+            }
           }),
         ),
       )
     } else {
       formData.set("rate", rateInput)
       formData.set("weight", weightInput)
+      if (hasLineStone) {
+        formData.set("stoneDetails", "1")
+        formData.set("stonePieces", lineStone.pieces != null ? String(lineStone.pieces) : "")
+        formData.set("stoneClarity", lineStone.clarity)
+        formData.set("stoneCertificateNumber", lineStone.certificateNumber)
+      }
     }
-    formAction(formData)
+    startTransition(() => formAction(formData))
   }
-
-  useEffect(() => {
-    if (state.success) {
-      toast.success(state.message || "Line item updated")
-      setEditing(false)
-      router.refresh()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state])
 
   if (!editing) {
     return (
@@ -178,9 +216,9 @@ function InvoiceItemRowView({
         {item.itemName}
         {isPiece ? (
           <div className="mt-2 space-y-1.5" data-testid="piece-quick-edit">
-            {pieceRows.map((row) => {
+            {pieceRows.map((row, rowIndex) => {
               const key = row.id ?? ""
-              const input = pieceInputs[key] ?? { rate: "", amount: "" }
+              const input = pieceInputs[key] ?? { rate: "", amount: "", details: { pieces: null, clarity: "", certificateNumber: "" } }
               const label =
                 row.kind === "METAL"
                   ? `${[row.metalName, row.purityLabel].filter(Boolean).join(" ") || "Metal"} · ${(row.netWeight ?? 0).toFixed(3)} g`
@@ -213,15 +251,53 @@ function InvoiceItemRowView({
                     />
                   ) : null}
                   {row.gstRatePercent != null ? <span className="text-muted-foreground">GST {row.gstRatePercent}%</span> : null}
+                  {row.kind === "STONE" ? (
+                    <StoneDetailsInputs
+                      className="basis-full"
+                      value={input.details}
+                      onChange={(patch) =>
+                        setPieceInputs((prev) => ({
+                          ...prev,
+                          [key]: {
+                            ...input,
+                            details: {
+                              pieces: "pieces" in patch ? patch.pieces ?? null : input.details.pieces,
+                              clarity: "clarity" in patch ? patch.clarity ?? "" : input.details.clarity,
+                              certificateNumber:
+                                "certificateNumber" in patch ? patch.certificateNumber ?? "" : input.details.certificateNumber,
+                            },
+                          },
+                        }))
+                      }
+                      clarities={clarities}
+                      testIdPrefix="quick-edit-piece-stone"
+                      index={rowIndex}
+                    />
+                  ) : null}
                 </div>
               )
             })}
           </div>
         ) : item.stoneMetalTypeName ? (
-          <span className="block text-xs text-muted-foreground">
-            Stone: {item.stoneMetalTypeName}
-            {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
-          </span>
+          <>
+            <span className="block text-xs text-muted-foreground">
+              Stone: {item.stoneMetalTypeName}
+              {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
+            </span>
+            <StoneDetailsInputs
+              className="mt-1.5 max-w-sm"
+              value={lineStone}
+              onChange={(patch) =>
+                setLineStone((prev) => ({
+                  pieces: "pieces" in patch ? patch.pieces ?? null : prev.pieces,
+                  clarity: "clarity" in patch ? patch.clarity ?? "" : prev.clarity,
+                  certificateNumber: "certificateNumber" in patch ? patch.certificateNumber ?? "" : prev.certificateNumber,
+                }))
+              }
+              clarities={clarities}
+              testIdPrefix="quick-edit-stone"
+            />
+          </>
         ) : null}
       </td>
       <td className="px-4 py-3">{item.quantity}</td>
@@ -303,10 +379,13 @@ export function InvoiceItemsTable({
   invoiceId,
   items,
   canEdit,
+  clarities = [],
 }: {
   invoiceId: string
   items: InvoiceItemRow[]
   canEdit: boolean
+  /** Settings → Stone Clarity names, suggested on a stone's Clarity. */
+  clarities?: string[]
 }) {
   // A column with nothing to show across every line item is dead weight,
   // not information — most invoices are metal-only with no making/stone
@@ -338,6 +417,7 @@ export function InvoiceItemsTable({
               canEdit={canEdit}
               showMaking={showMaking}
               showStone={showStone}
+              clarities={clarities}
             />
           ))}
         </tbody>

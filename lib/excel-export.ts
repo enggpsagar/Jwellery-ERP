@@ -71,6 +71,7 @@ export function buildExcelExport(
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
   const fileName = timestampedFileName(filePrefix, "xlsx");
+  autoFitColumns(workbook);
   const buffer = styleHeaderRow(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
 
   return { fileName, fileBase64: Buffer.from(buffer).toString("base64") };
@@ -149,6 +150,7 @@ export function buildMultiSheetExcelExport(
   }
 
   const fileName = timestampedFileName(filePrefix, "xlsx");
+  autoFitColumns(workbook);
   const buffer = styleHeaderRow(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
 
   return { fileName, fileBase64: Buffer.from(buffer).toString("base64") };
@@ -220,6 +222,7 @@ export function buildImportTemplateWithDropdowns({
     );
   });
 
+  autoFitColumns(workbook);
   let buffer: Buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 
   if (validations.length) {
@@ -246,6 +249,39 @@ export function buildImportTemplateWithDropdowns({
   };
 }
 
+
+/**
+ * Sizes every column to its longest value (header included), so nothing is
+ * cut off or hidden behind "###". The header row is bold, which renders
+ * wider, so it gets a little extra. Capped so one long note doesn't make a
+ * column screen-wide (Excel wraps nothing by default, but the cell is still
+ * readable in the formula bar). Sheets that already set their own widths
+ * (Instructions) are left alone.
+ */
+const MIN_COLUMN_WIDTH = 8;
+const MAX_COLUMN_WIDTH = 60;
+
+export function autoFitColumns(workbook: XLSX.WorkBook): void {
+  for (const name of workbook.SheetNames) {
+    const sheet = workbook.Sheets[name];
+    if (!sheet || sheet["!cols"] || !sheet["!ref"]) continue;
+    const range = XLSX.utils.decode_range(sheet["!ref"]);
+    const widths: { wch: number }[] = [];
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      let longest = 0;
+      for (let r = range.s.r; r <= range.e.r; r++) {
+        const cell = sheet[XLSX.utils.encode_cell({ r, c })];
+        if (!cell || cell.v === undefined || cell.v === null) continue;
+        const text = cell.v instanceof Date ? "00/00/0000" : String(cell.w ?? cell.v);
+        // The longest line of a multi-line cell is what needs the room.
+        const length = Math.max(...text.split("\n").map((line) => line.length));
+        longest = Math.max(longest, r === range.s.r ? Math.ceil(length * 1.15) : length);
+      }
+      widths.push({ wch: Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, longest + 2)) });
+    }
+    sheet["!cols"] = widths;
+  }
+}
 
 /**
  * Every workbook this app writes gets the same header treatment: row 1 frozen

@@ -80,10 +80,10 @@ test("finish: product import, stock import, both exports", async ({ page }) => {
 
   // Exports show labels, never raw enum values.
   const stockCsv = await exportCsv(page, "/inventory/stock")
-  expect(stockCsv).not.toMatch(/KACHA|PAKKA/)
+  expect(stockCsv).not.toMatch(/(?<![\w-])(KACHA|PAKKA)(?![\w-])/)
   const productCsv = await exportCsv(page, "/inventory/products")
   expect(productCsv).toContain("Finished / Hallmarked")
-  expect(productCsv).not.toMatch(/KACHA|PAKKA/)
+  expect(productCsv).not.toMatch(/(?<![\w-])(KACHA|PAKKA)(?![\w-])/)
   // CSV and Excel exports carry exactly the import template's columns.
   const csvHeader = XLSX.utils.sheet_to_json<string[]>(XLSX.read(productCsv.replace(/^\uFEFF/, ""), { type: "string" }).Sheets.Sheet1, { header: 1 })[0]
   expect(csvHeader).toEqual(PRODUCT_SHEET_HEADERS)

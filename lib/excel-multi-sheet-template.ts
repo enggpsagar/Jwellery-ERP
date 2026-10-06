@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 
-import { styleHeaderRow } from "@/lib/excel-export";
+import { autoFitColumns, styleHeaderRow } from "@/lib/excel-export";
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -78,6 +78,7 @@ export function buildMultiSheetTemplate({
   });
   XLSX.utils.book_append_sheet(workbook, optionsSheet, "Options");
 
+  autoFitColumns(workbook);
   let buffer: Buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 
   const perSheet = sheets.map((sheet) =>

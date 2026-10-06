@@ -44,6 +44,7 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `stock-sheet.spec.ts` / `product-sheet-multi.spec.ts` / `finish-io.spec.ts` | Stock and Product import/export: every field, multi-metal pieces, Finish |
 | `sheet-features.spec.ts` | Style off → no Style column in product/stock templates and exports, old files still import; E-way Bill / E-Invoice off → no such invoice export columns |
 | `stock-pick-multi-part.spec.ts` | Picking a gold + silver + diamond (12 pcs) + ruby piece on Invoice / Estimate / Quotation opens every metal and stone with rates and pcs, and the invoice saves all four rows |
+| `stone-piece-details.spec.ts` | Hand-typed stone pcs / clarity / certificate saved on an Estimate, kept on conversion to Invoice and printed; Add Stock of a multi-part Product writes its rows |
 | `reports.spec.ts` | Every report tab renders; Stock report's Available / Out of Stock split; CSV export |
 
 **When you build a feature, add a test for it here** — that's what keeps

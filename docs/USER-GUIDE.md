@@ -323,6 +323,13 @@ wastage, sold, remaining. Filter by financial year or dates. Reports and Ledger 
 Sales trend by metal, best sellers, metal stock and money KPIs, with Daily/Monthly
 toggles. Cards can be dragged and resized; your layout is remembered.
 
+### Stone details on bills
+
+Under every stone on a Tax Invoice, Estimate or Quotation you can fill **Pcs**, **Clarity**
+and **Certificate No.** Picking a stock piece fills them from the product; they print on
+the bill, e.g. *Diamond Natural 0.28 ct · 12 pcs · VVS · Cert IGI-123*. A piece made of
+several metals and stones brings all of them when picked.
+
 ### Importing and exporting with Excel
 
 Parties, Products, Stock, Artisans, Estimates and Settings → Metals & Categories can all

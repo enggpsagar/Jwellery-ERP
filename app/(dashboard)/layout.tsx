@@ -27,7 +27,7 @@ import {
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { TopBar } from "@/components/dashboard/top-bar";
-import { getSellingRateGroups } from "@/lib/selling-rates";
+import { getSellingRateGroups, getLastSellingRateUpdate } from "@/lib/selling-rates";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -166,7 +166,7 @@ export default async function DashboardLayout({
   // Karigars see only their own jobs, never store prices.
   const showRates = Boolean(activeStoreId) && activeRole !== UserRole.KARIGAR;
 
-  const [storeInfo, sidebarCounts, brandingSettings, sellingRates] = await Promise.all([
+  const [storeInfo, sidebarCounts, brandingSettings, sellingRates, ratesUpdated] = await Promise.all([
     activeStoreId
       ? prisma.store.findUnique({
           where: { id: activeStoreId },
@@ -185,6 +185,7 @@ export default async function DashboardLayout({
       ? prisma.storeBranding.findUnique({ where: { storeId: activeStoreId } })
       : Promise.resolve(null),
     showRates && activeStoreId ? getSellingRateGroups(activeStoreId) : Promise.resolve([]),
+    showRates && activeStoreId ? getLastSellingRateUpdate(activeStoreId) : Promise.resolve(null),
   ]);
 
   // Resolved fresh on every layout render, not read off the session token —
@@ -317,6 +318,7 @@ export default async function DashboardLayout({
         canSwitchStores={isSuperAdmin || stores.length > 1}
         planExpired={isPlanExpired}
         sellingRates={sellingRates}
+        ratesUpdated={ratesUpdated}
         canEditRates={activeRole === UserRole.ADMIN || activeRole === UserRole.SUPER_ADMIN}
       />
 

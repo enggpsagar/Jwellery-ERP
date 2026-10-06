@@ -28,6 +28,8 @@ export type SellingRateGroup = {
   /** "g" or "ct" — what the price is per. */
   unit: string;
   isGemstone: boolean;
+  /** A purity (Has Purity metal) or stone type (gemstone) can be added. */
+  canAddOption: boolean;
   rows: SellingRateRow[];
 };
 
@@ -83,7 +85,14 @@ export async function getSellingRateGroups(storeId: string): Promise<SellingRate
       rows = [{ kind: "metal", id: metal.id, label: metal.name, price: num(metal.sellingPrice) }];
     }
 
-    return { metalId: metal.id, metalName: metal.name, unit, isGemstone: metal.isGemstone, rows };
+    return {
+      metalId: metal.id,
+      metalName: metal.name,
+      unit,
+      isGemstone: metal.isGemstone,
+      canAddOption: metal.isGemstone || metal.hasPurity,
+      rows,
+    };
   });
 }
 
@@ -186,4 +195,20 @@ export async function getSellingRateHistory(storeId: string, take = 200): Promis
     price: num(r.sellingPrice),
     changedBy: r.changedById ? names.get(r.changedById) ?? null : null,
   }));
+}
+
+export type SellingRateLastUpdate = { at: string; by: string | null } | null;
+
+/** When the store's selling rates last changed, and who changed them. */
+export async function getLastSellingRateUpdate(storeId: string): Promise<SellingRateLastUpdate> {
+  const last = await prisma.sellingRateEntry.findFirst({
+    where: { storeId },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true, changedById: true },
+  });
+  if (!last) return null;
+  const user = last.changedById
+    ? await prisma.user.findUnique({ where: { id: last.changedById }, select: { name: true } })
+    : null;
+  return { at: last.createdAt.toISOString(), by: user?.name ?? null };
 }

@@ -24,7 +24,7 @@ import { GlobalSearch } from "@/components/dashboard/global-search";
 import { StoreSwitcher } from "@/components/dashboard/store-switcher";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { RatesChip } from "@/components/dashboard/rates-chip";
-import type { SellingRateGroup } from "@/lib/selling-rates";
+import type { SellingRateGroup, SellingRateLastUpdate } from "@/lib/selling-rates";
 
 type StoreOption = {
   id: string;
@@ -42,6 +42,8 @@ type TopBarProps = {
   planExpired?: boolean;
   /** Active store's selling rates for the Today's Rates chip; empty hides it. */
   sellingRates?: SellingRateGroup[];
+  /** Last selling-rate change (time + who), shown in the rates popover. */
+  ratesUpdated?: SellingRateLastUpdate;
   /** Store Owner in the active store — may edit the rates from the chip. */
   canEditRates?: boolean;
 };
@@ -52,6 +54,7 @@ export function TopBar({
   canSwitchStores = false,
   planExpired = false,
   sellingRates = [],
+  ratesUpdated = null,
   canEditRates = false,
 }: TopBarProps) {
   const { data: session } = useSession();
@@ -127,7 +130,7 @@ export function TopBar({
       )}
 
       <div className="ml-auto flex min-w-0 items-center gap-1.5">
-        <RatesChip groups={sellingRates} canEdit={canEditRates} />
+        <RatesChip groups={sellingRates} canEdit={canEditRates} lastUpdate={ratesUpdated} />
 
         {canAccessBilling && (
           <DropdownMenu>

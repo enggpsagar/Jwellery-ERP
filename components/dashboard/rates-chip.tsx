@@ -3,19 +3,25 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Coins } from "lucide-react";
+import { Coins, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/components/providers/toast-provider";
-import { updateSellingRates, type SellingRateUpdate } from "@/lib/actions/selling-rate-actions";
-import type { SellingRateGroup } from "@/lib/selling-rates";
+import {
+  addSellingRateOption,
+  addStandardSellingRates,
+  updateSellingRates,
+  type SellingRateUpdate,
+} from "@/lib/actions/selling-rate-actions";
+import type { SellingRateGroup, SellingRateLastUpdate } from "@/lib/selling-rates";
 
 type RatesChipProps = {
   groups: SellingRateGroup[];
   /** Store Owner (Admin/Super Admin in the active store). Others read only. */
   canEdit: boolean;
+  lastUpdate?: SellingRateLastUpdate;
 };
 
 const inr = (value: number) =>
@@ -23,16 +29,32 @@ const inr = (value: number) =>
 
 const keyOf = (kind: string, id: string) => `${kind}:${id}`;
 
+function updatedLabel(last: NonNullable<SellingRateLastUpdate>) {
+  const at = new Date(last.at);
+  const sameDay = at.toDateString() === new Date().toDateString();
+  const when = at.toLocaleString("en-IN", {
+    ...(sameDay ? {} : { day: "numeric", month: "short" }),
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `Last updated ${sameDay ? "today " : ""}${when}${last.by ? ` by ${last.by}` : ""}`;
+}
+
 /**
  * Header "Today's Rates": the store's selling rates one click away instead
  * of Settings > Taxonomy. Edits write the same columns Settings does
- * (lib/actions/selling-rate-actions.ts), so billing uses them immediately.
+ * (lib/actions/selling-rate-actions.ts), so billing uses them immediately,
+ * and every change is kept as history (Metal Rates → Your Selling Rates).
  */
-export function RatesChip({ groups, canEdit }: RatesChipProps) {
+export function RatesChip({ groups, canEdit, lastUpdate = null }: RatesChipProps) {
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  // Which metal's "+ Add" row is open, and what's typed in it.
+  const [adding, setAdding] = useState<string | null>(null);
+  const [newLabel, setNewLabel] = useState("");
+  const [newPrice, setNewPrice] = useState("");
 
   const initial = useMemo(() => {
     const map: Record<string, string> = {};
@@ -43,10 +65,12 @@ export function RatesChip({ groups, canEdit }: RatesChipProps) {
   }, [groups]);
 
   const [drafts, setDrafts] = useState(initial);
-  // Fresh server values (after a save, or a change made in Settings) replace
-  // the drafts whenever the popover isn't open mid-edit.
+  // Fresh server values replace the drafts while closed; while open (e.g.
+  // after "+ Add"), only rows that weren't there before are filled in, so
+  // rates the owner is still typing aren't wiped.
   useEffect(() => {
     if (!open) setDrafts(initial);
+    else setDrafts((d) => ({ ...initial, ...Object.fromEntries(Object.entries(d).filter(([k]) => k in initial)) }));
   }, [initial, open]);
 
   // The chip shows the first priced rate of each of the first three metals
@@ -56,24 +80,32 @@ export function RatesChip({ groups, canEdit }: RatesChipProps) {
       groups
         .map((g) => {
           const row = g.rows.find((r) => r.price != null);
-          return row ? { label: row.label, price: row.price as number, unit: g.unit } : null;
+          return row ? { label: row.label, price: row.price as number } : null;
         })
-        .filter((x): x is { label: string; price: number; unit: string } => x !== null)
+        .filter((x): x is { label: string; price: number } => x !== null)
         .slice(0, 3),
     [groups],
   );
 
   if (groups.length === 0) return null;
 
-  const changed = Object.keys(drafts).filter((k) => drafts[k].trim() !== initial[k].trim());
+  const changed = Object.keys(drafts).filter(
+    (k) => k in initial && (drafts[k] ?? "").trim() !== (initial[k] ?? "").trim(),
+  );
+
+  function parsePrice(raw: string): number | null | undefined {
+    const t = raw.trim();
+    if (t === "") return null;
+    const n = Number(t);
+    return Number.isFinite(n) && n >= 0 ? n : undefined;
+  }
 
   function save() {
     const updates: SellingRateUpdate[] = [];
     for (const k of changed) {
       const [kind, id] = k.split(":") as ["metal" | "purity" | "stoneType", string];
-      const raw = drafts[k].trim();
-      const price = raw === "" ? null : Number(raw);
-      if (price !== null && (!Number.isFinite(price) || price < 0)) {
+      const price = parsePrice(drafts[k]);
+      if (price === undefined) {
         toast.error("Rates must be a positive amount.");
         return;
       }
@@ -92,8 +124,46 @@ export function RatesChip({ groups, canEdit }: RatesChipProps) {
     });
   }
 
+  function addStandard() {
+    startTransition(async () => {
+      const result = await addStandardSellingRates();
+      if (result.success) {
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+    });
+  }
+
+  function addOption(metalId: string) {
+    const price = parsePrice(newPrice);
+    if (price === undefined) {
+      toast.error("Rates must be a positive amount.");
+      return;
+    }
+    startTransition(async () => {
+      const result = await addSellingRateOption({ metalId, label: newLabel, price });
+      if (result.success) {
+        toast.success(result.message);
+        setAdding(null);
+        setNewLabel("");
+        setNewPrice("");
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+    });
+  }
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setAdding(null);
+      }}
+    >
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -118,14 +188,26 @@ export function RatesChip({ groups, canEdit }: RatesChipProps) {
         </button>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-[min(24rem,calc(100vw-2rem))] p-0">
+      <PopoverContent align="end" className="w-[min(26rem,calc(100vw-2rem))] p-0">
         <div className="border-b px-4 py-3">
           <p className="font-medium">Today&apos;s selling rates</p>
           <p className="text-xs text-muted-foreground">
+            {lastUpdate ? updatedLabel(lastUpdate) : "Not updated yet"}
+            {" · "}
             {canEdit
-              ? "Used on new invoices, estimates and quotations. Leave blank to fall back to the metal's own rate."
-              : "Set by the Store Owner. Used on new invoices, estimates and quotations."}
+              ? "used on new invoices, estimates and quotations."
+              : "set by the Store Owner."}
           </p>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={addStandard}
+              disabled={pending}
+              className="mt-2 text-xs font-medium text-[var(--chart-1)] underline-offset-2 hover:underline disabled:opacity-50"
+            >
+              Add standard purities &amp; stone types (24K, 22K, 18K … Natural, Lab-Grown)
+            </button>
+          )}
         </div>
 
         <div className="max-h-[60vh] space-y-4 overflow-y-auto px-4 py-3">
@@ -166,6 +248,52 @@ export function RatesChip({ groups, canEdit }: RatesChipProps) {
                   </div>
                 );
               })}
+
+              {canEdit && g.canAddOption && (
+                adding === g.metalId ? (
+                  <div className="flex items-center gap-2 pt-1">
+                    <Input
+                      autoFocus
+                      aria-label={`New ${g.isGemstone ? "stone type" : "purity"} for ${g.metalName}`}
+                      placeholder={g.isGemstone ? "e.g. Lab-Grown" : "e.g. 23K"}
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addOption(g.metalId)}
+                      className="h-8 min-w-0 flex-1"
+                      disabled={pending}
+                    />
+                    <Input
+                      aria-label={`Rate for the new ${g.metalName} entry`}
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.01"
+                      placeholder="₹ rate"
+                      value={newPrice}
+                      onChange={(e) => setNewPrice(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addOption(g.metalId)}
+                      className="h-8 w-24 text-right tabular-nums"
+                      disabled={pending}
+                    />
+                    <Button size="sm" variant="outline" onClick={() => addOption(g.metalId)} disabled={pending}>
+                      Add
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdding(g.metalId);
+                      setNewLabel("");
+                      setNewPrice("");
+                    }}
+                    className="inline-flex items-center gap-1 pt-0.5 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Add {g.isGemstone ? "stone type" : "purity"}
+                  </button>
+                )
+              )}
             </div>
           ))}
         </div>
@@ -173,11 +301,11 @@ export function RatesChip({ groups, canEdit }: RatesChipProps) {
         {canEdit && (
           <div className="flex items-center justify-between gap-2 border-t px-4 py-3">
             <Link
-              href="/settings/taxonomy"
+              href="/metal-rates"
               className="text-xs text-muted-foreground underline-offset-2 hover:underline"
               onClick={() => setOpen(false)}
             >
-              Manage metals in Settings
+              Rate history
             </Link>
             <Button size="sm" onClick={save} disabled={pending || changed.length === 0}>
               {pending ? "Saving…" : changed.length > 0 ? `Save ${changed.length}` : "Save"}

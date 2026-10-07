@@ -74,6 +74,7 @@ export function AddPurityDialog({ open, onOpenChange, storeMetalId, onCreated }:
         sellingPrice: sellingPrice ? Number(sellingPrice) : null,
         isHallmarkable,
         wastagePercent: null,
+        finenessCheckIgnoredAt: null,
         sortOrder: 0,
         isActive: true,
       })

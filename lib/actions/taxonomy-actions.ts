@@ -82,6 +82,9 @@ export type StoreMetalPurityRow = {
   // Default wastage / touch % copied onto new sale / purchase lines of this
   // purity (Settings > Weights). null = none.
   wastagePercent: number | null;
+  // Fineness the owner kept despite the "looks wrong" warning; the warning
+  // stays hidden while finenessPercent still equals it.
+  finenessCheckIgnoredAt: number | null;
   sortOrder: number;
   isActive: boolean;
 };
@@ -695,6 +698,7 @@ export async function getStoreMetalPurities(
     finenessPercent: Number(row.finenessPercent),
     sellingPrice: row.sellingPrice != null ? Number(row.sellingPrice) : null,
     isHallmarkable: row.isHallmarkable,
+    finenessCheckIgnoredAt: row.finenessCheckIgnoredAt != null ? Number(row.finenessCheckIgnoredAt) : null,
     wastagePercent: row.wastagePercent != null ? Number(row.wastagePercent) : null,
     sortOrder: row.sortOrder,
     isActive: row.isActive,
@@ -934,12 +938,14 @@ export async function getMisconfiguredPurities(): Promise<MisconfiguredPurityRow
       storeMetalId: true,
       label: true,
       finenessPercent: true,
+      finenessCheckIgnoredAt: true,
       storeMetal: { select: { name: true } },
     },
   });
 
   return purities.flatMap((row) => {
     const finenessPercent = Number(row.finenessPercent);
+    if (row.finenessCheckIgnoredAt != null && Number(row.finenessCheckIgnoredAt) === finenessPercent) return [];
     const expected = finenessMismatch(row.storeMetal.name, row.label, finenessPercent);
     return expected == null
       ? []
@@ -954,6 +960,43 @@ export async function getMisconfiguredPurities(): Promise<MisconfiguredPurityRow
           },
         ];
   });
+}
+
+/**
+ * "Ignore" on a fineness warning: the Store Owner keeps this purity's
+ * fineness on purpose (e.g. a house 76% for 18K). Remembers the value kept,
+ * so the warning returns only if the fineness is later changed.
+ */
+export async function ignorePurityFineness(id: string): Promise<TaxonomyFormState> {
+  try {
+    await requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+  } catch {
+    return { success: false, message: "Only the Store Owner can update these settings." };
+  }
+
+  try {
+    const storeId = await requireStoreScope();
+    const row = await prisma.storeMetalPurity.findFirst({
+      where: { id, storeId },
+      select: { label: true, finenessPercent: true, storeMetal: { select: { name: true } } },
+    });
+    if (!row) return { success: false, message: "Purity not found" };
+
+    await prisma.storeMetalPurity.updateMany({
+      where: { id, storeId },
+      data: { finenessCheckIgnoredAt: row.finenessPercent },
+    });
+    revalidatePath(TAXONOMY_PATH);
+
+    return {
+      success: true,
+      id,
+      message: `${row.storeMetal.name} ${row.label} kept at ${Number(row.finenessPercent)}% fine — won't be flagged again unless it changes`,
+    };
+  } catch (error) {
+    logger.error("ignorePurityFineness error", error);
+    return { success: false, message: actionErrorMessage(error, "Failed to ignore the warning") };
+  }
 }
 
 /**

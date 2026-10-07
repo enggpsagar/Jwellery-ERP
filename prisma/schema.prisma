@@ -391,6 +391,11 @@ model StoreMetalPurity {
   // to StoreMetal.sellingPrice that column already documented.
   sellingPrice    Decimal?   @db.Decimal(12, 2)
   // Replaces the hardcoded isHallmarkablePurity() purity list.
+  // The fineness the Store Owner chose to keep when Settings flagged it as
+  // unusual for its label ("Ignore" on "Gold 18 is saved at 76% — should be
+  // 75%?"). The warning stays hidden while finenessPercent equals this;
+  // change the fineness and it's checked again. null = never ignored.
+  finenessCheckIgnoredAt Decimal? @db.Decimal(5, 2)
   isHallmarkable  Boolean    @default(false)
   // Default wastage / touch % copied onto each new sale and purchase line of
   // this purity (editable there). null / 0 = none. Added to the fineness for

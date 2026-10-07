@@ -20,6 +20,7 @@ import {
   toggleStoreMetalPurityActive,
   deleteStoreMetalPurity,
   fixPurityFineness,
+  ignorePurityFineness,
   upsertStoreCategory,
   toggleStoreCategoryActive,
   deleteStoreCategory,
@@ -144,7 +145,26 @@ function useFixPurityFineness(onFixed: () => void) {
     }
   }
 
-  return { fix, fixingId };
+  async function ignore(id: string) {
+    try {
+      setFixingId(id);
+      const result = await ignorePurityFineness(id);
+      if (result.success) {
+        toast.success(result.message);
+        onFixed();
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to ignore the warning");
+    } finally {
+      setFixingId(null);
+    }
+  }
+
+  return { fix, ignore, fixingId };
 }
 
 function MisconfiguredPuritiesBanner({
@@ -156,7 +176,7 @@ function MisconfiguredPuritiesBanner({
   canEdit: boolean;
   onFixed: () => void;
 }) {
-  const { fix, fixingId } = useFixPurityFineness(onFixed);
+  const { fix, ignore, fixingId } = useFixPurityFineness(onFixed);
   if (!purities.length) return null;
 
   return (
@@ -183,6 +203,17 @@ function MisconfiguredPuritiesBanner({
                     className="font-medium underline underline-offset-2 hover:no-underline disabled:opacity-50"
                   >
                     {fixingId === purity.id ? "Fixing…" : "Fix"}
+                  </button>
+                ) : null}
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={() => ignore(purity.id)}
+                    disabled={fixingId === purity.id}
+                    className="text-amber-800/80 underline underline-offset-2 hover:no-underline disabled:opacity-50 dark:text-amber-200/80"
+                    title={`Keep ${formatFineness(purity.finenessPercent)} — don't flag it again unless the fineness changes`}
+                  >
+                    Ignore
                   </button>
                 ) : null}
               </li>
@@ -1058,7 +1089,7 @@ function PuritiesSection({
 
   const purityEligibleMetals = metals.filter((metal) => metal.hasPurity);
   const selectedMetalName = metals.find((metal) => metal.id === selectedMetalId)?.name ?? "";
-  const { fix, fixingId } = useFixPurityFineness(() => reloadPurities(selectedMetalId));
+  const { fix, ignore, fixingId } = useFixPurityFineness(() => reloadPurities(selectedMetalId));
 
   const reloadPurities = React.useCallback(async (storeMetalId: string) => {
     if (!storeMetalId) {
@@ -1214,6 +1245,7 @@ function PuritiesSection({
                       {(() => {
                         const expected = finenessMismatch(selectedMetalName, option.label, option.finenessPercent);
                         if (expected == null) return null;
+                        if (option.finenessCheckIgnoredAt === option.finenessPercent) return null;
                         return (
                           <span
                             className="ml-2 inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-xs text-amber-900 no-underline dark:text-amber-200"
@@ -1229,6 +1261,16 @@ function PuritiesSection({
                                 className="font-medium underline underline-offset-2 hover:no-underline disabled:opacity-50"
                               >
                                 {fixingId === option.id ? "Fixing…" : "Fix"}
+                              </button>
+                            ) : null}
+                            {canEdit ? (
+                              <button
+                                type="button"
+                                onClick={() => ignore(option.id)}
+                                disabled={fixingId === option.id}
+                                className="underline underline-offset-2 opacity-80 hover:no-underline disabled:opacity-50"
+                              >
+                                Ignore
                               </button>
                             ) : null}
                           </span>

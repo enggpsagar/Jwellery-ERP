@@ -486,6 +486,11 @@ it as "Your Selling Rates" above the "Market Rates" table. Store export and Forc
 Delete include the table (its FK is RESTRICT). Don't make a market API fill the
 selling price. Spec: `e2e/header-rates.spec.ts`.
 
+### Added 2026-10-07: purity duplicates refused; fineness warning can be ignored
+
+- `purityLabelKey` (`lib/purity-label.ts`): "18" = "18K" = "18 kt" = "18 karat" (a bare number ≤ 24 is karats; 925/999 stay millesimal). The Settings purity form, the rates chip "+ Add purity" and the taxonomy Purities import compare by it — Mangal Jewell had both "18" and "18K". `scripts/merge-purity.ts "<store>" <metal> <from> <to> [--apply]` merges an existing duplicate for one store (dry run by default); **not yet applied to Mangal on production** (needs the owner's go-ahead: 69 products / 70 product metal rows / 69 stock pieces use "18", no bills).
+- "Ignore" on the "looks wrong" fineness warning stores the kept value in `StoreMetalPurity.finenessCheckIgnoredAt` (migration `20261013100000_purity_fineness_ignore`); the warning stays hidden while `finenessPercent` equals it and returns if the fineness changes.
+
 ### Added 2026-10-07: Settings › Weights (net / fine weight calculation per store)
 
 Migration `20261012100000_weight_calculation_settings` (additive, defaults = previous behaviour, no data change). `BusinessSettings` gains `netDeductStoneWeight` / `netDeductDmoWeight` (net = gross − stone − DMO by default), `fineWeightBasis` (NET default, or GROSS — falls back to net without a gross), `addWastageToFineWeight` (off), `weightDecimalsGram` / `weightDecimalsCarat` (3). `StoreMetalPurity.wastagePercent` is a per-purity default copied onto lines (`wastagePercent` on InvoiceItem, KachaInvoiceItem, QuotationItem, PurchaseItem, PieceComponent; InventoryStock already had it) and stays editable; it's only added to fine (net × (fineness + wastage)%) when the toggle is on.

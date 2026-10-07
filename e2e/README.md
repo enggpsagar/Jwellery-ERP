@@ -50,6 +50,7 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `icon-tooltips.spec.ts` | Hovering row / settings / sidebar / dialog icons shows their tooltip; a crawl of 8 main pages fails on any unlabelled icon-only control |
 | `search-focus.spec.ts` | Header search, stock picker and the list search on Products / Stock / Parties / Artisans / Invoices keep the cursor while typing and through the reload |
 | `igi-search.spec.ts` | Products and Stock are found by a partial IGI / certificate number |
+| `weight-decimals.spec.ts` | With 2 gram decimals: product detail, invoice line, Stock report (+ CSV) and ledger show 2-decimal grams |
 | `reports.spec.ts` | Every report tab renders; Stock report's Available / Out of Stock split; CSV export |
 
 **When you build a feature, add a test for it here** — that's what keeps

@@ -13,6 +13,7 @@ import { getUnfulfilledDraftOrderItemsForJob } from "@/lib/actions/draft-order-a
 import { formatShortDate } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { getWeightFormat } from "@/lib/weight-settings.server";
 
 import { PageBackHeader } from "@/components/shared/page-back-header";
 import { ReceiveItemsForm } from "@/components/karigars/receive-items-form";
@@ -51,6 +52,7 @@ export default async function ReceiveItemsPage({ params }: Props) {
   }
 
   const storeId = await requireStoreScope();
+  const wf = await getWeightFormat(storeId);
 
   const job = await prisma.karigarJob.findFirst({
     where: { id: jobId, karigarId: id, storeId },
@@ -95,13 +97,12 @@ export default async function ReceiveItemsPage({ params }: Props) {
         description={`Job ${job.jobNumber ?? job.id} · Issued ${formatDate(job.issueDate)} · ${
           job.issueWeight ? Number(job.issueWeight) : 0
         }g ${job.issuePurity ?? ""} (${
-          job.issueFineWeight ? Number(job.issueFineWeight).toFixed(3) : "0.000"
+          wf.g(job.issueFineWeight ? Number(job.issueFineWeight) : 0)
         }g fine)${
           job.issueWeight && Number(job.receiveWeight ?? 0) > 0
-            ? ` · ${Number(job.receiveWeight).toFixed(3)}g already received, ${Math.max(
-                0,
-                Number(job.issueWeight) - Number(job.receiveWeight),
-              ).toFixed(3)}g remaining`
+            ? ` · ${wf.g(Number(job.receiveWeight))}g already received, ${wf.g(
+                Math.max(0, Number(job.issueWeight) - Number(job.receiveWeight)),
+              )}g remaining`
             : ""
         }`}
         backHref={`/karigars/${id}`}

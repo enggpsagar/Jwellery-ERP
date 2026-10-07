@@ -17,6 +17,7 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/piece-components-text";
+import { getWeightFormat } from "@/lib/weight-settings.server";
 import { getFineWeightResolver, storedLineWeights } from "@/lib/fine-weight";
 import {
   getPieceResolver,
@@ -589,6 +590,7 @@ export async function exportQuotationsToExcel(
     }
 
     const storeId = await requireStoreScope();
+    const wf = await getWeightFormat(storeId);
     await assertPlanActiveForExport(storeId);
     const scope = await getLocationScope();
     const sortBy = toQuotationSortBy(params.sortBy);
@@ -630,7 +632,7 @@ export async function exportQuotationsToExcel(
       // A piece of several metals/stones — its rows, per line.
       [METALS_AND_STONES_COLUMN]: quotations[index].items
         .filter((item) => item.components.length)
-        .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components)}`)
+        .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components, wf)}`)
         .join(" | "),
     }));
 

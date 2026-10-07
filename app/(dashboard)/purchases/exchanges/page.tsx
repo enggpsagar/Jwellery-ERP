@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { formatShortDate } from "@/lib/utils"
+import { getActiveWeightFormat } from "@/lib/weight-settings.server"
 
 export const metadata: Metadata = {
   title: "Bought from Customers",
@@ -20,7 +21,6 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic"
 
-const grams = (value: number) => `${value.toFixed(3)} g`
 const rupees = (value: number) => `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 /**
@@ -30,7 +30,8 @@ const rupees = (value: number) => `₹${value.toLocaleString("en-IN", { minimumF
  * metal is shown physical and in pure (24K / 999) terms.
  */
 export default async function CustomerExchangesPage() {
-  const { rows, summary, truncated } = await getOldGoldExchanges()
+  const [{ rows, summary, truncated }, wf] = await Promise.all([getOldGoldExchanges(), getActiveWeightFormat()])
+  const grams = wf.grams
 
   const cards = [
     { label: "Exchanges", value: String(summary.count) },
@@ -102,11 +103,11 @@ export default async function CustomerExchangesPage() {
                           {line.description} · {line.metalName} {line.purity}
                           <span className="block text-xs text-muted-foreground">
                             {line.isGemstone
-                              ? `${(line.caratWeight ?? 0).toFixed(3)} ct × ${rupees(line.rate)}/ct`
+                              ? `${wf.carats(line.caratWeight ?? 0)} × ${rupees(line.rate)}/ct`
                               : `${grams(line.netWeight)} → ${grams(line.fineWeight)} pure × ${rupees(line.rate)}`}
                             {line.deductionPercent > 0 ? ` − ${line.deductionPercent}%` : ""}
                             {line.stone
-                              ? ` + stone ${line.stone.name}${line.stone.caratWeight ? ` ${line.stone.caratWeight} ct` : ""} ${rupees(line.stone.value)}`
+                              ? ` + stone ${line.stone.name}${line.stone.caratWeight ? ` ${wf.stoneCarats(line.stone.caratWeight)}` : ""} ${rupees(line.stone.value)}`
                               : ""}{" "}
                             = {rupees(line.value)}
                             {line.inStock ? "" : " · out of stock"}

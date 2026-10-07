@@ -14,7 +14,7 @@
 // A metal row's pure weight follows Settings > Weights (lib/weight-calc.ts
 // calcFineWeight): basis net / gross, plus the row's wastage % when that's on.
 
-import { calcFineWeight, DEFAULT_WEIGHT_SETTINGS, normalizeWastagePercent, type WeightSettings } from "@/lib/weight-calc"
+import { calcFineWeight, DEFAULT_WEIGHT_FORMAT, DEFAULT_WEIGHT_SETTINGS, normalizeWastagePercent, type WeightFormat, type WeightSettings } from "@/lib/weight-calc"
 
 export type PieceMetalDraft = {
   key: string
@@ -348,12 +348,13 @@ export function stoneDetailsText(row: { pieces?: number | null; clarity?: string
 /** Short human summary, e.g. "Gold 22K 8.200 g + Silver 925 3.000 g + Diamond 0.40 ct". */
 export function describeComponents(
   rows: { kind: string; metalName?: string | null; purityLabel?: string | null; netWeight?: number | null; stoneMetalTypeName?: string | null; caratWeight?: number | null }[],
+  wf: WeightFormat = DEFAULT_WEIGHT_FORMAT,
 ) {
   return rows
     .map((row) =>
       row.kind === "METAL"
-        ? `${[row.metalName, row.purityLabel].filter(Boolean).join(" ")} ${(row.netWeight ?? 0).toFixed(3)} g`
-        : `${row.stoneMetalTypeName ?? "Stone"} ${(row.caratWeight ?? 0).toFixed(2)} ct`,
+        ? `${[row.metalName, row.purityLabel].filter(Boolean).join(" ")} ${wf.grams(row.netWeight ?? 0)}`
+        : `${row.stoneMetalTypeName ?? "Stone"} ${wf.stoneCarats(row.caratWeight ?? 0)}`,
     )
     .join(" + ")
 }

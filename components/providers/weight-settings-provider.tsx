@@ -1,8 +1,8 @@
 "use client"
 
-import { createContext, useContext } from "react"
+import { createContext, useContext, useMemo } from "react"
 
-import { DEFAULT_WEIGHT_SETTINGS, type WeightSettings } from "@/lib/weight-calc"
+import { DEFAULT_WEIGHT_SETTINGS, weightFormatter, type WeightFormat, type WeightSettings } from "@/lib/weight-calc"
 
 const WeightSettingsContext = createContext<WeightSettings>(DEFAULT_WEIGHT_SETTINGS)
 
@@ -17,4 +17,10 @@ export function WeightSettingsProvider({ value, children }: { value: WeightSetti
 
 export function useWeightSettings(): WeightSettings {
   return useContext(WeightSettingsContext)
+}
+
+/** The store's weight display formatter (lib/weight-calc.ts weightFormatter). */
+export function useWeightFormat(): WeightFormat {
+  const settings = useWeightSettings()
+  return useMemo(() => weightFormatter(settings), [settings])
 }

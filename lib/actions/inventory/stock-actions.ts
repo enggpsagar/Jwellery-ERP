@@ -51,6 +51,7 @@ import { PURITY_LABELS } from "@/lib/purity"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
 import { getFineWeightResolver, resolveFineWeight } from "@/lib/fine-weight"
 import { describePieceComponentsText, METALS_AND_STONES_COLUMN } from "@/lib/piece-components-text"
+import { getWeightFormat } from "@/lib/weight-settings.server"
 import { formatShortDate, formatShortDateTime } from "@/lib/utils"
 import { logger } from "@/lib/logger";
 import { isProportionalStockSplit, newStockPieceRows, resplitStockPieceRows } from "@/lib/inventory/stock-piece-rows"
@@ -430,6 +431,7 @@ export async function exportInventoryStockToExcel(
     const num = (value: { toString(): string } | null | undefined) => (value == null ? "" : Number(value))
     // This store's columns only (lib/sheet-features.ts).
     const storeId = await requireStoreScope()
+    const wf = await getWeightFormat(storeId)
     const features = await getSheetFeatures(storeId)
     const headers = stockSheetHeaders(features)
     const rows = stockItems.map((item) => {
@@ -459,7 +461,7 @@ export async function exportInventoryStockToExcel(
         "Metal Type": item.metalType?.name ?? "",
         Purity: item.purityLabel ?? (item.purity ? PURITY_LABELS[item.purity as PurityType] : ""),
         "Fine Weight (g)": num(item.fineWeight),
-        "Metals & Stones": describePieceComponentsText(item.components),
+        "Metals & Stones": describePieceComponentsText(item.components, wf),
         "Created At": item.createdAt ? formatShortDateTime(item.createdAt) : "",
       }
       return pickSheetRow(values, headers)
@@ -474,11 +476,11 @@ export async function exportInventoryStockToExcel(
       "Metal Type": item.metalType?.name || "-",
       Purity: item.purity || "-",
       Quantity: item.quantity,
-      "Gross Weight (g)": item.grossWeight || "-",
-      "Net Weight (g)": item.netWeight || "-",
-      "Stone Weight (g)": item.stoneWeight || "-",
-      "Carat Weight (ct)": item.caratWeight || "-",
-      [METALS_AND_STONES_COLUMN]: describePieceComponentsText(item.components),
+      "Gross Weight (g)": item.grossWeight ? wf.g(item.grossWeight) : "-",
+      "Net Weight (g)": item.netWeight ? wf.g(item.netWeight) : "-",
+      "Stone Weight (g)": item.stoneWeight ? wf.g(item.stoneWeight) : "-",
+      "Carat Weight (ct)": item.caratWeight ? wf.ct(item.caratWeight) : "-",
+      [METALS_AND_STONES_COLUMN]: describePieceComponentsText(item.components, wf),
       "Purchase Rate": item.purchaseRate || "-",
       "Sale Rate": item.saleRate || "-",
       "Making Charge": item.makingCharge || "-",

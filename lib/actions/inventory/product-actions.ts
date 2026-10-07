@@ -10,6 +10,7 @@ import { getSheetFeatures } from "@/lib/sheet-features.server";
 import { prisma } from "@/lib/prisma";
 import { getFineWeightResolver } from "@/lib/fine-weight";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
+import { getWeightFormat } from "@/lib/weight-settings.server";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scope";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
@@ -836,6 +837,8 @@ export async function exportProductsToExcel(
     // The PDF gets its own shorter column set — all 25 export columns on one
     // landscape page left each only a few characters wide, so names, codes
     // and dates broke mid-word. Every column is still in CSV/Excel.
+    // Settings > Weights decimals for the PDF's weight text.
+    const wf = await getWeightFormat(storeId);
     const pdfRows = () =>
       products.map((product, index) => ({
         "Sr.": index + 1,
@@ -846,9 +849,9 @@ export async function exportProductsToExcel(
         Metal: product.metalType || "-",
         Purity: product.defaultPurity || "-",
         HSN: product.hsnCode || "-",
-        "Gross Wt (g)": product.defaultGrossWeight ?? "-",
-        "Net Wt (g)": product.defaultNetWeight ?? "-",
-        "Stone Wt (g)": product.defaultStoneWeight ?? "-",
+        "Gross Wt (g)": product.defaultGrossWeight != null ? wf.g(product.defaultGrossWeight) : "-",
+        "Net Wt (g)": product.defaultNetWeight != null ? wf.g(product.defaultNetWeight) : "-",
+        "Stone Wt (g)": product.defaultStoneWeight != null ? wf.g(product.defaultStoneWeight) : "-",
         "Making Charge":
           product.defaultMakingCharge != null
             ? product.defaultMakingChargeType === "PERCENTAGE"

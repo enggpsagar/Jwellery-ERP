@@ -1,5 +1,6 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { startTransition, useActionState, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Check, Pencil, X } from "lucide-react"
@@ -59,6 +60,7 @@ function InvoiceItemRowView({
   showStone: boolean
   clarities: string[]
 }) {
+  const wf = useWeightFormat()
   const [editing, setEditing] = useState(false)
   const router = useRouter()
   const toast = useToast()
@@ -169,7 +171,7 @@ function InvoiceItemRowView({
         </td>
         <td className="px-4 py-3">{item.quantity}</td>
         <td className="px-4 py-3">
-          {quantity != null ? `${quantity.toFixed(3)} ${isDiamond ? "ct" : "g"}` : "-"}
+          {quantity != null ? wf.unit(quantity, isDiamond ? "CARAT" : "GRAM") : "-"}
         </td>
         <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
         {showMaking && (
@@ -221,8 +223,8 @@ function InvoiceItemRowView({
               const input = pieceInputs[key] ?? { rate: "", amount: "", details: { pieces: null, clarity: "", certificateNumber: "" } }
               const label =
                 row.kind === "METAL"
-                  ? `${[row.metalName, row.purityLabel].filter(Boolean).join(" ") || "Metal"} · ${(row.netWeight ?? 0).toFixed(3)} g`
-                  : `${row.stoneMetalTypeName ?? "Stone"} · ${(row.caratWeight ?? 0).toFixed(2)} ct`
+                  ? `${[row.metalName, row.purityLabel].filter(Boolean).join(" ") || "Metal"} · ${wf.g(row.netWeight ?? 0)} g`
+                  : `${row.stoneMetalTypeName ?? "Stone"} · ${wf.stoneCt(row.caratWeight ?? 0)} ct`
               return (
                 <div key={key} className="flex flex-wrap items-center gap-2 text-xs">
                   <span className="min-w-36 text-muted-foreground">{label}</span>
@@ -303,7 +305,7 @@ function InvoiceItemRowView({
       <td className="px-4 py-3">{item.quantity}</td>
       {isPiece ? (
         <>
-          <td className="px-4 py-3 text-xs text-muted-foreground">{(item.netWeight ?? 0).toFixed(3)} g</td>
+          <td className="px-4 py-3 text-xs text-muted-foreground">{wf.g(item.netWeight ?? 0)} g</td>
           <td className="px-4 py-3 text-xs text-muted-foreground">Per row</td>
         </>
       ) : (

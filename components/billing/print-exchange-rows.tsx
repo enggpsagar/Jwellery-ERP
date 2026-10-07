@@ -1,18 +1,44 @@
+import { Fragment } from "react"
+
+import { WeightText } from "@/components/shared/weight-text"
 import type { getInvoiceOldGoldExchange } from "@/lib/actions/old-gold-actions"
+import { DEFAULT_WEIGHT_FORMAT, type WeightFormat } from "@/lib/weight-calc"
 
 export type PrintExchange = NonNullable<Awaited<ReturnType<typeof getInvoiceOldGoldExchange>>>
 
 const fmt = (value: number) => value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 /** What the customer sold the shop, e.g. "Gold 22K 9.160 g pure, Diamond 0.50 ct". */
-export function exchangeSummary(exchange: PrintExchange) {
+export function exchangeSummary(exchange: PrintExchange, wf: WeightFormat = DEFAULT_WEIGHT_FORMAT) {
   return exchange.lines
     .map((line) =>
       line.isGemstone
-        ? `${line.metalName} ${(line.caratWeight ?? 0).toFixed(2)} ct`
-        : `${[line.metalName, line.purity].filter(Boolean).join(" ")} ${line.fineWeight.toFixed(3)} g pure`,
+        ? `${line.metalName} ${wf.stoneCarats(line.caratWeight ?? 0)}`
+        : `${[line.metalName, line.purity].filter(Boolean).join(" ")} ${wf.grams(line.fineWeight)} pure`,
     )
     .join(", ")
+}
+
+/** exchangeSummary with the store's weight decimals (Settings > Weights). */
+function ExchangeSummaryText({ exchange }: { exchange: PrintExchange }) {
+  return (
+    <>
+      {exchange.lines.map((line, index) => (
+        <Fragment key={index}>
+          {index > 0 ? ", " : ""}
+          {line.isGemstone ? (
+            <>
+              {line.metalName} <WeightText value={line.caratWeight ?? 0} stone />
+            </>
+          ) : (
+            <>
+              {[line.metalName, line.purity].filter(Boolean).join(" ")} <WeightText value={line.fineWeight} /> pure
+            </>
+          )}
+        </Fragment>
+      ))}
+    </>
+  )
 }
 
 /** Money actually received on the bill — paidAmount also counts the exchange's applied value. */
@@ -43,7 +69,9 @@ export function PrintExchangeRows({
       <div className={rowClassName}>
         <span>
           Less: Bought from customer ({exchange.number})
-          <span className="block text-[0.85em] opacity-75">{exchangeSummary(exchange)}</span>
+          <span className="block text-[0.85em] opacity-75">
+            <ExchangeSummaryText exchange={exchange} />
+          </span>
         </span>
         <span className="whitespace-nowrap">-₹{fmt(exchange.applied)}</span>
       </div>

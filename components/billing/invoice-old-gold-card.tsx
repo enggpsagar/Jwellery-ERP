@@ -1,10 +1,10 @@
 import Link from "next/link"
 
+import { WeightText } from "@/components/shared/weight-text"
 import type { getInvoiceOldGoldExchange } from "@/lib/actions/old-gold-actions"
 
 type Exchange = NonNullable<Awaited<ReturnType<typeof getInvoiceOldGoldExchange>>>
 
-const grams = (value: number) => `${value.toFixed(3)} g`
 const rupees = (value: number) => `₹${value.toFixed(2)}`
 
 /** What the customer sold to the shop against this invoice (gold, silver or
@@ -31,9 +31,15 @@ export function InvoiceOldGoldCard({
           <li key={line.id} className="flex flex-wrap justify-between gap-2">
             <span>
               {line.description} · {line.metalName} {line.purity} —{" "}
-              {line.isGemstone
-                ? `${(line.caratWeight ?? 0).toFixed(3)} ct × ${rupees(line.rate)}/ct`
-                : `${grams(line.netWeight)} → ${grams(line.fineWeight)} pure × ${rupees(line.rate)}`}
+              {line.isGemstone ? (
+                <>
+                  <WeightText value={line.caratWeight ?? 0} unit="CARAT" /> × {rupees(line.rate)}/ct
+                </>
+              ) : (
+                <>
+                  <WeightText value={line.netWeight} /> → <WeightText value={line.fineWeight} /> pure × {rupees(line.rate)}
+                </>
+              )}
               {line.deductionPercent > 0 ? ` − ${line.deductionPercent}%` : ""}
               {line.stone ? ` + stone ${line.stone.name} ${rupees(line.stone.value)}` : ""}
             </span>

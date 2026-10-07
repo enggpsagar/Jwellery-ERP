@@ -13,6 +13,7 @@ import { EmailKachaInvoiceButton } from "@/components/billing/kacha/email-kacha-
 import { LineStoneDetails, PieceBreakdown } from "@/components/billing/piece-breakdown"
 import { InvoiceOldGoldCard } from "@/components/billing/invoice-old-gold-card"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import { WeightText } from "@/components/shared/weight-text"
 import { Button } from "@/components/ui/button"
 import { IconTooltip } from "@/components/ui/icon-tooltip"
 
@@ -170,9 +171,11 @@ export default async function KachaInvoiceDetailPage({ params }: Props) {
                 </td>
                 <td className="px-4 py-3">{item.quantity}</td>
                 <td className="px-4 py-3">
-                  {item.purity === "DIAMOND"
-                    ? item.caratWeight != null ? `${item.caratWeight.toFixed(3)} ct` : "-"
-                    : item.netWeight != null ? `${item.netWeight.toFixed(3)} g` : "-"}
+                  {item.purity === "DIAMOND" ? (
+                    <WeightText value={item.caratWeight} unit="CARAT" fallback="-" />
+                  ) : (
+                    <WeightText value={item.netWeight} fallback="-" />
+                  )}
                 </td>
                 <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
                 {showMaking && (

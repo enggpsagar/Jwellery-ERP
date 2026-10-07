@@ -3,6 +3,7 @@ import { ArrowRightCircle } from "lucide-react"
 
 import type { Quotation } from "@/lib/actions/quotation-actions"
 import { formatShortDate } from "@/lib/utils"
+import { WeightText } from "@/components/shared/weight-text"
 import { QuotationStatusBadge } from "@/components/quotations/quotation-status-badge"
 import { LineStoneDetails, PieceBreakdown } from "@/components/billing/piece-breakdown"
 import { QuotationExchangeEstimateCard, QuotationExchangeEstimateRows } from "@/components/quotations/quotation-exchange-estimate"
@@ -104,9 +105,11 @@ export function QuotationDetailContent({ quotation }: QuotationDetailContentProp
                 </td>
                 <td className="px-4 py-3">{item.quantity}</td>
                 <td className="px-4 py-3">
-                  {item.purity === "DIAMOND"
-                    ? item.caratWeight != null ? `${item.caratWeight.toFixed(3)} ct` : "-"
-                    : item.netWeight != null ? `${item.netWeight.toFixed(3)} g` : "-"}
+                  {item.purity === "DIAMOND" ? (
+                    <WeightText value={item.caratWeight} unit="CARAT" fallback="-" />
+                  ) : (
+                    <WeightText value={item.netWeight} fallback="-" />
+                  )}
                 </td>
                 <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
                 {showMaking && (

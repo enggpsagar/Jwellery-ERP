@@ -4,6 +4,7 @@ import type { getInventoryStockById } from "@/lib/actions/inventory/stock-action
 import { StockStatusBadge } from "@/components/inventory/shared/stock-status-badge"
 import { FinishBadge } from "@/components/inventory/shared/finish-badge"
 import { DetailField, DetailGrid, DetailSection } from "@/components/shared/detail-section"
+import { WeightText } from "@/components/shared/weight-text"
 import { formatShortDate } from "@/lib/utils"
 
 type Stock = NonNullable<Awaited<ReturnType<typeof getInventoryStockById>>>
@@ -15,6 +16,12 @@ function formatDate(value: Date | string | null | undefined) {
 function formatNumber(value: unknown) {
   if (value === null || value === undefined || value === "") return "-"
   return String(value)
+}
+
+/** Grams with the store's decimals (Settings > Weights). */
+function formatGrams(value: unknown) {
+  if (value === null || value === undefined || value === "") return "-"
+  return <WeightText value={Number(value)} />
 }
 
 /**
@@ -74,10 +81,10 @@ export function StockDetailContent({
 
       <DetailSection title="Weight Details" icon={Scale} tint="var(--chart-3)" compact>
         <DetailGrid dense>
-          <DetailField label="Gross Weight" value={formatNumber(stock.grossWeight)} />
-          <DetailField label="Less Weight" value={formatNumber(stock.lessWeight)} />
-          <DetailField label="Net Weight" value={formatNumber(stock.netWeight)} />
-          <DetailField label="Stone Weight" value={formatNumber(stock.stoneWeight)} />
+          <DetailField label="Gross Weight" value={formatGrams(stock.grossWeight)} />
+          <DetailField label="Less Weight" value={formatGrams(stock.lessWeight)} />
+          <DetailField label="Net Weight" value={formatGrams(stock.netWeight)} />
+          <DetailField label="Stone Weight" value={formatGrams(stock.stoneWeight)} />
           <DetailField label="Wastage %" value={formatNumber(stock.wastagePercent)} />
         </DetailGrid>
       </DetailSection>

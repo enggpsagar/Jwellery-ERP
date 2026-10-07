@@ -3,11 +3,13 @@
 // gets the defaults, which reproduce the behaviour before these settings.
 import "server-only";
 
+import { cache } from "react";
 import { unstable_cache } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { weightSettingsTag } from "@/lib/cache-tags";
-import { normalizeWeightSettings, type WeightSettings } from "@/lib/weight-calc";
+import { getEffectiveStoreId } from "@/lib/store-context";
+import { normalizeWeightSettings, weightFormatter, type WeightFormat, type WeightSettings } from "@/lib/weight-calc";
 
 export const weightSettingsSelect = {
   netDeductStoneWeight: true,
@@ -33,4 +35,19 @@ export function getCachedWeightSettings(storeId: string): Promise<WeightSettings
     tags: [weightSettingsTag(storeId)],
     revalidate: 300,
   })();
+}
+
+/**
+ * Display formatter for a store's weights (lib/weight-calc.ts
+ * weightFormatter) — read once per request from the cached settings. Server
+ * pages, routes and exports use this; client components useWeightFormat().
+ */
+export const getWeightFormat = cache(async (storeId: string | null | undefined): Promise<WeightFormat> => {
+  const settings = storeId ? await getCachedWeightSettings(storeId) : normalizeWeightSettings(null);
+  return weightFormatter(settings);
+});
+
+/** getWeightFormat for the store the request is acting on (defaults when none). */
+export async function getActiveWeightFormat(): Promise<WeightFormat> {
+  return getWeightFormat(await getEffectiveStoreId());
 }

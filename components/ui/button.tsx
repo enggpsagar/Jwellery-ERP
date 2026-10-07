@@ -3,6 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { Slot } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 const buttonVariants = cva(
   "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -102,6 +103,35 @@ function Button({
     asChild?: boolean
   }) {
   const Comp = asChild ? Slot.Root : "button"
+
+  // An icon-only button (size icon / icon-xs / icon-sm / icon-lg) shows its
+  // label as a tooltip on hover and keyboard focus — every Edit / Delete /
+  // View / Export icon in the app gets one from its aria-label (or title)
+  // without wrapping each call site. The native title is dropped so the
+  // browser's own tooltip doesn't show on top; aria-label stays for screen
+  // readers. A label-less icon button gets no tooltip: give it an aria-label.
+  const label =
+    props["aria-label"] ?? (typeof props.title === "string" ? props.title : undefined)
+  const iconOnly = typeof size === "string" && size.startsWith("icon")
+
+  if (iconOnly && label) {
+    const { title: _title, ...rest } = props
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Comp
+            data-slot="button"
+            data-variant={variant}
+            data-size={size}
+            className={cn(buttonVariants({ variant, size, className }))}
+            {...rest}
+            aria-label={label}
+          />
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+    )
+  }
 
   return (
     <Comp

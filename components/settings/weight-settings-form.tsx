@@ -36,13 +36,13 @@ import { useToast } from "@/components/providers/toast-provider"
 // Kept here (not imported) because lib/weight-recalc.server.ts is server-only;
 // only its types cross over.
 const PHASES: { id: RecalcPhase; label: string }[] = [
+  { id: "ledgerEntry", label: "Stock-added ledger entries" },
   { id: "pieceComponent", label: "Metal rows of multi-part pieces" },
   { id: "inventoryStock", label: "Stock pieces" },
   { id: "purchaseItem", label: "Purchase lines" },
   { id: "invoiceItem", label: "Invoice lines" },
   { id: "kachaInvoiceItem", label: "Estimate lines" },
   { id: "quotationItem", label: "Quotation lines" },
-  { id: "ledgerEntry", label: "Stock-added ledger entries" },
 ]
 
 function Checkbox({ id, checked, onChange, label, hint }: { id: string; checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {

@@ -39,13 +39,14 @@ import { deriveNetWeight, fineDecimals, netDecimals, type WeightSettings } from 
 export const RECALC_BATCH_SIZE = 500;
 
 export const RECALC_PHASES = [
+  // First: it compares each entry with its piece's figures BEFORE this run.
+  "ledgerEntry",
   "pieceComponent",
   "inventoryStock",
   "purchaseItem",
   "invoiceItem",
   "kachaInvoiceItem",
   "quotationItem",
-  "ledgerEntry",
 ] as const;
 export type RecalcPhase = (typeof RECALC_PHASES)[number];
 
@@ -324,25 +325,60 @@ const componentSelect = {
   select: { kind: true, sortOrder: true, metalTypeId: true, fineWeight: true },
 };
 
+const stockSelect = {
+  id: true,
+  status: true,
+  metalTypeId: true,
+  purity: true,
+  purityLabel: true,
+  grossWeight: true,
+  netWeight: true,
+  fineWeight: true,
+  stoneWeight: true,
+  dmoWeight: true,
+  lessWeight: true,
+  wastagePercent: true,
+  _count: { select: { invoiceItems: true, kachaInvoiceItems: true, karigarJobs: true } },
+} as const;
+
+type StockRow = Prisma.InventoryStockGetPayload<{ select: typeof stockSelect }>;
+
+/** A single (not multi-part) stock row's new net / fine — null = unchanged. */
+function stockNext(row: StockRow, ctx: BatchContext): { netWeight: number | null; fineWeight: number | null } {
+  if (row.netWeight === null) return { netWeight: null, fineWeight: null };
+  let netWeight = asNum(row.netWeight);
+  let netChanged: number | null = null;
+  const unsold =
+    row.status === "IN_STOCK" &&
+    row._count.invoiceItems === 0 &&
+    row._count.kachaInvoiceItems === 0 &&
+    row._count.karigarJobs === 0;
+  if (
+    ctx.netChange &&
+    unsold &&
+    (asNum(row.grossWeight) ?? 0) > 0 &&
+    !(row.metalTypeId && ctx.gemstoneIds.has(row.metalTypeId)) &&
+    isDerivedNet(row, ctx.job.from)
+  ) {
+    const next = ctx.fineOf.deriveNet({
+      grossWeight: asNum(row.grossWeight),
+      stoneWeight: asNum(row.stoneWeight),
+      dmoWeight: asNum(row.dmoWeight),
+      lessWeight: asNum(row.lessWeight),
+    });
+    if (next !== null && differs(row.netWeight, next)) {
+      netChanged = next;
+      netWeight = next;
+    }
+  }
+  const nextFine = ctx.fineOf({ ...row, netWeight, wastagePercent: row.wastagePercent ?? null });
+  return { netWeight: netChanged, fineWeight: nextFine !== null && differs(row.fineWeight, nextFine) ? nextFine : null };
+}
+
 async function runStock(tx: Tx, ctx: BatchContext): Promise<BatchResult> {
   const rows = await tx.inventoryStock.findMany({
     where: { storeId: ctx.storeId },
-    select: {
-      id: true,
-      status: true,
-      metalTypeId: true,
-      purity: true,
-      purityLabel: true,
-      grossWeight: true,
-      netWeight: true,
-      fineWeight: true,
-      stoneWeight: true,
-      dmoWeight: true,
-      lessWeight: true,
-      wastagePercent: true,
-      components: componentSelect,
-      _count: { select: { invoiceItems: true, kachaInvoiceItems: true, karigarJobs: true } },
-    },
+    select: { ...stockSelect, components: componentSelect },
     ...batchArgs(ctx.job.cursor),
   });
   let fine = 0;
@@ -356,36 +392,14 @@ async function runStock(tx: Tx, ctx: BatchContext): Promise<BatchResult> {
       }
       continue;
     }
-    if (row.netWeight === null) continue;
-    let netWeight = asNum(row.netWeight);
-    const unsold =
-      row.status === "IN_STOCK" &&
-      row._count.invoiceItems === 0 &&
-      row._count.kachaInvoiceItems === 0 &&
-      row._count.karigarJobs === 0;
+    const next = stockNext(row, ctx);
     const data: Prisma.InventoryStockUpdateInput = {};
-    if (
-      ctx.netChange &&
-      unsold &&
-      (asNum(row.grossWeight) ?? 0) > 0 &&
-      !(row.metalTypeId && ctx.gemstoneIds.has(row.metalTypeId)) &&
-      isDerivedNet(row, ctx.job.from)
-    ) {
-      const next = ctx.fineOf.deriveNet({
-        grossWeight: asNum(row.grossWeight),
-        stoneWeight: asNum(row.stoneWeight),
-        dmoWeight: asNum(row.dmoWeight),
-        lessWeight: asNum(row.lessWeight),
-      });
-      if (next !== null && differs(row.netWeight, next)) {
-        data.netWeight = next;
-        netWeight = next;
-        net++;
-      }
+    if (next.netWeight !== null) {
+      data.netWeight = next.netWeight;
+      net++;
     }
-    const nextFine = ctx.fineOf({ ...row, netWeight, wastagePercent: row.wastagePercent ?? null });
-    if (nextFine !== null && differs(row.fineWeight, nextFine)) {
-      data.fineWeight = nextFine;
+    if (next.fineWeight !== null) {
+      data.fineWeight = next.fineWeight;
       fine++;
     }
     if (Object.keys(data).length) await tx.inventoryStock.update({ where: { id: row.id }, data });
@@ -552,24 +566,43 @@ async function runLedger(tx: Tx, ctx: BatchContext): Promise<BatchResult> {
   const stocks = codes.length
     ? await tx.inventoryStock.findMany({
         where: { storeId: ctx.storeId, stockCode: { in: codes } },
-        select: { stockCode: true, metalTypeId: true, fineWeight: true, components: componentSelect },
+        select: {
+          ...stockSelect,
+          stockCode: true,
+          components: {
+            where: { kind: "METAL" as const },
+            select: { metalTypeId: true, purity: true, purityLabel: true, grossWeight: true, netWeight: true, fineWeight: true, wastagePercent: true },
+          },
+        },
       })
     : [];
   const stockByCode = new Map(stocks.map((stock) => [stock.stockCode, stock]));
+  const round5 = (value: number) => Math.round(value * 100000) / 100000;
   let fine = 0;
   for (const row of rows) {
     const code = stockCodeFromDescription(row.description);
     const stock = code ? stockByCode.get(code) : undefined;
     if (!stock || !row.metalTypeId) continue;
+    // Runs before the stock / component phases, so the piece still has its
+    // old figures: the entry follows only if it still matches them (a piece
+    // edited after it was added keeps its ledger entry as posted — stock
+    // edits never post to the ledger).
+    let before: number | null = null;
     let next: number | null = null;
     if (stock.components.length) {
       const metalRows = stock.components.filter((component) => component.metalTypeId === row.metalTypeId);
       if (metalRows.length) {
-        next = Math.round(metalRows.reduce((acc, component) => acc + (asNum(component.fineWeight) ?? 0), 0) * 100000) / 100000;
+        before = round5(metalRows.reduce((acc, component) => acc + (asNum(component.fineWeight) ?? 0), 0));
+        next = round5(
+          metalRows.reduce((acc, component) => acc + (ctx.fineOf({ ...component, wastagePercent: component.wastagePercent ?? null }) ?? 0), 0),
+        );
       }
     } else if (stock.metalTypeId === row.metalTypeId) {
-      next = asNum(stock.fineWeight);
+      before = asNum(stock.fineWeight);
+      const computed = stockNext(stock, ctx);
+      next = computed.fineWeight ?? before;
     }
+    if (before === null || differs(row.metalWeightFine, before)) continue;
     if (next !== null && next > 0 && differs(row.metalWeightFine, next)) {
       await tx.ledgerEntry.update({ where: { id: row.id }, data: { metalWeightFine: next } });
       fine++;

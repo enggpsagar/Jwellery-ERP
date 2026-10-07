@@ -7,6 +7,7 @@ import { Printer } from "lucide-react"
 import { getCreditNoteById } from "@/lib/actions/credit-note-actions"
 import { CreditNoteDetailContent } from "@/components/billing/credit-note-detail-content"
 import { PageBackHeader } from "@/components/shared/page-back-header"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -37,14 +38,15 @@ export default async function CreditNoteDetailPage({ params }: Props) {
         backHref="/billing/credit-notes"
         backLabel="Back to Credit Notes"
         action={
-          <Link
-            href={`/billing/credit-notes/${creditNote.id}/print`}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
-            aria-label="Print credit note"
-            title="Print"
-          >
-            <Printer className="h-4 w-4" />
-          </Link>
+          <IconTooltip label="Print credit note">
+            <Link
+              href={`/billing/credit-notes/${creditNote.id}/print`}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
+              aria-label="Print credit note"
+            >
+              <Printer className="h-4 w-4" />
+            </Link>
+          </IconTooltip>
         }
       />
 

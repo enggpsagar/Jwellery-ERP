@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Loader } from "@/components/ui/loader"
 import { useToast } from "@/components/providers/toast-provider"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 const initialState: PlatformContentFormState = { success: false, message: "" }
 
@@ -125,26 +126,28 @@ export function FaqManager({ faqs }: { faqs: PlatformFaqRow[] }) {
 
             <div className="flex shrink-0 items-center gap-1.5">
               <div className="flex flex-col">
-                <button
-                  type="button"
-                  onClick={() => handleMove(faq.id, "up")}
-                  disabled={busyId === faq.id || index === 0}
-                  className="inline-flex h-5 w-6 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30"
-                  aria-label={`Move "${faq.question}" up`}
-                  title="Move up"
-                >
-                  <ArrowUp className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleMove(faq.id, "down")}
-                  disabled={busyId === faq.id || index === faqs.length - 1}
-                  className="inline-flex h-5 w-6 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30"
-                  aria-label={`Move "${faq.question}" down`}
-                  title="Move down"
-                >
-                  <ArrowDown className="h-3.5 w-3.5" />
-                </button>
+                <IconTooltip label={`Move "${faq.question}" up`}>
+                  <button
+                    type="button"
+                    onClick={() => handleMove(faq.id, "up")}
+                    disabled={busyId === faq.id || index === 0}
+                    className="inline-flex h-5 w-6 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30"
+                    aria-label={`Move "${faq.question}" up`}
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  </button>
+                </IconTooltip>
+                <IconTooltip label={`Move "${faq.question}" down`}>
+                  <button
+                    type="button"
+                    onClick={() => handleMove(faq.id, "down")}
+                    disabled={busyId === faq.id || index === faqs.length - 1}
+                    className="inline-flex h-5 w-6 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30"
+                    aria-label={`Move "${faq.question}" down`}
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                  </button>
+                </IconTooltip>
               </div>
 
               <Switch

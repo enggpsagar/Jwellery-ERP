@@ -23,6 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 const initialState: CollaborationActionState = { success: false, message: "" }
 
@@ -117,16 +118,17 @@ export function RequestStoreAccessButton({
               <code className="flex-1 font-mono text-lg font-semibold tracking-wider">
                 {access.code}
               </code>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => handleCopy(access.code!)}
-                aria-label="Copy code"
-                title="Copy code"
-              >
-                {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-              </Button>
+              <IconTooltip label="Copy code">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleCopy(access.code!)}
+                  aria-label="Copy code"
+                >
+                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </IconTooltip>
             </div>
           ) : (
             <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">

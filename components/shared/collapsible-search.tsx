@@ -5,6 +5,7 @@ import { Search, X } from "lucide-react"
 
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 type CollapsibleSearchProps = {
   value: string
@@ -74,19 +75,20 @@ export function CollapsibleSearch({
         disabled={disabled}
       />
       {value ? (
-        <button
-          type="button"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            onChange("")
-            setExpanded(false)
-          }}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          title="Clear search"
-          aria-label="Clear search"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <IconTooltip label="Clear search">
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onChange("")
+              setExpanded(false)
+            }}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </IconTooltip>
       ) : null}
     </div>
   )

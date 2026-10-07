@@ -248,7 +248,7 @@ export function KachaInvoiceTable({
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <Button variant="info" size="icon" asChild title="View Estimate">
+                  <Button variant="info" size="icon" asChild aria-label={`View estimate ${kachaInvoice.slipNumber}`}>
                     <Link href={`/billing/kacha/${kachaInvoice.id}`}>
                       <Eye className="h-4 w-4" />
                     </Link>

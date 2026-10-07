@@ -112,7 +112,12 @@ function Button({
   // readers. A label-less icon button gets no tooltip: give it an aria-label.
   const label =
     props["aria-label"] ?? (typeof props.title === "string" ? props.title : undefined)
-  const iconOnly = typeof size === "string" && size.startsWith("icon")
+  // A square button that shows its own text (a calendar day's number) isn't
+  // icon-only: a tooltip there would just repeat it and cover its neighbours.
+  const showsText = React.Children.toArray(props.children).some(
+    (child) => typeof child === "string" || typeof child === "number"
+  )
+  const iconOnly = typeof size === "string" && size.startsWith("icon") && !showsText
 
   if (iconOnly && label) {
     const { title: _title, ...rest } = props

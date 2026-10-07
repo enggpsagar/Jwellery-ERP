@@ -11,6 +11,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Loader } from "@/components/ui/loader"
 import { cn } from "@/lib/utils"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 type UploadedAttachment = {
   url: string
@@ -123,15 +124,16 @@ export function TicketAttachmentField({ ticketId }: TicketAttachmentFieldProps) 
               ({formatBytes(attachment.size)})
             </span>
           </span>
-          <button
-            type="button"
-            onClick={clearAttachment}
-            aria-label="Remove attachment"
-            title="Remove attachment"
-            className="shrink-0 rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
+          <IconTooltip label="Remove attachment">
+            <button
+              type="button"
+              onClick={clearAttachment}
+              aria-label="Remove attachment"
+              className="shrink-0 rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </IconTooltip>
         </div>
       ) : (
         <div className="flex items-center gap-2">

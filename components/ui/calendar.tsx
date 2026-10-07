@@ -10,6 +10,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from "lucide-react"
 
 function Calendar({
@@ -173,6 +174,18 @@ function Calendar({
             </td>
           )
         },
+        // Month arrows are icon-only: give them the same tooltip as every
+        // other icon button in the app.
+        PreviousMonthButton: (props) => (
+          <IconTooltip label="Previous month">
+            <button {...props} />
+          </IconTooltip>
+        ),
+        NextMonthButton: (props) => (
+          <IconTooltip label="Next month">
+            <button {...props} />
+          </IconTooltip>
+        ),
         ...components,
       }}
       {...props}

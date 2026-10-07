@@ -21,7 +21,7 @@ export function ProductRowActions({
 }: ProductRowActionsProps) {
   return (
     <div className="flex items-center gap-2">
-      <Button variant="info" size="icon" asChild title="View product">
+      <Button variant="info" size="icon" asChild aria-label={`View ${productName}`}>
         <Link href={`/inventory/products/${productId}`}>
           <Eye className="h-4 w-4" />
         </Link>
@@ -29,7 +29,7 @@ export function ProductRowActions({
 
       {canEdit && (
         <>
-          <Button variant="edit" size="icon" asChild title="Edit product">
+          <Button variant="edit" size="icon" asChild aria-label={`Edit ${productName}`}>
             <Link href={`/inventory/products/${productId}/edit`}>
               <Pencil className="h-4 w-4" />
             </Link>

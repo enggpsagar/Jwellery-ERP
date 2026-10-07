@@ -6,6 +6,7 @@ import StarterKit from "@tiptap/starter-kit"
 import Placeholder from "@tiptap/extension-placeholder"
 import { Bold, Italic, List, ListOrdered } from "lucide-react"
 
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 import { cn } from "@/lib/utils"
 
 type RichTextEditorProps = {
@@ -28,19 +29,20 @@ function ToolbarButton({
   children: React.ReactNode
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      aria-pressed={active}
-      title={label}
-      className={cn(
-        "inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground",
-        active && "bg-muted text-foreground",
-      )}
-    >
-      {children}
-    </button>
+    <IconTooltip label={label}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={label}
+        aria-pressed={active}
+        className={cn(
+          "inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground",
+          active && "bg-muted text-foreground",
+        )}
+      >
+        {children}
+      </button>
+    </IconTooltip>
   )
 }
 

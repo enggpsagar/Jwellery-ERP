@@ -274,10 +274,10 @@ function TagFieldsCard({
               <span className="flex-1">{LABELS.get(field)}</span>
               {canEdit && (
                 <>
-                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label="Move up" disabled={index === 0} onClick={() => move(index, -1)}>
+                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label={`Move ${LABELS.get(field)} up`} disabled={index === 0} onClick={() => move(index, -1)}>
                     <ArrowUp className="h-3.5 w-3.5" />
                   </Button>
-                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label="Move down" disabled={index === fields.length - 1} onClick={() => move(index, 1)}>
+                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label={`Move ${LABELS.get(field)} down`} disabled={index === fields.length - 1} onClick={() => move(index, 1)}>
                     <ArrowDown className="h-3.5 w-3.5" />
                   </Button>
                   <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label={`Remove ${LABELS.get(field)}`} onClick={() => onChange(fields.filter((f) => f !== field))}>

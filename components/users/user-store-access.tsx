@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 const ASSIGNABLE_ROLES: UserRole[] = [
   UserRole.ADMIN,
@@ -154,16 +155,17 @@ export function UserStoreAccess({ userId, rows }: UserStoreAccessProps) {
                   </Button>
 
                   {row.granted && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() => remove(row)}
-                      aria-label={`Remove access to ${row.storeName}`}
-                      title="Remove store access"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <IconTooltip label={`Remove access to ${row.storeName}`}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() => remove(row)}
+                        aria-label={`Remove access to ${row.storeName}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </IconTooltip>
                   )}
                 </div>
               </div>

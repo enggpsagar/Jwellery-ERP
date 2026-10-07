@@ -246,7 +246,7 @@ export function StoneComponentFields({
                   type="button"
                   variant="secondary"
                   size="icon"
-                  title="Add Stone"
+                  aria-label="Add Stone"
                   onClick={() => setAddStoneOpen(true)}
                 >
                   <Plus className="h-4 w-4" />
@@ -279,7 +279,7 @@ export function StoneComponentFields({
                   type="button"
                   variant="secondary"
                   size="icon"
-                  title="Add Stone Type"
+                  aria-label="Add Stone Type"
                   disabled={!selectedStone}
                   onClick={() => setAddTypeOpen(true)}
                 >
@@ -378,7 +378,7 @@ export function StoneComponentFields({
                 type="button"
                 variant="secondary"
                 size="icon"
-                title="Add Stone"
+                aria-label="Add Stone"
                 onClick={() => setAddStoneOpen(true)}
               >
                 <Plus className="h-4 w-4" />

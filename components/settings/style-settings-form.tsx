@@ -20,6 +20,7 @@ import { ActiveBadge } from "@/components/shared/active-badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/providers/toast-provider";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 
 const initialState: TaxonomyFormState = { success: false, message: "" };
 
@@ -117,25 +118,27 @@ export function StyleSettingsForm({ styles, canEdit }: StyleSettingsFormProps) {
                       disabled={togglingId === style.id}
                       onCheckedChange={(checked) => handleToggle(style.id, checked)}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(style.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                      aria-label={`Edit ${style.name}`}
-                      title="Edit style"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(style.id, style.name)}
-                      disabled={deletingId === style.id}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                      aria-label={`Delete ${style.name}`}
-                      title="Delete style (only if unused)"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <IconTooltip label={`Edit ${style.name}`}>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(style.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                        aria-label={`Edit ${style.name}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    </IconTooltip>
+                    <IconTooltip label={`Delete ${style.name} (only if unused)`}>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(style.id, style.name)}
+                        disabled={deletingId === style.id}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                        aria-label={`Delete ${style.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </IconTooltip>
                   </div>
                 ) : (
                   <ActiveBadge isActive={style.isActive} />

@@ -85,7 +85,7 @@ export function UserRowActions({ user }: { user: ActionableUser }) {
       <Button
         size="icon"
         variant="edit"
-        title="Edit user"
+        aria-label={user.name ? `Edit ${user.name}` : "Edit user"}
         asChild
       >
         <Link href={`/users/${user.id}/edit`}>
@@ -98,7 +98,7 @@ export function UserRowActions({ user }: { user: ActionableUser }) {
         size="icon"
         disabled={isPending}
         onClick={handleToggleStatus}
-        title={user.status === "DISABLED" ? "Enable user" : "Disable user"}
+        aria-label={`${user.status === "DISABLED" ? "Enable" : "Disable"} ${user.name ?? "user"}`}
       >
         {user.status === "DISABLED" ? (
           <ToggleLeft className="h-4 w-4" />
@@ -112,7 +112,7 @@ export function UserRowActions({ user }: { user: ActionableUser }) {
         size="icon"
         disabled={isPending}
         onClick={handleDelete}
-        title="Delete user"
+        aria-label={user.name ? `Delete ${user.name}` : "Delete user"}
       >
         <Trash2 className="h-4 w-4" />
       </Button>

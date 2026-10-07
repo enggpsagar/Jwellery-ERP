@@ -57,6 +57,7 @@ import {
   type PieceValueOptions,
   type StoredPieceComponent,
 } from "@/lib/piece-components"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 // A purchase values each metal row on its net weight × rate (not pure
 // weight — that's a Customer Exchange) — lib/piece-components.ts.
@@ -1290,15 +1291,17 @@ export function PurchaseForm({
               return (
               <div key={item.key} className="rounded-lg border">
                 <div className={`grid ${compactRowGridCols} items-start gap-2 p-2`}>
-                  <button
-                    type="button"
-                    onClick={() => toggleExpanded(item.key)}
-                    className="mt-1.5 text-muted-foreground hover:text-foreground"
-                    aria-label={isExpanded ? "Collapse line item details" : "Expand line item details"}
-                    aria-expanded={isExpanded}
-                  >
-                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  </button>
+                  <IconTooltip label={isExpanded ? "Collapse line item details" : "Expand line item details"}>
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(item.key)}
+                      className="mt-1.5 text-muted-foreground hover:text-foreground"
+                      aria-label={isExpanded ? "Collapse line item details" : "Expand line item details"}
+                      aria-expanded={isExpanded}
+                    >
+                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+                  </IconTooltip>
 
                   <div className="space-y-1">
                     {/* Manual entry (no catalog Product) is an explicit
@@ -1311,15 +1314,16 @@ export function PurchaseForm({
                         <div className="flex h-9 flex-1 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
                           No product — manual entry
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => updateItem(item.key, { productLinkDecided: false })}
-                          className="shrink-0 text-muted-foreground hover:text-foreground"
-                          aria-label="Pick a product instead"
-                          title="Pick a product instead"
-                        >
-                          <Search className="h-4 w-4" />
-                        </button>
+                        <IconTooltip label="Pick a product instead">
+                          <button
+                            type="button"
+                            onClick={() => updateItem(item.key, { productLinkDecided: false })}
+                            className="shrink-0 text-muted-foreground hover:text-foreground"
+                            aria-label="Pick a product instead"
+                          >
+                            <Search className="h-4 w-4" />
+                          </button>
+                        </IconTooltip>
                       </div>
                     ) : (
                       <ProductSelect
@@ -1439,14 +1443,16 @@ export function PurchaseForm({
 
                   <div className="flex justify-center pt-1">
                     {items.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.key)}
-                        className="text-red-600 hover:text-red-700"
-                        aria-label="Remove item"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <IconTooltip label="Remove item">
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.key)}
+                          className="text-red-600 hover:text-red-700"
+                          aria-label="Remove item"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </IconTooltip>
                     )}
                   </div>
                 </div>

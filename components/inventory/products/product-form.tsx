@@ -1096,7 +1096,7 @@ export function ProductForm({
                   variant="secondary"
                   size="icon"
                   className="h-11 w-9 shrink-0 px-0"
-                  title="Add Category"
+                  aria-label="Add Category"
                   onClick={() => setAddCategoryOpen(true)}
                 >
                   <Plus className="h-4 w-4" />
@@ -1180,7 +1180,7 @@ export function ProductForm({
                   variant="secondary"
                   size="icon"
                   className="h-11 w-9 shrink-0 px-0"
-                  title="Add Type"
+                  aria-label="Add Type"
                   disabled={loadingTypes}
                   onClick={() => setAddTypeOpen(true)}
                 >
@@ -1292,7 +1292,7 @@ export function ProductForm({
                           variant="secondary"
                           size="icon"
                           className="w-9 shrink-0 px-0"
-                          title="Add Metal Type"
+                          aria-label="Add Metal Type"
                           onClick={() => setAddMetalForKey(row.key)}
                         >
                           <Plus className="h-4 w-4" />
@@ -1327,7 +1327,7 @@ export function ProductForm({
                           variant="secondary"
                           size="icon"
                           className="w-9 shrink-0 px-0"
-                          title="Add Purity"
+                          aria-label="Add Purity"
                           disabled={!rowMetal || !rowMetal.hasPurity}
                           onClick={() => setAddPurityForKey(row.key)}
                         >
@@ -1647,7 +1647,7 @@ export function ProductForm({
                         variant="secondary"
                         size="icon"
                         className="shrink-0"
-                        title="Add Clarity"
+                        aria-label="Add Clarity"
                         onClick={() => {
                           setAddClarityName("");
                           setAddClarityForKey(row.key);

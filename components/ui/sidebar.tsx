@@ -343,7 +343,7 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon-sm"
-      title="Toggle Sidebar"
+      aria-label="Toggle Sidebar"
       className={cn(className)}
       onClick={(event) => {
         onClick?.(event)

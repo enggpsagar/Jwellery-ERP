@@ -13,6 +13,7 @@ import {
   type GlobalSearchResult,
   type GlobalSearchResultType,
 } from "@/lib/actions/global-search-actions";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 
 const TYPE_ICON: Record<GlobalSearchResultType, typeof Users> = {
   customer: Users,
@@ -237,15 +238,16 @@ export function GlobalSearch() {
           full-width bar docked under the header, rather than search being
           unreachable below the old md: cutoff. */}
       <div className="lg:hidden">
-        <button
-          type="button"
-          aria-label="Search"
-          title="Search"
-          onClick={() => setMobileOpen((v) => !v)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        >
-          <Search className="h-5 w-5" />
-        </button>
+        <IconTooltip label="Search">
+          <button
+            type="button"
+            aria-label="Search"
+            onClick={() => setMobileOpen((v) => !v)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Search className="h-5 w-5" />
+          </button>
+        </IconTooltip>
 
         {mobileOpen && (
           <div className="fixed inset-x-0 top-16 z-40 border-b bg-background/95 p-3 shadow-lg backdrop-blur-md">
@@ -267,20 +269,21 @@ export function GlobalSearch() {
                 aria-expanded={showDropdown}
                 aria-controls="global-search-results"
               />
-              <button
-                type="button"
-                aria-label="Close search"
-                title="Close search"
-                onClick={() => {
-                  setMobileOpen(false);
-                  setOpen(false);
-                  setQuery("");
-                  setResults([]);
-                }}
-                className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <IconTooltip label="Close search">
+                <button
+                  type="button"
+                  aria-label="Close search"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    setOpen(false);
+                    setQuery("");
+                    setResults([]);
+                  }}
+                  className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </IconTooltip>
 
               {showDropdown && resultsList}
             </div>

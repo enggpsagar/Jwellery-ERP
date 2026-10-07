@@ -5,6 +5,7 @@ import { ImagePlus, Loader2, Star, X } from "lucide-react"
 
 import { useToast } from "@/components/providers/toast-provider"
 import { cn } from "@/lib/utils"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 // Kept in step with MAX_PRODUCT_IMAGES in product-actions.ts (a "use
 // server" file can only export async functions) and the upload route's own
@@ -111,26 +112,28 @@ export function ProductImagesField({ initialUrls = [] }: { initialUrls?: string[
               </span>
             )}
 
-            <button
-              type="button"
-              onClick={() => remove(url)}
-              className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black"
-              aria-label={`Remove image ${index + 1}`}
-              title="Remove"
-            >
-              <X className="size-3.5" />
-            </button>
-
-            {index > 0 && (
+            <IconTooltip label={`Remove image ${index + 1}`}>
               <button
                 type="button"
-                onClick={() => makeCover(url)}
-                className="absolute bottom-1.5 left-1.5 flex size-6 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black"
-                aria-label={`Make image ${index + 1} the cover`}
-                title="Make cover"
+                onClick={() => remove(url)}
+                className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black"
+                aria-label={`Remove image ${index + 1}`}
               >
-                <Star className="size-3.5" />
+                <X className="size-3.5" />
               </button>
+            </IconTooltip>
+
+            {index > 0 && (
+              <IconTooltip label={`Make image ${index + 1} the cover`}>
+                <button
+                  type="button"
+                  onClick={() => makeCover(url)}
+                  className="absolute bottom-1.5 left-1.5 flex size-6 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black"
+                  aria-label={`Make image ${index + 1} the cover`}
+                >
+                  <Star className="size-3.5" />
+                </button>
+              </IconTooltip>
             )}
           </li>
         ))}

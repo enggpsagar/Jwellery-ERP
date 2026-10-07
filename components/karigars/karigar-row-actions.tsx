@@ -84,14 +84,14 @@ export function KarigarRowActions({
     <>
       <div className="flex items-center gap-2">
         {showView && (
-          <Button variant="info" size="icon" asChild title="View artisan">
+          <Button variant="info" size="icon" asChild aria-label={`View ${karigarName}`}>
             <Link href={`/karigars/${karigarId}`}>
               <Eye className="h-4 w-4" />
             </Link>
           </Button>
         )}
 
-        <Button variant="edit" size="icon" asChild title="Edit artisan">
+        <Button variant="edit" size="icon" asChild aria-label={`Edit ${karigarName}`}>
           <Link href={`/karigars/${karigarId}/edit`}>
             <Pencil className="h-4 w-4" />
           </Link>
@@ -113,7 +113,7 @@ export function KarigarRowActions({
           variant="warning"
           size="icon"
           onClick={() => setConfirmDisable(true)}
-          title="Disable artisan"
+          aria-label={`Disable ${karigarName}`}
         >
           <ToggleRight className="h-4 w-4" />
         </Button>

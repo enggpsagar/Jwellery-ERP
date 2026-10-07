@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 export type PaymentMethodValue = {
   method: string
@@ -220,15 +221,17 @@ export function PaymentMethodFields({ value, onChange, maxAmount }: PaymentMetho
             <span className="flex-1 truncate text-xs text-muted-foreground">
               {attachmentName}
             </span>
-            <button
-              type="button"
-              onClick={() => onChange({ attachmentUrl: "" })}
-              className="text-muted-foreground hover:text-foreground"
-              title="Remove attachment"
-            >
-              <X className="h-3.5 w-3.5" />
-              <span className="sr-only">Remove attachment</span>
-            </button>
+            <IconTooltip label="Remove attachment">
+              <button
+                type="button"
+                onClick={() => onChange({ attachmentUrl: "" })}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Remove attachment"
+              >
+                <X className="h-3.5 w-3.5" />
+                <span className="sr-only">Remove attachment</span>
+              </button>
+            </IconTooltip>
           </div>
         )}
       </div>

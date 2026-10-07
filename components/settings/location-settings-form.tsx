@@ -22,6 +22,7 @@ import { ActiveBadge } from "@/components/shared/active-badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/providers/toast-provider";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 
 const initialState: LocationFormState = { success: false, message: "" };
 
@@ -150,15 +151,16 @@ export function LocationSettingsForm({ locations, states, canEdit }: LocationSet
                       disabled={togglingId === location.id}
                       onCheckedChange={(checked) => handleToggle(location.id, checked)}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(location.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
-                      aria-label={`Edit ${location.name}`}
-                      title="Edit location"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
+                    <IconTooltip label={`Edit ${location.name}`}>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(location.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                        aria-label={`Edit ${location.name}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    </IconTooltip>
                   </div>
                 ) : (
                   <ActiveBadge isActive={location.isActive} />

@@ -582,7 +582,7 @@ function RemoveButton({ onClick, disabled }: { onClick: () => void; disabled?: b
       variant="ghost"
       size="icon"
       className="h-9 w-9 justify-self-end text-muted-foreground hover:text-destructive"
-      title="Remove row"
+      aria-label="Remove row"
       disabled={disabled}
       onClick={onClick}
     >

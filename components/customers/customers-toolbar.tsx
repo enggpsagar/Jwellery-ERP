@@ -9,6 +9,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { CollapsibleSearch } from "@/components/shared/collapsible-search"
 import { exportCustomersToExcel } from "@/lib/actions/customer-actions"
 import { useToast } from "@/components/providers/toast-provider"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 type CustomersToolbarProps = {
   selectedCustomerIds: string[]
@@ -208,23 +209,24 @@ export function CustomersToolbar({
             className="w-[190px]"
           />
           {currentDateFrom || currentDateTo ? (
-            <button
-              type="button"
-              onClick={() => {
-                startTransition(() => {
-                  const params = new URLSearchParams(searchParams.toString())
-                  params.delete("dateFrom")
-                  params.delete("dateTo")
-                  params.set("page", "1")
-                  router.replace(`${pathname}?${params.toString()}`)
-                })
-              }}
-              className="text-muted-foreground hover:text-foreground"
-              title="Clear date range"
-              aria-label="Clear date range"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <IconTooltip label="Clear date range">
+              <button
+                type="button"
+                onClick={() => {
+                  startTransition(() => {
+                    const params = new URLSearchParams(searchParams.toString())
+                    params.delete("dateFrom")
+                    params.delete("dateTo")
+                    params.set("page", "1")
+                    router.replace(`${pathname}?${params.toString()}`)
+                  })
+                }}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Clear date range"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </IconTooltip>
           ) : null}
         </div>
       </div>

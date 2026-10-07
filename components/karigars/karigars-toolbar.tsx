@@ -19,6 +19,7 @@ import { exportKarigarsToExcel } from "@/lib/actions/karigar-actions"
 import { useToast } from "@/components/providers/toast-provider"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 type KarigarsToolbarProps = {
   selectedKarigarIds: string[]
@@ -214,23 +215,24 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
             className="w-[190px]"
           />
           {currentDateFrom || currentDateTo ? (
-            <button
-              type="button"
-              onClick={() => {
-                startTransition(() => {
-                  const params = new URLSearchParams(searchParams.toString())
-                  params.delete("dateFrom")
-                  params.delete("dateTo")
-                  params.set("page", "1")
-                  router.replace(`${pathname}?${params.toString()}`)
-                })
-              }}
-              className="text-muted-foreground hover:text-foreground"
-              title="Clear date range"
-              aria-label="Clear date range"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <IconTooltip label="Clear date range">
+              <button
+                type="button"
+                onClick={() => {
+                  startTransition(() => {
+                    const params = new URLSearchParams(searchParams.toString())
+                    params.delete("dateFrom")
+                    params.delete("dateTo")
+                    params.set("page", "1")
+                    router.replace(`${pathname}?${params.toString()}`)
+                  })
+                }}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Clear date range"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </IconTooltip>
           ) : null}
         </div>
       </div>

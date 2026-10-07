@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 /**
  * Shows a freshly-generated secret exactly once. There is nothing to
@@ -55,21 +56,22 @@ export function RevealOnceSecretDialog({
           <code className="flex-1 overflow-x-auto whitespace-nowrap font-mono text-sm">
             {secret}
           </code>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
-            onClick={handleCopy}
-            aria-label="Copy secret"
-            title="Copy secret"
-          >
-            {copied ? (
-              <Check className="h-4 w-4 text-green-600" />
-            ) : (
-              <Copy className="h-4 w-4" />
-            )}
-          </Button>
+          <IconTooltip label="Copy secret">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
+              onClick={handleCopy}
+              aria-label="Copy secret"
+            >
+              {copied ? (
+                <Check className="h-4 w-4 text-green-600" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </Button>
+          </IconTooltip>
         </div>
 
         <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">

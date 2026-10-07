@@ -90,6 +90,7 @@ import { AddCategoryTypeDialog } from "@/components/inventory/shared/add-categor
 import { LinkedProductDetails } from "@/components/inventory/shared/linked-product-details"
 import type { StockOptionProductDetails } from "@/lib/inventory/stock-option-details"
 import { stockPieceDrafts, stoneSellingRate, type LinkedStoneDetails } from "@/lib/inventory/stock-pick-rates"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 type CustomerOption = {
   id: string
@@ -2085,7 +2086,7 @@ export function InvoiceForm({
                           variant="secondary"
                           size="icon"
                           className="h-11 w-9 shrink-0 px-0"
-                          title="Add Metal Type"
+                          aria-label="Add Metal Type"
                           disabled={isLinked}
                           onClick={() => setAddMetalForKey(item.key)}
                         >
@@ -2124,7 +2125,7 @@ export function InvoiceForm({
                           variant="secondary"
                           size="icon"
                           className="h-11 w-9 shrink-0 px-0"
-                          title="Add Purity"
+                          aria-label="Add Purity"
                           disabled={isLinked || !item.metalTypeId}
                           onClick={() => setAddPurityForKey(item.key)}
                         >
@@ -2153,15 +2154,17 @@ export function InvoiceForm({
                   Every input here is the exact same state/handler as the
                   Details region below, just relocated. */}
               <div className={`grid ${compactRowGridCols} items-start gap-2 p-2`}>
-                <button
-                  type="button"
-                  onClick={() => toggleExpanded(item.key)}
-                  className="mt-1.5 text-muted-foreground hover:text-foreground"
-                  aria-label={isExpanded ? "Collapse line item details" : "Expand line item details"}
-                  aria-expanded={isExpanded}
-                >
-                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </button>
+                <IconTooltip label={isExpanded ? "Collapse line item details" : "Expand line item details"}>
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(item.key)}
+                    className="mt-1.5 text-muted-foreground hover:text-foreground"
+                    aria-label={isExpanded ? "Collapse line item details" : "Expand line item details"}
+                    aria-expanded={isExpanded}
+                  >
+                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </button>
+                </IconTooltip>
 
                 <div className="space-y-1">
                   {/* Search-and-select is the default way onto this line —
@@ -2179,15 +2182,16 @@ export function InvoiceForm({
                         className="flex-1"
                         onChange={(e) => updateItem(item.key, { itemName: e.target.value })}
                       />
-                      <button
-                        type="button"
-                        onClick={() => updateItem(item.key, { stockLinkDecided: false })}
-                        className="shrink-0 text-muted-foreground hover:text-foreground"
-                        aria-label="Search a stock item instead"
-                        title="Search a stock item instead"
-                      >
-                        <Search className="h-4 w-4" />
-                      </button>
+                      <IconTooltip label="Search a stock item instead">
+                        <button
+                          type="button"
+                          onClick={() => updateItem(item.key, { stockLinkDecided: false })}
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                          aria-label="Search a stock item instead"
+                        >
+                          <Search className="h-4 w-4" />
+                        </button>
+                      </IconTooltip>
                     </div>
                   ) : (
                     <StockItemSelect
@@ -2344,14 +2348,16 @@ export function InvoiceForm({
 
                 <div className="flex justify-center pt-1">
                   {items.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.key)}
-                      className="text-red-600 hover:text-red-700"
-                      aria-label="Remove item"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <IconTooltip label="Remove item">
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.key)}
+                        className="text-red-600 hover:text-red-700"
+                        aria-label="Remove item"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </IconTooltip>
                   )}
                 </div>
               </div>
@@ -2440,7 +2446,7 @@ export function InvoiceForm({
                                 variant="secondary"
                                 size="icon"
                                 className="h-11 w-9 shrink-0 px-0"
-                                title="Add Category"
+                                aria-label="Add Category"
                                 onClick={() => setAddCategoryForKey(item.key)}
                               >
                                 <Plus className="h-4 w-4" />
@@ -2475,7 +2481,7 @@ export function InvoiceForm({
                                 variant="secondary"
                                 size="icon"
                                 className="h-11 w-9 shrink-0 px-0"
-                                title="Add Type"
+                                aria-label="Add Type"
                                 disabled={!item.categoryId}
                                 onClick={() => setAddTypeForKey(item.key)}
                               >

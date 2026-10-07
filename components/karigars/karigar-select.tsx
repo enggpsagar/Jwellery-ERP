@@ -123,7 +123,7 @@ export function KarigarSelect({
             variant="secondary"
             size="icon"
             className="h-11 w-9 shrink-0 px-0"
-            title="Add Artisan"
+            aria-label="Add Artisan"
             onClick={() => setAddOpen(true)}
           >
             <Plus className="h-4 w-4" />

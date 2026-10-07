@@ -51,6 +51,7 @@ import {
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { SidebarCounts } from "@/lib/actions/sidebar-actions";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 
 type CountKey = keyof SidebarCounts;
 
@@ -336,16 +337,17 @@ function SidebarNavItem({
             QUICK_ADD_HIGHLIGHT_CLASS) so the quick-add action is easy to
             notice — this item has no section chevron to share the row with. */}
         {item.quickAddHref && (
-          <SidebarMenuAction asChild className={QUICK_ADD_HIGHLIGHT_CLASS}>
-            <Link
-              href={item.quickAddHref}
-              prefetch={false}
-              title={`Add new ${item.title}`}
-              aria-label={`Add new ${item.title}`}
-            >
-              <Plus className="h-4 w-4" />
-            </Link>
-          </SidebarMenuAction>
+          <IconTooltip label={`Add new ${item.title}`}>
+            <SidebarMenuAction asChild className={QUICK_ADD_HIGHLIGHT_CLASS}>
+              <Link
+                href={item.quickAddHref}
+                prefetch={false}
+                aria-label={`Add new ${item.title}`}
+              >
+                <Plus className="h-4 w-4" />
+              </Link>
+            </SidebarMenuAction>
+          </IconTooltip>
         )}
       </SidebarMenuItem>
     );
@@ -371,20 +373,22 @@ function SidebarNavItem({
       {/* A real button beside the link rather than inside it: the chevron
           expands and collapses, and must not navigate. Nesting it in the
           <Link> would also be invalid HTML. */}
-      <SidebarMenuAction
-        // Closing sets null rather than undefined: undefined would fall back
-        // to the route and immediately re-open the section you are inside.
-        onClick={() => setOpenMenu(open ? null : item.title)}
-        aria-expanded={open}
-        aria-label={`${open ? "Collapse" : "Expand"} ${item.title}`}
-        className={NAV_CONTROL_CLASS}
-      >
-        <ChevronRight
-          className={`h-4 w-4 shrink-0 transition-transform ${
-            open ? "rotate-90" : ""
-          }`}
-        />
-      </SidebarMenuAction>
+      <IconTooltip label={`${open ? "Collapse" : "Expand"} ${item.title}`}>
+        <SidebarMenuAction
+          // Closing sets null rather than undefined: undefined would fall back
+          // to the route and immediately re-open the section you are inside.
+          onClick={() => setOpenMenu(open ? null : item.title)}
+          aria-expanded={open}
+          aria-label={`${open ? "Collapse" : "Expand"} ${item.title}`}
+          className={NAV_CONTROL_CLASS}
+        >
+          <ChevronRight
+            className={`h-4 w-4 shrink-0 transition-transform ${
+              open ? "rotate-90" : ""
+            }`}
+          />
+        </SidebarMenuAction>
+      </IconTooltip>
 
       {open && (
         <SidebarMenuSub>
@@ -407,16 +411,17 @@ function SidebarNavItem({
                   "+" icons must look and behave identically everywhere they
                   appear, not just within one section. */}
               {subItem.quickAddHref && (
-                <SidebarMenuAction asChild className={NAV_CONTROL_CLASS}>
-                  <Link
-                    href={subItem.quickAddHref}
-                    prefetch={false}
-                    title={`Add new ${subItem.title}`}
-                    aria-label={`Add new ${subItem.title}`}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Link>
-                </SidebarMenuAction>
+                <IconTooltip label={`Add new ${subItem.title}`}>
+                  <SidebarMenuAction asChild className={NAV_CONTROL_CLASS}>
+                    <Link
+                      href={subItem.quickAddHref}
+                      prefetch={false}
+                      aria-label={`Add new ${subItem.title}`}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Link>
+                  </SidebarMenuAction>
+                </IconTooltip>
               )}
             </SidebarMenuSubItem>
           ))}

@@ -22,6 +22,7 @@ import { PartyGstTypeSelect } from "@/components/shared/party-gst-type-select"
 import { AddMetalInlineDialog } from "@/components/karigars/add-metal-inline-dialog"
 import { useToast } from "@/components/providers/toast-provider"
 import type { GstScheme } from "@prisma/client"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 type StateItem = { id: string; name: string }
 type CityItem = { id: string; name: string }
@@ -204,28 +205,30 @@ export function KarigarForm({
           left-aligned in a bare row. Click/hover the avatar itself to
           upload, same treatment as the Add/Edit User form. */}
       <div className="flex flex-col items-center gap-3">
-        <button
-          type="button"
-          className="group relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          disabled={uploadingPhoto}
-          onClick={() => photoInputRef.current?.click()}
-          title="Upload photo"
-        >
-          <Avatar className="h-24 w-24 border-2 shadow-sm">
-            <AvatarImage src={imageUrl || ""} />
-            <AvatarFallback className="text-2xl" style={avatarColor(karigar?.name).style}>
-              {initialsOf(karigar?.name)}
-            </AvatarFallback>
-          </Avatar>
+        <IconTooltip label="Upload photo">
+          <button
+            type="button"
+            className="group relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            disabled={uploadingPhoto}
+            onClick={() => photoInputRef.current?.click()}
+            aria-label="Upload photo"
+          >
+            <Avatar className="h-24 w-24 border-2 shadow-sm">
+              <AvatarImage src={imageUrl || ""} />
+              <AvatarFallback className="text-2xl" style={avatarColor(karigar?.name).style}>
+                {initialsOf(karigar?.name)}
+              </AvatarFallback>
+            </Avatar>
 
-          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-            {uploadingPhoto ? (
-              <Loader className="h-5 w-5 text-white" />
-            ) : (
-              <Camera className="h-5 w-5 text-white" />
-            )}
-          </span>
-        </button>
+            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+              {uploadingPhoto ? (
+                <Loader className="h-5 w-5 text-white" />
+              ) : (
+                <Camera className="h-5 w-5 text-white" />
+              )}
+            </span>
+          </button>
+        </IconTooltip>
 
         <input
           ref={photoInputRef}

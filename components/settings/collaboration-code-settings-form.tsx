@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 /**
  * Store Owner's side of Store Owner Authorization — the code shown here is
@@ -114,21 +115,22 @@ export function CollaborationCodeSettingsForm({
               <code className="flex-1 font-mono text-lg font-semibold tracking-wider">
                 {settings.code}
               </code>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
-                onClick={handleCopy}
-                aria-label="Copy code"
-                title="Copy code"
-              >
-                {copied ? (
-                  <Check className="h-4 w-4 text-green-600" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </Button>
+              <IconTooltip label="Copy code">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="border-transparent bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-700"
+                  onClick={handleCopy}
+                  aria-label="Copy code"
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              </IconTooltip>
             </div>
           ) : (
             <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">

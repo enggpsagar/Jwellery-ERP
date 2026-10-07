@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 type UserFormDialogUser = {
   id: string
@@ -342,28 +343,30 @@ export function UserFormDialog({
           itself to upload; Remove stays an explicit button since it isn't
           something hovering the avatar should also mean. */}
       <div className="flex flex-col items-center gap-3">
-        <button
-          type="button"
-          className="group relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          disabled={uploadingPhoto}
-          onClick={() => photoInputRef.current?.click()}
-          title="Upload photo"
-        >
-          <Avatar className="h-24 w-24 border-2 shadow-sm">
-            <AvatarImage src={imageUrl || ""} />
-            <AvatarFallback className="text-2xl" style={avatarColor(user?.name).style}>
-              {initialsOf(user?.name)}
-            </AvatarFallback>
-          </Avatar>
+        <IconTooltip label="Upload photo">
+          <button
+            type="button"
+            className="group relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            disabled={uploadingPhoto}
+            onClick={() => photoInputRef.current?.click()}
+            aria-label="Upload photo"
+          >
+            <Avatar className="h-24 w-24 border-2 shadow-sm">
+              <AvatarImage src={imageUrl || ""} />
+              <AvatarFallback className="text-2xl" style={avatarColor(user?.name).style}>
+                {initialsOf(user?.name)}
+              </AvatarFallback>
+            </Avatar>
 
-          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-            {uploadingPhoto ? (
-              <Loader className="h-5 w-5 text-white" />
-            ) : (
-              <Camera className="h-5 w-5 text-white" />
-            )}
-          </span>
-        </button>
+            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+              {uploadingPhoto ? (
+                <Loader className="h-5 w-5 text-white" />
+              ) : (
+                <Camera className="h-5 w-5 text-white" />
+              )}
+            </span>
+          </button>
+        </IconTooltip>
 
         <input
           ref={photoInputRef}

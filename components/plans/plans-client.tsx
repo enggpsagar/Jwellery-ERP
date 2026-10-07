@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/providers/toast-provider";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 
 const initialState: PlanFormState = { success: false, message: "" };
 
@@ -97,15 +98,16 @@ export function PlansClient({ plans }: { plans: PlanRow[] }) {
                       disabled={togglingId === plan.id}
                       onCheckedChange={(checked) => handleToggle(plan.id, checked)}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(plan.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
-                      aria-label={`Edit ${plan.name}`}
-                      title="Edit plan"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
+                    <IconTooltip label={`Edit ${plan.name}`}>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(plan.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                        aria-label={`Edit ${plan.name}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    </IconTooltip>
                   </div>
                 </div>
               ),

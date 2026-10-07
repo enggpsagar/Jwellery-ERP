@@ -60,13 +60,13 @@ export function StockRowActions({ stockId, stockCode }: StockRowActionsProps) {
   return (
     <>
       <div className="flex items-center gap-2">
-        <Button variant="info" size="icon" asChild title="View stock item">
+        <Button variant="info" size="icon" asChild aria-label={`View ${stockCode}`}>
           <Link href={`/inventory/stock/${stockId}`}>
             <Eye className="h-4 w-4" />
           </Link>
         </Button>
 
-        <Button variant="edit" size="icon" asChild title="Edit stock item">
+        <Button variant="edit" size="icon" asChild aria-label={`Edit ${stockCode}`}>
           <Link href={`/inventory/stock/${stockId}/edit`}>
             <Pencil className="h-4 w-4" />
           </Link>

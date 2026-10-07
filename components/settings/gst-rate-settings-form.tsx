@@ -21,6 +21,7 @@ import { ActiveBadge } from "@/components/shared/active-badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/providers/toast-provider";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 
 const initialState: GstRateFormState = { success: false, message: "" };
 
@@ -136,15 +137,16 @@ export function GstRateSettingsForm({ rates, canEdit }: GstRateSettingsFormProps
                       disabled={togglingId === rate.id}
                       onCheckedChange={(checked) => handleToggle(rate.id, checked)}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(rate.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
-                      aria-label={`Edit ${rate.name}`}
-                      title="Edit GST rate"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
+                    <IconTooltip label={`Edit ${rate.name}`}>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(rate.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition hover:bg-muted"
+                        aria-label={`Edit ${rate.name}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    </IconTooltip>
                   </div>
                 ) : (
                   <ActiveBadge isActive={rate.isActive} />

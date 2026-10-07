@@ -1162,7 +1162,7 @@ export function QuotationForm({
                       variant="secondary"
                       size="icon"
                       className="w-9 shrink-0 px-0"
-                      title="Add Metal Type"
+                      aria-label="Add Metal Type"
                       disabled={isLinked}
                       onClick={() => setAddMetalForKey(item.key)}
                     >
@@ -1201,7 +1201,7 @@ export function QuotationForm({
                       variant="secondary"
                       size="icon"
                       className="w-9 shrink-0 px-0"
-                      title="Add Purity"
+                      aria-label="Add Purity"
                       disabled={isLinked || !item.metalTypeId}
                       onClick={() => setAddPurityForKey(item.key)}
                     >

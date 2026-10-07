@@ -56,6 +56,7 @@ import { useToast } from "@/components/providers/toast-provider";
 import { MetalCategoryImportDialog, MetalCategoryExportButton } from "@/components/settings/metal-category-import-dialog";
 import { StoneTypeImportDialog, StoneTypeExportButton } from "@/components/settings/stone-type-import-dialog";
 import { finenessMismatch } from "@/lib/purity-fineness-check";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 // Note: StoneTypesSection below still uses the plain Select above for the
 // *parent stone* picker (unchanged) — only the child Stone Type value
 // itself moved from a fixed Select to a free-text Input, mirroring
@@ -347,35 +348,38 @@ function MetalsSection({
                       disabled={togglingId === metal.id}
                       onCheckedChange={(checked) => handleToggle(metal.id, checked)}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(metal.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                      aria-label={`Edit ${metal.name}`}
-                      title="Edit metal"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMoveToStones(metal.id, metal.name)}
-                      disabled={movingId === metal.id}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-amber-50 text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-950/60"
-                      aria-label={`Move ${metal.name} to Stones`}
-                      title="Move to Stones (e.g. Diamond added as a metal by mistake)"
-                    >
-                      <ArrowRightLeft className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(metal.id, metal.name)}
-                      disabled={deletingId === metal.id}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                      aria-label={`Delete ${metal.name}`}
-                      title="Delete metal (only if unused)"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <IconTooltip label={`Edit ${metal.name}`}>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(metal.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                        aria-label={`Edit ${metal.name}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    </IconTooltip>
+                    <IconTooltip label={`Move ${metal.name} to Stones (e.g. Diamond added as a metal by mistake)`}>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveToStones(metal.id, metal.name)}
+                        disabled={movingId === metal.id}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-amber-50 text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-950/60"
+                        aria-label={`Move ${metal.name} to Stones`}
+                      >
+                        <ArrowRightLeft className="h-4 w-4" />
+                      </button>
+                    </IconTooltip>
+                    <IconTooltip label={`Delete ${metal.name} (only if unused)`}>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(metal.id, metal.name)}
+                        disabled={deletingId === metal.id}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                        aria-label={`Delete ${metal.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </IconTooltip>
                   </div>
                 ) : (
                   <ActiveBadge isActive={metal.isActive} />
@@ -611,25 +615,27 @@ function StonesSection({
                       disabled={togglingId === stone.id}
                       onCheckedChange={(checked) => handleToggle(stone.id, checked)}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(stone.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                      aria-label={`Edit ${stone.name}`}
-                      title="Edit stone"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(stone.id, stone.name)}
-                      disabled={deletingId === stone.id}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                      aria-label={`Delete ${stone.name}`}
-                      title="Delete stone (only if unused)"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <IconTooltip label={`Edit ${stone.name}`}>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(stone.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                        aria-label={`Edit ${stone.name}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    </IconTooltip>
+                    <IconTooltip label={`Delete ${stone.name} (only if unused)`}>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(stone.id, stone.name)}
+                        disabled={deletingId === stone.id}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                        aria-label={`Delete ${stone.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </IconTooltip>
                   </div>
                 ) : (
                   <ActiveBadge isActive={stone.isActive} />
@@ -910,25 +916,27 @@ function StoneTypesSection({
                           disabled={togglingId === option.id}
                           onCheckedChange={(checked) => handleToggle(option.id, checked)}
                         />
-                        <button
-                          type="button"
-                          onClick={() => setEditingId(option.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                          aria-label={`Edit ${option.name}`}
-                          title="Edit Stone Type"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(option.id, option.name)}
-                          disabled={deletingId === option.id}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                          aria-label={`Delete ${option.name}`}
-                          title="Delete Stone Type (only if unused)"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <IconTooltip label={`Edit ${option.name}`}>
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(option.id)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                            aria-label={`Edit ${option.name}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        </IconTooltip>
+                        <IconTooltip label={`Delete ${option.name} (only if unused)`}>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(option.id, option.name)}
+                            disabled={deletingId === option.id}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                            aria-label={`Delete ${option.name}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </IconTooltip>
                       </div>
                     ) : (
                       <ActiveBadge isActive={option.isActive} />
@@ -1285,25 +1293,27 @@ function PuritiesSection({
                           disabled={togglingId === option.id}
                           onCheckedChange={(checked) => handleToggle(option.id, checked)}
                         />
-                        <button
-                          type="button"
-                          onClick={() => setEditingId(option.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                          aria-label={`Edit ${option.label}`}
-                          title="Edit Purity"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(option.id, option.label)}
-                          disabled={deletingId === option.id}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                          aria-label={`Delete ${option.label}`}
-                          title="Delete Purity (only if unused)"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <IconTooltip label={`Edit ${option.label}`}>
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(option.id)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                            aria-label={`Edit ${option.label}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        </IconTooltip>
+                        <IconTooltip label={`Delete ${option.label} (only if unused)`}>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(option.id, option.label)}
+                            disabled={deletingId === option.id}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                            aria-label={`Delete ${option.label}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </IconTooltip>
                       </div>
                     ) : (
                       <ActiveBadge isActive={option.isActive} />
@@ -1565,25 +1575,27 @@ function CategoriesSection({
                         disabled={togglingId === category.id}
                         onCheckedChange={(checked) => handleToggle(category.id, checked)}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(category.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                        aria-label={`Edit ${category.name}`}
-                        title="Edit category"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(category.id, category.name)}
-                        disabled={deletingId === category.id}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                        aria-label={`Delete ${category.name}`}
-                        title="Delete category (only if unused)"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <IconTooltip label={`Edit ${category.name}`}>
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(category.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                          aria-label={`Edit ${category.name}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      </IconTooltip>
+                      <IconTooltip label={`Delete ${category.name} (only if unused)`}>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(category.id, category.name)}
+                          disabled={deletingId === category.id}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                          aria-label={`Delete ${category.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </IconTooltip>
                     </div>
                   ) : (
                     <ActiveBadge isActive={category.isActive} />
@@ -1915,25 +1927,27 @@ function TypesSection({
                           disabled={togglingId === type.id}
                           onCheckedChange={(checked) => handleToggle(type.id, checked)}
                         />
-                        <button
-                          type="button"
-                          onClick={() => setEditingId(type.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
-                          aria-label={`Edit ${type.name}`}
-                          title="Edit type"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(type.id, type.name)}
-                          disabled={deletingId === type.id}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
-                          aria-label={`Delete ${type.name}`}
-                          title="Delete type (only if unused)"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <IconTooltip label={`Edit ${type.name}`}>
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(type.id)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
+                            aria-label={`Edit ${type.name}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        </IconTooltip>
+                        <IconTooltip label={`Delete ${type.name} (only if unused)`}>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(type.id, type.name)}
+                            disabled={deletingId === type.id}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-destructive text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50"
+                            aria-label={`Delete ${type.name}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </IconTooltip>
                       </div>
                     ) : (
                       <ActiveBadge isActive={type.isActive} />

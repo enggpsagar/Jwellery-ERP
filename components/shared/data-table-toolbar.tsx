@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useToast } from "@/components/providers/toast-provider"
 import { downloadBase64File } from "@/lib/download-file"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 export type DataTableExportFormat = "csv" | "xlsx" | "pdf"
 
@@ -457,23 +458,24 @@ export function DataTableToolbar({
               className="w-[190px]"
             />
             {currentDateFrom || currentDateTo ? (
-              <button
-                type="button"
-                onClick={() => {
-                  startTransition(() => {
-                    const params = new URLSearchParams(searchParams.toString())
-                    params.delete("dateFrom")
-                    params.delete("dateTo")
-                    params.set("page", "1")
-                    router.replace(`${pathname}?${params.toString()}`)
-                  })
-                }}
-                className="text-muted-foreground hover:text-foreground"
-                title="Clear date range"
-                aria-label="Clear date range"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <IconTooltip label="Clear date range">
+                <button
+                  type="button"
+                  onClick={() => {
+                    startTransition(() => {
+                      const params = new URLSearchParams(searchParams.toString())
+                      params.delete("dateFrom")
+                      params.delete("dateTo")
+                      params.set("page", "1")
+                      router.replace(`${pathname}?${params.toString()}`)
+                    })
+                  }}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Clear date range"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </IconTooltip>
             ) : null}
           </div>
         ) : null}

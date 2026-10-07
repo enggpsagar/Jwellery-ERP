@@ -168,7 +168,7 @@ test("an item bought from a customer can be gold + diamond, metals at pure weigh
   // Gold 22K 10 g × ₹7,000 pure → 9.16 g × 7,000 = ₹64,120; drop the
   // starter silver row; a 0.5 ct diamond the shop pays ₹20,000 for.
   await fillMetalRow(page, "exchange-piece", 0, "Gold", /^22K/, "10", "7000")
-  await section.getByTestId("exchange-piece-metal-row").nth(1).getByTitle("Remove row").click()
+  await section.getByTestId("exchange-piece-metal-row").nth(1).getByRole("button", { name: "Remove row", exact: true }).click()
   await pick(page, section.getByTestId("exchange-piece-stone").first(), "Diamond")
   await section.getByTestId("exchange-piece-carat").first().fill("0.5")
   await section.getByTestId("exchange-piece-stone-value").first().fill("20000")

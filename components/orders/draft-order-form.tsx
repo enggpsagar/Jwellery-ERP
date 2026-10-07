@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { RequiredMark } from "@/components/shared/required-mark"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 const initialState: DraftOrderFormState = { success: false, message: "" }
 
@@ -414,14 +415,17 @@ export function DraftOrderForm({
                     Item {index + 1}
                   </span>
                   {items.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeItem(item.key)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <IconTooltip label={`Remove item ${index + 1}`}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeItem(item.key)}
+                        aria-label={`Remove item ${index + 1}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </IconTooltip>
                   )}
                 </div>
 

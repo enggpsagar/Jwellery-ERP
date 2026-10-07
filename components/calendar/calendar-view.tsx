@@ -8,6 +8,7 @@ import { toggleReminderDone, deleteReminder, type CalendarEvent } from "@/lib/ac
 import { useToast } from "@/components/providers/toast-provider"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
@@ -232,14 +233,16 @@ export function CalendarView({ year, month, events, selectedDate, onSelectDate }
                     />
                     Done
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(event)}
-                    className="inline-flex h-5 w-5 items-center justify-center rounded bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    title="Delete reminder"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
+                  <IconTooltip label="Delete reminder">
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(event)}
+                      className="inline-flex h-5 w-5 items-center justify-center rounded bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      aria-label="Delete reminder"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </IconTooltip>
                 </div>
               )}
             </div>

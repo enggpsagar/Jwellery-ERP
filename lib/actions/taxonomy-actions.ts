@@ -9,6 +9,7 @@ import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
 import { sellingRatesTag } from "@/lib/cache-tags";
+import { findDuplicatePurity, purityLabelKey } from "@/lib/purity-label";
 import { earlierRowHint, namesAsCandidates, suggestFrom } from "@/lib/import-suggest";
 import { parseExcelWorkbook } from "@/lib/excel-export";
 import { buildMultiSheetTemplate } from "@/lib/excel-multi-sheet-template";
@@ -765,19 +766,20 @@ export async function upsertStoreMetalPurity(
 
     if (!finenessPercentRaw) finenessPercent = defaultFinenessForLabel(metal.name, label);
 
-    const existing = await prisma.storeMetalPurity.findFirst({
-      where: { storeMetalId, label, NOT: id ? { id } : undefined },
-      select: { id: true },
+    // "18" and "18K" are the same purity — compare by purityLabelKey, not
+    // the raw label, so a near-twin can't be added.
+    const siblings = await prisma.storeMetalPurity.findMany({
+      where: { storeMetalId },
+      select: { id: true, label: true },
     });
+    const existing = findDuplicatePurity(siblings, label, id || undefined);
 
     if (existing) {
-      return {
-        success: false,
-        message: "A purity with this label already exists for this metal",
-        errors: {
-          label: ["A purity with this label already exists for this metal"],
-        },
-      };
+      const message =
+        existing.label === label
+          ? "A purity with this label already exists for this metal"
+          : `This is the same purity as "${existing.label}", which already exists — use or edit that one`;
+      return { success: false, message, errors: { label: [message] } };
     }
 
     let savedId = id;
@@ -2270,7 +2272,9 @@ export async function importMetalsAndCategoriesFromExcel(
         continue;
       }
 
-      const pairKey = `${metalKey}::${label.toLowerCase()}`;
+      // purityLabelKey: "18" and "18K" are one purity, in the file and
+      // against what's saved (an "18" row updates a saved "18K").
+      const pairKey = `${metalKey}::${purityLabelKey(label)}`;
       if (seenPurities.has(pairKey)) {
         errors.push(`Purities Row ${line}: "${label}" is duplicated for "${metalName}" in this sheet`);
         continue;
@@ -2279,7 +2283,7 @@ export async function importMetalsAndCategoriesFromExcel(
 
       // @@unique([storeMetalId, label]) is case-sensitive; match the saved
       // label ignoring case so "22k" updates "22K" instead of adding a twin.
-      const existing = existingMetal?.purities.find((p) => p.label.trim().toLowerCase() === label.toLowerCase()) ?? null;
+      const existing = existingMetal?.purities.find((p) => purityLabelKey(p.label) === purityLabelKey(label)) ?? null;
 
       const skuCode = taxonomyImportCell(row, "SKU Code") || existing?.skuCode || "";
       if (!skuCode) rowErrors.push("SKU Code is required");

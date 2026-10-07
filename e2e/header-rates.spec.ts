@@ -150,3 +150,20 @@ test("rates chip is cached, and a Settings change shows on it at once", async ({
     await db().sellingRateEntry.deleteMany({ where: { storeId, refId: purity.id, sellingPrice: 6200 } })
   }
 })
+
+/** "22" / "22 kt" are the same purity as a saved "22K": the rates chip refuses the twin. */
+test("a purity that duplicates an existing one under another spelling is refused", async ({ page }) => {
+  const storeId = await demoStoreId()
+  const gold = await db().storeMetal.findFirstOrThrow({ where: { storeId, name: "Gold" }, select: { id: true } })
+  const before = await db().storeMetalPurity.count({ where: { storeMetalId: gold.id } })
+
+  await page.goto("/dashboard")
+  await page.waitForLoadState("networkidle")
+  await page.getByRole("button", { name: "Today's selling rates" }).click()
+  const goldSection = page.getByText("Gold (per g)").locator("..")
+  await goldSection.getByRole("button", { name: "Add purity" }).click()
+  await page.getByLabel("New purity for Gold").fill("22 kt")
+  await page.getByRole("button", { name: "Add", exact: true }).click()
+  await expect(page.getByText(/Gold 22K already exists/)).toBeVisible()
+  expect(await db().storeMetalPurity.count({ where: { storeMetalId: gold.id } })).toBe(before)
+})

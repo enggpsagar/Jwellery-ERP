@@ -14,6 +14,7 @@ import {
   type SellingRateKind,
 } from "@/lib/selling-rates";
 import { defaultFinenessForLabel } from "@/lib/purity-fineness-check";
+import { findDuplicatePurity } from "@/lib/purity-label";
 
 export type SellingRateUpdate = {
   kind: SellingRateKind;
@@ -165,11 +166,11 @@ export async function addSellingRateOption(input: {
       if (!metal.hasPurity) {
         return `${metal.name} has no purities — turn on Has Purity in Settings to price it by purity.`;
       }
-      const clash = await tx.storeMetalPurity.findFirst({
-        where: { storeMetalId: metal.id, label: { equals: label, mode: "insensitive" } },
-        select: { id: true },
-      });
-      if (clash) return `${metal.name} ${label} already exists.`;
+      const clash = findDuplicatePurity(
+        await tx.storeMetalPurity.findMany({ where: { storeMetalId: metal.id }, select: { id: true, label: true } }),
+        label,
+      );
+      if (clash) return `${metal.name} ${clash.label} already exists${clash.label === label ? "" : ` (same purity as ${label})`}.`;
       const last = await tx.storeMetalPurity.aggregate({ where: { storeMetalId: metal.id }, _max: { sortOrder: true } });
       const skuCode = (label.replace(/[^0-9A-Za-z]/g, "").toUpperCase() || "P").slice(0, 20);
       const created = await tx.storeMetalPurity.create({

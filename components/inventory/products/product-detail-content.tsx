@@ -8,8 +8,8 @@ import type { getProductById } from "@/lib/actions/inventory/product-actions"
 type Product = NonNullable<Awaited<ReturnType<typeof getProductById>>>
 
 /**
- * The body of a product's detail view — Basic Information / Metal Details /
- * Default Charges / Weights / Product Details / Additional Information.
+ * The body of a product's detail view — Basic Information / Metal & Weights /
+ * Default Charges / Stone Details / Product Details / Additional Information.
  * Shared between the standalone /inventory/products/[id] page and the
  * inline detail pane on the Products list itself (ProductDetailPanel), so
  * the two can never drift apart. Every field captured on Add Product
@@ -121,8 +121,10 @@ export function ProductDetailContent({
         )}
       </Section>
 
-      {hasMetalDetails ? (
-        <Section title="Metal Details">
+      {/* Metal and weights in one card — two half-empty cards wasted the
+          space and split facts that are read together. */}
+      {hasMetalDetails || hasWeights ? (
+        <Section title={hasMetalDetails ? (hasWeights ? "Metal & Weights" : "Metal Details") : "Weights"}>
           {hasMetalComponents ? (
             product.metalComponents!.map((component, index) => (
               <Field
@@ -146,6 +148,9 @@ export function ProductDetailContent({
               />
             </>
           )}
+          <Field label="Gross Weight" value={grossWeight} />
+          <Field label="Stone Weight" value={stoneWeight} />
+          <Field label="Net Weight" value={netWeight} />
         </Section>
       ) : null}
 
@@ -176,14 +181,6 @@ export function ProductDetailContent({
         </Section>
       ) : null}
 
-      {hasWeights ? (
-        <Section title="Weights">
-          <Field label="Gross Weight" value={grossWeight} />
-          <Field label="Stone Weight" value={stoneWeight} />
-          <Field label="Net Weight" value={netWeight} />
-        </Section>
-      ) : null}
-
       {hasStoneDetails ? (
         <Section title="Stone Details">
           {hasStoneComponents ? (
@@ -200,12 +197,12 @@ export function ProductDetailContent({
               return (
                 <div
                   key={component.id}
-                  className={`sm:col-span-2 lg:col-span-3 ${index > 0 ? "border-t pt-6" : ""}`}
+                  className={`w-full ${index > 0 ? "border-t pt-6" : ""}`}
                 >
                   {product.stoneComponents!.length > 1 ? (
                     <p className="mb-4 text-sm font-semibold">Stone {index + 1}</p>
                   ) : null}
-                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="flex flex-wrap gap-x-10 gap-y-6">
                     <Field label="Stone" value={component.stoneMetalTypeName} />
                     <Field label="Stone Type" value={component.stoneTypeNames} />
                     <Field label="Clarity" value={component.clarity} />
@@ -268,7 +265,7 @@ export function ProductDetailContent({
                 <span className="whitespace-pre-wrap">{product.description}</span>
               ) : null
             }
-            className="sm:col-span-2 lg:col-span-3"
+            className="w-full"
           />
           <Field
             label="Internal Notes"
@@ -277,7 +274,7 @@ export function ProductDetailContent({
                 <span className="whitespace-pre-wrap">{product.notes}</span>
               ) : null
             }
-            className="sm:col-span-2 lg:col-span-3"
+            className="w-full"
           />
         </Section>
       ) : null}
@@ -298,7 +295,7 @@ function Field({
   if (empty) return null
 
   return (
-    <div className={className}>
+    <div className={`min-w-[8rem] max-w-full ${className}`}>
       <p className="text-xs uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
@@ -317,7 +314,10 @@ function Section({
   return (
     <div className="rounded-xl border bg-card p-6">
       <h3 className="mb-6 text-lg font-semibold">{title}</h3>
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
+      {/* Fields take the width their content needs and wrap onto the next
+          line only when the card is full — a fixed 3-column grid squeezed
+          "Gold (18K) — 3.780 g net" into two lines next to empty space. */}
+      <div className="flex flex-wrap gap-x-10 gap-y-6">{children}</div>
     </div>
   )
 }
